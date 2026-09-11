@@ -1,0 +1,49 @@
+# Production VPS. Rien n'est exposé hors du réseau Docker sauf l'application,
+# en loopback, derrière Nginx.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data
+    env_file: .env.minio
+    volumes:
+      - miniodata:/data
+    networks: [internal]
+
+  app:
+    image: ghcr.io/${GH_OWNER}/immipro:${TAG}
+    restart: unless-stopped
+    env_file: .env.app
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [internal]
+
+  worker:
+    image: ghcr.io/${GH_OWNER}/immipro:${TAG}
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    env_file: .env.app
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal]
+
+networks:
+  internal: { driver: bridge }
+
+volumes:
+  pgdata:
+  miniodata:

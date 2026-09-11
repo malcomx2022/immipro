@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════
+// Référentiel réglementaire versionné
+// ═══════════════════════════════════════════════════════════
+
+enum VisaCategory { ETUDES EMPLOI FAMILLE RECHERCHE_EMPLOI }
+
+/// Niveau de confiance de la source. Pilote l'affichage côté utilisateur
+/// et conditionne la publication (INV-4).
+enum SourceTier { OFFICIEL INSTITUTIONNEL SECONDAIRE }
+
+enum RuleStatus { DRAFT PUBLISHED ARCHIVED }
+
+model VisaRule {
+  id            String       @id @default(uuid())
+  countryCode   String       @db.Char(2)
+  visaType      String
+  category      VisaCategory
+  version       Int
+  effectiveFrom DateTime     @db.Date
+  effectiveTo   DateTime?    @db.Date
+  rules         Json
+  schemaVersion Int          @default(1)
+  sourceUrl     String
+  sourceTier    SourceTier
+  verifiedAt    DateTime     @db.Date
+  verifiedBy    String
+  /// Alimente la file de veille (WF-14).
+  nextReviewAt  DateTime     @db.Date
+  status        RuleStatus   @default(DRAFT)
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  applications  Application[]
+
+  @@unique([countryCode, visaType, version])
+  @@index([countryCode, category, status])
+  @@index([status, nextReviewAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Comptes
+// ═══════════════════════════════════════════════════════════
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String?
+  firstName     String?
+  lastName      String?
+  phone         String?
+  countryCode   String?   @db.Char(2)
+  locale        String    @default("fr")
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+
+  profile       Profile?
+  consents      Consent[]
+  applications  Application[]
+  transactions  Transaction[]
+  aiUsage       AiUsage[]
+}
+
+model Profile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  objectif        String?
+  highestDegree   String?
+  fieldOfStudy    String?
+  yearsExperience Int?
+  languages       Json?
+  budgetTotal     Int?
+  budgetCurrency  String?
+  updatedAt       DateTime @updatedAt
+}
+
+enum ConsentKind { CGU CONFIDENTIALITE PIECES_IDENTITE MARKETING }
+
+/// Le consentement au traitement des pièces d'identité est séparé
+/// et révocable (RG-02.1).
+model Consent {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      ConsentKind
+  granted   Boolean
+  version   String
+  grantedAt DateTime    @default(now())
+  revokedAt DateTime?
+
+  @@index([userId, kind])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Dossiers
+// ═══════════════════════════════════════════════════════════
+
+enum ApplicationStatus {
+  BROUILLON ACTIF PRET SOUMIS SUSPENDU ISSUE_DECLAREE ABANDONNE ARCHIVE
+}
+
+enum Issue { ACCEPTE REFUSE SANS_REPONSE RENONCE }
+
+model Application {
+  id             String            @id @default(uuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Snapshot de la règle au moment de l'ouverture (INV-3).
+  visaRuleId     String?
+  visaRule       VisaRule?         @relation(fields: [visaRuleId], references: [id])
+
+  status         ApplicationStatus @default(BROUILLON)
+  completeness   Int               @default(0)
+  targetDate     DateTime?         @db.Date
+  submittedAt    DateTime?
+  issue          Issue?
+  issueReason    String?
+  purgedAt       DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  documents      Document[]
+  deadlines      Deadline[]
+  transactions   Transaction[]
+  aiUsage        AiUsage[]
+
+  @@index([userId, status])
+  @@index([visaRuleId])
+}
+
+enum DocumentStatus {
+  ATTENDUE EN_ANALYSE CONFORME A_CORRIGER ILLISIBLE HORS_SUJET EXPIREE PURGEE
+}
+
+model Document {
+  id            String         @id @default(uuid())
+  applicationId String
+  application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  code          String
+  label         String
+  required      Boolean        @default(true)
+  status        DocumentStatus @default(ATTENDUE)
+  objectKey     String?
+  checksum      String?
+  extracted     Json?
+  /// Message actionnable affiché à l'utilisateur (RG-06.3).
+  feedback      String?
+  expiresAt     DateTime?      @db.Date
+  analyzedAt    DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@unique([applicationId, code])
+  @@index([status, expiresAt])
+}
+
+model Deadline {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  code          String
+  label         String
+  dueAt         DateTime    @db.Date
+  doneAt        DateTime?
+
+  @@index([applicationId, dueAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Paiements
+// ═══════════════════════════════════════════════════════════
+
+enum PaymentProvider { FEDAPAY STRIPE }
+enum TransactionStatus { INITIEE EN_ATTENTE CONFIRMEE ECHOUEE EXPIREE REMBOURSEE }
+
+model Transaction {
+  id            String            @id @default(uuid())
+  reference     String            @unique
+  userId        String
+  user          User              @relation(fields: [userId], references: [id])
+  applicationId String?
+  application   Application?      @relation(fields: [applicationId], references: [id])
+  packCode      String
+  amount        Int
+  currency      String            @db.Char(3)
+  provider      PaymentProvider
+  /// Clé d'idempotence du webhook (INV-7).
+  providerTxId  String?           @unique
+  status        TransactionStatus @default(INITIEE)
+  createdAt     DateTime          @default(now())
+  confirmedAt   DateTime?
+
+  @@index([status, createdAt])
+}
+
+/// Comptage des tokens, pas des « vérifications » (INV-6).
+model AiUsage {
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id])
+  operation     String
+  inputTokens   Int
+  outputTokens  Int
+  costMicros    Int
+  createdAt     DateTime     @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  target    String
+  /// Motif obligatoire pour tout accès à une pièce d'identité (RG-15.1).
+  reason    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([target, createdAt])
+}
