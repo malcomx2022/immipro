@@ -11,12 +11,16 @@ import {
   libelleAlertePeremption,
   libelleAvancementFamille,
   libelleBlocage,
+  lienDePiece,
   premiereATraiter,
   type FamillePiece,
   type Piece,
 } from "@/domain/dossiers/piece";
+import { jourEnFrancais } from "@/domain/format/moment";
 import { DOSSIERS, dossierParId, piecesDuDossier } from "@/lib/contenu/dossiers";
+import { PARTENAIRE } from "@/lib/contenu/alertes";
 import { EnteteDossier } from "./EnteteDossier";
+import { PropositionPartenaire } from "./PropositionPartenaire";
 
 /**
  * C-06 — Dossier, checklist. WF-06.
@@ -49,13 +53,6 @@ export async function generateMetadata({
   };
 }
 
-const FORMAT_DATE = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
 export default async function PageChecklist({
   params,
 }: {
@@ -83,7 +80,7 @@ export default async function PageChecklist({
         </h1>
         <p className="text-14 text-ink-700">
           {dossier.depotVise
-            ? `Dépôt visé : ${FORMAT_DATE.format(new Date(`${dossier.depotVise}T00:00:00Z`))}`
+            ? `Dépôt visé : ${jourEnFrancais(dossier.depotVise)}`
             : "Date de dépôt non fixée"}
         </p>
       </div>
@@ -97,8 +94,18 @@ export default async function PageChecklist({
         Prochaine action : {dossier.prochaineAction}
       </p>
 
+      {/* T-03 : la proposition n'apparaît que sur une situation déclarée, et
+          elle est posée après la prochaine action, pas devant elle. */}
+      {dossier.limiteDeclaree ? (
+        <PropositionPartenaire
+          partenaire={PARTENAIRE}
+          motif={dossier.limiteDeclaree}
+        />
+      ) : null}
+
       <nav aria-label="Vues du dossier" className="flex flex-wrap gap-2">
         <LienVue href={`/dossiers/${id}/completude`}>Complétude</LienVue>
+        <LienVue href={`/dossiers/${id}/redaction`}>Rédiger une pièce</LienVue>
         <LienVue href={`/dossiers/${id}/echeancier`}>Échéancier</LienVue>
         <LienVue href={`/dossiers/${id}/cloture`}>Clôturer</LienVue>
       </nav>
@@ -128,7 +135,7 @@ export default async function PageChecklist({
         <p className="text-14 text-ink-700">{libelleBlocage(pieces)}</p>
         {premiere ? (
           <LienBouton
-            href={`/dossiers/${id}/pieces/${premiere.id}`}
+            href={lienDePiece(id, premiere)}
             pleineLargeur
             className="md:w-auto"
           >
@@ -187,7 +194,7 @@ function SectionPieces({
               message={piece.message}
               mention={libelleAlertePeremption(piece, depotVise) ?? undefined}
               action={libelleAction(piece)}
-              href={`/dossiers/${dossierId}/pieces/${piece.id}`}
+              href={lienDePiece(dossierId, piece)}
             />
           </li>
         ))}

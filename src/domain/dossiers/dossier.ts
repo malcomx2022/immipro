@@ -1,5 +1,6 @@
 import type { CompletenessPublic } from "@/domain/completeness/score";
 import type { FicheDestination } from "@/domain/destinations/fiche";
+import type { MotifProposition } from "@/domain/consultants/proposition";
 
 /**
  * Dossier vu du candidat — WF-09, écran C-01.
@@ -34,6 +35,12 @@ export interface Dossier {
    * liste tout ce qu'il reste ne dit pas par où commencer.
    */
   prochaineAction: string;
+  /**
+   * Situation déclarée par le candidat qui dépasse ce que la plateforme sait
+   * faire (WF-13, écran T-03). Elle vit sur le dossier et non sur le profil :
+   * un refus antérieur ne pèse que sur la destination concernée.
+   */
+  limiteDeclaree?: MotifProposition;
 }
 
 /** Trois dossiers en parallèle au maximum (C-01). */

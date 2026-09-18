@@ -11,6 +11,7 @@ import {
   urgence,
   type Echeance,
 } from "@/domain/dossiers/echeancier";
+import { jourEnFrancais } from "@/domain/format/moment";
 import { ECHEANCES_NL, dossierParId } from "@/lib/contenu/dossiers";
 import { EnteteDossier } from "../EnteteDossier";
 
@@ -45,12 +46,6 @@ export async function generateMetadata({
   };
 }
 
-const FORMAT_DATE = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
 const FORMAT_COURT = new Intl.DateTimeFormat("fr-FR", {
   day: "2-digit",
   month: "short",
@@ -89,8 +84,7 @@ export default async function PageEcheancier({
           Échéancier
         </h1>
         <p className="text-16 text-ink-700">
-          Dépôt visé le{" "}
-          {FORMAT_DATE.format(new Date(`${dossier.depotVise}T00:00:00Z`))}
+          Dépôt visé le {jourEnFrancais(dossier.depotVise)}
         </p>
         <p className="text-14 font-medium text-ink-900">
           {libelleCompteARebours(aujourdhui, dossier.depotVise)}

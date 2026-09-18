@@ -131,6 +131,27 @@ export const CONSULTATION_ANNULATION_HEURES = 24;
 /** En dessous, frais de collecte et coût IA rendent la transaction non rentable (RG-05.5). */
 export const MONTANT_MINIMUM_XOF = 3000;
 
+/**
+ * Commission perçue par ImmiPro sur un entretien de consultant partenaire
+ * (WF-13, écran T-03).
+ *
+ * Elle vit ici et non dans l'écran : le taux annoncé au candidat et le taux
+ * appliqué à la facturation doivent être le même nombre. Le prototype
+ * l'écrivait uniquement dans T-03, sans support en code — la première
+ * facturation aurait pu diverger de la mention sans que rien ne le signale.
+ *
+ * Le taux est annoncé dans l'écran de proposition lui-même, jamais renvoyé
+ * aux conditions générales : une recommandation rémunérée non déclarée est
+ * un conflit d'intérêts, quel que soit le sérieux du partenaire.
+ */
+export const COMMISSION_PARTENAIRE = 0.15;
+
+/** Taux de commission mis en forme pour l'affichage : « 15 % ». */
+export const tauxCommissionFormate = (): string =>
+  new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractionDigits: 0 }).format(
+    COMMISSION_PARTENAIRE,
+  );
+
 
 
 /** Seuil d'alerte de marge : coût IA d'un dossier au-delà de 15 % du prix du pack (RG-16.1). */

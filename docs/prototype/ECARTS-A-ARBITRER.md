@@ -269,8 +269,8 @@ Relevé pour ne pas le re-signaler à chaque passe :
 | 2 | C — le garde-fou | P0 Dossier 2, puis P1 | **tranché le 18/09**, encodé |
 | 3 | B.2 — volume et prix de la recharge | P0 Paiement | règle encodée, **volume en attente de mesure** |
 | 4 | A — C-01, C-02, C-06, C-09 | P0 Dossier 1 et Dossier 2 | **appliqué** le 18/09 sur les quatre écrans |
-| 5 | B.3, B.4 — consultation et commission | P1 (T-03), P2 WF-12 | ouvert |
-| 6 | A — T-01, T-05 | P1, P2 WF-12 | ouvert |
+| 5 | B.3, B.4 — consultation et commission | P1 (T-03), P2 WF-12 | **tranché le 18/09** : T-03 lit la grille, commission en code |
+| 6 | A — T-01, T-05 | P1, P2 WF-12 | T-01 **tranché le 18/09** ; T-05 ouvert (lot P2 WF-12) |
 
 
 ---
@@ -301,3 +301,51 @@ apostrophe de commentaire pour un début de littéral. Le commentaire qui
 maintenant un balayage (`src/domain/copy/source.ts`), commentaires et
 expressions régulières écartés, et elle est testée — y compris sur le fait
 qu'elle voit encore la faute qu'elle doit voir.
+
+
+---
+
+## F · Lot P1 — ce qui a été tranché et ce qui a divergé
+
+### Les deux décisions restées ouvertes
+
+**T-01, la progression du dossier.** Le prototype notifiait « Complétude
+passée de 58 à 68 sur 100 » : le dernier endroit où la note avait survécu à
+l'arbitrage C-09, et le plus tenace, puisque retirer le chiffre ne suffisait
+pas — il fallait dire ce qu'une progression annonce sans nombre d'ensemble.
+
+Retenu : **une pièce de moins, et combien il en reste.** « Une pièce
+obligatoire de moins à réunir : il en reste 2. » Le candidat peut le vérifier
+sur sa checklist, et rien là-dedans ne se relit comme une probabilité. C'est
+aussi ce que le score avait pour lui — la progression visible d'une session à
+l'autre — rendu sans le chiffre. La phrase est calculée par
+`libelleProgression`, à partir des deux états de la complétude ; elle se tait
+quand rien n'a progressé, plutôt que d'annoncer un mouvement nul.
+
+**T-03, le prix de la consultation.** Le prototype affiche 25 000 F pour une
+heure, l'arbitrage du 13/09 a retenu 20 000 F pour 45 minutes. L'écran lit
+désormais `CONSULTATION` et `CONSULTATION_DUREE_MINUTES` : entre deux prix
+pour la même prestation, c'est celui qui est facturé qui fera foi, et un
+écran qui affiche l'autre ment.
+
+**La commission de 15 %** n'avait aucun support en code : elle n'existait que
+dans le texte de T-03. Elle vit maintenant dans `COMMISSION_PARTENAIRE`
+(`domain/payments/pricing.ts`), et un test vérifie que la phrase de l'écran
+reprend ce taux. La phrase elle-même déclenche l'interdit du pourcentage :
+c'est la **première entrée de `copy-exceptions.json`**, motivée et datée.
+L'écrire en lettres pour passer le garde-fou aurait affaibli une obligation
+de transparence — c'est exactement l'usage prévu pour l'échappatoire.
+
+### Divergences internes du prototype, lot P1
+
+| # | Où | Ce que dit le prototype | Ce qui est codé |
+|---|---|---|---|
+| F.1 | R-02, avancement | `Math.round((i + 1) / 8 * 100) + "%"` | « Question 3 sur 8 » ; la barre compte des questions dans `aria-valuenow`, aucune part n'est écrite |
+| F.2 | R-01, durées | « 8 questions · environ 15 minutes » à côté de « prévois vingt minutes pour l'entretien et la relecture » | deux minutes par question, sans arrondi : 16 minutes, compatible avec l'avertissement de la même page |
+| F.3 | R-01, jeux de questions | les quatre pièces partagent le même questionnaire | chaque pièce reprend les questions qui la concernent — une attestation de prise en charge ne demande pas le niveau d'anglais |
+| F.4 | R-04, remarque de forme | « 412 mots pour une limite conseillée de 400 » au-dessus d'une lettre de 134 mots | calculée sur le texte réel ; absente quand le texte tient dans la limite |
+| F.5 | T-01, alerte d'échéance | « Échéance dans 7 jours » écrit dans le titre | délai recalculé à l'affichage : le titre figé restait affiché le jour même, puis une semaine après |
+| F.6 | T-02, impact | « il te faut 696 € de plus, soit environ 456 000 F » | montant en euros seul : le taux de 655,957 F a été retiré de P-06 et de $-02, l'afficher ici le réintroduirait |
+| F.7 | T-02, arbitrage | option « migrer » présélectionnée | aucune présélection : un arbitrage pré-coché n'est pas un arbitrage |
+| F.8 | R-03, dates de version | « il y a 12 heures » pour un enregistrement de la veille | seuil au jour civil : « hier à 21 h 04 » dit quand, le relatif oblige à le calculer |
+| F.9 | Partout | `Intl` écrit « 1 janvier 2027 » | « 1er janvier 2027 » — le français met l'ordinal au premier du mois, et nulle part ailleurs |

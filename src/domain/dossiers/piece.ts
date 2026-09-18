@@ -195,6 +195,16 @@ export function libelleBlocage(pieces: readonly Piece[]): string {
     : "1 pièce bloque le dépôt";
 }
 
+/**
+ * Où mène la ligne de checklist. Une pièce à rédiger ouvre l'entretien guidé,
+ * pas l'écran de téléversement : proposer « dépose ton fichier » à quelqu'un
+ * qui n'a rien écrit ne l'avance pas.
+ */
+export const lienDePiece = (dossierId: string, piece: Piece): string =>
+  piece.remede === "REDIGER"
+    ? `/dossiers/${dossierId}/redaction/${piece.id}`
+    : `/dossiers/${dossierId}/pieces/${piece.id}`;
+
 /** Première pièce à traiter : celle qui bloque, sinon celle qui renforce. */
 export function premiereATraiter(pieces: readonly Piece[]): Piece | undefined {
   const { bloquantes, ensuite } = grouperPourCompletude(pieces);
