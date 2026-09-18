@@ -11,13 +11,26 @@ datasource db {
 // Référentiel réglementaire versionné
 // ═══════════════════════════════════════════════════════════
 
-enum VisaCategory { ETUDES EMPLOI FAMILLE RECHERCHE_EMPLOI }
+enum VisaCategory {
+  ETUDES
+  EMPLOI
+  FAMILLE
+  RECHERCHE_EMPLOI
+}
 
 /// Niveau de confiance de la source. Pilote l'affichage côté utilisateur
 /// et conditionne la publication (INV-4).
-enum SourceTier { OFFICIEL INSTITUTIONNEL SECONDAIRE }
+enum SourceTier {
+  OFFICIEL
+  INSTITUTIONNEL
+  SECONDAIRE
+}
 
-enum RuleStatus { DRAFT PUBLISHED ARCHIVED }
+enum RuleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
 
 model VisaRule {
   id            String       @id @default(uuid())
@@ -84,7 +97,12 @@ model Profile {
   updatedAt       DateTime @updatedAt
 }
 
-enum ConsentKind { CGU CONFIDENTIALITE PIECES_IDENTITE MARKETING }
+enum ConsentKind {
+  CGU
+  CONFIDENTIALITE
+  PIECES_IDENTITE
+  MARKETING
+}
 
 /// Le consentement au traitement des pièces d'identité est séparé
 /// et révocable (RG-02.1).
@@ -106,10 +124,22 @@ model Consent {
 // ═══════════════════════════════════════════════════════════
 
 enum ApplicationStatus {
-  BROUILLON ACTIF PRET SOUMIS SUSPENDU ISSUE_DECLAREE ABANDONNE ARCHIVE
+  BROUILLON
+  ACTIF
+  PRET
+  SOUMIS
+  SUSPENDU
+  ISSUE_DECLAREE
+  ABANDONNE
+  ARCHIVE
 }
 
-enum Issue { ACCEPTE REFUSE SANS_REPONSE RENONCE }
+enum Issue {
+  ACCEPTE
+  REFUSE
+  SANS_REPONSE
+  RENONCE
+}
 
 model Application {
   id             String            @id @default(uuid())
@@ -140,7 +170,14 @@ model Application {
 }
 
 enum DocumentStatus {
-  ATTENDUE EN_ANALYSE CONFORME A_CORRIGER ILLISIBLE HORS_SUJET EXPIREE PURGEE
+  ATTENDUE
+  EN_ANALYSE
+  CONFORME
+  A_CORRIGER
+  ILLISIBLE
+  HORS_SUJET
+  EXPIREE
+  PURGEE
 }
 
 model Document {
@@ -180,8 +217,19 @@ model Deadline {
 // Paiements
 // ═══════════════════════════════════════════════════════════
 
-enum PaymentProvider { FEDAPAY STRIPE }
-enum TransactionStatus { INITIEE EN_ATTENTE CONFIRMEE ECHOUEE EXPIREE REMBOURSEE }
+enum PaymentProvider {
+  FEDAPAY
+  STRIPE
+}
+
+enum TransactionStatus {
+  INITIEE
+  EN_ATTENTE
+  CONFIRMEE
+  ECHOUEE
+  EXPIREE
+  REMBOURSEE
+}
 
 model Transaction {
   id            String            @id @default(uuid())

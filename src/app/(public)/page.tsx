@@ -6,8 +6,8 @@
 export default function Accueil() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-3xl">Où pouvez-vous étudier ou travailler&nbsp;?</h1>
-      <p className="mt-4 text-ink-500">
+      <h1 className="text-32">Où pouvez-vous étudier ou travailler&nbsp;?</h1>
+      <p className="mt-4 text-16 text-ink-500">
         Squelette. Le simulateur sera implémenté à partir du prototype.
       </p>
     </main>

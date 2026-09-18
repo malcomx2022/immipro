@@ -2,7 +2,9 @@
   "name": "immipro",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -19,25 +21,30 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
     "@prisma/client": "^6.0.0",
+    "clsx": "^2.1.0",
+    "minio": "^8.0.0",
     "next": "^15.0.0",
     "next-auth": "^4.24.0",
+    "pg-boss": "^10.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "minio": "^8.0.0",
-    "pg-boss": "^10.0.0",
-    "zod": "^3.23.0",
-    "@anthropic-ai/sdk": "^0.30.0",
     "stripe": "^17.0.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.5.0"
+    "tailwind-merge": "^2.5.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.0.0",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.0",
     "prettier": "^3.3.0",
     "prisma": "^6.0.0",

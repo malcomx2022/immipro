@@ -49,8 +49,20 @@ export default {
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
-      minHeight: { touch: "44px" },
+      // Cibles tactiles du prototype : 44 px minimum partout, 48 px pour les
+      // boutons, 52 px pour l'action principale mobile (DOC-12, Fondations §6).
+      minHeight: { touch: "44px", bouton: "48px", action: "52px" },
       minWidth: { touch: "44px" },
+      // 22 px : case à cocher. 18 (72 px) : hauteur d'une ligne de checklist.
+      // Deux crans qui manquent aux valeurs natives de Tailwind.
+      spacing: { 5.5: "22px", 18: "72px" },
+      // Pastille de choix exclusif pleine (Bibliothèque §3).
+      borderWidth: { 6: "6px" },
+      // Règle clavier 3 : contour 2 px accent-700 à 3 px de décalage sur les
+      // actions, anneau accent-100 de 3 px sur les champs. Ni l'un ni l'autre
+      // n'est écrivable sans ces deux crans.
+      outlineOffset: { 3: "3px" },
+      ringWidth: { 3: "3px" },
     },
   },
   plugins: [],

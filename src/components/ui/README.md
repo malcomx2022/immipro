@@ -1,18 +1,34 @@
 # Bibliothèque de composants
 
 Construite à partir du prototype Claude Design, **composants avant écrans**.
+Références : `docs/prototype/ImmiPro Fondations.dc.html`,
+`ImmiPro Bibliothèque de composants.dc.html`, `ImmiPro Parcours clavier.dc.html`.
 
-Ordre de production (DOC-12 §4.1) :
+## Produits (DOC-12 §4.1, étape 1)
 
-1. `Button` — 5 variantes × 4 états
-2. `Input`, `Select`, `RadioGroup`
-3. `Card` — carte destination
-4. `ChecklistRow` — ligne de pièce avec pastille d'état
-5. `StatusBadge` — Conforme / À corriger / Attendue / Expirée
-6. `ProgressBar` — complétude du dossier
-7. `BottomSheet` — modale mobile
-8. `SourceNote` — « Information vérifiée le … — source : … » (INV-8)
-9. `Header`, `Footer`
+| Composant | Fichier | Ce qu'il tient |
+|---|---|---|
+| `Button` | `ui/Button.tsx` | 5 variantes × repos, survol, focus, chargement, désactivé. `disabled` réel, hauteur 48 px, la raison du désactivé est reliée par `aria-describedby` |
+| `Input`, `Select` | `ui/Input.tsx`, `ui/Select.tsx` | libellé visible toujours ; l'erreur remplace l'aide, elle ne s'y ajoute pas ; un champ désactivé garde sa valeur |
+| `RadioGroup` | `ui/RadioGroup.tsx` | un seul arrêt de tabulation, flèches, Origine et Fin, `aria-checked` (règle clavier 4) |
+| `Checkbox` | `ui/Checkbox.tsx` | composant contrôlé sans `defaultChecked` : aucune case ne peut être pré-cochée (A-05) |
+| `Card` | `ui/Card.tsx` | rayon plafonné à `rounded-lg` |
+| `ChecklistRow` | `ui/ChecklistRow.tsx` | un `button`, jamais un `div` cliquable (règle clavier 9) |
+| `StatusBadge` | `ui/StatusBadge.tsx` | couleur **et** mot ; les états viennent de `DocumentState`, pas d'une liste recopiée |
+| `CompletenessTier` | `ui/CompletenessTier.tsx` | remplace `ProgressBar` : palier nommé et dénombrement des manques, aucune note d'ensemble (arbitrage C-09) |
+| `BottomSheet` | `ui/BottomSheet.tsx` | `role="dialog"`, piège de tabulation, Échap, retour du focus au déclencheur (règles 5 et 8) |
+| `SourceNote` | `ui/SourceNote.tsx` | source et date de vérification obligatoires par le type (INV-8) |
+| `SkipLink`, `Header`, `Footer` | `layout/` | « Aller au contenu » premier arrêt de chaque page (règle clavier 2) ; second saut « Aller à l'action » sur C-06 et C-09 (règle 12) |
 
-Contraintes : tokens Tailwind uniquement, cible tactile 44 px minimum,
-une seule occurrence de la couleur d'accent par écran.
+## Contraintes
+
+- Jetons Tailwind uniquement : aucune couleur, aucun espacement, aucun rayon en dur.
+- L'échelle de tailles est fermée à neuf crans (`text-13` … `text-44`). `text-sm`,
+  `text-lg` et les autres n'existent pas.
+- Cible tactile 44 px minimum, 48 px pour les boutons, 52 px pour l'action
+  principale mobile.
+- Une seule occurrence de la couleur d'accent par écran.
+- L'anneau de focus n'est jamais supprimé — il est posé dans `globals.css`,
+  pas composant par composant.
+- Un test Vitest minimal par composant : rendu, état désactivé, focus.
+  Ils vivent dans `tests/ui/`.
