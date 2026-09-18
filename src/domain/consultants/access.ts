@@ -37,6 +37,44 @@ export interface DossierRef {
 export type PorteeLecture = "pieces" | "analyse" | "checklist" | "echeancier" | "echanges";
 export const PORTEE_CONSULTANT: readonly PorteeLecture[] = ["pieces", "analyse", "checklist", "echeancier", "echanges"];
 
+/**
+ * Ce que l'écran d'accord annonce, dérivé de la portée elle-même (T-04).
+ *
+ * La liste affichée au candidat et la liste qu'applique `peutLire` sont la
+ * même : un écran qui énumère à part ce que le consultant verra finit par
+ * promettre autre chose que ce que le code autorise, et c'est le sens du
+ * consentement qui se perd.
+ */
+export const LIBELLE_PORTEE: Record<PorteeLecture, string> = {
+  pieces: "Tes pièces déposées",
+  analyse: "Le résultat de leur analyse",
+  checklist: "Ta checklist",
+  echeancier: "Ton échéancier",
+  echanges: "Vos échanges dans ImmiPro",
+};
+
+/**
+ * Ce qui reste hors de portée quoi qu'il arrive. Énoncé au même endroit que
+ * ce qui est accordé : un consentement qui ne dit que ce qu'il ouvre se lit
+ * comme un blanc-seing.
+ */
+export const HORS_PORTEE: readonly string[] = [
+  "Ton moyen de paiement et tes achats",
+  "Tes dossiers pour d'autres destinations",
+  "Ton mot de passe et tes identifiants",
+];
+
+/**
+ * L'accord est révocable à tout moment, et l'écran le dit avant de le
+ * demander — pas après. Une autorisation qu'on ne sait pas retirer n'est pas
+ * donnée librement.
+ */
+export const MENTION_REVOCATION =
+  "Le consultant ne voit rien tant que tu n'as pas donné ton accord. Tu peux le retirer à tout moment depuis « Mes consentements ».";
+
+export const MENTION_JOURNAL =
+  "Chaque consultation de ton dossier par le consultant est inscrite au journal, que tu peux demander à tout moment.";
+
 export type MotifRefus = "NON_HABILITE" | "SANS_ACCORD";
 
 export type Decision =

@@ -270,7 +270,7 @@ Relevé pour ne pas le re-signaler à chaque passe :
 | 3 | B.2 — volume et prix de la recharge | P0 Paiement | règle encodée, **volume en attente de mesure** |
 | 4 | A — C-01, C-02, C-06, C-09 | P0 Dossier 1 et Dossier 2 | **appliqué** le 18/09 sur les quatre écrans |
 | 5 | B.3, B.4 — consultation et commission | P1 (T-03), P2 WF-12 | **tranché le 18/09** : T-03 lit la grille, commission en code |
-| 6 | A — T-01, T-05 | P1, P2 WF-12 | T-01 **tranché le 18/09** ; T-05 ouvert (lot P2 WF-12) |
+| 6 | A — T-01, T-05 | P1, P2 WF-12 | **tranchés le 18/09**, les deux |
 
 
 ---
@@ -407,3 +407,59 @@ alimenté `AiUsage`. Ce qui est affiché est vrai sans mesure : le nom de
 chaque métrique, sa source de calcul, et les garde-fous exprimés en ratio.
 C'est le même chantier que le volume de la recharge — une semaine de pipeline
 réel referme les deux.
+
+
+---
+
+## H · Lot P2 WF-12 — le dernier pourcentage, et les quatre décisions déjà prises
+
+### T-05 : « Ta checklist est à 80 % »
+
+C'était le dernier pourcentage de l'interface candidat, et le plus facile à
+retirer une fois posé le bon critère : la phrase du prototype nommait déjà
+les deux pièces concernées. Or c'est la seule chose utile avant un appel de
+quarante-cinq minutes — le chiffre n'ajoutait qu'une note à retenir de
+travers.
+
+Retenu : **les pièces nommées, sans part.** « 2 pièces obligatoires restent à
+traiter : passeport et attestation de ressources. » Calculé par
+`libelleAPreparer` depuis la checklist, avec bascule sur les complémentaires
+quand rien ne bloque, et une phrase distincte quand tout est conforme.
+
+Restait la question que j'avais signalée — un email ne se recalcule pas à
+l'ouverture. Elle ne se pose pas ici : l'écran T-05 est dans l'application.
+Elle se posera au courriel de confirmation, qui n'est pas prototypé (§5) ; la
+réponse y sera la même, à ceci près qu'il faudra dater la phrase ou renvoyer
+à la checklist plutôt que de la recopier.
+
+### Les quatre décisions du 13/09 étaient déjà en code
+
+Les écrans les appliquent sans rien redéclarer, et c'est ce qui les rend
+vérifiables :
+
+| Décision | Où elle vit |
+|---|---|
+| Tarif unique, 20 000 F la consultation de 45 minutes | `CONSULTATION`, `CONSULTATION_DUREE_MINUTES` |
+| ImmiPro encaisse, le consultant ne manipule aucun paiement | parcours `$`, inchangé |
+| Annulation sans frais jusqu'à 24 h avant | `CONSULTATION_ANNULATION_HEURES` |
+| Ce que le consultant voit, sous double condition révocable | `domain/consultants/access.ts` |
+
+La dernière a donné le point le plus utile du lot : l'écran d'accord dérive
+sa liste « ce qu'il verra » de `PORTEE_CONSULTANT`, au lieu de l'énumérer à
+part. Un écran de consentement qui recopie sa propre liste finit par
+promettre autre chose que ce que `peutLire` autorise, et c'est le sens du
+consentement qui se perd.
+
+### Divergences et corrections du lot
+
+| # | Où | Ce que dit le prototype | Ce qui est codé |
+|---|---|---|---|
+| H.1 | T-05 confirmé | « Ta checklist est à 80 % : les deux pièces à reprendre sont… » | les pièces nommées, sans part |
+| H.2 | T-05, créneaux | horaires figés (15, 17, 18 sept.) | disponibilités posées en jours à venir : figées, elles finissent toutes dans le passé et l'écran propose des rendez-vous impossibles |
+| H.3 | T-05, limite d'annulation | « jusqu'au mardi 22 septembre, 10 h 00 » sur un écran, au jour près sur l'autre | toujours avec l'heure : écrite au jour près, elle fait annuler trop tard quelqu'un qui s'y fie, et la consultation est due |
+| H.4 | T-04, état vide | « Trois consultants sont habilités pour les Pays-Bas et deux pour le Canada » écrit en dur | compté sur la table des habilitations |
+| H.5 | T-04, filtres | « Pays-Bas · Langue · Sous 48 h » fixes | langues proposées = celles réellement couvertes par la destination |
+| H.6 | T-05, référence | « RDV-2609-8814 » | dérivée du créneau et du consultant : une réservation rejouée n'en crée pas deux (INV-7) |
+
+Une dernière, trouvée à l'écran : le libellé du groupe radio répétait le
+titre du jour, annoncé deux fois par un lecteur d'écran.

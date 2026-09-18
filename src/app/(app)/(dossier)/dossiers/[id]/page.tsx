@@ -100,12 +100,14 @@ export default async function PageChecklist({
         <PropositionPartenaire
           partenaire={PARTENAIRE}
           motif={dossier.limiteDeclaree}
+          dossierId={id}
         />
       ) : null}
 
       <nav aria-label="Vues du dossier" className="flex flex-wrap gap-2">
         <LienVue href={`/dossiers/${id}/completude`}>Complétude</LienVue>
         <LienVue href={`/dossiers/${id}/redaction`}>Rédiger une pièce</LienVue>
+        <LienVue href={`/consultants?dossier=${id}`}>Consultants</LienVue>
         <LienVue href={`/dossiers/${id}/echeancier`}>Échéancier</LienVue>
         <LienVue href={`/dossiers/${id}/cloture`}>Clôturer</LienVue>
       </nav>

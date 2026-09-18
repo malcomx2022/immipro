@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { LienBouton } from "@/components/ui/LienBouton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { MotifProposition, Partenaire } from "@/domain/consultants/proposition";
 import {
@@ -36,6 +37,8 @@ import { formatMontant } from "@/lib/utils";
 export interface PropositionPartenaireProps {
   partenaire: Partenaire;
   motif: MotifProposition;
+  /** Dossier concerné : l'annuaire est propre à sa destination (T-04). */
+  dossierId: string;
   /** Code pays du candidat, pour la devise affichée. */
   pays?: string;
 }
@@ -43,6 +46,7 @@ export interface PropositionPartenaireProps {
 export function PropositionPartenaire({
   partenaire,
   motif,
+  dossierId,
   pays = "BJ",
 }: PropositionPartenaireProps) {
   const [ouverte, setOuverte] = useState(false);
@@ -119,9 +123,13 @@ export function PropositionPartenaire({
         </ul>
 
         <div className="flex flex-col gap-2 border-t border-ink-300 pt-3">
-          <Button pleineLargeur className="min-h-action">
+          <LienBouton
+            href={`/consultants?dossier=${dossierId}`}
+            pleineLargeur
+            className="min-h-action"
+          >
             {LIBELLE_SUITE.CRENEAUX}
-          </Button>
+          </LienBouton>
           <Button
             variante="secondaire"
             pleineLargeur

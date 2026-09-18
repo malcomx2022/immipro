@@ -210,3 +210,34 @@ export function premiereATraiter(pieces: readonly Piece[]): Piece | undefined {
   const { bloquantes, ensuite } = grouperPourCompletude(pieces);
   return bloquantes[0] ?? ensuite[0];
 }
+
+/** « le passeport, l'attestation de ressources et la photo d'identité ». */
+const enumerer = (libelles: readonly string[]): string => {
+  if (libelles.length <= 1) return libelles[0] ?? "";
+  return `${libelles.slice(0, -1).join(", ")} et ${libelles[libelles.length - 1]}`;
+};
+
+/**
+ * Ce qu'il reste à préparer, nommé — T-05, avant un rendez-vous.
+ *
+ * Le prototype écrivait « Ta checklist est à 80 % : les deux pièces à
+ * reprendre sont le relevé bancaire et la photo d'identité ». Le pourcentage
+ * était le dernier de l'interface candidat, et il était de trop : la phrase
+ * nommait déjà les deux pièces, ce qui est la seule chose utile avant un
+ * appel de quarante-cinq minutes. Le chiffre n'ajoutait qu'une note à
+ * retenir de travers (arbitrage C-09).
+ */
+export function libelleAPreparer(pieces: readonly Piece[]): string {
+  const { bloquantes, ensuite } = grouperPourCompletude(pieces);
+  const aTraiter = bloquantes.length > 0 ? bloquantes : ensuite;
+
+  if (aTraiter.length === 0) {
+    return "Toutes les pièces demandées sont conformes : l'appel peut porter sur le fond du dossier.";
+  }
+
+  const noms = enumerer(aTraiter.map((p) => p.libelle.toLowerCase()));
+  const nature = bloquantes.length > 0 ? "obligatoires" : "complémentaires";
+  return aTraiter.length > 1
+    ? `${aTraiter.length} pièces ${nature} restent à traiter : ${noms}.`
+    : `1 pièce ${nature === "obligatoires" ? "obligatoire" : "complémentaire"} reste à traiter : ${noms}.`;
+}

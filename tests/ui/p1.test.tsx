@@ -329,7 +329,13 @@ describe("T-02 — Divergence réglementaire", () => {
 
 describe("T-03 — Proposition partenaire", () => {
   const rendre = () =>
-    render(<PropositionPartenaire partenaire={PARTENAIRE} motif={MOTIF_PARTENAIRE} />);
+    render(
+      <PropositionPartenaire
+        partenaire={PARTENAIRE}
+        motif={MOTIF_PARTENAIRE}
+        dossierId="nl-4471"
+      />,
+    );
 
   it("nomme le motif avant de proposer quoi que ce soit", () => {
     const { container } = rendre();
@@ -360,6 +366,9 @@ describe("T-03 — Proposition partenaire", () => {
     expect(
       screen.getByText("Refuser ne change rien à ton dossier ni à ton pack."),
     ).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "Voir les créneaux" }).getAttribute("href"),
+    ).toBe("/consultants?dossier=nl-4471");
     fireEvent.click(screen.getByRole("button", { name: "Continuer sans consultant" }));
     expect(screen.getByText(/Ton dossier et ton pack sont inchangés/)).toBeDefined();
   });
