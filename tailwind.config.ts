@@ -50,8 +50,9 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       // Cibles tactiles du prototype : 44 px minimum partout, 48 px pour les
-      // boutons, 52 px pour l'action principale mobile (DOC-12, Fondations §6).
-      minHeight: { touch: "44px", bouton: "48px", action: "52px" },
+      // boutons, 52 px pour l'action principale mobile, 60 px pour une ligne
+      // de choix du simulateur (DOC-12, Fondations §6).
+      minHeight: { touch: "44px", bouton: "48px", action: "52px", option: "60px" },
       minWidth: { touch: "44px" },
       // 22 px : case à cocher. 18 (72 px) : hauteur d'une ligne de checklist.
       // Deux crans qui manquent aux valeurs natives de Tailwind.

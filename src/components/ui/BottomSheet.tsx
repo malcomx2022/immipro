@@ -87,8 +87,10 @@ export function BottomSheet({
 
   if (!ouverte) return null;
 
+  // Le prototype la pose en `absolute` dans son cadre de 390 px ; dans une
+  // page réelle elle doit couvrir la fenêtre, d'où `fixed`.
   return (
-    <div className="absolute inset-0 z-10">
+    <div className="fixed inset-0 z-50">
       {/* Le voile n'est pas un arrêt de tabulation : la fermeture au clavier
           passe par Échap, pas par un bouton invisible. */}
       <div
