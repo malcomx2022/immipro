@@ -135,6 +135,11 @@ export const DOSSIERS: readonly Dossier[] = [
     completude: completudeDesPieces(PIECES_NL),
     prochaineAction:
       "Remplacer ton passeport, sa validité est trop courte de deux mois.",
+    limiteDeclaree: {
+      constat: "Tu as déclaré un refus de visa Schengen en 2024.",
+      raison:
+        "Une demande après refus se justifie pièce par pièce, et c'est le genre de dossier où un consultant change réellement quelque chose.",
+    },
   },
   {
     id: "de-8820",

@@ -6,5 +6,12 @@
     "Au-delà de cinq entrées, ce n'est plus une exception, c'est une dérive du vocabulaire :",
     "la règle est à rediscuter, pas le fichier à rallonger."
   ],
-  "exceptions": []
+  "exceptions": [
+    {
+      "chaine": "ImmiPro perçoit une commission de 15 % sur cet entretien.",
+      "fichier": "src/app/(app)/(dossier)/dossiers/[id]/PropositionPartenaire.tsx",
+      "motif": "T-03, WF-13 : divulgation du taux de commission sur un entretien partenaire. L'interdit du pourcentage vise la note de dossier (arbitrage C-09), pas un taux de rémunération. Le rendre implicite ou l'écrire en lettres pour passer le garde-fou affaiblirait une obligation de transparence. Le taux vit dans COMMISSION_PARTENAIRE (domain/payments/pricing.ts) et un test vérifie que cette phrase le reprend.",
+      "date": "2026-09-18"
+    }
+  ]
 }

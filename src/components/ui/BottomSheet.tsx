@@ -26,6 +26,13 @@ export interface BottomSheetProps {
   ouverte: boolean;
   titre: string;
   onFermer: () => void;
+  /**
+   * `bas` : feuille ancrée en bas à toutes les largeurs (P-01).
+   * `adaptatif` : feuille en 390 px, boîte de dialogue centrée en 1440 px.
+   * Une feuille du bas sur un écran large laisse le regard en haut et la
+   * décision en bas, à 900 px de distance (T-02, T-03).
+   */
+  ancrage?: "bas" | "adaptatif";
   children: ReactNode;
   className?: string;
 }
@@ -34,6 +41,7 @@ export function BottomSheet({
   ouverte,
   titre,
   onFermer,
+  ancrage = "bas",
   children,
   className,
 }: BottomSheetProps) {
@@ -105,11 +113,19 @@ export function BottomSheet({
         aria-labelledby={idTitre}
         tabIndex={-1}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex flex-col gap-3 rounded-t-lg bg-white p-4 pb-6 shadow-e3 outline-none",
+          "absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col gap-3 overflow-y-auto rounded-t-lg bg-white p-4 pb-6 shadow-e3 outline-none",
+          ancrage === "adaptatif" &&
+            "md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-[600px] md:max-w-[calc(100vw-4rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg md:p-6",
           className,
         )}
       >
-        <span aria-hidden="true" className="h-1 w-10 self-center rounded-full bg-ink-300" />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "h-1 w-10 self-center rounded-full bg-ink-300",
+            ancrage === "adaptatif" && "md:hidden",
+          )}
+        />
         <h2 id={idTitre} className="text-19 font-semibold text-ink-900">
           {titre}
         </h2>

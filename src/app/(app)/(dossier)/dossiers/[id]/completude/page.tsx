@@ -9,6 +9,7 @@ import {
   libelleAction,
   libelleAlertePeremption,
   libelleBlocage,
+  lienDePiece,
   type Piece,
 } from "@/domain/dossiers/piece";
 import { DOSSIERS, dossierParId, piecesDuDossier } from "@/lib/contenu/dossiers";
@@ -166,7 +167,7 @@ function Groupe({
                 message={piece.message}
                 mention={libelleAlertePeremption(piece, depotVise) ?? undefined}
                 action={libelleAction(piece)}
-                href={`/dossiers/${dossierId}/pieces/${piece.id}`}
+                href={lienDePiece(dossierId, piece)}
               />
             </li>
           ))}
