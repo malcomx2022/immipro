@@ -17,11 +17,31 @@
 
 ## Vocabulaire interdit dans le code et l'interface
 
-Ces expressions sont bloquées par `npm run check:copy` en intégration continue :
+La liste vit dans `src/domain/copy/vocabulaire-interdit.ts`. Elle est lue par
+`npm run check:copy`, par le test de l'interface candidat, et — quand les
+écrans de publication existeront — par la validation à l'enregistrement du
+back-office. Une seule liste, trois points d'application : un administrateur
+qui saisit une promesse dans un guide pays doit buter sur la même règle qu'un
+développeur.
 
-- « chances d'obtention », « chances de succès », « probabilité de succès »
-- « garanti », « garantie d'obtention »
-- « nous remplissons votre formulaire », « nous déposons votre demande »
+Deux portées :
+
+- **Partout** — les promesses de résultat : « chances d'obtention », « taux
+  d'acceptation », « visa garanti », « visa assuré », « réussite garantie »,
+  « sans risque de refus », « on s'occupe de tout », « nous déposons votre
+  dossier », « nous vous conseillons juridiquement », « notre avocat ».
+- **Interface candidat seule** — le vocabulaire de la note de dossier :
+  « score », « chances », un pourcentage, « sur 100 ». Ils restent légitimes
+  dans `domain/completeness/`, où le barème interne vit sans jamais s'afficher.
+
+Deux issues, et deux seulement :
+
+1. **La négation est reconnue.** « ImmiPro ne garantit pas l'obtention du
+   visa » passe : une négation ne peut pas devenir une promesse. La portée
+   s'arrête à la proposition — « Pas de doute, visa garanti » reste refusé.
+2. **`copy-exceptions.json`** pour le reste : chaîne exacte, chemin, motif,
+   date. L'échappatoire apparaît dans la diff et se justifie. Au-delà de cinq
+   entrées, ce n'est plus une exception, c'est une dérive du vocabulaire.
 
 Le score affiché s'appelle **complétude du dossier**. Jamais autre chose.
 

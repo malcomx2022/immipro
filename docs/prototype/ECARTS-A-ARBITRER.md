@@ -78,9 +78,30 @@ Le cadre **et** le libellé sont sur Essentiel. `pricing.ts` porte
 `misEnAvant` sur `dossier`, conformément au report. Les trois écrans
 contredisent donc leur propre arbitrage de clôture.
 
-**À trancher :** le report l'emporte-t-il (mise en avant sur Dossier, à
-suivre depuis `misEnAvant`), ou l'arbitrage doit-il être rouvert ? Tant que
-ce n'est pas dit, $-01 ne peut pas être codé fidèlement.
+**Tranché le 18/09/2026.** Les deux sources ne répondaient pas à la même
+question, d'où la contradiction apparente.
+
+- **Essentiel reste premier dans l'ordre de lecture**, sans badge. Son rôle
+  est défensif — tenir le prix d'entrée face à l'offre locale — et il répond
+  à « combien ça coûte ».
+- **La mise en avant va sur Dossier**, parce que le badge répond à « lequel
+  me faut-il » : sur un dossier Campus France, la lettre de motivation et le
+  projet d'études sont la partie difficile, et Essentiel ne les couvre pas.
+  Recommander Essentiel, c'est une recommandation que le produit contredit
+  quarante-huit heures plus tard, en support.
+- **Le badge est factuel, pas commercial** : « Couvre l'ensemble des pièces
+  exigées pour cette destination », jamais « le plus populaire ». Même règle
+  qu'INV-1 — on justifie, on ne survend pas.
+- **Pas de présélection du bouton radio** sur $-01 : mise en avant visuelle
+  oui, case cochée d'avance non. Le montant est répété sur $-02 avant le
+  déclenchement du paiement.
+
+La décision sort de `pricing.ts` — `misEnAvant: boolean` et `justification` —
+et un test garantit qu'un seul pack la porte. L'écran ne peut donc plus
+rediverger du code comme le prototype l'a fait.
+
+En v2, le pack mis en avant se calculera contre les pièces obligatoires de la
+destination retenue. Pas en lot 1.
 
 ### B.2 — Recharge de 10 analyses : 5 € ou 7 €
 
@@ -92,6 +113,46 @@ ce n'est pas dit, $-01 ne peut pas être codé fidèlement.
 
 Le plancher de 3 000 F est cohérent partout (RG-05.5). Seul l'euro diverge.
 Le prix affiché vient du domaine, donc l'écran montre aujourd'hui 7 €.
+
+**Reformulé le 18/09/2026 : le choix 5 € / 7 € est indécidable tel qu'il est
+posé.** La recharge est libellée en analyses, les packs sont contingentés en
+tokens ; tant que les deux ne sont pas dans la même unité, n'importe quel
+prix crée un arbitrage sans qu'on le voie.
+
+La décision porte donc sur la règle, pas sur le nombre :
+
+> **Le prix au millier de tokens d'une recharge doit être strictement
+> supérieur à celui du pack le plus cher au token, avec une marge d'au moins
+> 50 %.**
+
+Elle est encodée — `MARGE_MINIMALE_RECHARGE`, `pireTauxParPack` — et le test
+`tarification` dit ce qui manque encore pour l'appliquer.
+
+Ce qui manque, c'est le volume. Prix au millier de tokens de la grille :
+
+| Pack | analyses annoncées | tokens | €/1k | F/1k |
+|---|---|---|---|---|
+| Essentiel | 10 | 120 000 | 0,100 | 41,7 |
+| Dossier | 30 | 400 000 | 0,073 | 37,5 |
+| Dossier Pro | 90 | 1 200 000 | 0,049 | 37,5 |
+
+Essentiel est le pack le plus cher au token : c'est lui que la recharge doit
+dépasser de moitié, soit **plus de 0,150 €/1k et 62,5 F/1k**.
+
+Les packs annoncent donc **12 000 à 13 333 tokens par analyse**. À ce volume,
+une recharge de dix analyses vaut 120 000 tokens — un quota Essentiel entier —
+et revient à 0,058 €/1k à 7 €, ou 25 F/1k à 3 000 F : **elle échoue à la règle
+dans les deux devises, d'un facteur 2,5**. Aucun prix compatible avec le
+plancher de 3 000 F ne la sauve : il faudrait dépasser 18 € et 7 500 F.
+
+**C'est le volume qu'il faut reprendre, pas le montant.** Ramenée à une
+analyse, la recharge passe largement : 0,58 €/1k et 250 F/1k. Mais cela
+change le produit — tout le prototype écrit « Recharge de 10 analyses » — et
+les quotas `tokensIA` sont eux-mêmes des hypothèses.
+
+**En attente :** la mesure du coût réel d'une analyse sur les dix premiers
+dossiers. La règle et son test survivront à la mesure ; ni le volume ni le
+montant.
 
 ### B.3 — Consultation consultant : 20 000 F / 45 min, sauf sur T-03
 
@@ -137,18 +198,46 @@ l'invariant, et il refuse déjà, ou refusera, des textes corrects :
 Les deux derniers sont des pourcentages qui ne parlent pas du dossier ;
 B-05 est déjà hors périmètre, le segment `(admin)` étant exclu du test.
 
-**À trancher :** faut-il rapprocher le test de la règle écrite ? Une piste
-qui garde la contrainte serrée sans mordre sur ces textes :
+**Tranché le 18/09/2026 : l'interdit reste large, avec deux issues
+mécaniques.**
 
-- n'interdire `%`, `score` et `chances` que dans une phrase qui parle aussi
-  du dossier, de la complétude ou du visa — c'est le qualificatif de la règle ;
-- ou maintenir l'interdit large et exiger une dérogation explicite et
-  motivée, ligne par ligne, dans le fichier concerné.
+Resserrer sur « à propos du dossier » a été écarté pour une raison technique :
+c'est une portée sémantique qu'un script ne peut pas trancher. Dès qu'une
+règle demande du jugement, elle cesse d'être mécanique — et c'était toute sa
+raison d'être. Une règle qu'un script ne décide pas sans ambiguïté finit
+désactivée en six mois.
 
-La première colle à l'intention, la seconde est plus facile à auditer.
-Tant que rien n'est décidé, chaque lot continuera de buter dessus, et la
-tentation d'assouplir le test au coup par coup — le plus mauvais des trois
-chemins — grandira à chaque fois.
+Mais l'interdit large avait un trou réel : il empêchait d'écrire la phrase
+qui protège. « ImmiPro ne garantit pas l'obtention du visa » contient
+« garanti ». Les conditions d'utilisation, la page des limites et la charte
+anti-arnaque étaient mécaniquement impossibles à rédiger.
+
+Trois ajustements, tous lexicaux :
+
+1. **La négation est reconnue.** Un motif précédé d'une négation explicite
+   — *ne*, *n'*, *pas*, *aucune*, *sans*, *jamais*, *ni*, *non* — est
+   autorisé. Une négation ne peut pas devenir une promesse. La portée est
+   bornée à la proposition : « Pas de doute, visa garanti » reste refusé,
+   la virgule coupant la portée comme à la lecture.
+2. **Une liste d'exceptions bornée et justifiée** pour le reste, dans
+   `copy-exceptions.json` : chaîne exacte, chemin, motif, date. Le coût de
+   l'échappatoire est qu'elle apparaît dans la diff. Au-delà de cinq entrées,
+   ce n'est plus une exception, c'est une dérive du vocabulaire.
+3. **Le périmètre s'étend au contenu**, pas au seul code : `src/lib/contenu`,
+   les seeds, `content/`. Et la liste est extraite dans
+   `src/domain/copy/vocabulaire-interdit.ts` pour que la validation à
+   l'enregistrement du back-office lise la même. **C'est le vrai trou :** un
+   administrateur qui saisit « 95 % de réussite » dans un guide pays
+   contourne aujourd'hui tout le dispositif.
+
+La liste s'élargit au passage : « taux d'acceptation », « visa assuré »,
+« réussite garantie », « sans risque de refus », « on s'occupe de tout », et
+le versant juridique, qui relève du même invariant — « nous vous conseillons
+juridiquement », « notre avocat », « nous déposons votre dossier ».
+
+**Reste à faire :** brancher la validation sur l'enregistrement du
+back-office, quand B-02 et les écrans de publication existeront. La liste est
+prête, le point d'application manque.
 
 ---
 
@@ -174,11 +263,11 @@ Relevé pour ne pas le re-signaler à chaque passe :
 
 ## Ordre d'urgence, par rapport aux lots restants
 
-| Rang | Écart | Bloque |
-|---|---|---|
-| 1 | B.1 — mise en avant de $-01 | **P0 Paiement**, le lot suivant |
-| 2 | B.2 — recharge en euros | P0 Paiement (P-06 l'affiche déjà) |
-| 3 | A — C-01, C-02, C-06, C-09 | P0 Dossier 1 et Dossier 2 |
-| 4 | C — le garde-fou | P0 Dossier 2 (C-09, C-10), puis P1 |
-| 5 | B.3, B.4 — consultation et commission | P1 (T-03), P2 WF-12 |
-| 6 | A — T-01, T-05 | P1, P2 WF-12 |
+| Rang | Écart | Bloque | État |
+|---|---|---|---|
+| 1 | B.1 — mise en avant de $-01 | P0 Paiement | **tranché le 18/09**, encodé |
+| 2 | C — le garde-fou | P0 Dossier 2, puis P1 | **tranché le 18/09**, encodé |
+| 3 | B.2 — volume et prix de la recharge | P0 Paiement | règle encodée, **volume en attente de mesure** |
+| 4 | A — C-01, C-02, C-06, C-09 | P0 Dossier 1 et Dossier 2 | ouvert |
+| 5 | B.3, B.4 — consultation et commission | P1 (T-03), P2 WF-12 | ouvert |
+| 6 | A — T-01, T-05 | P1, P2 WF-12 | ouvert |

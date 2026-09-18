@@ -1,0 +1,10 @@
+{
+  "_lisez-moi": [
+    "Dérogations au vocabulaire interdit (src/domain/copy/vocabulaire-interdit.ts).",
+    "Une entrée vaut pour une chaîne exacte dans un fichier exact, et rien d'autre.",
+    "Elle apparaît dans la diff et exige un motif écrit : c'est le prix de l'échappatoire.",
+    "Au-delà de cinq entrées, ce n'est plus une exception, c'est une dérive du vocabulaire :",
+    "la règle est à rediscuter, pas le fichier à rallonger."
+  ],
+  "exceptions": []
+}
