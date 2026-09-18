@@ -7,6 +7,7 @@ import {
   precedeDUneNegation,
   verifierTexte,
 } from "@/domain/copy/vocabulaire-interdit";
+import { extraireChaines } from "@/domain/copy/source";
 
 /**
  * Vocabulaire interdit dans l'interface candidat (CLAUDE.md, arbitrage C-09).
@@ -51,7 +52,7 @@ describe("vocabulaire interdit côté candidat", () => {
     const fautes: string[] = [];
     for (const f of RACINES.flatMap((r) => fichiers(r))) {
       const src = sansSpecificateurs(readFileSync(f, "utf8"));
-      const chaines = src.match(/(["'`])(?:(?!\1)[^\\]|\\.)*\1/g) ?? [];
+      const chaines = extraireChaines(src);
       for (const chaine of chaines) {
         if (exceptions.some((e) => e.fichier === f && chaine.includes(e.chaine))) continue;
         for (const faute of verifierTexte(chaine, INTERDITS_ECRAN_CANDIDAT)) {
@@ -116,5 +117,35 @@ describe("portées de la liste", () => {
 
   it("les promesses de résultat sont interdites partout, contenu compris", () => {
     expect(verifierTexte("visa assuré", INTERDITS_PARTOUT).length).toBeGreaterThan(0);
+  });
+});
+
+describe("extraction des chaînes affichables", () => {
+  it("ignore les commentaires, y compris ceux qui contiennent une apostrophe", () => {
+    const src = [
+      "// Le score interne n'est pas affiché : c'est le palier qui l'est.",
+      "/* Aucune chance d'obtention n'est annoncée ici. */",
+      'const titre = "Complétude du dossier";',
+    ].join("\n");
+    expect(extraireChaines(src)).toEqual(["Complétude du dossier"]);
+  });
+
+  it("ignore une expression régulière contenant une apostrophe", () => {
+    const src = "const motif = /chances?\\s+d['’]obtention/iu;\nconst t = 'Palier';";
+    expect(extraireChaines(src)).toEqual(["Palier"]);
+  });
+
+  it("garde les gabarits et les chaînes échappées", () => {
+    const src = "const a = `2 pièces manquent`;\nconst b = 'l\\'écran';";
+    expect(extraireChaines(src)).toEqual(["2 pièces manquent", "l'écran"]);
+  });
+
+  it("voit encore la faute qu'elle doit voir", () => {
+    // Sans cette vérification, une extraction qui ne trouverait plus rien
+    // ferait passer le garde-fou pour vert.
+    const src = 'const promesse = "95 % de réussite garantie";';
+    const chaines = extraireChaines(src);
+    expect(chaines).toEqual(["95 % de réussite garantie"]);
+    expect(verifierTexte(chaines[0]!, INTERDITS_ECRAN_CANDIDAT).length).toBeGreaterThan(0);
   });
 });

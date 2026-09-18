@@ -76,6 +76,14 @@ export interface Complement {
   type: Exclude<TypeAchat, "pack">;
   libelle: string;
   prix: Record<Devise, number>;
+  /**
+   * Volume acheté, dans l'unité du complément : des analyses pour une
+   * recharge, des minutes pour une consultation. C'est la grandeur que
+   * `MARGE_MINIMALE_RECHARGE` mettra en regard du prix le jour où le coût
+   * réel d'une analyse sera mesuré ; l'écran C-07 la lit déjà, pour qu'un
+   * volume révisé change le message sans qu'on ait à y penser.
+   */
+  volume: number;
 }
 
 /**
@@ -100,6 +108,7 @@ export const RECHARGE_ANALYSES: Complement = {
   type: "recharge_analyses",
   libelle: "10 analyses supplémentaires",
   prix: { XOF: 3000, EUR: 7 },
+  volume: 10,
 };
 
 /**
@@ -112,9 +121,10 @@ export const CONSULTATION: Complement = {
   type: "consultation",
   libelle: "Consultation de 45 minutes",
   prix: { XOF: 20000, EUR: 35 },
+  volume: 45,
 };
 
-export const CONSULTATION_DUREE_MINUTES = 45;
+export const CONSULTATION_DUREE_MINUTES = CONSULTATION.volume;
 /** Annulation ou report sans frais jusqu'à ce délai avant le créneau ; au-delà, la consultation est due. */
 export const CONSULTATION_ANNULATION_HEURES = 24;
 
