@@ -5,8 +5,20 @@
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
   body { @apply bg-white text-ink-700 antialiased; }
-  h1, h2, h3 { @apply text-ink-900 font-semibold tracking-tight; }
-  /* Corps de texte jamais sous 16 px — DOC-12 §2.2 */
-  p, li { @apply text-base leading-6; }
-  :focus-visible { @apply outline-none ring-2 ring-accent-500 ring-offset-2; }
+  h1, h2, h3 { @apply text-ink-900 font-semibold; }
+  /* Corps de texte jamais sous 16 px — DOC-12 §2.2. L'interligne vient du
+     jeton `text-16` lui-même : l'échelle est fermée, rien ne s'écrit à côté. */
+  p, li { @apply text-16; }
+
+  /* Règle clavier 3 : l'anneau de focus n'est jamais supprimé.
+     Actions et liens — contour 2 px accent-700 à 3 px de décalage. */
+  :focus-visible { @apply outline outline-2 outline-offset-3 outline-accent-700; }
+
+  /* Champs — bordure accent-500 et anneau accent-100 de 3 px
+     (Bibliothèque de composants §2). */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply border-accent-500 outline-none ring-3 ring-accent-100;
+  }
 }

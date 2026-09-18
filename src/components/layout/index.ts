@@ -1,0 +1,3 @@
+export { SkipLink, type SkipLinkProps } from "./SkipLink";
+export { Header, type HeaderProps } from "./Header";
+export { Footer, type FooterProps } from "./Footer";
