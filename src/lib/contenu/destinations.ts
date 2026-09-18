@@ -196,6 +196,59 @@ export const LES_PLUS_DEMANDEES = [
   },
 ] as const;
 
+/**
+ * Critères comparés sur C-03, dans l'ordre où ils écartent une destination :
+ * le coût d'abord, puis ce qu'il faut prouver, puis ce qui se passe après.
+ */
+export const CRITERES_COMPARATEUR = [
+  { cle: "cout", intitule: "Coût 1re année" },
+  { cle: "ressources", intitule: "Ressources à prouver" },
+  { cle: "travail", intitule: "Travail étudiant" },
+  { cle: "apres", intitule: "Après diplôme" },
+  { cle: "delai", intitule: "Délai d'instruction" },
+  { cle: "langue", intitule: "Langue du cursus" },
+  { cle: "frais", intitule: "Frais de demande" },
+] as const;
+
+export type CleCritere = (typeof CRITERES_COMPARATEUR)[number]["cle"];
+
+export const COMPARAISON: Record<string, Record<CleCritere, string>> = {
+  "pays-bas": {
+    cout: "6 900 000 F",
+    ressources: "13 569,24 € / an",
+    travail: "16 h / semaine, permis demandé par l'employeur",
+    apres: "12 mois",
+    delai: "60 jours",
+    langue: "Anglais",
+    frais: "243 €",
+  },
+  allemagne: {
+    cout: "7 400 000 F",
+    ressources: "11 904 € bloqués",
+    travail: "140 jours pleins par an, sans permis employeur",
+    apres: "18 mois",
+    delai: "6 à 12 semaines",
+    langue: "Anglais ou allemand",
+    frais: "75 €",
+  },
+  canada: {
+    cout: "11 200 000 F",
+    ressources: "20 635 CAD / an",
+    travail: "24 h / semaine hors campus, sans permis séparé",
+    apres: "jusqu'à 36 mois",
+    delai: "12 semaines",
+    langue: "Anglais ou français",
+    frais: "150 CAD",
+  },
+};
+
+/** Le critère qui se lit de travers le plus souvent, expliqué sous le tableau. */
+export const LECTURE_ATTENTIVE = {
+  titre: "Le travail étudiant se lit de près",
+  texte:
+    "Aux Pays-Bas, c'est l'employeur qui demande le permis de travail à ton nom, et beaucoup de petits employeurs refusent cette démarche. En Allemagne et au Canada, aucune autorisation séparée n'est requise.",
+} as const;
+
 export const MENTION_ACCUEIL: Mention = {
   source: "ind.nl, canada.ca, make-it-in-germany.com",
   verifieeLe: VERIFIEE_LE,

@@ -53,15 +53,41 @@ export interface CompletenessTierProps {
   completude: CompletenessPublic;
   /** Mention de partage des rôles, à préciser par destination sur C-09. */
   mention?: string;
+  /**
+   * `bloc` sur C-09, où la complétude est le sujet de l'écran.
+   * `carte` sur C-01, où elle tient en deux lignes dans une carte de dossier
+   * — c'est ce qui remplace la note sur cent et sa barre de progression.
+   */
+  variante?: "bloc" | "carte";
   className?: string;
 }
 
 export function CompletenessTier({
   completude,
   mention = MENTION_PAR_DEFAUT,
+  variante = "bloc",
   className,
 }: CompletenessTierProps) {
   const ton = TONS[completude.palier];
+
+  if (variante === "carte") {
+    return (
+      <div className={cn("flex flex-col items-start gap-1.5", className)}>
+        <span
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full bg-ink-100 px-2.5 py-1 text-13 font-medium",
+            ton.texte,
+          )}
+        >
+          <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", ton.point)} />
+          {LIBELLE_PALIER[completude.palier]}
+        </span>
+        <span className="text-pretty text-14 text-ink-700">
+          {libelleDenombrement(completude.compteurs)}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col gap-2 rounded-lg bg-ink-100 p-5", className)}>
