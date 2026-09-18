@@ -54,11 +54,14 @@ export default {
       // de choix du simulateur (DOC-12, Fondations §6).
       minHeight: { touch: "44px", bouton: "48px", action: "52px", option: "60px" },
       minWidth: { touch: "44px" },
-      // 22 px : case à cocher. 18 (72 px) : hauteur d'une ligne de checklist.
-      // Deux crans qui manquent aux valeurs natives de Tailwind.
-      spacing: { 5.5: "22px", 18: "72px" },
+      // 22 px : case à cocher. 13 (52 px) : largeur de l'interrupteur et
+      // action principale mobile. 18 (72 px) : hauteur d'une ligne de
+      // checklist. Trois crans qui manquent aux valeurs natives de Tailwind.
+      spacing: { 5.5: "22px", 13: "52px", 18: "72px" },
       // Pastille de choix exclusif pleine (Bibliothèque §3).
       borderWidth: { 6: "6px" },
+      // Saisie du code de vérification (A-03), espacée pour se relire.
+      letterSpacing: { code: "0.24em" },
       // Règle clavier 3 : contour 2 px accent-700 à 3 px de décalage sur les
       // actions, anneau accent-100 de 3 px sur les champs. Ni l'un ni l'autre
       // n'est écrivable sans ces deux crans.

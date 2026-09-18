@@ -12,6 +12,8 @@ Références : `docs/prototype/ImmiPro Fondations.dc.html`,
 | `Input`, `Select` | `ui/Input.tsx`, `ui/Select.tsx` | libellé visible toujours ; l'erreur remplace l'aide, elle ne s'y ajoute pas ; un champ désactivé garde sa valeur |
 | `RadioGroup` | `ui/RadioGroup.tsx` | un seul arrêt de tabulation, flèches, Origine et Fin, `aria-checked` (règle clavier 4) |
 | `Checkbox` | `ui/Checkbox.tsx` | composant contrôlé sans `defaultChecked` : aucune case ne peut être pré-cochée (A-05) |
+| `Switch` | `ui/Switch.tsx` | `role="switch"`, relié à son titre et à sa description : il s'annonce avec ce qu'il autorise, pas « activé, bouton » |
+| `LienBouton` | `ui/LienBouton.tsx` | allure de bouton, sémantique de lien. Partage ses classes avec `Button` via `bouton-styles.ts`, hors frontière client |
 | `Card` | `ui/Card.tsx` | rayon plafonné à `rounded-lg` |
 | `ChecklistRow` | `ui/ChecklistRow.tsx` | un `button`, jamais un `div` cliquable (règle clavier 9) |
 | `StatusBadge` | `ui/StatusBadge.tsx` | couleur **et** mot ; les états viennent de `DocumentState`, pas d'une liste recopiée |
@@ -32,3 +34,7 @@ Références : `docs/prototype/ImmiPro Fondations.dc.html`,
   pas composant par composant.
 - Un test Vitest minimal par composant : rendu, état désactivé, focus.
   Ils vivent dans `tests/ui/`.
+- Les classes partagées vivent dans `bouton-styles.ts`, sans `"use client"` :
+  au travers de cette frontière, un composant serveur ne reçoit qu'une
+  référence au module, pas ses valeurs. `tests/frontiere-client.test.ts`
+  refuse qu'une constante la retraverse.
