@@ -53,7 +53,9 @@ model VisaRule {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  applications  Application[]
+  applications   Application[]
+  migrationsFrom RuleMigration[] @relation("MigrationFrom")
+  migrationsTo   RuleMigration[] @relation("MigrationTo")
 
   @@unique([countryCode, visaType, version])
   @@index([countryCode, category, status])
@@ -81,6 +83,7 @@ model User {
   applications  Application[]
   transactions  Transaction[]
   aiUsage       AiUsage[]
+  notifications Notification[]
 }
 
 model Profile {
@@ -142,31 +145,47 @@ enum Issue {
 }
 
 model Application {
-  id             String            @id @default(uuid())
-  userId         String
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Snapshot de la règle au moment de l'ouverture (INV-3).
-  visaRuleId     String?
-  visaRule       VisaRule?         @relation(fields: [visaRuleId], references: [id])
+  visaRuleId String?
+  visaRule   VisaRule? @relation(fields: [visaRuleId], references: [id])
 
-  status         ApplicationStatus @default(BROUILLON)
-  completeness   Int               @default(0)
-  targetDate     DateTime?         @db.Date
-  submittedAt    DateTime?
-  issue          Issue?
-  issueReason    String?
-  purgedAt       DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  status ApplicationStatus @default(BROUILLON)
 
-  documents      Document[]
-  deadlines      Deadline[]
-  transactions   Transaction[]
-  aiUsage        AiUsage[]
+  /// Barème interne, 0 à 100 (WF-07). Back-office seul : il n'est jamais
+  /// sérialisé vers le candidat, qui voit un palier et un dénombrement
+  /// (arbitrage C-09). Le nom le rappelle à qui écrit une requête.
+  internalScore Int       @default(0)
+  /// Passage en PRET : calculé, jamais déclaré (RG-07.2). Remis à null
+  /// dès qu'une pièce régresse, y compris par péremption (RG-07.4).
+  readyAt       DateTime?
+
+  targetDate  DateTime? @db.Date
+  submittedAt DateTime?
+  issue       Issue?
+  issueReason String?
+  /// Échéance de purge annoncée au candidat à la clôture (INV-5, RG-10.2).
+  purgeDueAt  DateTime?
+  purgedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  documents     Document[]
+  deadlines     Deadline[]
+  transactions  Transaction[]
+  aiUsage       AiUsage[]
+  credits       AnalysisCredit[]
+  notifications Notification[]
+  migrations    RuleMigration[]
+  accesses      ConsultantAccess[]
+  appointments  Appointment[]
 
   @@index([userId, status])
   @@index([visaRuleId])
+  @@index([status, purgeDueAt])
 }
 
 enum DocumentStatus {
@@ -180,25 +199,54 @@ enum DocumentStatus {
   PURGEE
 }
 
+/// Ce qui lève le manque. C'est le remède, et non l'état, qui détermine
+/// l'action proposée : un passeport trop court se remplace à
+/// l'administration, et « Ajouter » mentirait sur l'effort demandé.
+enum DocumentRemedy {
+  TELEVERSER
+  REMPLACER
+  REDIGER
+  DEMARCHE
+}
+
+enum DocumentFamily {
+  OBLIGATOIRE
+  COMPLEMENTAIRE
+}
+
 model Document {
   id            String         @id @default(uuid())
   applicationId String
   application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   code          String
   label         String
+  family        DocumentFamily @default(OBLIGATOIRE)
   required      Boolean        @default(true)
+  remedy        DocumentRemedy @default(TELEVERSER)
   status        DocumentStatus @default(ATTENDUE)
-  objectKey     String?
-  checksum      String?
-  extracted     Json?
+
+  extracted Json?
   /// Message actionnable affiché à l'utilisateur (RG-06.3).
-  feedback      String?
-  expiresAt     DateTime?      @db.Date
-  analyzedAt    DateTime?
-  createdAt     DateTime       @default(now())
+  feedback  String?
+  /// Le même constat en forme brève : mesure, exigence, action.
+  finding   String?
+  /// Conseil propre à cette pièce, affiché au dépôt. « Le PDF de ton
+  /// application bancaire se lit mieux » ne vaut que pour un relevé.
+  hint      String?
+
+  /// Durée de validité, en mois, des pièces périssables (RG-06.6). Elle sert
+  /// aussi à calculer la date « au plus tôt » de l'échéancier (WF-09).
+  validityMonths Int?
+  expiresAt      DateTime? @db.Date
+  analyzedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  versions  DocumentVersion[]
+  interview InterviewAnswer[]
 
   @@unique([applicationId, code])
   @@index([status, expiresAt])
+  @@index([applicationId, family, status])
 }
 
 model Deadline {
@@ -248,7 +296,17 @@ model Transaction {
   createdAt     DateTime          @default(now())
   confirmedAt   DateTime?
 
+  /// Rapprochement bancaire : distinct du cycle de paiement. Un silence de
+  /// l'opérateur laisse `reconciledAt` nul sans faire basculer `status` en
+  /// échec — aucun paiement n'est accusé sur l'absence de réponse d'un tiers.
+  reconciledAt DateTime?
+  /// Écart constaté, conservé jusqu'à résolution manuelle (B-04).
+  discrepancy  String?
+
+  credits AnalysisCredit[]
+
   @@index([status, createdAt])
+  @@index([reconciledAt, createdAt])
 }
 
 /// Comptage des tokens, pas des « vérifications » (INV-6).
@@ -278,4 +336,396 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([target, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Versions de pièce, analyse et revue humaine
+// ═══════════════════════════════════════════════════════════
+
+/// Version déposée d'une pièce — fichier téléversé (C-07) ou texte rédigé
+/// (R-03). Les deux vivent ici : ce sont les mêmes versions dans la même
+/// checklist, et les séparer obligerait chaque écran à savoir laquelle lire.
+///
+/// `checksum` porte RG-06.2 : une pièce re-téléversée à l'identique réutilise
+/// le verdict en cache, sans débit de quota. L'unicité par document le rend
+/// vrai en base plutôt qu'en intention.
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  rank       Int
+
+  /// Clé MinIO du fichier. Nulle pour une pièce rédigée.
+  objectKey String?
+  checksum  String?
+  mimeType  String?
+  sizeBytes Int?
+
+  /// Texte d'une pièce rédigée. Nul pour un fichier.
+  body       String?
+  wordCount  Int?
+  /// Ce qui a changé, en une phrase. Une liste de versions sans motif ne se lit pas.
+  changeNote String?
+
+  uploadedAt DateTime  @default(now())
+  /// Contenu supprimé, métadonnées conservées (INV-5, RG-10.1).
+  purgedAt   DateTime?
+
+  analyses DocumentAnalysis[]
+  findings CritiqueFinding[]
+
+  @@unique([documentId, rank])
+  @@unique([documentId, checksum])
+  @@index([documentId, uploadedAt])
+}
+
+enum AnalysisVerdict {
+  CONFORME
+  A_CORRIGER
+  ILLISIBLE
+  HORS_SUJET
+}
+
+/// Résultat d'une analyse de pièce (C-08, WF-06).
+///
+/// `creditConsumed` est stocké et non déduit du verdict : une reprise après
+/// ILLISIBLE ne débite rien (WF-06, cas limites), une relecture humaine peut
+/// rendre l'analyse, et un verdict réutilisé sur empreinte identique ne
+/// coûte pas non plus. Recalculer la règle à la lecture la ferait diverger
+/// du grand livre de crédits.
+model DocumentAnalysis {
+  id             String          @id @default(uuid())
+  versionId      String
+  version        DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  verdict        AnalysisVerdict
+  /// Champs lus, affichés en regard de l'exigence (C-08).
+  fields         Json?
+  /// Titre et corps du verdict, actionnables (RG-06.3).
+  title          String
+  body           String
+  /// Trace technique de la lecture, pour l'opérateur seul (B-05).
+  engineLog      String?
+  inputTokens    Int             @default(0)
+  outputTokens   Int             @default(0)
+  creditConsumed Boolean         @default(true)
+  analyzedAt     DateTime        @default(now())
+
+  review ManualReview?
+
+  @@index([verdict, analyzedAt])
+}
+
+enum ReviewReason {
+  SIGNALE_PAR_LE_CANDIDAT
+  ECHEC_TECHNIQUE
+  DOCUMENT_NON_RECONNU
+  NETTETE_INSUFFISANTE
+}
+
+/// Revue manuelle d'une pièce en échec (B-05, WF-15).
+///
+/// `message` est obligatoire dès qu'une décision est prise : c'est RG-06.3
+/// appliqué à un humain plutôt qu'à la machine. La contrainte vit dans la
+/// migration, pas seulement dans l'écran.
+model ManualReview {
+  id             String           @id @default(uuid())
+  analysisId     String           @unique
+  analysis       DocumentAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  reason         ReviewReason
+  queuedAt       DateTime         @default(now())
+  reviewerId     String?
+  decision       AnalysisVerdict?
+  /// Message envoyé au candidat. Jamais « non conforme » seul (RG-06.3).
+  message        String?
+  /// Une analyse rendue recrédite le quota : la lecture n'a rien rendu.
+  creditRefunded Boolean          @default(false)
+  decidedAt      DateTime?
+
+  @@index([decidedAt, queuedAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Quota d'analyses — grand livre
+// ═══════════════════════════════════════════════════════════
+
+enum CreditReason {
+  ACHAT_PACK
+  RECHARGE
+  ANALYSE
+  ANALYSE_RENDUE
+  GESTE_COMMERCIAL
+}
+
+/// Grand livre du quota d'analyses (INV-6).
+///
+/// Un solde stocké se désynchronise du jour où une écriture échoue à
+/// mi-chemin ; un grand livre se recompte. C'est aussi la seule forme qui
+/// rend un recréditement traçable : « 2 analyses rendues après pièces
+/// illisibles » est une ligne, pas une soustraction silencieuse.
+///
+/// `delta` est positif à l'octroi, négatif à la consommation. Le solde est
+/// la somme, et il ne descend jamais sous zéro : jamais de dépassement
+/// silencieux.
+model AnalysisCredit {
+  id            String       @id @default(uuid())
+  applicationId String
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  delta         Int
+  reason        CreditReason
+  /// Achat qui a ouvert le quota, le cas échéant.
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  /// Analyse qui l'a consommé ou rendu, le cas échéant.
+  analysisId    String?
+  note          String?
+  createdAt     DateTime     @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Rédaction assistée
+// ═══════════════════════════════════════════════════════════
+
+/// Réponse à une question de l'entretien guidé (R-02, WF-08).
+///
+/// Elles sont conservées à mesure, pour que l'entretien se reprenne. Le texte
+/// produit vient d'elles et de rien d'autre : c'est ce qui sépare une mise en
+/// forme d'une fabrication (RG-08.2).
+model InterviewAnswer {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  rank       Int
+  section    String
+  question   String
+  answer     String
+  updatedAt  DateTime @updatedAt
+
+  @@unique([documentId, rank])
+}
+
+enum CritiqueKind {
+  INCOHERENCE
+  A_RENFORCER
+  FORME
+}
+
+/// Remarque d'analyse critique (R-04, WF-08).
+///
+/// Elle relève une incohérence ou une imprécision. Il n'y a volontairement
+/// aucune note ni aucun score : une note portée sur une lettre se retiendrait
+/// comme un pronostic sur la décision (INV-1).
+model CritiqueFinding {
+  id         String          @id @default(uuid())
+  versionId  String
+  version    DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  kind       CritiqueKind
+  title      String
+  body       String
+  /// Les deux valeurs qui divergent, avec la pièce qui les porte (RG-08.3).
+  gaps       Json?
+  resolvedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([versionId, kind])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Alertes et divergence réglementaire
+// ═══════════════════════════════════════════════════════════
+
+enum NotificationKind {
+  REGLEMENTATION
+  ECHEANCE
+  ANALYSE
+  PAIEMENT
+  VEILLE
+}
+
+/// Alerte adressée à un candidat (T-01, WF-11).
+///
+/// `dueAt` porte la date visée par une alerte d'échéance : le délai
+/// « dans 7 jours » se recalcule à l'affichage. Écrit dans le titre, il
+/// resterait affiché le jour même, puis une semaine après.
+///
+/// RG-11.2 : les alertes sont ciblées par dossier, jamais diffusées à toute
+/// la base — d'où `applicationId` plutôt qu'un envoi par destination.
+model Notification {
+  id            String           @id @default(uuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application?     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kind          NotificationKind
+  title         String
+  body          String
+  /// Source réglementaire, quand l'alerte en cite une (INV-8).
+  sourceUrl     String?
+  dueAt         DateTime?        @db.Date
+  /// Migration à arbitrer, le cas échéant : l'alerte ouvre T-02.
+  migrationId   String?
+  readAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([createdAt])
+}
+
+enum RuleImpact {
+  MINEUR
+  MAJEUR
+  CRITIQUE
+}
+
+enum MigrationDecision {
+  MIGRER
+  CONSERVER
+}
+
+/// Arbitrage d'une divergence réglementaire (T-02, WF-11).
+///
+/// INV-3 tient ici : publier une version ne migre aucun dossier. La ligne
+/// existe dès la publication, `decision` reste nulle tant que le candidat
+/// n'a pas tranché, et rien ne change dans sa checklist entre-temps. Migrer
+/// d'office aurait rendu ce modèle inutile — c'est précisément pourquoi il
+/// existe.
+model RuleMigration {
+  id            String             @id @default(uuid())
+  applicationId String
+  application   Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromRuleId    String
+  fromRule      VisaRule           @relation("MigrationFrom", fields: [fromRuleId], references: [id])
+  toRuleId      String
+  toRule        VisaRule           @relation("MigrationTo", fields: [toRuleId], references: [id])
+  impact        RuleImpact
+  /// Diff calculé à la publication, affiché côte à côte (T-02).
+  diff          Json
+  decision      MigrationDecision?
+  decidedAt     DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@unique([applicationId, toRuleId])
+  @@index([decision, createdAt])
+}
+
+/// Relevé d'une source de veille (B-01, WF-14).
+///
+/// Une source muette ne vaut pas un changement de règle : l'échec est
+/// enregistré ici, et rien n'est dépublié (RG-14.3). C'est ce qui permet à
+/// l'écran d'annoncer « 13 sources sur 14 » avec un compte exact plutôt
+/// qu'un « collecte partielle » invérifiable.
+model SourceCheck {
+  id         String   @id @default(uuid())
+  sourceUrl  String
+  checkedAt  DateTime @default(now())
+  reachable  Boolean
+  attempts   Int      @default(1)
+  error      String?
+  /// Écart constaté par rapport à la règle publiée, le cas échéant.
+  difference String?
+
+  @@index([checkedAt])
+  @@index([sourceUrl, checkedAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Consultants habilités (WF-12)
+// ═══════════════════════════════════════════════════════════
+
+model Consultant {
+  id            String   @id @default(uuid())
+  name          String
+  firm          String
+  city          String
+  /// Mention d'agrément et ancienneté, affichées telles quelles (T-04).
+  qualification String
+  languages     Json
+  /// Délai de réponse annoncé, en heures.
+  responseHours Int
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  accreditations Accreditation[]
+  accesses       ConsultantAccess[]
+  appointments   Appointment[]
+}
+
+/// Habilitation par destination (RG-12.1).
+///
+/// Elle atteste qu'un titre d'exercice a été vérifié dans la juridiction
+/// concernée — RCIC pour le Canada, l'équivalent ailleurs. Elle ne dit rien
+/// de l'issue d'une demande, et l'annuaire le dit en toutes lettres (INV-1).
+///
+/// Une habilitation retirée reste en table, datée : la retirer effacerait la
+/// preuve qu'elle a existé quand un rendez-vous a eu lieu.
+model Accreditation {
+  id           String     @id @default(uuid())
+  consultantId String
+  consultant   Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  countryCode  String     @db.Char(2)
+  /// Titre vérifié : « RCIC », « avocat au barreau d'Amsterdam »…
+  title        String
+  verifiedAt   DateTime   @db.Date
+  verifiedBy   String
+  revokedAt    DateTime?
+
+  @@unique([consultantId, countryCode])
+  @@index([countryCode, revokedAt])
+}
+
+/// Accord nominatif d'accès à un dossier (RG-12.2).
+///
+/// Deux conditions cumulées avec l'habilitation, et aucune ne couvre
+/// l'autre : la première répond à la compétence, celle-ci au consentement.
+///
+/// `expiresAt` est obligatoire : le partage est révocable **et** expire de
+/// lui-même. Un accord sans échéance survit à la consultation qui l'a
+/// motivé, et personne ne pense à le retirer.
+model ConsultantAccess {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  consultantId  String
+  consultant    Consultant  @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  grantedAt     DateTime    @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+
+  @@index([applicationId, revokedAt])
+  @@index([consultantId, expiresAt])
+}
+
+enum AppointmentStatus {
+  RESERVE
+  HONORE
+  ANNULE
+  REPORTE
+  ABSENT
+}
+
+/// Rendez-vous avec un consultant (T-05, WF-12).
+///
+/// `reference` est unique et dérivée du créneau et du consultant : une
+/// réservation rejouée n'en crée pas deux, comme le paiement qui la précède
+/// est idempotent (INV-7).
+model Appointment {
+  id            String            @id @default(uuid())
+  reference     String            @unique
+  applicationId String
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  consultantId  String
+  consultant    Consultant        @relation(fields: [consultantId], references: [id])
+  startsAt      DateTime
+  durationMin   Int
+  status        AppointmentStatus @default(RESERVE)
+  /// Limite d'annulation sans frais, calculée au créneau moins le délai de
+  /// la grille. Stockée parce qu'elle est opposable : la grille peut changer
+  /// après la réservation, pas la condition acceptée ce jour-là.
+  freeUntil     DateTime
+  transactionId String?           @unique
+  createdAt     DateTime          @default(now())
+
+  @@unique([consultantId, startsAt])
+  @@index([applicationId, startsAt])
 }
