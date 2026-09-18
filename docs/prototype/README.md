@@ -264,6 +264,8 @@ Alignée sur `src/domain/payments/pricing.ts`.
 
 Les neuf reports vers le code sont réunis dans `ImmiPro Reports vers le code.dc.html`, classés par fichier (`tailwind.config.ts`, `pricing.ts`, `completeness/`, `consultants/`).
 
+**Les écrans n'ont pas été repassés après les arbitrages du 13/09.** Le relevé complet des textes et des montants restés en arrière est dans [`ECARTS-A-ARBITRER.md`](./ECARTS-A-ARBITRER.md), classé par ordre d'urgence par rapport aux lots restants. À lire avant de coder un lot, pour ne pas découvrir l'écart écran par écran.
+
 Les quatre arbitrages qui restaient — C-09, $-01, consultants, `tokensIA` — ont été rendus le 13/09/2026 et sont consignés avec leur motif dans `ImmiPro Arbitrages clos.dc.html`. Ils sont réversibles : le motif est écrit pour qu'un désaccord porte sur le raisonnement.
 
 - **Essai lecteur d'écran** : rien n'a été entendu sur appareil réel. Le protocole en douze vérifications est écrit, et la feuille de relevé s'imprime telle quelle. Compter une heure sur un appareil milieu de gamme. C'est le seul point qui peut encore renvoyer du travail de fond.
