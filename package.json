@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:copy": "node scripts/check-forbidden-copy.mjs",
+    "check:copy": "tsx scripts/check-forbidden-copy.ts",
     "check": "npm run lint && npm run typecheck && npm run test && npm run check:copy",
     "seed:rules": "tsx prisma/seed/visa-rules.ts",
     "worker": "tsx src/server/jobs/worker.ts",

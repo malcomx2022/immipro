@@ -16,14 +16,53 @@ export interface Pack {
    */
   tokensIA: number;
   destinations: number;
-  /** Un seul pack peut être mis en avant sur $-01 : ni remise, ni prix barré, ni prorata. */
-  misEnAvant?: true;
+  /**
+   * Mise en avant de $-01. Un seul pack la porte, et le test le garantit :
+   * la décision sort du domaine, jamais du composant, pour que l'écran ne
+   * puisse pas rediverger du code comme le prototype l'a fait.
+   *
+   * Essentiel reste premier dans l'ordre de lecture sans être recommandé :
+   * il répond à « combien ça coûte », la mise en avant répond à « lequel me
+   * faut-il ». Les deux questions n'ont pas la même réponse.
+   */
+  misEnAvant: boolean;
+  /**
+   * Texte du badge. Factuel, jamais commercial : il dit ce que le pack
+   * couvre, il ne dit pas qu'il est populaire. Même règle qu'INV-1 — on
+   * justifie, on ne survend pas.
+   */
+  justification: string;
 }
 
+/** L'ordre est celui de lecture de $-01 : Essentiel d'abord, prix croissant. */
 export const PACKS: Pack[] = [
-  { code: "essentiel", libelle: "Essentiel", prix: { XOF: 5000, EUR: 12 }, tokensIA: 120_000, destinations: 1 },
-  { code: "dossier", libelle: "Dossier", prix: { XOF: 15000, EUR: 29 }, tokensIA: 400_000, destinations: 1, misEnAvant: true },
-  { code: "pro", libelle: "Dossier Pro", prix: { XOF: 45000, EUR: 59 }, tokensIA: 1_200_000, destinations: 3 },
+  {
+    code: "essentiel",
+    libelle: "Essentiel",
+    prix: { XOF: 5000, EUR: 12 },
+    tokensIA: 120_000,
+    destinations: 1,
+    misEnAvant: false,
+    justification: "Une destination, dix analyses de pièces",
+  },
+  {
+    code: "dossier",
+    libelle: "Dossier",
+    prix: { XOF: 15000, EUR: 29 },
+    tokensIA: 400_000,
+    destinations: 1,
+    misEnAvant: true,
+    justification: "Couvre l'ensemble des pièces exigées pour cette destination",
+  },
+  {
+    code: "pro",
+    libelle: "Dossier Pro",
+    prix: { XOF: 45000, EUR: 59 },
+    tokensIA: 1_200_000,
+    destinations: 3,
+    misEnAvant: false,
+    justification: "Trois destinations comparées en parallèle",
+  },
 ];
 
 /**
@@ -39,7 +78,23 @@ export interface Complement {
   prix: Record<Devise, number>;
 }
 
-/** Recharge de 10 analyses, achetée là où le quota s'épuise (C-07, RG-06.5). */
+/**
+ * Ce que la règle ci-dessus attend encore.
+ *
+ * La recharge est libellée en analyses, les packs sont contingentés en
+ * tokens : tant que les deux ne sont pas dans la même unité, n'importe quel
+ * prix crée un arbitrage sans qu'on le voie. Le volume de la recharge — et
+ * donc l'application de `MARGE_MINIMALE_RECHARGE` — attend la mesure du coût
+ * réel d'une analyse sur les dix premiers dossiers.
+ *
+ * Relevé au 18/09/2026, à titre d'ordre de grandeur et non de vérité :
+ * les packs annoncent 10, 30 et 90 analyses pour 120 k, 400 k et 1,2 M de
+ * tokens, soit 12 000 à 13 333 tokens par analyse. À ce volume, une recharge
+ * de dix analyses vaut un quota Essentiel entier, et aucun prix compatible
+ * avec le plancher de 3 000 F ne satisfait la règle : c'est le volume qu'il
+ * faut reprendre, pas le montant.
+ */
+
 export const RECHARGE_ANALYSES: Complement = {
   code: "recharge-10",
   type: "recharge_analyses",
@@ -66,6 +121,8 @@ export const CONSULTATION_ANNULATION_HEURES = 24;
 /** En dessous, frais de collecte et coût IA rendent la transaction non rentable (RG-05.5). */
 export const MONTANT_MINIMUM_XOF = 3000;
 
+
+
 /** Seuil d'alerte de marge : coût IA d'un dossier au-delà de 15 % du prix du pack (RG-16.1). */
 export const SEUIL_MARGE_IA = 0.15;
 
@@ -77,6 +134,25 @@ export const deviseParDefaut = (countryCode?: string | null): Devise =>
 export const getPack = (code: string) => PACKS.find((p) => p.code === code);
 
 export const packMisEnAvant = () => PACKS.find((p) => p.misEnAvant);
+
+/**
+ * Règle de tarification de la recharge, arrêtée le 18/09/2026.
+ *
+ * Une recharge doit rester strictement plus chère au token que le pack le
+ * plus cher au token, avec une marge d'au moins 50 %. Sans cette règle, le
+ * volume de la recharge crée un arbitrage invisible : il devient rationnel
+ * de n'acheter que le pack d'entrée et de recharger, et personne ne voit
+ * l'erreur avant de lire les comptes.
+ *
+ * Le test `tarification` la vérifie. Les quotas `tokensIA` étant eux-mêmes
+ * des hypothèses, c'est la règle qui tient, pas les montants : la mesure sur
+ * dix dossiers réels les refera, la règle restera.
+ */
+export const MARGE_MINIMALE_RECHARGE = 1.5;
+
+/** Prix au millier de tokens le plus élevé de la grille, par devise. */
+export const pireTauxParPack = (devise: Devise): number =>
+  Math.max(...PACKS.map((p) => p.prix[devise] / p.tokensIA));
 
 /** Vue client d'un pack : tout sauf tokensIA. À utiliser dans toute réponse d'API publique. */
 export type PackPublic = Omit<Pack, "tokensIA">;

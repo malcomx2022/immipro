@@ -170,9 +170,14 @@ describe("P-06 — Tarifs", () => {
     expect(texte).not.toMatch(/taux de change/i);
   });
 
-  it("met en avant le seul pack que le domaine désigne", () => {
+  it("met en avant le seul pack que le domaine désigne, avec sa justification", () => {
     render(<Tarifs />);
-    expect(screen.getAllByText("Le plus choisi")).toHaveLength(1);
+    const misEnAvant = PACKS.filter((p) => p.misEnAvant);
+    expect(misEnAvant).toHaveLength(1);
+    const badge = screen.getByText(misEnAvant[0]?.justification as string);
+    expect(badge).toBeDefined();
+    // Le badge dit ce que le pack couvre, jamais qu'il est populaire.
+    expect(screen.queryByText(/le plus choisi|populaire/i)).toBeNull();
   });
 
   it("dit que les frais versés à l'administration ne passent pas par ImmiPro", () => {

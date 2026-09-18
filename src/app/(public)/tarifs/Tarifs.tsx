@@ -14,9 +14,14 @@ import { formatMontant } from "@/lib/utils";
  * P-06 — Tarifs.
  *
  * Les montants viennent de `domain/payments/pricing.ts`, source unique : un
- * prix affiché ici et un prix débité là ne peuvent pas diverger. La mise en
- * avant suit le champ `misEnAvant` du pack, le seul du domaine — report n° 3
- * du prototype : « un seul champ de mise en avant ».
+ * prix affiché ici et un prix débité là ne peuvent pas diverger.
+ *
+ * La mise en avant et le texte de son badge viennent du même endroit
+ * (arbitrage du 18/09/2026). Essentiel reste premier dans l'ordre de lecture
+ * — il répond à « combien ça coûte » — sans porter le badge, qui répond à
+ * « lequel me faut-il ». Le badge dit ce que le pack couvre, jamais qu'il est
+ * populaire : une popularité n'est pas une raison, et le produit la
+ * contredirait en support.
  */
 const AVANTAGES: Record<string, readonly string[]> = {
   decouverte: [
@@ -121,8 +126,9 @@ export function Tarifs() {
             prix={prix(pack.prix)}
             action={`Choisir ${pack.libelle}`}
             href="/inscription"
-            principal={Boolean(pack.misEnAvant)}
-            misEnAvant={Boolean(pack.misEnAvant)}
+            principal={pack.misEnAvant}
+            misEnAvant={pack.misEnAvant}
+            justification={pack.justification}
           />
         ))}
       </div>
@@ -180,6 +186,7 @@ function CartePack({
   href,
   principal,
   misEnAvant,
+  justification,
 }: {
   code: string;
   libelle: string;
@@ -188,6 +195,7 @@ function CartePack({
   href: string;
   principal: boolean;
   misEnAvant: boolean;
+  justification?: string;
 }) {
   return (
     <div
@@ -202,9 +210,9 @@ function CartePack({
           <h2 className="text-19 font-semibold text-ink-900">{libelle}</h2>
           <p className="text-14 text-ink-500">{SOUS_TITRES[code]}</p>
         </div>
-        {misEnAvant ? (
-          <span className="flex-none whitespace-nowrap rounded-full bg-accent-50 px-2.5 py-1 text-13 font-medium text-accent-700">
-            Le plus choisi
+        {misEnAvant && justification ? (
+          <span className="flex-none rounded-full bg-accent-50 px-2.5 py-1 text-13 font-medium text-accent-700">
+            {justification}
           </span>
         ) : null}
       </div>
