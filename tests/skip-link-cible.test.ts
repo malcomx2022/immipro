@@ -12,7 +12,11 @@ import { join } from "node:path";
  * Le test lit les sources plutôt que de rendre chaque page : il attrape la
  * route ajoutée sans sa cible, ce qu'aucun rendu d'écran existant ne ferait.
  */
-const RACINES = [join("src", "app", "(public)"), join("src", "app", "(auth)")];
+const RACINES = [
+  join("src", "app", "(public)"),
+  join("src", "app", "(auth)"),
+  join("src", "app", "(app)"),
+];
 
 function routes(dir: string, acc: string[] = []): string[] {
   const entrees = readdirSync(dir);
@@ -35,8 +39,8 @@ function sourcesDeLaRoute(dir: string): string {
 describe("cible du lien d'évitement", () => {
   const dossiers = RACINES.flatMap((r) => routes(r));
 
-  it("il y a bien des routes à vérifier, dans les deux gabarits", () => {
-    expect(dossiers.length).toBeGreaterThanOrEqual(12);
+  it("il y a bien des routes à vérifier, dans les trois gabarits", () => {
+    expect(dossiers.length).toBeGreaterThanOrEqual(25);
   });
 
   it.each(dossiers)("%s pose un titre focalisable id=\"contenu\"", (dir) => {

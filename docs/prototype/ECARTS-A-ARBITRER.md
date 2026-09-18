@@ -268,6 +268,36 @@ Relevé pour ne pas le re-signaler à chaque passe :
 | 1 | B.1 — mise en avant de $-01 | P0 Paiement | **tranché le 18/09**, encodé |
 | 2 | C — le garde-fou | P0 Dossier 2, puis P1 | **tranché le 18/09**, encodé |
 | 3 | B.2 — volume et prix de la recharge | P0 Paiement | règle encodée, **volume en attente de mesure** |
-| 4 | A — C-01, C-02, C-06, C-09 | P0 Dossier 1 et Dossier 2 | ouvert |
+| 4 | A — C-01, C-02, C-06, C-09 | P0 Dossier 1 et Dossier 2 | **appliqué** le 18/09 sur les quatre écrans |
 | 5 | B.3, B.4 — consultation et commission | P1 (T-03), P2 WF-12 | ouvert |
 | 6 | A — T-01, T-05 | P1, P2 WF-12 | ouvert |
+
+
+---
+
+## E · Divergences internes du prototype, relevées au codage du lot Dossier 2
+
+Aucune ne demande d'arbitrage : dans chaque cas, deux cadres du prototype se
+contredisent, et le 390 px fait foi pour les textes et les règles. Elles sont
+consignées pour que la reprise du prototype les corrige à la source.
+
+| # | Où | Ce que dit le prototype | Ce qui est codé |
+|---|---|---|---|
+| E.1 | C-06 en-tête | « Complétude de votre dossier — 68 / 100 » | palier et dénombrement (arbitrage C-09, qui porte sur l'API) |
+| E.2 | C-06 vs C-09 | la même pièce y porte « Ajouter » puis « Déposer » ; la photo d'identité y est illisible puis déjà conforme | une seule description de pièce, l'action déduite du remède ; C-09 regroupe la même liste |
+| E.3 | C-06, test d'anglais | pastille « Expire bientôt » sur un score valable sept semaines *après* le dépôt visé | « Valable jusqu'au 3 mars 2027 » ; « Expire le …, avant le dépôt visé » est réservé au cas qui bloque |
+| E.4 | C-07, envoi | « 62 % envoyés » | volume envoyé sur volume total — un pourcentage sur un écran de dossier se relit comme une note |
+| E.5 | C-07, conseils | « Prendre une photo », les trois cadrages et le conseil du relevé bancaire s'affichent sous toutes les pièces | conseils de prise de vue réservés aux pièces à numériser, conseil bancaire porté par la pièce |
+| E.6 | C-07, quota | « Une recharge de 10 analyses coûte 3 000 F » écrit en dur | lu dans la grille tarifaire, volume compris : le montant et le volume attendent encore la mesure du coût d'une analyse |
+| E.7 | C-08, verdict « à corriger » | « Il manque 1 391 € » au-dessus d'un solde de 10 000 € et d'une exigence de 13 569,24 € | l'écart annoncé est celui des montants affichés |
+| E.8 | C-10, relevé bancaire | échéance au 20 décembre pour une pièce de moins de trois mois au 15 janvier | calculée à rebours : 15 octobre 2026 |
+| E.9 | C-10, rappels | « Rappels par email activés », sans moyen de les couper | la mention renvoie au profil |
+| E.10 | C-10 / C-11 en 1440 px | vouvoiement, purge à 12 mois, compteurs différents du 390 px | tutoiement et purge à 30 jours, comme le 390 px et INV-5 |
+
+Une seule correction ne vient pas du prototype : le test `copy-forbidden`
+extrayait les chaînes du code par expression régulière et prenait une
+apostrophe de commentaire pour un début de littéral. Le commentaire qui
+*explique* l'interdit se faisait refuser par l'interdit. L'extraction est
+maintenant un balayage (`src/domain/copy/source.ts`), commentaires et
+expressions régulières écartés, et elle est testée — y compris sur le fait
+qu'elle voit encore la faute qu'elle doit voir.
