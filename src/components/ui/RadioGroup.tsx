@@ -19,6 +19,12 @@ export interface RadioOption {
   /** Raison d'indisponibilité, ou précision affichée sous le libellé. */
   description?: string;
   desactivee?: boolean;
+  /**
+   * Option mise en avant. Elle est cadrée sans être retenue : une mise en
+   * avant n'est pas un choix fait à la place de qui lit. L'information est
+   * aussi portée par la description, jamais par la seule couleur.
+   */
+  misEnAvant?: boolean;
 }
 
 export interface RadioGroupProps {
@@ -120,7 +126,9 @@ export function RadioGroup({
                 "flex min-h-touch items-center gap-3 rounded-md border px-3.5 py-2.5 text-left",
                 retenue
                   ? "border-accent-500 bg-accent-50"
-                  : "border-ink-300 bg-white hover:bg-ink-100",
+                  : o.misEnAvant
+                    ? "border-2 border-accent-500 bg-white hover:bg-ink-100"
+                    : "border-ink-300 bg-white hover:bg-ink-100",
                 o.desactivee && "cursor-not-allowed bg-ink-100 hover:bg-ink-100",
               )}
             >
