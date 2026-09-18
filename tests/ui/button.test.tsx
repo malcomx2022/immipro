@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 describe("Button", () => {
   it("rend son libellé et déclenche l'action", () => {
@@ -50,5 +51,25 @@ describe("Button", () => {
     const bouton = screen.getByRole("button", { name: "Continuer" });
     bouton.focus();
     expect(document.activeElement).toBe(bouton);
+  });
+});
+
+describe("cn et l'échelle de tailles fermée", () => {
+  it("garde la taille du bouton quand une couleur de texte suit", () => {
+    // `tailwind-merge` prenait `text-16` pour une couleur et le supprimait :
+    // le bouton primaire perdait sa taille au profit de `text-white`.
+    expect(cn("text-16", "text-white")).toContain("text-16");
+    expect(cn("text-16", "text-white")).toContain("text-white");
+  });
+
+  it("remplace bien une taille par une autre", () => {
+    expect(cn("text-16", "text-14")).toBe("text-14");
+  });
+
+  it("le bouton primaire rendu porte sa taille et sa couleur", () => {
+    render(<Button>Continuer</Button>);
+    const classes = screen.getByRole("button", { name: "Continuer" }).className;
+    expect(classes).toContain("text-16");
+    expect(classes).toContain("text-white");
   });
 });

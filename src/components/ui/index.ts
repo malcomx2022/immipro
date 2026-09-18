@@ -1,4 +1,10 @@
-export { Button, type ButtonProps, type ButtonVariante } from "./Button";
+export { Button, type ButtonProps } from "./Button";
+export {
+  SOCLE_BOUTON,
+  VARIANTES_BOUTON,
+  type ButtonVariante,
+} from "./bouton-styles";
+export { LienBouton, type LienBoutonProps } from "./LienBouton";
 export { Input, type InputProps } from "./Input";
 export { Select, type SelectProps, type SelectOption } from "./Select";
 export { RadioGroup, type RadioGroupProps, type RadioOption } from "./RadioGroup";
