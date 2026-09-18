@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+  @keyframes immi-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<template id="__bundler_thumbnail" data-bg-color="#1F4E79">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#1F4E79"/>
+    <rect x="470" y="230" width="260" height="400" rx="34" fill="#FFFFFF"/>
+    <rect x="500" y="280" width="200" height="16" rx="8" fill="#2E75B6"/>
+    <rect x="500" y="322" width="140" height="12" rx="6" fill="#DDDDDD"/>
+    <rect x="500" y="366" width="200" height="74" rx="14" fill="#EEF4FB"/>
+    <rect x="500" y="456" width="200" height="74" rx="14" fill="#F7F7F7"/>
+    <rect x="500" y="556" width="200" height="44" rx="14" fill="#2E75B6"/>
+  </svg>
+</template>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.3 · LOT P0 — ESPACE CANDIDAT, 2 SUR 2 · 390 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">C-07 téléversement · C-08 analyse · C-09 complétude · C-10 échéancier · C-11 clôture</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Aucun écran n'annonce de chances d'obtention : C-09 parle de complétude du dossier. C-07 et C-08 sont commutables entre leurs états, y compris quota épuisé et perte de réseau.</p>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 56px;">
+
+    <div id="6a" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">6a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-07 — Téléversement</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-06 · {{ upLabel }}</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button onClick="{{ upPret }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Prêt</button>
+        <button onClick="{{ upEnvoi }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Envoi en cours</button>
+        <button onClick="{{ upQuota }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Quota épuisé</button>
+        <button onClick="{{ upReseau }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Réseau coupé</button>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>{{ statusRight }}</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Checklist</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Attestation de ressources</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Un relevé bancaire de moins de trois mois montrant 13 569,24 € disponibles.</p>
+          </div>
+
+          <sc-if value="{{ upIsReseau }}">
+            <div style="margin: 0 16px 20px; padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; gap: 12px; align-items: flex-start;">
+              <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #B45309;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Connexion perdue</span>
+                <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ton fichier est conservé sur ton téléphone et sera envoyé dès le retour du réseau. Ne quitte pas l'application.</span>
+              </span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ upIsQuota }}">
+            <div style="margin: 0 16px 20px; padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Tes 30 analyses du pack Dossier sont utilisées</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tu peux toujours téléverser et conserver tes pièces, sans vérification automatique. Une recharge de 10 analyses coûte 3 000 F.</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <button style="min-height: 44px; padding: 0 14px; border: none; border-radius: 999px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Recharger 10 analyses</button>
+                <button style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Téléverser sans analyse</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ upIsEnvoi }}">
+            <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 16px;">
+              <div style="padding: 20px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; gap: 14px; align-items: center;">
+                <div style="flex: 0 0 44px; position: relative; width: 44px; height: 44px;">
+                  <div style="position: absolute; inset: 0; border-radius: 999px; border: 3px solid #D7E5F5; border-top-color: #2E75B6; animation: immi-spin 1.2s linear infinite;"></div>
+                </div>
+                <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Envoi en cours</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 20px; color: #6B6B6B;">releve-bancaire.pdf · 1,8 Mo</div>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="height: 8px; border-radius: 999px; background: #F7F7F7; overflow: hidden;"><div style="width: 62%; height: 8px; border-radius: 999px; background: #2E75B6;"></div></div>
+                <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">62 % envoyés · environ 20 secondes restantes sur ta connexion</div>
+              </div>
+              <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tu peux continuer à remplir ton dossier pendant l'envoi. L'analyse démarre automatiquement à la fin.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ upShowForm }}" hint-placeholder-val="{{ true }}">
+            <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="padding: 24px 20px; border: 1px dashed #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;">
+                <div style="width: 56px; height: 56px; border-radius: 12px; background: #EEF4FB;"></div>
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Ajoute ton relevé</div>
+                <div style="font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">PDF ou photo, 10 Mo maximum. Plusieurs pages acceptées.</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                  <button style="min-height: 48px; padding: 0 18px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Prendre une photo</button>
+                  <button style="min-height: 48px; padding: 0 18px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Choisir un fichier</button>
+                </div>
+                <div style="font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Le PDF téléchargé depuis ton application bancaire évite la photo, et se lit toujours mieux.</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Pour une photo lisible</h2>
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <span style="flex: 0 0 28px; height: 28px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">1</span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Pose le document à plat sur une surface claire, près d'une fenêtre.</span>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <span style="flex: 0 0 28px; height: 28px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">2</span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Cadre les quatre coins, sans rogner les bords ni le cachet.</span>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <span style="flex: 0 0 28px; height: 28px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">3</span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Coupe le flash : il crée un reflet qui masque les montants.</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <img src="public/illustrations/cadrage-bon.svg" alt="" width="320" height="200" style="display: block; width: 100%; height: auto;" />
+                    <span style="font-size: 13px; line-height: 18px; font-weight: 500; color: #0F7B4F;">À plat — attendu</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <img src="public/illustrations/cadrage-incline.svg" alt="" width="320" height="200" style="display: block; width: 100%; height: auto;" />
+                    <span style="font-size: 13px; line-height: 18px; font-weight: 500; color: #6B6B6B;">Incliné — à éviter</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <img src="public/illustrations/cadrage-reflet.svg" alt="" width="320" height="200" style="display: block; width: 100%; height: auto;" />
+                    <span style="font-size: 13px; line-height: 18px; font-weight: 500; color: #6B6B6B;">Reflet — à éviter</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Analyses restantes : 12 sur 30</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Une nouvelle version de la même pièce consomme une analyse.</div>
+              </div>
+
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Tes pièces sont chiffrées et supprimées à la clôture du dossier. Tu as autorisé l'analyse automatique des pièces financières le 11/09/2026.</p>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">{{ upCta }}</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ upFoot }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="6b" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">6b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-08 — Résultat d'analyse</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-06 · {{ anaLabel }}</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <button onClick="{{ anaConforme }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Conforme</button>
+        <button onClick="{{ anaCorriger }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">À corriger</button>
+        <button onClick="{{ anaIllisible }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Illisible</button>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Checklist</button>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Attestation de ressources</h1>
+              <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #F7F7F7; font-size: 14px; line-height: 20px; font-weight: 500; color: {{ anaColor }};">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ anaColor }};"></span>{{ anaEtat }}
+              </span>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px 20px;">
+            <div style="height: 180px; border-radius: 16px; background: repeating-linear-gradient(135deg, #F7F7F7 0 10px, #DDDDDD 10px 20px); display: flex; align-items: flex-end; justify-content: space-between; padding: 12px 14px; gap: 12px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #40403F;">aperçu de la pièce · page 1 sur 3</span>
+              <span style="flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; background: #FFFFFF; font-size: 13px; line-height: 18px; font-weight: 500; color: #1A1A1A;">Agrandir</span>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="padding: 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">{{ anaTitre }}</div>
+              <div style="font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">{{ anaCorps }}</div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce que nous avons lu</h2>
+              <div style="display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Titulaire</span><span style="font-weight: 500; color: #1A1A1A; text-align: right;">{{ lecTitulaire }}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Solde disponible</span><span style="font-weight: 500; color: #1A1A1A; text-align: right;">{{ lecSolde }}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Date du relevé</span><span style="font-weight: 500; color: #1A1A1A; text-align: right;">{{ lecDate }}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Montant exigé</span><span style="font-weight: 500; color: #1A1A1A; text-align: right;">13 569,24 € · 8 901 000 F</span></div>
+              </div>
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Lecture automatique, susceptible d'erreur. Si une valeur est fausse, signale-le : nous faisons relire la pièce par un humain.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <a href="#6b" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Signaler une erreur de lecture</a>
+              <a href="#6b" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Voir l'historique des versions</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">{{ anaCta }}</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ anaFoot }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="6c" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">6c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-09 — Complétude</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-07</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mon dossier</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Complétude de ton dossier</h1>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 24px;">
+            <div style="padding: 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #B3261E;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B3261E;"></span>Dossier incomplet</span>
+              <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">2 pièces obligatoires manquent, 2 complémentaires restent à traiter</span>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ce qui manque au dossier, pas tes chances d'obtenir le visa. Cette décision appartient à l'administration néerlandaise.</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce qui bloque le dépôt</h2>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">2 pièces</span>
+              </div>
+              <div style="display: flex; flex-direction: column; border: 1px solid #DDDDDD; border-radius: 16px; overflow: hidden;">
+                <div style="min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 14px 16px;">
+                  <span style="flex: 0 0 40px; height: 40px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">ID</span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Passeport</span><span style="font-size: 14px; line-height: 20px; color: #B3261E; text-wrap: pretty;">Validité insuffisante : 4 mois après le retour, il en faut 6.</span></span>
+                  <button style="flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; color: #1A1A1A; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;">Voir</button>
+                </div>
+                <div style="min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid #DDDDDD;">
+                  <span style="flex: 0 0 40px; height: 40px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">FIN</span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Attestation de ressources</span><span style="font-size: 14px; line-height: 20px; color: #B45309; text-wrap: pretty;">Juillet manquant, solde inférieur de 1 800 €.</span></span>
+                  <button style="flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; color: #1A1A1A; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;">Remplacer</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">À traiter ensuite</h2>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">2 pièces</span>
+              </div>
+              <div style="display: flex; flex-direction: column; border: 1px solid #DDDDDD; border-radius: 16px; overflow: hidden;">
+                <div style="min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 14px 16px;">
+                  <span style="flex: 0 0 40px; height: 40px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">LET</span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Lettre de motivation</span><span style="font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">Pas encore déposée.</span></span>
+                  <button style="flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; color: #1A1A1A; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;">Déposer</button>
+                </div>
+                <div style="min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid #DDDDDD;">
+                  <span style="flex: 0 0 40px; height: 40px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">DIP</span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Diplôme</span><span style="font-size: 14px; line-height: 20px; color: #B45309; text-wrap: pretty;">Ton prénom s'écrit « Aline » sur le passeport et « Alinne » sur le diplôme.</span></span>
+                  <button style="flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; color: #1A1A1A; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;">Voir</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Déjà conforme</h2>
+              <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; line-height: 20px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Relevés de notes</span>
+                <span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; line-height: 20px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Test d'anglais</span>
+                <span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; line-height: 20px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Acte de naissance</span>
+                <span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; line-height: 20px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Photo d'identité</span>
+              </div>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Liste établie sur les exigences publiées par l'IND, vérifiées le 11/09/2026. Un dossier complet n'est pas un dossier accepté.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">2 pièces à reprendre</div>
+          <button style="flex: 0 0 auto; min-height: 48px; padding: 0 20px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Reprendre la checklist</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="6d" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">6d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-10 — Échéancier</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-09</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mon dossier</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Échéancier</h1>
+            <div style="padding: 16px 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Dépôt visé le 15 janvier 2027</div>
+              <div style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">126 jours restants</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Deux échéances tombent ce mois-ci.</div>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Septembre 2026</h2>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">ce mois-ci</span>
+              </div>
+              <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                <span style="flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 19px; line-height: 26px; font-weight: 500; color: #1A1A1A;">18</span>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">sept.</span>
+                </span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Déposer la demande de renouvellement du passeport</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Compte six à huit semaines de délai à la Direction de l'émigration.</span>
+                  <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 500; color: #B45309;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>Dans 7 jours</span>
+                </span>
+              </div>
+              <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                <span style="flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 19px; line-height: 26px; font-weight: 500; color: #1A1A1A;">30</span>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">sept.</span>
+                </span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Reprendre la photo d'identité</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">La version actuelle est floue sur les bords.</span>
+                </span>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Novembre 2026</h2>
+              <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                <span style="flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 19px; line-height: 26px; font-weight: 500; color: #1A1A1A;">15</span>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">nov.</span>
+                </span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Demander l'IELTS si le score expire</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ton score arrive à échéance le 3 mars 2027, après le dépôt visé.</span>
+                </span>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Décembre 2026</h2>
+              <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                <span style="flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 19px; line-height: 26px; font-weight: 500; color: #1A1A1A;">20</span>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">déc.</span>
+                </span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Demander le relevé bancaire</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Au plus tôt à cette date : il doit avoir moins de trois mois le jour du dépôt.</span>
+                  <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #EEF4FB; font-size: 13px; line-height: 18px; font-weight: 500; color: #1F4E79;">Pièce périssable</span>
+                </span>
+              </div>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Délais de validité vérifiés le 11/09/2026 — source : ind.nl. Les délais administratifs béninois sont des moyennes observées, non garanties.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">Rappels par email activés</div>
+          <button style="flex: 0 0 auto; min-height: 48px; padding: 0 20px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Changer la date</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="6e" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">6e</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-11 — Clôture</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-10 · {{ issueLabel }}</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mon dossier</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Comment s'est terminée ta démarche ?</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Ta réponse nous sert à corriger nos checklists. Elle reste anonyme dans nos statistiques.</p>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ issues }}" as="i" hint-placeholder-count="4">
+                <button onClick="{{ i.pick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 0 16px; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 500; color: #1A1A1A; text-align: left; cursor: pointer; border: {{ i.border }};">
+                  <span>{{ i.label }}</span>
+                  <span style="font-size: 14px; font-weight: 500; color: #1F4E79;">{{ i.mark }}</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ issueNeedsDetail }}">
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">{{ detailLabel }}</span>
+                <textarea value="{{ detail }}" onChange="{{ setDetail }}" placeholder="Le motif indiqué sur la décision, si tu l'as." style="min-height: 96px; padding: 12px 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; line-height: 24px; color: #1A1A1A; resize: none;"></textarea>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Optionnel. C'est ce champ qui nous aide le plus.</span>
+              </label>
+            </sc-if>
+
+            <div style="padding: 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 12px;">
+              <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce qui se passe à la clôture</div>
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #0F7B4F;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tes pièces sont supprimées de nos serveurs sous trente jours : passeport, relevés, diplômes, tout.</span>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #0F7B4F;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tu peux télécharger l'ensemble de ton dossier avant la suppression.</span>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ton compte et tes reçus de paiement restent, pour l'obligation comptable.</span>
+              </div>
+              <button style="align-self: flex-start; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Télécharger mon dossier</button>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">La suppression est définitive. Si tu redéposes une demande plus tard, il faudra téléverser tes pièces à nouveau.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Clôturer mon dossier</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ issueFoot }}</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : C-07 → WF-06 avec RG-06.5 pour le quota, conseils de prise de vue et état hors ligne. C-08 → WF-06, message actionnable, jamais « non conforme » seul. C-09 → WF-07, libellé « complétude », aucune probabilité. C-10 → WF-09, calendrier à rebours des pièces périssables. C-11 → WF-10, purge annoncée comme une garantie.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 1100}}">
+class Component extends DCLogic {
+  state = { up: "pret", ana: "corriger", issue: "obtenu", detail: "" };
+
+  issueOptions = [
+    { key: "obtenu", label: "J'ai obtenu mon visa" },
+    { key: "refus", label: "Ma demande a été refusée" },
+    { key: "abandon", label: "J'ai abandonné la démarche" },
+    { key: "autre", label: "Autre situation" }
+  ];
+
+  renderVals() {
+    const s = this.state;
+    const up = s.up;
+    const ana = s.ana;
+    const needsDetail = s.issue === "refus" || s.issue === "abandon" || s.issue === "autre";
+
+    const anaMap = {
+      conforme: {
+        etat: "Conforme",
+        color: "#0F7B4F",
+        titre: "Cette pièce est complète",
+        corps: "Le relevé est daté du 2 septembre 2026 et montre 11 680 €, au-dessus du montant exigé. Rien à reprendre.",
+        cta: "Revenir à la checklist",
+        foot: "Plus qu'une pièce obligatoire manquante",
+        titulaire: "DOSSOU Aline",
+        solde: "11 680 €",
+        date: "2 septembre 2026"
+      },
+      corriger: {
+        etat: "À corriger",
+        color: "#B45309",
+        titre: "Il manque 1 391 € sur le relevé",
+        corps: "Le relevé montre 10 000 € disponibles, et l'IND en exige 13 569,24 € pour l'année. Téléverse un relevé plus récent, ou ajoute une attestation de prise en charge d'un garant.",
+        cta: "Téléverser une autre version",
+        foot: "Analyses restantes : 12 sur 30",
+        titulaire: "DOSSOU Aline",
+        solde: "10 000 €",
+        date: "2 septembre 2026"
+      },
+      illisible: {
+        etat: "Illisible",
+        color: "#B3261E",
+        titre: "Le montant n'est pas lisible sur la photo",
+        corps: "Un reflet couvre la colonne des soldes sur la page 2. Reprends la photo sans flash, ou télécharge le relevé en PDF depuis ton application bancaire.",
+        cta: "Reprendre la photo",
+        foot: "Cette reprise ne consomme pas d'analyse",
+        titulaire: "DOSSOU Aline",
+        solde: "non lu",
+        date: "non lue"
+      }
+    };
+    const a = anaMap[ana];
+
+    return {
+      upIsPret: up === "pret",
+      upShowForm: up !== "envoi",
+      upIsEnvoi: up === "envoi",
+      upIsQuota: up === "quota",
+      upIsReseau: up === "reseau",
+      upLabel: up === "pret" ? "prêt" : up === "envoi" ? "envoi en cours" : up === "quota" ? "quota épuisé" : "réseau coupé",
+      upPret: () => this.setState({ up: "pret" }),
+      upEnvoi: () => this.setState({ up: "envoi" }),
+      upQuota: () => this.setState({ up: "quota" }),
+      upReseau: () => this.setState({ up: "reseau" }),
+      statusRight: up === "reseau" ? "hors ligne · 78 %" : "4G · 78 %",
+      upCta: up === "envoi" ? "Envoi en cours…" : up === "reseau" ? "Réessayer l'envoi" : "Ajouter la pièce",
+      upFoot: up === "quota"
+        ? "Téléversement toujours possible sans analyse"
+        : up === "reseau"
+          ? "Envoi automatique dès le retour du réseau"
+          : "Formats acceptés : PDF, JPG, PNG · 10 Mo maximum",
+
+      anaConforme: () => this.setState({ ana: "conforme" }),
+      anaCorriger: () => this.setState({ ana: "corriger" }),
+      anaIllisible: () => this.setState({ ana: "illisible" }),
+      anaLabel: a.etat.toLowerCase(),
+      anaEtat: a.etat,
+      anaColor: a.color,
+      anaTitre: a.titre,
+      anaCorps: a.corps,
+      anaCta: a.cta,
+      anaFoot: a.foot,
+      lecTitulaire: a.titulaire,
+      lecSolde: a.solde,
+      lecDate: a.date,
+
+      issues: this.issueOptions.map(i => ({
+        label: i.label,
+        mark: i.key === s.issue ? "Choisi" : "",
+        border: i.key === s.issue ? "2px solid #2E75B6" : "1px solid #DDDDDD",
+        pick: () => this.setState({ issue: i.key })
+      })),
+      issueLabel: this.issueOptions.find(i => i.key === s.issue).label.toLowerCase(),
+      issueNeedsDetail: needsDetail,
+      detailLabel: s.issue === "refus" ? "Quel motif de refus a été indiqué ?" : s.issue === "abandon" ? "Qu'est-ce qui t'a arrêté ?" : "Précise ta situation",
+      detail: s.detail,
+      setDetail: e => this.setState({ detail: e.target.value }),
+      issueFoot: s.issue === "obtenu"
+        ? "Félicitations. Tes pièces seront supprimées sous trente jours."
+        : "Tes pièces seront supprimées sous trente jours."
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #FFFFFF; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="font-family: Inter, system-ui, sans-serif; color: #40403F; background: #FFFFFF; padding: 56px 24px 96px; display: flex; justify-content: center;">
+<div style="width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 56px;">
+
+  <header style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 32px; border-bottom: 1px solid #DDDDDD;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §5 · REVUE DE RECEVABILITÉ · 11/09/2026</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Le prototype face aux dix critères</h1>
+    <p style="margin: 0; max-width: 62ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le §5 dit que le prototype n'est recevable que si les dix critères sont vrais. Les dix le sont. Le septième a été rouvert le 13/09/2026 — il s'appuyait sur un décompte d'écrans jamais vérifié, que l'index construit depuis les fichiers a démenti — puis refermé le jour même par la transposition des douze écrans qui manquaient en 1440 px. Cette page dit sur quoi chaque critère s'appuie et ce qui reste ouvert hors critères.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 8px;">
+      <span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; line-height: 20px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>10 respectés</span>
+    </div>
+  </header>
+
+  <section style="display: flex; flex-direction: column; gap: 24px;">
+    <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Les dix critères</h2>
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <sc-for list="{{ criteres }}" as="c" hint-placeholder-count="10">
+        <div style="padding: 20px 24px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ c.num }}</span>
+            <span style="flex: 1 1 320px; min-width: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">{{ c.titre }}</span>
+            <span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 500; color: {{ c.color }};">
+              <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ c.color }};"></span>{{ c.verdict }}
+            </span>
+          </div>
+          <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">{{ c.constat }}</p>
+          <sc-if value="{{ c.hasReste }}">
+            <div style="padding: 12px 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: #1A1A1A;">Ce qu'il reste à faire</span>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ c.reste }}</span>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Décisions ouvertes</h2>
+      <p style="margin: 0; max-width: 62ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Ces points sont dans le prototype sous forme d'hypothèse. Tant qu'ils ne sont pas tranchés, le prototype n'est pas une spécification sur ces écrans.</p>
+    </div>
+    <div style="display: flex; flex-direction: column;">
+      <sc-for list="{{ ouverts }}" as="o" hint-placeholder-count="5">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px 32px; padding: 20px 0; border-top: 1px solid #DDDDDD;">
+          <div style="flex: 0 0 180px; display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">{{ o.sujet }}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ o.ecrans }}</span>
+          </div>
+          <div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+            <span style="font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">{{ o.etat }}</span>
+            <span style="font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">{{ o.besoin }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 24px;">
+    <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Ce qui existe, document par document</h2>
+    <div style="display: flex; flex-direction: column;">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+        <span style="flex: 1 1 260px; min-width: 0;">Document</span>
+        <span style="flex: 0 0 150px;">Écrans</span>
+        <span style="flex: 0 0 90px;">Largeur</span>
+        <span style="flex: 0 0 80px;">Nombre</span>
+      </div>
+      <sc-for list="{{ inventaire }}" as="d" hint-placeholder-count="10">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 14px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;">
+          <span style="flex: 1 1 260px; min-width: 0; font-weight: 500; color: #1A1A1A;">{{ d.doc }}</span>
+          <span style="flex: 0 0 150px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ d.ecrans }}</span>
+          <span style="flex: 0 0 90px; color: #40403F;">{{ d.largeur }}</span>
+          <span style="flex: 0 0 80px; color: #40403F;">{{ d.nombre }}</span>
+        </div>
+      </sc-for>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 16px 0; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">
+        <span style="flex: 1 1 260px; min-width: 0;">Total</span>
+        <span style="flex: 0 0 150px;"></span>
+        <span style="flex: 0 0 90px;"></span>
+        <span style="flex: 0 0 80px;">{{ totalCadres }}</span>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 20px; padding: 28px; background: #F7F7F7; border-radius: 16px;">
+    <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Ce que je ferais ensuite, dans cet ordre</h2>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <span style="flex: 0 0 28px; height: 28px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #1F4E79;">1</span>
+        <span style="flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Fait : <code style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">pricing.ts</code> et le prototype disent la même chose. Les trois paliers, le minimum de 3 000 F et les destinations concordent. Le code a corrigé le prototype sur un point : les deux grilles sont natives, la mention du taux fixe a donc disparu de ses trois emplacements — P-06, $-02 et l'état de paiement. Reste à trancher si la recharge de 10 analyses est une ligne d'achat à part entière, puisqu'elle n'est pas un <code style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">Pack</code>.</span>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <span style="flex: 0 0 28px; height: 28px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #1F4E79;">2</span>
+        <span style="flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Fournir les photographies des pages publiques. Non bloquant pour le lancement : le motif de héros couvre P-01, seules P-05 et P-07 attendent une image. Les emplacements sont posés et annotés ; je ne génère pas d'images.</span>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <span style="flex: 0 0 28px; height: 28px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #1F4E79;">3</span>
+        <span style="flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Fait : les états de la section B sont produits en 1440 px — B-01 en chargement, vide et source injoignable, B-02 en publication refusée, B-03 en recherche sans résultat, B-04 en rapprochement suspendu, B-05 en file vide, B-06 en période sans écriture. B-07 était déjà livré vide.</span>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <span style="flex: 0 0 28px; height: 28px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #1F4E79;">4</span>
+        <span style="flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Fait : le parcours d'achat est déroulé au clavier seul, de $-01 à $-04, avec la séquence de tabulation par écran et douze règles tenues. La langue des messages d'erreur est tranchée dans son propre document.</span>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <span style="flex: 0 0 28px; height: 28px; border-radius: 999px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #1F4E79;">5</span>
+        <span style="flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Faire passer l'essai sur appareil réel. Le protocole est écrit et se tient à la main : profil d'appareil, douze vérifications avec l'annonce attendue, bascule en mode avion pendant $-03, quatre motifs d'échec. C'est la seule étape qui demande quelqu'un d'autre que moi, et la dernière avant de parler de conformité. Le lien d'évitement, lui, est posé : P-02, $-01, P-01, C-06 et les trois gabarits 1440 px.</span>
+      </div>
+    </div>
+  </section>
+
+  <footer style="padding-top: 32px; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+    <p style="margin: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tokens et logo pris de <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #F7F7F7; padding: 2px 6px; border-radius: 8px;">tailwind.config.ts</code> et <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #F7F7F7; padding: 2px 6px; border-radius: 8px;">docs/BRAND.md</code> du dépôt malcomx2022/immipro.</p>
+    <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">Revue établie le 11/09/2026, mise à jour le même jour après livraison de la bibliothèque de composants, des douze états manquants et des déclinaisons 1440 px ; mise à jour le 13/09/2026 après les quatre derniers arbitrages (C-09, $-01, consultants, tokensIA).</p>
+  </footer>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const OK = { verdict: "Respecté", color: "#0F7B4F" };
+    const PART = { verdict: "Partiel", color: "#B45309" };
+    const NON = { verdict: "Non tenu", color: "#B3261E" };
+
+    const criteres = [
+      {
+        num: "01", titre: "Chaque token porte le nom de la configuration Tailwind", v: OK,
+        constat: "Les valeurs viennent de tailwind.config.ts du dépôt, pas du §2 : accent 50 à 700, ink 100 à 900, success, warning, danger, rayons 8 / 12 / 16, élévations e1 à e3. La page de fondations nomme chaque token à côté de sa valeur."
+      },
+      {
+        num: "02", titre: "Aucune valeur en dur hors de la palette", v: OK,
+        constat: "Les seules valeurs hors palette sont les rgba des trois ombres, qui sont la définition des tokens e1 à e3, et les hachures des emplacements d'image, qui ne sont pas des éléments d'interface."
+      },
+      {
+        num: "03", titre: "Chaque composant existe avec toutes ses variantes et tous ses états", v: OK,
+        constat: "La bibliothèque du §4.1 étape 2 existe : boutons primaire, secondaire, discret et destructif en repos, survol, focus clavier, chargement et désactivé ; champs en repos, focus, erreur et désactivé, avec liste déroulante et zone de dépôt en quatre états ; cases, choix exclusifs, interrupteurs et segments ; pastilles, alertes, carte de pièce, ligne de dossier et son squelette. Cinq règles écrites fixent le focus et la désactivation, dont l'obligation d'accompagner tout bouton désactivé de sa raison. Le parcours clavier de bout en bout est documenté séparément : l'achat d'Essentiel de $-01 à $-04, arrêt par arrêt, six règles de navigation, aucun tabindex positif. Reste à essayer sur TalkBack et VoiceOver avant de parler de conformité au lecteur d'écran."
+      },
+      {
+        num: "04", titre: "Chaque écran des sections C et $ existe en vide, chargement, erreur", v: OK,
+        constat: "Les douze cadres manquants ont été produits : C-03 en chargement et vide, C-04 en chargement et erreur réseau, C-05 en création en cours et échec, C-11 en chargement et vide, $-01 en chargement des tarifs et tarifs indisponibles, $-04 en attente d'opérateur, $-06 en reçu hors ligne. Ils s'ajoutent aux huit du premier document et à ceux intégrés à leurs écrans. Aucun montant n'est affiché quand la grille tarifaire n'a pas répondu."
+      },
+      {
+        num: "05", titre: "Textes définitifs, en français, tutoiement cohérent", v: OK,
+        constat: "Aucun faux texte. Le tutoiement s'applique dans l'espace applicatif et le paiement, le vouvoiement sur les pages publiques et le desktop, ce qui est une décision assumée, pas une inconsistance. Les messages de pièce sont actionnables : « ton passeport expire 4 mois après la date de retour prévue, il en faut 6 », jamais « non conforme » seul. Deux variantes de ton sont proposées sur C-06."
+      },
+      {
+        num: "06", titre: "Les mentions de non-responsabilité apparaissent sur les écrans concernés", v: OK,
+        constat: "Elles sont écrites dans le contexte où le doute naît : sous les résultats du simulateur, en pied de fiche destination avec la source et la date, sur l'écran de complétude qui dit explicitement que le score n'est pas une probabilité, sur la proposition partenaire qui annonce la commission de 15 %, et sur le reçu qui précise qu'il ne se joint pas à une demande de visa."
+      },
+      {
+        num: "07", titre: "Les écrans existent en 390 px et en 1440 px", v: OK,
+        constat: "Le décompte annoncé ici, « les 39 écrans existent aux deux largeurs », était faux sur les deux termes ; l'index du README, établi en relevant les codes dans les documents plutôt qu'en reprenant un chiffre, donne quarante-cinq écrans. Les douze qui manquaient en 1440 px ont été transposés le 13/09/2026 : le paiement dans un document dédié, la rédaction assistée et les transverses P1 dans un autre. Trente-huit écrans existent désormais aux deux largeurs.",
+        reste: "Les sept écrans de back-office restent en 1440 px seulement. C'est une décision, pas un manque : B-01 à B-07 sont des outils de poste de travail, et une version mobile de la revue manuelle des pièces ou du journal d'audit n'aurait pas d'usage. Deux gabarits ont été posés pour cette passe — le gabarit paiement, qui ajoute un récapitulatif permanent à 416 px à la colonne de décision, et la reprise du gabarit dossier pour R et T."
+      },
+      {
+        num: "08", titre: "Contraste au niveau AA sur tous les textes", v: OK,
+        constat: "Mesuré, plus seulement lu : les ratios des dix encres sur les trois fonds sont calculés dans la passe de contraste. Neuf encres sur dix passent partout, du corps en ink-700 (9,4:1 au pire) aux couleurs sémantiques en pleine opacité (danger 5,9:1, success 4,8:1, warning 4,5:1). Aucun texte sur photo ni sur aplat d'accent.",
+        reste: "Une encre échouait : ink-500, le gris secondaire, passait à 4,54:1 sur blanc mais tombait à 4,24:1 sur ink-100 et 4,10:1 sur accent-50, où il sert le plus. Substitution faite — #767676 devient #6B6B6B dans les 803 emplois des vingt-trois documents, soit 5,33:1, 4,97:1 et 4,81:1. À répercuter dans tailwind.config.ts, où ink.500 porte encore l'ancienne valeur."
+      },
+      {
+        num: "09", titre: "Aucune cible tactile inférieure à 44 px", v: OK,
+        constat: "Les boutons principaux sont à 48 ou 52 px, les pills et boutons secondaires à 44 px minimum, les lignes de checklist à 72 px, les liens discrets portent une hauteur de 44 px même quand leur texte est petit."
+      },
+      {
+        num: "10", titre: "Chaque écran renvoie au workflow et aux règles de DOC-11", v: OK,
+        constat: "Chaque cadre porte son code d'inventaire et son workflow en surtitre, et chaque document se termine par le rattachement détaillé aux règles qu'il implémente, y compris les interdits : libellé complétude sur C-09, quota RG-06.5 sur C-07, arbitrage sans migration automatique sur T-02."
+      }
+    ];
+
+    return {
+      criteres: criteres.map(c => ({
+        num: c.num,
+        titre: c.titre,
+        verdict: c.v.verdict,
+        color: c.v.color,
+        constat: c.constat,
+        hasReste: !!c.reste,
+        reste: c.reste || ""
+      })),
+
+      ouverts: [
+        {
+          sujet: "Grille tarifaire",
+          ecrans: "P-06, $-01 à $-06",
+          etat: "Close. pricing.ts porte les trois paliers payants du prototype — Essentiel 5 000 F / 12 €, Dossier 15 000 F / 29 € sur une destination, Dossier Pro 45 000 F / 59 € sur trois — avec MONTANT_MINIMUM_XOF à 3 000 F (RG-05.5) et tokensIA à 120 000, 400 000 et 1 200 000. Pack Accompagné hors grille (WF-12, lot 4, habilitations consultants).",
+          besoin: "Deux corrections tirées du code : la grille est native dans chaque devise, pas une conversion, donc la mention du taux fixe de 655,957 F a été retirée de P-06, $-02 et de l'état de paiement — 12 € et 5 000 F ne se déduisent pas l'un de l'autre. Et la recharge de 10 analyses est tranchée comme type d'achat distinct, pas comme quatrième Pack : elle n'ouvre pas de destination, donc elle sort du choix de $-01 et s'achète depuis un dossier ouvert, à l'endroit où le quota s'épuise (C-07). P-06 et son équivalent 1440 px la gardent en mention hors grille. Le coût IA reste absorbé par tokensIA, constante à ajuster après les dix dossiers de mesure, sans effet sur les écrans ni sur la communication."
+        },
+        {
+          sujet: "Photographies",
+          ecrans: "P-05, P-07",
+          etat: "Emplacements hachurés, annotés avec le format et le poids attendus.",
+          besoin: "Une image par page publique au maximum, AVIF ou WebP, sous 120 Ko. Je ne génère pas d'images."
+        },
+        {
+          sujet: "Illustrations applicatives",
+          ecrans: "C-01 vide, C-03 vide, C-04 erreur, C-06 vide, C-07, $-04, $-05, $-06 hors ligne, P-01",
+          etat: "Douze SVG posés dans public/illustrations/, chargés dans les écrans. Couleurs en variables CSS avec valeurs de repli.",
+          besoin: "Plus de dépendance externe. Le motif de héros couvre P-01 ; les photographies de P-05 et P-07 restent à produire. Quota épuisé (RG-06.5) : pas de visuel, décision explicite — bandeau avec compteur et action, pas un état vide. $-03 garde l'anneau indéterminé, paiement-attente.svg sert de repli sous prefers-reduced-motion."
+        },
+        {
+          sujet: "Justificatif de ressources néerlandais et coût de la première année",
+          ecrans: "P-03, P-04, C-03",
+          etat: "Montée à la donnée officielle. La norme IND 2026 pour un étudiant de l'enseignement supérieur est de 1 130,77 € par mois, soit 13 569,24 € sur douze mois — c'est le seul chiffre que le consulat vérifie, et il couvre la vie courante hors scolarité. Les trois valeurs inventées du prototype (1 250 € par mois, 15 000 € l'année, 11 391 € l'année) sont remplacées sur onze documents, états et écrans pivots compris.",
+          besoin: "L'incohérence arithmétique que je signalais ici n'en était pas une, et l'entrée était mal posée : le justificatif de ressources est une preuve de fonds disponibles sur un compte, le coût de la première année est une dépense estimée. Rien n'oblige le second à dépasser le premier, et l'Allemagne présente la même forme sans être fautive (7 400 000 F de dépense, 11 904 € de compte bloqué). Aucune valeur de coût n'est donc touchée. Reste une divergence réelle, corrigée : le coût néerlandais valait 8 700 000 F en mobile contre 6 900 000 F en desktop, où la ventilation scolarité + logement + frais tombe juste — les écrans mobiles sont alignés sur 6 900 000 F. La note de C-03 qui distingue ressources et scolarité gagnerait à être reprise sur les fiches destination."
+        },
+        {
+          sujet: "Traitement de la complétude — arbitré",
+          ecrans: "C-09",
+          etat: "Clos le 13/09/2026 : dénombrement des manques en tête, palier nommé (« Dossier incomplet », « Presque complet », « Complet »), aucune note sur 100. Appliqué en 390 px, 1440 px et sur l'état vide ; le pivot 1d s'ouvre sur le traitement retenu, le score reste au sélecteur marqué écarté.",
+          besoin: "Le barème 60 / 20 / 20 n'a plus de surface d'affichage. Il peut rester interne à src/domain/completeness/ pour ordonner les lignes ; l'API expose une liste ordonnée de manques et un palier, pas un entier. Aucune chaîne de l'interface ne contient « % », « score » ni « chances »."
+        },
+        {
+          sujet: "Coût marginal d'un dossier",
+          ecrans: "B-07",
+          etat: "Aucune valeur affichée. B-07 est livré en état vide : noms des métriques, colonnes, seuils en ratio (moins de 15 % du prix du pack, RG-16.1), plafond quotidien à 3 × la médiane des sept derniers jours.",
+          besoin: "Arbitré le 13/09/2026 : tokensIA reste une variable interne, visible au back-office seul ; le candidat ne voit qu'un compteur d'analyses. Mesurable en une semaine : dix dossiers complets réels passés dans le pipeline, AiUsage enregistré, coût moyen par type de pièce, export du fournisseur à réclamer à l'équipe technique. Jusque-là B-07 garde son état vide — un chiffre inventé dans une spécification finit implémenté."
+        },
+        {
+          sujet: "Accessibilité clavier et lecteur d'écran",
+          ecrans: "P-01, P-02, $-01, $-03, C-06, B-01, B-05",
+          etat: "Douze règles clavier documentées et implémentées : focus au titre de chaque étape, piège et retour de focus de la feuille du bas, aria-live sur le seul texte de statut, listes du back-office en role=\"listbox\" à un arrêt, lien d'évitement en premier arrêt de P-02, $-01, P-01 et C-06, et second saut « Aller à l'action » sur C-06 pour atteindre la barre basse sans retraverser la checklist. Langue des messages d'erreur tranchée : français seul, lang=\"fr\" sur la racine, codes techniques réservés au back-office.",
+          besoin: "Il ne reste que l'essai lui-même : TalkBack sur Chrome Android, milieu de gamme, réseau bridé, avec bascule en mode avion pendant $-03. Le protocole en douze vérifications est écrit. Le lien d'évitement est maintenant sur les 39 écrans des deux largeurs, documents 1440 px dérivés compris : sur ces derniers, un gestionnaire unique cible le titre du cadre courant, ce qui évite vingt-et-un identifiants à maintenir. Une seule limite assumée : le second saut « Aller à l'action » reste mobile, l'action desktop étant déjà dans le rail droit."
+        },
+        {
+          sujet: "Variantes — arbitrées",
+          ecrans: "P-01, C-06, $-03, $-01",
+          etat: "Retenus : simulateur plein écran, messages en constat puis action, attente en fil d'étapes, et pour $-01 trois colonnes à égalité avec le pack Dossier cadré. Les écartées restent au sélecteur avec leur motif.",
+          besoin: "Deux conséquences à valider : P-01 n'a plus besoin de photographie au-dessus de la ligne de flottaison, et les messages d'analyse abandonnent le tutoiement au profit du constat impersonnel, le reste de l'espace applicatif le gardant. Pour $-01, un seul champ de mise en avant dans pricing.ts, ni remise ni prorata."
+        },
+        {
+          sujet: "Politique consultants — arbitrée",
+          ecrans: "T-04, T-05, A-05, B-06",
+          etat: "Clos le 13/09/2026. Accès au dossier sous deux conditions cumulées : habilitation sur la destination et accord nominatif du candidat, révocable depuis A-05. Tarif unique ImmiPro (20 000 F la consultation de 45 min), encaissement ImmiPro, annulation ou report sans frais jusqu'à 24 h avant. Écran d'accord ajouté (19h), emplacements hachurés remplis en 390 px et 1440 px.",
+          besoin: "Deux tables de droits dont l'accès est l'intersection ; toute lecture par un consultant s'inscrit au journal d'audit. Le montant de 20 000 F est un défaut à confirmer dans pricing.ts."
+        }
+      ],
+
+      inventaire: this.inventaire,
+      totalCadres: this.inventaire.filter(d => /^[0-9]+$/.test(d.nombre)).reduce((n, d) => n + Number(d.nombre), 0) + " cadres"
+    };
+  }
+
+  inventaire = [
+        { doc: "Fondations", ecrans: "DOC-02 §2", largeur: "fluide", nombre: "1 page" },
+        { doc: "Écrans pivots", ecrans: "P-01, C-06, $-03", largeur: "390 px", nombre: "3" },
+        { doc: "Lot P0 — public", ecrans: "P-02 à P-07", largeur: "390 px", nombre: "6" },
+        { doc: "Lot P0 — comptes", ecrans: "A-01 à A-05", largeur: "390 px", nombre: "5" },
+        { doc: "Lot P0 — dossier 1", ecrans: "C-01 à C-05", largeur: "390 px", nombre: "5" },
+        { doc: "Lot P0 — dossier 2", ecrans: "C-07 à C-11", largeur: "390 px", nombre: "5" },
+        { doc: "Lot P0 — paiement", ecrans: "$-01, $-02, $-04 à $-06", largeur: "390 px", nombre: "5" },
+        { doc: "États du lot P0", ecrans: "C-02, C-06, C-08 à C-10, $-02", largeur: "390 px", nombre: "8" },
+        { doc: "Lot P1", ecrans: "R-01 à R-04, T-01 à T-03", largeur: "390 px", nombre: "7" },
+        { doc: "Lot P2 — back-office 1", ecrans: "B-01, B-02, B-05", largeur: "1440 px", nombre: "3" },
+        { doc: "Lot P2 — back-office 2", ecrans: "B-03, B-04, B-06, B-07", largeur: "1440 px", nombre: "4" },
+        { doc: "Gabarits desktop", ecrans: "P-01, C-06, $-03", largeur: "1440 px", nombre: "3" },
+        { doc: "Bibliothèque de composants", ecrans: "DOC-12 §4.1 étape 2", largeur: "fluide", nombre: "1 page" },
+        { doc: "États du lot P0, suite", ecrans: "C-03 à C-05, C-11, $-01, $-04, $-06", largeur: "390 px", nombre: "12" },
+        { doc: "États du lot P2", ecrans: "B-01 à B-06", largeur: "1440 px", nombre: "8" },
+        { doc: "Desktop — pages publiques", ecrans: "P-02 à P-07", largeur: "1440 px", nombre: "6" },
+        { doc: "Desktop — comptes", ecrans: "A-01 à A-05", largeur: "1440 px", nombre: "5" },
+        { doc: "Desktop — dossier 1", ecrans: "C-01 à C-05", largeur: "1440 px", nombre: "5" },
+        { doc: "Desktop — dossier 2", ecrans: "C-07 à C-11", largeur: "1440 px", nombre: "5" },
+        { doc: "Parcours clavier", ecrans: "$-01 à $-04", largeur: "390 px", nombre: "4" },
+    { doc: "Langue des messages d'erreur", ecrans: "C-04, C-05, C-07, $-01, $-05, $-06, B-02", largeur: "fluide", nombre: "1 page" },
+    { doc: "Protocole d'essai TalkBack", ecrans: "P-01, P-02, $-01 à $-04, C-06, C-07", largeur: "fluide", nombre: "1 page" },
+    { doc: "Passe de contraste et de tailles", ecrans: "les 39 écrans, 23 documents", largeur: "fluide", nombre: "1 page" },
+    { doc: "Transverses WF-12", ecrans: "T-04, T-05, vide, confirmation, chargement, hors ligne", largeur: "390 px", nombre: "6" },
+    { doc: "Variantes de $-01", ecrans: "$-01, trois traitements", largeur: "390 px", nombre: "3" },
+    { doc: "Desktop — transverses WF-12", ecrans: "T-04, T-05", largeur: "1440 px", nombre: "2" }
+  ];
+}
+
+</script>
+</body>
+</html>

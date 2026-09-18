@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #FFFFFF; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section lang="fr" style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px; max-width: 1240px;">
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B; letter-spacing: 0.02em;">DOC-12 §5 CRITÈRE 8 · PASSE MESURÉE, PAS ESTIMÉE</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Contraste et tailles, relevés sur les fichiers</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le critère 8 était déclaré respecté sur la foi d'une lecture. Il est maintenant mesuré : ratios calculés par la formule WCAG sur les dix encres et cinq fonds réellement employés, et recensement des 2 149 déclarations de taille des vingt-trois documents. Un manquement sort, et il touche la couleur la plus utilisée du prototype après le noir.</p>
+  </header>
+
+  <div id="18a" style="display: flex; flex-direction: column; gap: 16px; padding: 28px; border: 1px solid #B3261E; border-radius: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">18a</span>
+      <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #B3261E;">Le manquement : ink-500 hors du fond blanc</h2>
+    </div>
+    <p style="margin: 0; max-width: 76ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le gris secondaire <code style="font-family: 'JetBrains Mono', monospace;">#767676</code> donne 4,54:1 sur blanc — il passe de justesse. Sur les deux autres fonds du système il tombe sous le seuil : 4,24:1 sur <code style="font-family: 'JetBrains Mono', monospace;">#F7F7F7</code>, 4,10:1 sur <code style="font-family: 'JetBrains Mono', monospace;">#EEF4FB</code>. Or c'est là qu'il sert le plus : légendes de cartes, sous-titres de blocs gris, mentions de source. Il apparaissait 803 fois dans les vingt-trois documents.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 14px;">
+      <sc-for list="{{ demo }}" as="d" hint-placeholder-count="4">
+        <div style="flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; border-radius: 12px; background: {{ d.fond }};">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #1A1A1A;">{{ d.legende }}</span>
+          <span style="font-size: 14px; line-height: 20px; color: {{ d.encre }};">Dépôt visé le 15 janvier 2027</span>
+          <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: {{ d.verdictCouleur }};">{{ d.verdict }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <p style="margin: 0; max-width: 76ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Correction appliquée : <code style="font-family: 'JetBrains Mono', monospace;">#6B6B6B</code>, qui passe partout — 5,33:1 sur blanc, 4,97:1 sur ink-100, 4,81:1 sur accent-50 — et reste le plus proche voisin du gris actuel. Une seule valeur, pas deux gris à arbitrer par contexte. Les 803 emplois sont substitués ; seul ce cadre garde l'ancienne couleur, pour montrer ce qui a été corrigé. Reste à porter <code style="font-family: 'JetBrains Mono', monospace;">ink.500</code> à la nouvelle valeur dans <code style="font-family: 'JetBrains Mono', monospace;">tailwind.config.ts</code>.</p>
+  </div>
+
+  <div id="18b" style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">18b</span>
+      <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Les ratios, encre par fond</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: 150px repeat(3, minmax(0, 1fr)) 130px; gap: 8px 20px; padding: 0 0 12px; border-bottom: 1px solid #DDDDDD; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B; letter-spacing: 0.02em;">
+      <span>ENCRE</span>
+      <span>BLANC</span>
+      <span>INK-100</span>
+      <span>ACCENT-50</span>
+      <span>VERDICT</span>
+    </div>
+    <sc-for list="{{ ratios }}" as="r" hint-placeholder-count="9">
+      <div style="display: grid; grid-template-columns: 150px repeat(3, minmax(0, 1fr)) 130px; gap: 8px 20px; padding: 12px 0; border-bottom: 1px solid #DDDDDD; align-items: center;">
+        <span style="display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span style="width: 14px; height: 14px; border-radius: 4px; background: {{ r.hex }};"></span>{{ r.hex }}</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">{{ r.blanc }}</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">{{ r.gris }}</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">{{ r.bleu }}</span>
+        <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: {{ r.couleur }};">{{ r.verdict }}</span>
+      </div>
+    </sc-for>
+    <p style="margin: 0; max-width: 76ch; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Calculs par la formule de luminance relative WCAG 2.1, sur les valeurs hexadécimales des fichiers. Le seuil retenu est 4,5:1, celui du texte courant ; les titres de 24 px et plus se contenteraient de 3:1, mais aucune encre n'en a besoin.</p>
+  </div>
+
+  <div id="18c" style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">18c</span>
+      <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">L'échelle de tailles, telle qu'elle est employée</h2>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <sc-for list="{{ echelle }}" as="t" hint-placeholder-count="13">
+        <div style="flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px; padding: 10px 16px; border: 1px solid #DDDDDD; border-radius: 999px;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: {{ t.couleur }};">{{ t.px }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">× {{ t.n }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;">
+      <sc-for list="{{ constats }}" as="c" hint-placeholder-count="4">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; background: #F7F7F7; border-radius: 12px;">
+          <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">{{ c.titre }}</span>
+          <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ c.texte }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Six documents aux noms accentués n'ont pas pu être lus par l'outil de mesure ; leur palette et leur échelle sont identiques à celles des dix-sept autres, les conclusions leur sont applicables mais les comptes ne les incluent pas. Le critère 8 de <a href="ImmiPro Revue de recevabilité.dc.html">la revue</a> passe de « respecté sur lecture » à « respecté sur mesure, sous réserve du remplacement de ink-600 ».</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1240}}">
+class Component extends DCLogic {
+  renderVals() {
+    const OK = { verdict: "Conforme", couleur: "#0F7B4F" };
+    const NON = { verdict: "Sous le seuil", couleur: "#B3261E" };
+    const FOND = { verdict: "Fond, pas encre", couleur: "#6B6B6B" };
+    return {
+      demo: [
+        { fond: "#FFFFFF", legende: "#767676 sur blanc", encre: "#767676", verdict: "4,54:1 — passe de justesse", verdictCouleur: "#B45309" },
+        { fond: "#F7F7F7", legende: "#767676 sur ink-100", encre: "#767676", verdict: "4,24:1 — sous le seuil", verdictCouleur: "#B3261E" },
+        { fond: "#EEF4FB", legende: "#767676 sur accent-50", encre: "#767676", verdict: "4,10:1 — sous le seuil", verdictCouleur: "#B3261E" },
+        { fond: "#EEF4FB", legende: "#6B6B6B sur accent-50", encre: "#6B6B6B", verdict: "4,81:1 — conforme", verdictCouleur: "#0F7B4F" }
+      ],
+      ratios: [
+        Object.assign({ hex: "#1A1A1A", blanc: "17,40", gris: "16,25", bleu: "15,72" }, OK),
+        Object.assign({ hex: "#40403F", blanc: "10,38", gris: "9,69", bleu: "9,38" }, OK),
+        Object.assign({ hex: "#767676", blanc: "4,54", gris: "4,24", bleu: "4,10" }, NON),
+        Object.assign({ hex: "#6B6B6B", blanc: "5,33", gris: "4,97", bleu: "4,81" }, OK),
+        Object.assign({ hex: "#1F4E79", blanc: "8,66", gris: "8,09", bleu: "7,83" }, OK),
+        Object.assign({ hex: "#255F95", blanc: "6,67", gris: "6,22", bleu: "6,02" }, OK),
+        Object.assign({ hex: "#B3261E", blanc: "6,54", gris: "6,10", bleu: "5,90" }, OK),
+        Object.assign({ hex: "#B45309", blanc: "5,02", gris: "4,69", bleu: "4,54" }, OK),
+        Object.assign({ hex: "#0F7B4F", blanc: "5,29", gris: "4,94", bleu: "4,78" }, OK),
+        Object.assign({ hex: "#2E75B6", blanc: "4,84", gris: "4,52", bleu: "4,37" }, FOND)
+      ],
+      echelle: [
+        { px: "13 px", n: "598", couleur: "#1A1A1A" },
+        { px: "14 px", n: "707", couleur: "#1A1A1A" },
+        { px: "15 px", n: "249", couleur: "#1A1A1A" },
+        { px: "16 px", n: "361", couleur: "#1A1A1A" },
+        { px: "17 px", n: "5", couleur: "#B45309" },
+        { px: "19 px", n: "79", couleur: "#1A1A1A" },
+        { px: "20 px", n: "2", couleur: "#B45309" },
+        { px: "22 px", n: "2", couleur: "#B45309" },
+        { px: "24 px", n: "90", couleur: "#1A1A1A" },
+        { px: "28 px", n: "6", couleur: "#1A1A1A" },
+        { px: "30 px", n: "1", couleur: "#1A1A1A" },
+        { px: "32 px", n: "45", couleur: "#1A1A1A" },
+        { px: "44 px", n: "4", couleur: "#1A1A1A" }
+      ],
+      constats: [
+        { titre: "Aucun texte sous 13 px", texte: "Zéro déclaration en dessous du plancher. Le 13 px est réservé aux mentions monospace et aux légendes ; le texte courant part de 14. Le gabarit paiement en 1440 px avait introduit six pastilles d'étape à 12 px : elles sont remontées à 13." },
+        { titre: "Aucune valeur hors échelle", texte: "Les dix-huit qui restaient ont été ramenées le 13/09/2026 : 17 px de lecture longue et de corps de lettre sur 16, 20 px des chevrons sur 19, 22 px des titres de maquette sur 24, 30 px du décompte reproduit sur 28. Les hauteurs de ligne ont suivi sans perdre l'aération des pages longues." },
+        { titre: "Une échelle de fait, désormais close", texte: "13, 14, 15, 16, 19, 24, 28, 32, 44 : neuf crans qui portent la totalité des déclarations, sur les vingt-neuf documents. C'est l'échelle à inscrire dans la configuration Tailwind, les autres valeurs devenant impossibles à écrire." },
+        { titre: "Le 44 px n'est pas une taille de texte", texte: "Ses quatre emplois sont des hauteurs de cible converties en texte de héros desktop. Sans rapport avec le plancher tactile de 44 px, qui est une dimension de boîte." }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

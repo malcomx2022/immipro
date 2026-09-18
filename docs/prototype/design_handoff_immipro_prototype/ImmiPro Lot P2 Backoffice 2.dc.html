@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.7 · LOT P2 — BACK-OFFICE, 2 SUR 2 · 1440 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">B-03 utilisateurs · B-04 paiements · B-06 journal d'audit · B-07 coûts IA</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le back-office est complet avec ces quatre écrans. Mêmes tokens, même navigation latérale, densité élevée et accent réservé à l'action principale.</p>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 56px;">
+
+    <div id="10a" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">10a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-03 — Utilisateurs</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-15 · {{ userLabel }}</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Utilisateurs</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">2 847 comptes · 412 dossiers actifs · 38 demandes de suppression en cours</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <input type="text" value="{{ userQuery }}" onChange="{{ setUserQuery }}" placeholder="Rechercher un email ou un identifiant de dossier" style="width: 340px; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Exporter la sélection</button>
+            </div>
+          </div>
+
+          <div style="padding: 16px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{ userFilters }}" as="f" hint-placeholder-count="4">
+                <button onClick="{{ f.pick }}" style="min-height: 40px; padding: 0 14px; border-radius: 999px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ f.border }}; background: {{ f.bg }}; color: {{ f.color }};">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">{{ userCount }}</span>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; display: flex;">
+            <div style="flex: 1 1 auto; min-width: 0; overflow-y: auto;">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #DDDDDD; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+                <span style="flex: 1 1 200px; min-width: 0;">Compte</span>
+                <span style="flex: 0 0 108px;">Inscrit le</span>
+                <span style="flex: 0 0 88px;">Dossiers</span>
+                <span style="flex: 0 0 104px;">Pack</span>
+                <span style="flex: 0 0 116px;">Consentements</span>
+                <span style="flex: 0 0 96px;">Statut</span>
+              </div>
+              <sc-for list="{{ userRows }}" as="u" hint-placeholder-count="8">
+                <button onClick="{{ u.pick }}" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 24px; border: none; border-bottom: 1px solid #DDDDDD; font-family: Inter, sans-serif; font-size: 14px; line-height: 20px; text-align: left; cursor: pointer; background: {{ u.bg }};" style-hover="background: #F7F7F7;">
+                  <span style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+                    <span style="font-weight: 500; color: #1A1A1A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ u.nom }}</span>
+                    <span style="font-size: 13px; color: #6B6B6B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ u.email }}</span>
+                  </span>
+                  <span style="flex: 0 0 108px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ u.inscrit }}</span>
+                  <span style="flex: 0 0 88px; color: #40403F;">{{ u.dossiers }}</span>
+                  <span style="flex: 0 0 104px; color: #40403F;">{{ u.pack }}</span>
+                  <span style="flex: 0 0 116px; font-size: 13px; color: #40403F;">{{ u.consent }}</span>
+                  <span style="flex: 0 0 96px; display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ u.statutColor }};"></span>
+                    <span style="font-size: 13px; color: {{ u.statutColor }};">{{ u.statut }}</span>
+                  </span>
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="flex: 0 0 360px; border-left: 1px solid #DDDDDD; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">COMPTE SÉLECTIONNÉ</div>
+                <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">{{ selNom }}</div>
+                <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">{{ selEmail }}</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Inscrit le</span><span style="font-weight: 500; color: #1A1A1A;">{{ selInscrit }}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 12px; padding: 0 0 10px; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Dossiers</span><span style="font-weight: 500; color: #1A1A1A;">{{ selDossiers }}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 12px; padding: 0 0 10px; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Pack</span><span style="font-weight: 500; color: #1A1A1A;">{{ selPack }}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Analyses utilisées</span><span style="font-weight: 500; color: #1A1A1A;">{{ selQuota }}</span></div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">CONSENTEMENTS</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ selConsentDetail }}</div>
+              </div>
+
+              <div style="padding: 14px 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ce que tu ne peux pas voir</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Les pièces du candidat ne sont accessibles que depuis la file de revue, sur une pièce en échec, et l'accès est consigné.</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <button style="width: 100%; min-height: 44px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Renvoyer l'email de vérification</button>
+                <button style="width: 100%; min-height: 44px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Recréditer des analyses</button>
+                <button style="width: 100%; min-height: 44px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #B3261E; cursor: pointer;" style-hover="background: #F7F7F7;">Traiter la demande de suppression</button>
+              </div>
+
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Chaque action sur un compte est horodatée au journal d'audit avec ton identifiant.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="10b" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">10b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-04 — Paiements et réconciliation</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-15 · {{ payLabel }}</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Paiements</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Journée du 11 septembre 2026 · dernier rapprochement MTN il y a 8 minutes</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Exporter le grand livre</button>
+              <button style="min-height: 44px; padding: 0 18px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Lancer le rapprochement</button>
+            </div>
+          </div>
+
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; gap: 16px;">
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Encaissé aujourd'hui</span>
+              <span style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">465 000 F</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">31 paiements confirmés</span>
+            </div>
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">En attente de confirmation</span>
+              <span style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">60 000 F</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">4 transactions, dont 1 de plus de 5 min</span>
+            </div>
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Échecs du jour</span>
+              <span style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">9</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">7 délais dépassés, 2 soldes insuffisants</span>
+            </div>
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #FFFFFF; border: 1px solid #B45309; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #B45309;">Écarts à traiter</span>
+              <span style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">2</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">débit opérateur sans dossier ouvert</span>
+            </div>
+          </div>
+
+          <div style="padding: 16px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{ payFilters }}" as="f" hint-placeholder-count="4">
+                <button onClick="{{ f.pick }}" style="min-height: 40px; padding: 0 14px; border-radius: 999px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ f.border }}; background: {{ f.bg }}; color: {{ f.color }};">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">{{ payCount }}</span>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #DDDDDD; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 0 0 136px;">Référence</span>
+              <span style="flex: 1 1 180px; min-width: 0;">Compte</span>
+              <span style="flex: 0 0 104px;">Montant</span>
+              <span style="flex: 0 0 116px;">Moyen</span>
+              <span style="flex: 0 0 148px;">Transaction opérateur</span>
+              <span style="flex: 0 0 88px;">Heure</span>
+              <span style="flex: 0 0 128px;">Rapprochement</span>
+            </div>
+            <sc-for list="{{ payRows }}" as="p" hint-placeholder-count="10">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px; background: {{ p.bg }};">
+                <span style="flex: 0 0 136px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">{{ p.ref }}</span>
+                <span style="flex: 1 1 180px; min-width: 0; color: #40403F;">{{ p.compte }}</span>
+                <span style="flex: 0 0 104px; font-weight: 500; color: #1A1A1A;">{{ p.montant }}</span>
+                <span style="flex: 0 0 116px; color: #40403F;">{{ p.moyen }}</span>
+                <span style="flex: 0 0 148px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ p.tx }}</span>
+                <span style="flex: 0 0 88px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ p.heure }}</span>
+                <span style="flex: 0 0 128px; display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ p.color }};"></span>
+                  <span style="font-size: 13px; color: {{ p.color }};">{{ p.etat }}</span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding: 16px 24px; border-top: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Les écarts sont conservés jusqu'à leur résolution manuelle et consignés au journal d'audit.</span>
+            <button style="min-height: 44px; padding: 0 18px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Traiter les 2 écarts</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="10c" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">10c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-06 — Journal d'audit</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-15 · {{ auditLabel }}</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Journal d'audit</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Conservation cinq ans · écritures non modifiables · 1 284 entrées ce mois</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <input type="text" value="{{ auditQuery }}" onChange="{{ setAuditQuery }}" placeholder="Filtrer par identifiant, dossier ou action" style="width: 340px; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Exporter la période</button>
+            </div>
+          </div>
+
+          <div style="padding: 16px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{ auditFilters }}" as="f" hint-placeholder-count="5">
+                <button onClick="{{ f.pick }}" style="min-height: 40px; padding: 0 14px; border-radius: 999px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ f.border }}; background: {{ f.bg }}; color: {{ f.color }};">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">{{ auditCount }}</span>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #DDDDDD; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 0 0 150px;">Horodatage</span>
+              <span style="flex: 0 0 140px;">Acteur</span>
+              <span style="flex: 0 0 156px;">Action</span>
+              <span style="flex: 0 0 136px;">Objet</span>
+              <span style="flex: 1 1 200px; min-width: 0;">Détail</span>
+              <span style="flex: 0 0 108px;">Origine</span>
+            </div>
+            <sc-for list="{{ auditRows }}" as="a" hint-placeholder-count="12">
+              <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;">
+                <span style="flex: 0 0 150px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ a.ts }}</span>
+                <span style="flex: 0 0 140px; color: #1A1A1A;">{{ a.acteur }}</span>
+                <span style="flex: 0 0 156px;"><span style="padding: 3px 8px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: {{ a.color }};">{{ a.action }}</span></span>
+                <span style="flex: 0 0 136px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ a.objet }}</span>
+                <span style="flex: 1 1 200px; min-width: 0; color: #40403F; text-wrap: pretty;">{{ a.detail }}</span>
+                <span style="flex: 0 0 108px; font-size: 13px; color: #6B6B6B;">{{ a.origine }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding: 16px 24px; border-top: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; color: #6B6B6B;">Aucune entrée ne peut être supprimée ni modifiée depuis l'interface. Les accès aux pièces d'un candidat apparaissent avec le motif déclaré.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="10d" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">10d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-07 — Supervision des coûts IA</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-16</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Coûts IA</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Coûts IA</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Septembre 2026, du 1er au 11 · aucune mesure enregistrée</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{ coutTabs }}" as="t" hint-placeholder-count="3">
+                <button onClick="{{ t.pick }}" style="min-height: 44px; padding: 0 14px; border-radius: 999px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ t.border }}; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; gap: 16px;">
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Dépensé ce mois</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 24px; line-height: 30px; color: #6B6B6B;">—</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">somme de AiUsage.costXof sur la période</span>
+            </div>
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Coût IA par dossier payant</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 24px; line-height: 30px; color: #6B6B6B;">—</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">indicateur qui conditionne la grille tarifaire</span>
+            </div>
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Analyses exécutées</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 24px; line-height: 30px; color: #6B6B6B;">—</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">dont reprises non décomptées au candidat</span>
+            </div>
+            <div style="flex: 1 1 0; min-width: 0; padding: 16px 18px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Part du prix du pack</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 24px; line-height: 30px; color: #6B6B6B;">— %</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">seuil d'alerte : 15 % (RG-16.1)</span>
+            </div>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; display: flex;">
+            <div style="flex: 1 1 auto; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto;">
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px;">
+                  <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Dépense quotidienne</h2>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">plafond : 3 × la médiane des sept derniers jours</span>
+                </div>
+                <div style="height: 200px; border: 1px dashed #DDDDDD; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 0 32px;">
+                  <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Aucune dépense enregistrée</div>
+                  <div style="max-width: 46ch; font-size: 14px; line-height: 20px; color: #6B6B6B; text-align: center; text-wrap: pretty;">L'histogramme se remplit dès la première écriture dans AiUsage. Un jour sans appel reste affiché à zéro, pas masqué.</div>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Par type d'appel</h2>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+                  <span style="flex: 1 1 180px; min-width: 0;">Usage</span>
+                  <span style="flex: 0 0 108px;">Appels</span>
+                  <span style="flex: 0 0 120px;">Coût unitaire</span>
+                  <span style="flex: 0 0 120px;">Total</span>
+                  <span style="flex: 0 0 96px;">Part</span>
+                </div>
+                <sc-for list="{{ coutRows }}" as="c" hint-placeholder-count="5">
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;">
+                    <span style="flex: 1 1 180px; min-width: 0; font-weight: 500; color: #1A1A1A;">{{ c.usage }}</span>
+                    <span style="flex: 0 0 108px; color: #40403F;">{{ c.appels }}</span>
+                    <span style="flex: 0 0 120px; color: #40403F;">{{ c.unitaire }}</span>
+                    <span style="flex: 0 0 120px; font-weight: 500; color: #1A1A1A;">{{ c.total }}</span>
+                    <span style="flex: 0 0 96px; color: #40403F;">{{ c.part }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="flex: 0 0 360px; border-left: 1px solid #DDDDDD; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">GARDE-FOUS</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Coût IA par dossier</span>
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">au-delà, le pack est vendu trop bas (RG-16.1)</span>
+                  </span>
+                  <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: #1A1A1A;">15 % du pack</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Plafond quotidien</span>
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">au-delà, la file passe en revue humaine</span>
+                  </span>
+                  <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: #1A1A1A;">3 × médiane 7 j</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Quota par pack</span>
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">affiché en analyses, décompté en tokens côté serveur</span>
+                  </span>
+                  <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: #1A1A1A;">30</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px;">
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Alerte de dépassement</span>
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">email à l'équipe produit</span>
+                  </span>
+                  <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: #1A1A1A;">80 % du budget</span>
+                </div>
+              </div>
+
+              <div style="padding: 14px 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Comment cet écran se remplit</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Dix dossiers complets réels passés dans le pipeline, AiUsage enregistré à chaque appel. Une semaine suffit pour obtenir le coût moyen par type de pièce.</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tant que cette mesure n'existe pas, l'écran n'affiche aucune valeur : un chiffre posé ici serait repris comme une spécification.</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Modifier les plafonds</button>
+                <button style="width: 100%; min-height: 44px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Exporter le détail des appels</button>
+              </div>
+
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Aucune donnée de candidat n'apparaît sur cet écran : seuls les volumes et les coûts sont remontés.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : B-03 et B-04 → WF-15, accès aux pièces restreint à la file de revue et consigné, écarts de rapprochement traités manuellement. B-06 → WF-15, écritures non modifiables, conservation cinq ans. B-07 → WF-16, plafonds, quota par pack et bascule en revue humaine au-delà du plafond quotidien. Les valeurs de coût sont volontairement absentes : B-07 est livré en état vide, avec les noms des métriques et des seuils exprimés en ratio (RG-16.1, moins de 15 % du prix du pack), tant que dix dossiers réels n'ont pas alimenté AiUsage.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1560, &quot;height&quot;: 1000}}">
+class Component extends DCLogic {
+  state = {
+    userFilter: "Tous",
+    userQuery: "",
+    selUser: 0,
+    payFilter: "Tous",
+    auditFilter: "Toutes",
+    auditQuery: "",
+    coutTab: "Ce mois"
+  };
+
+  users = [
+    { nom: "Aline Dossou", email: "aline.dossou@email.com", inscrit: "02/09/2026", dossiers: "2", pack: "Dossier", consent: "4 sur 5", statut: "Actif", quota: "18 sur 30", consentDetail: "Pièces d'identité et pièces financières autorisées le 09/09/2026. Alertes réglementaires actives. Propositions de consultants refusées." },
+    { nom: "Samuel Kpadé", email: "s.kpade@email.com", inscrit: "28/08/2026", dossiers: "1", pack: "Dossier", consent: "3 sur 5", statut: "Actif", quota: "27 sur 30", consentDetail: "Pièces financières autorisées. Analyse des pièces d'identité refusée : les pièces sont conservées sans lecture automatique." },
+    { nom: "Rachelle Tossou", email: "r.tossou@email.com", inscrit: "21/08/2026", dossiers: "1", pack: "Découverte", consent: "2 sur 5", statut: "Email non vérifié", statutWarn: true, quota: "0 sur 0", consentDetail: "Aucune autorisation d'analyse. Le compte n'a jamais confirmé son adresse email : les alertes ne partent pas." },
+    { nom: "Franck Zinsou", email: "f.zinsou@email.com", inscrit: "14/08/2026", dossiers: "3", pack: "Dossier", consent: "5 sur 5", statut: "Actif", quota: "41 sur 60", consentDetail: "Toutes les autorisations actives, y compris la mise en relation avec un consultant partenaire." },
+    { nom: "Marlène Ahouandjinou", email: "m.ahouandjinou@email.com", inscrit: "07/08/2026", dossiers: "1", pack: "Dossier", consent: "4 sur 5", statut: "Suppression demandée", statutDanger: true, quota: "30 sur 30", consentDetail: "Demande de suppression reçue le 10/09/2026. Purge des pièces à exécuter sous trente jours, reçus de paiement conservés." },
+    { nom: "Loïc Gbaguidi", email: "l.gbaguidi@email.com", inscrit: "30/07/2026", dossiers: "1", pack: "Dossier", consent: "3 sur 5", statut: "Actif", quota: "12 sur 30", consentDetail: "Pièces d'identité autorisées, pièces financières refusées. Mesure d'audience désactivée." },
+    { nom: "Sidonie Hounkpatin", email: "s.hounkpatin@email.com", inscrit: "22/07/2026", dossiers: "2", pack: "Découverte", consent: "1 sur 5", statut: "Inactif 60 j", statutWarn: true, quota: "0 sur 0", consentDetail: "Seules les alertes réglementaires sont actives. Aucun dossier payant ouvert." },
+    { nom: "Bertin Sossou", email: "b.sossou@email.com", inscrit: "11/07/2026", dossiers: "1", pack: "Dossier", consent: "4 sur 5", statut: "Clôturé", quota: "29 sur 30", consentDetail: "Dossier clôturé le 05/09/2026, issue déclarée : visa obtenu. Purge des pièces effectuée le 08/09/2026." }
+  ];
+
+  payments = [
+    { ref: "IMP-2609-4471", compte: "aline.dossou@email.com", montant: "15 000 F", moyen: "MTN MoMo", tx: "MP260911.0943", heure: "09:43", etat: "Rapproché", cat: "ok" },
+    { ref: "IMP-2609-4470", compte: "s.kpade@email.com", montant: "15 000 F", moyen: "MTN MoMo", tx: "MP260911.0921", heure: "09:21", etat: "Rapproché", cat: "ok" },
+    { ref: "IMP-2609-4469", compte: "f.zinsou@email.com", montant: "15 000 F", moyen: "Carte", tx: "ch_3Qk8Hs", heure: "09:04", etat: "Rapproché", cat: "ok" },
+    { ref: "IMP-2609-4468", compte: "l.gbaguidi@email.com", montant: "15 000 F", moyen: "Moov Money", tx: "MV260911.0852", heure: "08:52", etat: "En attente", cat: "attente" },
+    { ref: "IMP-2609-4467", compte: "inconnu", montant: "15 000 F", moyen: "MTN MoMo", tx: "MP260911.0830", heure: "08:30", etat: "Écart", cat: "ecart" },
+    { ref: "IMP-2609-4466", compte: "m.ahouandjinou@email.com", montant: "15 000 F", moyen: "MTN MoMo", tx: "—", heure: "08:14", etat: "Échec", cat: "echec" },
+    { ref: "IMP-2609-4465", compte: "r.tossou@email.com", montant: "15 000 F", moyen: "MTN MoMo", tx: "—", heure: "07:58", etat: "Échec", cat: "echec" },
+    { ref: "IMP-2609-4464", compte: "s.hounkpatin@email.com", montant: "5 000 F", moyen: "MTN MoMo", tx: "MP260911.0742", heure: "07:42", etat: "Rapproché", cat: "ok" },
+    { ref: "IMP-2609-4463", compte: "inconnu", montant: "5 000 F", moyen: "Moov Money", tx: "MV260911.0725", heure: "07:25", etat: "Écart", cat: "ecart" },
+    { ref: "IMP-2609-4462", compte: "b.sossou@email.com", montant: "15 000 F", moyen: "Carte", tx: "ch_3Qk7Za", heure: "07:03", etat: "Rapproché", cat: "ok" }
+  ];
+
+  audits = [
+    { ts: "11/09/2026 09:44", acteur: "système", action: "Paiement confirmé", objet: "IMP-2609-4471", detail: "Pack Dossier ouvert pour le dossier NL-4471, 15 000 F encaissés.", origine: "webhook MTN", cat: "paiement" },
+    { ts: "11/09/2026 09:31", acteur: "M. Agossou", action: "Accès à une pièce", objet: "NL-4471 / photo", detail: "Motif déclaré : pièce en échec d'analyse, revue manuelle B-05.", origine: "back-office", cat: "acces" },
+    { ts: "11/09/2026 09:12", acteur: "M. Agossou", action: "Règle publiée", objet: "DE / études v5", detail: "Compte bloqué porté à 11 904 €, applicable au 01/01/2027. Motif : mise à jour du barème officiel.", origine: "back-office", cat: "regle" },
+    { ts: "11/09/2026 09:12", acteur: "système", action: "Alertes envoyées", objet: "DE / études v5", detail: "37 candidats notifiés, 29 arbitrages en attente.", origine: "tâche planifiée", cat: "regle" },
+    { ts: "11/09/2026 08:47", acteur: "aline.dossou", action: "Consentement modifié", objet: "compte 2847", detail: "Analyse des pièces financières activée.", origine: "application", cat: "consent" },
+    { ts: "11/09/2026 08:30", acteur: "système", action: "Écart de paiement", objet: "MP260911.0830", detail: "Débit opérateur de 15 000 F sans dossier correspondant. À traiter manuellement.", origine: "rapprochement", cat: "paiement" },
+    { ts: "11/09/2026 08:02", acteur: "K. Houngbo", action: "Analyse rendue", objet: "DE-3920 / relevé", detail: "Quota recrédité au candidat après erreur de lecture confirmée.", origine: "back-office", cat: "acces" },
+    { ts: "10/09/2026 18:20", acteur: "m.ahouandjinou", action: "Suppression demandée", objet: "compte 2102", detail: "Purge des pièces programmée au 10/10/2026, reçus conservés.", origine: "application", cat: "consent" },
+    { ts: "10/09/2026 17:55", acteur: "système", action: "Purge exécutée", objet: "compte 1877", detail: "8 pièces supprimées après clôture du dossier NL-3211.", origine: "tâche planifiée", cat: "consent" },
+    { ts: "10/09/2026 16:41", acteur: "K. Houngbo", action: "Brouillon enregistré", objet: "BE / études v5", detail: "Délai d'instruction porté à 8 semaines, non publié.", origine: "back-office", cat: "regle" },
+    { ts: "10/09/2026 15:08", acteur: "système", action: "Plafond IA atteint", objet: "10/09/2026", detail: "Plafond quotidien atteint à 15:08, file basculée en revue humaine.", origine: "supervision", cat: "cout" },
+    { ts: "10/09/2026 11:30", acteur: "M. Agossou", action: "Analyses recréditées", objet: "compte 2391", detail: "5 analyses rendues après incident d'extraction.", origine: "back-office", cat: "acces" }
+  ];
+
+  couts = [
+    { usage: "Lecture de pièces d'identité", appels: "—", unitaire: "—", total: "—", part: "—" },
+    { usage: "Lecture de pièces financières", appels: "—", unitaire: "—", total: "—", part: "—" },
+    { usage: "Rédaction assistée", appels: "—", unitaire: "—", total: "—", part: "—" },
+    { usage: "Analyse critique et incohérences", appels: "—", unitaire: "—", total: "—", part: "—" },
+    { usage: "Collecte de veille réglementaire", appels: "—", unitaire: "—", total: "—", part: "—" }
+  ];
+
+  renderVals() {
+    const s = this.state;
+
+    const userFilters = ["Tous", "Actifs", "Email non vérifié", "Suppression demandée"];
+    const uStatutColor = u => (u.statutDanger ? "#B3261E" : u.statutWarn ? "#B45309" : "#6B6B6B");
+    const usersVisible = this.users.filter(u => {
+      if (s.userFilter === "Actifs") return u.statut === "Actif";
+      if (s.userFilter === "Email non vérifié") return u.statut === "Email non vérifié";
+      if (s.userFilter === "Suppression demandée") return u.statut === "Suppression demandée";
+      return true;
+    }).filter(u => {
+      const q = s.userQuery.trim().toLowerCase();
+      return q.length === 0 || (u.nom + " " + u.email).toLowerCase().indexOf(q) >= 0;
+    });
+    const selU = this.users[s.selUser];
+
+    const payFilters = ["Tous", "Rapprochés", "En attente", "Écarts"];
+    const payColor = { ok: "#0F7B4F", attente: "#B45309", ecart: "#B3261E", echec: "#6B6B6B" };
+    const paysVisible = this.payments.filter(p => {
+      if (s.payFilter === "Rapprochés") return p.cat === "ok";
+      if (s.payFilter === "En attente") return p.cat === "attente";
+      if (s.payFilter === "Écarts") return p.cat === "ecart";
+      return true;
+    });
+
+    const auditFilters = ["Toutes", "Règles", "Accès aux pièces", "Paiements", "Consentements"];
+    const auditMap = { "Règles": "regle", "Accès aux pièces": "acces", "Paiements": "paiement", "Consentements": "consent" };
+    const auditColor = { regle: "#1F4E79", acces: "#B45309", paiement: "#0F7B4F", consent: "#40403F", cout: "#B3261E" };
+    const auditsVisible = this.audits.filter(a => {
+      const want = auditMap[s.auditFilter];
+      return !want || a.cat === want;
+    }).filter(a => {
+      const q = s.auditQuery.trim().toLowerCase();
+      return q.length === 0 || (a.acteur + " " + a.action + " " + a.objet + " " + a.detail).toLowerCase().indexOf(q) >= 0;
+    });
+
+    return {
+      userFilters: userFilters.map(label => ({
+        label,
+        pick: () => this.setState({ userFilter: label }),
+        bg: label === s.userFilter ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.userFilter ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.userFilter ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+      userLabel: s.userFilter.toLowerCase(),
+      userCount: usersVisible.length > 1 ? usersVisible.length + " comptes affichés" : usersVisible.length + " compte affiché",
+      userQuery: s.userQuery,
+      setUserQuery: e => this.setState({ userQuery: e.target.value }),
+      userRows: usersVisible.map(u => {
+        const idx = this.users.indexOf(u);
+        return {
+          nom: u.nom, email: u.email, inscrit: u.inscrit, dossiers: u.dossiers,
+          pack: u.pack, consent: u.consent, statut: u.statut,
+          statutColor: uStatutColor(u),
+          bg: idx === s.selUser ? "#EEF4FB" : "#FFFFFF",
+          pick: () => this.setState({ selUser: idx })
+        };
+      }),
+      selNom: selU.nom,
+      selEmail: selU.email,
+      selInscrit: selU.inscrit,
+      selDossiers: selU.dossiers,
+      selPack: selU.pack,
+      selQuota: selU.quota,
+      selConsentDetail: selU.consentDetail,
+
+      payFilters: payFilters.map(label => ({
+        label,
+        pick: () => this.setState({ payFilter: label }),
+        bg: label === s.payFilter ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.payFilter ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.payFilter ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+      payLabel: s.payFilter.toLowerCase(),
+      payCount: paysVisible.length > 1 ? paysVisible.length + " lignes affichées" : paysVisible.length + " ligne affichée",
+      payRows: paysVisible.map(p => ({
+        ref: p.ref, compte: p.compte, montant: p.montant, moyen: p.moyen,
+        tx: p.tx, heure: p.heure, etat: p.etat,
+        color: payColor[p.cat],
+        bg: p.cat === "ecart" ? "#F7F7F7" : "#FFFFFF"
+      })),
+
+      auditFilters: auditFilters.map(label => ({
+        label,
+        pick: () => this.setState({ auditFilter: label }),
+        bg: label === s.auditFilter ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.auditFilter ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.auditFilter ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+      auditLabel: s.auditFilter.toLowerCase(),
+      auditCount: auditsVisible.length > 1 ? auditsVisible.length + " entrées affichées" : auditsVisible.length + " entrée affichée",
+      auditQuery: s.auditQuery,
+      setAuditQuery: e => this.setState({ auditQuery: e.target.value }),
+      auditRows: auditsVisible.map(a => ({
+        ts: a.ts, acteur: a.acteur, action: a.action, objet: a.objet,
+        detail: a.detail, origine: a.origine, color: auditColor[a.cat]
+      })),
+
+      coutTabs: ["Ce mois", "Mois dernier", "12 mois"].map(label => ({
+        label,
+        pick: () => this.setState({ coutTab: label }),
+        bg: label === s.coutTab ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.coutTab ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.coutTab ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+      coutRows: this.couts
+    };
+  }
+}
+
+</script>
+</body>
+</html>

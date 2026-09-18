@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.4 ET §3.6 · LOT P1 · 390 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">R-01 à R-04 rédaction assistée · T-01 à T-03 transverses</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">L'entretien guidé avance question par question, l'éditeur conserve ses versions, et T-02 est un écran d'arbitrage : migrer vers la nouvelle règle ou conserver l'ancienne.</p>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 56px;">
+
+    <div id="8a" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">R-01 — Type de pièce</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-08</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Checklist</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Que veux-tu rédiger ?</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Nous te posons des questions, tu réponds en français simple, et nous mettons en forme. Le texte reste le tien : tu peux tout modifier.</p>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 12px;">
+            <sc-for list="{{ docTypes }}" as="d" hint-placeholder-count="4">
+              <button onClick="{{ d.pick }}" style="width: 100%; padding: 18px; border-radius: 16px; background: #FFFFFF; font-family: Inter, sans-serif; text-align: left; cursor: pointer; display: flex; gap: 14px; align-items: flex-start; border: {{ d.border }};">
+                <span style="flex: 0 0 36px; height: 36px; border-radius: 8px; background: #F7F7F7; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ d.code }}</span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">{{ d.name }}</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ d.detail }}</span>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ d.meta }}</span>
+                </span>
+                <span style="flex: 0 0 auto; font-size: 14px; font-weight: 500; color: #1F4E79;">{{ d.mark }}</span>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ce que nous ne faisons pas</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Nous n'inventons aucun fait, aucune expérience, aucun montant. Si une information manque, la question te revient.</div>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Un texte généré et non relu se repère. Prévois vingt minutes pour l'entretien et la relecture.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Commencer l'entretien</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ docFoot }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="8b" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">R-02 — Entretien guidé</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-08 · {{ qLabel }}</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 16px; display: flex; align-items: center; gap: 12px;">
+            <button onClick="{{ qPrev }}" style="flex: 0 0 auto; min-height: 44px; padding: 0 12px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Retour</button>
+            <div style="flex: 1 1 auto; min-width: 0; height: 8px; border-radius: 999px; background: #F7F7F7; overflow: hidden;">
+              <div style="height: 8px; border-radius: 999px; background: #2E75B6; width: {{ qProgress }};"></div>
+            </div>
+            <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">{{ qLabel }}</span>
+          </div>
+
+          <div style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">LETTRE DE MOTIVATION · {{ qSection }}</div>
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">{{ qQuestion }}</h1>
+            </div>
+
+            <div style="padding: 16px; background: #EEF4FB; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1F4E79;">Pourquoi cette question</div>
+              <div style="font-size: 14px; line-height: 20px; color: #1F4E79; text-wrap: pretty;">{{ qWhy }}</div>
+            </div>
+
+            <label style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Ta réponse</span>
+              <textarea value="{{ answer }}" onChange="{{ setAnswer }}" placeholder="{{ qPlaceholder }}" style="min-height: 160px; padding: 14px 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; line-height: 24px; color: #1A1A1A; resize: none;"></textarea>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ answerCount }}</span>
+            </label>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Exemples de ce qui fonctionne</div>
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #2E75B6;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ qTip1 }}</span>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #2E75B6;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ qTip2 }}</span>
+              </div>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Réponds en français ou en anglais, comme tu préfères. La lettre finale sera en anglais pour les Pays-Bas.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button onClick="{{ qNext }}" style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">{{ qCta }}</button>
+          <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Passer cette question</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="8c" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">R-03 — Éditeur et versions</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-08 · {{ verLabel }}</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onClick="{{ verEdit }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Éditeur</button>
+        <button onClick="{{ verList }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Versions</button>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #DDDDDD;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Checklist</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Lettre de motivation</h1>
+            <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Version 3 · modifiée il y a 4 minutes · 412 mots</div>
+          </div>
+
+          <sc-if value="{{ verIsEdit }}" hint-placeholder-val="{{ true }}">
+            <div style="padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">OUVERTURE</div>
+                <p style="margin: 0; font-size: 16px; line-height: 26px; color: #1A1A1A; text-wrap: pretty;">Je m'appelle Aline Dossou et je suis candidate au programme de licence en International Business de la Hanze University of Applied Sciences pour la rentrée de septembre 2027.</p>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">PARCOURS</div>
+                <p style="margin: 0; font-size: 16px; line-height: 26px; color: #1A1A1A; text-wrap: pretty;">J'ai obtenu ma licence en gestion à l'Université d'Abomey-Calavi en juillet 2026, avec une spécialisation en commerce international. Pendant ma dernière année, j'ai effectué un stage de quatre mois chez un transitaire du port de Cotonou, où j'ai suivi les procédures douanières de trente-deux expéditions vers l'Europe.</p>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">POURQUOI CE PROGRAMME</div>
+                <p style="margin: 0; font-size: 16px; line-height: 26px; color: #1A1A1A; text-wrap: pretty;">Le port de Rotterdam traite la majorité du fret qui entre en Europe, et le programme de Hanze est le seul qui associe logistique portuaire et commerce international dans un cursus en anglais accessible depuis le Bénin.</p>
+                <div style="padding: 14px 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="font-size: 13px; line-height: 18px; font-weight: 600; color: #1A1A1A;">Suggestion</div>
+                  <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Nomme un cours ou un enseignant précis du programme. Les lettres qui citent un module sont plus difficiles à recycler.</div>
+                  <div style="display: flex; gap: 8px; padding-top: 4px;">
+                    <button style="min-height: 44px; padding: 0 14px; border: none; border-radius: 999px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Répondre</button>
+                    <button style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Ignorer</button>
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">APRÈS LE DIPLÔME</div>
+                <p style="margin: 0; font-size: 16px; line-height: 26px; color: #1A1A1A; text-wrap: pretty;">Je compte rentrer au Bénin pour travailler dans la logistique portuaire, un secteur en expansion depuis la modernisation du port de Cotonou.</p>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ verIsList }}">
+            <div style="padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 12px;">
+              <div style="padding: 16px; border: 2px solid #2E75B6; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Version 3</span>
+                  <span style="font-size: 13px; line-height: 18px; font-weight: 500; color: #1F4E79;">Actuelle</span>
+                </div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F;">412 mots · il y a 4 minutes</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ajout du paragraphe sur le stage au port de Cotonou.</div>
+              </div>
+              <div style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Version 2</span>
+                  <button style="min-height: 44px; padding: 0 12px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Restaurer</button>
+                </div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F;">338 mots · hier à 21 h 04</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Réécriture de l'ouverture, plus directe.</div>
+              </div>
+              <div style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Version 1</span>
+                  <button style="min-height: 44px; padding: 0 12px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Restaurer</button>
+                </div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F;">296 mots · 9 septembre 2026</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Première mise en forme de tes réponses à l'entretien.</div>
+              </div>
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Les versions sont conservées jusqu'à la clôture du dossier, puis supprimées avec le reste.</p>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Lancer l'analyse critique</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">1 suggestion en attente</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="8d" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">R-04 — Analyse critique</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-08</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Éditeur</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Relecture de ta lettre</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Trois points à traiter, dont une incohérence avec une autre pièce de ton dossier.</p>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="padding: 18px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #B3261E;"></span>
+                <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: #B3261E; text-transform: uppercase; letter-spacing: 0.04em;">Incohérence entre pièces</span>
+              </div>
+              <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Deux dates de fin de licence différentes</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ta lettre indique juillet 2026. Ton relevé de notes porte la date du 18 septembre 2026. Une administration qui lit les deux pièces verra l'écart.</div>
+              <div style="padding: 12px 14px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Dans la lettre</span><span style="font-weight: 500; color: #1A1A1A;">juillet 2026</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Sur le relevé de notes</span><span style="font-weight: 500; color: #1A1A1A;">18 septembre 2026</span></div>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <button style="min-height: 44px; padding: 0 14px; border: none; border-radius: 999px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Corriger la lettre</button>
+                <button style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Voir le relevé</button>
+              </div>
+            </div>
+
+            <div style="padding: 18px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>
+                <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: #B45309; text-transform: uppercase; letter-spacing: 0.04em;">À renforcer</span>
+              </div>
+              <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Le projet de retour reste général</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">« Travailler dans la logistique portuaire » ne cite ni employeur, ni type de poste, ni échéance. C'est le paragraphe que les administrations lisent le plus attentivement.</div>
+              <button style="align-self: flex-start; min-height: 44px; padding: 0 14px; border: none; border-radius: 999px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Répondre à trois questions</button>
+            </div>
+
+            <div style="padding: 18px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+                <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.04em;">Remarque de forme</span>
+              </div>
+              <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">412 mots pour une limite conseillée de 400</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Hanze ne fixe pas de limite stricte. Douze mots au-dessus n'est pas un problème.</div>
+            </div>
+
+            <div style="padding: 18px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Ce que nous ne jugeons pas</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Nous relevons les incohérences et les imprécisions. Nous ne notons pas ta lettre et nous ne prédisons pas la décision de l'administration.</div>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Relecture automatique du 11/09/2026. Elle ne remplace pas la lecture d'un consultant.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Traiter l'incohérence</button>
+          <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Joindre la lettre au dossier</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="8e" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8e</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-01 — Notifications</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-11</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="height: 100%; overflow-y: auto;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Alertes</h1>
+            <button style="flex: 0 0 auto; min-height: 44px; padding: 0 12px; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Tout marquer lu</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; padding: 0 16px 16px; overflow-x: auto;">
+            <sc-for list="{{ notifTabs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.pick }}" style="flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-radius: 999px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ t.border }}; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-direction: column;">
+            <div style="padding: 16px; border-top: 1px solid #DDDDDD; background: #EEF4FB; display: flex; gap: 12px; align-items: flex-start;">
+              <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #2E75B6;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Le compte bloqué allemand passe à 11 904 €</span>
+                <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Applicable aux demandes déposées à partir du 1er janvier 2027. Ton dossier Allemagne est concerné.</span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Il y a 2 heures · source : make-it-in-germany.com</span>
+              </span>
+            </div>
+
+            <div style="padding: 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: flex-start;">
+              <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #B45309;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Échéance dans 7 jours</span>
+                <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Déposer la demande de renouvellement du passeport avant le 18 septembre.</span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Hier à 8 h 00 · dossier Pays-Bas</span>
+              </span>
+            </div>
+
+            <div style="padding: 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: flex-start;">
+              <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #0F7B4F;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Ton diplôme est conforme</span>
+                <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Complétude passée de 58 à 68 sur 100.</span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">9 septembre · dossier Pays-Bas</span>
+              </span>
+            </div>
+
+            <div style="padding: 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: flex-start;">
+              <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Reçu de paiement disponible</span>
+                <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Pack Dossier, 15 000 F, référence IMP-2609-4471.</span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">9 septembre</span>
+              </span>
+            </div>
+
+            <div style="padding: 16px; border-top: 1px solid #DDDDDD; border-bottom: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: flex-start;">
+              <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Fiche Pays-Bas relue</span>
+                <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Aucun changement d'exigence depuis la dernière vérification.</span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">4 septembre · source : ind.nl</span>
+              </span>
+            </div>
+          </div>
+
+          <div style="padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 10px;">
+            <a href="#8e" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Régler mes alertes par email</a>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Les alertes réglementaires ne concernent que tes dossiers ouverts. Elles sont conservées six mois.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="8f" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8f</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-02 — Divergence réglementaire</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-11 · {{ arbLabel }}</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Alertes</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Une exigence a changé pour l'Allemagne</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Tu décides si ton dossier suit la nouvelle règle ou reste sur l'ancienne. Nous ne modifions rien sans ton accord.</p>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="border: 1px solid #DDDDDD; border-radius: 16px; overflow: hidden;">
+              <div style="padding: 16px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">VERSION 4 · EN VIGUEUR DANS TON DOSSIER</div>
+                <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">11 208 € sur compte bloqué</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F;">Publiée le 12/01/2026 · applicable aux dépôts jusqu'au 31/12/2026</div>
+              </div>
+              <div style="padding: 16px; background: #EEF4FB; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #1F4E79;">VERSION 5 · NOUVELLE</div>
+                <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1F4E79;">11 904 € sur compte bloqué</div>
+                <div style="font-size: 14px; line-height: 20px; color: #1F4E79;">Publiée le 09/09/2026 · applicable aux dépôts à partir du 01/01/2027</div>
+              </div>
+            </div>
+
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ce que ça change pour ton dossier</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ta date de dépôt n'est pas fixée. Si tu déposes en 2027, c'est la version 5 qui s'applique et il te faut 696 € de plus, soit environ 456 000 F.</div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Ton arbitrage</span>
+              <sc-for list="{{ arbOptions }}" as="a" hint-placeholder-count="2">
+                <button onClick="{{ a.pick }}" style="width: 100%; padding: 16px; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; text-align: left; cursor: pointer; display: flex; gap: 12px; align-items: flex-start; border: {{ a.border }};">
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">{{ a.title }}</span>
+                    <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ a.detail }}</span>
+                  </span>
+                  <span style="flex: 0 0 auto; font-size: 14px; font-weight: 500; color: #1F4E79;">{{ a.mark }}</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Changement détecté le 09/09/2026, vérifié le 11/09/2026 — source : make-it-in-germany.com. L'ancienne version reste consultable dans l'historique de la fiche.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">{{ arbCta }}</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ arbFoot }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="8g" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">8g</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-03 — Proposition partenaire</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-13</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="height: 100%; overflow-y: auto; display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+
+          <div style="flex: 1 1 auto; padding: 16px; display: flex; flex-direction: column; justify-content: flex-end; gap: 0;">
+            <div style="padding: 24px 20px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); display: flex; flex-direction: column; gap: 20px;">
+              <div style="width: 40px; height: 4px; border-radius: 999px; background: #DDDDDD; align-self: center;"></div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Ce point dépasse ce que nous savons faire</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Tu as déclaré un refus de visa Schengen en 2024. Une demande après refus se justifie pièce par pièce, et c'est le genre de dossier où un consultant change réellement quelque chose.</p>
+              </div>
+
+              <div style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; gap: 14px; align-items: flex-start;">
+                <span style="flex: 0 0 48px; height: 48px; border-radius: 999px; background: repeating-linear-gradient(135deg, #F7F7F7 0 6px, #DDDDDD 6px 12px);"></span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Cabinet Adjovi &amp; Associés</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F;">Cotonou · agréé, 9 ans d'exercice</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F;">Premier entretien : 25 000 F, une heure</span>
+                </span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">ImmiPro perçoit une commission de 15 % sur cet entretien.</span>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Nous ne transmettons aucune pièce sans ton accord explicite.</span>
+                </div>
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                  <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 8px; border-radius: 999px; background: #6B6B6B;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Refuser ne change rien à ton dossier ni à ton pack.</span>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Voir les créneaux</button>
+                <button style="width: 100%; min-height: 48px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Continuer seule</button>
+                <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Ne plus me proposer de consultant</button>
+              </div>
+
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">ImmiPro n'est pas un cabinet de conseil en immigration. Les consultants partenaires sont indépendants et responsables de leurs prestations.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : R-01 à R-04 → WF-08, aucun fait inventé, l'analyse critique relève les incohérences croisées sans noter le texte. T-01 → WF-11. T-02 → WF-11, écran d'arbitrage migrer ou conserver, l'application ne tranche pas seule. T-03 → WF-13, commission annoncée dans l'écran et refus sans conséquence.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 1100}}">
+class Component extends DCLogic {
+  state = { doc: "motivation", q: 2, answers: {}, ver: "edit", notif: "Toutes", arb: "migrer" };
+
+  docs = [
+    { key: "motivation", code: "MOT", name: "Lettre de motivation", detail: "Pourquoi ce programme, ce pays, et ce que tu feras après.", meta: "8 questions · environ 15 minutes", req: "Exigée par Hanze University" },
+    { key: "projet", code: "PRO", name: "Projet d'études", detail: "Le détail de ton cursus visé et de sa cohérence avec ton parcours.", meta: "6 questions · environ 12 minutes", req: "Recommandée" },
+    { key: "retour", code: "RET", name: "Déclaration d'intention de retour", detail: "Tes attaches au Bénin et ton projet professionnel au retour.", meta: "5 questions · environ 10 minutes", req: "Recommandée après un refus" },
+    { key: "garant", code: "GAR", name: "Attestation de prise en charge", detail: "Le texte que ton garant doit signer, avec les mentions exigées.", meta: "4 questions · environ 8 minutes", req: "Si tu ne finances pas seule" }
+  ];
+
+  questions = [
+    { section: "PARCOURS", q: "Quel diplôme as-tu obtenu, et quand ?", why: "La date doit correspondre exactement à celle de ton relevé de notes, sinon l'écart se voit.", ph: "Licence en gestion, Université d'Abomey-Calavi, septembre 2026.", t1: "Donne l'intitulé exact du diplôme, pas une traduction approximative.", t2: "Précise la mention si tu en as une." },
+    { section: "PARCOURS", q: "Qu'as-tu fait pendant ta dernière année ?", why: "Une expérience concrète, même courte, vaut mieux que des qualités générales.", ph: "Stage de quatre mois chez un transitaire du port de Cotonou, suivi des procédures douanières.", t1: "Chiffre ce que tu as fait : combien de dossiers, de mois, de personnes.", t2: "Une seule expérience bien décrite suffit." },
+    { section: "POURQUOI CE PROGRAMME", q: "Pourquoi ce programme précis, et pas un autre ?", why: "C'est le paragraphe qui distingue une candidature d'un envoi en série. Cite un module ou un enseignant.", ph: "Le module de logistique portuaire, parce que Rotterdam traite la majorité du fret entrant en Europe.", t1: "Nomme un cours, un laboratoire ou un enseignant du programme.", t2: "Relie-le à ce que tu as déjà fait, pas seulement à ce que tu aimes." },
+    { section: "FINANCEMENT", q: "Comment finances-tu ton année ?", why: "L'administration vérifie la cohérence entre ce que tu écris et ton relevé bancaire.", ph: "Épargne familiale et prise en charge de mon oncle, plus une demande de bourse d'établissement.", t1: "Nomme la source des fonds, elle doit correspondre au titulaire du compte.", t2: "Ne gonfle aucun montant : le relevé sera lu." },
+    { section: "APRÈS LE DIPLÔME", q: "Que comptes-tu faire après ton diplôme ?", why: "Le projet de retour est lu attentivement. Un poste et un secteur précis valent mieux qu'une intention.", ph: "Rentrer travailler dans la logistique portuaire au Bénin, secteur en expansion depuis la modernisation du port.", t1: "Cite un type de poste et, si possible, un employeur ou un secteur local.", t2: "Donne une échéance, même approximative." },
+    { section: "ATTACHES", q: "Quelles sont tes attaches au Bénin ?", why: "Famille, biens, engagements : ce sont des éléments factuels, pas des sentiments.", ph: "Mes parents et mes deux sœurs vivent à Cotonou. Je suis bénévole dans une association de quartier depuis 2023.", t1: "Reste factuelle : liens familiaux, propriété, engagements datés.", t2: "N'invente rien, ces points peuvent être vérifiés." },
+    { section: "LANGUES", q: "Quel est ton niveau d'anglais et comment l'as-tu acquis ?", why: "Le niveau déclaré doit correspondre à ton test, et le test doit être valable au dépôt.", ph: "IELTS 6.0 obtenu en mars 2025, et trois ans de cours en anglais à l'université.", t1: "Donne le score et la date du test.", t2: "Mentionne les cours suivis en anglais, ils comptent." },
+    { section: "OUVERTURE", q: "Comment veux-tu te présenter en une phrase ?", why: "C'est la première ligne que le lecteur verra. Elle doit dire qui tu es et ce que tu demandes.", ph: "Je suis Aline Dossou, candidate au programme de licence en International Business pour la rentrée 2027.", t1: "Nom, situation, et la demande précise, en une phrase.", t2: "Pas de formule d'accroche : le lecteur en voit des centaines." }
+  ];
+
+  arbChoices = [
+    { key: "migrer", title: "Migrer vers la version 5", detail: "Ta checklist et tes montants passent à 11 904 €. C'est le choix cohérent si tu déposes en 2027." },
+    { key: "conserver", title: "Conserver la version 4", detail: "Ta checklist reste à 11 208 €. À ne garder que si tu déposes avant le 31 décembre 2026." }
+  ];
+
+  renderVals() {
+    const s = this.state;
+    const i = s.q;
+    const cur = this.questions[i];
+    const last = i === this.questions.length - 1;
+    const selDoc = this.docs.find(d => d.key === s.doc);
+    const answer = s.answers[i] || "";
+    const words = answer.trim().length === 0 ? 0 : answer.trim().split(/\s+/).length;
+    const arb = this.arbChoices.find(a => a.key === s.arb);
+
+    return {
+      docTypes: this.docs.map(d => ({
+        code: d.code,
+        name: d.name,
+        detail: d.detail,
+        meta: d.meta,
+        mark: d.key === s.doc ? "Choisi" : "",
+        border: d.key === s.doc ? "2px solid #2E75B6" : "1px solid #DDDDDD",
+        pick: () => this.setState({ doc: d.key })
+      })),
+      docFoot: selDoc.req + " · " + selDoc.meta,
+
+      qLabel: (i + 1) + " / 8",
+      qProgress: Math.round(((i + 1) / 8) * 100) + "%",
+      qSection: cur.section,
+      qQuestion: cur.q,
+      qWhy: cur.why,
+      qPlaceholder: cur.ph,
+      qTip1: cur.t1,
+      qTip2: cur.t2,
+      answer: answer,
+      setAnswer: e => {
+        const v = e.target.value;
+        this.setState(p => ({ answers: Object.assign({}, p.answers, { [i]: v }) }));
+      },
+      answerCount: words === 0 ? "Deux ou trois phrases suffisent." : words + (words > 1 ? " mots écrits" : " mot écrit"),
+      qCta: last ? "Mettre en forme ma lettre" : "Question suivante",
+      qNext: () => this.setState(p => ({ q: Math.min(7, p.q + 1) })),
+      qPrev: () => this.setState(p => ({ q: Math.max(0, p.q - 1) })),
+
+      verIsEdit: s.ver === "edit",
+      verIsList: s.ver === "list",
+      verLabel: s.ver === "edit" ? "éditeur" : "trois versions",
+      verEdit: () => this.setState({ ver: "edit" }),
+      verList: () => this.setState({ ver: "list" }),
+
+      notifTabs: ["Toutes", "Réglementation", "Échéances"].map(label => ({
+        label,
+        pick: () => this.setState({ notif: label }),
+        bg: label === s.notif ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.notif ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.notif ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+
+      arbOptions: this.arbChoices.map(a => ({
+        title: a.title,
+        detail: a.detail,
+        mark: a.key === s.arb ? "Choisi" : "",
+        border: a.key === s.arb ? "2px solid #2E75B6" : "1px solid #DDDDDD",
+        pick: () => this.setState({ arb: a.key })
+      })),
+      arbLabel: s.arb === "migrer" ? "migrer" : "conserver",
+      arbCta: arb.title,
+      arbFoot: s.arb === "migrer"
+        ? "Ta checklist Allemagne sera mise à jour"
+        : "Ta checklist Allemagne restera en version 4"
+    };
+  }
+}
+
+</script>
+</body>
+</html>

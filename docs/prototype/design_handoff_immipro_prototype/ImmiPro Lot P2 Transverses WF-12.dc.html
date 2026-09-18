@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #FFFFFF; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section lang="fr" style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B; letter-spacing: 0.02em;">DOC-12 §3.6 · TRANSVERSES WF-12 · 390 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">T-04 annuaire consultants · T-05 prise de rendez-vous</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Les deux derniers écrans de l'inventaire jamais prototypés. Ils dépendent du pack Accompagné, lui-même en attente des habilitations consultants — donc tout ce qui relève d'une politique non arrêtée est laissé en emplacement annoté, comme les photographies, et non inventé. Les quatre décisions que ces écrans présument sont listées en <a href="#19e">19e</a>.</p>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;">
+
+    <div id="19a" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-04 — Annuaire</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-12</span>
+      </div>
+      <div data-screen-label="T-04" style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 24px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:41</span><span>4G · 78 %</span></div>
+          <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 16px; border-radius: 12px; background: #EEF4FB; font-size: 14px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 44px; margin: 0 16px 12px; padding: 0 14px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+          <div style="padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid #DDDDDD;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="color: #1F4E79;">‹ Mon dossier</button>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h1 style="margin: 0; outline: none; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Consultants habilités</h1>
+              <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Pays-Bas — séjour études · 3 consultants</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; background: #EEF4FB; font-size: 14px; font-weight: 600; color: #1F4E79;">Pays-Bas</span>
+              <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; font-size: 14px; font-weight: 500; color: #1A1A1A;">Langue</span>
+              <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; font-size: 14px; font-weight: 500; color: #1A1A1A;">Sous 48 h</span>
+            </div>
+          </div>
+          <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <sc-for list="{{ consultants }}" as="c" hint-placeholder-count="3">
+              <div style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; align-items: flex-start; gap: 12px;">
+                  <span style="flex: 0 0 48px; height: 48px; border-radius: 999px; background: repeating-linear-gradient(135deg, #EEF4FB 0 6px, #D7E5F5 6px 12px);"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">{{ c.nom }}</span>
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ c.cabinet }}</span>
+                  </span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Habilité le</span><span style="font-weight: 500; color: #1A1A1A;">{{ c.habilite }}</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Destinations</span><span style="font-weight: 500; color: #1A1A1A;">{{ c.destinations }}</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Langues</span><span style="font-weight: 500; color: #1A1A1A;">{{ c.langues }}</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Répond en</span><span style="font-weight: 500; color: #1A1A1A;">{{ c.delai }}</span></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Consultation 45 min</span><span style="font-weight: 500; color: #1A1A1A;">20 000 F · tarif unique ImmiPro</span></div>
+                <button style="width: 100%; min-height: 48px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Voir les créneaux</button>
+              </div>
+            </sc-for>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Le conseil donné en rendez-vous engage le consultant, pas ImmiPro. L'habilitation atteste que son titre a été vérifié, pas que ta demande aboutira.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="19b" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-04 — Aucun habilité</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">état vide</span>
+      </div>
+      <div data-screen-label="T-04 vide" style="width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:41</span><span>4G · 78 %</span></div>
+        <div style="padding: 8px 16px 16px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Consultants habilités</span>
+          <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Allemagne — séjour études</span>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; padding: 32px 16px; display: flex; flex-direction: column; gap: 20px; align-items: flex-start;">
+          <img src="public/illustrations/empty-dossier.svg" alt="" width="320" height="200" style="display: block; width: 100%; max-width: 220px; height: auto; align-self: center;" />
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Aucun consultant habilité pour l'Allemagne</span>
+            <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Trois consultants sont habilités pour les Pays-Bas et deux pour le Canada. L'habilitation se fait destination par destination, parce qu'elle vérifie un titre d'exercice local.</span>
+          </div>
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Me prévenir dès qu'il y en a un</button>
+          <button style="width: 100%; min-height: 48px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Continuer sans consultant</button>
+          <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ton dossier avance sans rendez-vous. Les pièces, l'analyse et l'échéancier ne dépendent pas d'un consultant.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="19c" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-05 — Créneaux</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">{{ creneauLabel }}</span>
+      </div>
+      <div data-screen-label="T-05" style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:42</span><span>4G · 78 %</span></div>
+          <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 16px; border-radius: 12px; background: #EEF4FB; font-size: 14px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 44px; margin: 0 16px 12px; padding: 0 14px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+          <div style="padding: 8px 16px 16px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="color: #1F4E79;">‹ Annuaire</button>
+            <h1 style="margin: 0; outline: none; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Choisis un créneau</h1>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="flex: 0 0 40px; height: 40px; border-radius: 999px; background: repeating-linear-gradient(135deg, #EEF4FB 0 6px, #D7E5F5 6px 12px);"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Maître A. Vermeulen</span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">45 minutes · en visioconférence</span>
+              </span>
+            </div>
+          </div>
+          <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{ jours }}" as="j" hint-placeholder-count="3">
+                <button onClick="{{ j.pick }}" style="flex: 1 1 0; min-width: 0; min-height: 60px; padding: 8px 4px; border: {{ j.border }}; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;" style-hover="background: #F7F7F7;">
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ j.jour }}</span>
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">{{ j.date }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <div role="radiogroup" aria-label="Créneaux disponibles" onKeyDown="{{ creneauKeys }}" style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ creneaux }}" as="c" hint-placeholder-count="5">
+                <button onClick="{{ c.pick }}" role="radio" aria-checked="{{ c.sel }}" tabindex="{{ c.tab }}" ref="{{ c.ref }}" style="width: 100%; min-height: 56px; padding: 0 16px; border: {{ c.border }}; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px;" style-hover="background: #F7F7F7;">
+                  <span style="font-size: 16px; line-height: 24px; font-weight: 500; color: #1A1A1A;">{{ c.heure }}</span>
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1F4E79;">{{ c.mark }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #F7F7F7; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">20 000 F, réglés à ImmiPro. Annulation ou report sans frais jusqu'à 24 h avant.</span>
+              <span style="font-size: 13px; line-height: 18px; color: #40403F;">Horaires dans ton fuseau, Cotonou.</span>
+            </div>
+          </div>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Confirmer {{ creneauLabel }}</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">Le créneau est tenu 10 minutes</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="19d" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-05 — Confirmé</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-12</span>
+      </div>
+      <div data-screen-label="T-05 confirmé" style="width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:43</span><span>4G · 78 %</span></div>
+        <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 600; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Rendez-vous confirmé</span>
+            <span style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Jeudi 17 septembre, 15 h 30</span>
+            <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Avec Maître A. Vermeulen, 45 minutes, en visioconférence. Le lien arrive par courriel et reste dans ton dossier.</span>
+          </div>
+          <div style="padding: 16px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Référence</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">RDV-2609-8814</span></div>
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Dossier</span><span style="font-weight: 500; color: #1A1A1A;">Pays-Bas — études</span></div>
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Ton fuseau</span><span style="font-weight: 500; color: #1A1A1A;">Cotonou, UTC+1</span></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">À préparer avant l'appel</span>
+            <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Ta checklist est à 80 % : les deux pièces à reprendre sont le relevé bancaire et la photo d'identité. Le consultant y aura accès pendant l'appel, avec ton accord, que tu peux retirer à tout moment.</span>
+          </div>
+          <button style="width: 100%; min-height: 48px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Ajouter à mon agenda</button>
+          <div style="padding: 12px 14px; border-radius: 12px; background: #F7F7F7; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Annulation ou report sans frais jusqu'au mardi 22 septembre, 10 h 00. Passé ce délai, la consultation est due.</div>
+        </div>
+        <div style="padding: 12px 16px 20px; border-top: 1px solid #DDDDDD;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Revenir à mon dossier</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="19f" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19f</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-04 — Chargement</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">squelettes</span>
+      </div>
+      <div data-screen-label="T-04 chargement" style="width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:41</span><span>4G · 78 %</span></div>
+        <div style="padding: 8px 16px 16px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Consultants habilités</span>
+          <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Pays-Bas — séjour études</span>
+        </div>
+        <div aria-busy="true" aria-label="Chargement des consultants" style="flex: 1 1 auto; min-height: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <sc-for list="{{ squelettes }}" as="s" hint-placeholder-count="3">
+            <div aria-hidden="true" style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 16px; display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="flex: 0 0 48px; height: 48px; border-radius: 999px; background: #F7F7F7;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="height: 16px; width: 70%; border-radius: 8px; background: #F7F7F7;"></span>
+                  <span style="height: 12px; width: 50%; border-radius: 6px; background: #F7F7F7;"></span>
+                </span>
+              </div>
+              <span style="height: 12px; width: 100%; border-radius: 6px; background: #F7F7F7;"></span>
+              <span style="height: 12px; width: 85%; border-radius: 6px; background: #F7F7F7;"></span>
+              <span style="height: 48px; width: 100%; border-radius: 12px; background: #F7F7F7;"></span>
+            </div>
+          </sc-for>
+          <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Trois consultants attendus, vérifiés ce matin.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="19g" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19g</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-05 — Hors ligne</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">créneaux indisponibles</span>
+      </div>
+      <div data-screen-label="T-05 hors ligne" style="width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:44</span><span>hors ligne · 76 %</span></div>
+        <div style="padding: 8px 16px 16px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 6px;">
+          <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Choisis un créneau</span>
+          <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Maître A. Vermeulen · 45 minutes</span>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start;">
+          <img src="public/illustrations/hors-ligne.svg" alt="" width="320" height="200" style="display: block; width: 100%; max-width: 220px; height: auto; align-self: center;" />
+          <div style="width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); border-left: 3px solid #B45309;">
+            <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #B45309;">Les créneaux ne peuvent pas être affichés maintenant</span>
+            <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Tu es hors ligne. Aucune disponibilité n'est montrée plutôt qu'un horaire déjà pris par quelqu'un d'autre.</span>
+          </div>
+          <button disabled="{{ vrai }}" style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #DDDDDD; color: #6B6B6B; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: not-allowed;">Confirmer un créneau</button>
+          <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 15px; font-weight: 600; color: #1A1A1A; cursor: pointer; align-self: flex-start;" style-hover="background: #F7F7F7;">Réessayer</button>
+          <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Le reste de ton dossier fonctionne hors ligne : ta checklist, tes pièces déjà déposées et ton échéancier restent consultables.</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="19h" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">19h</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">T-04 — Accord d'accès</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">avant T-05</span>
+      </div>
+      <div data-screen-label="T-04 accord" style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;"><span>9:43</span><span>4G · 77 %</span></div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Consultants habilités</button>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Ouvrir ton dossier à Maître A. Vermeulen</h1>
+              <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Habilité Pays-Bas depuis le 12/03/2026</span>
+            </div>
+          </div>
+          <div style="padding: 0 16px; display: flex; flex-direction: column; gap: 24px;">
+            <p style="margin: 0; font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Le consultant ne voit rien tant que tu n'as pas donné ton accord. Tu peux le retirer à tout moment depuis « Mes consentements ».</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce qu'il verra</h2>
+              <div style="display: flex; flex-direction: column; border: 1px solid #DDDDDD; border-radius: 16px; overflow: hidden;">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span><span style="font-size: 15px; line-height: 22px; color: #1A1A1A;">Tes pièces déposées et leur analyse</span></div>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid #DDDDDD;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span><span style="font-size: 15px; line-height: 22px; color: #1A1A1A;">Ta checklist et ton échéancier</span></div>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid #DDDDDD;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span><span style="font-size: 15px; line-height: 22px; color: #1A1A1A;">Vos échanges dans ImmiPro</span></div>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce qu'il ne verra jamais</h2>
+              <div style="display: flex; flex-direction: column; border: 1px solid #DDDDDD; border-radius: 16px; overflow: hidden;">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #DDDDDD;"></span><span style="font-size: 15px; line-height: 22px; color: #40403F;">Ton moyen de paiement et tes achats</span></div>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid #DDDDDD;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #DDDDDD;"></span><span style="font-size: 15px; line-height: 22px; color: #40403F;">Tes dossiers pour d'autres destinations</span></div>
+              </div>
+            </div>
+            <label style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 16px; cursor: pointer;">
+              <input type="checkbox" checked="{{ accordCoche }}" onChange="{{ toggleAccord }}" style="flex: 0 0 24px; width: 24px; height: 24px; margin: 0; accent-color: #2E75B6;" />
+              <span style="font-size: 15px; line-height: 22px; color: #1A1A1A; text-wrap: pretty;">J'autorise Maître A. Vermeulen à consulter mon dossier Pays-Bas jusqu'à ce que je retire cet accord.</span>
+            </label>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Chaque consultation de ton dossier par le consultant est inscrite au journal, que tu peux demander à tout moment.</p>
+          </div>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <button disabled="{{ accordBloque }}" style="flex: 1 1 auto; min-height: 52px; border: none; border-radius: 12px; background: {{ accordBg }}; color: {{ accordFg }}; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: {{ accordCursor }};">Donner mon accord et choisir un créneau</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="19e" style="display: flex; flex-direction: column; gap: 20px; padding: 28px; background: #F7F7F7; border-radius: 16px; max-width: 1240px;">
+    <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Quatre décisions que ces écrans présument, tranchées le 13/09/2026</h2>
+    <p style="margin: 0; max-width: 76ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Chacune changeait l'écran. Elles sont désormais arrêtées par défaut, motif écrit dans « ImmiPro Arbitrages clos » ; les écrans ci-dessus les appliquent.</p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;">
+      <sc-for list="{{ ouverts }}" as="o" hint-placeholder-count="4">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; background: #FFFFFF; border-radius: 12px;">
+          <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">{{ o.titre }}</span>
+          <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ o.texte }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #1F4E79;">{{ o.effet }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : T-04 et T-05 → WF-12, pack Accompagné, lot 4. L'annuaire n'annonce aucune chance d'obtention et distingue l'habilitation, qui vérifie un titre, de la réussite, qui ne se promet pas. Les douze règles clavier et la doctrine d'erreur des documents de méthode s'appliquent : lien d'évitement en premier arrêt, créneaux en groupe radio à un seul arrêt, flèches pour changer.</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1720}}">
+class Component extends DCLogic {
+  state = { jour: 1, creneau: 2 };
+
+  refs = [];
+  heures = ["09 h 00", "11 h 30", "15 h 30", "16 h 30", "18 h 00"];
+
+  skip = e => {
+    e.preventDefault();
+    const cadre = e.currentTarget.closest("[data-screen-label]");
+    const cible = cadre && cadre.querySelector("h1");
+    if (cible) {
+      cible.setAttribute("tabindex", "-1");
+      cible.focus();
+    }
+  };
+
+  creneauKeys = e => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const n = this.heures.length;
+    const suivant = e.key === "ArrowDown"
+      ? (this.state.creneau + 1) % n
+      : (this.state.creneau - 1 + n) % n;
+    this.setState({ creneau: suivant }, () => {
+      const el = this.refs[suivant];
+      if (el) el.focus();
+    });
+  };
+
+  renderVals() {
+    const s = this.state;
+    return {
+      skip: this.skip,
+      vrai: true,
+      squelettes: [1, 2, 3],
+      creneauKeys: this.creneauKeys,
+      creneauLabel: this.heures[s.creneau],
+      consultants: [
+        { nom: "Maître A. Vermeulen", cabinet: "Vermeulen Immigratierecht, Amsterdam", habilite: "12/03/2026", destinations: "Pays-Bas", langues: "Français, néerlandais", delai: "24 h" },
+        { nom: "Maître S. Adjovi", cabinet: "Cabinet Adjovi, Cotonou et La Haye", habilite: "04/06/2026", destinations: "Pays-Bas, Belgique", langues: "Français, fon, anglais", delai: "48 h" },
+        { nom: "Maître L. Bakker", cabinet: "Bakker & Partners, Rotterdam", habilite: "27/07/2026", destinations: "Pays-Bas", langues: "Néerlandais, anglais", delai: "72 h" }
+      ],
+      jours: [
+        { jour: "mar.", date: "15 sept.", border: s.jour === 0 ? "2px solid #2E75B6" : "1px solid #DDDDDD", pick: () => this.setState({ jour: 0 }) },
+        { jour: "jeu.", date: "17 sept.", border: s.jour === 1 ? "2px solid #2E75B6" : "1px solid #DDDDDD", pick: () => this.setState({ jour: 1 }) },
+        { jour: "ven.", date: "18 sept.", border: s.jour === 2 ? "2px solid #2E75B6" : "1px solid #DDDDDD", pick: () => this.setState({ jour: 2 }) }
+      ],
+      creneaux: this.heures.map((heure, i) => ({
+        heure,
+        sel: i === s.creneau ? "true" : "false",
+        tab: i === s.creneau ? 0 : -1,
+        ref: el => { this.refs[i] = el; },
+        mark: i === s.creneau ? "Choisi" : "",
+        border: i === s.creneau ? "2px solid #2E75B6" : "1px solid #DDDDDD",
+        pick: () => this.setState({ creneau: i })
+      })),
+      accordCoche: !!s.accord,
+      toggleAccord: () => this.setState({ accord: !s.accord }),
+      accordBloque: !s.accord,
+      accordBg: s.accord ? "#2E75B6" : "#DDDDDD",
+      accordFg: s.accord ? "#FFFFFF" : "#6B6B6B",
+      accordCursor: s.accord ? "pointer" : "not-allowed",
+      ouverts: [
+        { titre: "Qui fixe le tarif de la consultation", texte: "ImmiPro, dans une grille unique : 20 000 F la consultation de 45 minutes, même valeur sur chaque carte. Montant à inscrire dans pricing.ts avec les trois paliers.", effet: "T-04 en-tête · T-05 pied" },
+        { titre: "Qui encaisse", texte: "ImmiPro. Le rendez-vous passe par le parcours $ et ses états d'échec ; le consultant ne manipule jamais de paiement dans le produit.", effet: "T-05 · $-01 à $-05" },
+        { titre: "Conditions d'annulation", texte: "Annulation ou report sans frais jusqu'à 24 h avant le créneau, remboursement intégral. Passé ce délai, la consultation est due.", effet: "T-05 avant et après confirmation" },
+        { titre: "Ce que le consultant voit du dossier", texte: "Les pièces et les échanges, jamais le moyen de paiement. Deux conditions cumulées : habilitation sur la destination et accord nominatif du candidat, révocable à tout moment depuis A-05. Toute lecture s'inscrit au journal d'audit.", effet: "T-05 confirmé · A-05 · B-06" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

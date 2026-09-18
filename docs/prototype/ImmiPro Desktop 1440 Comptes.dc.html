@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §4.1 ÉTAPE 6 · COMPTES EN 1440 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">A-01 à A-05 sur le gabarit acquisition</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le formulaire ne s'élargit pas avec l'écran : il reste à 520 px, la place gagnée sert à dire pourquoi on demande chaque information. Les consentements restent séparés et jamais pré-cochés, comme en 390 px.</p>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 56px;">
+
+    <div id="13a" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-01 — Inscription</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+      <div data-screen-label="A-01 desktop" style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 48px; border-radius: 12px; background: #EEF4FB; font-size: 15px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 48px; margin: 16px 48px 0; padding: 0 18px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 48px; border-bottom: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="124" height="30" style="display: block;" />
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Vous avez déjà un compte ?</span>
+            <button style="min-height: 44px; padding: 0 18px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Connexion</button>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; justify-content: center; padding: 48px;">
+          <div style="width: 1120px; display: flex; gap: 64px; align-items: flex-start;">
+            <div style="flex: 0 0 520px; display: flex; flex-direction: column; gap: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Créer votre compte</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Vos réponses au simulateur seront rattachées à ce compte.</p>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                <label style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Nom complet</span>
+                  <input type="text" placeholder="Tel qu'il figure sur votre passeport" style="height: 48px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;" />
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Adresse électronique</span>
+                  <input type="email" placeholder="vous@exemple.com" style="height: 48px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;" />
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Un code de vérification y sera envoyé.</span>
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Mot de passe</span>
+                  <input type="password" value="{{ champs.c1 }}" onChange="{{ maj.c1 }}" placeholder="Au moins 10 caractères" style="height: 48px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;" />
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">10 caractères minimum.</span>
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Pays de résidence</span>
+                  <select style="height: 48px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;">
+                    <option>Bénin</option>
+                    <option>Côte d'Ivoire</option>
+                    <option>Sénégal</option>
+                  </select>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Détermine la devise d'affichage et les moyens de paiement disponibles.</span>
+                </label>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: 16px; background: #F7F7F7;">
+                <div style="min-height: 44px; display: flex; align-items: flex-start; gap: 12px; padding-top: 8px;">
+                  <span style="flex: 0 0 22px; height: 22px; border-radius: 6px; border: 1px solid #DDDDDD; background: #FFFFFF;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 22px; color: #1A1A1A; text-wrap: pretty;">J'accepte les conditions d'utilisation et la politique de confidentialité.</span>
+                </div>
+                <div style="min-height: 44px; display: flex; align-items: flex-start; gap: 12px;">
+                  <span style="flex: 0 0 22px; height: 22px; border-radius: 6px; border: 1px solid #DDDDDD; background: #FFFFFF;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 22px; color: #1A1A1A; text-wrap: pretty;">J'accepte de recevoir les alertes réglementaires concernant ma destination. Facultatif.</span>
+                </div>
+              </div>
+              <button disabled="{{ vrai }}" style="height: 52px; border: none; border-radius: 12px; background: #DDDDDD; color: #6B6B6B; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: not-allowed;">Créer mon compte</button>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Les conditions d'utilisation doivent être acceptées pour continuer.</span>
+            </div>
+            <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding: 28px; border-radius: 16px; background: #F7F7F7;">
+              <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce que le compte vous donne</span>
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">La checklist de votre destination</span>
+                  <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Les 12 pièces des Pays-Bas, avec ce qui rend chacune conforme.</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Les alertes de changement de règle</span>
+                  <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Le justificatif de ressources néerlandais a changé le 09/09/2026.</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">Vos pièces au même endroit</span>
+                  <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Conservées chiffrées, supprimables à tout moment.</span>
+                </div>
+              </div>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Aucun paiement n'est demandé à l'inscription. ImmiPro prépare votre dossier ; la décision appartient aux autorités du pays de destination.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13b" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-02 — Connexion</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02 · identifiants refusés</span>
+      </div>
+      <div data-screen-label="A-02 desktop" style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 48px; border-radius: 12px; background: #EEF4FB; font-size: 15px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 48px; margin: 16px 48px 0; padding: 0 18px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 48px; border-bottom: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="124" height="30" style="display: block;" />
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Pas encore de compte ?</span>
+            <button style="min-height: 44px; padding: 0 18px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Créer un compte</button>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 48px;">
+          <div style="width: 480px; display: flex; flex-direction: column; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">Se connecter</h1>
+              <p style="margin: 0; font-size: 16px; line-height: 24px;">Votre dossier vous attend là où vous l'avez laissé.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); border-left: 3px solid #B3261E;">
+              <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #B3261E;">Adresse ou mot de passe incorrect</span>
+              <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Deux tentatives restantes avant blocage temporaire de 15 minutes.</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Adresse électronique</span>
+                <input type="email" value="{{ champs.c2 }}" onChange="{{ maj.c2 }}" style="height: 48px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;" />
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Mot de passe</span>
+                <input type="password" value="{{ champs.c3 }}" onChange="{{ maj.c3 }}" style="height: 48px; padding: 0 14px; border: 1px solid #B3261E; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;" />
+              </label>
+            </div>
+            <button style="height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Se connecter</button>
+            <div style="min-height: 44px; display: flex; align-items: center;"><a href="#13d" style="font-size: 15px; line-height: 22px; font-weight: 500;">Mot de passe oublié</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13c" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-03 — Vérification email</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+      <div data-screen-label="A-03 desktop" style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 48px; border-radius: 12px; background: #EEF4FB; font-size: 15px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 48px; margin: 16px 48px 0; padding: 0 18px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 48px; border-bottom: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="124" height="30" style="display: block;" />
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">ÉTAPE 2 SUR 3</span>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 48px;">
+          <div style="width: 520px; display: flex; flex-direction: column; gap: 24px; align-items: flex-start;">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Entrez le code envoyé à awa.diallo@exemple.com</h1>
+              <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Six chiffres, valables 10 minutes. Vérifiez le dossier indésirable si vous ne le voyez pas.</p>
+            </div>
+            <div style="display: flex; gap: 12px;">
+              <span style="width: 60px; height: 68px; border: 1px solid #2E75B6; border-radius: 12px; box-shadow: 0 0 0 3px #D7E5F5; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: #1A1A1A;">4</span>
+              <span style="width: 60px; height: 68px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: #1A1A1A;">9</span>
+              <span style="width: 60px; height: 68px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: #1A1A1A;">2</span>
+              <span style="width: 60px; height: 68px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: #6B6B6B;"></span>
+              <span style="width: 60px; height: 68px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: #6B6B6B;"></span>
+              <span style="width: 60px; height: 68px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: #6B6B6B;"></span>
+            </div>
+            <button disabled="{{ vrai }}" style="height: 52px; padding: 0 28px; border: none; border-radius: 12px; background: #DDDDDD; color: #6B6B6B; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: not-allowed;">Vérifier</button>
+            <div style="display: flex; align-items: center; gap: 20px;">
+              <span style="font-size: 15px; line-height: 22px; color: #6B6B6B;">Renvoyer le code dans 00:42</span>
+              <a href="#13a" style="font-size: 15px; line-height: 22px; font-weight: 500;">Changer d'adresse</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13d" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-04 — Mot de passe</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02 · définition</span>
+      </div>
+      <div data-screen-label="A-04 desktop" style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 48px; border-radius: 12px; background: #EEF4FB; font-size: 15px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 48px; margin: 16px 48px 0; padding: 0 18px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 48px; border-bottom: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="124" height="30" style="display: block;" />
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">LIEN VALABLE 30 MINUTES</span>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 48px;">
+          <div style="width: 1000px; display: flex; gap: 64px; align-items: flex-start;">
+            <div style="flex: 0 0 520px; display: flex; flex-direction: column; gap: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">Choisir un nouveau mot de passe</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Vos pièces déposées restent accessibles, rien n'est perdu.</p>
+              </div>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Nouveau mot de passe</span>
+                <input type="password" value="{{ champs.c4 }}" onChange="{{ maj.c4 }}" style="height: 48px; padding: 0 14px; border: 1px solid #2E75B6; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%; box-shadow: 0 0 0 3px #D7E5F5;" />
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Confirmer</span>
+                <input type="password" value="{{ champs.c5 }}" onChange="{{ maj.c5 }}" style="height: 48px; padding: 0 14px; border: 1px solid #B45309; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; box-sizing: border-box; width: 100%;" />
+                <span style="font-size: 13px; line-height: 18px; color: #B45309;">Les deux saisies diffèrent.</span>
+              </label>
+              <button disabled="{{ vrai }}" style="height: 52px; border: none; border-radius: 12px; background: #DDDDDD; color: #6B6B6B; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: not-allowed;">Enregistrer et se connecter</button>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Disponible dès que les deux saisies concordent.</span>
+            </div>
+            <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 16px; background: #F7F7F7;">
+              <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Ce qui compte</span>
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span><span style="font-size: 15px; line-height: 22px; color: #0F7B4F;">10 caractères ou plus</span></div>
+                <div style="display: flex; align-items: center; gap: 10px;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #6B6B6B;"></span><span style="font-size: 15px; line-height: 22px; color: #40403F;">Pas de date de naissance</span></div>
+                <div style="display: flex; align-items: center; gap: 10px;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #6B6B6B;"></span><span style="font-size: 15px; line-height: 22px; color: #40403F;">Pas de numéro de téléphone</span></div>
+              </div>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Les sessions ouvertes sur d'autres appareils seront fermées.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13e" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13e</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-05 — Consentements</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+      <div data-screen-label="A-05 desktop" style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex; flex-direction: column;">
+        <a href="#contenu" onClick="{{ skip }}" style="display: flex; align-items: center; height: 0; overflow: hidden; margin: 0 48px; border-radius: 12px; background: #EEF4FB; font-size: 15px; font-weight: 600; color: #1F4E79; text-decoration: none; cursor: pointer;" style-focus="height: 48px; margin: 16px 48px 0; padding: 0 18px; outline: 2px solid #1F4E79; outline-offset: 3px; text-decoration: none;">Aller au contenu</a>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 48px; border-bottom: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="124" height="30" style="display: block;" />
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">ÉTAPE 3 SUR 3</span>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; justify-content: center; padding: 48px;">
+          <div style="width: 1000px; display: flex; gap: 64px; align-items: flex-start;">
+            <div style="flex: 0 0 560px; display: flex; flex-direction: column; gap: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">Ce que vous nous autorisez à faire</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Chaque autorisation est indépendante et révocable depuis vos réglages. Aucune case n'est cochée par défaut.</p>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; gap: 14px; padding: 18px 20px; border: 1px solid #DDDDDD; border-radius: 16px; background: #FFFFFF;" style-hover="background: #F7F7F7;">
+                  <span style="flex: 0 0 22px; height: 22px; margin-top: 2px; border-radius: 6px; border: 1px solid #DDDDDD; background: #FFFFFF;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Conserver mes pièces justificatives</span>
+                    <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Stockage chiffré jusqu'à la clôture du dossier, puis suppression sous 90 jours. Nécessaire pour le contrôle de conformité.</span>
+                  </span>
+                </div>
+                <div style="display: flex; gap: 14px; padding: 18px 20px; border: 1px solid #DDDDDD; border-radius: 16px; background: #FFFFFF;" style-hover="background: #F7F7F7;">
+                  <span style="flex: 0 0 22px; height: 22px; margin-top: 2px; border-radius: 6px; border: 1px solid #DDDDDD; background: #FFFFFF;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Traiter mes pièces d'identité</span>
+                    <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Passeport, acte de naissance et photo d'identité. Consentement distinct, exigé par la réglementation sur les données sensibles.</span>
+                  </span>
+                </div>
+                <div style="display: flex; gap: 14px; padding: 18px 20px; border: 1px solid #DDDDDD; border-radius: 16px; background: #FFFFFF;" style-hover="background: #F7F7F7;">
+                  <span style="flex: 0 0 22px; height: 22px; margin-top: 2px; border-radius: 6px; border: 1px solid #DDDDDD; background: #FFFFFF;"></span>
+                  <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Me proposer des services partenaires</span>
+                    <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Traduction assermentée, assurance, logement. ImmiPro perçoit une commission de 15 %, annoncée sur chaque proposition. Facultatif.</span>
+                  </span>
+                </div>
+              </div>
+              <button style="height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Enregistrer et accéder à mon espace</button>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Sans le premier consentement, le contrôle de conformité ne peut pas fonctionner : vous garderez l'accès aux checklists en lecture seule.</span>
+            </div>
+            <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 16px; background: #F7F7F7;">
+              <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Vos droits</span>
+              <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Vous pouvez à tout moment télécharger vos données, retirer un consentement ou supprimer votre compte depuis vos réglages.</span>
+              <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Retirer le consentement sur les pièces d'identité entraîne la suppression immédiate des documents concernés.</span>
+              <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Politique de confidentialité mise à jour le 11/09/2026.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Reste à décliner : C-01 à C-11 sur le gabarit dossier.</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { champs: { c1: "", c2: "awa.diallo@exemple.com", c3: "••••••", c4: "••••••••••••••", c5: "••••••••••" } };
+
+  maj = Object.fromEntries(["c1","c2","c3","c4","c5"].map(k => [k, e => {
+    const v = e.target.value;
+    this.setState(p => ({ champs: Object.assign({}, p.champs, { [k]: v }) }));
+  }]));
+
+  skip = e => {
+    e.preventDefault();
+    const cadre = e.currentTarget.closest("[data-screen-label]");
+    const cible = cadre && cadre.querySelector("h1");
+    if (cible) {
+      cible.setAttribute("tabindex", "-1");
+      cible.style.outline = "none";
+      cible.focus();
+    }
+  };
+
+  renderVals() { return { skip: this.skip, vrai: true, champs: this.state.champs, maj: this.maj }; }
+}
+</script>
+</body>
+</html>

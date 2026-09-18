@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="./doc-page.js"></script>
+<style>
+  doc-page:not(:defined) { visibility: hidden; }
+  body { margin: 0; }
+  a { color: #2E75B6; }
+  a:hover { color: #1F4E79; }
+</style>
+</helmet>
+
+<template id="__bundler_thumbnail" data-bg-color="#1F4E79">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#1F4E79"/>
+    <rect x="360" y="150" width="480" height="500" rx="12" fill="#FFFFFF"/>
+    <rect x="404" y="206" width="300" height="18" rx="9" fill="#2E75B6"/>
+    <rect x="404" y="262" width="392" height="10" rx="5" fill="#DDDDDD"/>
+    <rect x="404" y="306" width="392" height="10" rx="5" fill="#DDDDDD"/>
+    <rect x="404" y="350" width="392" height="10" rx="5" fill="#DDDDDD"/>
+    <rect x="404" y="394" width="392" height="10" rx="5" fill="#DDDDDD"/>
+    <rect x="404" y="438" width="392" height="10" rx="5" fill="#DDDDDD"/>
+    <rect x="404" y="482" width="392" height="10" rx="5" fill="#DDDDDD"/>
+    <rect x="404" y="526" width="240" height="10" rx="5" fill="#DDDDDD"/>
+  </svg>
+</template>
+
+<doc-page margin="0.6in">
+
+  <div style="font-family: Inter, system-ui, sans-serif; color: #40403F; font-size: 10.5pt; line-height: 1.45;">
+
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding-bottom: 10px; border-bottom: 2px solid #1A1A1A;">
+      <h1 style="margin: 0; font-size: 19pt; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Feuille de relevé — essai TalkBack</h1>
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 9pt; color: #6B6B6B; white-space: nowrap;">ImmiPro · 12 essais + coupure réseau</span>
+    </div>
+
+    <p style="margin: 12px 0 0; max-width: 76ch; text-wrap: pretty;">À remplir sur l'appareil, pendant l'essai, pas après. Notez ce que TalkBack a <strong style="font-weight: 600; color: #1A1A1A;">réellement dit</strong> — pas ce qu'il aurait dû dire. Un écart d'un mot suffit à qualifier un échec, et c'est la formulation entendue qui permet de corriger l'attribut fautif.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin-top: 16px; padding: 14px 16px; border: 1px solid #1A1A1A; border-radius: 4px; break-inside: avoid;">
+      <sc-for list="{{ entete }}" as="c" hint-placeholder-count="6">
+        <div style="display: flex; align-items: baseline; gap: 10px;">
+          <span style="flex: 0 0 auto; font-size: 9pt; font-weight: 600; color: #1A1A1A;">{{ c.label }}</span>
+          <span style="flex: 1 1 auto; min-width: 0; border-bottom: 1px solid #767676; height: 15px;"></span>
+        </div>
+      </sc-for>
+    </div>
+
+    <h2 style="margin: 26px 0 4px; font-size: 13pt; line-height: 1.2; font-weight: 600; color: #1A1A1A;">Les douze essais</h2>
+    <p style="margin: 0 0 12px; font-size: 9.5pt; color: #6B6B6B;">Cochez <strong style="font-weight: 600;">P</strong> si l'attendu est tenu au mot près, <strong style="font-weight: 600;">É</strong> sinon. Pas de demi-verdict.</p>
+
+    <sc-for list="{{ essais }}" as="e" hint-placeholder-count="12">
+      <div style="display: grid; grid-template-columns: 34px 1fr 62px; gap: 0 12px; padding: 10px 0; border-top: 1px solid #DDDDDD; break-inside: avoid;">
+
+        <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11pt; font-weight: 500; color: #1A1A1A;">{{ e.n }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 8pt; color: #6B6B6B;">{{ e.ecran }}</span>
+        </div>
+
+        <div style="min-width: 0; display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10pt; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">{{ e.geste }}</span>
+          <span style="font-size: 9.5pt; color: #40403F; text-wrap: pretty;"><span style="font-weight: 600; color: #6B6B6B;">Attendu — </span>{{ e.attendu }}</span>
+          <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 3px;">
+            <span style="flex: 0 0 auto; font-size: 9pt; font-weight: 600; color: #1A1A1A;">Entendu</span>
+            <span style="flex: 1 1 auto; min-width: 0; border-bottom: 1px solid #767676; height: 16px;"></span>
+          </div>
+          <span style="display: block; border-bottom: 1px solid #767676; height: 16px;"></span>
+        </div>
+
+        <div style="display: flex; gap: 6px; align-items: flex-start; justify-content: flex-end;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1.5px solid #0F7B4F; border-radius: 4px; font-size: 9pt; font-weight: 600; color: #0F7B4F;">P</span>
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1.5px solid #B3261E; border-radius: 4px; font-size: 9pt; font-weight: 600; color: #B3261E;">É</span>
+        </div>
+
+      </div>
+    </sc-for>
+
+    <div style="break-before: page;"></div>
+
+    <h2 style="margin: 0 0 4px; font-size: 13pt; line-height: 1.2; font-weight: 600; color: #1A1A1A;">La coupure réseau</h2>
+    <p style="margin: 0 0 12px; max-width: 76ch; font-size: 9.5pt; color: #6B6B6B; text-wrap: pretty;">Une seule séquence, dans l'ordre, sans revenir en arrière. Si une étape échoue, notez-le et continuez : ce qui suit une panne compte autant que la panne.</p>
+
+    <sc-for list="{{ avion }}" as="a" hint-placeholder-count="5">
+      <div style="display: grid; grid-template-columns: 26px 1fr 62px; gap: 0 12px; padding: 10px 0; border-top: 1px solid #DDDDDD; break-inside: avoid;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11pt; font-weight: 500; color: #1A1A1A;">{{ a.n }}</span>
+        <div style="min-width: 0; display: flex; flex-direction: column; gap: 5px;">
+          <span style="font-size: 10pt; color: #1A1A1A; text-wrap: pretty;">{{ a.texte }}</span>
+          <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 3px;">
+            <span style="flex: 0 0 auto; font-size: 9pt; font-weight: 600; color: #1A1A1A;">Entendu</span>
+            <span style="flex: 1 1 auto; min-width: 0; border-bottom: 1px solid #767676; height: 16px;"></span>
+          </div>
+          <span style="display: block; border-bottom: 1px solid #767676; height: 16px;"></span>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: flex-start; justify-content: flex-end;">
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1.5px solid #0F7B4F; border-radius: 4px; font-size: 9pt; font-weight: 600; color: #0F7B4F;">P</span>
+          <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1.5px solid #B3261E; border-radius: 4px; font-size: 9pt; font-weight: 600; color: #B3261E;">É</span>
+        </div>
+      </div>
+    </sc-for>
+
+    <h2 style="margin: 26px 0 4px; font-size: 13pt; line-height: 1.2; font-weight: 600; color: #1A1A1A;">Les quatre échecs qui priment</h2>
+    <p style="margin: 0 0 12px; max-width: 76ch; font-size: 9.5pt; color: #6B6B6B; text-wrap: pretty;">Chacun disqualifie l'écran à lui seul, même si les douze essais passent. Cochez ceux que vous avez rencontrés et dites où.</p>
+
+    <sc-for list="{{ echecs }}" as="f" hint-placeholder-count="4">
+      <div style="display: grid; grid-template-columns: 26px 1fr; gap: 0 12px; padding: 10px 0; border-top: 1px solid #DDDDDD; break-inside: avoid;">
+        <span style="width: 20px; height: 20px; margin-top: 2px; border: 1.5px solid #1A1A1A; border-radius: 4px;"></span>
+        <div style="min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 10pt; font-weight: 600; color: #1A1A1A;">{{ f.titre }}</span>
+          <span style="font-size: 9.5pt; color: #40403F; text-wrap: pretty;">{{ f.texte }}</span>
+          <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 3px;">
+            <span style="flex: 0 0 auto; font-size: 9pt; font-weight: 600; color: #1A1A1A;">Où</span>
+            <span style="flex: 1 1 auto; min-width: 0; border-bottom: 1px solid #767676; height: 16px;"></span>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+
+    <div style="margin-top: 26px; padding: 16px; border: 1px solid #1A1A1A; border-radius: 4px; break-inside: avoid;">
+      <div style="font-size: 10pt; font-weight: 600; color: #1A1A1A;">Verdict de la séance</div>
+      <p style="margin: 4px 0 12px; font-size: 9.5pt; color: #6B6B6B; text-wrap: pretty;">Une phrase : l'application est-elle utilisable en lecture vocale par quelqu'un qui ne voit pas l'écran ? Si non, nommez le premier obstacle rencontré.</p>
+      <span style="display: block; border-bottom: 1px solid #767676; height: 18px;"></span>
+      <span style="display: block; border-bottom: 1px solid #767676; height: 18px;"></span>
+      <span style="display: block; border-bottom: 1px solid #767676; height: 18px;"></span>
+    </div>
+
+  </div>
+
+</doc-page>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 900}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      entete: [
+        { label: "Appareil et prix" },
+        { label: "Version d'Android" },
+        { label: "Navigateur" },
+        { label: "Réseau au moment de l'essai" },
+        { label: "Date et heure" },
+        { label: "Personne qui relève" }
+      ],
+      essais: [
+        { n: "01", ecran: "P-01", geste: "Balayer vers la droite depuis le haut de l'écran, premier arrêt.", attendu: "« Aller au contenu, lien. » Puis un second balayage annonce le titre, pas le logo ni Connexion." },
+        { n: "02", ecran: "P-01", geste: "Activer le lien d'évitement par double frappe.", attendu: "Le titre « Où pouvez-vous étudier ou travailler ? » est lu, en entier, et le balayage suivant va au premier champ." },
+        { n: "03", ecran: "P-02", geste: "Répondre à une question, laisser l'écran passer à la suivante.", attendu: "Le nouveau titre est annoncé sans action supplémentaire. La progression n'est pas relue à chaque fois." },
+        { n: "04", ecran: "$-01", geste: "Atteindre le groupe des packs, balayer vers le haut puis vers le bas.", attendu: "Un seul arrêt pour les trois packs. Chaque changement annonce le nom, le prix, et « sélectionné »." },
+        { n: "05", ecran: "$-02", geste: "Saisir le numéro, écouter le retour du champ.", attendu: "Le libellé « Numéro à débiter » précède la valeur. Le format attendu est annoncé avant la saisie, pas après l'erreur." },
+        { n: "06", ecran: "$-03", geste: "Arriver sur l'écran d'attente et ne rien toucher pendant trente secondes.", attendu: "« En attente de ta confirmation » une fois. Ni le décompte ni la relève ne sont annoncés — ils sont en aria-hidden." },
+        { n: "07", ecran: "$-03", geste: "Attendre le passage à quatre-vingt-dix secondes.", attendu: "L'apparition de « Réessayer » est annoncée une fois, en polite, sans couper la lecture en cours." },
+        { n: "08", ecran: "$-04", geste: "Laisser la confirmation arriver.", attendu: "Le focus va au titre porteur du résultat, et le montant débité est lu dans la même phrase." },
+        { n: "09", ecran: "C-06", geste: "Premier et deuxième arrêts en haut de la checklist.", attendu: "« Aller au contenu » puis « Aller à l'action ». Le second mène au bouton Continuer, pas au bas de la liste." },
+        { n: "10", ecran: "C-06", geste: "Ouvrir une ligne de checklist, puis fermer la feuille du bas.", attendu: "La feuille annonce son titre à l'ouverture, le balayage tourne à l'intérieur, et à la fermeture le focus revient sur la ligne ouverte." },
+        { n: "11", ecran: "C-07", geste: "Lancer un dépôt par « Choisir un fichier ».", attendu: "Le passage à la surface système est annoncé par le système. Au retour, le nom du fichier et son état sont lus sans avoir à chercher." },
+        { n: "12", ecran: "C-07", geste: "Parcourir le trio de cadrage.", attendu: "Trois libellés autoportants — à plat attendu, incliné à éviter, reflet à éviter. Les images ne sont pas annoncées." }
+      ],
+      avion: [
+        { n: "1", texte: "Lancer un paiement, atteindre $-03, laisser le décompte descendre sous quatre minutes." },
+        { n: "2", texte: "Basculer en mode avion depuis le volet système, sans quitter l'écran." },
+        { n: "3", texte: "Écouter : le changement d'état doit être annoncé une fois, et dire ce qui est conservé — le dossier, pas la session." },
+        { n: "4", texte: "Vérifier qu'aucun bouton ne propose une action qui échouera à coup sûr, et que « Je n'ai rien reçu » reste atteignable." },
+        { n: "5", texte: "Sortir du mode avion. La reprise ne doit ni rejouer les annonces précédentes ni redémarrer le décompte à zéro." }
+      ],
+      echecs: [
+        { titre: "Une annonce répétée", texte: "Un statut relu à chaque relève rend l'écran inutilisable en lecture vocale." },
+        { titre: "Un arrêt sans nom", texte: "« Bouton » sans libellé, ou un libellé qui décrit l'icône au lieu de l'action." },
+        { titre: "Un focus perdu", texte: "Après une fermeture de feuille ou un changement d'écran, le focus revient en haut du document." },
+        { titre: "Un ordre qui contredit l'écran", texte: "La barre d'action lue avant le contenu, ou une ligne de checklist atteinte après le bouton qui la valide." }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

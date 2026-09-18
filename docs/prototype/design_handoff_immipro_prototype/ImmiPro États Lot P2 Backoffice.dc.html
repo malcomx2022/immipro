@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+  @keyframes immi-skel { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+  @keyframes immi-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.8 ÉTENDU · ÉTATS DE LA SECTION B · 1440 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Vide, chargement et erreur dans le back-office</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le critère 4 ne couvre que les sections C et $. Ces huit cadres étendent la même discipline à la section B, parce qu'elle s'implémentera avec. B-07 n'y figure pas : il est déjà livré en état vide, sans aucune valeur de coût.</p>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Trois règles tenues partout : le cadre de l'écran reste debout, un échec d'une source ne fait jamais passer une donnée pour absente, et rien n'est marqué en échec sur la seule absence de réponse d'un tiers.</p>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 56px;">
+
+    <div id="13a" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-01 — File de veille, chargement</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">squelettes</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Veille réglementaire</h1>
+              <span style="width: 320px; height: 14px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <span style="width: 104px; height: 44px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .1s infinite;"></span>
+              <span style="width: 128px; height: 44px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .2s infinite;"></span>
+            </div>
+          </div>
+          <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 0;">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 1 1 260px; min-width: 0;">Source</span>
+              <span style="flex: 0 0 160px;">Pays et procédure</span>
+              <span style="flex: 0 0 140px;">Détecté</span>
+              <span style="flex: 0 0 260px;">Écart constaté</span>
+              <span style="flex: 0 0 150px;">État</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid #DDDDDD;">
+              <span style="flex: 1 1 260px; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 0 0 160px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .1s infinite;"></span>
+              <span style="flex: 0 0 140px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .2s infinite;"></span>
+              <span style="flex: 0 0 260px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .3s infinite;"></span>
+              <span style="flex: 0 0 150px; height: 28px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .4s infinite;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid #DDDDDD;">
+              <span style="flex: 1 1 260px; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .1s infinite;"></span>
+              <span style="flex: 0 0 160px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .2s infinite;"></span>
+              <span style="flex: 0 0 140px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .3s infinite;"></span>
+              <span style="flex: 0 0 260px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .4s infinite;"></span>
+              <span style="flex: 0 0 150px; height: 28px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .5s infinite;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid #DDDDDD;">
+              <span style="flex: 1 1 260px; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .2s infinite;"></span>
+              <span style="flex: 0 0 160px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .3s infinite;"></span>
+              <span style="flex: 0 0 140px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .4s infinite;"></span>
+              <span style="flex: 0 0 260px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .5s infinite;"></span>
+              <span style="flex: 0 0 150px; height: 28px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .6s infinite;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid #DDDDDD;">
+              <span style="flex: 1 1 260px; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .3s infinite;"></span>
+              <span style="flex: 0 0 160px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .4s infinite;"></span>
+              <span style="flex: 0 0 140px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .5s infinite;"></span>
+              <span style="flex: 0 0 260px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .6s infinite;"></span>
+              <span style="flex: 0 0 150px; height: 28px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .7s infinite;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid #DDDDDD;">
+              <span style="flex: 1 1 260px; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .4s infinite;"></span>
+              <span style="flex: 0 0 160px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .5s infinite;"></span>
+              <span style="flex: 0 0 140px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .6s infinite;"></span>
+              <span style="flex: 0 0 260px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .7s infinite;"></span>
+              <span style="flex: 0 0 150px; height: 28px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out .8s infinite;"></span>
+            </div>
+            <div style="padding-top: 20px; font-size: 14px; line-height: 20px; color: #6B6B6B;">Relevé des 14 sources en cours. L'ordre des colonnes et la hauteur des lignes ne changeront pas à l'arrivée des données.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13b" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-01 — File de veille, vide</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">aucun écart à arbitrer</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Veille réglementaire</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">14 sources suivies · dernière collecte le 11/09/2026 à 6 h 00</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Journal des collectes</button>
+              <button style="min-height: 44px; padding: 0 16px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Lancer une collecte</button>
+            </div>
+          </div>
+          <div style="padding: 20px 24px 0;">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 1 1 260px; min-width: 0;">Source</span>
+              <span style="flex: 0 0 160px;">Pays et procédure</span>
+              <span style="flex: 0 0 140px;">Détecté</span>
+              <span style="flex: 0 0 260px;">Écart constaté</span>
+              <span style="flex: 0 0 150px;">État</span>
+            </div>
+          </div>
+          <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px;">
+            <div style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Aucun écart à arbitrer</div>
+            <div style="max-width: 56ch; font-size: 16px; line-height: 24px; color: #40403F; text-align: center; text-wrap: pretty;">Les 14 sources ont répondu ce matin et aucune ne diverge des règles publiées. La prochaine collecte est programmée à 18 h 00.</div>
+            <div style="display: flex; gap: 12px; padding-top: 4px;">
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Voir les règles publiées</button>
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Ajouter une source</button>
+            </div>
+            <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Une file vide est un état normal, pas une panne de collecte : la date de relevé le prouve.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13c" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-01 — Source injoignable</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">collecte partielle</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 6px;">
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Veille réglementaire</h1>
+            <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">13 sources sur 14 relevées le 11/09/2026 à 6 h 00</div>
+          </div>
+          <div style="margin: 20px 24px 0; padding: 18px 20px; border: 1px solid #B45309; border-radius: 12px; display: flex; align-items: flex-start; gap: 16px;">
+            <span style="flex: 0 0 10px; width: 10px; height: 10px; margin-top: 7px; border-radius: 999px; background: #B45309;"></span>
+            <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #B45309;">ind.nl n'a pas répondu, après trois tentatives</div>
+              <div style="max-width: 84ch; font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Les règles néerlandaises affichées datent de la dernière collecte réussie, le 10/09/2026 à 18 h 00. Elles restent publiées et les candidats continuent de les voir : une source muette ne vaut pas un changement de règle.</div>
+            </div>
+            <div style="flex: 0 0 auto; display: flex; gap: 8px;">
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Relever ind.nl</button>
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Déclarer un incident</button>
+            </div>
+          </div>
+          <div style="padding: 20px 24px;">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 1 1 260px; min-width: 0;">Source</span>
+              <span style="flex: 0 0 160px;">Pays et procédure</span>
+              <span style="flex: 0 0 140px;">Relevé</span>
+              <span style="flex: 0 0 260px;">Écart constaté</span>
+              <span style="flex: 0 0 150px;">État</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #DDDDDD; font-size: 15px; line-height: 22px;">
+              <span style="flex: 1 1 260px; min-width: 0; font-weight: 500; color: #1A1A1A;">ind.nl</span>
+              <span style="flex: 0 0 160px; color: #40403F;">Pays-Bas / études</span>
+              <span style="flex: 0 0 140px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #B45309;">10/09 18:00</span>
+              <span style="flex: 0 0 260px; color: #6B6B6B;">Inconnu depuis l'incident</span>
+              <span style="flex: 0 0 150px;"><span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: #B45309;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>Périmé</span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #DDDDDD; font-size: 15px; line-height: 22px;">
+              <span style="flex: 1 1 260px; min-width: 0; font-weight: 500; color: #1A1A1A;">make-it-in-germany.com</span>
+              <span style="flex: 0 0 160px; color: #40403F;">Allemagne / études</span>
+              <span style="flex: 0 0 140px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #40403F;">11/09 06:00</span>
+              <span style="flex: 0 0 260px; color: #40403F;">Compte bloqué porté à 11 904 €</span>
+              <span style="flex: 0 0 150px;"><span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: #B45309;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>À arbitrer</span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #DDDDDD; font-size: 15px; line-height: 22px;">
+              <span style="flex: 1 1 260px; min-width: 0; font-weight: 500; color: #1A1A1A;">canada.ca</span>
+              <span style="flex: 0 0 160px; color: #40403F;">Canada / études</span>
+              <span style="flex: 0 0 140px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #40403F;">11/09 06:00</span>
+              <span style="flex: 0 0 260px; color: #40403F;">Aucun écart</span>
+              <span style="flex: 0 0 150px;"><span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>À jour</span></span>
+            </div>
+            <div style="padding-top: 20px; max-width: 90ch; font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">La ligne périmée garde sa place et sa date au lieu de disparaître. Rien n'est dépublié automatiquement : la décision de retirer une règle appartient à l'opérateur humain (RG-14.3).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13d" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-02 — Publication refusée</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">brouillon conservé</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">ALLEMAGNE / ÉTUDES · VERSION 5, BROUILLON</div>
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Compte bloqué et délai d'instruction</h1>
+            </div>
+            <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #F7F7F7; font-size: 14px; font-weight: 500; color: #B45309;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>Non publiée</span>
+          </div>
+          <div style="flex: 1 1 auto; min-height: 0; display: flex;">
+            <div style="flex: 1 1 auto; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="padding: 18px 20px; border: 1px solid #B3261E; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #B3261E;">La publication a échoué</div>
+                <div style="max-width: 76ch; font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Le service de règles a répondu 503 à 09 h 18. Ton brouillon est enregistré en version 5 avec toutes tes modifications ; la version 4 reste celle que voient les candidats.</div>
+                <div style="display: flex; gap: 12px; padding-top: 4px;">
+                  <button style="min-height: 44px; padding: 0 16px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Réessayer la publication</button>
+                  <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Garder le brouillon et quitter</button>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 14px; max-width: 720px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Compte bloqué exigé</label>
+                  <div style="min-height: 48px; display: flex; align-items: center; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; font-size: 16px; color: #1A1A1A;">11 904 €</div>
+                  <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Valeur relevée sur make-it-in-germany.com le 11/09/2026.</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Entrée en vigueur</label>
+                  <div style="min-height: 48px; display: flex; align-items: center; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; font-size: 16px; color: #1A1A1A;">01/01/2027</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <label style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Motif de la modification</label>
+                  <div style="min-height: 88px; display: flex; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px; font-size: 16px; line-height: 24px; color: #1A1A1A;">Mise à jour du barème officiel publiée par les autorités allemandes.</div>
+                </div>
+              </div>
+            </div>
+            <div style="flex: 0 0 360px; border-left: 1px solid #DDDDDD; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">CE QUE LA PUBLICATION DÉCLENCHERA</div>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; gap: 10px;"><span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #DDDDDD;"></span><span style="flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 22px; color: #40403F;">37 candidats alertés, avec l'ancienne et la nouvelle valeur</span></div>
+                <div style="display: flex; gap: 10px;"><span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #DDDDDD;"></span><span style="flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 22px; color: #40403F;">29 dossiers mis en arbitrage, sans migration automatique</span></div>
+                <div style="display: flex; gap: 10px;"><span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #DDDDDD;"></span><span style="flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 22px; color: #40403F;">Écriture au journal d'audit, non modifiable</span></div>
+              </div>
+              <button aria-disabled="true" tabindex="-1" style="width: 100%; min-height: 48px; border: none; border-radius: 12px; background: #DDDDDD; color: #6B6B6B; font-family: Inter, sans-serif; font-size: 15px; font-weight: 600; cursor: not-allowed;">Publier la version 5</button>
+              <div style="font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Indisponible tant que le service de règles ne répond pas. Aucune alerte n'a été envoyée : l'échec s'est produit avant la diffusion.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13e" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13e</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-03 — Aucun compte trouvé</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">recherche sans résultat</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 16px;">
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Utilisateurs</h1>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="flex: 0 0 420px; min-height: 48px; display: flex; align-items: center; padding: 0 14px; border: 1px solid #2E75B6; border-radius: 12px; box-shadow: 0 0 0 3px #EEF4FB; font-size: 16px; color: #1A1A1A;">kpadé@</div>
+              <div style="display: flex; gap: 8px;">
+                <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #1A1A1A; background: #1A1A1A; font-size: 14px; font-weight: 500; color: #FFFFFF;">Email non vérifié</span>
+                <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #DDDDDD; background: #FFFFFF; font-size: 14px; font-weight: 500; color: #1A1A1A;">Suppression demandée</span>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 20px 24px 0;">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 1 1 280px; min-width: 0;">Compte</span>
+              <span style="flex: 0 0 140px;">Inscrit le</span>
+              <span style="flex: 0 0 110px;">Dossiers</span>
+              <span style="flex: 0 0 150px;">Pack</span>
+              <span style="flex: 0 0 150px;">Consentements</span>
+              <span style="flex: 0 0 190px;">Statut</span>
+            </div>
+          </div>
+          <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px;">
+            <div style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Aucun compte ne correspond à « kpadé@ » avec ce filtre</div>
+            <div style="max-width: 56ch; font-size: 16px; line-height: 24px; color: #40403F; text-align: center; text-wrap: pretty;">Un compte porte cette adresse, mais son email est vérifié. Retire le filtre pour le voir.</div>
+            <div style="display: flex; gap: 12px; padding-top: 4px;">
+              <button style="min-height: 44px; padding: 0 16px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Retirer le filtre « Email non vérifié »</button>
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Effacer la recherche</button>
+            </div>
+            <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Une recherche sans résultat dit toujours lequel des critères exclut le reste.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13f" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13f</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-04 — Rapprochement suspendu</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">opérateur muet</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 6px;">
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Paiements et réconciliation</h1>
+            <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">11/09/2026 · dernier rapprochement automatique à 09 h 12</div>
+          </div>
+          <div style="margin: 20px 24px 0; padding: 18px 20px; border: 1px solid #B45309; border-radius: 12px; display: flex; align-items: flex-start; gap: 16px;">
+            <span style="flex: 0 0 20px; width: 20px; height: 20px; margin-top: 2px; border-radius: 999px; border: 3px solid #F7DFC4; border-top-color: #B45309; animation: immi-spin 1.2s linear infinite;"></span>
+            <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #B45309;">L'API MTN MoMo ne répond plus depuis 09 h 12</div>
+              <div style="max-width: 84ch; font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">Le rapprochement automatique est suspendu et reprendra seul. Les paiements reçus restent en attente de rapprochement : aucun n'est marqué en échec sur la seule absence de réponse de l'opérateur, et aucun pack n'est fermé.</div>
+            </div>
+            <button style="flex: 0 0 auto; min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Rapprocher à la main</button>
+          </div>
+          <div style="padding: 20px 24px;">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 1 1 240px; min-width: 0;">Référence</span>
+              <span style="flex: 0 0 260px;">Compte</span>
+              <span style="flex: 0 0 130px;">Montant</span>
+              <span style="flex: 0 0 150px;">Moyen</span>
+              <span style="flex: 0 0 170px;">Transaction</span>
+              <span style="flex: 0 0 230px;">État</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #DDDDDD; font-size: 15px; line-height: 22px;">
+              <span style="flex: 1 1 240px; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">IMP-2609-4473</span>
+              <span style="flex: 0 0 260px; color: #40403F;">a.dossou@email.com</span>
+              <span style="flex: 0 0 130px; font-weight: 500; color: #1A1A1A;">5 000 F</span>
+              <span style="flex: 0 0 150px; color: #40403F;">MTN MoMo</span>
+              <span style="flex: 0 0 170px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #6B6B6B;">—</span>
+              <span style="flex: 0 0 230px;"><span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: #B45309;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>En attente de rapprochement</span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #DDDDDD; font-size: 15px; line-height: 22px;">
+              <span style="flex: 1 1 240px; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">IMP-2609-4472</span>
+              <span style="flex: 0 0 260px; color: #40403F;">s.hounkpatin@email.com</span>
+              <span style="flex: 0 0 130px; font-weight: 500; color: #1A1A1A;">3 000 F</span>
+              <span style="flex: 0 0 150px; color: #40403F;">Moov Money</span>
+              <span style="flex: 0 0 170px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #6B6B6B;">—</span>
+              <span style="flex: 0 0 230px;"><span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: #B45309;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>En attente de rapprochement</span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #DDDDDD; font-size: 15px; line-height: 22px;">
+              <span style="flex: 1 1 240px; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">IMP-2609-4471</span>
+              <span style="flex: 0 0 260px; color: #40403F;">aline.dossou@email.com</span>
+              <span style="flex: 0 0 130px; font-weight: 500; color: #1A1A1A;">15 000 F</span>
+              <span style="flex: 0 0 150px; color: #40403F;">MTN MoMo</span>
+              <span style="flex: 0 0 170px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #40403F;">MP260911.0943</span>
+              <span style="flex: 0 0 230px;"><span style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Rapproché</span></span>
+            </div>
+            <div style="padding-top: 20px; max-width: 90ch; font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">Le total encaissé du jour n'est pas affiché pendant l'incident : un chiffre partiel présenté comme un total est une erreur comptable.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13g" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13g</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-05 — File de revue vide</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">aucune pièce en échec</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Revue manuelle des pièces en échec</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">File partagée · tout accès à une pièce est consigné avec son motif</div>
+            </div>
+            <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #F7F7F7; font-size: 14px; font-weight: 500; color: #0F7B4F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>File à jour</span>
+          </div>
+          <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px;">
+            <div style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Aucune pièce en attente de revue</div>
+            <div style="max-width: 56ch; font-size: 16px; line-height: 24px; color: #40403F; text-align: center; text-wrap: pretty;">Les six pièces en échec d'analyse d'hier ont toutes été traitées, la dernière à 18 h 42. Les nouvelles arrivent ici dans les minutes qui suivent l'échec.</div>
+            <div style="display: flex; gap: 12px; padding-top: 4px;">
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Voir les pièces traitées</button>
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Motifs d'échec les plus fréquents</button>
+            </div>
+            <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Aucune pièce de candidat n'est préchargée ici : l'ouverture d'une pièce est un acte tracé.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="13h" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">13h</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-06 — Période sans écriture</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">journal immuable</span>
+      </div>
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Journal d'audit</h1>
+                <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Écritures non modifiables, conservation cinq ans</div>
+              </div>
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Exporter la période</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="min-height: 44px; display: flex; align-items: center; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #1A1A1A;">01/09/2026 — 07/09/2026</div>
+              <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #1A1A1A; background: #1A1A1A; font-size: 14px; font-weight: 500; color: #FFFFFF;">Paiements</span>
+              <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #DDDDDD; background: #FFFFFF; font-size: 14px; font-weight: 500; color: #1A1A1A;">Règles</span>
+              <span style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #DDDDDD; background: #FFFFFF; font-size: 14px; font-weight: 500; color: #1A1A1A;">Accès aux pièces</span>
+            </div>
+          </div>
+          <div style="padding: 20px 24px 0;">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid #DDDDDD; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+              <span style="flex: 0 0 190px;">Horodatage</span>
+              <span style="flex: 0 0 170px;">Acteur</span>
+              <span style="flex: 0 0 190px;">Action</span>
+              <span style="flex: 1 1 300px; min-width: 0;">Détail</span>
+              <span style="flex: 0 0 180px;">Origine</span>
+            </div>
+          </div>
+          <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 24px;">
+            <div style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Aucune écriture de paiement entre le 1er et le 7 septembre</div>
+            <div style="max-width: 60ch; font-size: 16px; line-height: 24px; color: #40403F; text-align: center; text-wrap: pretty;">La première écriture de paiement du mois date du 8 septembre à 07 h 03. Le journal ne comble jamais une période vide : s'il n'affiche rien, il ne s'est rien passé.</div>
+            <div style="display: flex; gap: 12px; padding-top: 4px;">
+              <button style="min-height: 44px; padding: 0 16px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Aller au 8 septembre</button>
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Retirer le filtre Paiements</button>
+            </div>
+            <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">L'export d'une période vide reste possible : il produit un fichier attestant l'absence d'écriture.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : B-01 et B-02 → WF-14, aucune dépublication automatique et aucune migration de dossier sans arbitrage (RG-14.3). B-03, B-04 et B-05 → WF-15, accès aux pièces consigné, écarts de rapprochement traités à la main, aucun paiement marqué en échec sur l'absence de réponse de l'opérateur. B-06 → WF-15, écritures immuables, période vide affichée telle quelle. B-07 → WF-16, déjà livré en état vide dans le document du lot P2.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1560, &quot;height&quot;: 1000}}"></script>
+</body>
+</html>

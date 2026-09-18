@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+  @keyframes immi-skel { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @keyframes immi-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.8 · ÉTATS DU LOT P0 · 390 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">Vide, chargement, erreur, hors ligne</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Les états déjà intégrés à leurs écrans ne sont pas repris ici : C-01 vide, C-07 quota et hors ligne, C-08 illisible, A-02 identifiants refusés, $-05 échec. Ce document couvre le reste. Chargement en squelettes, jamais en spinner plein écran.</p>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 56px;">
+
+    <div id="7a" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-06 — Chargement</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">squelettes</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid #DDDDDD;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 14px; font-weight: 600; color: #1A1A1A;">Mes dossiers</span>
+              <span style="width: 72px; height: 26px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="width: 74%; height: 26px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="width: 52%; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; gap: 12px;">
+                <span style="width: 46%; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 62px; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </div>
+              <div style="height: 8px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></div>
+            </div>
+          </div>
+
+          <div style="padding: 20px 16px 8px; display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="width: 40%; height: 20px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            <span style="width: 68px; height: 14px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+          </div>
+
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-top: 1px solid #DDDDDD;">
+              <span style="flex: 0 0 36px; height: 36px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 58%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 92px; height: 22px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-top: 1px solid #DDDDDD;">
+              <span style="flex: 0 0 36px; height: 36px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 72%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 92px; height: 22px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-top: 1px solid #DDDDDD;">
+              <span style="flex: 0 0 36px; height: 36px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 44%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 92px; height: 22px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-top: 1px solid #DDDDDD;">
+              <span style="flex: 0 0 36px; height: 36px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 66%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 92px; height: 22px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-top: 1px solid #DDDDDD; border-bottom: 1px solid #DDDDDD;">
+              <span style="flex: 0 0 36px; height: 36px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 54%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 92px; height: 22px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+          </div>
+
+          <p style="margin: 0; padding: 20px 16px 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">Chargement de ta checklist…</p>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></div>
+          <div style="flex: 0 0 120px; height: 48px; border-radius: 12px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="7b" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-06 — Vide</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">dossier tout juste ouvert</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid #DDDDDD;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <button style="min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mes dossiers</button>
+              <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 500; color: #40403F;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Actif</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Pays-Bas — séjour études</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Dossier ouvert aujourd'hui · dépôt visé le 15/01/2027</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #40403F;">Complétude de ton dossier</span>
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">0 / 100</span>
+              </div>
+              <div style="height: 8px; border-radius: 999px; background: #F7F7F7;"></div>
+              <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">La liste se précise à mesure que tu ajoutes des pièces.</div>
+            </div>
+          </div>
+
+          <div style="padding: 32px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; justify-content: center;">
+              <img src="public/illustrations/empty-checklist.svg" alt="" width="320" height="200" style="display: block; width: 100%; max-width: 300px; height: auto;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">Huit pièces à réunir, aucune commencée</h2>
+              <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Commence par ton passeport : c'est la pièce la plus longue à corriger si sa validité est trop courte.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Ajouter mon passeport</button>
+              <button style="width: 100%; min-height: 48px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Voir les huit pièces</button>
+            </div>
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Tu n'es pas obligé de tout faire aujourd'hui</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">L'échéancier t'indique quand demander chaque pièce périssable, pour qu'aucune ne soit trop vieille au dépôt.</div>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Exigences vérifiées le 11/09/2026 — source : ind.nl.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">8 pièces attendues</div>
+          <button style="flex: 0 0 auto; min-height: 48px; padding: 0 24px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Commencer</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="7c" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-06 — Erreur réseau</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">rien en cache</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>hors ligne · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #DDDDDD;">
+            <button style="min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mes dossiers</button>
+            <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Pays-Bas</span>
+          </div>
+
+          <div style="padding: 32px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="width: 96px; height: 96px; border-radius: 999px; background: #F7F7F7; display: flex; align-items: center; justify-content: center;">
+              <span style="width: 20px; height: 20px; border-radius: 999px; background: #B45309;"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Impossible de charger ta checklist</h1>
+              <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">La connexion s'est interrompue avant que nous ayons reçu tes pièces. Rien n'est perdu : tout est sur nos serveurs.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Réessayer</button>
+              <button style="width: 100%; min-height: 48px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Voir la dernière version enregistrée</button>
+            </div>
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Dernière synchronisation : hier à 18 h 12</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">La version enregistrée sur ton téléphone montre 68 sur 100 et sept pièces sur huit. Les modifications faites depuis ne s'y trouvent pas.</div>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Si le problème persiste, vérifie ton forfait data. La checklist pèse moins de 200 Ko par chargement.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">Aucune donnée reçue</div>
+          <button style="flex: 0 0 auto; min-height: 48px; padding: 0 24px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Réessayer</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="7d" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-02 — Hors ligne, saisie en attente</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>hors ligne · 74 %</span>
+          </div>
+
+          <div style="margin: 8px 16px 20px; padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; gap: 12px; align-items: flex-start;">
+            <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #B45309;"></span>
+            <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Tu es hors ligne</span>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tes trois modifications sont gardées sur ton téléphone et seront envoyées dès le retour du réseau. Ne vide pas les données de l'application.</span>
+            </span>
+          </div>
+
+          <div style="padding: 0 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Mon profil</h1>
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #40403F;">Profil rempli</span>
+                <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">80 %</span>
+              </div>
+              <div style="height: 8px; border-radius: 999px; background: #FFFFFF; overflow: hidden;"><div style="width: 80%; height: 8px; border-radius: 999px; background: #2E75B6;"></div></div>
+              <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">La liste sera mise à jour après la synchronisation.</div>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 16px;">
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Prénom et nom</span>
+              <input type="text" value="{{ nom }}" onChange="{{ setNom }}" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: #6B6B6B;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #0F7B4F;"></span>Enregistré sur nos serveurs</span>
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Niveau d'anglais attesté</span>
+              <input type="text" value="{{ lang }}" onChange="{{ setLang }}" style="min-height: 52px; padding: 0 16px; border: 1px solid #B45309; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: #6B6B6B;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>En attente d'envoi</span>
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Plus haut diplôme obtenu</span>
+              <input type="text" value="{{ dip }}" onChange="{{ setDip }}" style="min-height: 52px; padding: 0 16px; border: 1px solid #B45309; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+              <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: #6B6B6B;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #B45309;"></span>En attente d'envoi</span>
+            </label>
+            <div style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Le téléversement de pièces est suspendu</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Tu peux continuer à remplir les champs texte. Les fichiers demandent une connexion.</div>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Les modifications en attente sont conservées sept jours sur ton téléphone.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Enregistrer sur ce téléphone</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">3 modifications en attente d'envoi</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="7e" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7e</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-09 — Vide</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">aucune pièce analysée</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mon dossier</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Complétude de ton dossier</h1>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 24px;">
+            <div style="padding: 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #6B6B6B;"><span style="width: 8px; height: 8px; border-radius: 999px; background: #DDDDDD;"></span>Dossier pas encore commencé</span>
+              <span style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">5 pièces obligatoires attendues, aucune déposée</span>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">La liste de ce qui manque se précise à partir de la première pièce analysée. Commence par ton passeport.</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce que la liste vérifiera</h2>
+              <div style="display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Pièces obligatoires</span><span style="font-weight: 500; color: #1A1A1A;">5 attendues</span></div>
+              <div style="display: flex; justify-content: space-between; gap: 16px; padding: 0 0 14px; border-bottom: 1px solid #DDDDDD; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Pièces complémentaires</span><span style="font-weight: 500; color: #1A1A1A;">3 conseillées</span></div>
+              <div style="display: flex; justify-content: space-between; gap: 16px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Cohérence entre les pièces</span><span style="font-weight: 500; color: #1A1A1A;">noms, dates, montants</span></div>
+            </div>
+
+            <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Ajouter ma première pièce</button>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Ce qui manque à ton dossier, pas tes chances d'obtenir le visa. Liste établie sur les exigences de l'IND vérifiées le 11/09/2026.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">Aucune pièce analysée</div>
+          <button style="flex: 0 0 auto; min-height: 48px; padding: 0 20px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Ouvrir la checklist</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="7f" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7f</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">$-02 — Opérateur indisponible</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-05</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Retour</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Vérifie avant de payer</h1>
+          </div>
+
+          <div style="margin: 0 16px 20px; padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; gap: 12px; align-items: flex-start;">
+            <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #B45309;"></span>
+            <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">MTN MoMo ne répond pas en ce moment</span>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">La panne vient de l'opérateur, pas de ton compte. Elle dure en général moins d'une heure.</span>
+            </span>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="padding: 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Montant à payer</div>
+              <div style="font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">5 000 F</div>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Grille XOF · débit Mobile Money</div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Payer autrement</div>
+              <button style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 500; color: #1A1A1A; text-align: left; cursor: pointer;" style-hover="background: #F7F7F7;">
+                <span>Moov Money</span><span style="font-size: 14px; color: #0F7B4F;">Disponible</span>
+              </button>
+              <button style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 500; color: #1A1A1A; text-align: left; cursor: pointer;" style-hover="background: #F7F7F7;">
+                <span>Carte bancaire</span><span style="font-size: 14px; color: #0F7B4F;">Disponible</span>
+              </button>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #F7F7F7;">
+                <span style="font-size: 16px; line-height: 24px; font-weight: 500; color: #6B6B6B;">MTN MoMo</span><span style="font-size: 14px; color: #B45309;">Indisponible</span>
+              </div>
+            </div>
+
+            <div style="padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ou attends et reprends plus tard</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Ton dossier et ton pack sont conservés. Nous t'envoyons un email dès que MTN MoMo répond à nouveau.</div>
+              <button style="align-self: flex-start; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">M'avertir par email</button>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Aucun montant n'a été débité. Dernière tentative à 9 h 41.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Payer avec Moov Money</button>
+          <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Réessayer MTN MoMo</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="7g" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7g</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-10 — Chargement</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">squelettes</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 96px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 16px;">
+            <span style="font-size: 14px; font-weight: 600; color: #1A1A1A;">Mon dossier</span>
+            <span style="width: 46%; height: 26px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            <div style="padding: 16px 20px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <span style="width: 58%; height: 16px; border-radius: 8px; background: #FFFFFF; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="width: 72%; height: 28px; border-radius: 8px; background: #FFFFFF; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="width: 40%; height: 16px; border-radius: 8px; background: #FFFFFF; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <span style="width: 38%; height: 22px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+              <span style="flex: 0 0 52px; height: 44px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 82%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 64%; height: 14px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 96px; height: 22px; border-radius: 999px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+              <span style="flex: 0 0 52px; height: 44px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 70%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 52%; height: 14px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <span style="width: 32%; height: 22px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid #DDDDDD; border-radius: 12px;">
+              <span style="flex: 0 0 52px; height: 44px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="width: 76%; height: 18px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+                <span style="width: 58%; height: 14px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span>
+              </span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B;">Calcul de tes échéances…</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; gap: 12px; align-items: center;">
+          <div style="flex: 1 1 auto; min-width: 0; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></div>
+          <div style="flex: 0 0 140px; height: 48px; border-radius: 12px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="7h" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">7h</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">C-08 — Analyse en cours</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-06</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Checklist</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Attestation de ressources</h1>
+            <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #EEF4FB; font-size: 14px; line-height: 20px; font-weight: 500; color: #1F4E79;">
+              <span style="width: 8px; height: 8px; border-radius: 999px; background: #2E75B6;"></span>Analyse en cours
+            </span>
+          </div>
+
+          <div style="padding: 0 16px 20px;">
+            <div style="height: 180px; border-radius: 16px; background: repeating-linear-gradient(135deg, #F7F7F7 0 10px, #DDDDDD 10px 20px); display: flex; align-items: flex-end; padding: 12px 14px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #40403F;">aperçu de la pièce · page 1 sur 3</span>
+            </div>
+          </div>
+
+          <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <div style="padding: 20px; background: #F7F7F7; border-radius: 16px; display: flex; gap: 14px; align-items: center;">
+              <div style="flex: 0 0 44px; position: relative; width: 44px; height: 44px;">
+                <div style="position: absolute; inset: 0; border-radius: 999px; border: 3px solid #D7E5F5; border-top-color: #2E75B6; animation: immi-spin 1.2s linear infinite;"></div>
+              </div>
+              <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Nous lisons ton relevé</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Environ 30 secondes. Tu peux quitter cet écran, le résultat t'attendra dans la checklist.</div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">Ce que nous avons lu</h2>
+              <div style="display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid #DDDDDD;"><span style="font-size: 14px; color: #6B6B6B;">Titulaire</span><span style="width: 44%; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span></div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid #DDDDDD;"><span style="font-size: 14px; color: #6B6B6B;">Solde disponible</span><span style="width: 30%; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span></div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid #DDDDDD;"><span style="font-size: 14px; color: #6B6B6B;">Date du relevé</span><span style="width: 36%; height: 16px; border-radius: 8px; background: #F7F7F7; animation: immi-skel 1.4s ease-in-out infinite;"></span></div>
+                <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Montant exigé</span><span style="font-weight: 500; color: #1A1A1A;">13 569,24 € · 8 901 000 F</span></div>
+              </div>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Lecture automatique, susceptible d'erreur. Une analyse est décomptée de ton quota même si tu quittes l'écran.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Revenir à la checklist</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">Analyses restantes : 12 sur 30</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Règles appliquées : le chargement se montre en squelettes de la structure réelle, jamais en spinner plein écran. Toute erreur dit d'où vient la panne, ce qui a été conservé, et propose une action. Aucun état vide ne se contente d'une illustration : il porte la première action à faire.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 1100}}">
+class Component extends DCLogic {
+  state = { nom: "Aline Dossou", lang: "IELTS 6.0 — B2", dip: "Licence en gestion" };
+  renderVals() {
+    return {
+      nom: this.state.nom,
+      lang: this.state.lang,
+      dip: this.state.dip,
+      setNom: e => this.setState({ nom: e.target.value }),
+      setLang: e => this.setState({ lang: e.target.value }),
+      setDip: e => this.setState({ dip: e.target.value })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

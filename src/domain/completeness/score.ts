@@ -1,9 +1,14 @@
 /**
- * Score de complétude du dossier — WF-07.
+ * Complétude du dossier — WF-07.
  *
- * Ce score mesure l'avancement objectif d'un dossier. Ce n'est en aucun cas
- * une prédiction d'acceptation (INV-1). Le libellé affiché à l'utilisateur
- * est « complétude de votre dossier ».
+ * Le résultat exposé au candidat est une liste ordonnée de manques et un
+ * palier nommé. Aucun entier sur 100 ne remonte à l'interface (INV-1, arbitrage
+ * C-09 du 13/09/2026) : « 68 sur 100 » se retient comme une probabilité
+ * d'obtenir le visa, et le démenti écrit dessous ne survit pas à la mémoire
+ * du chiffre. Le libellé affiché est « complétude de votre dossier ».
+ *
+ * Le score pondéré reste calculé pour ordonner les lignes et pour le
+ * back-office ; il vit dans `interne` et n'est jamais sérialisé vers le client.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
@@ -41,13 +46,33 @@ export interface MissingPoint {
   bloquant: boolean;
 }
 
+/**
+ * Palier nommé, seul état d'ensemble montré au candidat.
+ * - INCOMPLET : au moins une pièce obligatoire ou une condition bloquante manque.
+ * - PRESQUE_COMPLET : le déterministe passe, il reste des pièces facultatives.
+ * - COMPLET : rien ne manque.
+ */
+export type Palier = "INCOMPLET" | "PRESQUE_COMPLET" | "COMPLET";
+
+export const LIBELLE_PALIER: Record<Palier, string> = {
+  INCOMPLET: "Dossier incomplet",
+  PRESQUE_COMPLET: "Presque complet",
+  COMPLET: "Dossier complet",
+};
+
 export interface CompletenessResult {
-  /** 0 à 100. */
-  score: number;
+  palier: Palier;
   /** Vrai uniquement si 100 % des composantes déterministes passent (RG-07.2). */
   ready: boolean;
+  /** Bloquants d'abord, puis facultatifs ; à l'intérieur, ordre du gain interne décroissant. */
   missing: MissingPoint[];
-  breakdown: { documents: number; conditions: number; coherence: number; redaction: number };
+  /** Compteurs affichables : « 2 pièces obligatoires manquent, 2 complémentaires restent à traiter ». */
+  compteurs: { obligatoiresManquantes: number; facultativesManquantes: number; conformes: number };
+  /** Back-office seul. Ne jamais inclure dans une réponse destinée au candidat. */
+  interne: {
+    score: number;
+    breakdown: { documents: number; conditions: number; coherence: number; redaction: number };
+  };
 }
 
 const POIDS = { documents: 50, conditions: 25, coherence: 15, redaction: 10 } as const;
@@ -56,8 +81,10 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export function computeCompleteness(input: CompletenessInput): CompletenessResult {
   const requis = input.documents.filter((d) => d.required);
-  const conformes = requis.filter((d) => d.status === "CONFORME");
-  const ratioDocs = requis.length === 0 ? 1 : conformes.length / requis.length;
+  const facultatifs = input.documents.filter((d) => !d.required);
+  const conformes = input.documents.filter((d) => d.status === "CONFORME");
+  const requisConformes = requis.filter((d) => d.status === "CONFORME");
+  const ratioDocs = requis.length === 0 ? 1 : requisConformes.length / requis.length;
 
   const bloquantes = input.conditions.filter((c) => c.bloquant);
   const satisfaites = bloquantes.filter((c) => c.satisfaite);
@@ -69,30 +96,46 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     coherence: clamp01(input.coherence) * POIDS.coherence,
     redaction: clamp01(input.redaction) * POIDS.redaction,
   };
-
   const score = Math.round(
     breakdown.documents + breakdown.conditions + breakdown.coherence + breakdown.redaction,
   );
 
+  const requisManquants = requis.filter((d) => d.status !== "CONFORME");
+  const facultatifsManquants = facultatifs.filter((d) => d.status !== "CONFORME");
+  const conditionsEchouees = bloquantes.filter((c) => !c.satisfaite);
+
   const missing: MissingPoint[] = [
-    ...requis
-      .filter((d) => d.status !== "CONFORME")
-      .map((d) => ({
-        code: d.code,
-        message: messagePourPiece(d),
-        bloquant: true,
-      })),
-    ...bloquantes
-      .filter((c) => !c.satisfaite)
-      .map((c) => ({ code: c.code, message: c.messageEchec, bloquant: true })),
+    ...requisManquants.map((d) => ({ code: d.code, message: messagePourPiece(d), bloquant: true })),
+    ...conditionsEchouees.map((c) => ({ code: c.code, message: c.messageEchec, bloquant: true })),
+    ...facultatifsManquants.map((d) => ({ code: d.code, message: messagePourPiece(d), bloquant: false })),
   ];
 
   // Une bonne lettre de motivation ne compense jamais une pièce bloquante
   // manquante : le passage en PRET exige 100 % du déterministe (RG-07.2).
   const ready = ratioDocs === 1 && ratioCond === 1;
 
-  return { score, ready, missing, breakdown };
+  const palier: Palier = !ready
+    ? "INCOMPLET"
+    : facultatifsManquants.length > 0
+      ? "PRESQUE_COMPLET"
+      : "COMPLET";
+
+  return {
+    palier,
+    ready,
+    missing,
+    compteurs: {
+      obligatoiresManquantes: requisManquants.length + conditionsEchouees.length,
+      facultativesManquantes: facultatifsManquants.length,
+      conformes: conformes.length,
+    },
+    interne: { score, breakdown },
+  };
 }
+
+/** Vue candidat : tout sauf `interne`. À utiliser dans toute réponse d'API publique. */
+export type CompletenessPublic = Omit<CompletenessResult, "interne">;
+export const versClient = ({ interne: _ignore, ...reste }: CompletenessResult): CompletenessPublic => reste;
 
 function messagePourPiece(d: DocumentInput): string {
   switch (d.status) {

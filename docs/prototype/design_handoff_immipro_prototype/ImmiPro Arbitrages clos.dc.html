@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #FFFFFF; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="font-family: Inter, system-ui, sans-serif; color: #40403F; background: #FFFFFF; padding: 56px 24px 96px; display: flex; justify-content: center;">
+<div style="width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 56px;">
+
+  <header style="display: flex; flex-direction: column; gap: 16px; padding-bottom: 32px; border-bottom: 1px solid #DDDDDD;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 · ARBITRAGES · 13/09/2026</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Les quatre décisions restantes, tranchées</h1>
+    <p style="margin: 0; max-width: 62ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Quatre points restaient ouverts après la revue : le traitement de C-09, la présentation de $-01, la politique consultants et l'origine des valeurs de <code style="font-family: 'JetBrains Mono', monospace; font-size: 14px; background: #F7F7F7; padding: 1px 5px; border-radius: 4px;">tokensIA</code>. Faute de retour, chacun est tranché ici par défaut, avec son motif et ce qu'il impose au code. Un désaccord sur l'un d'eux ne remet pas les autres en cause.</p>
+  </header>
+
+  <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="4">
+    <section style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #DDDDDD;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">{{ d.code }}</span>
+        <h2 style="flex: 1 1 320px; min-width: 0; margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">{{ d.titre }}</h2>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ d.ecrans }}</span>
+      </div>
+
+      <div style="padding: 22px 24px; border: 1px solid #1A1A1A; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DÉCISION</span>
+        <p style="margin: 0; font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">{{ d.decision }}</p>
+      </div>
+
+      <p style="margin: 0; max-width: 70ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">{{ d.motif }}</p>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        <div style="flex: 1 1 340px; min-width: 0; padding: 18px 20px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ce que le prototype montre</span>
+          <sc-for list="{{ d.proto }}" as="p" hint-placeholder-count="2">
+            <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ p }}</span>
+          </sc-for>
+        </div>
+        <div style="flex: 1 1 340px; min-width: 0; padding: 18px 20px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ce que le code doit porter</span>
+          <sc-for list="{{ d.code_a_faire }}" as="c" hint-placeholder-count="2">
+            <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ c }}</span>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 16px; border-left: 2px solid #DDDDDD;">
+        <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: #1A1A1A;">Écarté</span>
+        <span style="max-width: 68ch; font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">{{ d.ecarte }}</span>
+      </div>
+    </section>
+  </sc-for>
+
+  <section style="display: flex; flex-direction: column; gap: 16px; padding: 28px; background: #F7F7F7; border-radius: 16px;">
+    <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Ce qui reste ouvert après ces quatre</h2>
+    <p style="margin: 0; max-width: 68ch; font-size: 16px; line-height: 24px; text-wrap: pretty;">Un seul point, et c'est le même depuis le début : l'essai lecteur d'écran sur appareil réel. Le protocole en douze vérifications et la feuille de relevé sont prêts, comptez une heure sur un appareil milieu de gamme. C'est le seul point qui peut encore renvoyer du travail de fond sur les écrans.</p>
+    <p style="margin: 0; max-width: 68ch; font-size: 14px; line-height: 20px; color: #6B6B6B; text-wrap: pretty;">Les deux reports de code connus tiennent en deux lignes : <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #FFFFFF; padding: 1px 5px; border-radius: 4px;">ink.500</code> à <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #FFFFFF; padding: 1px 5px; border-radius: 4px;">#6B6B6B</code> et l'échelle de neuf tailles, tous deux dans <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #FFFFFF; padding: 1px 5px; border-radius: 4px;">tailwind.config.ts</code>.</p>
+  </section>
+
+  <footer style="padding-top: 32px; border-top: 1px solid #DDDDDD;">
+    <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Arbitrages rendus le 13/09/2026 en l'absence de retour sur les quatre questions posées. Chacun est réversible : le motif est écrit pour qu'un désaccord porte sur le raisonnement, pas sur le résultat.</p>
+  </footer>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;980&quot;, &quot;height&quot;: &quot;1400&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      decisions: [
+        {
+          code: "C-09",
+          titre: "Dénombrement des manques, sans note globale",
+          ecrans: "WF-07 · pivot 1d",
+          decision: "C-09 restitue la liste des pièces manquantes et des incohérences, en tête d'écran. Aucun chiffre sur 100. L'état d'ensemble est nommé, pas noté : « Dossier incomplet », « Presque complet », « Complet ».",
+          motif: "Un chiffre unique se retient comme une probabilité d'obtention, et le démenti écrit sous le chiffre ne survit pas à la mémoire du chiffre. C'est l'interdit produit de C-09, et il est plus solide de ne pas produire le nombre que de l'encadrer de précautions. Le dénombrement a par ailleurs une propriété que le score n'a pas : chaque ligne est une action, donc l'écran conduit quelque part.",
+          proto: [
+            "Traitement « dénombrement » du pivot 1d retenu comme référence ; le traitement « score agrégé » reste au sélecteur avec son motif d'écart.",
+            "Trois paliers nommés en tête, appuyés sur le nombre de pièces obligatoires manquantes : une ou plus, aucune mais des complémentaires manquantes, aucune.",
+            "Second saut « Aller à l'action » conservé : la barre basse s'atteint sans retraverser la liste."
+          ],
+          code_a_faire: [
+            "Le barème 60 / 20 / 20 n'a plus de surface d'affichage. Il peut rester interne à src/domain/completeness/ s'il sert au tri des lignes, mais il ne remonte pas à l'écran.",
+            "L'API de complétude expose une liste ordonnée de manques et un palier nommé, pas un entier.",
+            "Aucune chaîne de l'interface ne contient « % », « score » ni « chances »."
+          ],
+          ecarte: "Score seul, et score en tête avec dénombrement dessous : les deux réintroduisent le nombre que l'interdit produit cherche à éviter. Le palier nommé donne la même lecture d'un coup d'œil sans être mémorisable comme un pourcentage."
+        },
+        {
+          code: "$-01",
+          titre: "Trois colonnes à égalité, Dossier cadré",
+          ecrans: "WF-04 · variantes $-01",
+          decision: "La variante de référence est retenue : trois colonnes de largeur égale, Essentiel, Dossier, Dossier Pro, le pack Dossier porté par un cadre et la mention « Le plus choisi ». Aucun prix barré, aucune remise.",
+          motif: "C'est la seule des trois variantes qui ne suppose rien qui n'existe pas. La variante « pack recommandé » repose sur une mise à niveau au prorata absente de pricing.ts, et la variante « question avant le prix » ajoute une étape à un parcours qui en compte déjà trois. Le cadre sur Dossier suffit à orienter sans truquer la comparaison.",
+          proto: [
+            "Variante 1 promue en référence dans $-01, en 390 px et en 1440 px.",
+            "Les deux autres restent au sélecteur des variantes, chacune avec son motif d'écart.",
+            "Trois grilles natives conservées : XOF et EUR, aucune conversion à taux fixe."
+          ],
+          code_a_faire: [
+            "Un seul champ de mise en avant dans pricing.ts (le pack Dossier), pas de logique de remise ni de prorata.",
+            "La recharge de 10 analyses reste hors de cette grille : elle s'achète depuis un dossier ouvert, à 3 000 F plancher (RG-05.5)."
+          ],
+          ecarte: "« Pack recommandé » : suppose une mise à niveau au prorata à écrire côté domaine avant d'être montrable. « Question avant le prix » : allonge le parcours et cache la grille au moment où le visiteur la cherche."
+        },
+        {
+          code: "T-04 · T-05",
+          titre: "Habilitation par destination et accord du client, cumulés",
+          ecrans: "WF-12 · pack Accompagné",
+          decision: "Un consultant n'accède à un dossier que si deux conditions sont vraies en même temps : il est habilité sur la destination du dossier, et le client lui a donné un accord nominatif, révocable à tout moment depuis l'espace candidat.",
+          motif: "Les deux conditions répondent à deux risques différents, et aucune ne couvre l'autre. L'habilitation par destination répond à la compétence : un dossier néerlandais n'est pas un dossier canadien. L'accord nominatif répond au consentement : le dossier contient des pièces d'identité, et leur consentement est déjà séparé et non pré-coché à l'inscription. Le retirer doit être aussi simple que le donner.",
+          proto: [
+            "L'emplacement annoté de T-04 devient un écran d'accord : destination, nom du consultant, portée des pièces visibles, bouton de révocation.",
+            "Le consultant voit les pièces et les échanges du dossier. Il ne voit ni le moyen de paiement ni l'historique d'achat.",
+            "La révocation coupe l'accès sans supprimer les échanges déjà tenus, et s'inscrit au journal d'audit."
+          ],
+          code_a_faire: [
+            "Deux tables de droits, non une : habilitations par destination côté consultant, accords nominatifs côté dossier. L'accès est l'intersection.",
+            "Le tarif reste celui de la grille ImmiPro et l'encaissement reste chez ImmiPro : le consultant ne fixe pas de prix dans le produit.",
+            "Toute lecture de dossier par un consultant s'inscrit au journal d'audit (B-06)."
+          ],
+          ecarte: "Habilitation par destination seule : un client se verrait assigné sans l'avoir voulu. Accord du client seul : rien n'empêche un consultant de prendre un dossier hors de sa compétence. Accès libre avec traces : l'audit constate, il n'empêche pas."
+        },
+        {
+          code: "tokensIA",
+          titre: "Valeur interne, jamais affichée au client",
+          ecrans: "B-07 · pricing.ts",
+          decision: "tokensIA reste une variable d'ajustement interne, visible au back-office seul. Le candidat ne voit jamais un coût d'IA : il voit un compteur d'analyses restantes. Les trois valeurs actuelles sont des ordres de grandeur et sont étiquetées comme telles jusqu'au dossier de mesure.",
+          motif: "Le coût par dossier est une donnée d'exploitation, pas une information d'achat : affichée au client, elle transforme une offre en facture détaillée et invite à discuter le prix ligne par ligne. Le compteur d'analyses dit la même chose du point de vue de l'usage, sans ouvrir cette discussion. Au back-office en revanche, la donnée est nécessaire — c'est elle qui déclenche l'alerte de marge.",
+          proto: [
+            "B-07 reste en état vide, seuils exprimés en ratio (RG-16.1, moins de 15 % du prix du pack), sans montants en francs.",
+            "Aucun écran candidat ne mentionne de coût d'IA ; C-07 et C-08 parlent d'analyses restantes."
+          ],
+          code_a_faire: [
+            "tokensIA par pack dans pricing.ts, hors de toute sérialisation destinée au client.",
+            "Source à fournir : export du fournisseur d'inférence sur les dix premiers dossiers réels passés dans le pipeline, par destination. À réclamer à l'équipe technique — c'est la seule des quatre décisions qui attend une donnée du dehors.",
+            "Jusqu'à cet export, B-07 affiche son état vide plutôt que des valeurs provisoires."
+          ],
+          ecarte: "Affichage au client, même en petit : un coût d'inférence au dossier n'a pas de sens pour l'acheteur et fragilise le prix. Suppression de la variable : l'alerte de marge du back-office n'aurait plus d'assise."
+        }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #FFFFFF; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section lang="fr" style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px; max-width: 1240px;">
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B; letter-spacing: 0.02em;">DOC-12 §5 · LANGUE DES MESSAGES D'ERREUR</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A; text-wrap: pretty;">Ce que dit un écran quand quelque chose échoue</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Le point ouvert du parcours clavier portait sur la langue des messages d'erreur. Il se règle ici : sept règles d'écriture, la relecture des huit messages déjà posés dans le prototype, et la décision de langue pour le lot P0.</p>
+  </header>
+
+  <sc-if value="{{ montrerRegles }}" hint-placeholder-val="{{ true }}">
+    <div id="16a" style="display: flex; flex-direction: column; gap: 20px; padding: 28px; background: #F7F7F7; border-radius: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">16a</span>
+        <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Sept règles d'écriture</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+        <sc-for list="{{ regles }}" as="r" hint-placeholder-count="7">
+          <div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; background: #FFFFFF; border-radius: 12px;">
+            <span style="flex: 0 0 28px; height: 28px; border-radius: 8px; background: #EEF4FB; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #1F4E79;">{{ r.n }}</span>
+            <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">{{ r.titre }}</span>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ r.texte }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ montrerAudit }}" hint-placeholder-val="{{ true }}">
+    <div id="16b" style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">16b</span>
+        <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Les huit messages du prototype, relus</h2>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{ messages }}" as="m" hint-placeholder-count="8">
+          <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; padding: 20px 24px; border: 1px solid #DDDDDD; border-radius: 16px; border-left: 3px solid {{ m.bord }};">
+            <div style="flex: 0 0 150px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">{{ m.ecran }}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ m.cas }}</span>
+            </div>
+            <div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A; text-wrap: pretty;">{{ m.titre }}</span>
+              <span style="font-size: 15px; line-height: 22px; color: #40403F; text-wrap: pretty;">{{ m.corps }}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #1F4E79;">{{ m.actions }}</span>
+            </div>
+            <div style="flex: 0 0 260px; display: flex; flex-direction: column; gap: 6px;">
+              <sc-if value="{{ montrerVerdicts }}" hint-placeholder-val="{{ true }}">
+                <span style="align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: {{ m.fond }}; font-size: 13px; line-height: 18px; font-weight: 600; color: {{ m.bord }};">{{ m.verdict }}</span>
+              </sc-if>
+              <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ m.note }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <div id="16c" style="display: flex; flex-direction: column; gap: 20px; padding: 28px; background: #EEF4FB; border-radius: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">16c</span>
+      <h2 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Décision de langue pour le lot P0</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;">
+      <sc-for list="{{ langue }}" as="l" hint-placeholder-count="4">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; background: #FFFFFF; border-radius: 12px;">
+          <span style="font-size: 15px; line-height: 22px; font-weight: 600; color: #1A1A1A;">{{ l.titre }}</span>
+          <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ l.texte }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <p style="margin: 0; max-width: 76ch; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Conséquence pour le lecteur d'écran : l'attribut <code style="font-family: 'JetBrains Mono', monospace;">lang="fr"</code> porté par la racine de chaque écran suffit tant que l'interface est monolingue. Le jour où une seconde langue arrive, c'est cet attribut qui change, pas le comportement clavier décrit dans <a href="ImmiPro Parcours clavier.dc.html#14a">le parcours clavier</a>.</p>
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : messages de C-04, C-05 et C-07 → WF-06 ; $-01, $-05 et $-06 → WF-05 ; B-02 → WF-14. Le point ouvert « Traduction des messages d'erreur » du document clavier est clos par 16c.</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;montrerRegles&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Affichage&quot;}, &quot;montrerAudit&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Affichage&quot;}, &quot;montrerVerdicts&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Affichage&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const OK = { verdict: "Conforme", bord: "#1F7A4D", fond: "#E8F4EE" };
+    const RESERVE = { verdict: "Réservé au back-office", bord: "#1F4E79", fond: "#EEF4FB" };
+    return {
+      montrerRegles: this.props.montrerRegles ?? true,
+      montrerAudit: this.props.montrerAudit ?? true,
+      montrerVerdicts: this.props.montrerVerdicts ?? true,
+      regles: [
+        { n: "1", titre: "Le titre nomme le fait, pas le sentiment", texte: "« Les tarifs ne sont pas disponibles », pas « Oups » ni « Quelque chose s'est mal passé ». Le candidat doit savoir en une ligne ce qui n'a pas eu lieu." },
+        { n: "2", titre: "Le corps dit ce qui est conservé", texte: "Toute erreur au milieu d'un dépôt précise ce qui reste : brouillon enregistré, dossier conservé, réponses gardées sur l'appareil. C'est la première question que se pose quelqu'un qui a passé vingt minutes à remplir." },
+        { n: "3", titre: "Jamais de code technique dans un écran candidat", texte: "Pas de 503, pas de nom de service, pas de trace. Le back-office a le droit au code et à l'heure exacte, parce que son lecteur agit dessus." },
+        { n: "4", titre: "Une action principale, une seule", texte: "Un bouton plein pour ce qu'il y a à faire maintenant, un bouton discret pour la sortie. Deux boutons pleins obligent à choisir sans information." },
+        { n: "5", titre: "Le tutoiement, comme partout ailleurs", texte: "« Tu es hors ligne », « Tu n'as rien à ressaisir ». L'erreur n'est pas le moment de changer de registre pour se couvrir." },
+        { n: "6", titre: "Dire pourquoi rien n'est affiché", texte: "Quand l'écran préfère le vide à une valeur douteuse, il le dit : un montant approximatif ne serait pas opposable, une condition périmée ferait prendre une mauvaise décision." },
+        { n: "7", titre: "Rouge pour l'échec, ambre pour l'attente", texte: "Le rouge #B3261E marque ce qui a échoué. L'ambre #B45309 marque ce qui est seulement différé, comme un téléchargement hors ligne. Deux couleurs, deux promesses différentes." }
+      ],
+      messages: [
+        Object.assign({
+          ecran: "C-04", cas: "règles non chargées",
+          titre: "Les conditions n'ont pas pu être chargées",
+          corps: "Le serveur des règles n'a pas répondu. Rien n'est affiché plutôt qu'une information peut-être périmée.",
+          actions: "Réessayer · Voir la version du 28/08",
+          note: "Règles 1, 6 et 7 tenues. Le repli daté évite le cul-de-sac."
+        }, OK),
+        Object.assign({
+          ecran: "C-05", cas: "création interrompue",
+          titre: "Le dossier n'a pas été créé",
+          corps: "Le serveur a interrompu l'enregistrement. Tes réponses sont gardées sur ton appareil, tu n'as rien à ressaisir.",
+          actions: "Reprendre la création · Revenir à mes dossiers",
+          note: "Modèle de la règle 2 : la phrase de conservation vient avant toute action."
+        }, OK),
+        Object.assign({
+          ecran: "$-01", cas: "grille injoignable",
+          titre: "Les tarifs ne sont pas disponibles",
+          corps: "La grille n'a pas répondu. Aucun prix n'est affiché : un montant approximatif ne serait pas opposable.",
+          actions: "Réessayer · Revenir à mon dossier",
+          note: "Erreur bloquante qui ne bloque pas le dossier : le dépôt de pièces continue, le paiement attend."
+        }, OK),
+        Object.assign({
+          ecran: "$-05", cas: "délai dépassé",
+          titre: "Le délai de confirmation est dépassé",
+          corps: "Les cinq minutes se sont écoulées sans confirmation. Ton dossier est conservé, tu peux relancer le paiement maintenant.",
+          actions: "Relancer le paiement · Changer de moyen",
+          note: "Le délai est nommé en clair. Aucune mention de débit, puisqu'il n'y en a pas eu."
+        }, OK),
+        Object.assign({
+          ecran: "$-05", cas: "solde insuffisant",
+          titre: "Le paiement n'a pas abouti",
+          corps: "Ton opérateur a refusé l'opération pour solde insuffisant. Ton dossier est conservé en l'état.",
+          actions: "Relancer le paiement · Changer de moyen",
+          note: "Le motif vient de l'opérateur et lui est attribué : ImmiPro ne porte pas un refus qui n'est pas le sien."
+        }, OK),
+        Object.assign({
+          ecran: "$-06", cas: "hors ligne",
+          titre: "Le PDF ne peut pas être téléchargé maintenant",
+          corps: "Tu es hors ligne. Le reçu reste consultable ici et sera téléchargeable dès le retour du réseau.",
+          actions: "Télécharger le reçu (désactivé) · Réessayer",
+          note: "Seul message en ambre du lot P0 : rien n'a échoué, tout est différé. Le bouton désactivé garde sa place."
+        }, OK),
+        Object.assign({
+          ecran: "C-07", cas: "quota épuisé",
+          titre: "Tes 30 analyses du pack Dossier sont utilisées",
+          corps: "Tu peux toujours téléverser et conserver tes pièces, sans vérification automatique. Une recharge de 10 analyses coûte 3 000 F.",
+          actions: "Recharger 10 analyses · Téléverser sans analyse",
+          note: "Écrit comme une limite atteinte, pas comme une panne : ni rouge ni ambre, cadre neutre."
+        }, OK),
+        Object.assign({
+          ecran: "B-02", cas: "publication refusée",
+          titre: "La publication a échoué",
+          corps: "Le service de règles a répondu 503 à 09 h 18. Ton brouillon est enregistré en version de travail.",
+          actions: "Réessayer la publication · Voir le journal",
+          note: "Le code HTTP et l'horodatage restent, contrairement à la règle 3 : le lecteur est un agent qui ouvre le journal juste après. La règle 3 ne vaut que pour les écrans candidats."
+        }, RESERVE)
+      ],
+      langue: [
+        { titre: "Français seul en P0", texte: "Les huit messages sont en français uniquement. Aucune chaîne d'interface n'est laissée en anglais, y compris les libellés de validation de champs." },
+        { titre: "lang=\"fr\" sur la racine de l'écran", texte: "L'annonce vocale suit cet attribut. C'est le seul point à changer le jour où une seconde langue arrive." },
+        { titre: "Les données gardent leur langue", texte: "Un intitulé de document néerlandais ou allemand cité dans une checklist reste dans sa langue, porté par son propre lang, et n'est pas traduit." },
+        { titre: "Anglais différé, pas oublié", texte: "L'interface bilingue n'est pas dans le lot P0. La décision est de ne pas préparer de fichiers de traduction avant que le besoin soit arbitré." }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

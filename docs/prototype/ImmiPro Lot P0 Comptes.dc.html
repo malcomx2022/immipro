@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.2 · LOT P0 — COMPTE · 390 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">A-01 inscription · A-02 connexion · A-03 vérification · A-04 mot de passe · A-05 consentements</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Champs et interrupteurs réellement saisissables. Le consentement au traitement des pièces d'identité est séparé du reste et jamais pré-coché.</p>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 56px;">
+
+    <div id="4a" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">4a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-01 — Inscription</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="110" height="27" style="display: block;" />
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Crée ton compte</h1>
+              <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Tes réponses du simulateur sont conservées : Pays-Bas, séjour études.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Prénom et nom</span>
+                <input type="text" value="{{ nom }}" onChange="{{ setNom }}" placeholder="Aline Dossou" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+              </label>
+
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Adresse email</span>
+                <input type="email" value="{{ email }}" onChange="{{ setEmail }}" placeholder="aline.dossou@email.com" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">C'est là qu'arrivent les alertes de changement de règles.</span>
+              </label>
+
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Numéro Mobile Money</span>
+                <input type="tel" value="{{ tel }}" onChange="{{ setTel }}" placeholder="97 00 00 42" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Bénin, +229. Sert au paiement, jamais à la publicité.</span>
+              </label>
+
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Mot de passe</span>
+                <input type="password" value="{{ pass }}" onChange="{{ setPass }}" placeholder="Au moins 10 caractères" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+                <span style="display: flex; gap: 6px;">
+                  <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ str1 }};"></span>
+                  <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ str2 }};"></span>
+                  <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ str3 }};"></span>
+                </span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ strLabel }}</span>
+              </label>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button onClick="{{ toggleCgu }}" style="display: flex; gap: 12px; align-items: flex-start; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; text-align: left; cursor: pointer;">
+                <span style="flex: 0 0 24px; width: 24px; height: 24px; margin-top: 2px; border-radius: 8px; border: 2px solid #2E75B6; background: {{ cguBg }};"></span>
+                <span style="flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">J'accepte les conditions d'utilisation et la politique de confidentialité.</span>
+              </button>
+              <div style="padding: 14px 16px; background: #F7F7F7; border-radius: 12px; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Le consentement au traitement de tes pièces d'identité est demandé séparément, au moment du premier téléversement.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Créer mon compte</button>
+          <div style="text-align: center; font-size: 14px; line-height: 20px; color: #40403F;">Déjà inscrit ? <a href="#4b">Se connecter</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="4b" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">4b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-02 — Connexion</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02 · {{ loginLabel }}</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onClick="{{ loginNominal }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Nominal</button>
+        <button onClick="{{ loginErreur }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Identifiants refusés</button>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+            <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="110" height="27" style="display: block;" />
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Bon retour</h1>
+              <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F;">Ton dossier Pays-Bas t'attend à 68 sur 100.</p>
+            </div>
+
+            <sc-if value="{{ loginError }}">
+              <div style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: #F7F7F7; border-radius: 12px;">
+                <span style="flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: #B3261E;"></span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Email ou mot de passe incorrect</span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Il te reste trois essais avant que le compte soit bloqué quinze minutes.</span>
+                </span>
+              </div>
+            </sc-if>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Adresse email</span>
+                <input type="email" value="{{ email }}" onChange="{{ setEmail }}" placeholder="aline.dossou@email.com" style="min-height: 52px; padding: 0 16px; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; border: {{ loginBorder }};" />
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Mot de passe</span>
+                <input type="password" value="{{ pass }}" onChange="{{ setPass }}" placeholder="Ton mot de passe" style="min-height: 52px; padding: 0 16px; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A; border: {{ loginBorder }};" />
+              </label>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <button onClick="{{ toggleRester }}" style="display: flex; gap: 10px; align-items: center; padding: 0; min-height: 44px; border: none; background: #FFFFFF; font-family: Inter, sans-serif; cursor: pointer;">
+                  <span style="flex: 0 0 24px; width: 24px; height: 24px; border-radius: 8px; border: 2px solid #2E75B6; background: {{ resterBg }};"></span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F;">Rester connecté</span>
+                </button>
+                <a href="#4d" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Mot de passe oublié</a>
+              </div>
+            </div>
+
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Connexion sur un appareil partagé</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Laisse « Rester connecté » décoché si tu utilises un téléphone ou un cybercafé qui n'est pas le tien.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Se connecter</button>
+          <div style="text-align: center; font-size: 14px; line-height: 20px; color: #40403F;">Pas encore de compte ? <a href="#4a">S'inscrire</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="4c" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">4c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-03 — Vérification email</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 24px;">
+            <img src="public/brand/immipro-mark.svg" alt="ImmiPro" width="32" height="32" style="display: block;" />
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Vérifie ton adresse email</h1>
+              <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Nous avons envoyé un code à six chiffres à <span style="font-weight: 500; color: #1A1A1A;">aline.dossou@email.com</span>.</p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <label style="display: flex; flex-direction: column; gap: 8px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Code de vérification</span>
+                <input type="text" value="{{ code }}" onChange="{{ setCode }}" placeholder="000000" style="min-height: 64px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: 'JetBrains Mono', monospace; font-size: 32px; letter-spacing: 0.24em; color: #1A1A1A;" />
+              </label>
+              <div style="display: flex; gap: 6px;">
+                <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ code1 }};"></span>
+                <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ code2 }};"></span>
+                <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ code3 }};"></span>
+                <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ code4 }};"></span>
+                <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ code5 }};"></span>
+                <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ code6 }};"></span>
+              </div>
+              <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ codeLabel }}</div>
+            </div>
+
+            <div style="padding: 16px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Rien reçu ?</div>
+              <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Regarde dans les courriers indésirables. Sur une connexion lente, l'email peut mettre deux à trois minutes.</div>
+              <button style="align-self: flex-start; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;" style-hover="background: #FFFFFF;">Renvoyer le code</button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Mauvaise adresse ?</div>
+              <a href="#4c" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Corriger mon adresse email</a>
+            </div>
+
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Tant que ton adresse n'est pas vérifiée, tu peux consulter ton dossier mais pas recevoir les alertes de changement de règles.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Vérifier mon adresse</button>
+          <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Plus tard</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="4d" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">4d</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-04 — Mot de passe</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02 · {{ pwLabel }}</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onClick="{{ pwDemande }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Demande</button>
+        <button onClick="{{ pwEnvoye }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Lien envoyé</button>
+        <button onClick="{{ pwNouveau }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Nouveau</button>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 104px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 16px;">
+            <button style="min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Connexion</button>
+          </div>
+
+          <sc-if value="{{ pwIsDemande }}" hint-placeholder-val="{{ true }}">
+            <div style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Réinitialise ton mot de passe</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Entre l'adresse email de ton compte. Nous t'envoyons un lien valable une heure.</p>
+              </div>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Adresse email</span>
+                <input type="email" value="{{ email }}" onChange="{{ setEmail }}" placeholder="aline.dossou@email.com" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+              </label>
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Ton dossier et tes pièces ne sont pas affectés par cette opération.</p>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pwIsEnvoye }}">
+            <div style="padding: 24px 16px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="width: 96px; height: 96px; border-radius: 999px; background: #F7F7F7; display: flex; align-items: center; justify-content: center;">
+                <span style="width: 20px; height: 20px; border-radius: 999px; background: #0F7B4F;"></span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Lien envoyé</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Ouvre le message envoyé à aline.dossou@email.com et suis le lien. Il expire dans une heure.</p>
+              </div>
+              <div style="padding: 16px; background: #F7F7F7; border-radius: 16px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Sur une connexion lente, l'email peut mettre deux à trois minutes. Pense aux courriers indésirables.</div>
+                <button style="align-self: flex-start; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Renvoyer le lien</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pwIsNouveau }}">
+            <div style="padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A; text-wrap: pretty;">Choisis un nouveau mot de passe</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Au moins dix caractères. Évite une date de naissance ou un numéro de téléphone.</p>
+              </div>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Nouveau mot de passe</span>
+                <input type="password" value="{{ pass }}" onChange="{{ setPass }}" placeholder="Au moins 10 caractères" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+                <span style="display: flex; gap: 6px;">
+                  <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ str1 }};"></span>
+                  <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ str2 }};"></span>
+                  <span style="flex: 1 1 0; height: 6px; border-radius: 999px; background: {{ str3 }};"></span>
+                </span>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ strLabel }}</span>
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Confirme le mot de passe</span>
+                <input type="password" value="{{ pass2 }}" onChange="{{ setPass2 }}" placeholder="Répète le mot de passe" style="min-height: 52px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; color: #1A1A1A;" />
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ matchLabel }}</span>
+              </label>
+              <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Tes autres appareils connectés seront déconnectés.</p>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">{{ pwCta }}</button>
+          <div style="text-align: center; font-size: 14px; line-height: 20px; color: #40403F;"><a href="#4b">Revenir à la connexion</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="4e" style="display: flex; flex-direction: column; gap: 16px; width: 390px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">4e</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">A-05 — Consentements</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-02</span>
+      </div>
+
+      <div style="position: relative; width: 390px; height: 844px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden;">
+        <div style="box-sizing: border-box; height: 100%; overflow-y: auto; padding-bottom: 112px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1A1A1A;">
+            <span>9:41</span><span>4G · 78 %</span>
+          </div>
+          <div style="padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+            <button style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;">Mon profil</button>
+            <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Mes consentements</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 24px; color: #40403F; text-wrap: pretty;">Chaque autorisation est indépendante et révocable à tout moment. Le refus de l'analyse des pièces d'identité ne bloque pas ton compte.</p>
+          </div>
+
+          <div style="display: flex; flex-direction: column;">
+            <div style="padding: 20px 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 16px; align-items: flex-start;">
+              <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Analyse de mes pièces d'identité</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Passeport, carte d'identité, acte de naissance. Lecture automatique des dates et des noms pour vérifier la conformité. Données supprimées à la clôture du dossier.</div>
+                <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Sans cette autorisation, tu téléverses tes pièces sans analyse automatique.</div>
+              </div>
+              <button onClick="{{ toggleId }}" style="flex: 0 0 52px; width: 52px; height: 32px; padding: 0; border: none; border-radius: 999px; cursor: pointer; display: flex; align-items: center; background: {{ idTrack }};">
+                <span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); margin-left: {{ idKnob }};"></span>
+              </button>
+            </div>
+
+            <div style="padding: 20px 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 16px; align-items: flex-start;">
+              <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Analyse de mes pièces financières</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Relevés bancaires et attestations de ressources. Vérification du montant et de l'ancienneté du document.</div>
+              </div>
+              <button onClick="{{ toggleFin }}" style="flex: 0 0 52px; width: 52px; height: 32px; padding: 0; border: none; border-radius: 999px; cursor: pointer; display: flex; align-items: center; background: {{ finTrack }};">
+                <span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); margin-left: {{ finKnob }};"></span>
+              </button>
+            </div>
+
+            <div style="padding: 20px 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 16px; align-items: flex-start;">
+              <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Alertes de changement de règles</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Email quand une exigence de ta destination change. Ne concerne que tes dossiers ouverts.</div>
+              </div>
+              <button onClick="{{ toggleAlert }}" style="flex: 0 0 52px; width: 52px; height: 32px; padding: 0; border: none; border-radius: 999px; cursor: pointer; display: flex; align-items: center; background: {{ alertTrack }};">
+                <span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); margin-left: {{ alertKnob }};"></span>
+              </button>
+            </div>
+
+            <div style="padding: 20px 16px; border-top: 1px solid #DDDDDD; display: flex; gap: 16px; align-items: flex-start;">
+              <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Propositions de consultants partenaires</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Mise en relation quand ton dossier présente une difficulté qu'un consultant traite mieux que nous.</div>
+              </div>
+              <button onClick="{{ togglePart }}" style="flex: 0 0 52px; width: 52px; height: 32px; padding: 0; border: none; border-radius: 999px; cursor: pointer; display: flex; align-items: center; background: {{ partTrack }};">
+                <span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); margin-left: {{ partKnob }};"></span>
+              </button>
+            </div>
+
+            <div style="padding: 20px 16px; border-top: 1px solid #DDDDDD; border-bottom: 1px solid #DDDDDD; display: flex; gap: 16px; align-items: flex-start;">
+              <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-size: 16px; line-height: 24px; font-weight: 600; color: #1A1A1A;">Mesure d'audience anonyme</div>
+                <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">Statistiques d'usage sans identifiant personnel, pour savoir quels écrans posent problème.</div>
+              </div>
+              <button onClick="{{ toggleStat }}" style="flex: 0 0 52px; width: 52px; height: 32px; padding: 0; border: none; border-radius: 999px; cursor: pointer; display: flex; align-items: center; background: {{ statTrack }};">
+                <span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,.06); margin-left: {{ statKnob }};"></span>
+              </button>
+            </div>
+          </div>
+
+          <div style="padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 12px;">
+            <a href="#4e" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Télécharger mes données</a>
+            <a href="#4e" style="min-height: 44px; display: flex; align-items: center; font-size: 14px; line-height: 20px;">Supprimer mon compte et mes pièces</a>
+            <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Historique des consentements conservé cinq ans, comme l'exige la réglementation. Dernière modification le 11/09/2026.</p>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #FFFFFF; border-top: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+          <button style="width: 100%; min-height: 52px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Enregistrer</button>
+          <div style="text-align: center; font-size: 13px; line-height: 18px; color: #6B6B6B;">{{ consentLabel }}</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : tous ces écrans → WF-02. A-05 sépare le consentement au traitement des pièces d'identité des autres autorisations, et aucun interrupteur n'est actif par défaut au premier passage. A-02 montre l'état d'identifiants refusés sans indiquer lequel des deux champs est en cause.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 1100}}">
+class Component extends DCLogic {
+  state = {
+    nom: "", email: "", tel: "", pass: "", pass2: "", code: "",
+    cgu: false, rester: false,
+    login: "nominal", pw: "demande",
+    consents: { id: false, fin: false, alert: false, part: false, stat: false }
+  };
+
+  renderVals() {
+    const s = this.state;
+    const on = "#2E75B6";
+    const off = "#DDDDDD";
+    const n = s.pass.length;
+    const strength = n === 0 ? 0 : n < 8 ? 1 : n < 12 ? 2 : 3;
+    const digits = s.code.replace(/\D/g, "").length;
+    const bar = i => (digits >= i ? on : "#F7F7F7");
+    const c = s.consents;
+    const toggle = key => () => this.setState(p => ({ consents: Object.assign({}, p.consents, { [key]: !p.consents[key] }) }));
+    const activeCount = Object.keys(c).filter(k => c[k]).length;
+
+    return {
+      nom: s.nom, email: s.email, tel: s.tel, pass: s.pass, pass2: s.pass2, code: s.code,
+      setNom: e => this.setState({ nom: e.target.value }),
+      setEmail: e => this.setState({ email: e.target.value }),
+      setTel: e => this.setState({ tel: e.target.value }),
+      setPass: e => this.setState({ pass: e.target.value }),
+      setPass2: e => this.setState({ pass2: e.target.value }),
+      setCode: e => this.setState({ code: e.target.value.slice(0, 6) }),
+
+      str1: strength >= 1 ? (strength === 1 ? "#B3261E" : strength === 2 ? "#B45309" : "#0F7B4F") : "#F7F7F7",
+      str2: strength >= 2 ? (strength === 2 ? "#B45309" : "#0F7B4F") : "#F7F7F7",
+      str3: strength >= 3 ? "#0F7B4F" : "#F7F7F7",
+      strLabel: strength === 0 ? "Au moins dix caractères." : strength === 1 ? "Trop court, il manque des caractères." : strength === 2 ? "Convenable. Un mot de passe plus long serait mieux." : "Solide.",
+
+      cguBg: s.cgu ? "#2E75B6" : "#FFFFFF",
+      toggleCgu: () => this.setState(p => ({ cgu: !p.cgu })),
+      resterBg: s.rester ? "#2E75B6" : "#FFFFFF",
+      toggleRester: () => this.setState(p => ({ rester: !p.rester })),
+
+      loginError: s.login === "erreur",
+      loginLabel: s.login === "erreur" ? "identifiants refusés" : "état nominal",
+      loginBorder: s.login === "erreur" ? "1px solid #B3261E" : "1px solid #DDDDDD",
+      loginNominal: () => this.setState({ login: "nominal" }),
+      loginErreur: () => this.setState({ login: "erreur" }),
+
+      code1: bar(1), code2: bar(2), code3: bar(3), code4: bar(4), code5: bar(5), code6: bar(6),
+      codeLabel: digits === 6 ? "Code complet." : digits + (digits > 1 ? " chiffres" : " chiffre") + " sur 6 · le code expire dans 10 minutes",
+
+      pwIsDemande: s.pw === "demande",
+      pwIsEnvoye: s.pw === "envoye",
+      pwIsNouveau: s.pw === "nouveau",
+      pwLabel: s.pw === "demande" ? "demande" : s.pw === "envoye" ? "lien envoyé" : "nouveau mot de passe",
+      pwCta: s.pw === "demande" ? "Envoyer le lien" : s.pw === "envoye" ? "J'ai suivi le lien" : "Enregistrer le mot de passe",
+      pwDemande: () => this.setState({ pw: "demande" }),
+      pwEnvoye: () => this.setState({ pw: "envoye" }),
+      pwNouveau: () => this.setState({ pw: "nouveau" }),
+      matchLabel: s.pass2.length === 0 ? "Répète exactement le même mot de passe." : s.pass2 === s.pass ? "Les deux mots de passe correspondent." : "Les deux mots de passe diffèrent.",
+
+      idTrack: c.id ? on : off, idKnob: c.id ? "24px" : "4px", toggleId: toggle("id"),
+      finTrack: c.fin ? on : off, finKnob: c.fin ? "24px" : "4px", toggleFin: toggle("fin"),
+      alertTrack: c.alert ? on : off, alertKnob: c.alert ? "24px" : "4px", toggleAlert: toggle("alert"),
+      partTrack: c.part ? on : off, partKnob: c.part ? "24px" : "4px", togglePart: toggle("part"),
+      statTrack: c.stat ? on : off, statKnob: c.stat ? "24px" : "4px", toggleStat: toggle("stat"),
+      consentLabel: activeCount > 1
+        ? activeCount + " autorisations sur 5 actives"
+        : activeCount + " autorisation sur 5 active"
+    };
+  }
+}
+
+</script>
+</body>
+</html>

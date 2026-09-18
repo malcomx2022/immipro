@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #F7F7F7; -webkit-font-smoothing: antialiased; }
+  a { color: #255F95; text-decoration: none; }
+  a:hover { color: #1F4E79; text-decoration: underline; }
+</style>
+</helmet>
+
+<section style="font-family: Inter, system-ui, sans-serif; color: #40403F; padding: 56px 48px 96px; display: flex; flex-direction: column; gap: 40px;">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; max-width: 70ch;">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DOC-12 §3.7 · LOT P2 — BACK-OFFICE, 1 SUR 2 · 1440 px</div>
+    <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em; color: #1A1A1A;">B-01 file de veille · B-02 édition d'une règle · B-05 revue manuelle des pièces</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; text-wrap: pretty;">Registre outil interne : densité élevée, mêmes tokens, accent réservé à l'action principale et à la sélection. B-03, B-04, B-06 et B-07 suivent.</p>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 56px;">
+
+    <div id="9a" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">9a</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-01 — File de veille réglementaire</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-14 · {{ veilleLabel }}</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+          <div style="margin-top: auto; padding: 12px; background: #FFFFFF; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="font-size: 13px; line-height: 18px; font-weight: 600; color: #1A1A1A;">M. Agossou</div>
+            <div style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Analyste réglementaire</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">File de veille</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">42 fiches suivies · 5 en retard de relecture · 3 divergences détectées cette semaine</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <input type="text" value="{{ query }}" onChange="{{ setQuery }}" placeholder="Rechercher un pays ou un type de visa" style="width: 300px; min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+              <button style="min-height: 44px; padding: 0 18px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Nouvelle fiche</button>
+            </div>
+          </div>
+
+          <div style="padding: 16px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{ veilleFilters }}" as="f" hint-placeholder-count="4">
+                <button onClick="{{ f.pick }}" style="min-height: 40px; padding: 0 14px; border-radius: 999px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ f.border }}; background: {{ f.bg }}; color: {{ f.color }};">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 16px; align-items: center; font-size: 14px; line-height: 20px; color: #6B6B6B;">
+              <span>Trié par échéance de relecture</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">{{ veilleCount }}</span>
+            </div>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; display: flex;">
+            <div style="flex: 1 1 auto; min-width: 0; overflow-y: auto;">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #DDDDDD; background: #F7F7F7; font-size: 13px; line-height: 18px; font-weight: 600; color: #6B6B6B;">
+                <span style="flex: 0 0 120px;">Pays</span>
+                <span style="flex: 1 1 160px; min-width: 0;">Type de visa</span>
+                <span style="flex: 0 0 112px;">Niveau de source</span>
+                <span style="flex: 0 0 96px;">Vérifiée le</span>
+                <span style="flex: 0 0 108px;">Relecture</span>
+                <span style="flex: 0 0 64px;">Version</span>
+                <span style="flex: 0 0 80px;">Statut</span>
+              </div>
+              <div role="listbox" aria-label="Fiches de veille" onKeyDown="{{ veilleKeys }}" style="display: flex; flex-direction: column;">
+              <sc-for list="{{ veilleRows }}" as="r" hint-placeholder-count="9">
+                <button onClick="{{ r.pick }}" role="option" aria-selected="{{ r.sel }}" tabindex="{{ r.tab }}" ref="{{ r.ref }}" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 24px; border: none; border-bottom: 1px solid #DDDDDD; font-family: Inter, sans-serif; font-size: 14px; line-height: 20px; text-align: left; cursor: pointer; background: {{ r.bg }};" style-hover="background: #F7F7F7;">
+                  <span style="flex: 0 0 120px; display: flex; align-items: center; gap: 10px;">
+                    <span style="width: 24px; height: 24px; border-radius: 6px; background: repeating-linear-gradient(135deg, #F7F7F7 0 5px, #DDDDDD 5px 10px); display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ r.code }}</span>
+                    <span style="font-weight: 500; color: #1A1A1A;">{{ r.pays }}</span>
+                  </span>
+                  <span style="flex: 1 1 160px; min-width: 0; color: #40403F;">{{ r.visa }}</span>
+                  <span style="flex: 0 0 112px;"><span style="padding: 4px 10px; border-radius: 999px; background: #F7F7F7; font-size: 13px; font-weight: 500; color: {{ r.srcColor }};">{{ r.source }}</span></span>
+                  <span style="flex: 0 0 96px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ r.verifiee }}</span>
+                  <span style="flex: 0 0 108px; display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ r.dueColor }};"></span>
+                    <span style="font-size: 13px; color: {{ r.dueColor }};">{{ r.due }}</span>
+                  </span>
+                  <span style="flex: 0 0 64px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #40403F;">{{ r.version }}</span>
+                  <span style="flex: 0 0 80px; font-size: 13px; color: #40403F;">{{ r.statut }}</span>
+                </button>
+              </sc-for>
+              </div>
+            </div>
+
+            <div style="flex: 0 0 360px; border-left: 1px solid #DDDDDD; overflow-y: auto; display: flex; flex-direction: column;">
+              <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">COMPARAISON N / N+1</div>
+                <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">{{ selPays }} — {{ selVisa }}</div>
+                <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">{{ selMeta }}</div>
+              </div>
+
+              <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+                <sc-for list="{{ selDiffs }}" as="d" hint-placeholder-count="3">
+                  <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid #DDDDDD;">
+                    <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">{{ d.champ }}</div>
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                      <div style="flex: 1 1 0; min-width: 0; padding: 10px 12px; background: #F7F7F7; border-radius: 8px; display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">N</span>
+                        <span style="font-size: 14px; line-height: 20px; color: #40403F;">{{ d.avant }}</span>
+                      </div>
+                      <div style="flex: 1 1 0; min-width: 0; padding: 10px 12px; background: #EEF4FB; border-radius: 8px; display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #1F4E79;">N+1</span>
+                        <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1F4E79;">{{ d.apres }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Dossiers concernés</div>
+                  <div style="font-size: 14px; line-height: 20px; color: #40403F; text-wrap: pretty;">{{ selImpact }}</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Publier la version N+1</button>
+                  <button style="width: 100%; min-height: 44px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Ouvrir en édition</button>
+                  <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Marquer comme relue sans changement</button>
+                </div>
+
+                <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Toute publication crée une version horodatée et déclenche l'alerte aux candidats concernés. L'ancienne version reste consultable.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="9b" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">9b</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-02 — Édition d'une règle versionnée</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-14</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">FILE DE VEILLE · ALLEMAGNE</div>
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Séjour études — brouillon version 5</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">Modifié il y a 12 minutes par M. Agossou · version 4 en vigueur pour 37 dossiers</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <button style="min-height: 44px; padding: 0 16px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Enregistrer le brouillon</button>
+              <button style="min-height: 44px; padding: 0 18px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Publier la version 5</button>
+            </div>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; display: flex;">
+            <div style="flex: 1 1 auto; min-width: 0; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+              <div style="display: flex; gap: 24px;">
+                <label style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Montant du compte bloqué</span>
+                  <input type="text" value="{{ ruleMontant }}" onChange="{{ setRuleMontant }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #2E75B6; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+                  <span style="font-size: 13px; line-height: 18px; color: #1F4E79;">Modifié · version 4 : 11 208 €</span>
+                </label>
+                <label style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Applicable aux dépôts à partir du</span>
+                  <input type="text" value="{{ ruleDate }}" onChange="{{ setRuleDate }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #2E75B6; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+                  <span style="font-size: 13px; line-height: 18px; color: #1F4E79;">Modifié · version 4 : 12/01/2026</span>
+                </label>
+                <label style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Délai d'instruction</span>
+                  <input type="text" value="{{ ruleDelai }}" onChange="{{ setRuleDelai }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Inchangé</span>
+                </label>
+              </div>
+
+              <div style="display: flex; gap: 24px;">
+                <label style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Source</span>
+                  <input type="text" value="{{ ruleSource }}" onChange="{{ setRuleSource }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+                </label>
+                <div style="flex: 0 0 260px; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Niveau de source</span>
+                  <div style="display: flex; gap: 8px;">
+                    <sc-for list="{{ srcLevels }}" as="l" hint-placeholder-count="3">
+                      <button onClick="{{ l.pick }}" style="flex: 1 1 0; min-height: 44px; border-radius: 12px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: {{ l.border }}; background: {{ l.bg }}; color: {{ l.color }};">{{ l.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <label style="flex: 0 0 200px; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Prochaine relecture</span>
+                  <input type="text" value="{{ ruleRelecture }}" onChange="{{ setRuleRelecture }}" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+                </label>
+              </div>
+
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Libellé affiché au candidat</span>
+                <textarea value="{{ ruleLibelle }}" onChange="{{ setRuleLibelle }}" style="min-height: 88px; padding: 12px 14px; border: 1px solid #2E75B6; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; line-height: 20px; color: #1A1A1A; resize: none;"></textarea>
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Ce texte apparaît tel quel dans la checklist. Tutoiement, pas de jargon administratif.</span>
+              </label>
+
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Réserve affichée en contexte</span>
+                <textarea value="{{ ruleReserve }}" onChange="{{ setRuleReserve }}" style="min-height: 72px; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; line-height: 20px; color: #1A1A1A; resize: none;"></textarea>
+              </label>
+
+              <label style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Motif du changement</span>
+                <input type="text" value="{{ ruleMotif }}" onChange="{{ setRuleMotif }}" placeholder="Obligatoire pour publier" style="min-height: 44px; padding: 0 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; color: #1A1A1A;" />
+                <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Consigné au journal d'audit avec ton identifiant.</span>
+              </label>
+            </div>
+
+            <div style="flex: 0 0 400px; border-left: 1px solid #DDDDDD; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DIFFÉRENCES AVEC LA VERSION 4</div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <div style="padding: 12px 14px; background: #F7F7F7; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Montant du compte bloqué</span>
+                    <span style="font-size: 14px; line-height: 20px; color: #40403F;">11 208 € → <span style="font-weight: 600; color: #1A1A1A;">{{ ruleMontant }}</span></span>
+                  </div>
+                  <div style="padding: 12px 14px; background: #F7F7F7; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Date d'application</span>
+                    <span style="font-size: 14px; line-height: 20px; color: #40403F;">12/01/2026 → <span style="font-weight: 600; color: #1A1A1A;">{{ ruleDate }}</span></span>
+                  </div>
+                  <div style="padding: 12px 14px; background: #F7F7F7; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Libellé candidat</span>
+                    <span style="font-size: 14px; line-height: 20px; color: #40403F;">Réécrit</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">EFFET DE LA PUBLICATION</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Dossiers en version 4</span><span style="font-weight: 500; color: #1A1A1A;">37</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Dépôt prévu en 2027</span><span style="font-weight: 500; color: #1A1A1A;">29</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Arbitrage candidat requis</span><span style="font-weight: 500; color: #1A1A1A;">29</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px;"><span style="color: #6B6B6B;">Alertes email envoyées</span><span style="font-weight: 500; color: #1A1A1A;">37</span></div>
+                </div>
+                <div style="padding: 12px 14px; background: #EEF4FB; border-radius: 8px; font-size: 14px; line-height: 20px; color: #1F4E79; text-wrap: pretty;">Aucun dossier n'est migré automatiquement. Chaque candidat reçoit l'écran d'arbitrage T-02.</div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">HISTORIQUE</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="font-size: 14px; line-height: 20px; color: #40403F;">v4 · 12/01/2026 · M. Agossou</div>
+                  <div style="font-size: 14px; line-height: 20px; color: #40403F;">v3 · 04/07/2025 · K. Houngbo</div>
+                  <div style="font-size: 14px; line-height: 20px; color: #40403F;">v2 · 11/01/2025 · K. Houngbo</div>
+                  <div style="font-size: 14px; line-height: 20px; color: #40403F;">v1 · 02/03/2024 · import initial</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="9c" style="display: flex; flex-direction: column; gap: 16px; width: 1440px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: #FFFFFF; background: #1A1A1A; padding: 4px 10px; border-radius: 999px;">9c</span>
+        <span style="font-size: 16px; font-weight: 600; color: #1A1A1A;">B-05 — Revue manuelle des pièces en échec</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">WF-15</span>
+      </div>
+
+      <div style="width: 1440px; height: 900px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; display: flex;">
+        <div style="flex: 0 0 232px; background: #F7F7F7; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #DDDDDD;">
+          <img src="public/brand/immipro-logo-primary.svg" alt="ImmiPro" width="104" height="25" style="display: block;" />
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Veille réglementaire</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Utilisateurs</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Paiements</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: #FFFFFF; font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Pièces en échec</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Journal d'audit</div>
+            <div style="padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 20px; color: #40403F;">Coûts IA</div>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+          <div style="padding: 20px 24px; border-bottom: 1px solid #DDDDDD; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; color: #1A1A1A;">Pièces en échec d'analyse</h1>
+              <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">14 en attente de relecture humaine · délai cible 4 heures · plus ancienne : 2 h 12</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <span style="padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; font-weight: 500; color: #40403F;">Signalées par le candidat : 5</span>
+              <span style="padding: 8px 14px; border-radius: 999px; background: #F7F7F7; font-size: 14px; font-weight: 500; color: #40403F;">Échec technique : 9</span>
+            </div>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; display: flex;">
+            <div style="flex: 0 0 380px; border-right: 1px solid #DDDDDD; overflow-y: auto;">
+              <div role="listbox" aria-label="Pièces en échec" onKeyDown="{{ revueKeys }}" style="display: flex; flex-direction: column;">
+              <sc-for list="{{ revueRows }}" as="r" hint-placeholder-count="6">
+                <button onClick="{{ r.pick }}" role="option" aria-selected="{{ r.sel }}" tabindex="{{ r.tab }}" ref="{{ r.ref }}" style="width: 100%; padding: 16px 20px; border: none; border-bottom: 1px solid #DDDDDD; font-family: Inter, sans-serif; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 6px; background: {{ r.bg }};" style-hover="background: #F7F7F7;">
+                  <span style="display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;">
+                    <span style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">{{ r.piece }}</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #6B6B6B;">{{ r.age }}</span>
+                  </span>
+                  <span style="font-size: 14px; line-height: 20px; color: #40403F;">{{ r.dossier }}</span>
+                  <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: {{ r.motifColor }};">
+                    <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ r.motifColor }};"></span>{{ r.motif }}
+                  </span>
+                </button>
+              </sc-for>
+              </div>
+            </div>
+
+            <div style="flex: 1 1 auto; min-width: 0; overflow-y: auto; display: flex;">
+              <div style="flex: 1 1 auto; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="font-size: 19px; line-height: 26px; font-weight: 600; color: #1A1A1A;">{{ selPiece }}</div>
+                    <div style="font-size: 14px; line-height: 20px; color: #6B6B6B;">{{ selDossier }} · téléversée {{ selAge }}</div>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button style="min-height: 40px; padding: 0 12px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Page précédente</button>
+                    <button style="min-height: 40px; padding: 0 12px; border: 1px solid #DDDDDD; border-radius: 999px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: #1A1A1A; cursor: pointer;">Page suivante</button>
+                  </div>
+                </div>
+                <div style="flex: 1 1 auto; min-height: 320px; border-radius: 12px; background: repeating-linear-gradient(135deg, #F7F7F7 0 12px, #DDDDDD 12px 24px); display: flex; align-items: flex-end; padding: 16px;">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #40403F;">aperçu de la pièce · page 1 sur 3 · zoom 100 %</span>
+                </div>
+                <div style="padding: 16px; background: #F7F7F7; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="font-size: 14px; line-height: 20px; font-weight: 600; color: #1A1A1A;">Ce que la lecture automatique a renvoyé</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #40403F;">{{ selLog }}</div>
+                </div>
+              </div>
+
+              <div style="flex: 0 0 340px; border-left: 1px solid #DDDDDD; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 18px; color: #6B6B6B;">DÉCISION</div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="4">
+                      <button onClick="{{ d.pick }}" style="width: 100%; min-height: 44px; padding: 0 14px; border-radius: 12px; font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; border: {{ d.border }}; background: #FFFFFF; color: #1A1A1A;" style-hover="background: #F7F7F7;">{{ d.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <label style="display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-size: 14px; line-height: 20px; font-weight: 500; color: #1A1A1A;">Message envoyé au candidat</span>
+                  <textarea value="{{ revueMessage }}" onChange="{{ setRevueMessage }}" style="min-height: 120px; padding: 12px 14px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; line-height: 20px; color: #1A1A1A; resize: none;"></textarea>
+                  <span style="font-size: 13px; line-height: 18px; color: #6B6B6B;">Dis ce qui bloque et ce qu'il faut faire. Jamais « non conforme » seul.</span>
+                </label>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <button style="width: 100%; min-height: 44px; border: none; border-radius: 12px; background: #2E75B6; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;" style-hover="background: #255F95;">Enregistrer et passer à la suivante</button>
+                  <button style="width: 100%; min-height: 44px; border: 1px solid #DDDDDD; border-radius: 12px; background: #FFFFFF; font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; color: #1A1A1A; cursor: pointer;" style-hover="background: #F7F7F7;">Rendre l'analyse au candidat</button>
+                </div>
+
+                <p style="margin: 0; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Toute décision est consignée au journal d'audit avec ton identifiant. Une analyse rendue recrédite le quota du candidat.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin: 0; max-width: 70ch; font-size: 13px; line-height: 18px; color: #6B6B6B; text-wrap: pretty;">Rattachement DOC-11 : B-01 et B-02 → WF-14, requête des fiches à relire, comparaison N / N+1, versionnement horodaté, aucune migration automatique des dossiers. B-05 → WF-15, relecture humaine des pièces en échec, message actionnable obligatoire, décision consignée à l'audit.</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1560, &quot;height&quot;: 1000}}">
+class Component extends DCLogic {
+  veilleEls = {};
+  revueEls = {};
+
+  navList(e, order, curPos, setIdx, els) {
+    if (["ArrowDown", "ArrowUp", "Home", "End"].indexOf(e.key) < 0) return;
+    e.preventDefault();
+    const n = order.length;
+    if (!n) return;
+    let pos = curPos;
+    if (e.key === "ArrowDown") pos = Math.min(n - 1, curPos + 1);
+    if (e.key === "ArrowUp") pos = Math.max(0, curPos - 1);
+    if (e.key === "Home") pos = 0;
+    if (e.key === "End") pos = n - 1;
+    if (pos === curPos) return;
+    setIdx(order[pos]);
+    requestAnimationFrame(() => { const el = els[pos]; if (el) el.focus(); });
+  }
+
+  veilleKeys = e => {
+    const order = this.veilleOrder || [];
+    this.navList(e, order, Math.max(0, order.indexOf(this.state.selRow)), i => this.setState({ selRow: i }), this.veilleEls);
+  };
+
+  revueKeys = e => {
+    this.navList(e, this.revue.map((_, i) => i), this.state.selRevue, i => this.setState({ selRevue: i }), this.revueEls);
+  };
+
+  state = {
+    veilleFilter: "En retard",
+    query: "",
+    selRow: 0,
+    srcLevel: "Officiel",
+    rule: {
+      montant: "11 904 €",
+      date: "01/01/2027",
+      delai: "6 à 12 semaines",
+      source: "make-it-in-germany.com",
+      relecture: "09/12/2026",
+      libelle: "Il te faut 11 904 € sur un compte bloqué allemand pour l'année, si tu déposes à partir du 1er janvier 2027.",
+      reserve: "Le montant est réévalué chaque année. Une demande déposée après publication d'un nouveau barème est instruite sur le montant à jour.",
+      motif: ""
+    },
+    selRevue: 0,
+    decision: "Conforme",
+    message: "La photo est floue sur les bords. Reprends-la de face, sur un mur clair, sans flash."
+  };
+
+  rows = [
+    { code: "DE", pays: "Allemagne", visa: "Séjour études", source: "Officiel", verifiee: "09/09/2026", due: "En retard de 3 j", late: true, version: "v4", statut: "Publié" },
+    { code: "NL", pays: "Pays-Bas", visa: "Séjour études", source: "Officiel", verifiee: "11/09/2026", due: "Dans 90 j", late: false, version: "v7", statut: "Publié" },
+    { code: "CA", pays: "Canada", visa: "Permis d'études", source: "Officiel", verifiee: "02/09/2026", due: "En retard de 1 j", late: true, version: "v11", statut: "Publié" },
+    { code: "FR", pays: "France", visa: "Étudiant — Campus France", source: "Institutionnel", verifiee: "28/08/2026", due: "En retard de 6 j", late: true, version: "v9", statut: "Publié" },
+    { code: "BE", pays: "Belgique", visa: "Séjour études", source: "Officiel", verifiee: "01/09/2026", due: "Dans 12 j", late: false, version: "v5", statut: "Brouillon" },
+    { code: "DE", pays: "Allemagne", visa: "Recherche d'emploi", source: "Officiel", verifiee: "15/08/2026", due: "En retard de 12 j", late: true, version: "v3", statut: "Publié" },
+    { code: "PT", pays: "Portugal", visa: "Séjour études", source: "Secondaire", verifiee: "22/07/2026", due: "En retard de 24 j", late: true, version: "v2", statut: "Archivé" },
+    { code: "MA", pays: "Maroc", visa: "Séjour études", source: "Institutionnel", verifiee: "04/09/2026", due: "Dans 24 j", late: false, version: "v4", statut: "Publié" },
+    { code: "TN", pays: "Tunisie", visa: "Séjour études", source: "Secondaire", verifiee: "30/08/2026", due: "Dans 8 j", late: false, version: "v2", statut: "Brouillon" }
+  ];
+
+  diffs = {
+    0: [
+      { champ: "Montant du compte bloqué", avant: "11 208 €", apres: "11 904 €" },
+      { champ: "Applicable aux dépôts à partir du", avant: "12/01/2026", apres: "01/01/2027" },
+      { champ: "Frais de demande", avant: "75 €", apres: "75 €, inchangé" }
+    ]
+  };
+
+  revue = [
+    { piece: "Photo d'identité", dossier: "Dossier NL-4471 · A. Dossou", age: "2 h 12", motif: "Netteté insuffisante", late: true, log: "confidence 0.41 · bords flous détectés sur 3 des 4 côtés · aucun visage cadré selon la norme ISO/IEC 19794-5" },
+    { piece: "Relevé bancaire", dossier: "Dossier DE-3920 · S. Kpadé", age: "1 h 48", motif: "Signalé par le candidat", late: false, log: "solde lu 1 020 000 F · candidat déclare 10 200 000 F · écart d'un facteur 10, séparateur de milliers ambigu" },
+    { piece: "Diplôme du baccalauréat", dossier: "Dossier NL-4388 · R. Tossou", age: "1 h 30", motif: "Échec technique", late: false, log: "fichier PDF chiffré · extraction impossible · 3 tentatives" },
+    { piece: "Passeport", dossier: "Dossier CA-2210 · F. Zinsou", age: "58 min", motif: "Signalé par le candidat", late: false, log: "date d'expiration lue 12/03/2027 · candidat déclare 12/03/2029" },
+    { piece: "Attestation de ressources", dossier: "Dossier DE-3901 · M. Ahouandjinou", age: "42 min", motif: "Document non reconnu", late: false, log: "type de document non identifié · en-tête absent · document possiblement partiel" },
+    { piece: "Relevés de notes", dossier: "Dossier NL-4402 · L. Gbaguidi", age: "26 min", motif: "Échec technique", late: false, log: "image 340×480 px · résolution insuffisante pour l'extraction de texte" }
+  ];
+
+  decisionOptions = ["Conforme", "À corriger", "Illisible", "Hors sujet — mauvaise pièce"];
+
+  renderVals() {
+    const s = this.state;
+    const filters = ["En retard", "Toutes", "Officiel", "Brouillon"];
+    const visible = this.rows.filter(r => {
+      if (s.veilleFilter === "En retard") return r.late;
+      if (s.veilleFilter === "Officiel") return r.source === "Officiel";
+      if (s.veilleFilter === "Brouillon") return r.statut === "Brouillon";
+      return true;
+    }).filter(r => {
+      const q = s.query.trim().toLowerCase();
+      return q.length === 0 || (r.pays + " " + r.visa).toLowerCase().indexOf(q) >= 0;
+    });
+    const sel = this.rows[s.selRow];
+    const srcColor = lvl => (lvl === "Officiel" ? "#0F7B4F" : lvl === "Institutionnel" ? "#B45309" : "#6B6B6B");
+    const rev = this.revue[s.selRevue];
+    const r = s.rule;
+    this.veilleOrder = visible.map(row => this.rows.indexOf(row));
+
+    return {
+      veilleFilters: filters.map(label => ({
+        label,
+        pick: () => this.setState({ veilleFilter: label }),
+        bg: label === s.veilleFilter ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.veilleFilter ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.veilleFilter ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+      veilleLabel: s.veilleFilter.toLowerCase(),
+      veilleCount: visible.length > 1 ? visible.length + " fiches affichées" : visible.length + " fiche affichée",
+      query: s.query,
+      setQuery: e => this.setState({ query: e.target.value }),
+      veilleKeys: this.veilleKeys,
+      revueKeys: this.revueKeys,
+      veilleRows: visible.map((row, pos) => {
+        const idx = this.rows.indexOf(row);
+        const isSel = idx === s.selRow || (visible.indexOf(sel) < 0 && pos === 0);
+        return {
+          sel: isSel ? "true" : "false",
+          tab: isSel ? 0 : -1,
+          ref: el => { this.veilleEls[pos] = el; },
+          code: row.code,
+          pays: row.pays,
+          visa: row.visa,
+          source: row.source,
+          srcColor: srcColor(row.source),
+          verifiee: row.verifiee,
+          due: row.due,
+          dueColor: row.late ? "#B3261E" : "#6B6B6B",
+          version: row.version,
+          statut: row.statut,
+          bg: idx === s.selRow ? "#EEF4FB" : "#FFFFFF",
+          pick: () => this.setState({ selRow: idx })
+        };
+      }),
+      selPays: sel.pays,
+      selVisa: sel.visa,
+      selMeta: "Version " + sel.version + " · vérifiée le " + sel.verifiee + " · source " + sel.source.toLowerCase(),
+      selDiffs: this.diffs[s.selRow] || [
+        { champ: "Montant de ressources", avant: "valeur en vigueur", apres: "aucune divergence détectée" },
+        { champ: "Délai d'instruction", avant: "valeur en vigueur", apres: "aucune divergence détectée" }
+      ],
+      selImpact: s.selRow === 0
+        ? "37 dossiers utilisent la version 4, dont 29 avec un dépôt prévu en 2027. Chacun recevra l'écran d'arbitrage."
+        : "Aucune divergence détectée à la dernière collecte. Une relecture sans changement suffit.",
+
+      srcLevels: ["Officiel", "Institutionnel", "Secondaire"].map(label => ({
+        label,
+        pick: () => this.setState({ srcLevel: label }),
+        bg: label === s.srcLevel ? "#1A1A1A" : "#FFFFFF",
+        color: label === s.srcLevel ? "#FFFFFF" : "#1A1A1A",
+        border: label === s.srcLevel ? "1px solid #1A1A1A" : "1px solid #DDDDDD"
+      })),
+      ruleMontant: r.montant,
+      ruleDate: r.date,
+      ruleDelai: r.delai,
+      ruleSource: r.source,
+      ruleRelecture: r.relecture,
+      ruleLibelle: r.libelle,
+      ruleReserve: r.reserve,
+      ruleMotif: r.motif,
+      setRuleMontant: e => this.setRule("montant", e.target.value),
+      setRuleDate: e => this.setRule("date", e.target.value),
+      setRuleDelai: e => this.setRule("delai", e.target.value),
+      setRuleSource: e => this.setRule("source", e.target.value),
+      setRuleRelecture: e => this.setRule("relecture", e.target.value),
+      setRuleLibelle: e => this.setRule("libelle", e.target.value),
+      setRuleReserve: e => this.setRule("reserve", e.target.value),
+      setRuleMotif: e => this.setRule("motif", e.target.value),
+
+      revueRows: this.revue.map((row, idx) => ({
+        sel: idx === s.selRevue ? "true" : "false",
+        tab: idx === s.selRevue ? 0 : -1,
+        ref: el => { this.revueEls[idx] = el; },
+        piece: row.piece,
+        dossier: row.dossier,
+        age: row.age,
+        motif: row.motif,
+        motifColor: row.late ? "#B3261E" : "#B45309",
+        bg: idx === s.selRevue ? "#EEF4FB" : "#FFFFFF",
+        pick: () => this.setState({ selRevue: idx })
+      })),
+      selPiece: rev.piece,
+      selDossier: rev.dossier,
+      selAge: "il y a " + rev.age,
+      selLog: rev.log,
+      decisions: this.decisionOptions.map(label => ({
+        label,
+        pick: () => this.setState({ decision: label }),
+        border: label === s.decision ? "2px solid #2E75B6" : "1px solid #DDDDDD"
+      })),
+      revueMessage: s.message,
+      setRevueMessage: e => this.setState({ message: e.target.value })
+    };
+  }
+
+  setRule(key, value) {
+    this.setState(p => ({ rule: Object.assign({}, p.rule, { [key]: value }) }));
+  }
+}
+
+</script>
+</body>
+</html>
