@@ -42,7 +42,10 @@ export const INTERDITS_PARTOUT: readonly MotifInterdit[] = [
 export const INTERDITS_INTERFACE_CANDIDAT: readonly MotifInterdit[] = [
   { code: "score", motif: /\bscores?\b/iu, raison: "arbitrage C-09 — le dossier a un palier, pas une note" },
   { code: "chances", motif: /\bchances?\b/iu, raison: "INV-1 — aucun écran ne parle des chances du candidat" },
-  { code: "pourcentage", motif: /\d\s?%/u, raison: "arbitrage C-09 — aucune part affichée sur le dossier" },
+  // `\d+` et non `\d` : le motif reconnaît les mêmes textes, mais l'extrait
+  // rendu porte le nombre entier. « 95 % » cité « 5 % » dans un message de
+  // refus fait chercher à l'auteur ce qui cloche dans le mauvais chiffre.
+  { code: "pourcentage", motif: /\d+\s?%/u, raison: "arbitrage C-09 — aucune part affichée sur le dossier" },
   { code: "sur-100", motif: /\bsur\s*100\b/iu, raison: "arbitrage C-09 — aucune note sur cent" },
   { code: "probabilite-nue", motif: /probabilit/iu, raison: "INV-1 — pas de prédiction" },
   { code: "garanti-nu", motif: /garanti/iu, raison: "INV-2 — aucune promesse de résultat" },

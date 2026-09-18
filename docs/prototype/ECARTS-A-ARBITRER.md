@@ -235,9 +235,9 @@ La liste s'élargit au passage : « taux d'acceptation », « visa assuré »,
 le versant juridique, qui relève du même invariant — « nous vous conseillons
 juridiquement », « notre avocat », « nous déposons votre dossier ».
 
-**Reste à faire :** brancher la validation sur l'enregistrement du
-back-office, quand B-02 et les écrans de publication existeront. La liste est
-prête, le point d'application manque.
+**Fait le 18/09** avec le lot P2 Back-office : la validation est branchée sur
+B-02 (libellé et réserve affichés au candidat) et sur B-05 (message envoyé
+après une revue manuelle). Les trois points d'application existent.
 
 ---
 
@@ -349,3 +349,61 @@ de transparence — c'est exactement l'usage prévu pour l'échappatoire.
 | F.7 | T-02, arbitrage | option « migrer » présélectionnée | aucune présélection : un arbitrage pré-coché n'est pas un arbitrage |
 | F.8 | R-03, dates de version | « il y a 12 heures » pour un enregistrement de la veille | seuil au jour civil : « hier à 21 h 04 » dit quand, le relatif oblige à le calculer |
 | F.9 | Partout | `Intl` écrit « 1 janvier 2027 » | « 1er janvier 2027 » — le français met l'ordinal au premier du mois, et nulle part ailleurs |
+
+
+---
+
+## G · Lot P2 Back-office — le troisième point d'application, et le reste
+
+### Le trou est fermé
+
+Jusqu'à ce lot, le vocabulaire interdit protégeait le code. Un administrateur
+qui saisissait « 95 % de réussite » dans le libellé d'une checklist passait à
+travers `check:copy` comme à travers le test de l'interface, et son texte
+s'affichait tel quel chez le candidat.
+
+Deux écrans écrivent pour le candidat, et tous deux valident maintenant à la
+saisie, avec la même liste et la même reconnaissance de la négation :
+
+- **B-02** — le libellé de checklist et la réserve affichée en contexte. La
+  publication est bloquée tant qu'une formulation est refusée, et le message
+  de refus cite la formulation exacte plutôt que de renvoyer à une règle : un
+  administrateur qui ne voit pas quel mot bloque réécrit la phrase entière,
+  au hasard, jusqu'à ce que ça passe.
+- **B-05** — le message envoyé au candidat après une revue manuelle. Il y
+  passe en plus l'exigence de RG-06.3 : un constat nu — « non conforme »,
+  « illisible », « KO » — est refusé, comme le code se l'interdit à lui-même.
+
+Une correction est sortie de là : le motif du pourcentage capturait un seul
+chiffre, et le message de refus citait « 5 % » pour un texte qui disait
+« 95 % ». Il reconnaît exactement les mêmes textes qu'avant, mais rend
+maintenant le nombre entier.
+
+### Divergences et décisions du lot
+
+| # | Où | Ce que dit le prototype | Ce qui est codé |
+|---|---|---|---|
+| G.1 | B-05, file de revue | âges figés (« 2 h 12 »), avec un délai cible de 4 h | dépôts posés en minutes écoulées : figés, la file entière basculait hors délai au fil de la journée |
+| G.2 | B-05, `late: true` sur la première ligne | marquée en retard à 2 h 12 pour un délai cible de 4 h | le dépassement se calcule ; une seule pièce du jeu de démonstration le franchit |
+| G.3 | B-01, colonne « Vérifiée le » | — | date courte dans le tableau : le format long y passait sur deux lignes une ligne sur deux |
+| G.4 | B-01, source secondaire | niveau affiché seul | « jamais affiché (INV-4) » porté sur la ligne : l'opérateur doit voir ce qu'il produit |
+| G.5 | B-06, période vide | un seul cas vide | deux vides distingués — une période sans écriture et un filtre trop étroit n'appellent pas le même geste |
+
+### Ce que le back-office refuse de faire seul
+
+Quatre automatismes écartés, et c'est le fond de la section B :
+
+- une source muette ne dépublie rien (RG-14.3) ;
+- publier une règle ne migre aucun dossier (INV-3) ;
+- le silence d'un opérateur de paiement ne met aucun paiement en échec ;
+- pendant un incident, aucun total n'est affiché — un chiffre partiel
+  présenté comme un total est une erreur comptable, et elle se propage dans
+  l'export puis dans le rapport.
+
+### B-07 reste vide, et c'est la livraison
+
+Aucune valeur de coût n'est affichée tant que dix dossiers réels n'ont pas
+alimenté `AiUsage`. Ce qui est affiché est vrai sans mesure : le nom de
+chaque métrique, sa source de calcul, et les garde-fous exprimés en ratio.
+C'est le même chantier que le volume de la recharge — une semaine de pipeline
+réel referme les deux.

@@ -18,11 +18,12 @@
 ## Vocabulaire interdit dans le code et l'interface
 
 La liste vit dans `src/domain/copy/vocabulaire-interdit.ts`. Elle est lue par
-`npm run check:copy`, par le test de l'interface candidat, et — quand les
-écrans de publication existeront — par la validation à l'enregistrement du
-back-office. Une seule liste, trois points d'application : un administrateur
-qui saisit une promesse dans un guide pays doit buter sur la même règle qu'un
-développeur.
+`npm run check:copy`, par le test de l'interface candidat, et par la
+validation à l'enregistrement du back-office — B-02 pour les textes d'une
+règle, B-05 pour le message envoyé après une revue manuelle. Une seule liste,
+trois points d'application : un administrateur qui saisit une promesse dans un
+guide pays bute sur la même règle qu'un développeur, et sa publication est
+bloquée tant que la formulation est refusée.
 
 Deux portées :
 

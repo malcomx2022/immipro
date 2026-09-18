@@ -1,0 +1,119 @@
+/**
+ * Journal d'audit — B-06, WF-15.
+ *
+ * Écritures non modifiables, conservation cinq ans. Le journal ne comble
+ * jamais une période vide : s'il n'affiche rien, il ne s'est rien passé —
+ * et l'export d'une période vide reste possible, puisqu'il atteste
+ * précisément cette absence.
+ *
+ * Module pur : aucune dépendance à Prisma, Next ou au réseau.
+ */
+
+export type CategorieAudit = "PAIEMENT" | "REGLE" | "ACCES_PIECE" | "COMPTE";
+
+export const LIBELLE_CATEGORIE: Record<CategorieAudit, string> = {
+  PAIEMENT: "Paiements",
+  REGLE: "Règles",
+  ACCES_PIECE: "Accès aux pièces",
+  COMPTE: "Comptes",
+};
+
+export const CATEGORIES: readonly CategorieAudit[] = [
+  "PAIEMENT",
+  "REGLE",
+  "ACCES_PIECE",
+  "COMPTE",
+];
+
+export interface EcritureAudit {
+  id: string;
+  /** Horodatage, ISO. */
+  horodatage: string;
+  acteur: string;
+  categorie: CategorieAudit;
+  action: string;
+  objet: string;
+  /** Précision, y compris le motif déclaré pour un accès à une pièce. */
+  detail: string;
+  /** D'où vient l'écriture : back-office, webhook, tâche planifiée. */
+  origine: string;
+}
+
+/** Durée de conservation des écritures, en années (WF-15). */
+export const CONSERVATION_ANNEES = 5;
+
+export const MENTION_IMMUABLE =
+  `Écritures non modifiables, conservation ${CONSERVATION_ANNEES} ans. Aucune entrée ne peut être supprimée ni modifiée depuis l'interface.`;
+
+export const MENTION_MOTIF_ACCES =
+  "Les accès aux pièces d'un candidat apparaissent avec le motif déclaré.";
+
+export interface Periode {
+  /** Bornes incluses, ISO. */
+  du: string;
+  au: string;
+}
+
+const dansLaPeriode = (e: EcritureAudit, periode: Periode) =>
+  e.horodatage.slice(0, 10) >= periode.du && e.horodatage.slice(0, 10) <= periode.au;
+
+export function filtrerAudit(
+  ecritures: readonly EcritureAudit[],
+  periode: Periode,
+  categories: readonly CategorieAudit[],
+): EcritureAudit[] {
+  return ecritures
+    .filter((e) => dansLaPeriode(e, periode))
+    .filter((e) => categories.length === 0 || categories.includes(e.categorie))
+    .sort((a, b) => b.horodatage.localeCompare(a.horodatage));
+}
+
+export interface PeriodeVide {
+  message: string;
+  /** Première écriture postérieure, quand il y en a une. */
+  suivante?: { horodatage: string; message: string };
+  /** Catégorie dont le retrait ramènerait des écritures. */
+  categorieExcluante?: CategorieAudit;
+}
+
+/**
+ * Une période sans écriture se dit, et se distingue d'un filtre trop
+ * étroit. Les deux affichent une table vide ; ils n'appellent pas le même
+ * geste.
+ */
+export function diagnostiquerPeriode(
+  ecritures: readonly EcritureAudit[],
+  periode: Periode,
+  categories: readonly CategorieAudit[],
+  formaterMoment: (iso: string) => string,
+): PeriodeVide | null {
+  if (filtrerAudit(ecritures, periode, categories).length > 0) return null;
+
+  const sansCategorie = filtrerAudit(ecritures, periode, []);
+  if (categories.length > 0 && sansCategorie.length > 0) {
+    return {
+      message: `Aucune écriture ${categories.map((c) => LIBELLE_CATEGORIE[c].toLowerCase()).join(", ")} sur cette période`,
+      categorieExcluante: categories[0],
+    };
+  }
+
+  const categorie = categories[0];
+  const libelle = categorie ? ` ${LIBELLE_CATEGORIE[categorie].toLowerCase()}` : "";
+  const suivante = [...ecritures]
+    .filter((e) => e.horodatage.slice(0, 10) > periode.au)
+    .filter((e) => categories.length === 0 || categories.includes(e.categorie))
+    .sort((a, b) => a.horodatage.localeCompare(b.horodatage))[0];
+
+  return {
+    message: `Aucune écriture${libelle} entre le ${periode.du} et le ${periode.au}`,
+    suivante: suivante
+      ? {
+          horodatage: suivante.horodatage,
+          message: `La première écriture${libelle} suivante date du ${formaterMoment(suivante.horodatage)}. Le journal ne comble jamais une période vide : s'il n'affiche rien, il ne s'est rien passé.`,
+        }
+      : undefined,
+  };
+}
+
+export const MENTION_EXPORT_VIDE =
+  "L'export d'une période vide reste possible : il produit un fichier attestant l'absence d'écriture.";

@@ -16,7 +16,16 @@ const RACINES = [
   join("src", "app", "(public)"),
   join("src", "app", "(auth)"),
   join("src", "app", "(app)"),
+  join("src", "app", "(admin)"),
 ];
+
+/**
+ * Le back-office pose la cible dans son en-tête partagé plutôt que dans
+ * chaque écran : sept registres qui répètent le même titre focalisable
+ * finiraient par diverger. Le composant est vérifié une fois, ci-dessous, et
+ * une route qui le rend satisfait la règle.
+ */
+const PORTEURS = ["EnteteAdmin"];
 
 function routes(dir: string, acc: string[] = []): string[] {
   const entrees = readdirSync(dir);
@@ -39,12 +48,19 @@ function sourcesDeLaRoute(dir: string): string {
 describe("cible du lien d'évitement", () => {
   const dossiers = RACINES.flatMap((r) => routes(r));
 
-  it("il y a bien des routes à vérifier, dans les trois gabarits", () => {
-    expect(dossiers.length).toBeGreaterThanOrEqual(25);
+  it("il y a bien des routes à vérifier, dans les quatre gabarits", () => {
+    expect(dossiers.length).toBeGreaterThanOrEqual(35);
+  });
+
+  it("l'en-tête partagé du back-office pose bien la cible", () => {
+    const src = readFileSync(join("src", "components", "admin", "EnteteAdmin.tsx"), "utf8");
+    expect(src).toContain('id="contenu"');
+    expect(src).toContain("tabIndex={-1}");
   });
 
   it.each(dossiers)("%s pose un titre focalisable id=\"contenu\"", (dir) => {
     const src = sourcesDeLaRoute(dir);
+    if (PORTEURS.some((p) => src.includes(`<${p}`))) return;
     expect(src).toContain('id="contenu"');
     expect(src).toContain("tabIndex={-1}");
   });
