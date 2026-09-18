@@ -1,0 +1,135 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { RadioGroup } from "@/components/ui/RadioGroup";
+import { PACKS, RECHARGE_ANALYSES, type Devise } from "@/domain/payments/pricing";
+import { formatMontant } from "@/lib/utils";
+
+/**
+ * $-01 — Choix du pack.
+ *
+ * Aucun pack n'est retenu au départ : le prototype démarrait sur Essentiel
+ * présélectionné, ce qui fait un choix à la place du candidat sur l'écran
+ * qui débite. La mise en avant reste visuelle, portée par `misEnAvant`.
+ *
+ * Les trois packs forment un seul arrêt de tabulation — flèches, Origine et
+ * Fin — tenu par `RadioGroup` (règle clavier 4).
+ */
+export function ChoixDuPack() {
+  const [devise, setDevise] = useState<Devise>("XOF");
+  const [choisi, setChoisi] = useState<string | null>(null);
+
+  const pack = PACKS.find((p) => p.code === choisi) ?? null;
+  const prix = (montants: Record<Devise, number>) =>
+    formatMontant(montants[devise], devise);
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 pb-8 md:flex-row md:gap-12 md:px-12 md:py-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-5 md:max-w-[640px]">
+        <Link href="/tableau-de-bord" className="text-14 font-semibold text-ink-900">
+          Mon dossier
+        </Link>
+
+        <div className="flex flex-col gap-2">
+          <h1
+            id="contenu"
+            tabIndex={-1}
+            className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-32"
+          >
+            Ouvre ton dossier
+          </h1>
+          <p className="text-pretty text-16 text-ink-700">
+            Un paiement unique, valable jusqu&apos;à la clôture du dossier. Pas
+            d&apos;abonnement, pas de reconduction.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div
+            role="radiogroup"
+            aria-label="Devise d'affichage"
+            className="flex gap-2 rounded-full bg-ink-100 p-1"
+          >
+            {(["XOF", "EUR"] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                role="radio"
+                aria-checked={devise === d}
+                onClick={() => setDevise(d)}
+                className={`min-h-touch flex-1 rounded-full text-14 font-semibold text-ink-900 ${
+                  devise === d ? "bg-white shadow-e1" : "hover:bg-white"
+                }`}
+              >
+                {d === "XOF" ? "Francs CFA" : "Euros"}
+              </button>
+            ))}
+          </div>
+          <p className="text-13 text-ink-500">
+            Devise déduite de ton pays, le Bénin. Tu peux la changer.
+          </p>
+        </div>
+
+        <RadioGroup
+          libelle="Choix du pack"
+          valeur={choisi}
+          onChangement={setChoisi}
+          options={PACKS.map((p) => ({
+            valeur: p.code,
+            libelle: `${p.libelle} · ${prix(p.prix)}`,
+            description: p.misEnAvant ? p.justification : undefined,
+            misEnAvant: p.misEnAvant,
+          }))}
+        />
+
+        {/* La recharge n'est pas un pack : elle ne s'achète pas ici. */}
+        <div className="flex flex-col gap-1 rounded-lg border border-dashed border-ink-300 p-4">
+          <p className="text-15 font-semibold text-ink-900">
+            La recharge d&apos;analyses n&apos;est pas un pack
+          </p>
+          <p className="text-pretty text-14 text-ink-700">
+            {prix(RECHARGE_ANALYSES.prix)}, achetés depuis un dossier déjà ouvert
+            quand son quota est épuisé. Elle n&apos;ouvre pas de destination et ne
+            s&apos;achète pas ici.
+          </p>
+        </div>
+
+        <section className="flex flex-col gap-3 rounded-lg bg-ink-100 p-5">
+          <h2 className="text-16 font-semibold text-ink-900">Moyens de paiement</h2>
+          <ul className="flex flex-wrap gap-2">
+            {["MTN MoMo", "Moov Money", "Carte bancaire"].map((moyen) => (
+              <li
+                key={moyen}
+                className="rounded-full bg-white px-3.5 py-2 text-14 font-medium text-ink-700 shadow-e1"
+              >
+                {moyen}
+              </li>
+            ))}
+          </ul>
+          <p className="text-pretty text-13 text-ink-500">
+            Les frais de demande versés à l&apos;administration ne sont pas inclus
+            et ne passent jamais par ImmiPro.
+          </p>
+        </section>
+      </div>
+
+      <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
+        <Button
+          pleineLargeur
+          className="min-h-action"
+          disabled={pack === null}
+          raisonDesactivation={
+            pack === null ? "Choisissez un pack pour continuer." : undefined
+          }
+        >
+          {pack ? `Continuer avec ${pack.libelle}` : "Continuer"}
+        </Button>
+        <p className="text-center text-13 text-ink-500">
+          {pack ? `${prix(pack.prix)} · paiement unique` : "Aucun pack retenu"}
+        </p>
+      </div>
+    </div>
+  );
+}
