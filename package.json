@@ -18,6 +18,8 @@
     "seed:rules": "tsx prisma/seed/visa-rules.ts",
     "worker": "tsx src/server/jobs/worker.ts",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:garde-fous": "psql \"$DATABASE_URL\" -f scripts/verifier-garde-fous.sql",
     "db:studio": "prisma studio"
   },
   "dependencies": {

@@ -1,0 +1,170 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import type { DocumentState } from "@/domain/completeness/score";
+import type { StatutDossier } from "@/domain/dossiers/dossier";
+import type { FamillePiece, RemedePiece } from "@/domain/dossiers/piece";
+import type { GenreAlerte } from "@/domain/notifications/alerte";
+import type { Arbitrage } from "@/domain/notifications/divergence";
+import type { GenreRemarque } from "@/domain/redaction/relecture";
+import type { Decision, MotifEchec } from "@/domain/backoffice/revue";
+import type { NiveauSource } from "@/domain/backoffice/regle";
+import { LIBELLE_STATUT } from "@/domain/dossiers/dossier";
+import { LIBELLE_FAMILLE } from "@/domain/dossiers/piece";
+import { LIBELLE_MOTIF } from "@/domain/backoffice/revue";
+import { LIBELLE_GENRE } from "@/domain/redaction/relecture";
+import { LIBELLE_NIVEAU } from "@/domain/backoffice/regle";
+import { LIBELLES_ETAT_PIECE } from "@/components/ui/StatusBadge";
+
+/**
+ * Accord entre le schéma de données et le domaine.
+ *
+ * Les mêmes vocabulaires sont maintenant écrits deux fois : en enums Prisma
+ * et en unions TypeScript. C'est inévitable — le domaine doit rester pur, et
+ * `prisma generate` demande une base — mais c'est exactement le genre de
+ * duplication qui diverge en silence : un état ajouté d'un côté, et une
+ * ligne de checklist qui ne s'affiche plus de l'autre.
+ *
+ * Ce test lit le schéma comme un texte, sans client Prisma ni base, et
+ * compare les deux listes. Il échoue le jour où l'une bouge sans l'autre.
+ */
+const SCHEMA = readFileSync("prisma/schema.prisma", "utf8");
+
+function valeursDeLEnum(nom: string): string[] {
+  const bloc = new RegExp(`enum\\s+${nom}\\s*\\{([^}]*)\\}`, "u").exec(SCHEMA);
+  if (!bloc) throw new Error(`enum ${nom} absent de prisma/schema.prisma`);
+  return bloc[1]!
+    .split("\n")
+    .map((l) => l.replace(/\/\/.*$/u, "").trim())
+    .filter((l) => l.length > 0 && !l.startsWith("///"))
+    .sort();
+}
+
+const trie = (valeurs: readonly string[]) => [...valeurs].sort();
+
+describe("le schéma et le domaine nomment les mêmes choses", () => {
+  it("états de pièce — DocumentStatus / DocumentState", () => {
+    const domaine: DocumentState[] = [
+      "ATTENDUE",
+      "EN_ANALYSE",
+      "CONFORME",
+      "A_CORRIGER",
+      "ILLISIBLE",
+      "HORS_SUJET",
+      "EXPIREE",
+      "PURGEE",
+    ];
+    expect(valeursDeLEnum("DocumentStatus")).toEqual(trie(domaine));
+    // Et chaque état a un libellé affichable : un état sans mot se rend en
+    // code technique dans une pastille.
+    expect(trie(Object.keys(LIBELLES_ETAT_PIECE))).toEqual(trie(domaine));
+  });
+
+  it("statuts de dossier — ApplicationStatus / StatutDossier", () => {
+    // Le domaine candidat n'expose pas les états internes SUSPENDU,
+    // ISSUE_DECLAREE, ABANDONNE et ARCHIVE : ils existent en base et dans le
+    // back-office, pas dans les écrans du candidat.
+    const candidat: StatutDossier[] = ["BROUILLON", "ACTIF", "PRET", "SOUMIS", "CLOTURE"];
+    const base = valeursDeLEnum("ApplicationStatus");
+    for (const statut of candidat) {
+      if (statut === "CLOTURE") continue;
+      expect(base, statut).toContain(statut);
+    }
+    expect(trie(Object.keys(LIBELLE_STATUT))).toEqual(trie(candidat));
+  });
+
+  it("familles et remèdes de pièce — DocumentFamily / DocumentRemedy", () => {
+    const familles: FamillePiece[] = ["OBLIGATOIRE", "COMPLEMENTAIRE"];
+    expect(valeursDeLEnum("DocumentFamily")).toEqual(trie(familles));
+    expect(trie(Object.keys(LIBELLE_FAMILLE))).toEqual(trie(familles));
+
+    const remedes: RemedePiece[] = ["TELEVERSER", "REMPLACER", "REDIGER", "DEMARCHE"];
+    expect(valeursDeLEnum("DocumentRemedy")).toEqual(trie(remedes));
+  });
+
+  it("verdicts d'analyse — AnalysisVerdict / Decision de revue", () => {
+    const decisions: Decision[] = ["CONFORME", "A_CORRIGER", "ILLISIBLE", "HORS_SUJET"];
+    expect(valeursDeLEnum("AnalysisVerdict")).toEqual(trie(decisions));
+  });
+
+  it("motifs d'échec — ReviewReason / MotifEchec", () => {
+    const motifs: MotifEchec[] = [
+      "SIGNALE_PAR_LE_CANDIDAT",
+      "ECHEC_TECHNIQUE",
+      "DOCUMENT_NON_RECONNU",
+      "NETTETE_INSUFFISANTE",
+    ];
+    expect(valeursDeLEnum("ReviewReason")).toEqual(trie(motifs));
+    expect(trie(Object.keys(LIBELLE_MOTIF))).toEqual(trie(motifs));
+  });
+
+  it("genres d'alerte — NotificationKind / GenreAlerte", () => {
+    const genres: GenreAlerte[] = [
+      "REGLEMENTATION",
+      "ECHEANCE",
+      "ANALYSE",
+      "PAIEMENT",
+      "VEILLE",
+    ];
+    expect(valeursDeLEnum("NotificationKind")).toEqual(trie(genres));
+  });
+
+  it("arbitrage de divergence — MigrationDecision / Arbitrage", () => {
+    const decisions: Arbitrage[] = ["MIGRER", "CONSERVER"];
+    expect(valeursDeLEnum("MigrationDecision")).toEqual(trie(decisions));
+  });
+
+  it("remarques de relecture — CritiqueKind / GenreRemarque", () => {
+    const genres: GenreRemarque[] = ["INCOHERENCE", "A_RENFORCER", "FORME"];
+    expect(valeursDeLEnum("CritiqueKind")).toEqual(trie(genres));
+    expect(trie(Object.keys(LIBELLE_GENRE))).toEqual(trie(genres));
+  });
+
+  it("niveaux de source — SourceTier / NiveauSource", () => {
+    const niveaux: NiveauSource[] = ["OFFICIEL", "INSTITUTIONNEL", "SECONDAIRE"];
+    expect(valeursDeLEnum("SourceTier")).toEqual(trie(niveaux));
+    expect(trie(Object.keys(LIBELLE_NIVEAU))).toEqual(trie(niveaux));
+  });
+});
+
+describe("le schéma porte les invariants qu'il peut porter", () => {
+  const MIGRATIONS = readFileSync(
+    "prisma/migrations/20260918000100_garde_fous/migration.sql",
+    "utf8",
+  );
+
+  it("le barème interne ne porte plus un nom qui invite à le sérialiser", () => {
+    // `completeness` se copiait dans une réponse d'API sans qu'on y pense ;
+    // `internalScore` demande un instant de réflexion (arbitrage C-09).
+    expect(SCHEMA).toContain("internalScore");
+    expect(SCHEMA).not.toMatch(/\bcompleteness\s+Int/u);
+  });
+
+  it("chaque invariant que la base peut tenir a sa contrainte", () => {
+    for (const contrainte of [
+      "visa_rule_secondaire_jamais_publiee",
+      "visa_rule_source_non_vide",
+      "application_version_figee",
+      "application_pret_date_coherente",
+      "revue_decidee_porte_son_message",
+      "credit_delta_non_nul",
+      "credit_sens_coherent_avec_motif",
+      "acces_consultant_borne_dans_le_temps",
+      "rendez_vous_annulation_avant_creneau",
+      "version_porte_un_contenu",
+      "version_purgee_sans_objet",
+      "audit_motif_non_vide",
+    ]) {
+      expect(MIGRATIONS, contrainte).toContain(contrainte);
+    }
+  });
+
+  it("une empreinte identique ne se réanalyse pas (RG-06.2)", () => {
+    expect(SCHEMA).toContain("@@unique([documentId, checksum])");
+  });
+
+  it("un partage de dossier porte une échéance obligatoire (RG-12.2)", () => {
+    const bloc = /model ConsultantAccess \{([\s\S]*?)\n\}/u.exec(SCHEMA)![1]!;
+    expect(bloc).toMatch(/expiresAt\s+DateTime\s*$/mu);
+    expect(bloc).toMatch(/revokedAt\s+DateTime\?/u);
+  });
+});
