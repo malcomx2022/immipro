@@ -15,5 +15,6 @@ export const JOBS = {
   RECONCILIATION_PAIEMENT: "paiement.reconciliation",
   PURGE_RETENTION: "retention.purge",
   VEILLE_ECHEANCE: "veille.echeance",
+  DIVERGENCE_REGLEMENTAIRE: "regle.divergence",
   RAPPEL_ECHEANCIER: "echeancier.rappel",
 } as const;

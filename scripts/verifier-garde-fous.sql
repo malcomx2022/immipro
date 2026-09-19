@@ -111,6 +111,23 @@ SELECT refuse(
   $q$INSERT INTO "AuditLog" (id, "actorId", action, target, reason)
      VALUES ('l1','op','LECTURE','d1','   ')$q$);
 
+-- ── Sessions et secrets à usage unique ─────────────────────────────
+
+SELECT refuse(
+  'A-02 · une session qui expire avant d''être créée',
+  $q$INSERT INTO "Session" (id, "tokenHash", "userId", "expiresAt", "createdAt")
+     VALUES ('s1','h1','u1', now() - interval '1 day', now())$q$);
+
+SELECT refuse(
+  'A-03 · un code de vérification expiré à l''émission',
+  $q$INSERT INTO "AuthSecret" (id, "userId", kind, "secretHash", "expiresAt", "createdAt")
+     VALUES ('k1','u1','VERIFICATION_EMAIL','h', now() - interval '1 minute', now())$q$);
+
+SELECT refuse(
+  'A-03 · un compteur d''essais négatif, qui rouvre la recherche par force brute',
+  $q$INSERT INTO "AuthSecret" (id, "userId", kind, "secretHash", "expiresAt", attempts)
+     VALUES ('k2','u1','VERIFICATION_EMAIL','h', now() + interval '10 minutes', -1)$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

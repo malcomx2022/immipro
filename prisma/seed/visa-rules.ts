@@ -252,7 +252,7 @@ const rules = [
         { code: "preuve_fonds", libelle: "Justificatif de moyens financiers", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "logement", libelle: "Justificatif de logement", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "assurance_maladie", libelle: "Assurance maladie", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "cv_plan_etudes", libelle: "CV et plan d'études motivé", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "cv_plan_etudes", libelle: "CV et plan d'études motivé", nature: "rediger" as const, obligatoire: true, traduction_assermentee: false, legalisation: false },
       ],
       reserves: [
         "La Suisse ne délivre pas de visa étudiant fédéral : la procédure est cantonale et les exigences varient d'un canton à l'autre.",
@@ -331,7 +331,7 @@ const rules = [
       pieces_requises: [
         { code: "passeport", libelle: "Passeport", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "admission", libelle: "Lettre d'admission d'un établissement accrédité", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "visite_medicale", libelle: "Examen médical sur place", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "visite_medicale", libelle: "Examen médical sur place", nature: "demarche" as const, obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "assurance_maladie", libelle: "Assurance santé", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "diplome", libelle: "Diplôme légalisé et attesté", obligatoire: true, delai_obtention_jours: 45, traduction_assermentee: true, legalisation: true },
       ],
@@ -355,9 +355,23 @@ async function main() {
       console.warn(`[${r.countryCode}/${r.visaType}] forcé en DRAFT : source ${r.sourceTier}`);
     }
 
-    // 3. Archivage de la version précédente s'il y en a une
+    // 3. Archivage de la version précédente s'il y en a une.
+    //
+    // `version: { not: r.version }` n'est pas un détail : sans cette clause,
+    // un second passage du seed archive la ligne qu'il s'apprête à réécrire.
+    // L'upsert la repasse bien en PUBLISHED juste après, mais laisse
+    // derrière lui l'`effectiveTo` que l'archivage vient de poser — une
+    // règle publiée dont la validité s'est terminée le jour de son entrée en
+    // vigueur. Elle reste visible au back-office et disparaît de l'affichage
+    // candidat, ce qu'aucun écran ne signale : c'est le filtre de lecture
+    // qui l'écarte, silencieusement et à juste titre.
     await prisma.visaRule.updateMany({
-      where: { countryCode: r.countryCode, visaType: r.visaType, status: "PUBLISHED" },
+      where: {
+        countryCode: r.countryCode,
+        visaType: r.visaType,
+        status: "PUBLISHED",
+        version: { not: r.version },
+      },
       data: { status: "ARCHIVED", effectiveTo: new Date(r.effectiveFrom) },
     });
 
@@ -371,6 +385,12 @@ async function main() {
       },
       update: {
         rules: payload,
+        // Les bornes de validité sont réécrites, et pas seulement posées à la
+        // création : une reprise du seed doit ramener la fiche à l'état que
+        // le fichier décrit, sinon elle corrige les textes et laisse les
+        // dates d'un passage précédent.
+        effectiveFrom: new Date(r.effectiveFrom),
+        effectiveTo: r.effectiveTo ? new Date(r.effectiveTo) : null,
         sourceUrl: r.sourceUrl,
         sourceTier: r.sourceTier,
         verifiedAt: new Date(r.verifiedAt),

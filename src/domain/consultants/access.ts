@@ -129,3 +129,15 @@ export function evenementLecture(
     ? { type: "LECTURE_CONSULTANT", horodatage: a, consultantId, dossierId: dossier.id, portee, resultat: "AUTORISEE" }
     : { type: "LECTURE_CONSULTANT", horodatage: a, consultantId, dossierId: dossier.id, portee, resultat: "REFUSEE", motifs: decision.motifs };
 }
+
+/**
+ * Durée d'un accord de partage, en jours après le rendez-vous — RG-12.2.
+ *
+ * L'accord est révocable **et** expire de lui-même, et l'échéance est
+ * obligatoire en base. Reste à décider de sa valeur : elle couvre le
+ * rendez-vous et le temps d'un compte rendu, pas davantage. Deux semaines
+ * laissent au consultant de quoi revenir sur une pièce après l'entretien ;
+ * un mois laisserait un accès ouvert longtemps après que la question a été
+ * réglée, et personne ne penserait à le retirer.
+ */
+export const ACCORD_DUREE_JOURS = 14;
