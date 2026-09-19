@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { db } from "@/lib/db";
 import { ouvrirDossier } from "@/server/acces/dossiers";
-import { versDossier } from "@/server/vue/dossier";
-import { versFiche } from "@/server/acces/regles";
-import { trierDossiers } from "@/domain/dossiers/dossier";
+import { tableauDeBord } from "@/server/lecture/dossiers";
 
 /**
  * Dossiers du candidat — C-01, et ouverture (WF-04).
@@ -21,18 +18,7 @@ export const GET = route({
   acces: "candidat",
   limite: "lecture",
   async traiter({ acteur }) {
-    const dossiers = await db.application.findMany({
-      where: { userId: acteur!.id },
-      include: { documents: true, visaRule: true },
-      orderBy: { createdAt: "desc" },
-    });
-
-    const vues = dossiers.flatMap((d) => {
-      const fiche = d.visaRule ? versFiche(d.visaRule) : null;
-      return fiche ? [versDossier(d, d.documents, fiche)] : [];
-    });
-
-    return { dossiers: trierDossiers(vues) };
+    return { dossiers: await tableauDeBord(acteur!.id) };
   },
 });
 

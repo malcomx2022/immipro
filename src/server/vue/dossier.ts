@@ -72,7 +72,6 @@ export function versDossier(
   destination: FicheDestination,
 ): Dossier {
   const pieces = documents.map(versPiece);
-  const suivante = premiereATraiter(pieces);
   return {
     id: dossier.id,
     destination,
@@ -81,8 +80,29 @@ export function versDossier(
       ? { depotVise: dossier.targetDate.toISOString().slice(0, 10) }
       : {}),
     completude: completudeDesPieces(pieces),
-    prochaineAction: suivante
-      ? `${libelleAction(suivante)} : ${suivante.libelle.toLowerCase()}`
-      : "Rien ne bloque un dépôt.",
+    prochaineAction: prochaineAction(pieces),
   };
 }
+
+/**
+ * Une phrase, pas une étiquette.
+ *
+ * « Ajouter : passeport » se lit comme un intitulé de champ ; « Ajouter ton
+ * passeport » se lit comme une consigne, et c'est ce que le tableau de bord
+ * demande — une seule chose à faire, écrite comme on la dirait.
+ *
+ * Quand la pièce porte un constat, il suit : « Remplacer ton passeport : sa
+ * validité est trop courte. » Savoir *pourquoi* évite d'ouvrir l'écran pour
+ * l'apprendre.
+ */
+export function prochaineAction(pieces: readonly Piece[]): string {
+  const suivante = premiereATraiter(pieces);
+  if (!suivante) return "Rien ne bloque un dépôt.";
+
+  const verbe = libelleAction(suivante).toLowerCase();
+  const quoi = `${verbe} ton ${suivante.libelle.toLowerCase()}`;
+  return suivante.constat ? `${majuscule(quoi)} : ${minuscule(suivante.constat)}` : `${majuscule(quoi)}.`;
+}
+
+const majuscule = (texte: string) => texte.charAt(0).toUpperCase() + texte.slice(1);
+const minuscule = (texte: string) => texte.charAt(0).toLowerCase() + texte.slice(1);

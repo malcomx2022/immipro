@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import {
   CHAMPS_PROFIL,
   champsRestants,
@@ -18,21 +21,42 @@ import {
  * Complétion progressive : rien n'est obligatoire tout de suite, et l'écran
  * le dit. Ce qui manque est compté, pas mesuré en part — un décompte se
  * traduit en action, une jauge ne se traduit en rien.
+ *
+ * Le profil arrive de la page ; l'écran l'édite et l'enregistre. Ce qu'il
+ * ne fait pas : deviner des valeurs par défaut. Un champ vide se voit et se
+ * remplit, un champ pré-rempli au hasard se relit une fois et ne se corrige
+ * jamais.
  */
 const SECTIONS = ["Identité", "Parcours", "Situation"] as const;
 
-const INITIAL: ProfilCandidat = {
-  nom: "Aline Dossou",
-  naissance: "12/04/2004",
-  nationalite: "Béninoise",
-  diplome: "Licence en gestion",
-};
+export function Profil({ initial }: { initial: ProfilCandidat }) {
+  const [profil, setProfil] = useState<ProfilCandidat>(initial);
+  const [envoi, setEnvoi] = useState(false);
+  const [enregistre, setEnregistre] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
-export function Profil() {
-  const [profil, setProfil] = useState<ProfilCandidat>(INITIAL);
-
-  const modifier = (cle: CleChampProfil) => (valeur: string) =>
+  const modifier = (cle: CleChampProfil) => (valeur: string) => {
     setProfil((precedent) => ({ ...precedent, [cle]: valeur }));
+    setEnregistre(false);
+  };
+
+  async function enregistrer() {
+    setEnvoi(true);
+    setEchec(null);
+    const [prenom, ...reste] = (profil.nom ?? "").trim().split(/\s+/u);
+    const resultat = await appeler("/api/comptes/profil", {
+      methode: "PUT",
+      corps: {
+        ...(prenom ? { prenom } : {}),
+        ...(reste.length > 0 ? { nom: reste.join(" ") } : {}),
+        ...(profil.diplome ? { diplome: profil.diplome } : {}),
+        ...(profil.anglais ? { langues: { en: profil.anglais } } : {}),
+      },
+    });
+    setEnvoi(false);
+    if (resultat.ok) setEnregistre(true);
+    else setEchec(resultat.echec);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -81,9 +105,20 @@ export function Profil() {
       </p>
 
       <div className="flex flex-col gap-2">
-        <Button pleineLargeur className="min-h-action">
+        {echec ? <BlocEchec echec={echec} /> : null}
+        <Button
+          pleineLargeur
+          className="min-h-action"
+          chargement={envoi}
+          onClick={() => void enregistrer()}
+        >
           Enregistrer
         </Button>
+        {enregistre ? (
+          <p role="status" className="text-center text-13 text-ink-500">
+            Profil enregistré.
+          </p>
+        ) : null}
         <p className="text-center text-13 text-ink-500">
           Tu peux compléter ton profil plus tard
         </p>

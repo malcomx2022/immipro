@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FicheDetaillee } from "./FicheDetaillee";
-import { ficheParSlug } from "@/domain/destinations/fiche";
-import { FICHES } from "@/lib/contenu/destinations";
+import { ficheParSlugPubliee } from "@/server/lecture/destinations";
+import { exigerCandidat } from "@/server/securite/page";
 
 /**
  * C-04 — Fiche détaillée. WF-03, INV-8.
@@ -16,9 +16,7 @@ import { FICHES } from "@/lib/contenu/destinations";
  * n'ajoute pas de segment d'URL — les deux résolvaient la même adresse et le
  * build refusait. « Fiche détaillée » est le nom de l'écran dans DOC-12.
  */
-export function generateStaticParams() {
-  return FICHES.map((f) => ({ slug: f.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -26,7 +24,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const fiche = ficheParSlug(FICHES, slug);
+  const fiche = await ficheParSlugPubliee(slug);
   if (!fiche) return { title: "Destination introuvable" };
   return { title: `${fiche.pays} — fiche détaillée`, description: fiche.resume };
 }
@@ -36,8 +34,9 @@ export default async function PageFicheDetaillee({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  await exigerCandidat(`/fiches/${(await params).slug}`);
   const { slug } = await params;
-  const fiche = ficheParSlug(FICHES, slug);
+  const fiche = await ficheParSlugPubliee(slug);
   if (!fiche) notFound();
 
   return <FicheDetaillee fiche={fiche} />;

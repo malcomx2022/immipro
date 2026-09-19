@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import PageChecklist from "@/app/(app)/(dossier)/dossiers/[id]/page";
-import PageCompletude from "@/app/(app)/(dossier)/dossiers/[id]/completude/page";
-import PageEcheancier from "@/app/(app)/(dossier)/dossiers/[id]/echeancier/page";
+import { Checklist } from "@/app/(app)/(dossier)/dossiers/[id]/Checklist";
+import { Completude } from "@/app/(app)/(dossier)/dossiers/[id]/completude/Completude";
+import { Echeancier } from "@/app/(app)/(dossier)/dossiers/[id]/echeancier/Echeancier";
+import { ECHEANCES_NL } from "@/lib/contenu/dossiers";
 import { PieceDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier";
 import { Cloture } from "@/app/(app)/(dossier)/dossiers/[id]/cloture/Cloture";
 import {
@@ -14,13 +15,21 @@ import {
 import { LIBELLE_PALIER } from "@/domain/completeness/score";
 
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
   notFound: () => {
     throw new Error("notFound");
   },
 }));
 
 const DOSSIER = dossierParId("nl-4471")!;
-const params = Promise.resolve({ id: "nl-4471" });
+
+/**
+ * Les pages lisent la base ; les composants rendent. Les tests d'écran
+ * portent donc sur les composants, avec les données du contenu de
+ * référence — ce qui les rend vérifiables sans base de données, et vérifie
+ * autre chose que la lecture.
+ */
+const AUJOURDHUI = "2026-09-18";
 
 const attestation = PIECES_NL.find((p) => p.id === "attestation-de-ressources")!;
 const motivation = PIECES_NL.find((p) => p.id === "lettre-motivation")!;
@@ -41,7 +50,7 @@ const rendrePiece = (props: Partial<Parameters<typeof PieceDuDossier>[0]> = {}) 
 
 describe("C-06 — Checklist", () => {
   it("affiche un palier et un dénombrement, jamais une note sur cent", async () => {
-    const { container } = render(await PageChecklist({ params }));
+    const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(screen.getAllByText(LIBELLE_PALIER.INCOMPLET).length).toBeGreaterThan(0);
     const texte = container.textContent ?? "";
     expect(texte).not.toMatch(/\d\s?\/\s?100/);
@@ -50,44 +59,44 @@ describe("C-06 — Checklist", () => {
   });
 
   it("range les pièces en obligatoires et complémentaires, avec l'avancement", async () => {
-    render(await PageChecklist({ params }));
+    render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(screen.getByText("Obligatoires")).toBeDefined();
     expect(screen.getByText("3 sur 5 conformes")).toBeDefined();
     expect(screen.getByText("Complémentaires")).toBeDefined();
   });
 
   it("fait de chaque ligne un lien atteignable au clavier (règle 5)", async () => {
-    render(await PageChecklist({ params }));
+    render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     const ligne = screen.getByRole("link", { name: /Passeport/ });
     expect(ligne.getAttribute("href")).toBe("/dossiers/nl-4471/pieces/passeport");
   });
 
   it("garde le constat suivi de l'action sur une pièce à corriger", async () => {
-    render(await PageChecklist({ params }));
+    render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(screen.getByText(/Lance le renouvellement avant de déposer/)).toBeDefined();
   });
 
   it("ne dit pas « expire bientôt » d'une pièce valable au-delà du dépôt", async () => {
-    const { container } = render(await PageChecklist({ params }));
+    const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toContain("Valable jusqu'au 3 mars 2027");
     expect(container.textContent).not.toContain("Expire bientôt");
   });
 
   it("annonce ce qui bloque, sans parler de pièces à reprendre", async () => {
-    const { container } = render(await PageChecklist({ params }));
+    const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(screen.getByText("2 pièces bloquent le dépôt")).toBeDefined();
     expect(container.textContent).not.toContain("à reprendre");
   });
 
   it("porte la source et la date de vérification (INV-8)", async () => {
-    const { container } = render(await PageChecklist({ params }));
+    const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toMatch(/Information vérifiée le .* source : ind\.nl/);
   });
 });
 
 describe("C-09 — Complétude", () => {
   it("nomme le palier et dénombre, sans aucune note ni part", async () => {
-    const { container } = render(await PageCompletude({ params }));
+    const { container } = render(<Completude dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "Complétude de ton dossier",
     );
@@ -99,7 +108,7 @@ describe("C-09 — Complétude", () => {
   });
 
   it("met en tête ce qui bloque le dépôt", async () => {
-    render(await PageCompletude({ params }));
+    render(<Completude dossier={DOSSIER} pieces={PIECES_NL} />);
     const bloque = screen.getByRole("heading", { name: "Ce qui bloque le dépôt" })
       .parentElement!.parentElement!;
     expect(within(bloque).getByRole("link", { name: /Passeport/ })).toBeDefined();
@@ -108,7 +117,7 @@ describe("C-09 — Complétude", () => {
   });
 
   it("rappelle qu'un dossier complet n'est pas un dossier accepté", async () => {
-    const { container } = render(await PageCompletude({ params }));
+    const { container } = render(<Completude dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toContain("Un dossier complet n'est pas un dossier accepté");
   });
 });
@@ -213,7 +222,7 @@ describe("C-08 — Résultat d'analyse", () => {
 
 describe("C-10 — Échéancier", () => {
   it("groupe les échéances par mois et dit ce que chaque date implique", async () => {
-    const { container } = render(await PageEcheancier({ params }));
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} />);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Échéancier");
     expect(screen.getByRole("heading", { name: "Octobre 2026" })).toBeDefined();
     expect(container.textContent).toContain(
@@ -222,20 +231,21 @@ describe("C-10 — Échéancier", () => {
   });
 
   it("marque la pièce périssable comme une date au plus tôt", async () => {
-    const { container } = render(await PageEcheancier({ params }));
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} />);
     expect(container.textContent).toContain("Pièce périssable — date au plus tôt");
   });
 
   it("ne garantit pas les délais administratifs", async () => {
-    const { container } = render(await PageEcheancier({ params }));
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} />);
     expect(container.textContent).toContain(
       "des moyennes observées, non garanties",
     );
   });
 
-  it("dit ce qu'il manque au brouillon plutôt que d'afficher un calendrier vide", async () => {
+  it("dit ce qu'il manque au brouillon plutôt que d'afficher un calendrier vide", () => {
+    const brouillon = dossierParId("de-8820")!;
     const { container } = render(
-      await PageEcheancier({ params: Promise.resolve({ id: "de-8820" }) }),
+      <Echeancier dossier={brouillon} echeances={[]} aujourdhui={AUJOURDHUI} />,
     );
     expect(container.textContent).toContain("L'échéancier attend ta date de dépôt");
   });

@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Annuaire } from "./Annuaire";
-import { CONSULTANTS } from "@/lib/contenu/consultants";
-import { DOSSIERS, dossierParId } from "@/lib/contenu/dossiers";
+import { annuaire } from "@/server/lecture/consultants";
+import { tableauDeBord, vueDuDossier } from "@/server/lecture/dossiers";
+import { exigerCandidat } from "@/server/securite/page";
 
 /**
  * T-04 — Annuaire des consultants habilités. WF-12, pack Accompagné.
  *
  * L'annuaire est propre à un dossier : l'habilitation se vérifie destination
- * par destination, et la liste n'a pas de sens hors de l'une d'elles.
+ * par destination (RG-12.1), et la liste n'a pas de sens hors de l'une
+ * d'elles. Sans dossier ouvert, il n'y a rien à afficher — et l'écran le dit
+ * plutôt que de lister des consultants sans rapport.
  */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Consultants habilités",
   description:
@@ -21,15 +26,21 @@ export default async function PageConsultants({
 }: {
   searchParams: Promise<{ dossier?: string }>;
 }) {
+  const acteur = await exigerCandidat("/consultants");
   const { dossier: id } = await searchParams;
-  const dossier = dossierParId(id ?? DOSSIERS[0]!.id);
-  if (!dossier) notFound();
+
+  const dossiers = await tableauDeBord(acteur.id);
+  const choisi = id ?? dossiers[0]?.id;
+  if (!choisi) notFound();
+
+  const vue = await vueDuDossier(choisi, acteur.id).catch(() => null);
+  if (!vue) notFound();
 
   return (
     <Annuaire
-      dossier={dossier}
-      consultants={CONSULTANTS}
-      destination={dossier.destination.code}
+      dossier={vue.dossier}
+      consultants={await annuaire(vue.dossier.destination.code)}
+      destination={vue.dossier.destination.code}
     />
   );
 }

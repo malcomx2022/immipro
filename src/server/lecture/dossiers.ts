@@ -1,0 +1,263 @@
+import type { Application, Document, DocumentVersion, VisaRule } from "@prisma/client";
+import { db } from "@/lib/db";
+import { echec } from "@/server/http/echecs";
+import { versFiche, payload } from "@/server/acces/regles";
+import { versDossier, versPiece } from "@/server/vue/dossier";
+import { compteur } from "@/server/acces/quota";
+import type { Dossier } from "@/domain/dossiers/dossier";
+import { trierDossiers } from "@/domain/dossiers/dossier";
+import type { Piece } from "@/domain/dossiers/piece";
+import { grouperPourCompletude } from "@/domain/dossiers/piece";
+import type { Echeance } from "@/domain/dossiers/echeancier";
+import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
+import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers/analyse";
+import type { Quota } from "@/domain/dossiers/televersement";
+import { getPack } from "@/domain/payments/pricing";
+
+/**
+ * Lecture des dossiers, partagée par les pages serveur et les routes.
+ *
+ * Les fonctions rendent les types du domaine que les écrans consomment déjà
+ * — `Dossier`, `Piece`, `Echeance`, `ResultatAnalyse`, `Quota`. C'est la
+ * condition pour que le branchement soit une substitution : un écran change
+ * l'origine de sa donnée, pas sa forme.
+ */
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+type DossierComplet = Application & { documents: Document[]; visaRule: VisaRule | null };
+
+/**
+ * Tableau de bord — C-01.
+ *
+ * Un dossier dont la règle figée ne se relit plus n'est pas masqué : il
+ * serait invisible sans explication, et le candidat a payé pour lui. Il
+ * remonte avec sa destination réduite à ce que la base sait encore en dire.
+ */
+export async function tableauDeBord(userId: string): Promise<Dossier[]> {
+  const dossiers = await db.application.findMany({
+    where: { userId },
+    include: { documents: true, visaRule: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const vues = dossiers.flatMap((d) => {
+    const fiche = d.visaRule ? versFiche(d.visaRule) : null;
+    return fiche ? [versDossier(d, d.documents, fiche)] : [];
+  });
+  return trierDossiers(vues);
+}
+
+async function charger(id: string, userId: string): Promise<DossierComplet> {
+  const dossier = await db.application.findFirst({
+    where: { id, userId },
+    include: {
+      documents: { orderBy: [{ family: "asc" }, { createdAt: "asc" }] },
+      visaRule: true,
+    },
+  });
+  if (!dossier) throw echec("introuvable");
+  return dossier;
+}
+
+export interface VueDossier {
+  dossier: Dossier;
+  pieces: Piece[];
+  checklist: ReturnType<typeof grouperPourCompletude>;
+  quota: { restantes: number; total: number };
+}
+
+/** Checklist d'un dossier — C-06. */
+export async function vueDuDossier(id: string, userId: string): Promise<VueDossier> {
+  const brut = await charger(id, userId);
+  const fiche = brut.visaRule ? versFiche(brut.visaRule) : null;
+  if (!fiche) throw echec("regle_indisponible");
+
+  const pieces = brut.documents.map(versPiece);
+  return {
+    dossier: versDossier(brut, brut.documents, fiche),
+    pieces,
+    checklist: grouperPourCompletude(pieces),
+    quota: await compteur(brut.id),
+  };
+}
+
+/**
+ * Quota tel que l'écran de dépôt l'affiche — C-07.
+ *
+ * Le libellé du pack vient du dernier achat confirmé. Sans achat, le pack
+ * n'a pas de nom : écrire « Essentiel » par défaut annoncerait un quota que
+ * personne n'a payé.
+ */
+export async function quotaDuDossier(applicationId: string): Promise<Quota> {
+  const compte = await compteur(applicationId);
+  const achat = await db.transaction.findFirst({
+    where: { applicationId, status: "CONFIRMEE" },
+    orderBy: { confirmedAt: "desc" },
+    select: { packCode: true },
+  });
+  const pack = achat ? getPack(achat.packCode) : undefined;
+  return { restantes: compte.restantes, total: compte.total, pack: pack?.libelle ?? "sans pack" };
+}
+
+/**
+ * Échéancier — C-10, WF-09.
+ *
+ * Deux origines, et la distinction compte à l'écran. Les échéances en table
+ * ont été calculées à l'ouverture depuis les délais du référentiel : ce sont
+ * des dates limites. Celles des pièces périssables sont des « au plus tôt »,
+ * recalculées à l'affichage depuis le dépôt visé — demander un relevé de
+ * trois mois six mois à l'avance le fait redemander deux fois.
+ */
+export async function echeancierDuDossier(id: string, userId: string): Promise<{
+  depotVise: string | null;
+  echeances: Echeance[];
+}> {
+  const dossier = await charger(id, userId);
+  const enTable = await db.deadline.findMany({
+    where: { applicationId: dossier.id },
+    orderBy: { dueAt: "asc" },
+  });
+
+  const depotVise = dossier.targetDate ? iso(dossier.targetDate) : null;
+
+  /**
+   * La date de dépôt, et non la date cible.
+   *
+   * Une pièce valable trois mois doit l'être **le jour du dépôt**, pas le
+   * jour de la rentrée : calculée depuis la date cible, la date « au plus
+   * tôt » tombait deux jours avant le dépôt, c'est-à-dire trop tard pour
+   * une pièce qui met trois semaines à venir. Le dépôt est l'échéance que
+   * l'ouverture a calculée en retirant le délai d'instruction (RG-09.1) ;
+   * sans elle, on retombe sur la date cible, qui reste une approximation
+   * prudente.
+   */
+  const depot = enTable.find((e) => e.code === "depot");
+  const reference = depot ? iso(depot.dueAt) : depotVise;
+
+  const limites: Echeance[] = enTable.map((e) => ({
+    id: e.code,
+    date: iso(e.dueAt),
+    titre: e.label,
+    detail: detailDeLEcheance(e.code, dossier.visaRule),
+    imposee: e.code === "depot",
+  }));
+
+  const perissables: Echeance[] = reference
+    ? dossier.documents
+        .filter((d) => d.validityMonths !== null && d.status !== "CONFORME")
+        .map((d) => ({
+          id: `${d.code}-au-plus-tot`,
+          date: dateAuPlusTot(reference, d.validityMonths!),
+          titre: `Demander : ${d.label}`,
+          detail: `Cette pièce vaut ${d.validityMonths} mois, et doit être valable le jour du dépôt. Demandée plus tôt, elle sera périmée à ce moment-là et il faudra la redemander.`,
+          perissable: true,
+        }))
+    : [];
+
+  return {
+    depotVise,
+    echeances: [...limites, ...perissables].sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+/**
+ * Le détail dit pourquoi cette date, jamais une date nue. Le délai vient du
+ * référentiel (RG-09.1) ; sans lui, la phrase ne prétend pas en connaître un.
+ */
+function detailDeLEcheance(code: string, regle: VisaRule | null): string {
+  if (!regle) return "Date calculée à l'ouverture du dossier.";
+  const p = payload(regle);
+  if (code === "depot") {
+    return p.delai_traitement_jours
+      ? `L'instruction prend ${p.delai_traitement_jours.min} à ${p.delai_traitement_jours.max} jours selon l'autorité : au-delà de cette date, la réponse arriverait après ton départ visé.`
+      : "Date de dépôt visée.";
+  }
+  const piece = p.pieces_requises.find((r) => r.code === code);
+  if (piece?.delai_obtention_jours) {
+    return `Compte ${piece.delai_obtention_jours} jours d'obtention pour cette pièce, délai annoncé par l'autorité.`;
+  }
+  return "Date calculée à rebours du dépôt visé.";
+}
+
+/**
+ * Analyse de la dernière version d'une pièce — C-08.
+ *
+ * Rend `null` quand aucune analyse n'existe : l'écran montre alors son état
+ * d'attente, plutôt qu'un résultat vide qui se lirait comme un verdict.
+ */
+export async function analyseDeLaPiece(
+  pieceId: string,
+  applicationId: string,
+  userId: string,
+): Promise<{ piece: Piece; analyse: ResultatAnalyse | null; versions: DocumentVersion[] }> {
+  const document = await db.document.findFirst({
+    where: { id: pieceId, applicationId, application: { userId } },
+    include: {
+      versions: {
+        orderBy: { rank: "desc" },
+        include: { analyses: { orderBy: { analyzedAt: "desc" }, take: 1 } },
+      },
+      application: { include: { visaRule: true } },
+    },
+  });
+  if (!document) throw echec("introuvable");
+
+  const derniere = document.versions[0];
+  const analyse = derniere?.analyses[0];
+
+  return {
+    piece: versPiece(document),
+    versions: document.versions,
+    analyse: analyse
+      ? {
+          verdict: verdictAffichable(analyse.verdict),
+          fichier: nomDuFichier(derniere!),
+          analyseeLe: analyse.analyzedAt.toISOString(),
+          pages: 1,
+          titre: analyse.title,
+          corps: analyse.body,
+          champs: champsLus(analyse.fields),
+          exigence: exigenceDe(document.code, document.application.visaRule),
+        }
+      : null,
+  };
+}
+
+/**
+ * `HORS_SUJET` n'est pas un verdict d'écran : C-08 en connaît trois. Un
+ * document du mauvais type se présente comme à corriger, avec le
+ * reclassement en action — c'est ce que le candidat a à faire.
+ */
+const verdictAffichable = (v: string): VerdictAnalyse =>
+  v === "CONFORME" ? "CONFORME" : v === "ILLISIBLE" ? "ILLISIBLE" : "A_CORRIGER";
+
+const nomDuFichier = (version: DocumentVersion): string =>
+  version.objectKey?.split("/").pop() ?? "version rédigée";
+
+function champsLus(fields: unknown): ChampLu[] {
+  if (typeof fields !== "object" || fields === null) return [];
+  return Object.entries(fields as Record<string, unknown>).map(([intitule, valeur]) => ({
+    intitule: intitule.replace(/_/gu, " "),
+    valeur: valeur === null || valeur === undefined ? null : String(valeur),
+  }));
+}
+
+/**
+ * L'exigence affichée en regard de la lecture. Elle vient de la condition du
+ * référentiel qui porte sur cette pièce : une analyse qui montre ce qu'elle a
+ * lu sans montrer ce qui est attendu ne se conteste pas non plus.
+ */
+function exigenceDe(code: string, regle: VisaRule | null): ChampLu {
+  if (!regle) return { intitule: "Exigence", valeur: null };
+  const condition = payload(regle).conditions.find(
+    (c) => c.code.startsWith(code) || code.startsWith(c.code.split("_")[0] ?? ""),
+  );
+  if (!condition) return { intitule: "Exigence", valeur: null };
+  return {
+    intitule: condition.code.replace(/_/gu, " "),
+    valeur: `${Array.isArray(condition.valeur) ? condition.valeur.join(", ") : condition.valeur}${
+      condition.unite ? ` ${condition.unite}` : ""
+    }`,
+  };
+}

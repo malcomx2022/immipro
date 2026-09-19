@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { SkipLink } from "@/components/layout/SkipLink";
+import { db } from "@/lib/db";
+import { exigerCandidat, initiales } from "@/server/securite/page";
 
 /**
  * Gabarit dossier — section C (DOC-12, handoff §Gabarits).
@@ -10,7 +12,13 @@ import { SkipLink } from "@/components/layout/SkipLink";
  *
  * La barre d'onglets est le dernier élément de l'ordre du DOM, comme la barre
  * d'action (règle clavier 12) : Maj+Tab y ramène en un coup.
+ *
+ * Le gabarit exige une session. La garde est ici plutôt que sur chaque page :
+ * une page ajoutée demain sous ce groupe de routes est protégée sans que
+ * personne y pense, et c'est exactement le genre d'oubli qui ouvre un
+ * dossier à qui n'est pas connecté.
  */
+export const dynamic = "force-dynamic";
 const NAVIGATION = [
   { href: "/tableau-de-bord", libelle: "Dossiers" },
   { href: "/comparateur", libelle: "Destinations" },
@@ -18,11 +26,17 @@ const NAVIGATION = [
   { href: "/profil", libelle: "Profil" },
 ] as const;
 
-export default function GabaritDossier({
+export default async function GabaritDossier({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const acteur = await exigerCandidat();
+  const profil = await db.user.findUnique({
+    where: { id: acteur.id },
+    select: { firstName: true, lastName: true },
+  });
+
   return (
     <div className="flex min-h-screen flex-col bg-white md:flex-row">
       <SkipLink cible="contenu" />
@@ -74,7 +88,7 @@ export default function GabaritDossier({
             aria-label="Mon profil"
             className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-ink-100 text-14 font-semibold text-ink-700"
           >
-            AD
+            {initiales(acteur, profil?.firstName, profil?.lastName)}
           </Link>
         </header>
         <main className="flex-1 pb-20 md:pb-0">{children}</main>

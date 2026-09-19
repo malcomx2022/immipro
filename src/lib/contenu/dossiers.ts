@@ -8,6 +8,21 @@ import type { Quota } from "@/domain/dossiers/televersement";
 import { ALLEMAGNE, PAYS_BAS } from "./destinations";
 
 /**
+ * ⚠ Statut de ce fichier depuis le branchement des écrans.
+ *
+ * Les écrans ne le lisent plus : ils reçoivent leurs données de
+ * `src/server/lecture/`, qui les tire de la base. Ce qui reste ici a deux
+ * usages, et un seul est durable :
+ *
+ * - **Jeux d'essai.** Les valeurs servent de fixtures aux tests d'écran, qui
+ *   vérifient un rendu sans base de données. Elles restent, et c'est leur
+ *   place.
+ * - **Contenu éditorial.** Ce qui ne se vérifie sur le site d'aucune
+ *   autorité — un nom de pays en français, un slug, une phrase de résumé —
+ *   reste ici et le serveur le joint au référentiel. Le ranger sous
+ *   `verifiedAt` affaiblirait ce que cet horodatage veut dire.
+ */
+/**
  * Dossiers de démonstration — provisoires, comme les fiches destination.
  *
  * Ils viendront de la base une fois le schéma dérivé de DOC-11. Les écrans ne

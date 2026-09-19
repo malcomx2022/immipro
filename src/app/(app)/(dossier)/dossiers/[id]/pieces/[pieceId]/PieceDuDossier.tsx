@@ -3,7 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { SOCLE_BOUTON, VARIANTES_BOUTON } from "@/components/ui/bouton-styles";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -73,9 +77,12 @@ export function PieceDuDossier({
   const [vue, setVue] = useState<Vue>(analyse ? "ANALYSE" : "TELEVERSEMENT");
   const [etat, setEtat] = useState<EtatTeleversement>(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
   const [fichier, setFichier] = useState<Fichier | null>(null);
+  const [brut, setBrut] = useState<File | null>(null);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [envoyes, setEnvoyes] = useState(0);
   const [refus, setRefus] = useState<string | null>(null);
   const champ = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   // Le réseau est un état de l'écran, pas une erreur de fin d'envoi : le
   // dire avant que la personne appuie lui évite de croire que son geste a
@@ -100,21 +107,69 @@ export function PieceDuDossier({
     setRefus(motif);
     if (motif) return;
     setFichier(candidat);
+    setBrut(brut);
     setEnvoyes(0);
+    setEchec(null);
   }
 
   /**
-   * Seam de l'envoi réel : la requête part vers une URL présignée de cinq
-   * minutes, obtenue à la demande (règle d'architecture 4), et `envoyes` suit
-   * `xhr.upload.onprogress`. Tant que la route n'existe pas, l'écran montre
-   * l'envoi sans en inventer l'avancement.
+   * Envoi en trois temps — WF-06, règle d'architecture 4.
+   *
+   * 1. Le serveur vérifie ce qui se vérifie sans l'octet — consentement,
+   *    format, taille, empreinte déjà connue — et rend une URL de dépôt
+   *    valable cinq minutes.
+   * 2. Le navigateur écrit **directement** dans le stockage. Faire transiter
+   *    dix mégaoctets par l'application les ferait monter deux fois, sur une
+   *    connexion mobile.
+   * 3. Le serveur confirme et met l'analyse en file.
+   *
+   * L'empreinte est calculée ici, avant l'envoi : c'est elle qui permet au
+   * serveur de reconnaître un fichier déjà déposé et de ne rien refacturer
+   * (RG-06.2). La calculer après l'envoi ferait monter les octets pour rien.
    */
-  function envoyer() {
-    if (!fichier) {
+  async function envoyer() {
+    if (!fichier || !brut) {
       champ.current?.click();
       return;
     }
     setEtat("ENVOI");
+    setEchec(null);
+    setEnvoyes(0);
+
+    const empreinte = await empreinteDuFichier(brut);
+    const demande = {
+      nom: fichier.nom,
+      octets: fichier.octets,
+      typeMime: brut.type,
+      empreinte,
+    };
+
+    const prepare = await appeler<{ depot: { url: string; cle: string } }>(
+      `/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`,
+      { corps: demande },
+    );
+    if (!prepare.ok) {
+      setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
+      setEchec(prepare.echec);
+      return;
+    }
+
+    const monte = await televerser(prepare.donnees.depot.url, brut, setEnvoyes);
+    if (!monte) {
+      setEtat("RESEAU_COUPE");
+      return;
+    }
+
+    const confirme = await appeler(
+      `/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`,
+      { methode: "PUT", corps: { ...demande, cle: prepare.donnees.depot.cle } },
+    );
+    if (!confirme.ok) {
+      setEtat("PRET");
+      setEchec(confirme.echec);
+      return;
+    }
+    router.refresh();
   }
 
   if (vue === "ANALYSE" && analyse) {
@@ -254,6 +309,9 @@ export function PieceDuDossier({
               {refus}
             </p>
           ) : null}
+          {/* Refus venu du serveur : il dit ce qui est conservé, l'écran ne
+              le reformule pas. */}
+          {echec ? <BlocEchec echec={echec} /> : null}
           {piece.astuce ? <p className="text-pretty text-13 text-ink-500">{piece.astuce}</p> : null}
         </section>
       ) : null}
@@ -310,7 +368,7 @@ export function PieceDuDossier({
         <Button
           pleineLargeur
           chargement={envoiEnCours(etat)}
-          onClick={envoyer}
+          onClick={() => void envoyer()}
           className="min-h-action"
         >
           {libelleCta(etat)}
@@ -421,4 +479,46 @@ function Analyse({
       </div>
     </div>
   );
+}
+
+/**
+ * Empreinte SHA-256 du fichier, calculée dans le navigateur.
+ *
+ * `crypto.subtle` demande un contexte sécurisé : en HTTP simple, elle est
+ * absente. Plutôt que d'échouer, on rend une empreinte vide, que le serveur
+ * refusera avec un message lisible — c'est préférable à une exception sans
+ * texte au moment où quelqu'un dépose son passeport.
+ */
+async function empreinteDuFichier(fichier: File): Promise<string> {
+  if (typeof crypto === "undefined" || !crypto.subtle) return "";
+  const octets = await fichier.arrayBuffer();
+  const condensat = await crypto.subtle.digest("SHA-256", octets);
+  return [...new Uint8Array(condensat)]
+    .map((o) => o.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Envoi direct au stockage, avec l'avancement réel.
+ *
+ * `XMLHttpRequest` et non `fetch` : c'est la seule API du navigateur qui
+ * rapporte l'avancement d'un envoi. Sans elle, l'écran affiche une barre qui
+ * n'avance pas, ce qui est pire que pas de barre du tout sur une connexion
+ * lente.
+ */
+function televerser(
+  url: string,
+  fichier: File,
+  avancer: (octets: number) => void,
+): Promise<boolean> {
+  return new Promise((resoudre) => {
+    const requete = new XMLHttpRequest();
+    requete.open("PUT", url);
+    requete.setRequestHeader("content-type", fichier.type);
+    requete.upload.onprogress = (e) => avancer(e.loaded);
+    requete.onload = () => resoudre(requete.status >= 200 && requete.status < 300);
+    requete.onerror = () => resoudre(false);
+    requete.onabort = () => resoudre(false);
+    requete.send(fichier);
+  });
 }

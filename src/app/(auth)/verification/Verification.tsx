@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
@@ -10,6 +12,8 @@ import {
   LONGUEUR_CODE,
   normaliserCode,
 } from "@/domain/comptes/code-verification";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,10 +25,40 @@ import { cn } from "@/lib/utils";
  * puisqu'elle change sans action directe sur elle.
  */
 export function Verification() {
+  const router = useRouter();
   const [code, setCode] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [renvoi, setRenvoi] = useState(false);
+  const [renvoye, setRenvoye] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const idAvancement = useId();
   const chiffres = normaliserCode(code).length;
   const complet = codeComplet(code);
+
+  async function verifier() {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler("/api/comptes/verification", { corps: { code } });
+    if (resultat.ok) {
+      router.push("/tableau-de-bord");
+      return;
+    }
+    setEnvoi(false);
+    setEchec(resultat.echec);
+  }
+
+  async function renvoyer() {
+    setRenvoi(true);
+    setEchec(null);
+    setRenvoye(false);
+    const resultat = await appeler("/api/comptes/verification", { methode: "PUT" });
+    setRenvoi(false);
+    // Le code précédent est annulé par l'émission du suivant : le dire évite
+    // qu'on saisisse l'ancien, reçu deux minutes plus tôt, et qu'on croie
+    // s'être trompé de chiffres.
+    if (resultat.ok) setRenvoye(true);
+    else setEchec(resultat.echec);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-6">
@@ -74,10 +108,22 @@ export function Verification() {
           Regarde dans les courriers indésirables. Sur une connexion lente,
           l&apos;email peut mettre deux à trois minutes.
         </p>
-        <Button variante="secondaire" className="h-11 rounded-full px-3.5 text-14">
+        <Button
+          variante="secondaire"
+          className="h-11 rounded-full px-3.5 text-14"
+          chargement={renvoi}
+          onClick={() => void renvoyer()}
+        >
           Renvoyer le code
         </Button>
+        {renvoye ? (
+          <p role="status" className="text-pretty text-14 text-ink-700">
+            Un nouveau code est parti. Le précédent ne fonctionne plus.
+          </p>
+        ) : null}
       </div>
+
+      {echec ? <BlocEchec echec={echec} /> : null}
 
       <div className="flex flex-col gap-1.5">
         <p className="text-14 font-medium text-ink-900">Mauvaise adresse&nbsp;?</p>
@@ -99,13 +145,20 @@ export function Verification() {
           pleineLargeur
           className="min-h-action"
           disabled={!complet}
+          chargement={envoi}
           raisonDesactivation={
             complet ? undefined : `Saisissez les ${LONGUEUR_CODE} chiffres du code.`
           }
+          onClick={() => void verifier()}
         >
           Vérifier mon adresse
         </Button>
-        <Button variante="tertiaire" pleineLargeur className="h-11 text-14">
+        <Button
+          variante="tertiaire"
+          pleineLargeur
+          className="h-11 text-14"
+          onClick={() => router.push("/tableau-de-bord")}
+        >
           Plus tard
         </Button>
       </div>

@@ -6,6 +6,21 @@ import type { Regle } from "@/domain/backoffice/regle";
 import type { Collecte, FicheSuivie } from "@/domain/backoffice/veille";
 
 /**
+ * ⚠ Statut de ce fichier depuis le branchement des écrans.
+ *
+ * Les écrans ne le lisent plus : ils reçoivent leurs données de
+ * `src/server/lecture/`, qui les tire de la base. Ce qui reste ici a deux
+ * usages, et un seul est durable :
+ *
+ * - **Jeux d'essai.** Les valeurs servent de fixtures aux tests d'écran, qui
+ *   vérifient un rendu sans base de données. Elles restent, et c'est leur
+ *   place.
+ * - **Contenu éditorial.** Ce qui ne se vérifie sur le site d'aucune
+ *   autorité — un nom de pays en français, un slug, une phrase de résumé —
+ *   reste ici et le serveur le joint au référentiel. Le ranger sous
+ *   `verifiedAt` affaiblirait ce que cet horodatage veut dire.
+ */
+/**
  * Jeu de démonstration du back-office — provisoire.
  *
  * Il viendra des tables `visa_rules`, `users`, `payments`, `audit_log` et

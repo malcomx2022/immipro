@@ -114,3 +114,14 @@ export const SANS_CONSULTANT =
  */
 export const MENTION_HABILITATION =
   "Le conseil donné en rendez-vous engage le consultant, pas ImmiPro. L'habilitation atteste que son titre d'exercice a été vérifié pour cette destination, pas que ta demande aboutira.";
+
+/**
+ * « 3 consultants habilités », « 1 consultant habilité ».
+ *
+ * L'accord suit le compte. Écrit au pluriel en toutes circonstances, il
+ * annonçait « 1 consultants » — une faute d'accord sur un écran qui promet
+ * une vérification d'habilitation entame la confiance dans la vérification
+ * elle-même.
+ */
+export const libelleNombre = (combien: number): string =>
+  combien > 1 ? `${combien} consultants habilités` : `${combien} consultant habilité`;

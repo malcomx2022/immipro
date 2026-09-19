@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { db } from "@/lib/db";
+import { journal } from "@/server/lecture/backoffice";
 
 /**
  * Journal d'audit — B-06, RG-15.1.
@@ -14,29 +14,9 @@ export const GET = route({
   acces: "admin",
   limite: "lecture",
   requete: z.object({
-    cible: z.string().optional(),
-    acteur: z.string().optional(),
+    categorie: z.enum(["PAIEMENT", "REGLE", "ACCES_PIECE", "COMPTE"]).optional(),
   }),
   async traiter({ requete }) {
-    const lignes = await db.auditLog.findMany({
-      where: {
-        ...(requete.cible ? { target: { contains: requete.cible } } : {}),
-        ...(requete.acteur ? { actorId: requete.acteur } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    });
-
-    return {
-      journal: lignes.map((l) => ({
-        id: l.id,
-        acteurId: l.actorId,
-        action: l.action,
-        cible: l.target,
-        motif: l.reason,
-        details: l.metadata,
-        survenuLe: l.createdAt.toISOString(),
-      })),
-    };
+    return { journal: await journal(requete.categorie) };
   },
 });

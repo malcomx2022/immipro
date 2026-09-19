@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { FileDeVeille } from "./FileDeVeille";
-import { COLLECTE, FICHES_SUIVIES } from "@/lib/contenu/backoffice";
+import { collecte, fichesSuivies } from "@/server/lecture/backoffice";
+import { exigerVeilleur } from "@/server/securite/page";
 
 /**
  * B-01 — File de veille réglementaire. WF-14.
  *
  * Rendu à la demande : les retards de relecture se comptent depuis
  * aujourd'hui. Figés au build, ils vieilliraient d'un jour par jour.
+ *
+ * Accès veilleur, pas administrateur : relire des sources est son métier, et
+ * le moindre privilège veut qu'il n'ait pas davantage (RG-15.3).
  */
 export const dynamic = "force-dynamic";
 
@@ -15,11 +19,14 @@ export const metadata: Metadata = {
   description: "Les fiches à relire, les écarts détectés et l'état des sources.",
 };
 
-export default function PageVeille() {
+export default async function PageVeille() {
+  await exigerVeilleur("/veille");
+  const [fiches, etatCollecte] = await Promise.all([fichesSuivies(), collecte()]);
+
   return (
     <FileDeVeille
-      fiches={FICHES_SUIVIES}
-      collecte={COLLECTE}
+      fiches={fiches}
+      collecte={etatCollecte}
       aujourdhui={new Date().toISOString().slice(0, 10)}
     />
   );

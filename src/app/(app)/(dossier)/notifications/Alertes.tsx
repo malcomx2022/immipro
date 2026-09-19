@@ -29,7 +29,12 @@ export interface AlertesProps {
   alertes: readonly Alerte[];
   /** Horodatage de rendu, passé par le serveur pour que « Il y a 2 heures » soit stable. */
   maintenant: string;
-  divergence: {
+  /**
+   * Divergence à arbitrer. Absente quand il n'y en a aucune — un écran
+   * d'arbitrage permanent cesse d'être lu, et le jour où il porte un
+   * changement critique, personne ne l'ouvre.
+   */
+  divergence?: {
     pays: string;
     ancienne: VersionRegle;
     nouvelle: VersionRegle;
@@ -125,7 +130,7 @@ export function Alertes({ alertes, maintenant, divergence }: AlertesProps) {
               </div>
               <p className="text-pretty text-14 text-ink-700">{alerte.corps}</p>
               <p className="text-13 text-ink-500">{libelleContexte(alerte, date)}</p>
-              {alerte.arbitrage ? (
+              {alerte.arbitrage && divergence ? (
                 <Button
                   variante="secondaire"
                   className="mt-1 self-start"
@@ -149,11 +154,13 @@ export function Alertes({ alertes, maintenant, divergence }: AlertesProps) {
         <p className="text-pretty text-13 text-ink-500">{MENTION_PORTEE}</p>
       </div>
 
-      <DivergenceReglementaire
-        ouverte={arbitrageOuvert}
-        onFermer={() => setArbitrageOuvert(false)}
-        {...divergence}
-      />
+      {divergence ? (
+        <DivergenceReglementaire
+          ouverte={arbitrageOuvert}
+          onFermer={() => setArbitrageOuvert(false)}
+          {...divergence}
+        />
+      ) : null}
     </div>
   );
 }

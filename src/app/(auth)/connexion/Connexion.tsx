@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
+import { appeler } from "@/lib/api";
 
 /**
  * A-02 — Connexion.
@@ -14,14 +16,44 @@ import { Input } from "@/components/ui/Input";
  * depuis un cybercafé.
  *
  * L'échec est annoncé en `role="alert"` et porte le décompte d'essais
- * restants — un blocage sans préavis paraît arbitraire.
+ * restants — un blocage sans préavis paraît arbitraire. Le message ne dit
+ * jamais lequel des deux champs est en cause : marquer le seul champ email
+ * dirait qu'il existe un compte à cette adresse.
+ *
+ * Après connexion, l'écran renvoie là où la personne allait. Quelqu'un qui
+ * ouvre un lien vers son dossier après expiration de sa session doit y
+ * revenir, pas atterrir sur un tableau de bord et chercher.
  */
 export function Connexion() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [rester, setRester] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
   // Le refus vient du serveur ; l'écran sait seulement l'afficher.
-  const [echec] = useState<{ essaisRestants: number } | null>(null);
+  const [echec, setEchec] = useState<string | null>(null);
+
+  async function connecter() {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler<{ compte: { emailVerifie: boolean } }>(
+      "/api/comptes/session",
+      { corps: { email: email.trim(), motDePasse } },
+    );
+    if (resultat.ok) {
+      // La suite est lue au moment de l'envoi, pas au rendu : `useSearchParams`
+      // rendrait tout l'écran dynamique, alors que c'est le premier que voit
+      // quelqu'un qui revient — celui qu'il faut servir le plus vite.
+      const suite = new URLSearchParams(window.location.search).get("suite");
+      router.push(destination(suite, resultat.donnees.compte.emailVerifie));
+      return;
+    }
+    setEnvoi(false);
+    // Le décompte d'essais est déjà dans la phrase du serveur : « il te reste
+    // 3 essais… ». Le réextraire pour le recomposer ici ferait deux endroits
+    // où le même nombre peut diverger.
+    setEchec(resultat.echec.corps);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[480px] flex-col gap-5 px-4 pb-8 md:py-6">
@@ -39,10 +71,7 @@ export function Connexion() {
       </div>
 
       {echec ? (
-        <div
-          role="alert"
-          className="flex items-start gap-3 rounded-md bg-ink-100 p-3.5"
-        >
+        <div role="alert" className="flex items-start gap-3 rounded-md bg-ink-100 p-3.5">
           <span
             aria-hidden="true"
             className="mt-2 h-2 w-2 flex-none rounded-full bg-danger"
@@ -51,10 +80,10 @@ export function Connexion() {
             <span className="text-14 font-semibold text-ink-900">
               Email ou mot de passe incorrect
             </span>
-            <span className="text-pretty text-14 text-ink-700">
-              Il te reste {echec.essaisRestants} essais avant que le compte soit
-              bloqué quinze minutes.
-            </span>
+            {/* Le décompte d'essais est écrit par le serveur : il connaît le
+                compteur, l'écran non. Un blocage sans préavis paraît
+                arbitraire, et un préavis inventé serait faux. */}
+            <span className="text-pretty text-14 text-ink-700">{echec}</span>
           </span>
         </div>
       ) : null}
@@ -111,11 +140,13 @@ export function Connexion() {
           pleineLargeur
           className="min-h-action"
           disabled={!email || !motDePasse}
+          chargement={envoi}
           raisonDesactivation={
             email && motDePasse
               ? undefined
               : "Renseignez votre adresse email et votre mot de passe."
           }
+          onClick={() => void connecter()}
         >
           Se connecter
         </Button>
@@ -128,4 +159,21 @@ export function Connexion() {
       </div>
     </div>
   );
+}
+
+/**
+ * Où aller après la connexion.
+ *
+ * Une adresse non vérifiée passe d'abord par la vérification : c'est elle
+ * qui conditionne l'ouverture d'un dossier, et y buter trois écrans plus
+ * loin est plus désagréable que d'y passer tout de suite.
+ *
+ * La suite n'est suivie que si elle est interne. Une adresse absolue venue
+ * du paramètre de requête ferait de cet écran une redirection ouverte, dont
+ * on se sert pour faire atterrir quelqu'un sur une fausse page de connexion.
+ */
+function destination(suite: string | null, emailVerifie: boolean): string {
+  if (!emailVerifie) return "/verification";
+  if (suite && suite.startsWith("/") && !suite.startsWith("//")) return suite;
+  return "/tableau-de-bord";
 }

@@ -60,7 +60,12 @@ const jourCourt = (iso: string) => FORMAT_COURT.format(new Date(`${iso}T00:00:00
 
 export interface FileDeVeilleProps {
   fiches: readonly FicheSuivie[];
-  collecte: Collecte;
+  /**
+   * État de la dernière collecte. Nul tant qu'aucune n'a eu lieu : afficher
+   * « 14 sources sur 14 » sans avoir relevé personne serait un compte
+   * inventé, et c'est précisément le chiffre auquel un veilleur se fie.
+   */
+  collecte: Collecte | null;
   /** Date de rendu, ISO court : les retards se comptent depuis aujourd'hui. */
   aujourdhui: string;
 }
@@ -72,7 +77,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
 
   const visibles = filtrerVeille(fiches, filtre, recherche, aujourdhui);
   const retenue = visibles.find((f) => f.id === selection) ?? visibles[0];
-  const incident = messageSourceInjoignable(collecte, moment);
+  const incident = collecte ? messageSourceInjoignable(collecte, moment) : null;
 
   return (
     <div className="flex flex-col">
@@ -88,17 +93,21 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
       />
 
       <div className="flex flex-col gap-4 p-6">
-        <p className="text-13 text-ink-500">{resumeCollecte(collecte, moment)}</p>
+        <p className="text-13 text-ink-500">
+          {collecte
+            ? resumeCollecte(collecte, moment)
+            : "Aucune collecte enregistrée : le relevé automatique des sources n'a pas encore tourné."}
+        </p>
 
         {incident ? (
           <section className="flex flex-col items-start gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
             <h2 className="text-16 font-semibold text-ink-900">
-              {collecte.injoignable?.source} n&apos;a pas répondu
+              {collecte?.injoignable?.source} n&apos;a pas répondu
             </h2>
             <p className="max-w-[80ch] text-pretty text-14 text-ink-700">{incident}</p>
             <div className="flex gap-2">
               <Button variante="secondaire">
-                Relever {collecte.injoignable?.source}
+                Relever {collecte?.injoignable?.source}
               </Button>
               <Button variante="tertiaire">Déclarer un incident</Button>
             </div>
@@ -143,7 +152,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
                   <span>Statut</span>
                 </div>
               }
-              vide={<FileVide collecte={collecte} />}
+              vide={collecte ? <FileVide collecte={collecte} /> : <SansCollecte />}
               rendu={(fiche) => (
                 <div className="grid grid-cols-[2.5rem_1fr_10rem_6rem_8rem_7rem] items-center gap-3">
                   <span className="font-mono text-13 text-ink-700">{fiche.code}</span>
@@ -214,7 +223,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
         </div>
 
         <p className="text-pretty text-13 text-ink-500">{MENTION_SANS_DEPUBLICATION}</p>
-        {collecteComplete(collecte) && visibles.length === 0 ? (
+        {collecte && collecteComplete(collecte) && visibles.length === 0 ? (
           <p className="text-pretty text-13 text-ink-500">{MENTION_FILE_VIDE}</p>
         ) : null}
       </div>
@@ -239,6 +248,24 @@ function FileVide({ collecte }: { collecte: Collecte }) {
           Voir les règles publiées
         </Link>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Rien n'a encore été relevé. L'écran le dit plutôt que de laisser croire à
+ * une file vide parce que tout est à jour : les deux se ressemblent, et ils
+ * n'appellent pas la même action.
+ */
+function SansCollecte() {
+  return (
+    <div className="flex flex-col gap-2 rounded-md bg-ink-100 p-5">
+      <p className="text-16 font-semibold text-ink-900">Aucune fiche à relire</p>
+      <p className="text-pretty text-14 text-ink-700">
+        Aucune collecte n&apos;a encore été enregistrée. Une file vide parce que
+        tout est à jour et une file vide parce que rien n&apos;a été relevé ne
+        demandent pas la même chose.
+      </p>
     </div>
   );
 }

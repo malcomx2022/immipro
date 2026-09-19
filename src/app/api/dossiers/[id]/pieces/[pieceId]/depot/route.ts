@@ -93,6 +93,10 @@ export const PUT = route({
       data: {
         status: analysable ? "EN_ANALYSE" : "ATTENDUE",
         expiresAt: dateDePeremption(piece.validityMonths, new Date()),
+        // Un fichier existe désormais : la ligne propose de le remplacer, pas
+        // de l'ajouter. Sans quoi le candidat cherche une pièce qu'il vient
+        // d'envoyer.
+        ...(piece.remedy === "TELEVERSER" ? { remedy: "REMPLACER" as const } : {}),
       },
     });
 

@@ -9,6 +9,7 @@ import { verdictDeConnexion, aBloquer, libelleEchec, ESSAIS_AVANT_BLOCAGE } from
 import { comparer } from "@/server/jobs/divergence";
 import { sansCommentaires } from "@/domain/copy/source";
 import { refusDuFichier } from "@/domain/dossiers/televersement";
+import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
 import { z } from "zod";
 // L'import installe la table de messages française, comme pour une route.
 import "@/server/http/messages-zod";
@@ -377,5 +378,15 @@ describe("un conseil ne s'affiche que sous la pièce qu'il concerne", () => {
     expect(refus).not.toContain("bancaire");
     // Il reste actionnable : il dit ce qui est accepté.
     expect(refus).toContain("PDF");
+  });
+});
+
+describe("WF-09 — la date « au plus tôt » se calcule depuis le dépôt", () => {
+  it("une pièce de trois mois se demande trois mois avant le dépôt, pas avant la rentrée", () => {
+    // Le défaut corrigé : calculée depuis la date cible (1er septembre), la
+    // date tombait deux jours avant le dépôt du 3 juin — trop tard pour une
+    // pièce qui met trois semaines à venir.
+    expect(dateAuPlusTot("2027-06-03", 3)).toBe("2027-03-03");
+    expect(dateAuPlusTot("2027-09-01", 3)).toBe("2027-06-01");
   });
 });

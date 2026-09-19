@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Inscription } from "@/app/(auth)/inscription/Inscription";
 import { Connexion } from "@/app/(auth)/connexion/Connexion";
 import { Verification } from "@/app/(auth)/verification/Verification";
@@ -107,7 +107,10 @@ describe("A-03 — Vérification email", () => {
 });
 
 describe("A-04 — Mot de passe", () => {
-  it("part de la demande et enchaîne sur le lien envoyé", () => {
+  it("part de la demande et enchaîne sur la saisie du code", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ envoye: true }) } as Response);
     render(<MotDePasse />);
     expect(
       screen.getByRole("heading", { name: "Réinitialise ton mot de passe" }),
@@ -116,11 +119,16 @@ describe("A-04 — Mot de passe", () => {
     fireEvent.change(screen.getByLabelText("Adresse email"), {
       target: { value: "aline.dossou@email.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Envoyer le lien" }));
-    expect(screen.getByRole("heading", { name: "Lien envoyé" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer le code" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Choisis un nouveau mot de passe" }),
+      ).toBeDefined(),
+    );
+    expect(screen.getByLabelText("Code reçu par email")).toBeDefined();
   });
 
-  it("ouvre directement l'étape du nouveau mot de passe depuis le lien reçu", () => {
+  it("ouvre directement l'étape du nouveau mot de passe depuis le paramètre", () => {
     parametres.set("etape", "nouveau");
     render(<MotDePasse />);
     expect(
@@ -128,11 +136,27 @@ describe("A-04 — Mot de passe", () => {
     ).toBeDefined();
   });
 
+  it("le changement annonce qu'il déconnecte l'appareil en cours, pas seulement les autres", () => {
+    parametres.set("etape", "nouveau");
+    const { container } = render(<MotDePasse />);
+    // Le geste se fait après avoir perdu un téléphone : laisser l'appareil
+    // perdu connecté l'annulerait.
+    expect(container.textContent).toContain("celui-ci compris");
+  });
+
   it("refuse d'enregistrer tant que les deux saisies diffèrent, et le dit", () => {
     parametres.set("etape", "nouveau");
     render(<MotDePasse />);
     const enregistrer = screen.getByRole("button", {
       name: "Enregistrer le mot de passe",
+    });
+    // La raison affichée est celle du premier manque dans l'ordre de lecture
+    // de l'écran : le code vient avant les mots de passe.
+    expect(enregistrer).toHaveAccessibleDescription(
+      "Saisissez les 6 chiffres reçus par email.",
+    );
+    fireEvent.change(screen.getByLabelText("Code reçu par email"), {
+      target: { value: "531044" },
     });
     fireEvent.change(screen.getByLabelText("Nouveau mot de passe"), {
       target: { value: "douze-caracteres" },

@@ -1,13 +1,15 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { RadioGroup } from "@/components/ui/RadioGroup";
-import { ficheParSlug, libellePieces } from "@/domain/destinations/fiche";
+import { libellePieces, type FicheDestination } from "@/domain/destinations/fiche";
 import { getPack } from "@/domain/payments/pricing";
-import { FICHES, PAYS_BAS } from "@/lib/contenu/destinations";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -16,39 +18,93 @@ import { formatMontant } from "@/lib/utils";
  * La date de dépôt commande l'échéancier : c'est la seule question vraiment
  * nécessaire, et « Je ne sais pas encore » est une réponse valable — forcer
  * une date inventée produirait un échéancier faux.
+ *
+ * Les deux dates proposées sont calculées depuis aujourd'hui et non écrites
+ * en dur. Figées, elles finissent dans le passé et l'écran propose alors des
+ * dépôts impossibles — le même défaut que les créneaux de consultant du lot
+ * WF-12.
  */
-const DATES = [
-  { valeur: "janvier", libelle: "15 janvier 2027", description: "rentrée de septembre 2027" },
-  { valeur: "mai", libelle: "2 mai 2027", description: "rentrée de février 2028" },
-  {
-    valeur: "inconnu",
-    libelle: "Je ne sais pas encore",
-    description: "échéancier calculé plus tard",
-  },
-];
-
-export function OuvertureDossier() {
-  return (
-    <Suspense fallback={<Squelette />}>
-      <Formulaire />
-    </Suspense>
-  );
+interface Rentree {
+  valeur: string;
+  libelle: string;
+  description: string;
+  /** Date ISO, transmise au serveur. Absente pour « je ne sais pas encore ». */
+  iso?: string;
 }
 
-function Formulaire() {
-  const parametres = useSearchParams();
-  const fiche = ficheParSlug(FICHES, parametres.get("destination") ?? "") ?? PAYS_BAS;
+const FORMAT_LONG = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
+/** Prochaine occurrence d'un jour et d'un mois, strictement à venir. */
+function prochaine(mois: number, jour: number, aujourdhui: Date): Date {
+  const cette = new Date(Date.UTC(aujourdhui.getUTCFullYear(), mois - 1, jour));
+  if (cette.getTime() > aujourdhui.getTime()) return cette;
+  return new Date(Date.UTC(aujourdhui.getUTCFullYear() + 1, mois - 1, jour));
+}
+
+export function datesProposees(aujourdhui = new Date()): Rentree[] {
+  const janvier = prochaine(1, 15, aujourdhui);
+  const mai = prochaine(5, 2, aujourdhui);
+  return [
+    {
+      valeur: "janvier",
+      libelle: FORMAT_LONG.format(janvier),
+      description: "rentrée de septembre suivante",
+      iso: janvier.toISOString().slice(0, 10),
+    },
+    {
+      valeur: "mai",
+      libelle: FORMAT_LONG.format(mai),
+      description: "rentrée de février suivante",
+      iso: mai.toISOString().slice(0, 10),
+    },
+    {
+      valeur: "inconnu",
+      libelle: "Je ne sais pas encore",
+      description: "échéancier calculé plus tard",
+    },
+  ].sort((a, b) => (a.iso ?? "9999").localeCompare(b.iso ?? "9999"));
+}
+
+export function OuvertureDossier({
+  fiche,
+  visaRuleId,
+  apercu,
+}: {
+  fiche: FicheDestination | null;
+  visaRuleId: string;
+  apercu: readonly string[];
+}) {
+  const router = useRouter();
   const [date, setDate] = useState<string | null>(null);
   const [etablissement, setEtablissement] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const packDossier = getPack("dossier");
+  const DATES = datesProposees();
 
-  const apercu = [
-    "Passeport",
-    "Diplôme du baccalauréat",
-    "Relevés de notes, trois dernières années",
-  ];
+  if (!fiche) return <SansDestination />;
+
   const autres = Math.max(0, fiche.piecesAReunir - apercu.length);
+
+  async function ouvrir() {
+    setEnvoi(true);
+    setEchec(null);
+    const choisie = DATES.find((d) => d.valeur === date);
+    const resultat = await appeler<{ id: string }>("/api/dossiers", {
+      corps: { visaRuleId, ...(choisie?.iso ? { dateCible: choisie.iso } : {}) },
+    });
+    if (resultat.ok) {
+      router.push(`/dossiers/${resultat.donnees.id}`);
+      return;
+    }
+    setEnvoi(false);
+    setEchec(resultat.echec);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -112,13 +168,16 @@ function Formulaire() {
       </p>
 
       <div className="flex flex-col gap-2">
+        {echec ? <BlocEchec echec={echec} /> : null}
         <Button
           pleineLargeur
           className="min-h-action"
           disabled={date === null}
+          chargement={envoi}
           raisonDesactivation={
             date === null ? "Choisissez une date de dépôt visée, même approximative." : undefined
           }
+          onClick={() => void ouvrir()}
         >
           Créer mon dossier
         </Button>
@@ -132,18 +191,25 @@ function Formulaire() {
   );
 }
 
-function Squelette() {
+/**
+ * Aucune fiche publiée : on ne peut pas ouvrir un dossier sur une règle qui
+ * n'existe plus. L'écran le dit au lieu de proposer un formulaire qui
+ * échouerait à l'envoi.
+ */
+function SansDestination() {
   return (
-    <div className="mx-auto w-full max-w-[640px] px-4 py-8">
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 py-10 md:px-8">
       <h1
         id="contenu"
         tabIndex={-1}
         className="text-24 font-semibold text-ink-900 outline-none md:text-32"
       >
-        Ouvrir un dossier
+        Aucune destination n&apos;est ouverte en ce moment
       </h1>
-      <p role="status" className="mt-2 text-16 text-ink-700">
-        Lecture de la destination choisie.
+      <p className="text-pretty text-16 text-ink-700">
+        Les fiches disparaissent de l&apos;affichage dès que leur date de relecture
+        est dépassée, et un dossier fige la règle en vigueur à son ouverture :
+        il ne peut donc pas s&apos;ouvrir sur une fiche retirée.
       </p>
     </div>
   );

@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ChoixDeLaPiece } from "./ChoixDeLaPiece";
-import { DOSSIERS, dossierParId } from "@/lib/contenu/dossiers";
-import { PIECES_REDIGEABLES } from "@/lib/contenu/redaction";
+import { vueDuDossier } from "@/server/lecture/dossiers";
+import { piecesARediger } from "@/server/lecture/redaction";
+import { exigerCandidat } from "@/server/securite/page";
 
 /**
  * R-01 — Rédaction assistée, choix de la pièce. WF-08.
+ *
+ * Les pièces proposées sont celles de **ce** dossier dont le remède est
+ * « rédiger », pas le catalogue entier : proposer d'écrire une lettre que la
+ * destination n'exige pas fait perdre une heure à quelqu'un qui en a peu.
  */
-export function generateStaticParams() {
-  return DOSSIERS.map((d) => ({ id: d.id }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -17,8 +20,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const dossier = dossierParId(id);
-  if (!dossier) return { title: "Dossier introuvable" };
+  const acteur = await exigerCandidat(`/dossiers/${id}/redaction`);
+  const vue = await vueDuDossier(id, acteur.id).catch(() => null);
+  if (!vue) return { title: "Dossier introuvable" };
   return {
     title: "Rédaction assistée",
     description:
@@ -32,8 +36,11 @@ export default async function PageRedaction({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const dossier = dossierParId(id);
-  if (!dossier) notFound();
+  const acteur = await exigerCandidat(`/dossiers/${id}/redaction`);
+  const vue = await vueDuDossier(id, acteur.id).catch(() => null);
+  if (!vue) notFound();
 
-  return <ChoixDeLaPiece dossier={dossier} pieces={PIECES_REDIGEABLES} />;
+  return (
+    <ChoixDeLaPiece dossier={vue.dossier} pieces={await piecesARediger(id, acteur.id)} />
+  );
 }

@@ -13,6 +13,7 @@ import {
   annuaireVide,
   filtrerAnnuaire,
   habilitesPour,
+  libelleNombre,
   languesDisponibles,
   libelleDelai,
 } from "@/domain/consultants/annuaire";
@@ -75,7 +76,7 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
         </h1>
         <p className="text-14 text-ink-700">
           {dossier.destination.pays} — {dossier.destination.intitule.split("—")[0]?.trim()} ·{" "}
-          {habilitesPour(consultants, destination).length} consultants · habilitation
+          {libelleNombre(habilitesPour(consultants, destination).length)} · habilitation
           vérifiée par ImmiPro
         </p>
       </div>
@@ -117,7 +118,7 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
             <p className="rounded-lg bg-ink-100 p-4 text-pretty text-14 text-ink-700">
               Aucun consultant habilité pour {nomDestination(destination)} ne correspond à
               ce filtre. Retire-le pour voir les{" "}
-              {habilitesPour(consultants, destination).length} habilités.
+              {libelleNombre(habilitesPour(consultants, destination).length)}.
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
