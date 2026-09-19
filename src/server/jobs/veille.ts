@@ -1,0 +1,26 @@
+import { db } from "@/lib/db";
+
+/**
+ * Échéance de relecture — RG-14.1, WF-14.
+ *
+ * « Une fiche dont `nextReviewAt` est dépassée repasse automatiquement en
+ * `DRAFT` et disparaît de l'affichage utilisateur. Une donnée non relue ne
+ * peut pas continuer à se présenter comme fiable. »
+ *
+ * Le filtre de lecture candidat écarte déjà ces fiches, requête par requête.
+ * Ce job ne fait donc pas disparaître la fiche — c'est déjà fait — il rend
+ * l'état de la base conforme à ce que l'utilisateur voit, et remet la fiche
+ * dans la file du veilleur. Les deux sont nécessaires : sans le filtre, un
+ * job en retard laisse passer une donnée périmée ; sans le job, le
+ * back-office croit publié ce qui ne s'affiche plus.
+ */
+export async function depublierLesFichesEchues(maintenant = new Date()): Promise<number> {
+  const jour = new Date(
+    Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth(), maintenant.getUTCDate()),
+  );
+  const { count } = await db.visaRule.updateMany({
+    where: { status: "PUBLISHED", nextReviewAt: { lt: jour } },
+    data: { status: "DRAFT" },
+  });
+  return count;
+}

@@ -189,3 +189,40 @@ export const AIDE_LIBELLE_CANDIDAT =
   "Ce texte apparaît tel quel dans la checklist. Tutoiement, pas de jargon administratif.";
 
 export const AIDE_MOTIF = "Consigné au journal d'audit avec ton identifiant.";
+
+/**
+ * Vérification du payload complet d'une règle — quatrième point
+ * d'application de la liste unique.
+ *
+ * `verifierTextesCandidat` couvre les deux champs du formulaire B-02. Le
+ * payload du référentiel en porte davantage : le libellé de la procédure,
+ * les messages d'échec de chaque condition, les libellés de pièce, les
+ * réserves. Tous s'affichent tels quels chez le candidat, et le message
+ * d'échec est le plus exposé de tous — il se lit au moment précis où une
+ * condition ne passe pas.
+ *
+ * La faute porte son chemin pour que le refus désigne le champ, et non « la
+ * règle » : un veilleur qui ne voit pas quel texte bloque reformule tout,
+ * au hasard.
+ */
+export function verifierPayloadCandidat(
+  textes: readonly { chemin: string; texte: string }[],
+): FauteDePayload[] {
+  const fautes: FauteDePayload[] = [];
+  for (const { chemin, texte } of textes) {
+    for (const faute of verifierTexte(texte, INTERDITS_ECRAN_CANDIDAT)) {
+      fautes.push({ chemin, extrait: faute.extrait, raison: faute.raison });
+    }
+  }
+  return fautes;
+}
+
+export interface FauteDePayload {
+  chemin: string;
+  extrait: string;
+  raison: string;
+}
+
+/** Même forme de message que B-02 : la formulation exacte, puis où la corriger. */
+export const messageDeRefusPayload = (faute: FauteDePayload): string =>
+  `« ${faute.extrait} » ne peut pas s'afficher chez le candidat — ${faute.raison}. Reformule le champ « ${faute.chemin} ».`;

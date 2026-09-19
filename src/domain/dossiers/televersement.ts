@@ -100,7 +100,11 @@ const extension = (nom: string) => nom.split(".").pop()?.toLowerCase() ?? "";
 export function refusDuFichier(fichier: Fichier): string | null {
   const ext = extension(fichier.nom);
   if (!FORMATS_ACCEPTES.includes(ext as (typeof FORMATS_ACCEPTES)[number])) {
-    return `Le format « .${ext} » n'est pas lu. Envoie un PDF, un JPG ou un PNG : le PDF téléchargé depuis ton application bancaire se lit toujours mieux qu'une photo.`;
+    // Le conseil qui suit vaut pour toutes les pièces. Celui qui ne vaut que
+    // pour un relevé — « le PDF de ton application bancaire se lit mieux
+    // qu'une photo » — vit dans `Piece.astuce`, où il ne s'affiche que sous
+    // la pièce concernée. Le lire sous un passeport ferait douter du reste.
+    return `Le format « .${ext} » n'est pas lu. Envoie un PDF, un JPG ou un PNG : un PDF d'origine se lit toujours mieux qu'une photo d'écran.`;
   }
   if (fichier.octets > TAILLE_MAXI_MO * OCTETS_PAR_MO) {
     return `Ton fichier fait ${enMo(fichier.octets)} Mo, la limite est de ${TAILLE_MAXI_MO} Mo. Enregistre le PDF en qualité moyenne, ou photographie les pages une par une.`;

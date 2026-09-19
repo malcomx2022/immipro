@@ -66,6 +66,18 @@ model VisaRule {
 // Comptes
 // ═══════════════════════════════════════════════════════════
 
+/// Rôles de la plateforme, repris des acteurs de DOC-11. `CONSULTANT` n'y
+/// figure pas : un consultant est référencé (table `Consultant`) et accède à
+/// un dossier par un accord nominatif, il ne se connecte pas encore.
+///
+/// RG-15.3 : moindre privilège. Un veilleur relit des sources et rédige des
+/// versions de règle ; il ne voit ni les paiements ni les pièces d'identité.
+enum Role {
+  CANDIDAT
+  VEILLEUR
+  ADMIN
+}
+
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
@@ -76,6 +88,19 @@ model User {
   countryCode   String?   @db.Char(2)
   locale        String    @default("fr")
   emailVerified DateTime?
+  role          Role      @default(CANDIDAT)
+  /// Suspension administrative (WF-15). Elle coupe les sessions en cours :
+  /// c'est la raison pour laquelle la session est en base et non dans un
+  /// jeton signé, qu'on ne peut pas retirer avant son échéance.
+  suspendedAt   DateTime?
+  /// Échecs de connexion consécutifs, et blocage temporaire (A-02).
+  ///
+  /// Le compteur est sur le compte et non sur l'adresse d'appel : une
+  /// attaque par liste de mots de passe change d'adresse à chaque essai, et
+  /// un comptage par adresse ne la voit pas. Il est remis à zéro par une
+  /// connexion réussie.
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
 
   profile       Profile?
@@ -84,6 +109,64 @@ model User {
   transactions  Transaction[]
   aiUsage       AiUsage[]
   notifications Notification[]
+  sessions      Session[]
+  secrets       AuthSecret[]
+}
+
+/// Session serveur, révocable.
+///
+/// DOC-11 (WF-02) demande des sessions en base. Un jeton signé serait plus
+/// simple, mais il ne se retire pas : une suspension de compte (WF-15) ou un
+/// changement de mot de passe ne prendraient effet qu'à son expiration. Ici
+/// une ligne supprimée ferme l'accès au prochain appel.
+///
+/// Le cookie porte un secret aléatoire ; la table n'en garde que
+/// l'empreinte. Une lecture de la base ne permet donc pas de se faire passer
+/// pour quelqu'un.
+model Session {
+  id         String   @id @default(uuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  /// Contexte de la connexion, pour qu'un candidat reconnaisse une session
+  /// qui n'est pas la sienne. Jamais l'adresse complète : elle n'apporte
+  /// rien à l'écran et se conserverait sans motif.
+  userAgent  String?
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+enum AuthSecretKind {
+  VERIFICATION_EMAIL
+  REINITIALISATION_MOT_DE_PASSE
+}
+
+/// Code ou jeton à usage unique (A-03, A-04).
+///
+/// `consumedAt` plutôt qu'une suppression : un code déjà utilisé doit se
+/// distinguer d'un code jamais émis, sans quoi le message d'échec ne peut
+/// pas dire lequel des deux s'est produit — et c'est la différence entre
+/// « demande un nouveau code » et « vérifie ton adresse ».
+///
+/// `attempts` borne la recherche par essais : six chiffres se devinent en un
+/// million de tentatives, ce qui n'est rien pour une machine.
+model AuthSecret {
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       AuthSecretKind
+  secretHash String
+  expiresAt  DateTime
+  attempts   Int            @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime       @default(now())
+
+  @@index([userId, kind, consumedAt])
+  @@index([expiresAt])
 }
 
 model Profile {

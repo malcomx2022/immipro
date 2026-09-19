@@ -253,3 +253,57 @@ export const MENTION_ACCUEIL: Mention = {
   source: "ind.nl, canada.ca, make-it-in-germany.com",
   verifieeLe: VERIFIEE_LE,
 };
+
+/**
+ * Part éditoriale d'une fiche.
+ *
+ * Elle est séparée du référentiel à dessein. `VisaRule` porte `sourceUrl`,
+ * `verifiedAt` et `verifiedBy` : c'est une attestation de diligence sur un
+ * contenu réglementaire (INV-8, RG-14.4). Le nom français d'un pays, une
+ * adresse de page et une phrase de résumé ne se vérifient pas sur le site
+ * de l'autorité ; les ranger sous le même horodatage affaiblirait ce que cet
+ * horodatage veut dire.
+ *
+ * Le serveur joint les deux pour produire une `FicheDestination`. Une paire
+ * absente d'ici n'est pas affichée : une règle publiée sans éditorial ne
+ * s'affiche pas à moitié, elle attend sa fiche.
+ */
+export interface Editorial {
+  /** Segment d'URL de P-03 et P-04. C'est lui que les liens existants portent. */
+  slug: string;
+  pays: string;
+  resume: string;
+  /** Intitulé complet de l'autorité, affiché en tête de fiche sur P-04. */
+  autorite?: string;
+}
+
+/** Clé : `${countryCode}/${visaType}`, la paire qui identifie une règle. */
+export const EDITORIAL: Record<string, Editorial> = {
+  "NL/etudes_mvv_vvr": {
+    slug: "pays-bas",
+    pays: "Pays-Bas",
+    resume: "Séjour études, licence acceptée avec anglais B2.",
+    autorite: "IND — Immigratie- en Naturalisatiedienst",
+  },
+  "NL/emploi_kennismigrant": {
+    slug: "pays-bas-emploi",
+    pays: "Pays-Bas",
+    resume: "Emploi qualifié, salaire minimum fixé par tranche d'âge.",
+    autorite: "IND — Immigratie- en Naturalisatiedienst",
+  },
+  "CH/etudes_permis_b": {
+    slug: "suisse",
+    pays: "Suisse",
+    resume: "Séjour études, admission de l'établissement exigée avant la demande.",
+    autorite: "SEM — Secrétariat d'État aux migrations",
+  },
+  "AE/etudes_residence_etudiante": {
+    slug: "emirats-arabes-unis",
+    pays: "Émirats arabes unis",
+    resume: "Résidence étudiante parrainée par l'établissement.",
+    autorite: "ICP — Identity, Citizenship, Customs and Port Security",
+  },
+};
+
+export const editorialDe = (countryCode: string, visaType: string): Editorial | undefined =>
+  EDITORIAL[`${countryCode}/${visaType}`];

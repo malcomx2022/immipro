@@ -37,6 +37,20 @@ const pieceRequise = z.object({
   delai_obtention_jours: z.number().int().nonnegative().optional(),
   traduction_assermentee: z.boolean().default(false),
   legalisation: z.boolean().default(false),
+  /**
+   * Ce qu'il faut faire pour lever le manque.
+   *
+   * C'est une propriété de l'exigence, pas de l'écran : un veilleur qui lit
+   * « examen médical sur place » sait que c'est une démarche et non un
+   * fichier. Le déduire du code par motif — ce que faisait le serveur — se
+   * trompait précisément là : « visite_medicale » y devenait un
+   * téléversement, et le bouton aurait dit « Ajouter » pour un rendez-vous
+   * à prendre. « Ajouter » mentirait sur l'effort demandé.
+   *
+   * Le défaut couvre le cas courant, un document qu'on possède déjà, et
+   * n'oblige pas à reprendre les fiches existantes.
+   */
+  nature: z.enum(["televerser", "rediger", "demarche"]).default("televerser"),
 });
 
 export const visaRulesSchema = z.object({
@@ -78,4 +92,33 @@ export type VisaRulesPayload = z.infer<typeof visaRulesSchema>;
 /** Garde-fou : une règle ne passe PUBLISHED que sur source OFFICIEL ou INSTITUTIONNEL. */
 export function peutEtrePubliee(tier: "OFFICIEL" | "INSTITUTIONNEL" | "SECONDAIRE") {
   return tier !== "SECONDAIRE";
+}
+
+/**
+ * Textes d'une règle qui s'affichent tels quels chez le candidat.
+ *
+ * C'est le quatrième point d'application de la liste de vocabulaire, et il
+ * était manquant. `domain/backoffice/regle.ts` vérifie les deux textes du
+ * formulaire B-02 ; le payload en porte davantage — le libellé de la
+ * procédure, chaque message d'échec de condition, chaque libellé de pièce,
+ * chaque réserve. Un veilleur qui écrit une promesse dans un message
+ * d'échec la ferait lire à chaque candidat dont la condition échoue, c'est-
+ * à-dire précisément au moment le plus sensible.
+ *
+ * La fonction rend le chemin exact de la faute, pour que le refus pointe le
+ * champ à reformuler et non « la règle ».
+ */
+export function textesCandidat(payload: VisaRulesPayload): { chemin: string; texte: string }[] {
+  return [
+    { chemin: "libelle", texte: payload.libelle },
+    ...payload.conditions.map((c, i) => ({
+      chemin: `conditions.${i}.message_echec`,
+      texte: c.message_echec,
+    })),
+    ...payload.pieces_requises.map((p, i) => ({
+      chemin: `pieces_requises.${i}.libelle`,
+      texte: p.libelle,
+    })),
+    ...payload.reserves.map((r, i) => ({ chemin: `reserves.${i}`, texte: r })),
+  ];
 }

@@ -463,3 +463,67 @@ consentement qui se perd.
 
 Une dernière, trouvée à l'écran : le libellé du groupe radio répétait le
 titre du jour, annoncé deux fois par un lecteur d'écran.
+
+---
+
+## Annexe I — API et routes serveur
+
+Le prototype ne couvre pas cette couche : il décrit des écrans, et §5 du
+guide de démarrage dit que le schéma et les intégrations sont à dériver de
+DOC-11. Les écarts relevés ici ne sont donc pas des divergences entre deux
+maquettes, mais des endroits où DOC-11, le prototype et le code existant ne
+disaient pas la même chose — ou ne disaient rien.
+
+### Ce qui a été tranché, et pourquoi
+
+| # | Point | Ce qui existait | Ce qui est codé |
+|---|---|---|---|
+| I.1 | Vérification de l'adresse | DOC-11 WF-02 : lien à usage unique, 24 h. Prototype A-03 : code à six chiffres, 10 min | le code à six chiffres. Le prototype fait foi pour les règles d'écran, et un code se recopie sans quitter le formulaire — ce qui compte quand l'email arrive sur le même téléphone |
+| I.2 | Sessions | DOC-11 : « NextAuth, sessions en base ». Le schéma n'avait ni table de session ni rôle | sessions en base, écrites ici. NextAuth v4 force le jeton signé dès qu'on accepte un mot de passe, et un jeton ne se révoque pas : une suspension (WF-15) n'aurait pris effet qu'à son expiration |
+| I.3 | Rôles | RG-15.3 exige un RBAC strict ; `User` n'avait pas de rôle | `Role { CANDIDAT, VEILLEUR, ADMIN }`, repris des acteurs de DOC-11. Un veilleur relit des sources et ne voit ni paiements ni pièces |
+| I.4 | Rétention | `PURGE_JOURS = 30` dans le domaine, annoncé au candidat ; `RETENTION_DOCUMENTS_DAYS=90` dans l'environnement, jamais lu | la variable est retirée. Un engagement affiché ne se règle pas par variable d'environnement : la valeur pourrait s'écarter de la phrase qui la promet sans que rien ne le signale |
+| I.5 | Remède d'une pièce | déduit du code par expression régulière, côté serveur | champ `nature` du référentiel. Le motif se trompait là où ça compte : « visite_medicale » devenait un téléversement, et la ligne aurait proposé d'ajouter un fichier pour un rendez-vous à prendre |
+| I.6 | Analyses par pack | 10, 30 et 90 écrits dans un commentaire de la grille | champ `analyses` sur `Pack`. La première écriture de quota aurait dû recopier un nombre à la main |
+| I.7 | Messages de validation | messages Zod par défaut, en anglais | table française posée globalement, à l'import du composeur. Traduire schéma par schéma se serait oublié au premier champ ajouté |
+| I.8 | Vocabulaire interdit dans le référentiel | vérifié sur les deux champs du formulaire B-02 | vérifié sur tous les textes du payload : libellé, messages d'échec, libellés de pièce, réserves. Le message d'échec est le plus exposé — il se lit au moment précis où une condition ne passe pas |
+| I.9 | Durée d'un accord de partage | `expiresAt` obligatoire, valeur non décidée | 14 jours après le rendez-vous : de quoi revenir sur une pièce après l'entretien, pas de quoi laisser un accès ouvert après que la question est réglée |
+| I.10 | Slug d'une fiche | fiches statiques à slug de pays | le serveur joint le référentiel et une part éditoriale (`EDITORIAL`). Le nom français d'un pays ne se vérifie pas sur le site de l'autorité : le ranger sous `verifiedAt` affaiblirait ce que cet horodatage veut dire |
+
+### Ce qui reste à arbitrer
+
+**I.A — Deux composantes du classement n'ont aucune source.** WF-01 donne six
+composantes pondérées ; « qualité de vie » (10 %) et « coût de la vie » (5 %)
+ne sont dans aucun référentiel, et rien ne les y met. Fabriquer une note par
+pays serait une information sans source sur une plateforme dont c'est la
+promesse inverse (INV-8). Les quatre composantes disponibles sont
+renormalisées sur 100 et `composantesAbsentes` le dit à l'appelant. Deux
+issues : brancher un indice public avec sa source et sa date de relevé, ou
+retirer ces deux composantes de DOC-11. La seconde est plus honnête que la
+première tant que personne ne relit l'indice.
+
+**I.B — Le budget n'est comparable qu'en zone euro.** La parité du franc CFA
+avec l'euro est fixe et se convertit sans risque. Le franc suisse et le
+dirham sont des cours de marché : les écrire en dur périmerait, et les
+afficher demanderait leur source et leur date comme toute autre donnée. En
+attendant, la Suisse et les Émirats ne sont pas filtrés sur le budget, et la
+réponse porte la mention correspondante. Il faut soit une source de taux
+datée, soit renoncer à comparer les budgets hors zone euro.
+
+**I.C — Trois dépendances ne sont pas branchées, faute de clés.** Messagerie,
+extraction IA, interrogation des fournisseurs de paiement. Chacune a un point
+de branchement unique et traite son absence plutôt que de faire semblant :
+une pièce non lue part en revue manuelle et l'analyse est rendue, un courrier
+manqué est journalisé, un paiement sans confirmation ouvre un écart au-delà
+de vingt-quatre heures. Aucune n'est simulée.
+
+**I.D — L'antivirus de WF-06 n'a pas de service.** L'étape 2 demande une
+analyse antivirus synchrone avant stockage. Les contrôles de format, de
+taille et de type MIME sont faits ; le balayage antivirus ne l'est pas, et
+il n'est pas non plus déclaré fait. C'est le seul point de WF-06 qui reste
+ouvert.
+
+**I.E — Le courrier de confirmation T-05 attend toujours sa décision.** Le
+point relevé au lot WF-12 n'a pas bougé : un email ne se recalcule pas à
+l'ouverture, la phrase doit donc être datée ou renvoyer vers l'écran. Le
+courrier d'alerte critique (RG-11.3) suit déjà cette règle et peut servir de
+modèle.

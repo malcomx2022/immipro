@@ -15,6 +15,17 @@ export interface Pack {
    * l'export du fournisseur sur les dix premiers dossiers réels.
    */
   tokensIA: number;
+  /**
+   * Analyses de pièces ouvertes par le pack — l'unité que compte le
+   * candidat, et celle du grand livre `AnalysisCredit` (INV-6).
+   *
+   * Elle est distincte de `tokensIA`, qui est la contrepartie interne : un
+   * pack se vend en analyses, il se consomme en jetons. Les deux chiffres
+   * vivaient jusqu'ici dans la même phrase de commentaire, et la première
+   * écriture de quota aurait dû en recopier un à la main. Un nombre
+   * recopié diverge.
+   */
+  analyses: number;
   destinations: number;
   /**
    * Mise en avant de $-01. Un seul pack la porte, et le test le garantit :
@@ -41,6 +52,7 @@ export const PACKS: Pack[] = [
     libelle: "Essentiel",
     prix: { XOF: 5000, EUR: 12 },
     tokensIA: 120_000,
+    analyses: 10,
     destinations: 1,
     misEnAvant: false,
     justification: "Une destination, dix analyses de pièces",
@@ -50,6 +62,7 @@ export const PACKS: Pack[] = [
     libelle: "Dossier",
     prix: { XOF: 15000, EUR: 29 },
     tokensIA: 400_000,
+    analyses: 30,
     destinations: 1,
     misEnAvant: true,
     justification: "Couvre l'ensemble des pièces exigées pour cette destination",
@@ -59,6 +72,7 @@ export const PACKS: Pack[] = [
     libelle: "Dossier Pro",
     prix: { XOF: 45000, EUR: 59 },
     tokensIA: 1_200_000,
+    analyses: 90,
     destinations: 3,
     misEnAvant: false,
     justification: "Trois destinations comparées en parallèle",

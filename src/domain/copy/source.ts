@@ -83,3 +83,63 @@ export function extraireChaines(source: string): string[] {
 
   return chaines;
 }
+
+/**
+ * Le même balayage, mais rendant le code débarrassé de ses commentaires.
+ *
+ * Il sert aux garde-fous qui portent sur ce que le code **fait** et non sur
+ * ce qu'il dit : vérifier qu'une route ne sérialise pas le barème interne,
+ * par exemple. Sans cela, le commentaire qui explique pourquoi le barème ne
+ * sort pas déclenche lui-même l'alerte — le garde-fou punit à nouveau sa
+ * propre justification, exactement le défaut que ce module a été écrit pour
+ * corriger.
+ *
+ * Les chaînes sont conservées : une valeur sérialisée sous un nom de clé
+ * littéral doit rester visible.
+ */
+export function sansCommentaires(source: string): string {
+  let sortie = "";
+  let i = 0;
+  let precedent = "";
+
+  while (i < source.length) {
+    const c = source[i]!;
+    const suivant = source[i + 1];
+
+    if (c === "/" && suivant === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (c === "/" && suivant === "*") {
+      i += 2;
+      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      const ouvrant = c;
+      sortie += c;
+      i += 1;
+      while (i < source.length) {
+        const r = source[i]!;
+        sortie += r;
+        if (r === "\\") {
+          sortie += source[i + 1] ?? "";
+          i += 2;
+          continue;
+        }
+        i += 1;
+        if (r === ouvrant) break;
+      }
+      precedent = ouvrant;
+      continue;
+    }
+
+    sortie += c;
+    if (!/\s/.test(c)) precedent = c;
+    i += 1;
+  }
+
+  void precedent;
+  return sortie;
+}
