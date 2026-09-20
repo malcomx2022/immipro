@@ -93,7 +93,15 @@ describe("ce que les rails disent déjà, et qu'on jetait", () => {
       charge: "ch_1",
     } as Record<string, string>);
     expect(JSON.stringify(lu)).not.toMatch(/insufficient funds|ch_1/u);
-    expect(Object.keys(lu ?? {}).sort()).toEqual(["cause", "providerTxId", "reference", "statut"]);
+    expect(Object.keys(lu ?? {}).sort()).toEqual([
+      "cause",
+      // La clé d'idempotence est descendue sur la notification (M.B) ; elle
+      // n'ajoute rien de ce que le schéma refuse de lire.
+      "providerEventId",
+      "providerTxId",
+      "reference",
+      "statut",
+    ]);
   });
 });
 

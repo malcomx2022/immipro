@@ -339,9 +339,11 @@ describe("B-03 — comptes", () => {
 describe("B-04 — réconciliation", () => {
   it("n'additionne que les paiements rapprochés", () => {
     const a = agreger(PAIEMENTS);
-    expect(a.encaisse).toBe(60000);
+    // Une somme par monnaie depuis M.B : additionner deux rails produisait
+    // un total en francs qui contenait des euros.
+    expect(a.encaisse).toEqual({ XOF: 60000 });
     expect(a.confirmes).toBe(2);
-    expect(a.enAttente).toBe(8000);
+    expect(a.enAttente).toEqual({ XOF: 8000 });
     expect(a.echecs).toBe(1);
     expect(a.ecarts).toBe(1);
   });

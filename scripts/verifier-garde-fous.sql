@@ -209,6 +209,25 @@ SELECT refuse(
        provider, status, "failureCause")
      VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE')$q$);
 
+-- ── M.B · le remboursement ────────────────────────────────────────────────
+SELECT refuse(
+  'M.B · un remboursement sans date',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt")
+     VALUES ('t5','IMP-260920-EEEEEE','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now())$q$);
+
+SELECT refuse(
+  'M.B · une date de remboursement sur un paiement encore acquis',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundedAt")
+     VALUES ('t6','IMP-260920-FFFFFF','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',now(),now())$q$);
+
+SELECT refuse(
+  'M.B · un remboursement sans encaissement préalable',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "refundedAt")
+     VALUES ('t7','IMP-260920-GGGGGG','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now())$q$);
+
 -- ── J.C · la publication éditoriale ───────────────────────────────────────
 SELECT refuse(
   'INV-8 · un guide publié sans source ni date de vérification',

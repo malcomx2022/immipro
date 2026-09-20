@@ -27,6 +27,8 @@ export interface Recu {
   moyen: string;
   /** Référence chez l'opérateur, absente tant que le webhook n'est pas passé. */
   transactionOperateur: string | null;
+  /** Quand la somme est repartie, nul tant qu'elle ne l'est pas (M.B). */
+  rembourseLe: string | null;
   achat: string;
   /** Le code de l'achat, pour relancer le même sur $-05. */
   achatCode: string;
@@ -64,6 +66,7 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
     le: (transaction.confirmedAt ?? transaction.createdAt).toISOString(),
     moyen: moyenDe(transaction.provider),
     transactionOperateur: transaction.providerTxId,
+    rembourseLe: transaction.refundedAt?.toISOString() ?? null,
     achat: libelleDeLAchat(transaction.packCode),
     achatCode: transaction.packCode,
     montant: transaction.amount,

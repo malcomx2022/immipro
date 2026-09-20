@@ -16,7 +16,7 @@ import {
   LIBELLE_ETAT,
   MENTION_ATTESTATION,
   MENTION_PDF,
-  MENTION_REMBOURSE,
+  mentionRembourse,
   RAISON_RENVOI_FERME,
   SANS_SUITE_CORPS,
   SANS_SUITE_TITRE,
@@ -132,7 +132,9 @@ export function Recu({ recu }: { recu: Donnees }) {
         <dl className="flex flex-col gap-3 border-b border-ink-300 p-5">
           {[
             { intitule: "Référence", valeur: recu.reference, mono: true },
-            { intitule: "Date", valeur: momentEnFrancais(recu.le), mono: false },
+            // « Date » suffisait tant qu'il n'y en avait qu'une. Depuis que
+            // le remboursement porte la sienne, le reçu en montre deux.
+            { intitule: "Date du paiement", valeur: momentEnFrancais(recu.le), mono: false },
             { intitule: "Moyen", valeur: recu.moyen, mono: false },
             ...(recu.transactionOperateur
               ? [
@@ -193,7 +195,9 @@ export function Recu({ recu }: { recu: Donnees }) {
 
       <p className="text-14 text-ink-700">{EMETTEUR}</p>
       {recu.etat === "rembourse" ? (
-        <p className="text-pretty text-13 text-ink-700">{MENTION_REMBOURSE}</p>
+        <p className="text-pretty text-13 text-ink-700">
+          {mentionRembourse(momentEnFrancais(recu.rembourseLe ?? recu.le))}
+        </p>
       ) : null}
       <p className="text-pretty text-13 text-ink-500">{MENTION_ATTESTATION}</p>
 
