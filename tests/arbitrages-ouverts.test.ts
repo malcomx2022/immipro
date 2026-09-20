@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { versXOF, convertible, MENTION_NON_COMPARABLE } from "@/domain/format/change";
 import { sansCommentaires } from "@/domain/copy/source";
+import { LIBELLE_JALON, PREALABLES } from "@/domain/exploitation/prealables";
 
 /**
  * Les lectures retenues pendant qu'un arbitrage est ouvert.
@@ -321,6 +322,47 @@ describe("I.D (tranché) — rien ne déclare un balayage qui n'a pas eu lieu", 
 });
 
 /* ------------------------------------------------------------------ *
+ * M.C — reçu ou facture, décidé sous réserve le 20/09
+ * ------------------------------------------------------------------ */
+
+describe("M.C (sous réserve) — le document reste un reçu", () => {
+  /**
+   * Décision produit du 20/09/2026, **soumise à une expertise comptable
+   * avant tout encaissement commercial**. Le produit maintient « reçu » et
+   * ne présente rien comme une facture ; savoir si une facture est requise,
+   * ce qu'elle doit porter et selon quelle séquence dépend du régime, de
+   * l'entité qui encaisse et des séries autorisées.
+   *
+   * Le garde-fou détaillé vit dans `tests/prealables.test.ts`, avec le
+   * registre. Ici, ce qui doit rester vrai quoi qu'il arrive : la référence
+   * ne devient pas un numéro de facture par renommage.
+   */
+  it("la référence de transaction n'est pas renommée en numéro de facture", () => {
+    // Commentaires retirés, et le registre des préalables écarté : l'un
+    // comme l'autre emploient le mot pour dire qu'il ne faut pas l'employer.
+    const fautifs = SOURCES.filter(
+      (f) =>
+        f !== "src/domain/exploitation/prealables.ts" &&
+        /num[ée]ro\s+de\s+facture|factureNumero|invoiceNumber/iu.test(
+          sansCommentaires(lire(f)),
+        ),
+    );
+    expect(fautifs).toEqual([]);
+  });
+
+  /**
+   * Et elle reste non séquentielle : c'est la propriété qui rend les deux
+   * pièces distinctes. Une facture se numérote en continu ; une suite
+   * d'entiers dirait le nombre de paiements du mois à qui en voit deux.
+   */
+  it("elle reste tirée au hasard, jamais incrémentée", () => {
+    const acces = lire("src/server/acces/paiements.ts");
+    expect(acces).toMatch(/suiteDictable\(6\)/u);
+    expect(acces).not.toMatch(/\+\s*1\b.*reference|reference.*\+\+/iu);
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * Le lien avec le document, dans les deux sens.
  * ------------------------------------------------------------------ */
 
@@ -340,7 +382,7 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
    * qu'il faut ne pas perdre de vue. Un troisième état la garde visible,
    * et le test exige qu'elle soit nommée dans le relevé.
    */
-  const SOUS_RESERVE = ["L.A"];
+  const SOUS_RESERVE = ["L.A", "M.C"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
@@ -398,17 +440,35 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   /**
    * Une réserve qui ne nomme pas sa condition n'en est pas une : elle
    * devient, six mois plus tard, un arbitrage que tout le monde croit
-   * fermé. Le relevé doit dire qui doit valider quoi, et avant quand.
+   * fermé.
+   *
+   * La première version de ce test épelait la condition de L.A —
+   * « validation juridique », « avant lancement ». Elle ne valait donc que
+   * pour elle, et M.C, dont la réserve est comptable, l'aurait fait
+   * échouer sans rien apprendre à personne. Le registre des préalables est
+   * la source : chaque réserve y est inscrite, et c'est lui qui dit quelle
+   * compétence tranche et quel jalon est bloqué.
    */
-  it("ceux sous réserve nomment leur condition, et le test le dit", () => {
+  it("ceux sous réserve sont au registre, et leur condition y est nommée", () => {
     for (const code of SOUS_RESERVE) {
       const texte = bloc(code);
       expect(texte, code).toMatch(/\*\*Décision produit provisoire/u);
-      expect(texte, code).toMatch(/validation juridique/iu);
-      expect(texte, code).toMatch(/avant lancement/iu);
       expect(texte, code).not.toMatch(/\*\*Tranché/u);
       expect(CE_FICHIER, code).toContain(`describe("${code} (sous réserve) —`);
+
+      // Le registre porte la condition : qui tranche, quel jalon est
+      // bloqué. Le test s'arrête à son existence — rapprocher deux textes
+      // de prose mot à mot serait le même sur-ajustement que celui qu'il
+      // vient de corriger.
+      const prealable = PREALABLES.find((p) => p.arbitrage === code);
+      expect(prealable, `${code} doit figurer au registre des préalables`).toBeDefined();
+      expect(LIBELLE_JALON[prealable!.jalon], code).toBeTruthy();
     }
+  });
+
+  /** Et l'inverse : aucun préalable ne flotte sans arbitrage qui le porte. */
+  it("aucun préalable du registre ne manque à cette liste", () => {
+    expect(PREALABLES.map((p) => p.arbitrage).sort()).toEqual([...SOUS_RESERVE].sort());
   });
 
   it("les tranchés la portent, et le test le dit dans son intitulé", () => {

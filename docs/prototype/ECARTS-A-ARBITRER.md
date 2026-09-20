@@ -280,8 +280,17 @@ jamais supprimé sans que la décision soit écrite ici.
 | **I.B** — *tranché le 20/09* | Seule la parité fixe du franc CFA convertit ; ailleurs le budget sort du classement | Une seconde parité écrite en dur |
 | **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
 | **I.D** — *tranché le 20/09* | Quarantaine, puis balayage, puis promotion — et rien ne sort avant | Un repli vers « saine » quand le moteur ne répond pas, ou un texte qui promet un fichier sain |
+| **M.C** — *décidé sous réserve, 20/09* | Un reçu, et une référence non séquentielle | Le mot « facture » dans un texte rendu, ou une référence incrémentée |
 
-Trois tests de plus lient le fichier au relevé : les codes cités doivent
+Un troisième état existe depuis L.A et M.C : **décidé sous réserve**. Le
+produit a tranché, mais une compétence qui n'est pas la sienne doit se
+prononcer avant un jalon — une validation juridique avant l'ouverture, une
+expertise comptable avant le premier encaissement. « Ouvert » laisserait
+croire que personne n'a décidé ; « tranché » ferait disparaître la réserve.
+Le registre `domain/exploitation/prealables` la porte, et un test vérifie
+que le relevé et lui se répondent.
+
+Quatre tests de plus lient le fichier au relevé : les codes cités doivent
 exister ici, les ouverts ne doivent pas porter la mention « Tranché », et
 les tranchés doivent la porter. Un arbitrage fermé dont le garde-fou survit
 continuerait de refuser une dérive que la décision vient peut-être
@@ -1571,8 +1580,49 @@ perdante n'écrit rien.
 interne de la transaction, qui est non séquentielle par choix (une suite
 d'entiers dit le nombre de paiements du mois à qui en voit deux). Une
 facture, elle, se numérote en continu dans la plupart des régimes
-comptables. Savoir si ImmiPro doit émettre des factures en plus des reçus,
-et sous quel régime, est une question de comptabilité, pas de produit.
+comptables. **Décision produit provisoire du 20/09/2026 — expertise
+comptable obligatoire avant tout encaissement commercial.**
+
+Le document continue de s'appeler « reçu » et n'est pas présenté comme une
+facture. Avant le premier encaissement commercial, un comptable détermine
+si une facture est requise, quelles mentions elle doit porter et selon
+quelle séquence de numérotation. Si elle l'est, elle devient un document
+**distinct** du reçu, avec sa propre numérotation continue — le reçu
+restant utile comme preuve immédiate du paiement.
+
+Une référence de transaction ne se renomme pas en numéro de facture : la
+numérotation dépend du régime comptable, de l'entité qui encaisse et
+éventuellement de séries autorisées. Définir une convention avant de
+connaître l'entité juridique reviendrait à la redéfinir ensuite, sur des
+pièces déjà émises.
+
+### Ce que l'application de la décision a trouvé
+
+**Deux arbitrages du même jour ont produit une réserve que rien ne tenait.**
+L.A attend une validation juridique, M.C une expertise comptable, et les
+deux ne vivaient que dans ce fichier — c'est-à-dire surveillées par qui
+l'ouvre. C'est le défaut exact qu'I.C a corrigé pour les services absents.
+Un registre les nomme désormais (`domain/exploitation/prealables`) : la
+question posée, la compétence qui tranche, le jalon bloqué, et ce que le
+produit fait en attendant.
+
+Le registre ne prétend pas les tenir, et c'est délibéré. Aucun test ne peut
+vérifier qu'un comptable a rendu son avis ; un drapeau « validé » à cocher
+serait coché. Ce qu'il garantit est plus modeste et vérifiable : aucune de
+ces réserves ne disparaît en silence, le relevé et lui se répondent.
+
+**Le méta-test des réserves ne valait que pour la première.** Écrit la
+veille pour L.A, il épelait « validation juridique » et « avant lancement ».
+M.C, dont la réserve est comptable, l'aurait fait échouer sans rien
+apprendre à personne — le test aurait dit « réserve mal formulée » là où la
+réserve était simplement d'une autre nature. Il s'appuie maintenant sur le
+registre, qui porte la condition, plutôt que sur des mots attendus dans de
+la prose.
+
+**Le mot « facture » désignait déjà un document inexistant.** Un commentaire
+du reçu disait « Émetteur, sur le reçu comme sur la facture ». Une phrase
+suffit à installer l'idée qu'il y en a une, et c'est précisément ce que la
+décision réserve à un comptable.
 
 ---
 
