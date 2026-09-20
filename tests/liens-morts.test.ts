@@ -55,10 +55,27 @@ const ECRANS = [
   ...fichiers("src/components", /\.tsx$/u),
 ];
 
-/** `href="/quelque-chose"` — les adresses littérales, ancres et requêtes ôtées. */
+/**
+ * Les adresses littérales d'un écran, ancres et requêtes ôtées.
+ *
+ * Deux formes, et la seconde manquait — c'est ce qui a laissé passer neuf
+ * liens morts dans l'en-tête et le pied de page, c'est-à-dire sur **toutes**
+ * les pages publiques :
+ *
+ * - `href="/tarifs"`, l'attribut JSX ;
+ * - `{ href: "/tarifs", libelle: "Tarifs" }`, la donnée qu'un `.map()`
+ *   transforme ensuite en attribut.
+ *
+ * La première version ne voyait que l'attribut. Or une barre de navigation
+ * ne s'écrit jamais autrement qu'en table : le test regardait partout sauf
+ * là où les liens se rassemblent.
+ */
 function adressesDe(fichier: string): string[] {
   const source = readFileSync(fichier, "utf8");
-  const trouvees = source.matchAll(/href="(\/[^"]*)"/gu);
+  const trouvees = [
+    ...source.matchAll(/href="(\/[^"]*)"/gu),
+    ...source.matchAll(/href:\s*"(\/[^"]*)"/gu),
+  ];
   return [...trouvees].map((m) => m[1]!.split("#")[0]!.split("?")[0]!);
 }
 
@@ -77,6 +94,45 @@ describe("aucun lien interne ne mène nulle part", () => {
 
   it.each(liens)("%s → %s est servi", (_fichier, adresse) => {
     expect(sert(adresse), `${adresse} n'a pas de page`).toBe(true);
+  });
+
+  /**
+   * Une porte close est un troisième genre de lien mort : l'adresse est
+   * servie, mais derrière une garde. Le pied de page a longtemps proposé
+   * « Consultants partenaires » à des visiteurs anonymes, que l'écran
+   * renvoyait à la connexion sans dire pourquoi.
+   *
+   * La garde vit dans le gabarit, jamais dans la page : un lien public qui
+   * entre dans `(app)` ou `(auth)` mène donc à un mur, et ce test le
+   * refuse. Les deux exceptions sont les portes elles-mêmes — s'inscrire et
+   * se connecter, qui sont l'endroit où l'on franchit le mur.
+   */
+  it("aucun écran public ne mène derrière une garde sans le dire", () => {
+    const PORTES = ["/inscription", "/connexion", "/mot-de-passe"];
+    const gardees = fichiers("src/app", /^page\.tsx$/u)
+      .filter((f) => /\/\((app|auth|admin)\)\//u.test(f))
+      .map((f) =>
+        f
+          .replace(/^src\/app/u, "")
+          .replace(/\/page\.tsx$/u, "")
+          .replace(/\/\([^/]*\)/gu, "")
+          .replace(/\[[^\]]+\]/gu, "*"),
+      );
+    const sousGarde = (adresse: string) =>
+      gardees.some((motif) => {
+        const sm = motif.split("/").filter(Boolean);
+        const sa = adresse.split("/").filter(Boolean);
+        return sm.length === sa.length && sm.every((m, i) => m === "*" || m === sa[i]);
+      });
+
+    const murs = fichiers("src/app/(public)", /\.tsx$/u)
+      .concat(["src/components/layout/Header.tsx", "src/components/layout/Footer.tsx"])
+      .flatMap((fichier) =>
+        adressesDe(fichier)
+          .filter((a) => !PORTES.includes(a) && sousGarde(a))
+          .map((a) => `${fichier} → ${a}`),
+      );
+    expect(murs).toEqual([]);
   });
 
   /**

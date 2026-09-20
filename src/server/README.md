@@ -58,7 +58,7 @@ src/server/
     backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
     partenaires.ts   WF-13. Rien n'est proposable par défaut.
     portabilite.ts   Export du compte et archive d'un dossier.
-    editorial.ts     Guides et articles : le public, et le registre B-08.
+    editorial.ts     Guides et articles : le public, les rubriques, B-08.
     paiements.ts     Le tunnel ($-01 à $-05) et le reçu ($-04, $-06).
   jobs/
     worker.ts        Branchement pg-boss et cadences.
@@ -279,10 +279,24 @@ déjà sorti de la base.
 
 **Régénéré à la demande, pas pré-généré.** Le build se fait en intégration
 continue, sans base de données (J.8) : `generateStaticParams` ne peut plus
-rien énumérer. Les pages se rendent à la première demande, restent en cache
-une heure, et la publication invalide leur adresse. On garde ce qui
-comptait pour le référencement — une page servie en HTML complet et sans
-attente — sans exiger une base au moment de la construction.
+rien énumérer. Les pages de document se rendent à la première demande,
+restent en cache une heure, et la publication invalide leur adresse — la
+leur **et celle de leur rubrique**, sans quoi un guide publié resterait une
+heure invisible depuis la page qui existe pour le trouver.
+
+Les trois index — `/guides`, `/articles`, `/destinations` — n'ont pas cette
+chance. Une page sans paramètre dynamique est pré-rendue au build, où il
+n'y a pas de base, et la construction échoue : `force-dynamic` est la seule
+réponse honnête, pour une requête par visite sur une liste de quelques
+lignes. La différence tient au segment, pas au contenu.
+
+**Les deux rubriques ne se classent pas pareil.** Un article est daté : le
+plus récent d'abord. Un guide porte un pays, et celui qu'on cherche est
+celui où l'on veut aller — ordre alphabétique, `localeCompare` en français
+pour qu'« Émirats » se range à sa place. La date affichée suit la même
+logique : un guide montre sa **vérification** (un guide de 2024 revérifié
+le mois dernier vaut mieux qu'un guide publié le mois dernier et jamais
+relu), un article sa **parution**.
 
 ## Écrire une route
 

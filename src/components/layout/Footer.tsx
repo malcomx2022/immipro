@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { EDITORIAL } from "@/lib/contenu/destinations";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,41 +9,49 @@ import { cn } from "@/lib/utils";
  * que la plateforme ne fait pas (INV-1, INV-2), et elle est présente sur tous
  * les écrans publics.
  *
- * La colonne des destinations vient du registre éditorial, et non de la
- * base. Écrite en dur, elle pointait vers le Canada et l'Allemagne, qui ne
- * sont pas couverts : un pied de page qui mène à des pages inexistantes se
- * voit sur chaque écran du site.
+ * Il n'énumère plus de destinations. Il en nommait trois, tirées du
+ * registre éditorial : celui-ci connaît les slugs mais pas ce qui est
+ * **publié**, et « Émirats arabes unis » menait donc à une fiche en 404,
+ * sur chaque écran public. Les lire en base aurait rendu dynamiques toutes
+ * les pages du gabarit, y compris celles qui n'ont aucune raison de l'être.
  *
- * La lire en base aurait été plus exact encore, et c'était la première
- * version — mais le pied de page est partagé par **toutes** les pages
- * publiques : une requête ici les rend toutes dynamiques, y compris les
- * guides et les articles qui n'ont aucune raison de l'être. Le registre
- * éditorial est la source des slugs ; il ne peut pas diverger d'eux.
+ * Le catalogue `/destinations` répond à la question que la colonne posait,
+ * et il la lit en base — une seule page dynamique au lieu de toutes.
+ */
+/**
+ * Ce que le pied de page promet, et que le site tient.
+ *
+ * Il portait neuf adresses qui répondaient 404 — « Comment ça marche »,
+ * « À propos », « Contact », et les trois pages légales — sur **toutes** les
+ * pages publiques. Le test des liens morts ne les voyait pas : il lisait
+ * les attributs `href="…"` et pas les tables de liens, c'est-à-dire tout
+ * sauf l'endroit où les liens se rassemblent.
+ *
+ * Elles sont retirées plutôt qu'écrites. Des mentions légales demandent un
+ * siège, un numéro RCCM et un hébergeur ; des conditions d'utilisation sont
+ * un contrat. Les inventer produirait un document juridique faux, ce qui
+ * est pire qu'une colonne absente — et le lien, lui, promettait déjà ce
+ * document sans l'avoir. Ce qui manque est consigné en annexe Q.
+ *
+ * « Consultants partenaires » est parti pour une autre raison : l'écran
+ * existe, mais derrière la garde candidat. Un lien public qui mène à un
+ * mur de connexion n'est pas un lien mort, c'est une porte close — et le
+ * pied de page ne dit pas laquelle.
  */
 const COLONNES = [
+  {
+    titre: "Destinations",
+    liens: [
+      { href: "/destinations", libelle: "Destinations couvertes" },
+      { href: "/simulateur", libelle: "Trouver la mienne" },
+    ],
+  },
   {
     titre: "Produit",
     liens: [
       { href: "/tarifs", libelle: "Tarifs" },
-      { href: "/comment-ca-marche", libelle: "Comment ça marche" },
       { href: "/guides", libelle: "Guides pays" },
-      { href: "/articles", libelle: "Blog" },
-    ],
-  },
-  {
-    titre: "Société",
-    liens: [
-      { href: "/a-propos", libelle: "À propos" },
-      { href: "/consultants", libelle: "Consultants partenaires" },
-      { href: "/contact", libelle: "Contact" },
-    ],
-  },
-  {
-    titre: "Légal",
-    liens: [
-      { href: "/mentions-legales", libelle: "Mentions légales" },
-      { href: "/donnees-personnelles", libelle: "Données personnelles" },
-      { href: "/conditions", libelle: "Conditions" },
+      { href: "/articles", libelle: "Articles" },
     ],
   },
 ] as const;
@@ -53,22 +60,8 @@ export interface FooterProps {
   className?: string;
 }
 
-/**
- * Une destination par pays : deux procédures du même pays donneraient deux
- * liens au même libellé, et le lecteur ne saurait pas lequel suivre.
- */
-const DESTINATIONS = {
-  titre: "Destinations",
-  liens: [
-    ...[...new Map(Object.values(EDITORIAL).map((e) => [e.pays, e])).values()]
-      .slice(0, 3)
-      .map((e) => ({ href: `/destinations/${e.slug}`, libelle: e.pays })),
-    { href: "/resultats", libelle: "Toutes les fiches" },
-  ],
-};
-
 export function Footer({ className }: FooterProps) {
-  const colonnes = [DESTINATIONS, ...COLONNES];
+  const colonnes = COLONNES;
 
   return (
     <footer className={cn("flex flex-col gap-6 bg-ink-100 px-4 py-8 md:px-12", className)}>

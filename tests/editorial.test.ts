@@ -13,8 +13,13 @@ import {
   sommaireDe,
   textesDuDocument,
   verifierLeDocument,
+  DATE_AFFICHEE,
+  RUBRIQUE_VIDE,
+  dateDeLaRubrique,
+  ordonner,
   type Bloc,
   type Corps,
+  type EnTete,
 } from "@/domain/editorial/document";
 import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 import { ECHECS } from "@/server/http/echecs";
@@ -150,6 +155,143 @@ describe("ce qui se dérive, et ne se saisit donc pas", () => {
     expect(MENTION_SUITE.GUIDE).toMatch(/ne constitue pas un conseil juridique/u);
     expect(MENTION_SUITE.ARTICLE).toMatch(/ne constitue pas un conseil juridique/u);
     expect(MENTION_SUITE.GUIDE).not.toBe(MENTION_SUITE.ARTICLE);
+  });
+});
+
+describe("l'ordre d'une rubrique — P.A", () => {
+  const entete = (o: Partial<EnTete>): EnTete => ({
+    genre: "GUIDE",
+    slug: "s",
+    titre: "T",
+    chapeau: "C",
+    surtitre: "Pays",
+    dureeLecture: "3 min",
+    verifieeLe: "2026-01-01",
+    publieLe: "2026-01-01",
+    ...o,
+  });
+
+  it("les articles vont du plus récent au plus ancien", () => {
+    // Un article est daté : un texte de l'an dernier sur une règle qui a
+    // changé depuis n'est pas ce qu'on veut lire en premier.
+    const liste = [
+      entete({ genre: "ARTICLE", slug: "vieux", publieLe: "2025-03-02" }),
+      entete({ genre: "ARTICLE", slug: "recent", publieLe: "2026-09-11" }),
+      entete({ genre: "ARTICLE", slug: "milieu", publieLe: "2026-01-20" }),
+    ];
+    expect(ordonner(liste, "ARTICLE").map((e) => e.slug)).toEqual([
+      "recent",
+      "milieu",
+      "vieux",
+    ]);
+  });
+
+  it("les guides vont par pays, pas par date", () => {
+    // Celui qu'on cherche est celui où l'on veut aller, pas le dernier
+    // écrit. Classer par date mettrait en tête celui qu'on a eu le temps
+    // de rédiger, ce qui n'est une information sur rien.
+    const liste = [
+      entete({ slug: "suisse", surtitre: "Suisse", publieLe: "2026-09-11" }),
+      entete({ slug: "pays-bas", surtitre: "Pays-Bas", publieLe: "2025-01-01" }),
+      entete({ slug: "emirats", surtitre: "Émirats arabes unis", publieLe: "2026-05-05" }),
+    ];
+    expect(ordonner(liste, "GUIDE").map((e) => e.slug)).toEqual([
+      "emirats",
+      "pays-bas",
+      "suisse",
+    ]);
+  });
+
+  it("l'ordre alphabétique est celui du français", () => {
+    // « Émirats » se range à É, pas après « Suisse » comme le ferait une
+    // comparaison de codes.
+    const liste = [
+      entete({ slug: "s", surtitre: "Suisse" }),
+      entete({ slug: "e", surtitre: "Émirats arabes unis" }),
+    ];
+    expect(ordonner(liste, "GUIDE")[0]?.slug).toBe("e");
+  });
+
+  it("un guide porte sa date de vérification, un article sa parution", () => {
+    // Un guide écrit il y a deux ans mais revérifié le mois dernier vaut
+    // mieux qu'un guide publié le mois dernier et jamais relu depuis.
+    const guide = entete({ verifieeLe: "2026-09-11", publieLe: "2024-02-02" });
+    expect(dateDeLaRubrique(guide)).toBe("2026-09-11");
+    expect(DATE_AFFICHEE.GUIDE.libelle).toBe("Vérifié le");
+
+    const article = entete({ genre: "ARTICLE", verifieeLe: "2026-09-11", publieLe: "2024-02-02" });
+    expect(dateDeLaRubrique(article)).toBe("2024-02-02");
+    expect(DATE_AFFICHEE.ARTICLE.libelle).toBe("Publié le");
+  });
+
+  it("le tri ne modifie pas la liste reçue", () => {
+    const liste = [entete({ slug: "b", surtitre: "B" }), entete({ slug: "a", surtitre: "A" })];
+    ordonner(liste, "GUIDE");
+    expect(liste.map((e) => e.slug)).toEqual(["b", "a"]);
+  });
+
+  it("une rubrique vide ne se présente pas comme une panne", () => {
+    expect(RUBRIQUE_VIDE.GUIDE).not.toMatch(/erreur|indisponible|panne/iu);
+    expect(RUBRIQUE_VIDE.ARTICLE).not.toMatch(/erreur|indisponible|panne/iu);
+  });
+});
+
+describe("les index de rubrique", () => {
+  it("l'en-tête et le pied de page ne promettent plus de 404", () => {
+    // Neuf adresses mortes sur toutes les pages publiques, depuis le
+    // premier lot. Le test des liens morts ne lisait que les attributs
+    // `href="…"`, jamais les tables de liens.
+    const liens = lire("tests/liens-morts.test.ts");
+    expect(liens).toMatch(/href:\\s\*"/u);
+  });
+
+  it("les trois index se rendent à la demande, et le build reste sans base", () => {
+    // Une page d'index n'a pas de paramètre dynamique : Next la pré-rend
+    // au build, où il n'y a pas de base (J.8), et la construction échoue.
+    // Les pages de document, elles, gardent leur cache — leur paramètre
+    // n'est énumérable par rien.
+    for (const page of [
+      "src/app/(public)/guides/page.tsx",
+      "src/app/(public)/articles/page.tsx",
+      "src/app/(public)/destinations/page.tsx",
+    ]) {
+      const source = sansCommentaires(lire(page));
+      expect(source).toMatch(/export const dynamic = "force-dynamic"/u);
+      expect(source).not.toMatch(/generateStaticParams/u);
+    }
+    for (const page of [
+      "src/app/(public)/guides/[pays]/page.tsx",
+      "src/app/(public)/articles/[slug]/page.tsx",
+    ]) {
+      expect(lire(page)).toMatch(/export const revalidate = 3600/u);
+    }
+  });
+
+  it("publier invalide le document et sa rubrique", () => {
+    // Oublier l'index laisserait un guide publié invisible une heure
+    // depuis la page qui existe pour le trouver.
+    const route = lire("src/app/api/admin/contenus/[id]/route.ts");
+    expect(route).toMatch(/revalidatePath\(CHEMIN\[genre\]\)/u);
+    expect(route.match(/revalider\(/gu)?.length).toBe(4);
+  });
+
+  it("le pied de page n'énumère plus de destinations", () => {
+    // Il en nommait trois, tirées du registre éditorial, qui connaît les
+    // slugs mais pas ce qui est publié : « Émirats arabes unis » menait à
+    // une fiche en 404, sur chaque écran public. Aucun test statique ne
+    // peut voir cet état de base — mais la cause, oui : une liste figée
+    // dans un composant partagé.
+    const pied = lire("src/components/layout/Footer.tsx");
+    expect(pied).not.toMatch(/EDITORIAL/u);
+    expect(pied).not.toMatch(/\/destinations\/\$\{/u);
+    expect(pied).toMatch(/href: "\/destinations"/u);
+  });
+
+  it("le catalogue des destinations n'est pas le classement du simulateur", () => {
+    // P-02 liste ce qui est couvert ; P-03 classe selon des réponses.
+    const catalogue = sansCommentaires(lire("src/app/(public)/destinations/page.tsx"));
+    expect(catalogue).toMatch(/fichesPubliees/u);
+    expect(catalogue).not.toMatch(/CLASSEMENT|Resultats|classement/u);
   });
 });
 

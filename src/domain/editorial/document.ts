@@ -210,3 +210,85 @@ export const AIDE_SOURCE =
 
 export const MENTION_DERIVES =
   "Le sommaire et la durée de lecture se calculent depuis le corps : ils n'ont pas de champ, et ne peuvent donc pas le contredire.";
+
+// ── Les index de rubrique — P.A ──────────────────────────────────────────
+
+/**
+ * Ce qu'une rubrique montre d'un document, sans son corps.
+ *
+ * `verifieeLe` et `publieLe` sont tous les deux là, parce que les deux
+ * rubriques ne s'appuient pas sur la même date — voir `ordonner`.
+ */
+export interface EnTete {
+  genre: GenreDocument;
+  slug: string;
+  titre: string;
+  chapeau: string;
+  /** Guide : le pays. Article : la rubrique. */
+  surtitre: string;
+  dureeLecture: string;
+  verifieeLe: string;
+  publieLe: string;
+}
+
+/**
+ * L'ordre d'une rubrique, et ce n'est pas le même des deux côtés — c'était
+ * la question que P.A laissait ouverte.
+ *
+ * **Un article est daté.** C'est du journalisme : le plus récent d'abord,
+ * parce qu'un texte de l'an dernier sur une règle qui a changé depuis n'est
+ * pas ce qu'on veut lire en premier.
+ *
+ * **Un guide ne l'est pas.** Il porte un pays, et celui qu'on cherche est
+ * celui où l'on veut aller — pas le dernier écrit. Classer des guides par
+ * date de publication, c'est mettre en tête celui qu'on a eu le temps de
+ * rédiger, ce qui n'est une information sur rien. L'ordre alphabétique du
+ * pays est neutre, et surtout prévisible : on sait où regarder avant
+ * d'avoir lu.
+ *
+ * `localeCompare` en français, pour que « Émirats » se range à sa place et
+ * non après « Suisse ».
+ */
+export function ordonner(entetes: readonly EnTete[], genre: GenreDocument): EnTete[] {
+  const triees = [...entetes];
+  if (genre === "ARTICLE") {
+    return triees.sort((a, b) => b.publieLe.localeCompare(a.publieLe));
+  }
+  return triees.sort((a, b) => a.surtitre.localeCompare(b.surtitre, "fr"));
+}
+
+/**
+ * La date qu'une rubrique affiche, et c'est la même distinction.
+ *
+ * Sur un guide, la date de publication ne dit rien de sa fiabilité : un
+ * guide écrit il y a deux ans mais revérifié le mois dernier vaut mieux
+ * qu'un guide publié le mois dernier et jamais relu depuis. C'est la date
+ * de vérification qui compte, et c'est déjà celle qu'INV-8 impose en pied
+ * de page. Sur un article, daté par nature, c'est la parution.
+ */
+export const DATE_AFFICHEE: Record<GenreDocument, { cle: "verifieeLe" | "publieLe"; libelle: string }> = {
+  GUIDE: { cle: "verifieeLe", libelle: "Vérifié le" },
+  ARTICLE: { cle: "publieLe", libelle: "Publié le" },
+};
+
+export const dateDeLaRubrique = (entete: EnTete): string =>
+  entete[DATE_AFFICHEE[entete.genre].cle];
+
+export const TITRE_RUBRIQUE: Record<GenreDocument, string> = {
+  GUIDE: "Guides pays",
+  ARTICLE: "Articles",
+};
+
+export const CHAPEAU_RUBRIQUE: Record<GenreDocument, string> = {
+  GUIDE: "Ce que coûte une année, ce qu'il faut prouver, et les erreurs qui reviennent — destination par destination.",
+  ARTICLE: "Des points de règle expliqués une fois, pour ne pas les découvrir au moment du dépôt.",
+};
+
+/**
+ * Ce que dit une rubrique vide. Elle ne se présente pas comme une panne :
+ * un site jeune n'a pas encore de guide, et c'est un état normal.
+ */
+export const RUBRIQUE_VIDE: Record<GenreDocument, string> = {
+  GUIDE: "Aucun guide n'est publié pour l'instant. Les fiches destination, elles, sont à jour.",
+  ARTICLE: "Aucun article n'est publié pour l'instant.",
+};

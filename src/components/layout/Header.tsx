@@ -8,9 +8,15 @@ import { cn } from "@/lib/utils";
  * Elle suit le lien d'évitement dans l'ordre du DOM : le premier arrêt de
  * tabulation de la page reste « Aller au contenu » (règle clavier 2).
  */
+/**
+ * Trois des quatre entrées répondaient 404 — « Destinations », « Comment ça
+ * marche » et « Guides pays » —, sur toutes les pages publiques et depuis le
+ * premier lot. Le catalogue et les guides existent désormais ; « Comment ça
+ * marche » demande une page de présentation qui n'est pas écrite, et une
+ * barre de navigation n'est pas l'endroit où promettre (annexe Q).
+ */
 const NAVIGATION = [
   { href: "/destinations", libelle: "Destinations" },
-  { href: "/comment-ca-marche", libelle: "Comment ça marche" },
   { href: "/tarifs", libelle: "Tarifs" },
   { href: "/guides", libelle: "Guides pays" },
 ] as const;
