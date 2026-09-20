@@ -62,7 +62,7 @@ describe("$-01 — Choix du pack", () => {
     }
     const continuer = screen.getByRole("button", { name: "Continuer" });
     expect(continuer).toBeDisabled();
-    expect(continuer).toHaveAccessibleDescription("Choisissez un pack pour continuer.");
+    expect(continuer).toHaveAccessibleDescription("Choisis un pack pour continuer.");
   });
 
   it("affiche les montants du domaine, pas une copie", () => {

@@ -214,7 +214,7 @@ describe("C-05 — Ouverture de dossier", () => {
     const creer = screen.getByRole("button", { name: "Créer mon dossier" });
     expect(creer).toBeDisabled();
     expect(creer).toHaveAccessibleDescription(
-      "Choisissez une date de dépôt visée, même approximative.",
+      "Choisis une date de dépôt visée, même approximative.",
     );
   });
 

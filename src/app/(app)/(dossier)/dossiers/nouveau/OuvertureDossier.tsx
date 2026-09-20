@@ -175,7 +175,7 @@ export function OuvertureDossier({
           disabled={date === null}
           chargement={envoi}
           raisonDesactivation={
-            date === null ? "Choisissez une date de dépôt visée, même approximative." : undefined
+            date === null ? "Choisis une date de dépôt visée, même approximative." : undefined
           }
           onClick={() => void ouvrir()}
         >

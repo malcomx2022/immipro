@@ -46,7 +46,7 @@ describe("P-02 — Simulateur", () => {
     const continuer = screen.getByRole("button", { name: "Continuer" });
     expect(continuer).toBeDisabled();
     expect(continuer).toHaveAccessibleDescription(
-      "Choisissez une réponse pour continuer.",
+      "Choisis une réponse pour continuer.",
     );
   });
 
