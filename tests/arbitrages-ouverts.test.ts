@@ -42,13 +42,19 @@ const SOURCES = [
  * L.A — le barème interne relève-t-il du droit d'accès ?
  * ------------------------------------------------------------------ */
 
-describe("L.A — le barème interne ne sort pas, tant que l'article 15 n'a pas tranché", () => {
+describe("L.A (sous réserve) — l'export explique sans restituer le barème", () => {
   /**
-   * L'article 20 (portabilité) ne couvre que les données fournies par la
-   * personne ; l'article 15 (accès) ne fait pas cette distinction.
-   * L'export retient la lecture compatible avec C-09 : un palier et un
-   * dénombrement, jamais le nombre. Le jour où le droit d'accès l'emporte,
-   * c'est ce test qui change — pas l'export en silence.
+   * Décision produit provisoire du 20/09/2026, **soumise à validation
+   * juridique avant lancement**. L'article 20 (portabilité) ne couvre que
+   * les données fournies ; l'article 15 (accès) ne fait pas cette
+   * distinction ; l'information sur la logique d'un traitement automatisé
+   * est encore autre chose. Le produit ne tranche pas cet arbitrage — il
+   * retient, en attendant, la lecture qui explique sans réintroduire le
+   * nombre que C-09 a retiré.
+   *
+   * Ce que le test tient est donc double : le nombre ne sort toujours pas,
+   * et l'explication qui le remplace reste une explication — pas une
+   * restitution du barème par un autre chemin.
    */
   it("aucune lecture ne sérialise le nombre", () => {
     const fautives = fichiers("src/server/lecture", /\.ts$/u).filter((f) =>
@@ -68,6 +74,36 @@ describe("L.A — le barème interne ne sort pas, tant que l'article 15 n'a pas 
     const portabilite = lire("src/server/lecture/portabilite.ts");
     expect(portabilite).toContain("palier");
     expect(portabilite).toContain("obligatoiresManquantes");
+  });
+
+  /**
+   * L'explication est le pas que la décision autorise. Elle s'arrête là :
+   * un coefficient, un total ou une part reviendraient à publier le barème
+   * en toutes lettres, ce que la décision réserve au juriste.
+   */
+  it("l'explication nomme les facteurs sans donner leur poids", () => {
+    const explication = lire("src/domain/completeness/explication.ts");
+    const textes = [...explication.matchAll(/"([^"]{20,})"/gu)].map((m) => m[1]!);
+    expect(textes.length).toBeGreaterThan(4);
+    for (const texte of textes) {
+      expect(texte, texte).not.toMatch(/\d+\s?%|sur\s?100|coefficient|pond[ée]ration de|\bpoints?\b/iu);
+    }
+    // Et la limite est dite, plutôt que passée sous silence.
+    expect(explication).toMatch(/LIMITE_DE_LA_RESTITUTION/u);
+  });
+
+  /**
+   * L'explication décrit le calcul qui décide, pas celui que le document
+   * décrit. WF-07 énumère quatre composantes pondérées ; le palier montré
+   * au candidat n'en pèse qu'une, et réciter les quatre aurait été faux.
+   */
+  it("elle décrit le calcul réellement appliqué, pas celui du référentiel", () => {
+    const explication = lire("src/domain/completeness/explication.ts");
+    expect(explication).toContain("CE_QUI_NE_PESE_PAS");
+    // Le calcul rendu au candidat neutralise ces deux composantes : la
+    // fonction qui le produit ne reçoit ni condition ni ratio.
+    const piece = lire("src/domain/dossiers/piece.ts");
+    expect(piece).toMatch(/conditions: \[\]/u);
   });
 });
 
@@ -293,7 +329,18 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   const CE_FICHIER = lire("tests/arbitrages-ouverts.test.ts");
 
   /** Encore ouverts : la lecture est provisoire, le test la tient. */
-  const OUVERTS = ["L.A", "N.A"];
+  const OUVERTS = ["N.A"];
+  /**
+   * Décidés par le produit, mais suspendus à une condition qui ne lui
+   * appartient pas — L.A attend une validation juridique avant lancement.
+   *
+   * Le relevé n'avait que deux états, ouvert et tranché, et aucun ne
+   * convenait : « ouvert » aurait laissé croire que personne n'a décidé,
+   * « tranché » aurait fait disparaître la réserve, qui est précisément ce
+   * qu'il faut ne pas perdre de vue. Un troisième état la garde visible,
+   * et le test exige qu'elle soit nommée dans le relevé.
+   */
+  const SOUS_RESERVE = ["L.A"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
@@ -301,6 +348,8 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
    * lecture provisoire.
    */
   const TRANCHES = ["I.B", "I.D", "K.A"];
+
+  const TOUS = [...OUVERTS, ...SOUS_RESERVE, ...TRANCHES];
 
   /**
    * Le bloc d'un arbitrage s'arrête au suivant, et non au bout de neuf
@@ -326,12 +375,14 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   it("les codes cités sont ceux du relevé", () => {
     const cites = [
       ...new Set(
-        [...CE_FICHIER.matchAll(/^describe\("([A-Z]\.[A-Z])(?: \(tranché\))? —/gmu)].map(
-          (m) => m[1]!,
-        ),
+        [
+          ...CE_FICHIER.matchAll(
+            /^describe\("([A-Z]\.[A-Z])(?: \((?:tranché|sous réserve)\))? —/gmu,
+          ),
+        ].map((m) => m[1]!),
       ),
     ].sort();
-    expect(cites).toEqual([...OUVERTS, ...TRANCHES].sort());
+    expect(cites).toEqual([...TOUS].sort());
 
     for (const code of cites) {
       expect(ECARTS, code).toMatch(new RegExp(`\\*\\*${code.replace(".", "\\.")} —`, "u"));
@@ -341,6 +392,22 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   it("les ouverts ne portent pas la mention qui les fermerait", () => {
     for (const code of OUVERTS) {
       expect(bloc(code), code).not.toMatch(/\*\*Tranché/u);
+    }
+  });
+
+  /**
+   * Une réserve qui ne nomme pas sa condition n'en est pas une : elle
+   * devient, six mois plus tard, un arbitrage que tout le monde croit
+   * fermé. Le relevé doit dire qui doit valider quoi, et avant quand.
+   */
+  it("ceux sous réserve nomment leur condition, et le test le dit", () => {
+    for (const code of SOUS_RESERVE) {
+      const texte = bloc(code);
+      expect(texte, code).toMatch(/\*\*Décision produit provisoire/u);
+      expect(texte, code).toMatch(/validation juridique/iu);
+      expect(texte, code).toMatch(/avant lancement/iu);
+      expect(texte, code).not.toMatch(/\*\*Tranché/u);
+      expect(CE_FICHIER, code).toContain(`describe("${code} (sous réserve) —`);
     }
   });
 

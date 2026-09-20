@@ -11,6 +11,15 @@ import {
 } from "@/domain/comptes/portabilite";
 import { A_FAIRE_AVANT, LIEN_AVANT_SUPPRESSION } from "@/domain/comptes/suppression";
 import { TTL_PRESIGNE_SECONDES } from "@/server/acces/pieces";
+import {
+  CE_QUI_DECIDE,
+  CE_QUI_NE_PESE_PAS,
+  HORS_CALCUL,
+  LIMITE_DE_LA_RESTITUTION,
+  expliquerLaCompletude,
+} from "@/domain/completeness/explication";
+import { completudeDesPieces } from "@/domain/dossiers/piece";
+import type { Piece } from "@/domain/dossiers/piece";
 
 const lire = (f: string) => readFileSync(f, "utf8");
 
@@ -167,5 +176,89 @@ describe("la suppression renvoie vers l'export, maintenant qu'il existe", () => 
     expect(LIEN_AVANT_SUPPRESSION).toBe("/compte/mes-donnees");
     const ecran = lire("src/app/(auth)/compte/suppression/SuppressionDuCompte.tsx");
     expect(ecran).toMatch(/LIEN_AVANT_SUPPRESSION/u);
+  });
+});
+
+/**
+ * L.A — décision produit provisoire du 20/09/2026, soumise à validation
+ * juridique avant lancement.
+ *
+ * L'export explique les principaux facteurs sans restituer le barème. Ce
+ * que ces tests tiennent : l'explication est vraie du calcul appliqué, et
+ * elle ne réintroduit pas par la description le nombre que C-09 a retiré.
+ */
+describe("l'export explique ce qui a pesé", () => {
+  const piece = (code: string, famille: Piece["famille"], etat: Piece["etat"]): Piece => ({
+    id: code,
+    code,
+    libelle: code,
+    famille,
+    etat,
+    remede: "TELEVERSER",
+  });
+
+  const incomplet = completudeDesPieces([
+    piece("PAS", "OBLIGATOIRE", "CONFORME"),
+    piece("REL", "OBLIGATOIRE", "ATTENDUE"),
+    piece("MOT", "COMPLEMENTAIRE", "ATTENDUE"),
+  ]);
+
+  it("dit ce qui décide, puis ce qui ne pèse pas", () => {
+    const e = expliquerLaCompletude(incomplet);
+    expect(e.ceQuiDecide).toEqual(CE_QUI_DECIDE);
+    expect(e.ceQuiNePesePas).toEqual(CE_QUI_NE_PESE_PAS);
+    expect(e.horsCalcul).toBe(HORS_CALCUL);
+    expect(e.limite).toBe(LIMITE_DE_LA_RESTITUTION);
+  });
+
+  it("décrit la situation réelle du dossier, à partir des compteurs", () => {
+    const e = expliquerLaCompletude(incomplet);
+    const texte = e.surTonDossier.join(" ");
+    // Chaque énoncé est une phrase, majuscule comprise : sans elle,
+    // l'export s'ouvrait sur « une pièce conforme à ce jour. »
+    expect(texte).toMatch(/Une pièce conforme à ce jour\./u);
+    expect(texte).toMatch(/Une pièce obligatoire manque/u);
+    expect(texte).toMatch(/Une pièce complémentaire reste à traiter/u);
+    for (const phrase of e.surTonDossier) {
+      expect(phrase[0], phrase).toBe(phrase[0]!.toUpperCase());
+    }
+  });
+
+  it("un dossier complet le dit, plutôt que de lister des manques absents", () => {
+    const complet = completudeDesPieces([
+      piece("PAS", "OBLIGATOIRE", "CONFORME"),
+      piece("MOT", "COMPLEMENTAIRE", "CONFORME"),
+    ]);
+    const e = expliquerLaCompletude(complet);
+    expect(e.surTonDossier.join(" ")).toMatch(/Rien ne manque/u);
+  });
+
+  /**
+   * Le garde-fou de C-09 vaut pour l'explication comme pour le reste :
+   * un nombre sur cent lu dans un fichier se retient comme un pronostic
+   * aussi sûrement qu'affiché à l'écran.
+   */
+  it("aucune phrase ne réintroduit le nombre ni son vocabulaire", () => {
+    const e = expliquerLaCompletude(incomplet);
+    const tout = [
+      ...e.ceQuiDecide,
+      ...e.ceQuiNePesePas,
+      ...e.surTonDossier,
+      e.horsCalcul,
+      e.limite,
+    ].join(" ");
+    expect(tout).not.toMatch(/\bscore\b|\bchances?\b|\d+\s?%|sur\s?100|probabilit/iu);
+  });
+
+  it("elle rappelle que la complétude n'est pas une prédiction (INV-1)", () => {
+    expect(HORS_CALCUL).toMatch(/décision de l'administration/u);
+  });
+
+  /** L'ordre des manques est exporté : c'est ce que la limite affirme. */
+  it("l'export porte les manques dans leur ordre, comme l'annonce la limite", () => {
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    expect(lecture).toMatch(/manques: completude\.missing\.map/u);
+    expect(lecture).toMatch(/explication: expliquerLaCompletude\(completude\)/u);
+    expect(LIMITE_DE_LA_RESTITUTION).toMatch(/l'ordre dans lequel les manques/u);
   });
 });

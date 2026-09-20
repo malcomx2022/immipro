@@ -137,6 +137,7 @@ export function completudeDesPieces(
     computeCompleteness({
       documents: pieces.map((p) => ({
         code: p.code,
+        libelle: p.libelle,
         required: p.famille === "OBLIGATOIRE",
         status: p.etat,
       })),

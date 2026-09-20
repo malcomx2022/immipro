@@ -275,7 +275,7 @@ jamais supprimé sans que la décision soit écrite ici.
 
 | Arbitrage | Lecture retenue | Ce que le test refuse |
 |---|---|---|
-| **L.A** — le barème interne relève-t-il du droit d'accès ? | Palier et dénombrement, jamais le nombre (C-09) | Une lecture ou une route qui sérialise `internalScore` |
+| **L.A** — *décidé sous réserve, 20/09* | Palier, dénombrement, manques ordonnés et explication des facteurs — jamais le nombre (C-09) | `internalScore` sérialisé, ou une explication qui donnerait les coefficients |
 | **K.A** — *tranché le 20/09* | Une aide fonctionnelle dans le dossier, les offres sur les surfaces dédiées | Une offre, ou son vocabulaire, dans un écran de l'espace dossier |
 | **I.B** — *tranché le 20/09* | Seule la parité fixe du franc CFA convertit ; ailleurs le budget sort du classement | Une seconde parité écrite en dur |
 | **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
@@ -1195,9 +1195,49 @@ l'écran (INV-1). L'export porte la complétude en palier et en dénombrement.
 **L.A — Le barème interne relève-t-il du droit d'accès ?** L'article 20
 (portabilité) ne couvre que les données fournies par la personne, ce qui
 exclut les données calculées. L'article 15 (accès) ne fait pas cette
-distinction. L'export retient la lecture compatible avec l'arbitrage C-09 —
-palier et dénombrement, pas le score — et le point mérite une réponse
-juridique, pas seulement produit.
+distinction, et l'information sur la logique d'un traitement automatisé est
+encore autre chose. **Décision produit provisoire du 20/09/2026 —
+validation juridique obligatoire avant lancement.**
+
+L'export individuel porte les données fournies par la personne, les
+résultats effectivement utilisés pour son dossier, le palier, le
+dénombrement et une explication intelligible des principaux facteurs. Il
+n'expose ni le nombre que C-09 a retiré, ni le barème exhaustif comme s'il
+s'agissait d'une donnée personnelle brute.
+
+Ce que la réserve couvre : la validation juridique doit confirmer si le
+contexte d'utilisation impose une information supplémentaire sur la logique
+du calcul. L'arbitrage entre portabilité, droit d'accès et information sur
+un traitement automatisé dépend du cadre applicable et de l'usage réel du
+calcul — il ne revient pas à l'équipe produit de le trancher seule.
+
+### Ce que l'application de la décision a trouvé
+
+**Le relevé n'avait que deux états, et aucun ne convenait.** « Ouvert »
+aurait laissé croire que personne n'a décidé ; « tranché » aurait fait
+disparaître la réserve, qui est précisément ce qu'il ne faut pas perdre de
+vue. Un troisième état existe désormais — décidé, sous condition — et un
+test exige qu'un arbitrage qui le porte **nomme** sa condition : qui doit
+valider, quoi, et avant quand. Une réserve qui ne dit pas cela devient,
+six mois plus tard, un arbitrage que tout le monde croit fermé.
+
+**L'explication devait décrire le calcul qui décide, pas celui que le
+document décrit.** WF-07 énumère quatre composantes pondérées : pièces
+obligatoires, conditions bloquantes, cohérence inter-documents, qualité
+rédactionnelle. Le palier montré au candidat n'en pèse qu'une. Les
+conditions chiffrées sont reportées sur la pièce qui les porte — leur
+résultat *est* le verdict de cette pièce — et les deux composantes
+confiées à l'IA sont neutres dans ce calcul-là. Réciter les quatre aurait
+été plus flatteur et faux : quelqu'un qui lit « la cohérence entre tes
+pièces compte » en tire une conclusion sur un calcul qui ne la regarde
+pas. L'explication dit donc les deux : ce qui décide, et ce que le
+référentiel prévoit sans que cela pèse ici.
+
+**L'ordre des manques est la seule trace visible de la pondération, et il
+est désormais dans l'export.** C'était le point le plus utile à restituer
+et le plus facile à oublier : le classement des manques n'est pas
+arbitraire, il sort du gain interne de chacun. Le dire sans l'exporter
+aurait été une affirmation invérifiable par qui lit le fichier.
 
 **L.B — Deux boutons morts restent, sur le reçu de paiement ($-06).**
 ~~« Télécharger » et « Renvoyer par email » ne font rien : ce sont deux
