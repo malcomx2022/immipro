@@ -277,14 +277,20 @@ jamais supprimé sans que la décision soit écrite ici.
 |---|---|---|
 | **L.A** — le barème interne relève-t-il du droit d'accès ? | Palier et dénombrement, jamais le nombre (C-09) | Une lecture ou une route qui sérialise `internalScore` |
 | **K.A** — RG-13.1 et RG-13.2 se contredisent | Une seule proposition, sur le seul écran qui l'affichait | Une seconde surface commerciale dans l'espace dossier |
-| **I.B** — le budget hors zone euro | Seule la parité fixe du franc CFA convertit ; le reste n'est pas comparé | Une seconde parité écrite en dur |
+| **I.B** — *tranché le 20/09* | Seule la parité fixe du franc CFA convertit ; ailleurs le budget sort du classement | Une seconde parité écrite en dur |
 | **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
 | **I.D** — l'antivirus de WF-06 | Le balayage n'est pas fait, et n'est pas déclaré fait | Un texte ou un champ qui affirmerait qu'un fichier a été analysé |
 
-Deux tests de plus lient le fichier au relevé : les codes cités doivent
-exister ici, et aucun ne doit déjà porter la mention « Tranché ». Un
-arbitrage fermé dont le garde-fou survit continuerait de refuser une
-dérive que la décision vient peut-être d'autoriser.
+Trois tests de plus lient le fichier au relevé : les codes cités doivent
+exister ici, les ouverts ne doivent pas porter la mention « Tranché », et
+les tranchés doivent la porter. Un arbitrage fermé dont le garde-fou survit
+continuerait de refuser une dérive que la décision vient peut-être
+d'autoriser — c'est ce mécanisme qui a fait relire I.B le 20/09.
+
+Un garde-fou ne disparaît pas forcément avec son arbitrage. Celui d'I.B
+reste : la décision ne referme pas la porte, elle pose une condition
+d'entrée — pas de taux sans source datée et surveillée — et une condition
+se tient mieux qu'une lecture provisoire.
 
 Vérifié par mutation, une par arbitrage : un barème dans l'export, un
 cours du franc suisse en dur, un `provider` au schéma d'entrée, une
@@ -561,13 +567,73 @@ titre qu'un rang. Un test compare désormais les clés rendues par
 `/api/simulations` aux clés déclarées par P-03 et refuse qu'elles divergent,
 dans un sens comme dans l'autre : c'est ce qui aurait vu le champ non lu.
 
-**I.B — Le budget n'est comparable qu'en zone euro.** La parité du franc CFA
-avec l'euro est fixe et se convertit sans risque. Le franc suisse et le
-dirham sont des cours de marché : les écrire en dur périmerait, et les
-afficher demanderait leur source et leur date comme toute autre donnée. En
-attendant, la Suisse et les Émirats ne sont pas filtrés sur le budget, et la
-réponse porte la mention correspondante. Il faut soit une source de taux
-datée, soit renoncer à comparer les budgets hors zone euro.
+**I.B — Le budget n'est comparable qu'en zone euro.** ~~La parité du franc
+CFA avec l'euro est fixe et se convertit sans risque. Le franc suisse et le
+dirham sont des cours de marché : les écrire en dur périmerait. Il faut soit
+une source de taux datée, soit renoncer à comparer les budgets hors zone
+euro.~~ **Tranché le 20/09/2026.**
+
+ImmiPro ne compare pas les budgets libellés dans une devise à cours variable
+tant qu'aucune source de change datée et surveillée n'est intégrée. Les
+destinations concernées restent présentées, mais **le budget est exclu de
+leur classement**. La conversion euro / franc CFA reste autorisée : sa parité
+est fixe, c'est un régime de change et non un cours relevé.
+
+Quatre raisons, dans l'ordre :
+
+- une conversion silencieuse avec un taux écrit en dur violerait la promesse
+  de données sourcées et datées (INV-8) ;
+- écarter entièrement la Suisse ou les Émirats serait plus dommageable que de
+  les conserver avec une limite clairement annoncée ;
+- un classement incomplet mais honnêtement qualifié vaut mieux qu'un
+  classement artificiellement précis ;
+- la décision ferme l'arbitrage fonctionnel sans empêcher une future
+  intégration de taux — elle en fixe la condition d'entrée : une source
+  datée et surveillée.
+
+Pas de dépendance de lancement.
+
+### Ce que l'application de la décision a trouvé
+
+Le comportement était **presque** conforme, et l'écart tenait dans une
+valeur par défaut. Le filtrage strict ignorait déjà le budget d'une
+destination non convertible, et la réponse portait la mention. Mais la
+pondération, elle, lui donnait `0,5` — la moyenne — au lieu de l'exclure :
+dix points sur vingt gagnés sans les avoir mérités, pendant qu'une
+destination au budget réellement mesuré et défavorable en gagnait moins. Le
+hasard de la monnaie de publication décidait d'un rang.
+
+« Exclu du classement » se code donc comme une composante à `null`, et la
+note se renormalise sur celles qui ont été pesées — la même opération que
+celle qui renormalise les quatre composantes disponibles sur les six de
+DOC-11 (I.A), appliquée cette fois destination par destination.
+
+Même traitement pour un candidat qui n'a pas déclaré de budget : la
+composante n'est pas mesurable, elle sort, elle ne se remplit pas au jugé.
+
+**Une conséquence à connaître.** Exclure une composante n'est pas la mettre
+à zéro : une destination dont le budget n'est pas évaluable est classée sur
+ses autres critères, et peut donc passer devant une destination par ailleurs
+identique dont le budget a été mesuré et trouvé médiocre. Vérifié à
+l'exécution, deux destinations identiques à cela près : 79 contre 76. C'est
+exactement ce que « incomplet mais honnêtement qualifié » veut dire, et la
+réserve affichée à côté du rang le dit au candidat — mais cela se voit à
+l'écran, et mieux vaut l'avoir écrit ici que le découvrir en production.
+
+La mention affichée le dit désormais : « faute de taux de change vérifié, il
+n'est pas comparé à ton budget, et le budget n'entre pas dans le classement
+de cette destination. » Elle est distincte de celle des fiches et du
+comparateur, où il n'y a pas de classement — la seconde moitié de la phrase
+y serait fausse.
+
+### Ce qui reste ouvert, et qui n'est pas I.B
+
+Le délai d'instruction inconnu vaut encore `0,5` dans la composante de
+facilité administrative. C'est la même valeur inventée, mais le cas n'est
+pas le même : la facilité repose sur deux entrées, et le permis employeur,
+lui, est connu. Exclure toute la composante jetterait une information
+vérifiée ; garder la moyenne en invente une. La décision d'I.B ne tranche
+pas ce cas-là, et il est relevé ici plutôt que réglé au passage.
 
 **I.C — Trois dépendances ne sont pas branchées, faute de clés.** Messagerie,
 extraction IA, interrogation des fournisseurs de paiement. Chacune a un point

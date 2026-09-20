@@ -98,16 +98,18 @@ describe("K.A — une seule surface commerciale, tant que la règle n'est pas r�
  * I.B — le budget n'est comparable qu'en zone euro
  * ------------------------------------------------------------------ */
 
-describe("I.B — aucune parité n'est écrite en dur hors du régime de change", () => {
+describe("I.B (tranché) — aucune parité n'est écrite en dur hors du régime de change", () => {
   /**
-   * La parité du franc CFA avec l'euro est fixe : ce n'est pas un cours,
-   * c'est un régime de change, et la convertir n'introduit aucune
-   * information non sourcée. Le franc suisse et le dirham sont des cours de
-   * marché : les écrire en dur périmerait, et les afficher demanderait leur
-   * source et leur date comme toute autre donnée (INV-8).
+   * Tranché le 20/09/2026. ImmiPro ne compare pas les budgets libellés dans
+   * une devise à cours variable tant qu'aucune source de change datée et
+   * surveillée n'est intégrée. Les destinations concernées restent
+   * présentées — les écarter serait plus dommageable que de les garder avec
+   * leur limite annoncée — mais le budget sort de leur classement.
    *
-   * Le jour où une source de taux datée est branchée, ce test change avec
-   * elle — et c'est le moment où l'on vérifie que la source est bien citée.
+   * La décision ne referme pas la porte : elle fixe la condition d'entrée
+   * d'un taux, une source datée et surveillée. Ces tests restent donc, et
+   * c'est le jour où cette source arrive qu'ils changent — le moment où
+   * l'on vérifie qu'elle est bien citée.
    */
   it("seules les monnaies à parité sûre se convertissent", () => {
     expect(versXOF(100, "EUR")).toBe(65_596);
@@ -206,38 +208,54 @@ describe("I.D — rien ne déclare l'analyse antivirus faite", () => {
  * Le lien avec le document, dans les deux sens.
  * ------------------------------------------------------------------ */
 
-describe("chaque garde-fou cite un arbitrage qui existe encore", () => {
+describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   const ECARTS = lire("docs/prototype/ECARTS-A-ARBITRER.md");
   const CE_FICHIER = lire("tests/arbitrages-ouverts.test.ts");
+
+  /** Encore ouverts : la lecture est provisoire, le test la tient. */
+  const OUVERTS = ["I.D", "K.A", "L.A", "N.A"];
+  /**
+   * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
+   * disparaît pas avec l'arbitrage : une décision qui pose une condition —
+   * « pas de taux sans source datée » — a plus besoin d'être tenue qu'une
+   * lecture provisoire.
+   */
+  const TRANCHES = ["I.B"];
+
+  const bloc = (code: string) =>
+    new RegExp(`\\*\\*${code.replace(".", "\\.")} —[\\s\\S]{0,900}`, "u").exec(ECARTS)![0];
 
   /**
    * Un arbitrage se tranche, et le garde-fou qui le cite devient un
    * vestige : il continue de refuser une dérive que la décision vient
    * peut-être d'autoriser. Ce test force à repasser ici le jour où l'un
-   * d'eux se ferme.
+   * d'eux se ferme — c'est ainsi qu'I.B a été relu le 20/09.
    */
   it("les codes cités sont ceux du relevé", () => {
     const cites = [
       ...new Set(
-        [...CE_FICHIER.matchAll(/^describe\("([A-Z]\.[A-Z]) —/gmu)].map((m) => m[1]!),
+        [...CE_FICHIER.matchAll(/^describe\("([A-Z]\.[A-Z])(?: \(tranché\))? —/gmu)].map(
+          (m) => m[1]!,
+        ),
       ),
     ].sort();
-    expect(cites).toEqual(["I.B", "I.D", "K.A", "L.A", "N.A"]);
+    expect(cites).toEqual([...OUVERTS, ...TRANCHES].sort());
 
     for (const code of cites) {
       expect(ECARTS, code).toMatch(new RegExp(`\\*\\*${code.replace(".", "\\.")} —`, "u"));
     }
   });
 
-  /**
-   * Et qu'il est bien encore ouvert : un arbitrage tranché porte la mention
-   * qui le dit, et son texte d'origine barré.
-   */
-  it("aucun des cinq n'est déjà tranché", () => {
-    for (const code of ["I.B", "I.D", "K.A", "L.A", "N.A"]) {
-      const bloc = new RegExp(`\\*\\*${code.replace(".", "\\.")} —[\\s\\S]{0,900}`, "u");
-      const texte = bloc.exec(ECARTS)![0];
-      expect(texte.slice(0, 400), code).not.toMatch(/\*\*Tranché/u);
+  it("les ouverts ne portent pas la mention qui les fermerait", () => {
+    for (const code of OUVERTS) {
+      expect(bloc(code).slice(0, 400), code).not.toMatch(/\*\*Tranché/u);
+    }
+  });
+
+  it("les tranchés la portent, et le test le dit dans son intitulé", () => {
+    for (const code of TRANCHES) {
+      expect(bloc(code), code).toMatch(/\*\*Tranché/u);
+      expect(CE_FICHIER, code).toContain(`describe("${code} (tranché) —`);
     }
   });
 });

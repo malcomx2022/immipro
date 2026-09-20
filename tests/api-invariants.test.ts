@@ -242,6 +242,87 @@ describe("WF-01 — classement des destinations", () => {
   });
 
   /**
+   * I.B, tranché le 20/09/2026 — un budget non comparable sort du
+   * classement de sa destination, il n'y entre pas pour une valeur
+   * moyenne.
+   *
+   * Avant, une destination dont le coût est publié en francs suisses
+   * recevait la moitié des points de la composante budget sans les avoir
+   * mérités — dix sur vingt — pendant qu'une destination au budget
+   * réellement mesuré et défavorable en recevait moins. Le hasard de la
+   * monnaie de publication décidait d'un rang.
+   */
+  it("un coût non converti retire le budget du classement, sans le remplacer", () => {
+    const reponses = { objectif: "Étudier", langue: "C1 et plus", budget: "Plus de 12 millions F" };
+    const comparable = classer([base], reponses).retenues[0]!;
+    const incomparable = classer([{ ...base, coutPremiereAnneeXOF: null }], reponses).retenues[0]!;
+
+    expect(comparable.interne.detail.budget).not.toBeNull();
+    expect(comparable.nonPesees).toEqual([]);
+
+    expect(incomparable.interne.detail.budget).toBeNull();
+    expect(incomparable.nonPesees).toEqual(["le budget"]);
+    // Les autres composantes valent la même chose : seule leur part change.
+    expect(incomparable.interne.detail.langue).toBe(comparable.interne.detail.langue);
+  });
+
+  /**
+   * La note est renormalisée sur ce qui reste, comme les quatre composantes
+   * disponibles le sont sur les six de DOC-11 — la même opération, appliquée
+   * destination par destination.
+   */
+  it("la note se calcule sur les seules composantes pesées", () => {
+    const sansBudget = classer([{ ...base, coutPremiereAnneeXOF: null }], {
+      objectif: "Étudier",
+      langue: "C1 et plus",
+    }).retenues[0]!;
+
+    const { langue, facilite, debouches } = sansBudget.interne.detail;
+    const attendue = Math.round(
+      ((langue! + facilite! + debouches!) / (POIDS.langue + POIDS.facilite + POIDS.debouches)) * 100,
+    );
+    expect(sansBudget.interne.note).toBe(attendue);
+  });
+
+  /**
+   * Un candidat qui n'a pas déclaré de budget n'a pas de budget à comparer
+   * non plus. Deux causes, la même conséquence : la composante sort, elle
+   * ne se remplit pas au jugé.
+   */
+  it("un budget non déclaré sort de la même façon", () => {
+    const sansReponse = classer([base], { objectif: "Étudier", langue: "C1 et plus" }).retenues[0]!;
+    expect(sansReponse.interne.detail.budget).toBeNull();
+    expect(sansReponse.nonPesees).toEqual(["le budget"]);
+  });
+
+  /**
+   * La conséquence assumée de la décision, écrite ici pour qu'elle ne
+   * surprenne personne.
+   *
+   * Exclure une composante, ce n'est pas la mettre à zéro : une
+   * destination dont le budget n'est pas évaluable est classée sur ses
+   * autres critères, et peut donc passer devant une destination identique
+   * dont le budget, lui, a été mesuré et trouvé médiocre. C'est ce que
+   * « incomplet mais honnêtement qualifié » veut dire — et la réserve
+   * affichée à côté du rang le dit au candidat.
+   */
+  it("une destination non évaluable sur le budget est classée sur le reste", () => {
+    const mesuree = { ...base, coutPremiereAnneeXOF: 12_836_580 };
+    const inevaluable = { ...mesuree, code: "CH", slug: "suisse", pays: "Suisse", coutPremiereAnneeXOF: null };
+
+    const { retenues } = classer([mesuree, inevaluable], {
+      objectif: "Étudier",
+      langue: "C1 et plus",
+      budget: "Plus de 12 millions F",
+    });
+
+    // Le budget des Pays-Bas est mesuré et médiocre ; celui de la Suisse
+    // n'est pas mesurable. La seconde passe devant, sur les trois autres.
+    expect(retenues.map((r) => r.destination.pays)).toEqual(["Suisse", "Pays-Bas"]);
+    expect(retenues[0]!.nonPesees).toEqual(["le budget"]);
+  });
+
+  /**
    * I.A — le classement dit ce qu'il a pesé et ce qu'il n'a pas pu peser.
    * Les deux phrases sont dérivées de `POIDS` et de la liste reçue : c'est
    * ce qui permet de brancher un indice demain sans relire l'écran.
