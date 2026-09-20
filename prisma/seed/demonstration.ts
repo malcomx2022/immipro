@@ -3,6 +3,7 @@ import { empreinte } from "../../src/server/securite/secret";
 import { checklistDepuis, echeancesDepuis } from "../../src/server/acces/dossiers";
 import { payload } from "../../src/server/acces/regles";
 import { getPack } from "../../src/domain/payments/pricing";
+import { COMMISSION_BPS_ANNONCEE } from "../../src/domain/partenaires/affiliation";
 
 /**
  * Jeu de démonstration — développement seulement.
@@ -20,6 +21,7 @@ const prisma = new PrismaClient();
 
 const MOT_DE_PASSE = "demonstration-2026";
 const EMAIL = "aline.dossou@email.com";
+const PARTENAIRE_DEMO = "Cabinet Adjovi & Associés";
 
 /**
  * Un compte par rôle, et non un seul compte tout-puissant.
@@ -61,6 +63,7 @@ async function main() {
     await prisma.user.delete({ where: { id: ancien.id } });
   }
   await prisma.consultant.deleteMany({ where: { firm: "Visser Immigration Advies" } });
+  await prisma.partner.deleteMany({ where: { name: PARTENAIRE_DEMO } });
   await prisma.sourceCheck.deleteMany({});
   await prisma.auditLog.deleteMany({ where: { actorId: "systeme:demonstration" } });
 
@@ -87,6 +90,9 @@ async function main() {
         create: [
           { kind: "CGU", granted: true, version: "1.0" },
           { kind: "PIECES_IDENTITE", granted: true, version: "1.0" },
+          // Sans cette autorisation, T-03 ne s'affiche pas : la proposition
+          // de partenaire n'est pas un encart qu'on subit (RG-13.1).
+          { kind: "PARTENAIRES", granted: true, version: "1.0" },
         ],
       },
     },
@@ -235,6 +241,35 @@ async function main() {
       kind: "ANALYSE",
       title: "Il manque 3 569,24 € sur le relevé",
       body: "Téléverse un relevé plus récent, ou ajoute une attestation de prise en charge d'un garant.",
+    },
+  });
+
+  /**
+   * Un partenaire activé sur les Pays-Bas, et un seul.
+   *
+   * Son taux est celui que T-03 écrit en toutes lettres : la lecture refuse
+   * de proposer un partenaire à un autre taux, pour que la phrase affichée
+   * et la commission facturée ne puissent pas diverger (RG-13.3). Rien n'est
+   * activé sur les autres destinations : c'est l'état par défaut que demande
+   * RG-13.4, et le dossier suisse du jeu de démonstration le montre — il
+   * n'affiche aucune proposition.
+   */
+  await prisma.partner.create({
+    data: {
+      name: PARTENAIRE_DEMO,
+      kind: "ASSURANCE_SANTE",
+      city: "Cotonou",
+      qualification: "courtier agréé, 9 ans d'exercice",
+      url: "https://exemple.invalid/assurance-etudiants",
+      commissionBps: COMMISSION_BPS_ANNONCEE,
+      activations: {
+        create: {
+          countryCode: "NL",
+          basis: "Rétro-commission licite sur courtage d'assurance santé aux Pays-Bas",
+          verifiedAt: new Date("2026-09-15"),
+          verifiedBy: "gislain",
+        },
+      },
     },
   });
 

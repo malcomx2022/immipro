@@ -128,6 +128,62 @@ SELECT refuse(
   $q$INSERT INTO "AuthSecret" (id, "userId", kind, "secretHash", "expiresAt", attempts)
      VALUES ('k2','u1','VERIFICATION_EMAIL','h', now() + interval '10 minutes', -1)$q$);
 
+-- ── Suppression de compte (RG-10.4) ────────────────────────────────
+
+SELECT refuse(
+  'RG-10.4 · un compte anonymisé sans demande de suppression',
+  $q$UPDATE "User" SET "deletedAt" = now() WHERE id = 'u1'$q$);
+
+SELECT refuse(
+  'RG-10.4 · une anonymisation qui garde le nom du candidat',
+  $q$UPDATE "User"
+        SET "deletionRequestedAt" = now(), "deletedAt" = now(), "firstName" = 'Aline'
+      WHERE id = 'u1'$q$);
+
+SELECT refuse(
+  'RG-10.4 · une anonymisation qui garde l''empreinte du mot de passe',
+  $q$UPDATE "User"
+        SET "deletionRequestedAt" = now(), "deletedAt" = now(), "passwordHash" = 'scrypt$x'
+      WHERE id = 'u1'$q$);
+
+-- ── Affiliation partenaires (WF-13) ────────────────────────────────
+
+INSERT INTO "Partner" (id, name, kind, url, "commissionBps")
+  VALUES ('p1','Cabinet X','CONSULTANT','https://x.example',1500);
+
+SELECT refuse(
+  'RG-13.3 · un taux de commission hors bornes',
+  $q$INSERT INTO "Partner" (id, name, kind, url, "commissionBps")
+     VALUES ('p2','Cabinet Y','CONSULTANT','https://y.example',12000)$q$);
+
+SELECT refuse(
+  'RG-13.4 · une activation sans vérification nommée',
+  $q$INSERT INTO "PartnerActivation" (id, "partnerId", "countryCode", basis, "verifiedAt", "verifiedBy")
+     VALUES ('pa1','p1','NL','   ','2026-01-01','veilleur')$q$);
+
+SELECT refuse(
+  'RG-13.1 · une proposition sans étape de checklist',
+  $q$INSERT INTO "PartnerReferral" (id, "partnerId", "applicationId", step, motive, "commissionBps")
+     VALUES ('pr1','p1','a0','  ','Refus déclaré en 2024',1500)$q$);
+
+SELECT refuse(
+  'WF-13 · une commission inscrite avant l''aboutissement',
+  $q$INSERT INTO "PartnerReferral" (id, "partnerId", "applicationId", step, motive,
+       "commissionBps", "commissionAmount", "commissionCurrency")
+     VALUES ('pr2','p1','a0','ID','Refus déclaré en 2024',1500,20000,'XOF')$q$);
+
+SELECT refuse(
+  'WF-13 · une proposition aboutie sans date de règlement',
+  $q$INSERT INTO "PartnerReferral" (id, "partnerId", "applicationId", step, motive,
+       "commissionBps", status, "redirectedAt")
+     VALUES ('pr3','p1','a0','ID','Refus déclaré en 2024',1500,'ABOUTIE', now())$q$);
+
+SELECT refuse(
+  'WF-13 · un aboutissement sans redirection tracée',
+  $q$INSERT INTO "PartnerReferral" (id, "partnerId", "applicationId", step, motive,
+       "commissionBps", status, "settledAt")
+     VALUES ('pr4','p1','a0','ID','Refus déclaré en 2024',1500,'ABOUTIE', now())$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

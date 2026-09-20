@@ -37,6 +37,9 @@ src/server/
     quota.ts         Grand livre d'analyses. Débit atomique (INV-6).
     paiements.ts     Idempotence à la création et à la notification (INV-7).
     comptes.ts       Inscription, connexion, codes, mot de passe.
+    consentements.ts Un genre par autorisation, lu par A-05 et par T-03.
+    suppression.ts   RG-10.4. Purge immédiate, puis anonymisation.
+    partenaires.ts   WF-13. Les trois issues d'une proposition, commission au résultat.
     journal.ts       Audit avec motif obligatoire (RG-15.1).
   paiement/
     signature.ts     Vérification HMAC horodatée des webhooks.
@@ -53,10 +56,11 @@ src/server/
     consultants.ts   Annuaire habilité, créneaux disponibles.
     redaction.ts     Pièces à rédiger, versions, remarques.
     backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
+    partenaires.ts   WF-13. Rien n'est proposable par défaut.
   jobs/
     worker.ts        Branchement pg-boss et cadences.
     analyse.ts       WF-06. Déterministe d'abord, IA pour l'extraction seule.
-    purge.ts         INV-5. Le contenu part, la trace reste.
+    purge.ts         INV-5. Le contenu part, la trace reste — copies comprises.
     veille.ts        RG-14.1. Dépublication à l'échéance de relecture.
     reconciliation.ts RG-05.4. Le filet du paiement débité sans crédit.
     divergence.ts    WF-11. Rien n'est migré d'office.
@@ -92,6 +96,36 @@ Les pages redirigent, les routes refusent avec le contrat d'échec : une page
 n'a pas de corps JSON à rendre, une API n'a pas à renvoyer une redirection à
 un client qui attend un objet. La redirection porte `suite`, pour que
 quelqu'un dont la session a expiré revienne là où il allait.
+
+## Ce qui part, ce qui reste
+
+Deux chemins effacent, et ils n'effacent pas la même chose.
+
+`jobs/purge.ts` est la **purge de rétention** (INV-5, RG-10.1) : à
+l'échéance, le contenu des pièces d'un dossier s'en va — l'objet dans le
+stockage, le texte d'une pièce rédigée, et les copies que ce contenu a
+laissées ailleurs : les champs lus par l'analyse, la trace du moteur, les
+deux valeurs qu'une remarque critique opposait, les réponses d'entretien.
+Cette dernière partie manquait ; supprimer le fichier en gardant le numéro
+de passeport qu'on y avait lu n'est pas une purge. Restent le verdict, le
+genre de remarque et les horodatages : ils prouvent que la vérification a eu
+lieu sans nommer personne.
+
+`acces/suppression.ts` est la **suppression de compte** (RG-10.4). Elle
+purge tous les dossiers sans attendre l'échéance, puis anonymise. Elle
+n'efface pas la ligne du compte : un reçu de paiement pointe dessus, et C-11
+l'annonce au candidat avant même qu'il clôture. Ce qui part est tout ce qui
+nomme quelqu'un ; ce qui reste est un compte sans personne.
+
+La frontière tient en une phrase : **ce qui décrit une personne s'en va, ce
+qui décrit une transaction reste.**
+
+L'ordre des deux temps est celui de la réversibilité. La demande ferme
+l'accès tout de suite — c'est gratuit et immédiat. L'anonymisation vient
+après la purge, parce qu'anonymiser d'abord laisserait, en cas de panne du
+stockage, des fichiers sans propriétaire identifiable que plus personne ne
+saurait retrouver. Entre les deux, le compte est « suppression demandée » :
+B-03 l'affiche, et la passe quotidienne de purge le reprend.
 
 ## Écrire une route
 

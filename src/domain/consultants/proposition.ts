@@ -34,8 +34,6 @@ export interface MotifProposition {
   raison: string;
 }
 
-export const TITRE_PROPOSITION = "Ce point dépasse ce que nous savons faire";
-
 /**
  * Engagements affichés sous la proposition. Ils portent sur ce que la
  * plateforme ne fera pas : c'est la seule forme d'engagement vérifiable par
@@ -46,17 +44,23 @@ export const ENGAGEMENTS: readonly string[] = [
   "Refuser ne change rien à ton dossier ni à ton pack.",
 ];
 
-export const MENTION_INDEPENDANCE =
-  "ImmiPro n'est pas un cabinet de conseil en immigration. Les consultants partenaires sont indépendants et responsables de leurs prestations.";
+/**
+ * Vaut pour tout partenaire, quel qu'il soit (INV-1). Qui répond de la
+ * prestation dépend en revanche du partenaire, et cette seconde phrase vit
+ * dans `domain/partenaires/affiliation` : sous un courtier en assurance,
+ * « les consultants partenaires » ne désignait personne.
+ */
+export const MENTION_INDEPENDANCE = "ImmiPro n'est pas un cabinet de conseil en immigration.";
 
-/** Les trois issues de l'écran. Le refus définitif en est une, et il se respecte. */
+/**
+ * Les trois issues de l'écran. Le refus définitif en est une, et il se
+ * respecte.
+ *
+ * Leurs libellés vivent dans `domain/partenaires/affiliation` : le même
+ * écran propose un consultant ou un courtier, et « continuer sans
+ * consultant » ne voulait rien dire sous le second.
+ */
 export type SuiteProposition = "CRENEAUX" | "CONTINUER_SEUL" | "NE_PLUS_PROPOSER";
-
-export const LIBELLE_SUITE: Record<SuiteProposition, string> = {
-  CRENEAUX: "Voir les créneaux",
-  CONTINUER_SEUL: "Continuer sans consultant",
-  NE_PLUS_PROPOSER: "Ne plus me proposer de consultant",
-};
 
 /**
  * Une proposition refusée définitivement ne revient pas, quelle que soit la

@@ -16,7 +16,7 @@ import {
   type Piece,
 } from "@/domain/dossiers/piece";
 import { jourEnFrancais } from "@/domain/format/moment";
-import { PARTENAIRE } from "@/lib/contenu/alertes";
+import type { Proposition } from "@/server/lecture/partenaires";
 import { EnteteDossier } from "./EnteteDossier";
 import { PropositionPartenaire } from "./PropositionPartenaire";
 
@@ -35,9 +35,11 @@ import { PropositionPartenaire } from "./PropositionPartenaire";
 export interface ChecklistProps {
   dossier: Dossier;
   pieces: readonly Piece[];
+  /** Proposition de partenaire en cours, s'il y en a une (T-03, WF-13). */
+  proposition?: Proposition | null;
 }
 
-export function Checklist({ dossier, pieces }: ChecklistProps) {
+export function Checklist({ dossier, pieces, proposition }: ChecklistProps) {
   const id = dossier.id;
   const premiere = premiereATraiter(pieces);
   const mention = dossier.destination.mention;
@@ -70,13 +72,18 @@ export function Checklist({ dossier, pieces }: ChecklistProps) {
         Prochaine action : {dossier.prochaineAction}
       </p>
 
-      {/* T-03 : la proposition n'apparaît que sur une situation déclarée, et
-          elle est posée après la prochaine action, pas devant elle. */}
-      {dossier.limiteDeclaree ? (
+      {/* T-03 : la proposition est rattachée à une étape de la checklist
+          (RG-13.1) et posée après la prochaine action, jamais devant elle.
+          Sans partenaire activé sur la destination, il n'y a rien ici — et
+          c'est l'état normal tant qu'aucun partenaire n'est signé. */}
+      {proposition ? (
         <PropositionPartenaire
-          partenaire={PARTENAIRE}
-          motif={dossier.limiteDeclaree}
+          partenaire={proposition.partenaire}
+          motif={proposition.motif}
           dossierId={id}
+          referenceId={proposition.id}
+          genre={proposition.genre}
+          url={proposition.url}
         />
       ) : null}
 

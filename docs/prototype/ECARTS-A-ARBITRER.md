@@ -576,23 +576,104 @@ Aucun de ces cinq n'aurait été vu par un test.
 
 ### Ce qui reste à arbitrer
 
-**J.A — La proposition de partenaire n'a pas de table.** `PartnerReferral`
+**J.A — La proposition de partenaire n'a pas de table.** ~~`PartnerReferral`
 figure dans la matrice de traçabilité de DOC-11 (WF-13) et n'existe pas au
-schéma. L'écran C-06 affiche donc encore un partenaire écrit dans le
-contenu. Deux issues : modéliser l'affiliation, ou retirer WF-13 du
-périmètre tant que le premier partenaire n'est pas signé — RG-13.4 demande
-de toute façon une vérification destination par destination avant
-activation.
+schéma.~~ **Tranché — voir annexe K.** L'affiliation est modélisée, et
+rien n'est proposable tant qu'une activation n'atteste pas la licéité de la
+rétro-commission sur la destination (RG-13.4).
 
 **J.B — La suppression de compte bute sur une contrainte, et c'est
-correct.** `Transaction.userId` ne tombe pas en cascade : un reçu survit à
-la suppression du compte, comme C-11 l'annonce au candidat. RG-10.4 demande
-donc une **anonymisation** des métadonnées, pas un effacement — et elle
-n'est pas écrite. Le jeu de démonstration contourne la contrainte ; le
-produit ne le pourra pas.
+correct.** ~~RG-10.4 demande une anonymisation des métadonnées, et elle
+n'est pas écrite.~~ **Tranché — voir annexe K.** Le compte survit vidé ;
+le reçu lui survit aussi.
 
 **J.C — Les guides et les articles restent éditoriaux.** Ils attendent un
 back-office de publication, qui n'est pas au périmètre. Ce sont les deux
 seuls écrans publics qui ne lisent pas la base, et ils sont les seuls à
 rester pré-générés — ce qui est exactement ce qu'on veut d'un contenu de
 référencement.
+
+---
+
+## Annexe K · Suppression de compte et affiliation
+
+Lot RG-10.4 + WF-13. Il ferme J.A et J.B ; il en ouvre trois autres.
+
+### Ce qui est tranché
+
+**K.1 — La suppression anonymise, elle n'efface pas.** Le compte survit
+vidé, parce qu'un reçu de paiement pointe dessus et que C-11 l'annonce déjà
+au candidat à la clôture. La frontière retenue tient en une phrase : *ce qui
+décrit une personne s'en va, ce qui décrit une transaction reste.* Partent
+le nom, l'adresse, le téléphone, le pays, le profil, les alertes, les
+sessions, le motif de refus déclaré. Restent les reçus, le grand livre
+d'analyses, le décompte de jetons, l'historique des consentements — sur un
+compte qui ne nomme plus personne.
+
+**K.2 — L'adresse de remplacement est tirée au sort, pas dérivée.** Un
+condensat de l'adresse d'origine se retrouve par dictionnaire : l'espace des
+adresses est énumérable. Ce serait une pseudonymisation déguisée en
+anonymisation, et le compte resterait rattachable à une personne par
+quiconque tient la liste. Le domaine `comptes.invalid` est réservé par la
+RFC 2606 : aucun courrier ne partira jamais vers ces adresses.
+
+**K.3 — Rien n'est proposable par défaut.** Un partenaire ne se propose que
+sur une destination où une activation atteste la licéité de la
+rétro-commission (RG-13.4). Tant qu'aucun partenaire n'est signé, T-03 ne
+s'affiche pas — c'est l'état normal, pas une panne.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **La purge laissait une copie du contenu.** Le fichier partait, mais
+  l'analyse gardait les champs lus dans la pièce — nom, numéro de passeport,
+  date de naissance — et son message les citait. La relecture critique
+  gardait les deux valeurs qui divergeaient, l'entretien les réponses du
+  candidat. INV-5 ne distingue pas l'original de la copie.
+- **La purge d'un brouillon butait sur INV-3.** La suppression de compte
+  purge tous les dossiers, y compris les brouillons, ce que la clôture ne
+  faisait jamais : un brouillon sans version de règle figée ne peut pas
+  passer en `ARCHIVE`, et la base le refusait à juste titre.
+- **T-03 parlait de consultant sous un courtier.** L'écran annonçait
+  « Premier entretien : 20 000 F, 45 minutes » — le tarif d'une consultation
+  — sous une assurance maladie, proposait de « continuer sans consultant »
+  et renvoyait vers l'annuaire des consultants. Six énoncés dépendent
+  désormais du genre du partenaire ; la divulgation du taux, les engagements
+  et la mention d'indépendance n'en dépendent pas.
+- **Deux autorisations partageaient une catégorie.** `consultants_partenaires`
+  et `mesure_audience` s'écrivaient toutes deux en `MARKETING`, et A-05
+  lisait « la dernière ligne de ce genre » : retirer l'une affichait l'autre
+  comme retirée. Une preuve de consentement qui répond pour une autre n'en
+  est pas une.
+
+### Ce qui reste à arbitrer
+
+**K.A — RG-13.1 et RG-13.2 se contredisent.** La première demande une
+proposition « contextuelle à l'étape » de checklist ; la seconde interdit
+« toute proposition commerciale dans l'espace dossier lui-même ». L'étape de
+checklist *est* l'espace dossier. Le lot a retenu la lecture la plus
+restrictive compatible avec les deux — une seule proposition, rattachée à
+une étape, sur le seul écran qui l'affichait déjà, et aucune nouvelle
+surface commerciale — mais la règle est à réécrire dans un sens ou dans
+l'autre.
+
+**K.B — L'export de données n'existe pas.** « Télécharger mes données »
+(A-05) et « Télécharger mon dossier » (C-11) mènent l'un à l'écran
+lui-même, l'autre à une adresse qui répond 404. C'est un bouton mort juste
+avant un geste irréversible, et l'écran de suppression a dû être réécrit
+pour ne pas conseiller un geste impossible. Le portage RGPD est un écran à
+part entière.
+
+**K.C — Qui supporte le coût d'un rendez-vous annulé par une suppression ?**
+La suppression libère les créneaux à venir chez le consultant — c'est sans
+ambiguïté meilleur pour lui que de l'attendre. Mais le créneau est payé et
+la grille prévoit des frais au-delà de vingt-quatre heures
+(`CONSULTATION_ANNULATION_HEURES`). Personne n'a tranché entre rembourser,
+retenir, ou traiter la suppression comme un cas de force majeure.
+
+**K.D — Le premier partenaire reste à signer.** Le modèle porte cinq genres
+— assurance santé, logement, équivalence de diplôme, transfert de fonds,
+consultant — et le jeu de démonstration en active un seul, sur une seule
+destination. Tant qu'aucun contrat n'existe, le taux réel, la devise de
+facturation et le mode de rapprochement des commissions sont des
+hypothèses : `enregistrerLAboutissement` est écrite et n'est appelée par
+rien.

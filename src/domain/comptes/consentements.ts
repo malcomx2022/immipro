@@ -17,7 +17,7 @@ export type CodeConsentement =
   | "pieces_identite"
   | "pieces_financieres"
   | "alertes_regles"
-  | "consultants_partenaires"
+  | "partenaires"
   | "mesure_audience";
 
 export interface Consentement {
@@ -53,10 +53,13 @@ export const CONSENTEMENTS: readonly Consentement[] = [
       "Email quand une exigence de ta destination change. Ne concerne que tes dossiers ouverts.",
   },
   {
-    code: "consultants_partenaires",
-    titre: "Propositions de consultants partenaires",
+    // Le même interrupteur couvre le consultant et le partenaire de
+    // service : T-03 propose les deux, et « ne plus me proposer » ne peut
+    // pas valoir pour l'un et pas pour l'autre sans mentir à l'un des deux.
+    code: "partenaires",
+    titre: "Propositions de partenaires",
     description:
-      "Mise en relation quand ton dossier présente une difficulté qu'un consultant traite mieux que nous.",
+      "Mise en relation quand ton dossier demande une pièce que nous ne délivrons pas, ou présente une difficulté qu'un consultant traite mieux que nous.",
   },
   {
     code: "mesure_audience",

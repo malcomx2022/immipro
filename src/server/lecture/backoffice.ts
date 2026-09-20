@@ -130,7 +130,12 @@ export async function collecte(): Promise<Collecte | null> {
 /** Comptes — B-03, WF-15. */
 export async function comptes(recherche?: string): Promise<Compte[]> {
   const lignes = await db.user.findMany({
-    where: recherche ? { email: { contains: recherche, mode: "insensitive" } } : {},
+    where: {
+      // Un compte anonymisé n'est plus un compte : plus de nom, plus
+      // d'adresse, personne à suspendre ni à rétablir (RG-10.4).
+      deletedAt: null,
+      ...(recherche ? { email: { contains: recherche, mode: "insensitive" as const } } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
@@ -166,8 +171,27 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
   });
 }
 
-const statutDuCompte = (u: { suspendedAt: Date | null; emailVerified: Date | null }): StatutCompte =>
-  u.suspendedAt ? "SUSPENDU" : u.emailVerified ? "ACTIF" : "EMAIL_NON_VERIFIE";
+/**
+ * L'ordre des cas est l'ordre d'urgence pour l'opérateur, pas celui des
+ * colonnes. Une suppression demandée passe devant une suspension : elle a
+ * une échéance réglementaire, et un compte resté dans cet état est une
+ * promesse non tenue au candidat (RG-10.4).
+ *
+ * Un compte anonymisé n'apparaît plus : il n'y a plus personne à administrer,
+ * et le lister rappellerait une identité que la suppression vient d'effacer.
+ */
+const statutDuCompte = (u: {
+  suspendedAt: Date | null;
+  emailVerified: Date | null;
+  deletionRequestedAt: Date | null;
+}): StatutCompte =>
+  u.deletionRequestedAt
+    ? "SUPPRESSION_DEMANDEE"
+    : u.suspendedAt
+      ? "SUSPENDU"
+      : u.emailVerified
+        ? "ACTIF"
+        : "EMAIL_NON_VERIFIE";
 
 /**
  * Paiements — B-04.
