@@ -27,6 +27,11 @@ import type { Reponses } from "./questions";
  * donc renormalisées sur 100, et `composantesAbsentes` le dit à l'appelant
  * plutôt que de le taire.
  *
+ * **La renormalisation vaut aussi destination par destination** — arbitrage
+ * I.B. Un coût publié dans une monnaie à cours variable n'est pas converti ;
+ * le budget sort alors du classement de cette destination-là, au lieu d'y
+ * entrer pour une valeur moyenne inventée.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
@@ -60,8 +65,6 @@ export const POIDS = {
   facilite: 20,
   debouches: 15,
 } as const;
-
-const TOTAL_POIDS = POIDS.langue + POIDS.budget + POIDS.facilite + POIDS.debouches;
 
 /** Ce que DOC-11 demande et que le référentiel ne porte pas. */
 export const COMPOSANTES_ABSENTES: readonly string[] = ["qualité de vie", "coût de la vie"];
@@ -111,8 +114,15 @@ export interface Retenue {
   destination: DestinationEvaluable;
   /** Les trois raisons principales, chiffrées (WF-01, étape 4). */
   motifs: Motif[];
-  /** Ordonne, ne s'affiche pas. */
-  interne: { note: number; detail: Record<keyof typeof POIDS, number> };
+  /**
+   * Ordonne, ne s'affiche pas.
+   *
+   * Une composante à `null` n'a pas été pesée pour cette destination-là,
+   * et la note est renormalisée sur celles qui l'ont été — I.B.
+   */
+  interne: { note: number; detail: Record<keyof typeof POIDS, number | null> };
+  /** Ce qui n'a pas pu être pesé ici, et pourquoi (I.B). */
+  nonPesees: readonly string[];
 }
 
 export interface Ecartee {
@@ -213,15 +223,37 @@ function filtrageStrict(
   return null;
 }
 
+/**
+ * Ce qui n'a pas pu être pesé pour une destination donnée — arbitrage I.B,
+ * tranché le 20/09/2026.
+ *
+ * Un coût publié dans une monnaie à cours variable n'est pas converti : le
+ * faire avec un taux écrit en dur donnerait une information non sourcée
+ * (INV-8). La destination reste présentée — l'écarter serait plus dommageable
+ * que de la garder avec sa limite annoncée — mais **le budget sort de son
+ * classement**.
+ *
+ * Il en sortait déjà du filtrage strict ; il entrait encore dans la
+ * pondération, et pour une valeur moyenne inventée. Une destination dont le
+ * budget n'est pas comparable gagnait ainsi la moitié des points de la
+ * composante sans les avoir mérités, pendant qu'une destination au budget
+ * réellement mesuré et défavorable en gagnait moins. Le hasard de la monnaie
+ * de publication décidait d'un rang.
+ */
+const BUDGET_NON_PESE = "le budget";
+
 function evaluer(d: DestinationEvaluable, profil: Profil): Retenue {
   const exige = exigence(d.niveauLangueMin);
   // Une marge au-dessus de l'exigence compte, mais plafonne : dépasser B2 de
   // deux crans n'ouvre pas deux fois plus de portes.
   const langue = Math.min(1, (profil.niveau - exige + 1) / 2);
 
+  // `null`, et non une valeur moyenne : la composante est retirée du calcul,
+  // pas remplie au jugé. Deux causes, la même conséquence — une monnaie sans
+  // parité sûre, ou un candidat qui n'a pas déclaré de budget.
   const budget =
     d.coutPremiereAnneeXOF === null || profil.budget === 0
-      ? 0.5
+      ? null
       : Math.min(1, profil.budget / d.coutPremiereAnneeXOF - 1 + 0.5);
 
   // Facilité administrative : le délai de traitement, et le permis employeur
@@ -235,19 +267,42 @@ function evaluer(d: DestinationEvaluable, profil: Profil): Retenue {
       ? 0
       : Math.min(1, (d.dureeApresDiplomeMois ?? 12) / 24);
 
-  const detail = {
+  const detail: Record<keyof typeof POIDS, number | null> = {
     langue: borne(langue) * POIDS.langue,
-    budget: borne(budget) * POIDS.budget,
+    budget: budget === null ? null : borne(budget) * POIDS.budget,
     facilite: borne(facilite) * POIDS.facilite,
     debouches: borne(debouches) * POIDS.debouches,
   };
-  const brute = detail.langue + detail.budget + detail.facilite + detail.debouches;
 
   return {
     destination: d,
     motifs: motifsDe(d, profil).slice(0, 3),
-    interne: { note: Math.round((brute / TOTAL_POIDS) * 100), detail },
+    interne: { note: noteRenormalisee(detail), detail },
+    nonPesees: budget === null ? [BUDGET_NON_PESE] : [],
   };
+}
+
+/**
+ * La note ne se calcule que sur ce qui a été pesé.
+ *
+ * C'est la même opération que celle qui renormalise les quatre composantes
+ * disponibles sur les six de DOC-11, appliquée cette fois destination par
+ * destination : une composante absente ne vaut ni zéro ni la moyenne, elle
+ * ne compte pas.
+ */
+function noteRenormalisee(detail: Record<keyof typeof POIDS, number | null>): number {
+  let points = 0;
+  let poids = 0;
+  for (const cle of Object.keys(POIDS) as (keyof typeof POIDS)[]) {
+    const valeur = detail[cle];
+    if (valeur === null) continue;
+    points += valeur;
+    poids += POIDS[cle];
+  }
+  // Aucune composante pesée : le cas n'existe pas aujourd'hui — la langue,
+  // la facilité et les débouchés sont toujours calculables — et zéro est la
+  // seule réponse qui n'invente rien s'il apparaissait.
+  return poids === 0 ? 0 : Math.round((points / poids) * 100);
 }
 
 const borne = (n: number) => Math.min(1, Math.max(0, n));

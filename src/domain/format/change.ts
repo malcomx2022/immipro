@@ -52,3 +52,15 @@ export const convertible = (devise: DeviseSource): boolean =>
 /** Ce qu'un écran écrit quand la comparaison n'est pas possible. */
 export const MENTION_NON_COMPARABLE =
   "Montant publié dans une autre monnaie : il n'est pas comparé à ton budget faute de taux de change vérifié.";
+
+/**
+ * La même limite, dite là où elle a une conséquence de plus — arbitrage
+ * I.B, tranché le 20/09/2026.
+ *
+ * Sur une fiche ou dans le comparateur, un montant non converti n'est
+ * simplement pas comparé. Dans le classement du simulateur, il en sort : la
+ * destination est ordonnée sur ses autres critères. Les deux phrases
+ * existent séparément parce que la seconde serait fausse partout ailleurs.
+ */
+export const MENTION_HORS_CLASSEMENT =
+  "Montant publié dans une autre monnaie : faute de taux de change vérifié, il n'est pas comparé à ton budget, et le budget n'entre pas dans le classement de cette destination.";
