@@ -501,6 +501,30 @@ issues : brancher un indice public avec sa source et sa date de relevé, ou
 retirer ces deux composantes de DOC-11. La seconde est plus honnête que la
 première tant que personne ne relit l'indice.
 
+*Lot I.A.* L'arbitrage reste entier — brancher un indice ou retirer les deux
+composantes est une décision sur DOC-11, pas sur le code. Ce qui a été
+fermé est le trou d'honnêteté qui vivait entre les deux : `composantesAbsentes`
+sortait de la route depuis le premier jour et **P-03 ne le lisait pas**. Son
+interface locale ne déclarait pas le champ ; le serveur savait donc que deux
+des six composantes n'avaient été mesurées par personne, et le candidat
+lisait un classement présenté comme entier. L'écran nomme désormais ce qui a
+été comparé et ce qui n'a pas pu l'être, en deux phrases dérivées de `POIDS`
+et de la liste reçue — brancher l'indice demain retire la seconde phrase
+sans qu'on relise l'écran. Aucun poids n'est cité : une part affichée est
+refusée par le vocabulaire interdit, et elle ordonne sans devoir se lire
+(arbitrage C-09).
+
+Deux défauts trouvés en chemin, qui ne relevaient d'aucun arbitrage. La
+mention de source vivait **à l'intérieur** du bloc des écartées : une
+simulation où toutes les destinations passent n'affichait donc aucune source,
+et l'écran où aucune ne passe non plus — celui qui n'est fait que de chiffres
+réglementaires. Elle porte maintenant sur l'écran entier. Et les écartées
+n'avaient pas de mention du tout dans la réponse de la route : un écart
+chiffré — « 12 000 000 F demandés » — est une donnée réglementaire au même
+titre qu'un rang. Un test compare désormais les clés rendues par
+`/api/simulations` aux clés déclarées par P-03 et refuse qu'elles divergent,
+dans un sens comme dans l'autre : c'est ce qui aurait vu le champ non lu.
+
 **I.B — Le budget n'est comparable qu'en zone euro.** La parité du franc CFA
 avec l'euro est fixe et se convertit sans risque. Le franc suisse et le
 dirham sont des cours de marché : les écrire en dur périmerait, et les
