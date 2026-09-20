@@ -380,6 +380,28 @@ enum PaymentProvider {
   STRIPE
 }
 
+/// Pourquoi un paiement n'a pas abouti — N.B.
+///
+/// Vocabulaire fermé, et volontairement grossier. Les deux rails ne disent
+/// pas la même chose et ne disent pas tout : FedaPay distingue le refus,
+/// l'annulation et la panne par son seul `status`, Stripe donne un code de
+/// refus normalisé. Ce qui entre ici est ce que les deux savent exprimer,
+/// et rien de ce qui désigne un moyen de paiement.
+enum PaymentFailure {
+  /// L'émetteur a nommé le solde. Le seul cas où l'écran ose le dire.
+  SOLDE_INSUFFISANT
+  /// Refusé, sans raison communiquée. Le cas le plus fréquent.
+  REFUS_EMETTEUR
+  /// Le payeur a renoncé sur son téléphone ou fermé la page du prestataire.
+  ANNULE_PAR_LE_PAYEUR
+  /// Carte expirée, numéro erroné, portefeuille non autorisé au marchand.
+  MOYEN_INVALIDE
+  /// Panne du côté de l'émetteur ou du prestataire. Rien à corriger chez soi.
+  INCIDENT_TECHNIQUE
+  /// Aucune réponse dans le délai. Prononcé par la plateforme, pas reçu.
+  DELAI_DEPASSE
+}
+
 enum TransactionStatus {
   INITIEE
   EN_ATTENTE
@@ -405,6 +427,18 @@ model Transaction {
   status        TransactionStatus @default(INITIEE)
   createdAt     DateTime          @default(now())
   confirmedAt   DateTime?
+
+  /// Pourquoi le paiement n'a pas abouti — N.B.
+  ///
+  /// Une catégorie à nous, jamais le texte du fournisseur. Ce qu'il envoie
+  /// cite un moyen de paiement, parfois un message de banque ; ce qu'on en
+  /// retient tient dans six mots fermés, qui suffisent à écrire la bonne
+  /// phrase au candidat et à ne pas accuser son solde à tort.
+  ///
+  /// Elle part avec le compte (RG-10.4). L'obligation comptable porte sur
+  /// le montant, la date et la référence, pas sur la raison pour laquelle
+  /// une carte a été refusée un jour.
+  failureCause PaymentFailure?
 
   /// Rapprochement bancaire : distinct du cycle de paiement. Un silence de
   /// l'opérateur laisse `reconciledAt` nul sans faire basculer `status` en

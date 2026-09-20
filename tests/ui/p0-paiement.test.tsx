@@ -38,6 +38,7 @@ const EN_COURS: PaiementEnCours = {
   reference: "IMP-260920-4K7QZA",
   etat: "en_cours",
   statut: "EN_ATTENTE",
+  cause: null,
   montant: PACKS[0]?.prix.XOF ?? 0,
   devise: "XOF",
   moyen: "Mobile Money",
@@ -237,7 +238,7 @@ describe("$-05 — Échec", () => {
       />,
     );
     expect(
-      screen.getByRole("heading", { name: "Le paiement n'a pas abouti" }),
+      screen.getByRole("heading", { name: "Ton solde n'a pas couvert le paiement" }),
     ).toBeDefined();
   });
 

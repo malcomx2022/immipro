@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LienBouton } from "@/components/ui/LienBouton";
-import { echecPourMotif, motifParDefaut, type MotifEchec } from "@/domain/paiement/echec";
+import { echecPourMotif, motifDeLEchec, type MotifEchec } from "@/domain/paiement/echec";
 import type { PaiementEnCours } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 
@@ -27,6 +27,9 @@ const MOTIFS: readonly MotifEchec[] = [
   "solde_insuffisant",
   "refus_operateur",
   "notification_absente",
+  "annule_par_le_payeur",
+  "moyen_invalide",
+  "incident_technique",
 ];
 
 const estMotif = (valeur: string | null): valeur is MotifEchec =>
@@ -40,14 +43,19 @@ export function Echec({
   motif: string | null;
 }) {
   /**
-   * L'adresse d'abord, l'état de la transaction ensuite.
+   * La cause conservée d'abord, l'adresse ensuite, l'état en dernier.
    *
-   * Le fournisseur transmet parfois un motif, et il est alors plus précis
-   * que tout ce qu'on peut déduire. Sinon, l'état en base dit ce qui est
-   * su — et il vaut mieux que l'ancien repli sur « délai dépassé », qui
-   * annonçait cinq minutes écoulées sur un refus reçu en deux secondes.
+   * Ce que l'émetteur a répondu est désormais en base (N.B) et prime sur
+   * tout : c'est le seul élément qui distingue un solde insuffisant d'une
+   * panne du prestataire. L'adresse reste acceptée pour un motif qu'un
+   * retour de fournisseur transmettrait sans passer par le webhook, et
+   * l'état ferme la marche.
    */
-  const retenu: MotifEchec = estMotif(motif) ? motif : motifParDefaut(paiement.statut);
+  const retenu: MotifEchec = paiement.cause
+    ? motifDeLEchec(paiement.cause, paiement.statut)
+    : estMotif(motif)
+      ? motif
+      : motifDeLEchec(null, paiement.statut);
   const montant = formatMontant(paiement.montant, paiement.devise);
   const echec = echecPourMotif(retenu, montant, paiement.telephone);
 

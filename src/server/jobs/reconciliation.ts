@@ -79,7 +79,9 @@ export async function reconcilierLesPaiements(
       // main depuis B-04. Ce qui est fermé, c'est l'attente côté écran.
       await db.transaction.update({
         where: { id: transaction.id },
-        data: { status: "EXPIREE" },
+        // Le motif est celui que la plateforme peut honnêtement prononcer :
+        // personne n'a refusé ce paiement, personne n'a répondu (N.B).
+        data: { status: "EXPIREE", failureCause: "DELAI_DEPASSE" },
       });
       bilan.expirees += 1;
     }

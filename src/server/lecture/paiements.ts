@@ -3,7 +3,7 @@ import { echec } from "@/server/http/echecs";
 import { versFiche } from "@/server/acces/regles";
 import { etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
 import { deviseParDefaut, type Devise } from "@/domain/payments/pricing";
-import { masquerNumero } from "@/domain/paiement/echec";
+import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
 
 /**
  * Lecture d'un reçu — $-04 et $-06.
@@ -138,8 +138,10 @@ export async function tunnelDuPaiement(dossierId: string, userId: string): Promi
 export interface PaiementEnCours {
   reference: string;
   etat: EtatRecu;
-  /** Le statut tel qu'il est en base : c'est lui qui nomme le motif d'échec. */
+  /** Le statut tel qu'il est en base : il nomme le motif à défaut de cause. */
   statut: string;
+  /** Pourquoi l'émetteur a refusé, quand il l'a dit (N.B). */
+  cause: CauseRefus | null;
   montant: number;
   devise: string;
   moyen: string;
@@ -175,6 +177,7 @@ export async function paiementDuTunnel(
     reference: transaction.reference,
     etat: etatDuRecu(transaction.status),
     statut: transaction.status,
+    cause: transaction.failureCause,
     montant: transaction.amount,
     devise: transaction.currency,
     moyen: moyenDe(transaction.provider),

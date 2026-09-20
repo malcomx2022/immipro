@@ -123,6 +123,15 @@ export async function acheverLaSuppression(
       where: { userId },
       data: { issueReason: null },
     }),
+    // Le motif de refus d'un paiement part pour la même raison, et c'est le
+    // garde-fou que la base ne pouvait pas porter : une contrainte CHECK
+    // n'interroge pas une autre table. L'obligation comptable tient au
+    // montant, à la date et à la référence — pas au fait qu'une carte a été
+    // refusée pour solde un jour de septembre, qui décrit une personne.
+    db.transaction.updateMany({
+      where: { userId, failureCause: { not: null } },
+      data: { failureCause: null },
+    }),
     // RG-12.2 : un partage de dossier ne survit pas au compte qui l'a
     // accordé. Révoqué, pas supprimé — la ligne prouve qu'il a existé le
     // jour d'une consultation.

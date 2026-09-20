@@ -184,6 +184,31 @@ SELECT refuse(
        "commissionBps", status, "settledAt")
      VALUES ('pr4','p1','a0','ID','Refus déclaré en 2024',1500,'ABOUTIE', now())$q$);
 
+-- ── N.B · le motif d'un refus ─────────────────────────────────────────────
+SELECT refuse(
+  'N.B · un motif de refus sur un paiement encaissé',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "failureCause")
+     VALUES ('t1','IMP-260920-AAAAAA','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE','REFUS_EMETTEUR')$q$);
+
+SELECT refuse(
+  'N.B · un motif de refus sur un paiement encore en attente',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "failureCause")
+     VALUES ('t2','IMP-260920-BBBBBB','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE','SOLDE_INSUFFISANT')$q$);
+
+SELECT refuse(
+  'N.B · une expiration qui accuserait le payeur',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "failureCause")
+     VALUES ('t3','IMP-260920-CCCCCC','u1','essentiel',5000,'XOF','FEDAPAY','EXPIREE','SOLDE_INSUFFISANT')$q$);
+
+SELECT refuse(
+  'N.B · un échec annoncé par l''émetteur qui se dirait hors délai',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "failureCause")
+     VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE')$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

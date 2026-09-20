@@ -135,9 +135,12 @@ describe("le motif d'échec, quand le fournisseur n'en donne pas", () => {
     }
   });
 
-  it("l'écran préfère le motif du fournisseur au sien", () => {
+  it("l'écran préfère la cause conservée à sa propre déduction", () => {
+    // Depuis N.B, la cause est en base et prime sur l'adresse comme sur
+    // l'état : c'est le seul élément qui distingue un solde insuffisant
+    // d'une panne du prestataire.
     const source = lire("src/app/(app)/paiement/echec/Echec.tsx");
-    expect(source).toMatch(/estMotif\(motif\) \? motif : motifParDefaut\(paiement\.statut\)/u);
+    expect(source).toMatch(/paiement\.cause\s*\?\s*motifDeLEchec\(paiement\.cause/u);
   });
 });
 

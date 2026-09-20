@@ -215,6 +215,7 @@ export async function paiements(maintenant = new Date()): Promise<Paiement[]> {
     devise: t.currency,
     moyen: moyenDe(t.provider),
     ...(t.providerTxId ? { transaction: t.providerTxId } : {}),
+    ...(t.failureCause ? { cause: t.failureCause } : {}),
     recuLe: t.createdAt.toISOString(),
     etat: etatDuRapprochement(t, maintenant),
   }));
@@ -232,7 +233,7 @@ function etatDuRapprochement(
   if (t.discrepancy) return "ECART";
   if (t.status === "CONFIRMEE") return t.reconciledAt ? "RAPPROCHE" : "EN_ATTENTE";
   if (t.status === "EXPIREE") return "ECHEC_DELAI";
-  if (t.status === "ECHOUEE") return "ECHEC_SOLDE";
+  if (t.status === "ECHOUEE") return "ECHEC";
   return aReconcilier(t.createdAt, maintenant) ? "ECART" : "EN_ATTENTE";
 }
 

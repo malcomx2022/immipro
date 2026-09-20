@@ -14,19 +14,26 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import type { CauseRefus } from "@/domain/paiement/echec";
+
 export type EtatRapprochement =
   | "RAPPROCHE"
   | "EN_ATTENTE"
   | "ECART"
   | "ECHEC_DELAI"
-  | "ECHEC_SOLDE";
+  | "ECHEC";
 
 export const LIBELLE_RAPPROCHEMENT: Record<EtatRapprochement, string> = {
   RAPPROCHE: "Rapproché",
   EN_ATTENTE: "En attente de rapprochement",
   ECART: "Écart à traiter",
   ECHEC_DELAI: "Délai dépassé",
-  ECHEC_SOLDE: "Solde insuffisant",
+  // « Échec », et non « Solde insuffisant » : l'état disait une cause, la
+  // même pour tous les refus. Une panne du prestataire et un renoncement du
+  // payeur s'y lisaient comme un problème d'argent, et un opérateur qui
+  // rappelle en parlant du solde se trompe de conversation (N.B). La cause,
+  // quand l'émetteur l'a donnée, est une colonne à part.
+  ECHEC: "Échec",
 };
 
 export interface Paiement {
@@ -40,12 +47,14 @@ export interface Paiement {
   /** Horodatage, ISO. */
   recuLe: string;
   etat: EtatRapprochement;
+  /** Pourquoi l'émetteur a refusé, quand il l'a dit (N.B). */
+  cause?: CauseRefus;
 }
 
 export const estConfirme = (p: Paiement): boolean => p.etat === "RAPPROCHE";
 export const estEnAttente = (p: Paiement): boolean => p.etat === "EN_ATTENTE";
 export const estEnEchec = (p: Paiement): boolean =>
-  p.etat === "ECHEC_DELAI" || p.etat === "ECHEC_SOLDE";
+  p.etat === "ECHEC_DELAI" || p.etat === "ECHEC";
 
 export interface EtatOperateur {
   /** Faux quand l'API de l'opérateur ne répond plus. */

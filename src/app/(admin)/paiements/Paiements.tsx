@@ -15,6 +15,7 @@ import {
   type Paiement,
 } from "@/domain/backoffice/reconciliation";
 import { formatMontant } from "@/lib/utils";
+import { LIBELLE_CAUSE } from "@/domain/paiement/echec";
 
 /**
  * B-04 — Paiements et réconciliation. WF-15, INV-7.
@@ -142,7 +143,15 @@ export function Paiements({
                   </td>
                   <td className="px-3 py-2 text-ink-700">{heure(p.recuLe)}</td>
                   <td className="px-3 py-2 text-ink-700">
-                    {LIBELLE_RAPPROCHEMENT[p.etat]}
+                    <span className="flex flex-col">
+                      {LIBELLE_RAPPROCHEMENT[p.etat]}
+                      {/* La cause sous l'état, et seulement quand l'émetteur
+                          l'a donnée. L'état disait « Solde insuffisant » pour
+                          tout refus, panne comprise (N.B). */}
+                      {p.cause ? (
+                        <span className="text-13 text-ink-500">{LIBELLE_CAUSE[p.cause]}</span>
+                      ) : null}
+                    </span>
                   </td>
                 </tr>
               ))}

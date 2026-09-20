@@ -896,12 +896,89 @@ supposaient un choix d'opérateur qui n'est modélisé nulle part :
 seule alternative réelle, changer de grille. Reste à savoir si le produit
 veut un choix d'opérateur, ce qui suppose que FedaPay en expose un.
 
-**N.B — La raison d'un refus n'est pas conservée.** Le cycle la reçoit du
-fournisseur et ne l'écrit nulle part ; $-05 la déduit donc du statut.
-Conserver `discrepancy` ou un champ voisin permettrait de dire « solde
-insuffisant » quand c'est le cas, au lieu de s'en tenir à « la raison ne
-nous est pas communiquée ». C'est une question de rétention autant que de
-produit : le motif d'un refus bancaire est une donnée sensible.
+**N.B — La raison d'un refus n'est pas conservée.** ~~Le cycle la reçoit du
+fournisseur et ne l'écrit nulle part ; $-05 la déduit donc du statut.~~
+**Tranché — voir annexe O.** Six valeurs fermées, écrites en base, et
+jamais le texte du fournisseur.
+
+---
+
+## Annexe O · La raison d'un refus
+
+Lot N.B. Il ferme le dernier point ouvert par le branchement du tunnel, et
+trouve que le back-office souffrait du même défaut que l'écran candidat.
+
+### Ce qui est tranché
+
+**O.1 — Une catégorie à nous, jamais le texte du fournisseur.** La question
+posée était une question de rétention : le motif d'un refus bancaire est
+une donnée sensible. La réponse tient dans ce qu'on choisit de retenir.
+`PaymentFailure` a six valeurs — solde insuffisant, refus de l'émetteur,
+annulation du payeur, moyen invalide, incident technique, délai dépassé —
+et aucune ne désigne une carte ni un portefeuille. Le message rédigé et les
+quatre derniers chiffres, qui voyagent dans le même objet Stripe, ne sont
+pas déclarés au schéma de lecture : ce qui n'y est pas n'atteint pas le
+code qui écrit.
+
+**O.2 — L'information était déjà là, et on la jetait.** FedaPay distingue
+`declined`, `canceled` et `failed` par son seul `status` ; les trois se
+lisaient comme un seul `ECHOUEE`. Une annulation du payeur n'est pas un
+refus de l'émetteur, et aucun des deux n'est une panne. Ce rail ne nomme
+jamais le solde, faute de code normalisé — l'y lire serait une accusation
+sans source.
+
+**O.3 — Stripe donne un code, et un tableau fermé décide de ce qu'on en
+fait.** `decline_code` est normalisé par le réseau. Onze codes sont
+traduits ; un code inconnu retombe sur le refus sans raison, jamais sur le
+solde. C'est la même prudence qu'ailleurs : l'inconnu tombe du côté qui
+n'accuse pas.
+
+**O.4 — Le motif part avec le compte.** L'obligation comptable tient au
+montant, à la date et à la référence. Savoir qu'une carte a été refusée
+pour solde un jour de septembre ne lui sert pas, et décrit une personne :
+l'anonymisation l'efface, comme elle efface déjà le motif de refus de
+visa. Le garde-fou n'est pas en base — une contrainte `CHECK` n'interroge
+pas une autre table — mais dans le service, à côté de son jumeau.
+
+**O.5 — Trois garde-fous de plus, vingt-neuf sur vingt-neuf.** Un motif sur
+un paiement encaissé, une expiration qui accuserait le payeur, un échec
+annoncé par l'émetteur qui se dirait hors délai : la base refuse les trois.
+Le remboursement non plus n'en porte pas — rendre l'argent n'est pas le
+refuser.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Le back-office souffrait du même défaut, en pire.** B-04 classait tout
+  échec en « Solde insuffisant » : l'état de rapprochement nommait une
+  cause, la même pour tous. Un opérateur qui rappelle un candidat en lui
+  parlant de son solde alors qu'il a simplement fermé la page se trompe de
+  conversation. L'état s'appelle « Échec », et la cause est une colonne à
+  part, remplie seulement quand l'émetteur l'a donnée.
+- **Deux titres se lisaient l'un pour l'autre.** « Le paiement n'a pas
+  abouti » pour un solde insuffisant, « Le paiement n'a pas pu aboutir »
+  pour une panne : à un mot près, et aucun des deux ne nommait son fait
+  (DOC-12 §16 règle 1). Ce sont maintenant « Ton solde n'a pas couvert le
+  paiement » et « Une panne a interrompu le paiement ».
+- **Un motif dans l'adresse pouvait contredire la base.** Tant que rien
+  n'était conservé, `?motif=` était la seule source. Elle ne l'est plus :
+  la cause conservée prime, et une adresse fabriquée n'annonce plus un
+  solde insuffisant sur une panne.
+
+### Ce qui reste à arbitrer
+
+**O.A — FedaPay ne dit pas pourquoi, et c'est une limite du rail.** Le
+candidat béninois qui paie en francs CFA verra « ton opérateur n'a pas
+confirmé le paiement » là où le candidat qui paie par carte verra « ton
+solde n'a pas couvert le paiement ». La différence tient au fournisseur,
+pas au produit. Savoir si FedaPay expose un code d'erreur par un autre
+canal — l'API de consultation d'une transaction, plutôt que le webhook —
+demande la documentation que nous n'avons pas encore.
+
+**O.B — Combien de temps garder le motif d'un compte vivant ?** Il part
+avec la suppression, c'est acquis. Mais un refus de 2026 reste lisible en
+2030 sur un compte actif, et personne n'en a l'usage passé la réclamation.
+Une purge à l'échéance — trois mois, un an — relève de la politique de
+rétention et non de ce lot.
 
 **N.C — La case des conditions passe sous la barre d'action.** Sur un écran
 de 390 px, la barre collante de $-02 recouvre la case qui déverrouille son

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { TransactionStatus } from "@prisma/client";
+import type { CauseRefus } from "@/domain/paiement/echec";
 
 /**
  * Lecture des notifications des deux rails.
@@ -23,6 +24,43 @@ const ETATS_FEDAPAY: Record<string, TransactionStatus> = {
   refunded: "REMBOURSEE",
 };
 
+/**
+ * Ce que le `status` de FedaPay dit déjà de la cause — N.B.
+ *
+ * Les trois états d'échec se lisaient comme un seul, et l'information était
+ * là depuis le début : « canceled » n'est pas « declined », et aucun des
+ * deux n'est « failed ». Le rail n'en dit pas plus — pas de code de refus
+ * normalisé —, donc le solde n'est jamais nommé de ce côté.
+ */
+const CAUSES_FEDAPAY: Record<string, CauseRefus> = {
+  declined: "REFUS_EMETTEUR",
+  canceled: "ANNULE_PAR_LE_PAYEUR",
+  failed: "INCIDENT_TECHNIQUE",
+};
+
+/**
+ * Codes de refus de Stripe, normalisés par le réseau — N.B.
+ *
+ * Ils arrivent dans `last_payment_error`, qui porte aussi un message
+ * rédigé et les quatre derniers chiffres de la carte. Rien de tout cela
+ * n'entre en base : seul le code est lu, et seul ce tableau décide ce
+ * qu'on en retient. Un code inconnu ne devient pas « solde insuffisant »
+ * par défaut — il retombe sur le refus sans raison.
+ */
+const CAUSES_STRIPE: Record<string, CauseRefus> = {
+  insufficient_funds: "SOLDE_INSUFFISANT",
+  card_velocity_exceeded: "SOLDE_INSUFFISANT",
+  expired_card: "MOYEN_INVALIDE",
+  incorrect_number: "MOYEN_INVALIDE",
+  incorrect_cvc: "MOYEN_INVALIDE",
+  invalid_account: "MOYEN_INVALIDE",
+  invalid_expiry_month: "MOYEN_INVALIDE",
+  invalid_expiry_year: "MOYEN_INVALIDE",
+  processing_error: "INCIDENT_TECHNIQUE",
+  issuer_not_available: "INCIDENT_TECHNIQUE",
+  try_again_later: "INCIDENT_TECHNIQUE",
+};
+
 const ETATS_STRIPE: Record<string, TransactionStatus> = {
   "checkout.session.completed": "CONFIRMEE",
   "payment_intent.succeeded": "CONFIRMEE",
@@ -35,6 +73,8 @@ export interface Lue {
   providerTxId: string;
   reference: string;
   statut: TransactionStatus;
+  /** Pourquoi, quand le rail le dit. Jamais deviné (N.B). */
+  cause?: CauseRefus;
 }
 
 const schemaFedaPay = z.object({
@@ -49,12 +89,15 @@ const schemaFedaPay = z.object({
 export function lireFedaPay(charge: unknown): Lue | null {
   const lu = schemaFedaPay.safeParse(charge);
   if (!lu.success) return null;
-  const statut = ETATS_FEDAPAY[lu.data.entity.status.toLowerCase()];
+  const etat = lu.data.entity.status.toLowerCase();
+  const statut = ETATS_FEDAPAY[etat];
   if (!statut) return null;
+  const cause = CAUSES_FEDAPAY[etat];
   return {
     providerTxId: `fedapay:${lu.data.entity.id}`,
     reference: lu.data.entity.reference,
     statut,
+    ...(cause ? { cause } : {}),
   };
 }
 
@@ -67,6 +110,17 @@ const schemaStripe = z.object({
       // La référence interne voyage dans les métadonnées : Stripe n'a pas de
       // champ de référence marchand qui survive à tous les types d'objet.
       metadata: z.object({ reference: z.string().min(1) }),
+      /**
+       * Le détail du refus, absent partout ailleurs que sur un échec.
+       *
+       * Seul `decline_code` est lu, et `code` à défaut. Le `message`
+       * rédigé et les quatre derniers chiffres de la carte, qui voyagent
+       * dans le même objet, ne sont pas déclarés ici : ce qui n'est pas au
+       * schéma n'atteint pas le code qui écrit en base.
+       */
+      last_payment_error: z
+        .object({ code: z.string().optional(), decline_code: z.string().optional() })
+        .optional(),
     }),
   }),
 });
@@ -76,9 +130,18 @@ export function lireStripe(charge: unknown): Lue | null {
   if (!lu.success) return null;
   const statut = ETATS_STRIPE[lu.data.type];
   if (!statut) return null;
+
+  const erreur = lu.data.data.object.last_payment_error;
+  const code = erreur?.decline_code ?? erreur?.code;
+  // Un échec annoncé sans code reconnu reste un refus sans raison : la
+  // valeur par défaut ne doit accuser ni le solde ni le moyen.
+  const cause: CauseRefus | undefined =
+    statut === "ECHOUEE" ? ((code ? CAUSES_STRIPE[code] : undefined) ?? "REFUS_EMETTEUR") : undefined;
+
   return {
     providerTxId: `stripe:${lu.data.data.object.id}`,
     reference: lu.data.data.object.metadata.reference,
     statut,
+    ...(cause ? { cause } : {}),
   };
 }

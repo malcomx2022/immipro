@@ -226,11 +226,27 @@ décidé dans `domain/paiement/attente.ts`, pas dans le composant :
   affirmer de l'argent ;
 - « délai dépassé » n'est prononcé que si la base l'a prononcé.
 
-**Le motif d'échec vient de l'adresse, sinon de l'état.** Le fournisseur
-transmet parfois une raison ; sinon `motifParDefaut` la déduit du statut.
-Le repli unique sur « délai dépassé » était plus faux que prudent : un
-refus reçu en deux secondes s'annonçait « les cinq minutes se sont
-écoulées », et envoyait vérifier le réseau au lieu du compte.
+**Le motif d'échec est conservé, et c'est lui qui prime.** `failureCause`
+porte six valeurs fermées — solde, refus de l'émetteur, annulation du
+payeur, moyen invalide, incident technique, délai dépassé — et rien du
+texte reçu : celui-ci cite un moyen de paiement, parfois un message de
+banque, et ce qui n'est pas déclaré au schéma de lecture n'atteint pas le
+code qui écrit. À défaut de cause, l'état de la transaction nomme encore le
+motif, et l'adresse est acceptée entre les deux.
+
+Chaque rail en dit ce qu'il sait. FedaPay distingue le refus, l'annulation
+et la panne par son seul `status` — l'information était là et se perdait —
+et ne nomme jamais le solde, faute de code normalisé. Stripe donne un
+`decline_code` du réseau, dont seul un tableau fermé décide de ce qu'on
+retient ; un code inconnu retombe sur le refus sans raison, jamais sur le
+solde.
+
+Le motif **part avec le compte** (RG-10.4), comme le motif de refus de
+visa. L'obligation comptable tient au montant, à la date et à la
+référence : savoir qu'une carte a été refusée pour solde un jour de
+septembre ne lui sert pas, et décrit une personne. Ce garde-fou-là est
+dans `acces/suppression.ts` et non en base — une contrainte `CHECK`
+n'interroge pas une autre table.
 
 ## Écrire une route
 

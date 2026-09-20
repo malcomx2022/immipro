@@ -62,7 +62,7 @@ export const CE_QUI_PART: readonly string[] = [
  * trace est légitime.
  */
 export const CE_QUI_RESTE: readonly string[] = [
-  "Tes reçus de paiement, sans ton nom, pour l'obligation comptable.",
+  "Tes reçus de paiement, sans ton nom ni la raison d'un refus, pour l'obligation comptable.",
   "Le décompte des analyses consommées, sans ton nom, pour nos comptes.",
   "L'historique de tes consentements, conservé cinq ans comme l'exige la réglementation.",
 ];
