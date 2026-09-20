@@ -61,8 +61,8 @@ describe("attente Mobile Money — $-03", () => {
 
 describe("échec de paiement — $-05", () => {
   it("distingue le délai dépassé du refus, et dit ce qui est conservé", () => {
-    const delai = echecPourMotif("delai_depasse", "5 000 F", "97 •• •• 42");
-    const solde = echecPourMotif("solde_insuffisant", "5 000 F", "97 •• •• 42");
+    const delai = echecPourMotif("delai_depasse", "5 000 F", "97 •• •• 42", "MOBILE_MONEY");
+    const solde = echecPourMotif("solde_insuffisant", "5 000 F", "97 •• •• 42", "MOBILE_MONEY");
     expect(delai.titre).not.toBe(solde.titre);
     expect(delai.corps).toContain("dossier est conservé");
     expect(solde.corps).toContain("dossier est conservé");
@@ -70,7 +70,7 @@ describe("échec de paiement — $-05", () => {
 
   it("propose trois vérifications au candidat, sans code technique", () => {
     for (const motif of ["delai_depasse", "solde_insuffisant"] as const) {
-      const echec = echecPourMotif(motif, "5 000 F", "97 •• •• 42");
+      const echec = echecPourMotif(motif, "5 000 F", "97 •• •• 42", "MOBILE_MONEY");
       expect(echec.verifications).toHaveLength(3);
       for (const v of echec.verifications) {
         expect(v).not.toMatch(/HTTP|\b[45]\d\d\b|fedapay|stripe|timeout/i);
@@ -80,7 +80,7 @@ describe("échec de paiement — $-05", () => {
 
   it("ne promet rien et ne note rien", () => {
     for (const motif of ["delai_depasse", "solde_insuffisant"] as const) {
-      const e = echecPourMotif(motif, "5 000 F", "97 •• •• 42");
+      const e = echecPourMotif(motif, "5 000 F", "97 •• •• 42", "MOBILE_MONEY");
       for (const texte of [e.titre, e.corps, ...e.verifications]) {
         expect(verifierTexte(texte, INTERDITS_ECRAN_CANDIDAT)).toEqual([]);
       }

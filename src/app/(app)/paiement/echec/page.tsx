@@ -7,9 +7,15 @@ import { exigerCandidat } from "@/server/securite/page";
 /**
  * $-05 — Échec ou expiration. WF-05.
  *
- * Le motif vient de l'opérateur, transmis dans l'adresse. Un motif inconnu
- * retombe sur le délai dépassé : c'est le cas le moins accusateur, et
- * annoncer un refus bancaire à tort est la pire des erreurs sur cet écran.
+ * Le motif vient de la cause conservée (N.B), de l'adresse à défaut, et de
+ * l'état de la transaction en dernier recours. Un échec dont on ignore la
+ * raison tombe dans le refus sans motif — et non plus dans le délai
+ * dépassé, qui paraissait le moins accusateur mais affirmait « les cinq
+ * minutes se sont écoulées » sur un refus reçu en deux secondes.
+ *
+ * Ce refus sans motif reste générique et n'invente pas de cause (O.A) : le
+ * rail Mobile Money ne fournit pas de code normalisé, et une précision
+ * inventée envoie corriger ce qui n'est pas en cause.
  *
  * L'écran porte maintenant la transaction qui a échoué : son montant, sa
  * référence — celle qu'on dicte au service client — et de quoi relancer le

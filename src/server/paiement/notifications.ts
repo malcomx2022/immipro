@@ -25,12 +25,29 @@ const ETATS_FEDAPAY: Record<string, TransactionStatus> = {
 };
 
 /**
- * Ce que le `status` de FedaPay dit déjà de la cause — N.B.
+ * Ce que le `status` de FedaPay dit déjà de la cause — N.B, confirmé par
+ * O.A le 20/09/2026.
  *
  * Les trois états d'échec se lisaient comme un seul, et l'information était
  * là depuis le début : « canceled » n'est pas « declined », et aucun des
  * deux n'est « failed ». Le rail n'en dit pas plus — pas de code de refus
  * normalisé —, donc le solde n'est jamais nommé de ce côté.
+ *
+ * **La condition d'entrée dans cette table, et c'est O.A qui la pose.**
+ * Un état ne peut s'y traduire que par une cause que le vocabulaire de
+ * `status` distingue réellement. `SOLDE_INSUFFISANT` et `MOYEN_INVALIDE`
+ * nomment une défaillance précise de l'instrument du payeur : les faire
+ * sortir de « declined » serait les deviner. Il faudrait pour cela un code
+ * de refus **normalisé et contractuellement stable**, et le webhook n'en
+ * porte pas.
+ *
+ * L'API de consultation d'une transaction en expose peut-être un. On ne
+ * l'appellera pas pour autant : interroger une seconde adresse à chaque
+ * échec, dans le seul but de fabriquer une précision incertaine, coûte un
+ * aller-retour sur le chemin d'un webhook et rapporte une cause dont on ne
+ * pourrait pas garantir le sens. L'étude de la documentation reste à faire
+ * et **ne bloque rien** ; elle décidera si une valeur stable existe. Un
+ * test tient la condition d'ici là.
  */
 const CAUSES_FEDAPAY: Record<string, CauseRefus> = {
   declined: "REFUS_EMETTEUR",
