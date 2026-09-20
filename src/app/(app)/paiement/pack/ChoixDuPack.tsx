@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { PACKS, RECHARGE_ANALYSES, type Devise } from "@/domain/payments/pricing";
+import { PRECISION_MOBILE_MONEY, moyenDeLaGrille, railDe } from "@/domain/payments/rail";
 import type { Tunnel } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 
@@ -111,18 +112,17 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
           </p>
         </div>
 
-        <section className="flex flex-col gap-3 rounded-lg bg-ink-100 p-5">
-          <h2 className="text-16 font-semibold text-ink-900">Moyens de paiement</h2>
-          <ul className="flex flex-wrap gap-2">
-            {["MTN MoMo", "Moov Money", "Carte bancaire"].map((moyen) => (
-              <li
-                key={moyen}
-                className="rounded-full bg-white px-3.5 py-2 text-14 font-medium text-ink-700 shadow-e1"
-              >
-                {moyen}
-              </li>
-            ))}
-          </ul>
+        {/* N.A — la section offrait trois pastilles, « MTN MoMo · Moov Money
+            · Carte bancaire », comme s'il y avait à choisir. Le rail suit la
+            devise, et le candidat vient de la choisir juste au-dessus : la
+            section répond donc à sa question — par quoi vais-je payer ? —
+            au lieu de proposer une commande qui n'existe pas. */}
+        <section className="flex flex-col gap-2 rounded-lg bg-ink-100 p-5">
+          <h2 className="text-16 font-semibold text-ink-900">Moyen de paiement</h2>
+          <p className="text-pretty text-14 text-ink-700">{moyenDeLaGrille(devise)}</p>
+          {railDe(devise) === "MOBILE_MONEY" ? (
+            <p className="text-pretty text-14 text-ink-700">{PRECISION_MOBILE_MONEY}</p>
+          ) : null}
           <p className="text-pretty text-13 text-ink-500">
             Les frais de demande versés à l&apos;administration ne sont pas inclus
             et ne passent jamais par ImmiPro.
@@ -144,7 +144,7 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
             pleineLargeur
             className="min-h-action"
             disabled
-            raisonDesactivation="Choisissez un pack pour continuer."
+            raisonDesactivation="Choisis un pack pour continuer."
           >
             Continuer
           </Button>

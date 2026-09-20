@@ -145,7 +145,7 @@ export function Simulateur() {
           className="min-h-action"
           disabled={!choisie}
           raisonDesactivation={
-            choisie ? undefined : "Choisissez une réponse pour continuer."
+            choisie ? undefined : "Choisis une réponse pour continuer."
           }
           onClick={continuer}
         >

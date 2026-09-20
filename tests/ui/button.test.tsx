@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -27,7 +29,7 @@ describe("Button", () => {
 
   it("accompagne le désactivé de sa raison, reliée au bouton", () => {
     render(
-      <Button disabled raisonDesactivation="Choisissez une destination d'abord.">
+      <Button disabled raisonDesactivation="Choisis une destination d'abord.">
         Continuer
       </Button>,
     );
@@ -35,7 +37,7 @@ describe("Button", () => {
     const idRaison = bouton.getAttribute("aria-describedby");
     expect(idRaison).toBeTruthy();
     expect(document.getElementById(idRaison as string)?.textContent).toBe(
-      "Choisissez une destination d'abord.",
+      "Choisis une destination d'abord.",
     );
   });
 
@@ -71,5 +73,45 @@ describe("cn et l'échelle de tailles fermée", () => {
     const classes = screen.getByRole("button", { name: "Continuer" }).className;
     expect(classes).toContain("text-16");
     expect(classes).toContain("text-white");
+  });
+});
+
+/**
+ * La phrase d'un contrôle désactivé s'adresse au candidat en pleine
+ * tâche : elle lui dit quoi faire pour débloquer le bouton. Elle tutoie,
+ * comme tout ce qu'il lit (DOC-12 §16, règle 5).
+ *
+ * Quatre d'entre elles vouvoyaient — « Choisissez un pack », « Choisissez
+ * une date », « Choisissez une réponse » — et rien ne les cherchait. Elles
+ * sont sorties au jour en lisant l'écran des packs pendant N.A.
+ *
+ * Le test se limite à ce registre. Le vouvoiement subsiste ailleurs, dans
+ * les descriptions de page et quelques titres publics, et trancher s'il
+ * doit y disparaître est un choix éditorial, pas une correction.
+ */
+describe("la raison d'un bouton désactivé tutoie", () => {
+  function fichiers(dir: string, filtre: RegExp, acc: string[] = []): string[] {
+    for (const nom of readdirSync(dir)) {
+      const p = join(dir, nom);
+      if (statSync(p).isDirectory()) fichiers(p, filtre, acc);
+      else if (filtre.test(nom)) acc.push(p.replace(/\\/gu, "/"));
+    }
+    return acc;
+  }
+
+  it("aucune ne vouvoie", () => {
+    const vouvoiement = /\b(vous|votre|vos|[A-ZÉÈ][a-zéèêàç]+ez)\b/u;
+    const fautives: string[] = [];
+    for (const f of fichiers("src", /\.tsx?$/u)) {
+      const source = readFileSync(f, "utf8");
+      for (const m of source.matchAll(/raisonDesactivation[=:]\s*"([^"]+)"/gu)) {
+        if (vouvoiement.test(m[1]!)) fautives.push(`${f} — ${m[1]!}`);
+      }
+      // Et les obstacles du domaine, qui alimentent ces mêmes boutons.
+      for (const m of source.matchAll(/return "([^"]*pour continuer\.)"/gu)) {
+        if (vouvoiement.test(m[1]!)) fautives.push(`${f} — ${m[1]!}`);
+      }
+    }
+    expect(fautives).toEqual([]);
   });
 });

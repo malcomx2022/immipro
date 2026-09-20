@@ -11,6 +11,7 @@ import {
 import { effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
 import { suiteDictable } from "@/server/securite/secret";
+import { fournisseurDe } from "@/domain/payments/rail";
 import type { CauseRefus } from "@/domain/paiement/echec";
 
 /**
@@ -86,7 +87,10 @@ export async function creerOuReprendre(
       packCode: achat.type === "pack" ? achat.code : achat.type,
       amount: montant,
       currency: devise,
-      provider: devise === "XOF" ? "FEDAPAY" : "STRIPE",
+      // N.A — le rail suit la devise, et la règle vit dans le domaine :
+      // elle était écrite ici, en ligne, et quatre écrans la redisaient
+      // chacun à leur façon.
+      provider: fournisseurDe(devise),
       status: "INITIEE",
     },
   });

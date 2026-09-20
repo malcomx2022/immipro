@@ -212,31 +212,65 @@ describe("I.B (tranché) — aucune parité n'est écrite en dur hors du régime
  * N.A — le rail de paiement suit la devise, et rien d'autre
  * ------------------------------------------------------------------ */
 
-describe("N.A — le rail se déduit, il ne se choisit pas", () => {
+describe("N.A (tranché) — le rail se déduit, il ne se choisit pas", () => {
   /**
-   * Francs CFA par Mobile Money, euros par carte. Les trois « autres
-   * moyens » du prototype supposaient un choix d'opérateur qui n'est
-   * modélisé nulle part. Savoir si le produit en veut un suppose que
-   * FedaPay en expose un — question ouverte.
-   *
-   * En attendant, `provider` se déduit de la devise à la création. Le
-   * laisser entrer depuis le client serait une façon silencieuse de
-   * trancher : quelqu'un paierait en euros par Mobile Money, et la
-   * réconciliation interrogerait le mauvais fournisseur.
+   * Tranché pour la V1 le 20/09/2026 : francs CFA par Mobile Money, euros
+   * par carte. Aucun choix d'opérateur tant que le fournisseur n'en expose
+   * pas un et que le besoin n'est pas constaté — une option d'interface
+   * sans capacité derrière est un faux choix, et il coûte plus cher
+   * qu'une absence de choix : il fait chercher un réglage inexistant au
+   * moment où un paiement vient d'échouer.
    */
-  it("le fournisseur est dérivé de la devise, à un seul endroit", () => {
-    const paiements = lire("src/server/acces/paiements.ts");
-    expect(paiements).toMatch(/provider:\s*devise === "XOF" \? "FEDAPAY" : "STRIPE"/u);
+  it("la règle vit dans le domaine, à un seul endroit", () => {
+    const rail = lire("src/domain/payments/rail.ts");
+    expect(rail).toMatch(/XOF: "MOBILE_MONEY"/u);
+    expect(rail).toMatch(/MOBILE_MONEY: "FEDAPAY"/u);
+
+    // Et nulle part ailleurs : elle était écrite en ligne dans le `create`,
+    // ce qui laissait chaque écran la redire à sa façon.
+    const ailleurs = [...fichiers("src/server", /\.ts$/u), ...fichiers("src/app", /\.tsx?$/u)]
+      .filter((f) => /devise === "XOF" \? "FEDAPAY"|currency === "XOF" \? "FEDAPAY"/u.test(lire(f)));
+    expect(ailleurs).toEqual([]);
   });
 
-  it("aucune route n'accepte un fournisseur du client", () => {
+  it("aucune route n'accepte un fournisseur venu du client", () => {
     const fautives = fichiers("src/app/api", /^route\.ts$/u).filter((f) => {
       const source = lire(f);
-      // Le schéma d'entrée, et lui seul : `provider` en sortie est légitime.
       const corps = /corps:\s*z\.object\(\{([\s\S]*?)\n\s*\}\)/u.exec(source)?.[1] ?? "";
       return /\b(provider|fournisseur|operateur)\b/u.test(corps);
     });
     expect(fautives).toEqual([]);
+  });
+
+  /**
+   * Aucun écran du tunnel de paiement n'offre de choisir un opérateur. La
+   * page des packs annonçait « MTN MoMo · Moov Money · Carte bancaire » en
+   * pastilles, c'est-à-dire trois options, alors que deux d'entre elles
+   * désignent des opérateurs que le produit ne sélectionne pas — c'est le
+   * fournisseur qui route selon le numéro.
+   *
+   * Le test porte sur le tunnel, et pas au-delà : nommer les opérateurs
+   * joignables sur une page publique est une annonce de couverture, pas un
+   * choix, et ce n'est pas ce que N.A tranche. (Que cette couverture soit
+   * vérifiée est une autre question, et elle relève d'I.C.)
+   */
+  it("aucun écran du tunnel ne nomme un opérateur", () => {
+    const operateurs = /\b(MTN|MoMo|Moov|Orange Money|Wave)\b/u;
+    const fautifs = fichiers("src/app/(app)/paiement", /\.tsx$/u).filter((f) =>
+      operateurs.test(sansCommentaires(lire(f))),
+    );
+    expect(fautifs).toEqual([]);
+  });
+
+  /** Les phrases du rail viennent toutes du même module. */
+  it("les écrans de paiement ne réécrivent pas la règle", () => {
+    for (const ecran of [
+      "src/app/(app)/paiement/pack/ChoixDuPack.tsx",
+      "src/app/(app)/paiement/echec/Echec.tsx",
+      "src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx",
+    ]) {
+      expect(lire(ecran), ecran).toContain("@/domain/payments/rail");
+    }
   });
 });
 
@@ -371,7 +405,7 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   const CE_FICHIER = lire("tests/arbitrages-ouverts.test.ts");
 
   /** Encore ouverts : la lecture est provisoire, le test la tient. */
-  const OUVERTS = ["N.A"];
+  const OUVERTS: string[] = [];
   /**
    * Décidés par le produit, mais suspendus à une condition qui ne lui
    * appartient pas — L.A attend une validation juridique avant lancement.
@@ -389,7 +423,7 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
    * « pas de taux sans source datée » — a plus besoin d'être tenue qu'une
    * lecture provisoire.
    */
-  const TRANCHES = ["I.B", "I.D", "K.A"];
+  const TRANCHES = ["I.B", "I.D", "K.A", "N.A"];
 
   const TOUS = [...OUVERTS, ...SOUS_RESERVE, ...TRANCHES];
 

@@ -10,6 +10,7 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import type { Tunnel } from "@/server/lecture/paiements";
 import type { Devise } from "@/domain/payments/pricing";
+import { deroulement, mentionDuRail } from "@/domain/payments/rail";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -91,9 +92,7 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
           <p className="text-14 text-ink-500">Montant à payer</p>
           <p className="text-32 font-semibold text-ink-900">{montant}</p>
           <p className="text-pretty text-14 text-ink-500">
-            {devise === "XOF"
-              ? "Grille en francs CFA, débitée par ton opérateur Mobile Money."
-              : "Grille en euros, prélevée par carte."}{" "}
+            {mentionDuRail(devise)}{" "}
             La grille en {autreDevise === "XOF" ? "francs CFA" : "euros"} est
             distincte, ce n&apos;est pas une conversion.
           </p>
@@ -134,9 +133,7 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
         <div className="flex flex-col gap-1.5 rounded-md bg-accent-50 p-4">
           <p className="text-14 font-semibold text-accent-700">Ce qui va se passer</p>
           <p className="text-pretty text-14 text-accent-700">
-            {devise === "XOF"
-              ? "Une notification Mobile Money arrive sur ton téléphone. Tu saisis ton code PIN, et ton dossier s'ouvre aussitôt."
-              : "Tu es conduit vers la page de paiement de notre prestataire. Une fois la carte validée, ton dossier s'ouvre aussitôt."}
+            {deroulement(devise)}
           </p>
         </div>
 

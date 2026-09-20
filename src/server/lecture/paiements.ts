@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { versFiche } from "@/server/acces/regles";
 import { etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
-import { deviseParDefaut, type Devise } from "@/domain/payments/pricing";
+import { deviseParDefaut, estDevise, type Devise } from "@/domain/payments/pricing";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
 
 /**
@@ -146,7 +146,7 @@ export interface PaiementEnCours {
   /** Pourquoi l'émetteur a refusé, quand il l'a dit (N.B). */
   cause: CauseRefus | null;
   montant: number;
-  devise: string;
+  devise: Devise;
   moyen: string;
   achat: string;
   /** Pour relancer le même achat après un échec. */
@@ -172,7 +172,7 @@ export async function paiementDuTunnel(
 ): Promise<PaiementEnCours> {
   const transaction = await db.transaction.findFirst({
     where: { reference, userId },
-    include: { user: { select: { phone: true } } },
+    include: { user: { select: { phone: true, countryCode: true } } },
   });
   if (!transaction) throw echec("paiement_introuvable");
 
@@ -182,7 +182,14 @@ export async function paiementDuTunnel(
     statut: transaction.status,
     cause: transaction.failureCause,
     montant: transaction.amount,
-    devise: transaction.currency,
+    // La colonne est un `Char(3)` ; le seul écrivain est `creerLaTransaction`,
+    // qui y met une devise du domaine. Le repli ne devrait donc jamais
+    // servir — mais il vaut mieux qu'un `as` : l'écran propose de changer
+    // de grille, et se tromper de grille sur un échec de paiement est
+    // précisément ce que N.A ferme.
+    devise: estDevise(transaction.currency)
+      ? transaction.currency
+      : deviseParDefaut(transaction.user.countryCode),
     moyen: moyenDe(transaction.provider),
     achat: libelleDeLAchat(transaction.packCode),
     achatCode: transaction.packCode,

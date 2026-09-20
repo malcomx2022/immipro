@@ -105,7 +105,7 @@ describe("commande — $-01 et $-02", () => {
   it("ne présélectionne aucun pack", () => {
     const commande = commandeInitiale("XOF", "97000042");
     expect(commande.pack).toBeNull();
-    expect(obstacleAuRecapitulatif(commande)).toBe("Choisissez un pack pour continuer.");
+    expect(obstacleAuRecapitulatif(commande)).toBe("Choisis un pack pour continuer.");
   });
 
   it("ne pré-coche pas les conditions", () => {

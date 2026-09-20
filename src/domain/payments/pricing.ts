@@ -176,6 +176,15 @@ const PAYS_XOF = new Set(["BJ", "CI", "SN", "TG", "BF", "ML", "NE", "GW"]);
 export const deviseParDefaut = (countryCode?: string | null): Devise =>
   countryCode && PAYS_XOF.has(countryCode) ? "XOF" : "EUR";
 
+/**
+ * Une devise lue en base. La colonne est un `Char(3)` ; le domaine n'en
+ * connaît que deux, et une valeur inconnue n'en devient pas une par
+ * défaut — même règle que `etatDuRecu`, qui ne fait jamais passer un
+ * statut inconnu pour « payé ».
+ */
+export const estDevise = (valeur: string): valeur is Devise =>
+  valeur === "XOF" || valeur === "EUR";
+
 export const getPack = (code: string) => PACKS.find((p) => p.code === code);
 
 export const packMisEnAvant = () => PACKS.find((p) => p.misEnAvant);

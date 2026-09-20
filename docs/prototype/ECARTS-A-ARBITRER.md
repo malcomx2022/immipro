@@ -278,7 +278,7 @@ jamais supprimé sans que la décision soit écrite ici.
 | **L.A** — *décidé sous réserve, 20/09* | Palier, dénombrement, manques ordonnés et explication des facteurs — jamais le nombre (C-09) | `internalScore` sérialisé, ou une explication qui donnerait les coefficients |
 | **K.A** — *tranché le 20/09* | Une aide fonctionnelle dans le dossier, les offres sur les surfaces dédiées | Une offre, ou son vocabulaire, dans un écran de l'espace dossier |
 | **I.B** — *tranché le 20/09* | Seule la parité fixe du franc CFA convertit ; ailleurs le budget sort du classement | Une seconde parité écrite en dur |
-| **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
+| **N.A** — *tranché le 20/09* | Le rail se déduit de la devise, dans le domaine | Une route qui accepte un fournisseur venu du client, ou un écran du tunnel qui nomme un opérateur |
 | **I.D** — *tranché le 20/09* | Quarantaine, puis balayage, puis promotion — et rien ne sort avant | Un repli vers « saine » quand le moteur ne répond pas, ou un texte qui promet un fichier sain |
 | **M.C** — *décidé sous réserve, 20/09* | Un reçu, et une référence non séquentielle | Le mot « facture » dans un texte rendu, ou une référence incrémentée |
 
@@ -1399,12 +1399,49 @@ sur la checklist, et la recharge va droit au récapitulatif.
 ### Ce qui reste à arbitrer
 
 **N.A — Le rail de paiement suit la devise, et rien d'autre.** Francs CFA
-par Mobile Money, euros par carte. Les trois « autres moyens » du
-prototype — Moov Money, carte bancaire, autre numéro Mobile Money —
-supposaient un choix d'opérateur qui n'est modélisé nulle part :
-`provider` se déduit de la devise à la création. Ils cèdent la place à la
-seule alternative réelle, changer de grille. Reste à savoir si le produit
-veut un choix d'opérateur, ce qui suppose que FedaPay en expose un.
+par Mobile Money, euros par carte. ~~Reste à savoir si le produit veut un
+choix d'opérateur, ce qui suppose que FedaPay en expose un.~~ **Tranché
+pour la V1 le 20/09/2026.**
+
+Aucun choix d'opérateur ni d'autre numéro n'est affiché tant que le
+fournisseur ne l'expose pas réellement et que le besoin n'est pas
+constaté. Une option d'interface sans capacité derrière est un faux choix,
+et un faux choix coûte plus cher qu'une absence de choix : il fait
+chercher un réglage qui n'existe pas, au moment précis où un paiement
+vient d'échouer. La seule alternative réellement prise en charge est de
+changer de grille, et elle en est une — les deux grilles sont distinctes,
+ce n'est pas une conversion. Un choix d'opérateur pourra s'ajouter si
+l'API permet de le piloter et si cela améliore réellement le taux de
+paiement.
+
+### Ce que l'application de la décision a trouvé
+
+**La règle du sujet n'était écrite nulle part.** « Le rail suit la devise »
+vivait dans un `create` Prisma — `provider: devise === "XOF" ? "FEDAPAY" :
+"STRIPE"` — et quatre écrans la redisaient chacun à leur façon. C'est
+exactement ainsi que les pastilles du prototype ont survécu à leur propre
+correction : la page d'échec avait été reprise au lot N, et la page des
+packs annonçait toujours « MTN MoMo · Moov Money · Carte bancaire » en
+trois pastilles, c'est-à-dire en trois options. Une règle sans domicile se
+recopie, et une copie ne se corrige pas avec l'original.
+
+**La section répond maintenant à la question qu'elle posait.** « Par quoi
+vais-je payer ? » a une réponse, et le candidat vient de la déterminer sur
+le même écran en choisissant sa grille. S'y ajoute la précision qui évite
+la question suivante : le débit passe par l'opérateur du numéro, quel
+qu'il soit, et il n'y a personne à désigner.
+
+**La devise d'un paiement était typée `string`.** L'écran d'échec propose
+de repayer dans l'autre grille ; il lisait donc une chaîne de trois
+caractères pour décider laquelle. Elle est désormais reconnue à la
+lecture, avec la même doctrine que l'état d'un reçu : une valeur inconnue
+ne devient pas une devise par défaut.
+
+*Point relevé, hors décision :* la page d'accueil et la page des tarifs
+annoncent « MTN MoMo et Moov Money ». C'est une annonce de couverture et
+non un choix — donc hors de ce que N.A tranche — mais elle nomme deux
+opérateurs dont la prise en charge dépend du contrat FedaPay, qui n'est
+pas signé (I.C).
 
 **N.B — La raison d'un refus n'est pas conservée.** ~~Le cycle la reçoit du
 fournisseur et ne l'écrit nulle part ; $-05 la déduit donc du statut.~~

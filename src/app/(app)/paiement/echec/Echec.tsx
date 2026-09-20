@@ -6,6 +6,7 @@ import { LienBouton } from "@/components/ui/LienBouton";
 import { echecPourMotif, motifDeLEchec, type MotifEchec } from "@/domain/paiement/echec";
 import type { PaiementEnCours } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
+import { actionVersLAutreGrille, mentionDeLAutreGrille } from "@/domain/payments/rail";
 
 /**
  * $-05 — Échec ou expiration.
@@ -18,9 +19,14 @@ import { formatMontant } from "@/lib/utils";
  *
  * Les trois « autres moyens de paiement » du prototype — Moov Money, carte
  * bancaire, autre numéro — ne correspondent à rien de modélisé : le rail
- * suit la devise (francs CFA par Mobile Money, euros par carte), et il n'y
- * a pas de choix d'opérateur à faire. Ils cèdent la place à la seule
- * alternative que le produit sait offrir, et qui en est une.
+ * suit la devise, et il n'y a pas de choix d'opérateur à faire (N.A,
+ * tranché pour la V1). Ils cèdent la place à la seule alternative que le
+ * produit sait offrir, et qui en est une : changer de grille.
+ *
+ * Les phrases viennent de `domain/payments/rail`. Écrites ici, elles
+ * l'étaient aussi au récapitulatif et à la page des packs, chacune à sa
+ * façon — et c'est ainsi que les pastilles ont survécu à la correction de
+ * cet écran-ci.
  */
 const MOTIFS: readonly MotifEchec[] = [
   "delai_depasse",
@@ -120,16 +126,14 @@ export function Echec({
         <section className="flex flex-col gap-2">
           <h2 className="text-14 font-semibold text-ink-900">Autre moyen de paiement</h2>
           <p className="text-pretty text-14 text-ink-700">
-            {paiement.devise === "XOF"
-              ? "La grille en euros se règle par carte bancaire. Ce n'est pas une conversion : c'est une autre grille."
-              : "La grille en francs CFA se règle par Mobile Money. Ce n'est pas une conversion : c'est une autre grille."}
+            {mentionDeLAutreGrille(paiement.devise)}
           </p>
           <LienBouton
             href={`${reessai.replace(`devise=${paiement.devise}`, `devise=${autreDevise}`)}`}
             variante="secondaire"
             className="self-start"
           >
-            {paiement.devise === "XOF" ? "Payer par carte, en euros" : "Payer par Mobile Money"}
+            {actionVersLAutreGrille(paiement.devise)}
           </LienBouton>
         </section>
       ) : null}

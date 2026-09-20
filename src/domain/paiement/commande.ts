@@ -32,12 +32,12 @@ export const commandeInitiale = (devise: Devise, numero: string): Commande => ({
 
 /** Ce qui manque pour passer au récapitulatif, ou rien. */
 export function obstacleAuRecapitulatif(commande: Commande): string | null {
-  return commande.pack === null ? "Choisissez un pack pour continuer." : null;
+  return commande.pack === null ? "Choisis un pack pour continuer." : null;
 }
 
 /** Ce qui manque pour déclencher le paiement, ou rien. */
 export function obstacleAuPaiement(commande: Commande): string | null {
-  if (commande.pack === null) return "Choisissez un pack pour continuer.";
+  if (commande.pack === null) return "Choisis un pack pour continuer.";
   if (!commande.conditionsAcceptees) {
     return "Acceptez les conditions d'utilisation pour payer.";
   }
