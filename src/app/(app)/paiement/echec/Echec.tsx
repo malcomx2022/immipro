@@ -2,41 +2,61 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { Button } from "@/components/ui/Button";
-import { echecPourMotif, masquerNumero, type MotifEchec } from "@/domain/paiement/echec";
-import { PACKS } from "@/domain/payments/pricing";
+import { LienBouton } from "@/components/ui/LienBouton";
+import { echecPourMotif, motifParDefaut, type MotifEchec } from "@/domain/paiement/echec";
+import type { PaiementEnCours } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 
 /**
  * $-05 — Échec ou expiration.
  *
- * Le motif vient de l'opérateur, transmis dans l'adresse. Un motif inconnu
- * retombe sur le délai dépassé : c'est le cas le moins accusateur, et
- * annoncer un refus bancaire à tort est la pire des erreurs sur cet écran.
+ * Le motif vient de l'opérateur, transmis dans l'adresse. Sans lui, c'est
+ * l'état de la transaction qui le nomme : annoncer un refus bancaire à tort
+ * est la pire erreur de cet écran, mais annoncer un délai dépassé sur un
+ * refus reçu en deux secondes en est une autre — et celle-là envoie
+ * vérifier ce qui n'est pas en cause.
+ *
+ * Les trois « autres moyens de paiement » du prototype — Moov Money, carte
+ * bancaire, autre numéro — ne correspondent à rien de modélisé : le rail
+ * suit la devise (francs CFA par Mobile Money, euros par carte), et il n'y
+ * a pas de choix d'opérateur à faire. Ils cèdent la place à la seule
+ * alternative que le produit sait offrir, et qui en est une.
  */
-const MOTIFS: readonly MotifEchec[] = ["delai_depasse", "solde_insuffisant"];
+const MOTIFS: readonly MotifEchec[] = [
+  "delai_depasse",
+  "solde_insuffisant",
+  "refus_operateur",
+  "notification_absente",
+];
 
 const estMotif = (valeur: string | null): valeur is MotifEchec =>
   valeur !== null && (MOTIFS as readonly string[]).includes(valeur);
 
-export function Echec() {
-  return (
-    <Suspense fallback={<Squelette />}>
-      <Contenu />
-    </Suspense>
-  );
-}
+export function Echec({
+  paiement,
+  motif,
+}: {
+  paiement: PaiementEnCours;
+  motif: string | null;
+}) {
+  /**
+   * L'adresse d'abord, l'état de la transaction ensuite.
+   *
+   * Le fournisseur transmet parfois un motif, et il est alors plus précis
+   * que tout ce qu'on peut déduire. Sinon, l'état en base dit ce qui est
+   * su — et il vaut mieux que l'ancien repli sur « délai dépassé », qui
+   * annonçait cinq minutes écoulées sur un refus reçu en deux secondes.
+   */
+  const retenu: MotifEchec = estMotif(motif) ? motif : motifParDefaut(paiement.statut);
+  const montant = formatMontant(paiement.montant, paiement.devise);
+  const echec = echecPourMotif(retenu, montant, paiement.telephone);
 
-function Contenu() {
-  const parametres = useSearchParams();
-  const brut = parametres.get("motif");
-  const motif: MotifEchec = estMotif(brut) ? brut : "delai_depasse";
-
-  const pack = PACKS[0];
-  const montant = pack ? formatMontant(pack.prix.XOF, "XOF") : "";
-  const echec = echecPourMotif(motif, montant, masquerNumero("97000042"));
+  const dossier = paiement.dossierId;
+  const reessai = dossier
+    ? `/paiement/recapitulatif?dossier=${dossier}&achat=${paiement.achatCode}&devise=${paiement.devise}`
+    : null;
+  const autreDevise = paiement.devise === "XOF" ? "EUR" : "XOF";
+  const estUnPack = !["recharge", "consultation"].includes(paiement.achatCode);
 
   return (
     <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
@@ -79,60 +99,59 @@ function Contenu() {
             checklist, sans analyse de pièces.
           </p>
         </div>
-        <Button variante="secondaire" pleineLargeur>
+        <LienBouton
+          href={dossier ? `/dossiers/${dossier}` : "/tableau-de-bord"}
+          variante="secondaire"
+          pleineLargeur
+        >
           Continuer en Découverte
-        </Button>
+        </LienBouton>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-14 font-semibold text-ink-900">Autre moyen de paiement</h2>
-        <ul className="flex flex-wrap gap-2">
-          {["Moov Money", "Carte bancaire", "Autre numéro Mobile Money"].map((moyen) => (
-            <li key={moyen}>
-              <Button variante="secondaire" className="h-11 rounded-full px-3.5 text-14">
-                {moyen}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {reessai ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-14 font-semibold text-ink-900">Autre moyen de paiement</h2>
+          <p className="text-pretty text-14 text-ink-700">
+            {paiement.devise === "XOF"
+              ? "La grille en euros se règle par carte bancaire. Ce n'est pas une conversion : c'est une autre grille."
+              : "La grille en francs CFA se règle par Mobile Money. Ce n'est pas une conversion : c'est une autre grille."}
+          </p>
+          <LienBouton
+            href={`${reessai.replace(`devise=${paiement.devise}`, `devise=${autreDevise}`)}`}
+            variante="secondaire"
+            className="self-start"
+          >
+            {paiement.devise === "XOF" ? "Payer par carte, en euros" : "Payer par Mobile Money"}
+          </LienBouton>
+        </section>
+      ) : null}
 
       <p className="text-pretty text-13 text-ink-500">
         Aucun montant n&apos;a été débité. Si tu as reçu un message de débit,
-        écris-nous avec la référence IMP-2609-4471.
+        écris-nous avec la référence{" "}
+        <span className="font-mono text-ink-700">{paiement.reference}</span>.
       </p>
 
       <div className="flex flex-col gap-2">
-        <Button pleineLargeur className="min-h-action">
-          Réessayer le paiement
-        </Button>
+        {reessai ? (
+          <LienBouton href={reessai} pleineLargeur className="min-h-action">
+            Réessayer le paiement
+          </LienBouton>
+        ) : null}
         <p className="text-center text-13 text-ink-500">
-          {pack?.libelle} · {montant}
+          {paiement.achat} · {montant}
         </p>
-        <Link
-          href="/paiement/pack"
-          className="flex min-h-touch items-center justify-center text-14 text-ink-700"
-        >
-          Changer de pack
-        </Link>
+        {/* Seul un pack se change. Une recharge n'est pas un pack, et
+            l'écran des packs refuserait un dossier déjà ouvert. */}
+        {dossier && estUnPack ? (
+          <Link
+            href={`/paiement/pack?dossier=${dossier}`}
+            className="flex min-h-touch items-center justify-center text-14 text-ink-700"
+          >
+            Changer de pack
+          </Link>
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-function Squelette() {
-  return (
-    <div className="mx-auto w-full max-w-[520px] px-4 py-8">
-      <h1
-        id="contenu"
-        tabIndex={-1}
-        className="text-24 font-semibold text-ink-900 outline-none md:text-32"
-      >
-        Paiement non abouti
-      </h1>
-      <p role="status" className="mt-2 text-16 text-ink-700">
-        Lecture du motif transmis par l&apos;opérateur.
-      </p>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from "@/domain/payments/pricing";
 import { effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
-import { jeton } from "@/server/securite/secret";
+import { suiteDictable } from "@/server/securite/secret";
 
 /**
  * Paiements — WF-05, INV-7.
@@ -97,9 +97,13 @@ export async function creerOuReprendre(
  * Lisible parce qu'elle est dictée au téléphone à un opérateur pendant une
  * réclamation ; non séquentielle parce qu'une suite d'entiers dit le nombre
  * de paiements du mois à qui en voit deux.
+ *
+ * Le suffixe vient d'un alphabet fait pour la voix, et non de `base64url`,
+ * qui produisait des `-` et des `_` au milieu d'une référence déjà
+ * ponctuée de tirets.
  */
 const referenceInterne = (): string =>
-  `IMP-${new Date().toISOString().slice(2, 10).replace(/-/gu, "")}-${jeton(4).toUpperCase().slice(0, 6)}`;
+  `IMP-${new Date().toISOString().slice(2, 10).replace(/-/gu, "")}-${suiteDictable(6)}`;
 
 export interface Notification {
   providerTxId: string;

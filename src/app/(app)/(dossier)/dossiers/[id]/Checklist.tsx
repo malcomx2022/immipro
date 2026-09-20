@@ -72,6 +72,32 @@ export function Checklist({ dossier, pieces, proposition }: ChecklistProps) {
         Prochaine action : {dossier.prochaineAction}
       </p>
 
+      {/* Un brouillon n'a pas de pack : c'est ici que le tunnel de paiement
+          s'ouvre, et c'était le seul endroit d'où personne n'y accédait.
+          Le bloc dit ce que le paiement ouvre, et rien de plus — ni délai,
+          ni issue (INV-1, INV-2). */}
+      {dossier.statut === "BROUILLON" ? (
+        <section className="flex flex-col gap-3 rounded-lg border border-ink-300 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-16 font-semibold text-ink-900">
+              Ce dossier est encore un brouillon
+            </h2>
+            <p className="text-pretty text-14 text-ink-700">
+              Tu vois la liste des pièces et leurs exigences. L&apos;analyse de
+              ce que tu téléverses, l&apos;échéancier et la rédaction guidée
+              s&apos;ouvrent avec un pack, payé une fois jusqu&apos;à la clôture.
+            </p>
+          </div>
+          <LienBouton
+            href={`/paiement/pack?dossier=${id}`}
+            pleineLargeur
+            className="md:w-auto md:self-start"
+          >
+            Voir les packs
+          </LienBouton>
+        </section>
+      ) : null}
+
       {/* T-03 : la proposition est rattachée à une étape de la checklist
           (RG-13.1) et posée après la prochaine action, jamais devant elle.
           Sans partenaire activé sur la destination, il n'y a rien ici — et

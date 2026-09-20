@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { PACKS, RECHARGE_ANALYSES, type Devise } from "@/domain/payments/pricing";
+import type { Tunnel } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -16,9 +18,14 @@ import { formatMontant } from "@/lib/utils";
  *
  * Les trois packs forment un seul arrêt de tabulation — flèches, Origine et
  * Fin — tenu par `RadioGroup` (règle clavier 4).
+ *
+ * L'écran ne débite pas : il retient un pack et passe au récapitulatif, qui
+ * est le seul à répéter le montant avant le débit. « Continuer » est donc un
+ * lien, pas un bouton qui appelle — ce qui le rend aussi ouvrable dans un
+ * nouvel onglet, et survivable à un retour arrière.
  */
-export function ChoixDuPack() {
-  const [devise, setDevise] = useState<Devise>("XOF");
+export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
+  const [devise, setDevise] = useState<Devise>(tunnel.devise);
   const [choisi, setChoisi] = useState<string | null>(null);
 
   const pack = PACKS.find((p) => p.code === choisi) ?? null;
@@ -28,7 +35,10 @@ export function ChoixDuPack() {
   return (
     <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 pb-8 md:flex-row md:gap-12 md:px-12 md:py-6">
       <div className="flex min-w-0 flex-1 flex-col gap-5 md:max-w-[640px]">
-        <Link href="/tableau-de-bord" className="text-14 font-semibold text-ink-900">
+        <Link
+          href={`/dossiers/${tunnel.dossier.id}`}
+          className="text-14 font-semibold text-ink-900"
+        >
           Mon dossier
         </Link>
 
@@ -41,7 +51,8 @@ export function ChoixDuPack() {
             Ouvre ton dossier
           </h1>
           <p className="text-pretty text-16 text-ink-700">
-            Un paiement unique, valable jusqu&apos;à la clôture du dossier. Pas
+            {tunnel.dossier.pays} — {tunnel.dossier.intitule}. Un paiement
+            unique, valable jusqu&apos;à la clôture du dossier. Pas
             d&apos;abonnement, pas de reconduction.
           </p>
         </div>
@@ -67,8 +78,12 @@ export function ChoixDuPack() {
               </button>
             ))}
           </div>
+          {/* Le pays du compte, et non « le Bénin » écrit en dur : un compte
+              sans pays renseigné n'a pas de déduction à annoncer. */}
           <p className="text-13 text-ink-500">
-            Devise déduite de ton pays, le Bénin. Tu peux la changer.
+            {tunnel.paysConnu
+              ? "Devise déduite du pays de ton compte. Tu peux la changer."
+              : "Devise par défaut : ton compte ne porte pas de pays. Tu peux la changer."}
           </p>
         </div>
 
@@ -116,16 +131,24 @@ export function ChoixDuPack() {
       </div>
 
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
-        <Button
-          pleineLargeur
-          className="min-h-action"
-          disabled={pack === null}
-          raisonDesactivation={
-            pack === null ? "Choisissez un pack pour continuer." : undefined
-          }
-        >
-          {pack ? `Continuer avec ${pack.libelle}` : "Continuer"}
-        </Button>
+        {pack ? (
+          <LienBouton
+            href={`/paiement/recapitulatif?dossier=${tunnel.dossier.id}&achat=${pack.code}&devise=${devise}`}
+            pleineLargeur
+            className="min-h-action"
+          >
+            Continuer avec {pack.libelle}
+          </LienBouton>
+        ) : (
+          <Button
+            pleineLargeur
+            className="min-h-action"
+            disabled
+            raisonDesactivation="Choisissez un pack pour continuer."
+          >
+            Continuer
+          </Button>
+        )}
         <p className="text-center text-13 text-ink-500">
           {pack ? `${prix(pack.prix)} · paiement unique` : "Aucun pack retenu"}
         </p>

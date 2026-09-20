@@ -91,6 +91,13 @@ describe("échec de paiement — $-05", () => {
     expect(masquerNumero("97000042")).toBe("97 •• •• 42");
     expect(masquerNumero("97 00 00 42")).toBe("97 •• •• 42");
     expect(masquerNumero("12")).toBe("•• •• •• ••");
+    // Les deux chiffres de tête sont ceux de l'opérateur, pas ceux du pays :
+    // trouvé à l'écran, sur un numéro enregistré au format international.
+    expect(masquerNumero("+22997000042")).toBe("97 •• •• 42");
+    expect(masquerNumero("+229 97 00 00 42")).toBe("97 •• •• 42");
+    expect(masquerNumero("0022997000042")).toBe("97 •• •• 42");
+    // Un numéro composé sans indicatif garde ses deux premiers chiffres.
+    expect(masquerNumero("2297000042")).toBe("22 •• •• 42");
   });
 });
 
