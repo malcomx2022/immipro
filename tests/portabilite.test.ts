@@ -109,9 +109,15 @@ describe("archive d'un dossier", () => {
     expect(TTL_PRESIGNE_SECONDES).toBe(300);
   });
 
-  it("une pièce purgée le dit, au lieu d'offrir un lien qui échoue", () => {
+  /**
+   * Trois conditions et non une : la pièce a des octets, ils n'ont pas été
+   * purgés, et le balayage les a admis (I.D). Un export est une sortie
+   * comme une autre — celle qu'on oublie, parce qu'elle ne s'affiche pas.
+   */
+  it("une pièce purgée ou non balayée le dit, au lieu d'offrir un lien qui échoue", () => {
     const lecture = lire("src/server/lecture/portabilite.ts");
-    expect(lecture).toMatch(/telechargeable: Boolean\(derniere\?\.objectKey && !derniere\.purgedAt\)/u);
+    const condition = /telechargeable: Boolean\(\s*derniere\?\.objectKey &&\s*!derniere\.purgedAt &&\s*consultable\(derniere\.scanState\),?\s*\)/u;
+    expect(lecture).toMatch(condition);
     expect(MENTION_PIECE_PURGEE).toMatch(/supprimé/u);
   });
 

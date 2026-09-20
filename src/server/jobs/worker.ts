@@ -13,10 +13,24 @@ import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
+import { balayerUnePiece } from "./balayage";
 import { propagerLaPublication } from "./divergence";
 
 async function main() {
   const boss = await getQueue();
+
+  // I.D — le balayage précède l'analyse, et c'est le worker qui les
+  // enchaîne. La promotion vers le stockage de confiance a lieu dans
+  // `balayerUnePiece` ; l'analyse n'est mise en file que si elle a eu lieu,
+  // ce qui rend impossible d'analyser un fichier resté en quarantaine.
+  await boss.work<{ applicationId: string; documentId: string; versionId: string }>(
+    JOBS.BALAYAGE_PIECE,
+    async ([job]) => {
+      if (!job) return;
+      const suite = await balayerUnePiece(job.data);
+      if (suite === "ANALYSE") await boss.send(JOBS.ANALYSE_DOCUMENT, job.data);
+    },
+  );
 
   await boss.work<{ applicationId: string; documentId: string; versionId: string }>(
     JOBS.ANALYSE_DOCUMENT,

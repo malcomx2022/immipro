@@ -14,6 +14,8 @@ import {
 } from "@/server/acces/pieces";
 import { compteur, solde } from "@/server/acces/quota";
 import { getQueue, JOBS } from "@/lib/queue";
+import { antivirusConfigure } from "@/server/securite/antivirus";
+import { MENTION_EN_QUARANTAINE } from "@/domain/dossiers/quarantaine";
 
 /**
  * Dépôt d'une pièce — C-07, WF-06.
@@ -27,11 +29,13 @@ import { getQueue, JOBS } from "@/lib/queue";
  * plus cher à tout le reste : dix mégaoctets montent deux fois, et un rendu
  * reste bloqué pendant l'envoi sur une connexion mobile.
  *
- * L'ordre des vérifications suit ce qu'il coûte de les rater. Le
- * consentement d'abord (RG-02.2) : sans lui, rien ne doit partir. L'empreinte
- * ensuite (RG-06.2) : un fichier déjà connu ne se renvoie pas et ne se
- * décompte pas. Le quota en dernier (RG-06.5) : il n'interdit pas le dépôt,
- * il n'interdit que l'analyse.
+ * L'ordre des vérifications suit ce qu'il coûte de les rater. Le balayeur
+ * d'abord (I.D) : sans lui, l'URL signée conduirait à une quarantaine dont
+ * rien ne sortirait, et le candidat aurait envoyé dix mégaoctets pour une
+ * pièce qui ne s'ouvre jamais. Le consentement ensuite (RG-02.2) : sans lui,
+ * rien ne doit partir. L'empreinte (RG-06.2) : un fichier déjà connu ne se
+ * renvoie pas et ne se décompte pas. Le quota en dernier (RG-06.5) : il
+ * n'interdit pas le dépôt, il n'interdit que l'analyse.
  */
 const demande = z.object({
   nom: z.string().min(1).max(255),
@@ -46,6 +50,11 @@ export const POST = route({
   limite: "sensible",
   corps: demande,
   async traiter({ corps, params, acteur }) {
+    // I.D — l'antivirus est un prérequis du téléversement, pas une option.
+    // Refuser ici coûte un aller-retour ; l'accepter coûterait un fichier
+    // que rien ne pourra promouvoir.
+    if (!antivirusConfigure()) throw echec("televersement_indisponible");
+
     const dossier = await dossierDuCandidat(params.id!, acteur!.id);
     exigerModifiable(dossier);
     await exigerConsentementPieces(acteur!.id);
@@ -71,9 +80,14 @@ export const POST = route({
 });
 
 /**
- * Confirmation. La pièce passe en analyse et le job est mis en file ; le
- * débit du quota a lieu dans le worker, au moment où l'appel IA part, et non
- * ici — une pièce qui n'atteint jamais l'analyse ne doit rien coûter.
+ * Confirmation. Les octets sont en quarantaine ; le job de balayage est mis
+ * en file, et c'est lui qui promeut, écarte, ou laisse en attente (I.D).
+ *
+ * Le job d'analyse n'est plus mis en file ici. Il l'est par le worker, après
+ * promotion : c'est la traduction en code de « aucun fichier non analysé
+ * n'est transmis à l'extraction ». Le débit du quota a lieu plus loin
+ * encore, au moment où l'appel part — une pièce qui n'atteint jamais
+ * l'analyse ne doit rien coûter.
  */
 export const PUT = route({
   nom: "piece.depot.confirmation",
@@ -86,12 +100,14 @@ export const PUT = route({
     const piece = await pieceDuDossier(params.pieceId!, dossier.id, acteur!.id);
 
     const version = await enregistrerLaVersion(piece.id, { cle: corps.cle, demande: corps });
-    const analysable = (await solde(dossier.id)) > 0;
 
     await db.document.update({
       where: { id: piece.id },
       data: {
-        status: analysable ? "EN_ANALYSE" : "ATTENDUE",
+        // Un balayage est en cours, quel que soit le quota : la pièce est
+        // bien en cours de traitement, et l'écran ne doit pas la présenter
+        // comme au repos. C'est le balayage qui décidera de la suite.
+        status: "EN_ANALYSE",
         expiresAt: dateDePeremption(piece.validityMonths, new Date()),
         // Un fichier existe désormais : la ligne propose de le remplacer, pas
         // de l'ajouter. Sans quoi le candidat cherche une pièce qu'il vient
@@ -100,19 +116,20 @@ export const PUT = route({
       },
     });
 
-    if (analysable) {
-      const file = await getQueue();
-      await file.send(JOBS.ANALYSE_DOCUMENT, {
-        applicationId: dossier.id,
-        documentId: piece.id,
-        versionId: version.id,
-      });
-    }
+    const file = await getQueue();
+    await file.send(JOBS.BALAYAGE_PIECE, {
+      applicationId: dossier.id,
+      documentId: piece.id,
+      versionId: version.id,
+    });
 
     await recalculerCompletude(dossier.id);
     return {
       versionId: version.id,
-      etat: analysable ? "EN_ANALYSE" : "ATTENDUE",
+      etat: "EN_ANALYSE",
+      mention: MENTION_EN_QUARANTAINE,
+      /** RG-06.5 — dit d'avance si l'analyse suivra la promotion. */
+      analyseraLaPiece: (await solde(dossier.id)) > 0,
       quota: await compteur(dossier.id),
     };
   },

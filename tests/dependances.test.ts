@@ -12,7 +12,8 @@ import {
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
 
 /**
- * I.C, tranché le 20/09/2026 — trois dépendances, trois statuts.
+ * I.C, tranché le 20/09/2026 — trois dépendances, trois statuts ; puis I.D
+ * le même jour, qui en ajoute une quatrième.
  *
  * La décision ne leur donne pas le même poids, et c'est tout son intérêt :
  * traiter une messagerie absente et une extraction IA absente de la même
@@ -25,14 +26,16 @@ const TOUT = {
   SMTP_URL: "smtp://exemple",
   FEDAPAY_WEBHOOK_SECRET: "s",
   STRIPE_WEBHOOK_SECRET: "s",
+  ANTIVIRUS_URL: "http://exemple",
   ANTHROPIC_API_KEY: "k",
 };
 
-describe("les trois dépendances n'ont pas le même statut", () => {
+describe("les quatre dépendances n'ont pas le même statut", () => {
   it("chacune est déclarée avec ce que son absence bloque", () => {
     expect(DEPENDANCES.map((d) => [d.cle, d.statut])).toEqual([
       ["messagerie", "BLOQUANTE_OUVERTURE"],
       ["paiements", "BLOQUANTE_ENCAISSEMENT"],
+      ["antivirus", "BLOQUANTE_TELEVERSEMENT"],
       ["extraction", "FACULTATIVE_PILOTE"],
     ]);
     for (const d of DEPENDANCES) {
@@ -91,10 +94,20 @@ describe("l'aptitude se lit des dépendances, pas du nom de l'environnement", ()
     ]);
   });
 
-  it("rien n'est branché : les deux bloquantes sont nommées", () => {
+  /**
+   * I.D — l'antivirus absent n'est pas une dégradation acceptable : il n'y
+   * a rien à faire à la place d'un balayage, sinon refuser le fichier.
+   */
+  it("l'antivirus manque : inapte à recevoir une pièce", () => {
+    const etat = etatDesDependances({ ...TOUT, ANTIVIRUS_URL: "" });
+    expect(etat.aptitude).toBe("INAPTE");
+    expect(etat.bloquantes).toEqual(["antivirus"]);
+  });
+
+  it("rien n'est branché : les trois bloquantes sont nommées", () => {
     const etat = etatDesDependances(RIEN);
     expect(etat.aptitude).toBe("INAPTE");
-    expect(etat.bloquantes).toEqual(["messagerie", "paiements"]);
+    expect(etat.bloquantes).toEqual(["messagerie", "paiements", "antivirus"]);
   });
 
   it("une variable vide ne vaut pas une variable renseignée", () => {
