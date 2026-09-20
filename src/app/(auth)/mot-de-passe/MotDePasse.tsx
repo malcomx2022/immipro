@@ -182,7 +182,7 @@ function Etapes() {
             className="min-h-action"
             disabled={!email}
             raisonDesactivation={
-              email ? undefined : "Renseignez l'adresse email de votre compte."
+              email ? undefined : "Renseigne l'adresse email de ton compte."
             }
             chargement={envoi}
             onClick={() => void demander()}

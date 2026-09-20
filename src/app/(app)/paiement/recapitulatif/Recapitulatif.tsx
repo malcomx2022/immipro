@@ -137,27 +137,47 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
           </p>
         </div>
 
-        <Checkbox
-          libelle="J'accepte les conditions d'utilisation et je comprends qu'ImmiPro prépare mon dossier sans garantir la décision de l'administration."
-          checked={conditions}
-          onChangement={setConditions}
-        />
-
         <p className="text-pretty text-13 text-ink-500">
           Montant débité une seule fois. Les frais de demande de visa se paient
           directement à l&apos;administration, au moment du dépôt.
         </p>
       </div>
 
-      <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
+      {/* N.C, tranché le 20/09/2026 — la zone d'action contient son propre
+          prérequis.
+
+          La case vivait en fin de contenu, et la barre collante la
+          recouvrait : mesurée à 390 px, la barre occupait 715→844 et la
+          case 757→865. L'élément qui déverrouille le bouton était donc
+          exactement sous le bouton.
+
+          Elle est maintenant dans la zone d'action, immédiatement
+          au-dessus. Aucune marge compensatoire : une valeur calée sur une
+          hauteur de barre se démentirait au premier message d'échec, qui
+          la fait grandir — et c'est justement le moment où le candidat
+          cherche la case. La structure le garantit, pas une constante.
+
+          Et la barre n'est plus collante ici, parce que mesurée elle ne
+          tenait pas : case comprise, elle occupait 245 px, soit 29 % d'un
+          écran de 390 × 844 et **38 % d'un 360 × 640** — avant le bloc
+          d'échec, qui la fait grandir au pire moment. Garder la barre
+          collante était secondaire ; rendre son prérequis lisible ne
+          l'était pas. Sur écran large, la colonne d'action reste en place
+          comme avant. */}
+      <div className="-mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
         {echec ? <BlocEchec echec={echec} annonce /> : null}
+        <Checkbox
+          libelle="J'accepte les conditions d'utilisation et je comprends qu'ImmiPro prépare mon dossier sans garantir la décision de l'administration."
+          checked={conditions}
+          onChangement={setConditions}
+        />
         <Button
           pleineLargeur
           className="min-h-action"
           chargement={envoi}
           disabled={!conditions}
           raisonDesactivation={
-            conditions ? undefined : "Acceptez les conditions d'utilisation pour payer."
+            conditions ? undefined : "Accepte les conditions d'utilisation pour payer."
           }
           onClick={() => void payer()}
         >

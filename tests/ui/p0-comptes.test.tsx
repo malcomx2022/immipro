@@ -75,7 +75,7 @@ describe("A-01 — Inscription", () => {
     const creer = screen.getByRole("button", { name: "Créer mon compte" });
     expect(creer).toBeDisabled();
     expect(creer).toHaveAccessibleDescription(
-      "Acceptez les conditions d'utilisation pour créer le compte.",
+      "Accepte les conditions d'utilisation pour créer le compte.",
     );
   });
 

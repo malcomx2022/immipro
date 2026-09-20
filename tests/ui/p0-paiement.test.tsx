@@ -106,6 +106,55 @@ describe("$-01 — Choix du pack", () => {
 });
 
 describe("$-02 — Récapitulatif", () => {
+  /**
+   * N.C, tranché le 20/09/2026 — la zone d'action contient son prérequis.
+   *
+   * À 390 px, la barre collante recouvrait la case qui déverrouille son
+   * propre bouton : barre 715→844, case 757→865. « Elle reste
+   * atteignable » ne suffit pas — le consentement doit être visible au
+   * moment de l'action.
+   *
+   * Le test porte sur la structure, pas sur des pixels : jsdom ne met rien
+   * en page, et une mesure y serait une fiction. Mais c'est précisément ce
+   * que la décision demande — que la zone d'action *contienne* le
+   * consentement — et une structure se vérifie sans moteur de rendu.
+   */
+  it("la case vit dans la zone d'action, immédiatement avant le bouton", () => {
+    const { container } = render(
+      <Recapitulatif
+        tunnel={TUNNEL}
+        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        deviseInitiale="XOF"
+      />,
+    );
+    const bouton = screen.getByRole("button", { name: /Payer/u });
+    const etiquette = container.querySelector('input[type="checkbox"]')!.closest("label")!;
+
+    // La zone d'action est le parent de la case : elle doit contenir le
+    // bouton. Désactivé, celui-ci s'enveloppe pour porter sa raison — on
+    // compare donc les conteneurs, pas les nœuds.
+    const zone = etiquette.parentElement!;
+    expect(zone.contains(bouton)).toBe(true);
+
+    // Et immédiatement avant : rien ne s'intercale entre les deux.
+    const suivant = etiquette.nextElementSibling!;
+    expect(suivant === bouton || suivant.contains(bouton)).toBe(true);
+  });
+
+  /**
+   * Aucune marge compensatoire : une valeur calée sur une hauteur de barre
+   * se dément au premier bloc d'échec, qui la fait grandir — au moment
+   * précis où le candidat cherche la case.
+   */
+  it("la barre n'est plus collante ici, et aucune marge ne la compense", () => {
+    const source = readFileSync(
+      "src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx",
+      "utf8",
+    );
+    expect(source).not.toMatch(/sticky bottom-0/u);
+    expect(source).not.toMatch(/pb-\[\d|mb-\[\d|paddingBottom/u);
+  });
+
   it("ne coche pas les conditions d'avance", () => {
     render(
       <Recapitulatif
@@ -128,7 +177,7 @@ describe("$-02 — Récapitulatif", () => {
     const payer = screen.getByRole("button", { name: /Payer/ });
     expect(payer).toBeDisabled();
     expect(payer).toHaveAccessibleDescription(
-      "Acceptez les conditions d'utilisation pour payer.",
+      "Accepte les conditions d'utilisation pour payer.",
     );
 
     fireEvent.click(screen.getByRole("checkbox"));

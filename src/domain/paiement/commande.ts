@@ -39,7 +39,7 @@ export function obstacleAuRecapitulatif(commande: Commande): string | null {
 export function obstacleAuPaiement(commande: Commande): string | null {
   if (commande.pack === null) return "Choisis un pack pour continuer.";
   if (!commande.conditionsAcceptees) {
-    return "Acceptez les conditions d'utilisation pour payer.";
+    return "Accepte les conditions d'utilisation pour payer.";
   }
   return null;
 }

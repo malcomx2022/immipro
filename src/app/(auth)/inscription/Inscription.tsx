@@ -59,10 +59,10 @@ export function Inscription() {
   }
 
   const raison = !conditions
-    ? "Acceptez les conditions d'utilisation pour créer le compte."
+    ? "Accepte les conditions d'utilisation pour créer le compte."
     : !longueurOk
       ? "Le mot de passe doit faire au moins dix caractères."
-      : "Renseignez votre nom et votre adresse email.";
+      : "Renseigne ton nom et ton adresse email.";
 
   return (
     <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">

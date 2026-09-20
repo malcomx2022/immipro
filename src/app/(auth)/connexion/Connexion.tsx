@@ -144,7 +144,7 @@ export function Connexion() {
           raisonDesactivation={
             email && motDePasse
               ? undefined
-              : "Renseignez votre adresse email et votre mot de passe."
+              : "Renseigne ton adresse email et ton mot de passe."
           }
           onClick={() => void connecter()}
         >
