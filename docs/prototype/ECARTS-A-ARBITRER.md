@@ -546,11 +546,56 @@ taille et de type MIME sont faits ; le balayage antivirus ne l'est pas, et
 il n'est pas non plus déclaré fait. C'est le seul point de WF-06 qui reste
 ouvert.
 
-**I.E — Le courrier de confirmation T-05 attend toujours sa décision.** Le
-point relevé au lot WF-12 n'a pas bougé : un email ne se recalcule pas à
-l'ouverture, la phrase doit donc être datée ou renvoyer vers l'écran. Le
-courrier d'alerte critique (RG-11.3) suit déjà cette règle et peut servir de
-modèle.
+**I.E — Le courrier de confirmation T-05 attend toujours sa décision.**
+~~Le point relevé au lot WF-12 n'a pas bougé : un email ne se recalcule pas
+à l'ouverture, la phrase doit donc être datée ou renvoyer vers l'écran.~~
+**Tranché.** Les deux issues énoncées ne s'excluaient pas : elles
+s'appliquent chacune à une moitié du courrier. Ce qui ne bougera plus est
+écrit et daté — le créneau, la durée, le consultant, la référence, la
+limite d'annulation opposable, la date où l'accord de partage expire. Ce
+qui bouge — les pièces qui restent à traiter — est renvoyé au dossier. Un
+courrier relu trois semaines plus tard qui énumérerait les pièces
+manquantes ferait préparer les mauvaises.
+
+*Lot I.E.* En écrivant le courrier, on a trouvé que le rendez-vous qu'il
+devait confirmer n'existait pas.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **T-05 ne réservait rien.** Le bouton « Confirmer » se contentait de
+  passer à l'étape suivante. L'écran affichait « Rendez-vous confirmé »,
+  une référence et une limite d'annulation, et aucune ligne n'était
+  écrite : ni créneau retenu, ni accord de partage — alors que les deux
+  étaient annoncés au candidat, et que la route qui les écrit existait
+  depuis le lot WF-12, complète, sans aucun appelant. C'est le même défaut
+  que M.B, d'un cran plus haut : là, rien n'écrivait un état que le schéma
+  prévoyait ; ici, rien n'appelait une route qui écrivait déjà tout.
+- **Les horaires étaient faux d'une heure.** Tous les formateurs du module
+  écrivaient en UTC, sous une phrase qui annonce « les horaires sont
+  donnés dans ton fuseau, Cotonou ». Un créneau à 10 h se lisait « 9 h ».
+  Chaque `timeZone: "UTC"` était défendable isolément ; c'est en
+  rapprochant les formateurs de la phrase que l'écart se voit. Le fuseau
+  est désormais une constante unique.
+- **« Le lien arrive par courriel » ne promettait rien de réel.** Aucune
+  visioconférence n'est modélisée : il n'y avait pas de lien à envoyer, et
+  pas de courriel non plus. La phrase dit maintenant ce qui arrive.
+- **« Ajouter à mon agenda » était un bouton mort**, de la même famille que
+  les quatre du lot L.B. Il rend un fichier iCalendar, fabriqué dans le
+  navigateur comme le PDF du reçu : trente lignes de texte n'appellent pas
+  une bibliothèque. Il porte les faits fixes, jamais l'état de la
+  checklist — un agenda se relit longtemps après.
+
+### Ce qui reste ouvert après ce lot
+
+- **Le fuseau est celui du Bénin, pas celui du candidat.** La constante
+  vaut pour Cotonou ; la plateforme s'adresse à l'Afrique francophone, de
+  UTC à UTC+3. Le faire suivre le candidat demande de décider d'où vient
+  son fuseau — le pays déclaré du profil, qui est effacé à
+  l'anonymisation, ou une préférence explicite.
+- **Rien ne permet d'annuler.** L'écran et le courrier annoncent une
+  limite d'annulation sans frais ; aucune route ne l'applique, et K.C —
+  qui supporte le coût d'un rendez-vous annulé — n'est pas tranché. La
+  limite reste une condition opposable, pas encore un geste.
 
 ---
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { LienBouton } from "@/components/ui/LienBouton";
@@ -26,12 +27,18 @@ import {
   grouperParJour,
   libelleFormat,
   libelleHeure,
-  libelleLimiteAnnulation,
+  libelleLimite,
   libelleRendezVous,
   mentionFuseau,
   peutConfirmer,
-  referenceRendezVous,
 } from "@/domain/consultants/rendez-vous";
+import {
+  fichierAgenda,
+  nomDuFichierAgenda,
+  TYPE_AGENDA,
+} from "@/domain/consultants/agenda";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { CONSULTATION, deviseParDefaut } from "@/domain/payments/pricing";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { formatMontant } from "@/lib/utils";
@@ -50,6 +57,14 @@ import { EnteteDossier } from "../../../dossiers/[id]/EnteteDossier";
  * Ce que le consultant verra est dérivé du modèle de droits (`access.ts`),
  * pas réécrit ici : l'écran ne peut donc pas promettre autre chose que ce
  * que `peutLire` autorise.
+ *
+ * **La confirmation réserve pour de bon — I.E.** Le bouton se contentait de
+ * passer à l'étape suivante : l'écran annonçait « Rendez-vous confirmé » et
+ * rien n'était écrit. Ni créneau retenu, ni accord de partage, alors que
+ * les deux étaient annoncés au candidat et que la route qui les écrit
+ * existait déjà, sans appelant. Ce qui s'affiche vient maintenant de la
+ * réponse du serveur : la référence, l'heure et la limite d'annulation
+ * qu'il a stockées, et non celles que l'écran recalculerait.
  */
 export interface PriseDeRendezVousProps {
   dossier: Dossier;
@@ -59,6 +74,17 @@ export interface PriseDeRendezVousProps {
 }
 
 type Etape = "ACCORD" | "CRENEAUX" | "CONFIRME";
+
+/** Ce que le serveur a écrit, et qui fait foi sur l'écran de confirmation. */
+interface Reservation {
+  reference: string;
+  debut: string;
+  dureeMinutes: number;
+  annulationSansFraisJusqua: string;
+  consultant: string;
+  dossier: string | null;
+  deja: boolean;
+}
 
 export function PriseDeRendezVous({
   dossier,
@@ -70,6 +96,9 @@ export function PriseDeRendezVous({
   const [accord, setAccord] = useState(false);
   const [choisi, setChoisi] = useState<string | null>(null);
   const [horsLigne, setHorsLigne] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [reservation, setReservation] = useState<Reservation | null>(null);
 
   // Hors ligne, aucune disponibilité n'est montrée : un horaire venu d'un
   // cache est peut-être déjà pris, et l'échec tomberait à la confirmation.
@@ -85,6 +114,50 @@ export function PriseDeRendezVous({
     };
   }, []);
 
+  async function reserver(quand: Creneau) {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler<Reservation>(
+      `/api/consultants/${consultant.id}/rendez-vous`,
+      {
+        corps: {
+          dossierId: dossier.id,
+          creneau: quand.debut,
+          accordDePartage: true,
+        },
+      },
+    );
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    setReservation(resultat.donnees);
+    setEtape("CONFIRME");
+  }
+
+  /**
+   * Le fichier est fabriqué ici, dans le navigateur, comme le PDF du reçu :
+   * aucune bibliothèque d'agenda n'entre au dépôt pour trente lignes de
+   * texte.
+   */
+  function telechargerLAgenda(faite: Reservation) {
+    const contenu = fichierAgenda({
+      reference: faite.reference,
+      debut: faite.debut,
+      dureeMinutes: faite.dureeMinutes,
+      consultant: faite.consultant,
+      dossier: faite.dossier ?? dossier.destination.pays,
+      adresse: `${window.location.origin}/dossiers/${dossier.id}`,
+      produitLe: new Date().toISOString(),
+    });
+    const lien = document.createElement("a");
+    lien.href = URL.createObjectURL(new Blob([contenu], { type: TYPE_AGENDA }));
+    lien.download = nomDuFichierAgenda(faite.reference);
+    lien.click();
+    URL.revokeObjectURL(lien.href);
+  }
+
   const devise = deviseParDefaut("BJ");
   const prix = formatMontant(CONSULTATION.prix[devise], devise);
   const jours = grouperParJour(creneaux);
@@ -98,7 +171,9 @@ export function PriseDeRendezVous({
     />
   );
 
-  if (etape === "CONFIRME" && creneau) {
+  if (etape === "CONFIRME" && reservation) {
+    const faite = reservation;
+    const retenu: Creneau = { debut: faite.debut, disponible: false };
     return (
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
         {entete}
@@ -112,19 +187,29 @@ export function PriseDeRendezVous({
             tabIndex={-1}
             className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-32"
           >
-            {libelleRendezVous(creneau)}
+            {libelleRendezVous(retenu)}
           </h1>
+          {/* La phrase promettait « le lien arrive par courriel ». Aucune
+              visioconférence n'est modélisée : il n'y avait pas de lien à
+              envoyer, et aucun courriel ne partait non plus. Elle dit
+              maintenant ce qui arrive vraiment (I.E). */}
           <p className="text-pretty text-16 text-ink-700">
-            Avec {consultant.nom}, {libelleFormat()}. Le lien arrive par courriel et
-            reste dans ton dossier.
+            Avec {faite.consultant}, {libelleFormat()}. La confirmation part par
+            courriel, et le rendez-vous reste dans ton dossier.
           </p>
         </div>
 
+        {/* La référence et l'heure sont celles que le serveur a écrites, et
+            non celles que l'écran recalculerait : deux sources pour une
+            pièce opposable finissent par diverger. */}
         <dl className="flex flex-col rounded-lg bg-ink-100 p-4">
-          <Ligne intitule="Référence" valeur={referenceRendezVous(creneau, consultant.id)} />
+          <Ligne intitule="Référence" valeur={faite.reference} />
           <Ligne
             intitule="Dossier"
-            valeur={`${dossier.destination.pays} — ${dossier.destination.intitule.split("—")[0]?.trim()}`}
+            valeur={
+              faite.dossier ??
+              `${dossier.destination.pays} — ${dossier.destination.intitule.split("—")[0]?.trim()}`
+            }
           />
           <Ligne intitule="Ton fuseau" valeur={FUSEAU_CANDIDAT} />
         </dl>
@@ -143,12 +228,20 @@ export function PriseDeRendezVous({
         </section>
 
         <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
-          <Button variante="secondaire" pleineLargeur className="md:w-auto md:self-start">
+          {/* Le bouton ne faisait rien, comme les quatre boutons morts du
+              lot L.B. Il rend maintenant un fichier d'agenda. */}
+          <Button
+            variante="secondaire"
+            pleineLargeur
+            className="md:w-auto md:self-start"
+            onClick={() => telechargerLAgenda(faite)}
+          >
             Ajouter à mon agenda
           </Button>
           <p className="text-pretty text-13 text-ink-500">
             Annulation ou report sans frais jusqu&apos;au{" "}
-            {libelleLimiteAnnulation(creneau)}. Passé ce délai, la consultation est due.
+            {libelleLimite(faite.annulationSansFraisJusqua)}. Passé ce délai, la
+            consultation est due.
           </p>
           <LienBouton
             href={`/dossiers/${dossier.id}`}
@@ -233,17 +326,19 @@ export function PriseDeRendezVous({
         )}
 
         <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
+          {echec ? <BlocEchec echec={echec} annonce /> : null}
           <p className="text-pretty text-13 text-ink-500">{conditions(prix)}</p>
           <Button
             pleineLargeur
             className="min-h-action md:w-auto md:self-start"
+            chargement={envoi}
             disabled={!peutConfirmer(accord, creneau)}
             raisonDesactivation={
               horsLigne
                 ? "Les créneaux ne sont pas disponibles hors ligne."
                 : "Choisis d'abord un créneau disponible."
             }
-            onClick={() => setEtape("CONFIRME")}
+            onClick={() => creneau && void reserver(creneau)}
           >
             {creneau ? `Confirmer ${libelleHeure(creneau)}` : "Confirmer un créneau"}
           </Button>

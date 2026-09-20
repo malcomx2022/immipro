@@ -1,4 +1,4 @@
-import type { Application, Document, Prisma } from "@prisma/client";
+import type { Application, Document, Prisma, VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { DOSSIERS_MAX } from "@/domain/dossiers/dossier";
@@ -24,6 +24,29 @@ import type { VisaRulesPayload } from "@/domain/rules/schema";
 
 export async function dossierDuCandidat(id: string, userId: string): Promise<Application> {
   const dossier = await db.application.findFirst({ where: { id, userId } });
+  if (!dossier) throw echec("introuvable");
+  return dossier;
+}
+
+/**
+ * Le dossier et la **version de règle qu'il a figée** — INV-3.
+ *
+ * La lecture passe par ici et non par la route, comme toute interrogation
+ * du référentiel (INV-4, et un test le vérifie en relisant les routes). La
+ * version figée n'est pas filtrée par `filtrePourCandidat` : elle peut
+ * avoir été remplacée depuis, et c'est précisément ce qu'INV-3 garantit —
+ * une évolution réglementaire ne casse pas une checklist en cours. La
+ * filtrer rendrait invisible la règle du dossier le jour où une version
+ * suivante paraît.
+ */
+export async function dossierAvecSaRegle(
+  id: string,
+  userId: string,
+): Promise<Application & { visaRule: VisaRule | null }> {
+  const dossier = await db.application.findFirst({
+    where: { id, userId },
+    include: { visaRule: true },
+  });
   if (!dossier) throw echec("introuvable");
   return dossier;
 }

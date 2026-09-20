@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Annuaire } from "@/app/(app)/(dossier)/consultants/Annuaire";
 import { PriseDeRendezVous } from "@/app/(app)/(dossier)/consultants/[id]/rendez-vous/PriseDeRendezVous";
 import { CONSULTANTS, consultantParId, creneaux } from "@/lib/contenu/consultants";
@@ -148,7 +148,7 @@ describe("T-05 — Créneaux", () => {
     ouvrirCreneaux();
     const groupes = screen.getAllByRole("radiogroup");
     expect(groupes).toHaveLength(3);
-    // Chaque groupe porte le jour : deux créneaux « 15 h 30 » sur deux jours
+    // Chaque groupe porte le jour : deux créneaux « 16 h 30 » sur deux jours
     // ne s'annoncent pas pareil.
     expect(groupes[0]!.getAttribute("aria-labelledby")).toBeTruthy();
     // Le jour est annoncé une fois, par le libellé du groupe.
@@ -159,10 +159,10 @@ describe("T-05 — Créneaux", () => {
 
   it("montre un créneau déjà pris plutôt que de le masquer", () => {
     ouvrirCreneaux();
-    // Chaque journée est un groupe nommé : « 11 h 30 » se répète d'un jour à
+    // Chaque journée est un groupe nommé : « 12 h 30 » se répète d'un jour à
     // l'autre, et c'est le groupe qui le désambiguïse pour le lecteur d'écran.
     const premierJour = screen.getAllByRole("radiogroup")[0]!;
-    const pris = within(premierJour).getByRole("radio", { name: /11 h 30/ });
+    const pris = within(premierJour).getByRole("radio", { name: /12 h 30/ });
     expect(pris).toHaveProperty("disabled", true);
     expect(screen.getAllByText("Déjà réservé").length).toBe(1);
   });
@@ -173,7 +173,7 @@ describe("T-05 — Créneaux", () => {
     expect(texte).toContain("20 000 F, réglés à ImmiPro");
     expect(texte).toContain("24 h avant le créneau");
     fireEvent.click(
-      within(screen.getAllByRole("radiogroup")[0]!).getByRole("radio", { name: "15 h 30" }),
+      within(screen.getAllByRole("radiogroup")[0]!).getByRole("radio", { name: "16 h 30" }),
     );
     expect(screen.getByText("Le créneau est tenu 10 minutes.")).toBeDefined();
   });
@@ -197,8 +197,35 @@ describe("T-05 — Créneaux", () => {
   });
 });
 
+/**
+ * T-05 — Confirmation.
+ *
+ * Le bouton se contentait de passer d'étape : l'écran annonçait
+ * « Rendez-vous confirmé » et rien n'était écrit, ni créneau retenu ni
+ * accord de partage (I.E). Il appelle maintenant la route, et ce qui
+ * s'affiche vient de sa réponse.
+ */
 describe("T-05 — Confirmation", () => {
-  const confirmer = () => {
+  const RESERVATION = {
+    reference: "RDV-1709-0930412",
+    debut: "2026-09-17T15:30:00.000Z",
+    dureeMinutes: 45,
+    annulationSansFraisJusqua: "2026-09-16T15:30:00.000Z",
+    consultant: "Marieke Vermeulen",
+    dossier: "Pays-Bas — Séjour pour études (MVV + VVR)",
+    deja: false,
+  };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(RESERVATION),
+    } as Response);
+  });
+
+  const choisirEtConfirmer = () => {
     render(
       <PriseDeRendezVous
         dossier={DOSSIER}
@@ -210,21 +237,39 @@ describe("T-05 — Confirmation", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /Donner mon accord/ }));
     fireEvent.click(
-      within(screen.getAllByRole("radiogroup")[0]!).getByRole("radio", { name: "15 h 30" }),
+      within(screen.getAllByRole("radiogroup")[0]!).getByRole("radio", { name: "16 h 30" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Confirmer 15 h 30" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmer 16 h 30" }));
   };
 
-  it("récapitule le rendez-vous avec sa référence", () => {
-    confirmer();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "Jeudi 17 septembre, 15 h 30",
+  const confirmer = async () => {
+    choisirEtConfirmer();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("17 septembre"),
     );
-    expect(document.body.textContent).toMatch(/RDV-\d{4}-\d{7}/);
+  };
+
+  it("réserve pour de bon, avec l'accord de partage", async () => {
+    await confirmer();
+    const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(url).toBe("/api/consultants/vermeulen/rendez-vous");
+    expect(JSON.parse(String((options as RequestInit).body))).toEqual({
+      dossierId: "nl-4471",
+      creneau: "2026-09-17T15:30:00.000Z",
+      accordDePartage: true,
+    });
   });
 
-  it("nomme les pièces à préparer, sans pourcentage", () => {
-    confirmer();
+  it("récapitule le rendez-vous avec la référence que le serveur a écrite", async () => {
+    await confirmer();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Jeudi 17 septembre, 16 h 30",
+    );
+    expect(document.body.textContent).toContain(RESERVATION.reference);
+  });
+
+  it("nomme les pièces à préparer, sans pourcentage", async () => {
+    await confirmer();
     const texte = document.body.textContent ?? "";
     expect(texte).toContain(
       "2 pièces obligatoires restent à traiter : passeport et attestation de ressources.",
@@ -233,16 +278,36 @@ describe("T-05 — Confirmation", () => {
     expect(texte).not.toMatch(/\bscore\b/i);
   });
 
-  it("donne la date limite d'annulation sans frais", () => {
-    confirmer();
+  it("donne la date limite d'annulation sans frais", async () => {
+    await confirmer();
     expect(document.body.textContent).toContain(
-      "Annulation ou report sans frais jusqu'au mercredi 16 septembre à 15 h 30",
+      "Annulation ou report sans frais jusqu'au mercredi 16 septembre à 16 h 30",
     );
     expect(document.body.textContent).toContain("la consultation est due");
   });
 
-  it("rappelle que l'accord se retire", () => {
-    confirmer();
+  it("rappelle que l'accord se retire", async () => {
+    await confirmer();
     expect(document.body.textContent).toContain("que tu peux retirer à tout moment");
+  });
+
+  /**
+   * L'écran promettait « le lien arrive par courriel ». Aucune
+   * visioconférence n'est modélisée : il n'y avait pas de lien à envoyer,
+   * et aucun courriel ne partait.
+   */
+  it("ne promet pas un lien que personne n'envoie", async () => {
+    await confirmer();
+    expect(document.body.textContent).not.toContain("Le lien arrive par courriel");
+    expect(document.body.textContent).toContain("La confirmation part par courriel");
+  });
+
+  it("le réseau coupé ne fait pas croire à une réservation", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("réseau"));
+    choisirEtConfirmer();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+    expect(screen.getByRole("alert").textContent).toContain("Tu es hors ligne");
+    expect(document.body.textContent).not.toContain("Rendez-vous confirmé");
   });
 });

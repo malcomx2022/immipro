@@ -2,8 +2,11 @@ import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { dossierDuCandidat } from "@/server/acces/dossiers";
+import { dossierAvecSaRegle } from "@/server/acces/dossiers";
 import { referenceRendezVous, limiteAnnulation } from "@/domain/consultants/rendez-vous";
+import { versFiche } from "@/server/acces/regles";
+import { envoyerConfirmationEntretien } from "@/server/courrier";
+import { jourEnFrancais } from "@/domain/format/moment";
 import { CONSULTATION_DUREE_MINUTES } from "@/domain/payments/pricing";
 import { ACCORD_DUREE_JOURS } from "@/domain/consultants/access";
 
@@ -25,6 +28,12 @@ import { ACCORD_DUREE_JOURS } from "@/domain/consultants/access";
  *
  * **La limite d'annulation est stockée.** La grille peut changer après la
  * réservation ; la condition acceptée ce jour-là, non.
+ *
+ * **La confirmation part par courriel (I.E).** Elle n'existait pas, et
+ * l'écran l'annonçait. Un envoi manqué ne défait pas une réservation déjà
+ * écrite : le rendez-vous est pris, l'accord est donné, et c'est l'écran
+ * qui en porte la preuve. L'échec se journalise — la réclamation qui
+ * arrivera saura quoi chercher.
  */
 export const POST = route({
   nom: "consultants.rendezvous",
@@ -39,7 +48,7 @@ export const POST = route({
     }),
   }),
   async traiter({ corps, params, acteur }) {
-    const dossier = await dossierDuCandidat(corps.dossierId, acteur!.id);
+    const dossier = await dossierAvecSaRegle(corps.dossierId, acteur!.id);
     const consultant = await db.consultant.findFirst({
       where: { id: params.id, active: true },
       include: { accreditations: { where: { revokedAt: null } } },
@@ -56,9 +65,24 @@ export const POST = route({
     const creneau = { debut: debut.toISOString(), disponible: true };
     const reference = referenceRendezVous(creneau, consultant.id);
 
+    // La version figée par le dossier, lue par le module d'accès : aucune
+    // route n'interroge le référentiel elle-même (INV-4).
+    const fiche = dossier.visaRule ? versFiche(dossier.visaRule) : null;
+    const libelleDossier = fiche ? `${fiche.pays} — ${fiche.intitule}` : null;
+
     const existant = await db.appointment.findUnique({ where: { reference } });
     if (existant) {
-      return { reference: existant.reference, deja: true };
+      // Rejeu : le rendez-vous est le même, et le courrier est déjà parti.
+      // En renvoyer un second ferait douter d'une double réservation.
+      return {
+        reference: existant.reference,
+        debut: existant.startsAt.toISOString(),
+        dureeMinutes: existant.durationMin,
+        annulationSansFraisJusqua: existant.freeUntil.toISOString(),
+        consultant: consultant.name,
+        dossier: libelleDossier,
+        deja: true,
+      };
     }
 
     const expire = new Date(debut.getTime() + ACCORD_DUREE_JOURS * 24 * 60 * 60 * 1000);
@@ -83,11 +107,24 @@ export const POST = route({
       }),
     ]);
 
+    await envoyerConfirmationEntretien({
+      destinataire: acteur!.email,
+      reference: rendezVous.reference,
+      creneau,
+      consultant: consultant.name,
+      dossier: libelleDossier,
+      partageExpireLe: jourEnFrancais(expire.toISOString()),
+    }).catch((erreur: unknown) => {
+      console.error(`[courrier] confirmation d'entretien ${reference} non partie`, erreur);
+    });
+
     return {
       reference: rendezVous.reference,
       debut: rendezVous.startsAt.toISOString(),
       dureeMinutes: rendezVous.durationMin,
       annulationSansFraisJusqua: rendezVous.freeUntil.toISOString(),
+      consultant: consultant.name,
+      dossier: libelleDossier,
       partageExpireLe: expire.toISOString().slice(0, 10),
       deja: false,
     };
