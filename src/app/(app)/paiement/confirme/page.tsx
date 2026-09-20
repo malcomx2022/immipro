@@ -94,7 +94,11 @@ export default function PageConfirme() {
       </p>
 
       <div className="flex flex-col gap-2">
-        <LienBouton href="/dossiers" pleineLargeur className="min-h-action">
+        {/* `/dossiers` n'existe pas : la liste est le tableau de bord, et
+            les checklists vivent sous `/dossiers/[id]`. Le bouton
+            renvoyait donc en 404 juste après un paiement — le pire moment
+            du parcours pour une page introuvable. */}
+        <LienBouton href="/tableau-de-bord" pleineLargeur className="min-h-action">
           Ouvrir ma checklist
         </LienBouton>
         <Link

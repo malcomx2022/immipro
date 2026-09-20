@@ -14,6 +14,8 @@ import {
   CE_QUI_PART,
   CE_QUI_RESTE,
   LIBELLE_CONFIRMATION,
+  LIBELLE_LIEN_AVANT_SUPPRESSION,
+  LIEN_AVANT_SUPPRESSION,
 } from "@/domain/comptes/suppression";
 
 /**
@@ -126,6 +128,12 @@ export function SuppressionDuCompte({ email }: { email: string }) {
           ))}
         </ul>
         <p className="text-pretty pt-1 text-14 text-ink-700">{A_FAIRE_AVANT}</p>
+        <Link
+          href={LIEN_AVANT_SUPPRESSION}
+          className="flex min-h-touch items-center text-14 font-medium text-accent-600"
+        >
+          {LIBELLE_LIEN_AVANT_SUPPRESSION}
+        </Link>
       </section>
 
       <p className="text-pretty text-14 text-ink-700">{AVERTISSEMENT_IRREVERSIBLE}</p>

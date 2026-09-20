@@ -141,7 +141,7 @@ export function Consentements() {
 
         <div className="flex flex-col gap-2">
           <Link
-            href="/consentements"
+            href="/compte/mes-donnees"
             className="flex min-h-touch items-center text-14 text-accent-600"
           >
             Télécharger mes données

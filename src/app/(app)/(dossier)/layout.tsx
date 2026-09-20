@@ -43,7 +43,7 @@ export default async function GabaritDossier({
 
       <nav
         aria-label="Navigation de l'espace candidat"
-        className="hidden flex-none flex-col gap-7 border-r border-ink-300 p-5 md:flex md:w-[264px]"
+        className="pas-a-imprimer hidden flex-none flex-col gap-7 border-r border-ink-300 p-5 md:flex md:w-[264px]"
       >
         <Link href="/tableau-de-bord" className="inline-flex items-center">
           <Image
@@ -72,7 +72,7 @@ export default async function GabaritDossier({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* En 390 px la colonne de navigation est masquée : sans cet en-tête,
             l'écran perdrait son seul repère de marque et l'accès au profil. */}
-        <header className="flex items-center justify-between gap-3 px-4 py-3 md:hidden">
+        <header className="pas-a-imprimer flex items-center justify-between gap-3 px-4 py-3 md:hidden">
           <Link href="/tableau-de-bord" className="inline-flex items-center">
             <Image
               src="/brand/immipro-logo-primary.svg"
@@ -97,7 +97,7 @@ export default async function GabaritDossier({
       {/* Dernier arrêt de tabulation, et premier atteint au pouce. */}
       <nav
         aria-label="Navigation de l'espace candidat"
-        className="fixed inset-x-0 bottom-0 flex border-t border-ink-300 bg-white px-2 py-2 md:hidden"
+        className="pas-a-imprimer fixed inset-x-0 bottom-0 flex border-t border-ink-300 bg-white px-2 py-2 md:hidden"
       >
         {NAVIGATION.map((lien) => (
           <Link

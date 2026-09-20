@@ -57,6 +57,7 @@ src/server/
     redaction.ts     Pièces à rédiger, versions, remarques.
     backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
     partenaires.ts   WF-13. Rien n'est proposable par défaut.
+    portabilite.ts   Export du compte et archive d'un dossier.
   jobs/
     worker.ts        Branchement pg-boss et cadences.
     analyse.ts       WF-06. Déterministe d'abord, IA pour l'extraction seule.
@@ -119,6 +120,28 @@ nomme quelqu'un ; ce qui reste est un compte sans personne.
 
 La frontière tient en une phrase : **ce qui décrit une personne s'en va, ce
 qui décrit une transaction reste.**
+
+`lecture/portabilite.ts` est le troisième côté de la même question : avant
+d'effacer, rendre. Deux sorties, deux besoins, et les confondre donnerait un
+fichier qui ne sert ni à l'un ni à l'autre. **L'export du compte** répond au
+droit d'accès : du JSON, structuré, relisible par une machine. **L'archive
+d'un dossier** répond à un geste : une page qui s'imprime, à garder avant la
+purge.
+
+Aucune des deux ne porte les fichiers. Ils se téléchargent un par un, par
+une URL signée créée au clic (règle d'architecture 4). Ce n'est pas un
+pis-aller : une archive unique de plusieurs dizaines de méga-octets, sur une
+connexion mobile qui coupe, échoue au bout de quatre minutes et ne laisse
+rien — pièce par pièce, ce qui est passé est passé. Et un lien signé posé
+dans une page meurt avant qu'on y arrive ; imprimé, il est mort pour
+toujours.
+
+Une règle de plus, et elle est facile à enfreindre sans le voir :
+**l'export rend ce que le candidat voit, pas ce que la base garde.** Le
+barème interne de WF-07 est une donnée sur la personne, et l'arbitrage C-09
+interdit de la lui montrer — l'exporter la lui montrerait par la porte de
+derrière. L'export porte donc la complétude comme les écrans la disent : un
+palier et un dénombrement.
 
 L'ordre des deux temps est celui de la réversibilité. La demande ferme
 l'accès tout de suite — c'est gratuit et immédiat. L'anonymisation vient

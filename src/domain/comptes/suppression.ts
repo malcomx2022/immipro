@@ -71,17 +71,20 @@ export const AVERTISSEMENT_IRREVERSIBLE =
   "La suppression est définitive. Personne, chez nous, ne peut retrouver ce compte ensuite.";
 
 /**
- * Ce que la suppression emporte sans retour possible.
+ * Ce qu'il faut faire avant, et l'écran le place avant le bouton — même
+ * ordre que C-11, pour la même raison : c'est l'ordre dans lequel on veut
+ * que les gestes soient faits.
  *
- * La première rédaction disait « télécharge tes dossiers avant » — et
- * l'export n'existe pas : le bouton de C-11 mène à une adresse qui répond
- * 404. Conseiller un geste impossible juste avant un geste irréversible est
- * la pire des deux fautes. La phrase dit donc ce qui est vrai aujourd'hui :
- * les fichiers téléversés sont encore sur l'appareil qui les a envoyés, ce
- * que la plateforme en a écrit ne l'est nulle part ailleurs.
+ * La rédaction précédente ne conseillait rien, parce qu'il n'y avait rien à
+ * conseiller : l'export n'existait pas, et le bouton de C-11 menait à une
+ * adresse qui répondait 404. Il existe ; la phrase le dit et l'écran y mène.
  */
 export const A_FAIRE_AVANT =
-  "Recopie ce que tu veux garder : tes pièces sont encore sur l'appareil qui les a envoyées, mais les lettres rédigées ici n'existent qu'ici.";
+  "Télécharge tes données avant : les lettres rédigées ici n'existent nulle part ailleurs, et nous ne pourrons plus te les rendre.";
+
+/** Où aller pour le faire. L'écran en fait un lien, avant le bouton. */
+export const LIEN_AVANT_SUPPRESSION = "/compte/mes-donnees";
+export const LIBELLE_LIEN_AVANT_SUPPRESSION = "Télécharger mes données";
 
 /** Libellé du champ de confirmation. Le mot de passe, parce qu'il est déjà connu. */
 export const LIBELLE_CONFIRMATION = "Ton mot de passe, pour confirmer";

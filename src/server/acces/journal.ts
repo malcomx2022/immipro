@@ -23,6 +23,7 @@ export type ActionAuditee =
   | "compte.suspension"
   | "compte.retablissement"
   | "compte.suppression"
+  | "compte.export"
   | "paiement.remboursement"
   | "paiement.reconciliation"
   | "regle.publication"

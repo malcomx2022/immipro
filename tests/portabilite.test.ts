@@ -1,0 +1,165 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import {
+  A_PROPOS,
+  CE_QUE_CONTIENT,
+  CE_QUE_NE_CONTIENT_PAS,
+  MENTION_LIEN_COURT,
+  MENTION_PIECE_PURGEE,
+  VERSION_EXPORT,
+  nomDuFichier,
+} from "@/domain/comptes/portabilite";
+import { A_FAIRE_AVANT, LIEN_AVANT_SUPPRESSION } from "@/domain/comptes/suppression";
+import { TTL_PRESIGNE_SECONDES } from "@/server/acces/pieces";
+
+const lire = (f: string) => readFileSync(f, "utf8");
+
+/**
+ * Export des données — A-05, C-11, WF-15.
+ *
+ * Ce qui se vérifie ici, c'est surtout ce que l'export **ne** fait **pas** :
+ * il ne fait pas sortir par la porte de derrière ce que l'arbitrage C-09
+ * interdit d'afficher, et il ne promet pas de contenir les fichiers.
+ */
+describe("export des données du compte", () => {
+  it("le fichier se nomme et se date", () => {
+    expect(nomDuFichier("2026-09-20")).toBe("immipro-mes-donnees-2026-09-20.json");
+    expect(VERSION_EXPORT).toMatch(/^\d+\.\d+$/u);
+  });
+
+  it("le fichier dit de lui-même ce qui n'y est pas", () => {
+    // Quelqu'un qui l'ouvre six mois plus tard n'a plus l'écran sous les
+    // yeux : l'explication voyage avec le fichier, pas à côté.
+    expect(A_PROPOS).toMatch(/téléversés n'y sont pas/u);
+    expect(A_PROPOS).toMatch(/cinq minutes/u);
+  });
+
+  it("le barème interne ne sort pas par l'export (arbitrage C-09)", () => {
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    // Le score de WF-07 est une donnée sur la personne, et l'exporter la
+    // lui montrerait — un nombre lu dans un fichier se retient comme un
+    // pronostic aussi sûrement qu'affiché à l'écran (INV-1).
+    expect(lecture).not.toMatch(/internalScore/u);
+    expect(lecture).not.toMatch(/\binterne\b\s*:/u);
+    // Ce qui sort est ce que les écrans disent : un palier, un dénombrement.
+    expect(lecture).toMatch(/LIBELLE_PALIER\[completude\.palier\]/u);
+  });
+
+  it("les textes rédigés sont dans l'export, les fichiers non", () => {
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    // La lettre écrite ici n'existe nulle part ailleurs : c'est ce que la
+    // suppression emporte, et donc ce que l'export doit rendre.
+    expect(lecture).toMatch(/texte: v\.body/u);
+    // Le fichier, lui, n'est que nommé — il se télécharge par une URL
+    // signée créée au clic (règle d'architecture 4).
+    expect(lecture).toMatch(/nomDuFichier: v\.objectKey/u);
+    expect(lecture).not.toMatch(/presigned|urlDeLecture/u);
+    expect(CE_QUE_NE_CONTIENT_PAS.join(" ")).toMatch(/fichiers eux-mêmes/u);
+  });
+
+  it("l'export descend comme un fichier, et il est journalisé", () => {
+    const route = lire("src/app/api/comptes/donnees/route.ts");
+    expect(route).toMatch(/content-disposition/u);
+    expect(route).toMatch(/attachment; filename=/u);
+    // Un appel qui rassemble tout un compte n'est pas une lecture ordinaire.
+    expect(route).toMatch(/limite: "sensible"/u);
+    // Après un vol de session, il faudra pouvoir dire ce qui est parti.
+    expect(route).toMatch(/compte\.export/u);
+  });
+
+  it("l'écran annonce le contenu avant le bouton", () => {
+    const ecran = lire("src/app/(auth)/compte/mes-donnees/MesDonnees.tsx");
+    expect(ecran.indexOf("CE_QUE_NE_CONTIENT_PAS")).toBeLessThan(
+      ecran.indexOf("Télécharger mes données"),
+    );
+    expect(CE_QUE_CONTIENT.length).toBeGreaterThan(3);
+  });
+});
+
+/**
+ * Archive d'un dossier — C-11.
+ *
+ * Elle existe parce qu'un bouton la promettait depuis le premier lot, et
+ * qu'il répondait 404 juste avant une purge irréversible.
+ */
+describe("archive d'un dossier", () => {
+  it("C-11 mène bien à l'archive", () => {
+    const cloture = lire("src/app/(app)/(dossier)/dossiers/[id]/cloture/Cloture.tsx");
+    expect(cloture).toMatch(/\/archive`/u);
+  });
+
+  it("l'archive porte les textes en entier, pas leur titre", () => {
+    const composant = lire(
+      "src/app/(app)/(dossier)/dossiers/[id]/archive/ArchiveDuDossier.tsx",
+    );
+    expect(composant).toMatch(/whitespace-pre-wrap/u);
+    expect(composant).toMatch(/\{t\.texte\}/u);
+  });
+
+  it("aucun lien signé n'est posé dans la page ni imprimé", () => {
+    // Un lien signé vaut cinq minutes : dans la page, il meurt avant qu'on
+    // y arrive ; imprimé, il est mort pour toujours.
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    expect(lecture).not.toMatch(/presignedGet/u);
+    const composant = lire(
+      "src/app/(app)/(dossier)/dossiers/[id]/archive/ArchiveDuDossier.tsx",
+    );
+    expect(composant).toMatch(/pas-a-imprimer[^"]*"\s*$|pas-a-imprimer/u);
+    expect(MENTION_LIEN_COURT).toMatch(/cinq minutes/u);
+    expect(TTL_PRESIGNE_SECONDES).toBe(300);
+  });
+
+  it("une pièce purgée le dit, au lieu d'offrir un lien qui échoue", () => {
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    expect(lecture).toMatch(/telechargeable: Boolean\(derniere\?\.objectKey && !derniere\.purgedAt\)/u);
+    expect(MENTION_PIECE_PURGEE).toMatch(/supprimé/u);
+  });
+
+  it("l'archive porte la source et la date de la règle appliquée (INV-8)", () => {
+    const composant = lire(
+      "src/app/(app)/(dossier)/dossiers/[id]/archive/ArchiveDuDossier.tsx",
+    );
+    // Le composant partagé, et non une mention réécrite : c'est lui qui
+    // tient la forme de l'engagement sur les six écrans qui le portent.
+    expect(composant).toMatch(/<SourceNote/u);
+    expect(composant).toMatch(/verifieeLe=\{regle\.verifieeLe\}/u);
+  });
+
+  it("la source est le domaine, pas l'adresse entière", () => {
+    // Trouvé à l'écran : l'URL complète du référentiel suisse fait cent
+    // trente caractères et s'étalait sur six lignes en 390 px. Partout
+    // ailleurs l'application affiche « ind.nl » (`mentionDe`).
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    expect(lecture).toMatch(/source: mentionDe\(a\.visaRule\)\.source/u);
+    // L'export, lui, garde l'adresse exacte : un fichier relu par un autre
+    // service doit permettre de retrouver la page, et il n'a pas de largeur
+    // à tenir.
+    expect(lecture).toMatch(/source: a\.visaRule\.sourceUrl/u);
+  });
+
+  it("l'impression retire la navigation, pas le contenu", () => {
+    const css = lire("src/styles/globals.css");
+    expect(css).toMatch(/@media print/u);
+    expect(css).toMatch(/break-inside: avoid/u);
+
+    // La règle ne devine pas par nom de balise : la première version
+    // masquait `header`, `nav` et `footer`, et emportait l'en-tête de
+    // l'archive — titre, pays, dates — avec sa mention de source. Vu en
+    // rendant la page en média « print », jamais à l'écran.
+    const bloc = /@media print \{([\s\S]*?)\n\}/u.exec(css)![1]!;
+    expect(bloc).not.toMatch(/^\s*(header|nav|footer)\s*[,{]/mu);
+
+    // Le gabarit nomme sa propre chrome.
+    const gabarit = lire("src/app/(app)/(dossier)/layout.tsx");
+    expect(gabarit.match(/pas-a-imprimer/gu)?.length).toBe(3);
+  });
+});
+
+describe("la suppression renvoie vers l'export, maintenant qu'il existe", () => {
+  it("l'écran de suppression conseille de télécharger, et y mène", () => {
+    expect(A_FAIRE_AVANT).toMatch(/Télécharge tes données/u);
+    expect(LIEN_AVANT_SUPPRESSION).toBe("/compte/mes-donnees");
+    const ecran = lire("src/app/(auth)/compte/suppression/SuppressionDuCompte.tsx");
+    expect(ecran).toMatch(/LIEN_AVANT_SUPPRESSION/u);
+  });
+});
