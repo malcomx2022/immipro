@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { JaugeMotDePasse } from "../JaugeMotDePasse";
 
 /**
@@ -14,8 +18,16 @@ import { JaugeMotDePasse } from "../JaugeMotDePasse";
  * Le bouton reste désactivé tant que les conditions ne sont pas acceptées ou
  * que le mot de passe est trop court, et dit laquelle des deux raisons
  * s'applique : un bouton gris sans explication est un défaut.
+ *
+ * La réponse du serveur est la même que l'adresse soit libre ou déjà prise,
+ * et l'écran mène donc à la vérification dans les deux cas. C'est l'email
+ * reçu qui distingue les deux : un formulaire d'inscription ne doit pas
+ * servir à vérifier si quelqu'un a un compte ici.
  */
 export function Inscription() {
+  const router = useRouter();
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
@@ -25,6 +37,26 @@ export function Inscription() {
 
   const longueurOk = motDePasseRecevable(motDePasse);
   const complet = Boolean(nom && email && longueurOk && conditions);
+
+  async function creer() {
+    setEnvoi(true);
+    setEchec(null);
+    const [prenom, ...reste] = nom.trim().split(/\s+/u);
+    const resultat = await appeler<{ etape: string }>("/api/comptes", {
+      corps: {
+        email: email.trim(),
+        motDePasse,
+        ...(prenom ? { prenom } : {}),
+        ...(reste.length > 0 ? { nom: reste.join(" ") } : {}),
+      },
+    });
+    if (resultat.ok) {
+      router.push("/verification");
+      return;
+    }
+    setEnvoi(false);
+    setEchec(resultat.echec);
+  }
 
   const raison = !conditions
     ? "Acceptez les conditions d'utilisation pour créer le compte."
@@ -95,6 +127,8 @@ export function Inscription() {
           onChangement={setConditions}
         />
 
+        {echec ? <BlocEchec echec={echec} /> : null}
+
         {/* RG-02.1 : le consentement aux pièces d'identité est séparé, et
             l'écran dit où il sera demandé plutôt que de le glisser ici. */}
         <p className="text-pretty rounded-md bg-ink-100 p-3.5 text-13 text-ink-500">
@@ -108,7 +142,9 @@ export function Inscription() {
           pleineLargeur
           className="min-h-action"
           disabled={!complet}
+          chargement={envoi}
           raisonDesactivation={complet ? undefined : raison}
+          onClick={() => void creer()}
         >
           Créer mon compte
         </Button>

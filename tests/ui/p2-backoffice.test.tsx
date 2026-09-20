@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import GabaritAdmin from "@/app/(admin)/layout";
+import { BarreAdmin } from "@/components/admin/BarreAdmin";
 import { FileDeVeille } from "@/app/(admin)/veille/FileDeVeille";
 import { EditionRegle } from "@/app/(admin)/regles/[id]/EditionRegle";
 import { RevueDesPieces } from "@/app/(admin)/revue/RevueDesPieces";
 import { Utilisateurs } from "@/app/(admin)/utilisateurs/Utilisateurs";
 import { Paiements } from "@/app/(admin)/paiements/Paiements";
 import { Journal } from "@/app/(admin)/journal/Journal";
-import PageCoutsIa from "@/app/(admin)/couts-ia/page";
+import { CoutsIa } from "@/app/(admin)/couts-ia/CoutsIa";
+import { METRIQUES } from "@/domain/backoffice/couts";
 import {
   COLLECTE,
   COLLECTE_PARTIELLE,
@@ -49,16 +50,26 @@ const editerRegle = () =>
 describe("gabarit back-office", () => {
   it("porte la navigation des six registres et le lien d'évitement", () => {
     render(
-      <GabaritAdmin>
+      <BarreAdmin nom="Mireille Agossou" role="Administration" initialesAffichees="MA">
         <h1 id="contenu" tabIndex={-1}>
           Écran
         </h1>
-      </GabaritAdmin>,
+      </BarreAdmin>,
     );
     expect(screen.getByRole("link", { name: "Aller au contenu" })).toBeDefined();
     const nav = screen.getByRole("navigation", { name: "Navigation du back-office" });
     expect(within(nav).getAllByRole("listitem")).toHaveLength(6);
     expect(within(nav).getByRole("link", { name: "Journal d'audit" })).toBeDefined();
+  });
+
+  it("nomme l'opérateur connecté, jamais un nom écrit en dur", () => {
+    const { container } = render(
+      <BarreAdmin nom="Koffi Houngbo" role="Analyste réglementaire" initialesAffichees="KH">
+        <p>Écran</p>
+      </BarreAdmin>,
+    );
+    expect(container.textContent).toContain("Koffi Houngbo");
+    expect(container.textContent).not.toContain("M. Agossou");
   });
 });
 
@@ -322,20 +333,20 @@ describe("B-06 — Journal d'audit", () => {
 
 describe("B-07 — Coûts IA", () => {
   it("n'affiche aucune valeur, et dit pourquoi", () => {
-    const { container } = render(<PageCoutsIa />);
+    const { container } = render(<CoutsIa metriques={METRIQUES} />);
     expect(container.textContent).toContain("Aucune mesure enregistrée");
     expect(container.textContent).toContain("un chiffre posé ici serait repris comme une spécification");
     expect(screen.getAllByText("—").length).toBe(4);
   });
 
   it("nomme les métriques et leur source de calcul", () => {
-    const { container } = render(<PageCoutsIa />);
+    const { container } = render(<CoutsIa metriques={METRIQUES} />);
     expect(container.textContent).toContain("somme de AiUsage.costXof sur la période");
     expect(container.textContent).toContain("Coût IA par dossier payant");
   });
 
   it("exprime les garde-fous en ratio, avec leur conséquence", () => {
-    const { container } = render(<PageCoutsIa />);
+    const { container } = render(<CoutsIa metriques={METRIQUES} />);
     expect(espaces(container.textContent ?? "")).toContain("15 % du prix du pack");
     expect(container.textContent).toContain("le pack est vendu trop bas");
     expect(container.textContent).toContain("3 × la médiane des 7 derniers jours");
@@ -343,7 +354,7 @@ describe("B-07 — Coûts IA", () => {
   });
 
   it("désactive l'export en disant qu'il n'y a rien à exporter", () => {
-    render(<PageCoutsIa />);
+    render(<CoutsIa metriques={METRIQUES} />);
     expect(
       screen.getByRole("button", { name: /Exporter le détail des appels/ }),
     ).toHaveProperty("disabled", true);
@@ -351,7 +362,7 @@ describe("B-07 — Coûts IA", () => {
   });
 
   it("ne montre aucune donnée de candidat", () => {
-    const { container } = render(<PageCoutsIa />);
+    const { container } = render(<CoutsIa metriques={METRIQUES} />);
     expect(container.textContent).toContain("Aucune donnée de candidat");
   });
 });

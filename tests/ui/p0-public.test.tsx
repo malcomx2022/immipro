@@ -12,9 +12,23 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: (url: string) => pousser(url) }),
 }));
 
+/**
+ * Réponse du serveur, posée par chaque test qui en attend une. Les écrans
+ * appellent désormais l'API : la mimer ici vérifie le branchement, là où une
+ * donnée importée depuis un fichier de contenu ne vérifiait que le rendu.
+ */
+function repondre(charge: unknown, statut = 200) {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: statut < 400,
+    status: statut,
+    json: async () => charge,
+  } as Response);
+}
+
 beforeEach(() => {
   pousser.mockClear();
   window.sessionStorage.clear();
+  global.fetch = vi.fn().mockRejectedValue(new Error("aucune réponse posée"));
 });
 
 describe("P-02 — Simulateur", () => {
@@ -115,7 +129,28 @@ describe("P-03 — Résultats", () => {
     );
   });
 
-  it("classe les destinations et nomme le motif de chaque écartée", async () => {
+  it("classe ce que le serveur renvoie, et nomme l'écart de chaque écartée", async () => {
+    repondre({
+      retenues: [
+        {
+          rang: "1",
+          slug: "pays-bas",
+          code: "NL",
+          pays: "Pays-Bas",
+          motifs: [{ texte: "B2 exigé, tu déclares B2.", favorable: true }],
+          mention: { source: "ind.nl", verifieeLe: "2026-09-11" },
+        },
+      ],
+      ecartees: [
+        {
+          code: "CH",
+          pays: "Suisse",
+          motif: "Le budget déclaré ne couvre pas la première année.",
+          ecart: "12 000 000 F demandés, 2 000 000 F au-dessus de ton budget.",
+        },
+      ],
+      aucuneNePasse: false,
+    });
     window.sessionStorage.setItem(
       "immipro.simulation",
       JSON.stringify({ objectif: "Étudier", budget: "8 à 12 millions F" }),
@@ -124,18 +159,52 @@ describe("P-03 — Résultats", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole("heading", {
-          name: "Trois destinations correspondent à ton profil",
-        }),
+        screen.getByRole("heading", { name: "Une destination correspond à ton profil" }),
       ).toBeDefined(),
     );
     expect(screen.getByText("Étudier, 8 à 12 millions F")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Pays-Bas" })).toBeDefined();
-    expect(screen.getByText(/Campagne Campus France close/)).toBeDefined();
+    // L'écart est chiffré : c'est ce qui rend le manque franchissable.
+    expect(screen.getByText(/2 000 000 F au-dessus de ton budget/)).toBeDefined();
     expect(screen.getByText(/il ne prédit aucune décision/)).toBeDefined();
   });
 
+  it("le titre suit le résultat, il n'annonce pas trois destinations quand il n'y en a aucune", async () => {
+    repondre({
+      retenues: [],
+      ecartees: [
+        { code: "NL", pays: "Pays-Bas", motif: "Niveau de langue non atteint.", ecart: "B2 exigé, tu déclares B1." },
+      ],
+      aucuneNePasse: true,
+    });
+    window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
+    render(<Resultats />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", {
+          name: "Aucune destination ne réunit encore tes conditions",
+        }),
+      ).toBeDefined(),
+    );
+    // RG-01.3 : ce qui manque est montré, chiffré, au lieu d'un écran vide.
+    expect(screen.getByText("B2 exigé, tu déclares B1.")).toBeDefined();
+  });
+
+  it("le réseau coupé dit ce qui est conservé et propose de réessayer", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("réseau"));
+    window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
+    render(<Resultats />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+    const alerte = screen.getByRole("alert");
+    expect(alerte.textContent).toContain("Tu es hors ligne");
+    expect(alerte.textContent).toContain("tu n'as rien à ressaisir");
+    expect(screen.getByRole("button", { name: "Réessayer" })).toBeDefined();
+  });
+
   it("n'annonce aucune décision de l'administration", async () => {
+    repondre({ retenues: [], ecartees: [], aucuneNePasse: true });
     window.sessionStorage.setItem(
       "immipro.simulation",
       JSON.stringify({ objectif: "Étudier" }),

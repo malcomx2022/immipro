@@ -4,6 +4,21 @@ import type { VersionRegle } from "@/domain/notifications/divergence";
 import type { Partenaire, MotifProposition } from "@/domain/consultants/proposition";
 
 /**
+ * ⚠ Statut de ce fichier depuis le branchement des écrans.
+ *
+ * Les écrans ne le lisent plus : ils reçoivent leurs données de
+ * `src/server/lecture/`, qui les tire de la base. Ce qui reste ici a deux
+ * usages, et un seul est durable :
+ *
+ * - **Jeux d'essai.** Les valeurs servent de fixtures aux tests d'écran, qui
+ *   vérifient un rendu sans base de données. Elles restent, et c'est leur
+ *   place.
+ * - **Contenu éditorial.** Ce qui ne se vérifie sur le site d'aucune
+ *   autorité — un nom de pays en français, un slug, une phrase de résumé —
+ *   reste ici et le serveur le joint au référentiel. Le ranger sous
+ *   `verifiedAt` affaiblirait ce que cet horodatage veut dire.
+ */
+/**
  * Alertes de démonstration — provisoires.
  *
  * Elles viendront de la veille réglementaire (WF-14) et des événements du

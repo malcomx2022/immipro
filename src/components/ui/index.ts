@@ -20,3 +20,4 @@ export {
 } from "./CompletenessTier";
 export { BottomSheet, type BottomSheetProps } from "./BottomSheet";
 export { SourceNote, type SourceNoteProps } from "./SourceNote";
+export { BlocEchec, type BlocEchecProps } from "./BlocEchec";

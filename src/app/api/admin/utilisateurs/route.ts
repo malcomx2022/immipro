@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
+import { comptes } from "@/server/lecture/backoffice";
 import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { fermerToutesLesSessions } from "@/server/securite/session";
@@ -23,28 +24,7 @@ export const GET = route({
   limite: "lecture",
   requete: z.object({ recherche: z.string().min(2).optional() }),
   async traiter({ requete }) {
-    const comptes = await db.user.findMany({
-      where: requete.recherche
-        ? { email: { contains: requete.recherche, mode: "insensitive" } }
-        : {},
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      include: { _count: { select: { applications: true, transactions: true } } },
-    });
-
-    return {
-      comptes: comptes.map((u) => ({
-        id: u.id,
-        email: u.email,
-        role: u.role,
-        emailVerifie: u.emailVerified !== null,
-        suspendu: u.suspendedAt !== null,
-        suspenduLe: u.suspendedAt?.toISOString() ?? null,
-        dossiers: u._count.applications,
-        paiements: u._count.transactions,
-        creeLe: u.createdAt.toISOString(),
-      })),
-    };
+    return { comptes: await comptes(requete.recherche) };
   },
 });
 

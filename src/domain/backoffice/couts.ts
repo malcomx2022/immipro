@@ -122,3 +122,54 @@ export const POURQUOI_AUCUNE_VALEUR =
 
 export const MENTION_SANS_DONNEE_CANDIDAT =
   "Aucune donnée de candidat n'apparaît sur cet écran : seuls les volumes et les coûts sont remontés.";
+
+/**
+ * Mesures réelles, quand il y en a.
+ *
+ * L'écran reste en état vide tant qu'aucun appel IA n'a été enregistré : la
+ * décision d'origine tient, et c'est même elle que cette fonction applique.
+ * Ce qu'elle ajoute, c'est qu'une fois les dossiers passés, les valeurs
+ * s'affichent d'elles-mêmes — sans qu'on ait à revenir remplacer des nulls à
+ * la main, ce qui est la façon habituelle dont un écran vide le reste.
+ */
+export interface Mesure {
+  dossiers: number;
+  /** Somme des coûts, en micro-unités de la devise de facturation. */
+  coutMicros: number;
+  appels: number;
+  /** Plus forte part du prix d'un pack consommée en IA, sur un dossier. */
+  pireePart: number | null;
+}
+
+export function metriquesMesurees(mesure: Mesure): readonly Metrique[] {
+  if (mesure.dossiers === 0) return METRIQUES;
+
+  const cout = mesure.coutMicros / 1_000_000;
+  const parDossier = cout / mesure.dossiers;
+  const nombre = (n: number, decimales = 0) =>
+    new Intl.NumberFormat("fr-FR", {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    }).format(n);
+
+  const valeurs: Record<string, string> = {
+    "depense-mois": `${nombre(cout, 2)} F`,
+    "cout-par-dossier": `${nombre(parDossier, 2)} F sur ${mesure.dossiers} dossiers`,
+    analyses: `${nombre(mesure.appels)} appels`,
+    "part-du-pack":
+      mesure.pireePart === null
+        ? "aucun pack payé"
+        : `${nombre(mesure.pireePart * 100, 1)} % au plus haut`,
+  };
+
+  return METRIQUES.map((m) => ({ ...m, valeur: valeurs[m.cle] ?? null }));
+}
+
+/**
+ * Nombre de dossiers réels attendus avant de tenir la grille pour mesurée.
+ *
+ * Il vient de la note de tarification : les quotas de tokens des packs sont
+ * des hypothèses jusqu'à cette mesure. Le dire ici permet à l'écran
+ * d'annoncer où il en est plutôt que de rester muet.
+ */
+export const DOSSIERS_POUR_MESURER = 10;

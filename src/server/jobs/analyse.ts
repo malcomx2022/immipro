@@ -118,6 +118,13 @@ export async function analyserUnePiece(
       finding: verdict.constat,
       extracted: lu.champs as never,
       analyzedAt: new Date(),
+      // Le remède suit l'état réel : une pièce déjà déposée se **remplace**,
+      // elle ne s'ajoute pas. « Ajouter » sur une ligne où un fichier existe
+      // déjà fait croire qu'il manque, et fait chercher ce qu'on a déjà
+      // envoyé. C'est le remède qui commande le libellé du bouton.
+      ...(verdict.verdict === "A_CORRIGER" && document.remedy === "TELEVERSER"
+        ? { remedy: "REMPLACER" as const }
+        : {}),
     },
   });
 

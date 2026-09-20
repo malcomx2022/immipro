@@ -1,12 +1,12 @@
 import { route } from "@/server/http/route";
-import { reglesPubliees, versFiche } from "@/server/acces/regles";
+import { fichesPubliees } from "@/server/lecture/destinations";
 
 /**
  * Fiches destination publiées — P-03.
  *
- * INV-4 tient dans `reglesPubliees`, qui ne sait construire qu'un filtre.
- * La route ne peut donc pas demander « toutes les règles » : la fonction
- * n'existe pas de ce côté du serveur.
+ * L'assemblée est dans `lecture/destinations`, partagée avec les pages
+ * serveur : deux chemins vers la même donnée divergent, et c'est l'écran qui
+ * finit par mentir. INV-4 et RG-14.1 y tiennent dans la requête.
  *
  * La réponse est mise en cache : elle ne dépend d'aucun compte, et une
  * minute de fraîcheur sur des fiches relues tous les quatre-vingt-dix jours
@@ -19,7 +19,7 @@ export const GET = route({
   limite: "lecture",
   cachePublicSecondes: 60,
   async traiter() {
-    const regles = await reglesPubliees();
-    return { destinations: regles.map(versFiche).filter((f) => f !== null) };
+    const { fiches, mention } = await fichesPubliees();
+    return { destinations: fiches, mention };
   },
 });

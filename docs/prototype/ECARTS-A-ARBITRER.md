@@ -527,3 +527,72 @@ point relevé au lot WF-12 n'a pas bougé : un email ne se recalcule pas à
 l'ouverture, la phrase doit donc être datée ou renvoyer vers l'écran. Le
 courrier d'alerte critique (RG-11.3) suit déjà cette règle et peut servir de
 modèle.
+
+---
+
+## Annexe J — Branchement des écrans
+
+Les vingt-neuf écrans lisaient `src/lib/contenu`. Ils lisent maintenant la
+base, par la couche `src/server/lecture/`, partagée avec les routes. Le
+prototype n'a pas d'avis sur cette couche ; ce qui suit sont les écarts que
+le branchement a révélés — pour la plupart en regardant les écrans, pas en
+lisant le code.
+
+### Ce qui a été tranché
+
+| # | Point | Ce qui existait | Ce qui est codé |
+|---|---|---|---|
+| J.1 | Code reçu par email pour le mot de passe | A-04 prévoyait un lien et une étape « J'ai suivi le lien » qui n'ouvrait rien : elle avançait sur un clic | un code à six chiffres, comme A-03. Un seul mécanisme pour deux parcours voisins, et l'étape fictive disparaît |
+| J.2 | « Destinations les plus demandées » | titre écrit en dur | l'intitulé suit la donnée : « les plus demandées » n'est écrit qu'au-delà de trente dossiers ouverts, sinon « Destinations couvertes », qui est exactement vrai |
+| J.3 | Dates de dépôt proposées à l'ouverture | « 15 janvier 2027 » et « 2 mai 2027 » figées | calculées depuis aujourd'hui. Figées, elles finissent dans le passé et l'écran propose des dépôts impossibles (même défaut que les créneaux du lot WF-12) |
+| J.4 | Pied de page | liens vers le Canada et l'Allemagne, non couverts | tirés du registre éditorial, qui est la source des slugs. Lu en base, il aurait rendu **toutes** les pages publiques dynamiques, guides et articles compris |
+| J.5 | Bandeau d'alerte du tableau de bord | affiché en permanence | affiché seulement s'il y a une divergence à arbitrer. Un bandeau qui ne s'éteint jamais cesse d'être lu |
+| J.6 | Opérateur du back-office | « M. Agossou · Analyste réglementaire » écrit en dur | l'opérateur connecté, avec son rôle réel |
+| J.7 | Encadré « le travail étudiant se lit de près » | citait l'Allemagne et le Canada | dérivé du tableau affiché : il nomme les destinations qui exigent un permis employeur et celles qui n'en exigent pas |
+| J.8 | Pages publiques | pré-générées au build | rendues à la demande. Le build ne doit pas exiger de base de données : l'image se construit en intégration continue, où il n'y en a pas |
+
+### Défauts trouvés à l'écran, corrigés
+
+Aucun de ces cinq n'aurait été vu par un test.
+
+- **Deux cartes « Pays-Bas » indistinguables** sur l'accueil et deux colonnes
+  homonymes dans le comparateur : un pays peut publier plusieurs procédures.
+  La carte et la colonne portent désormais l'intitulé.
+- **La date « au plus tôt » d'une pièce périssable** était calculée depuis la
+  date cible et non depuis le dépôt : elle tombait deux jours avant le dépôt
+  au lieu de trois mois, c'est-à-dire trop tard pour une pièce qui met trois
+  semaines à venir.
+- **Une pièce déjà déposée proposait « Ajouter »** au lieu de « Remplacer ».
+  Le remède suit maintenant l'état réel : chercher une pièce qu'on vient
+  d'envoyer est le genre de perte de temps que cet écran existe pour éviter.
+- **Une alerte affichait l'identifiant technique du dossier.** Elle nomme la
+  destination — c'est un écran d'alertes, pas un journal d'audit.
+- **« 1 consultants »** sur l'annuaire. Une faute d'accord sur un écran qui
+  promet une vérification d'habilitation entame la confiance dans la
+  vérification elle-même.
+- **Une cellule de tableau contenait une phrase de trois lignes** (« montant
+  publié dans une autre monnaie… »). Elle porte une valeur ; l'explication
+  vit sur la fiche, où il y a la place de la lire.
+
+### Ce qui reste à arbitrer
+
+**J.A — La proposition de partenaire n'a pas de table.** `PartnerReferral`
+figure dans la matrice de traçabilité de DOC-11 (WF-13) et n'existe pas au
+schéma. L'écran C-06 affiche donc encore un partenaire écrit dans le
+contenu. Deux issues : modéliser l'affiliation, ou retirer WF-13 du
+périmètre tant que le premier partenaire n'est pas signé — RG-13.4 demande
+de toute façon une vérification destination par destination avant
+activation.
+
+**J.B — La suppression de compte bute sur une contrainte, et c'est
+correct.** `Transaction.userId` ne tombe pas en cascade : un reçu survit à
+la suppression du compte, comme C-11 l'annonce au candidat. RG-10.4 demande
+donc une **anonymisation** des métadonnées, pas un effacement — et elle
+n'est pas écrite. Le jeu de démonstration contourne la contrainte ; le
+produit ne le pourra pas.
+
+**J.C — Les guides et les articles restent éditoriaux.** Ils attendent un
+back-office de publication, qui n'est pas au périmètre. Ce sont les deux
+seuls écrans publics qui ne lisent pas la base, et ils sont les seuls à
+rester pré-générés — ce qui est exactement ce qu'on veut d'un contenu de
+référencement.

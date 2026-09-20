@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Paiements } from "./Paiements";
-import { OPERATEUR, PAIEMENTS } from "@/lib/contenu/backoffice";
+import { etatOperateur, paiements } from "@/server/lecture/backoffice";
+import { exigerAdmin } from "@/server/securite/page";
 import { jourEnFrancais } from "@/domain/format/moment";
 
 /** B-04 — Paiements et réconciliation. WF-15, INV-7. */
@@ -11,12 +12,15 @@ export const metadata: Metadata = {
   description: "Rapprochement des paiements et traitement des écarts.",
 };
 
-export default function PagePaiements() {
+export default async function PagePaiements() {
+  await exigerAdmin("/paiements");
   const aujourdhui = new Date().toISOString().slice(0, 10);
+  const [lignes, operateur] = await Promise.all([paiements(), etatOperateur()]);
+
   return (
     <Paiements
-      paiements={PAIEMENTS}
-      operateur={OPERATEUR}
+      paiements={lignes}
+      operateur={operateur}
       journee={`Journée du ${jourEnFrancais(aujourdhui)}`}
     />
   );

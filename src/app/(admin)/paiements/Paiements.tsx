@@ -38,22 +38,30 @@ export function Paiements({
   journee,
 }: {
   paiements: readonly Paiement[];
-  operateur: EtatOperateur;
+  /**
+   * État de l'opérateur. Nul tant qu'aucun rapprochement n'a abouti :
+   * l'interrogation du fournisseur n'est pas branchée, et annoncer
+   * « disponible » sans avoir interrogé personne serait une affirmation
+   * sans mesure.
+   */
+  operateur: EtatOperateur | null;
   /** Libellé de la journée traitée. */
   journee: string;
 }) {
   const agregats = agreger(paiements);
-  const incident = messageIncidentOperateur(operateur, heure);
-  const publiable = totalPubliable(operateur);
+  const incident = operateur ? messageIncidentOperateur(operateur, heure) : null;
+  const publiable = operateur ? totalPubliable(operateur) : false;
 
   return (
     <div className="flex flex-col">
       <EnteteAdmin
         titre="Paiements et réconciliation"
         resume={
-          publiable
-            ? `${journee} · dernier rapprochement ${heure(operateur.dernierRapprochement)}`
-            : `${journee} · dernier rapprochement automatique ${heure(operateur.dernierRapprochement)}`
+          !operateur
+            ? `${journee} · aucun rapprochement automatique enregistré`
+            : publiable
+              ? `${journee} · dernier rapprochement ${heure(operateur.dernierRapprochement)}`
+              : `${journee} · dernier rapprochement automatique ${heure(operateur.dernierRapprochement)}`
         }
         actions={
           <>
@@ -69,7 +77,7 @@ export function Paiements({
         {incident ? (
           <section className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
             <h2 className="text-16 font-semibold text-ink-900">
-              L&apos;API {operateur.operateur} ne répond plus
+              L&apos;API {operateur?.operateur} ne répond plus
             </h2>
             <p className="max-w-[80ch] text-pretty text-14 text-ink-700">{incident}</p>
           </section>

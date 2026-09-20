@@ -1,7 +1,11 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { CHAMP_CONTROLE } from "@/components/ui/champ";
@@ -31,9 +35,32 @@ import { EnteteDossier } from "../EnteteDossier";
  * dans lequel on veut que les gestes soient faits.
  */
 export function Cloture({ dossier }: { dossier: Dossier }) {
+  const router = useRouter();
   const [issue, setIssue] = useState<IssueDemarche | null>(null);
   const [detail, setDetail] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const idDetail = useId();
+
+  /**
+   * La clôture est irréversible côté candidat : elle enclenche la purge.
+   * Le serveur rend la date, et c'est elle qui s'affiche ensuite — pas un
+   * délai recalculé par l'écran, qui pourrait diverger de l'engagement.
+   */
+  async function cloturer() {
+    if (!issue) return;
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler(`/api/dossiers/${dossier.id}/cloture`, {
+      corps: { issue, ...(detail.trim() ? { detail: detail.trim() } : {}) },
+    });
+    if (resultat.ok) {
+      router.push("/tableau-de-bord");
+      return;
+    }
+    setEnvoi(false);
+    setEchec(resultat.echec);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -110,12 +137,15 @@ export function Cloture({ dossier }: { dossier: Dossier }) {
       <p className="text-pretty text-14 text-ink-700">{AVERTISSEMENT_IRREVERSIBLE}</p>
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
+        {echec ? <BlocEchec echec={echec} /> : null}
         <Button
           variante="destructif"
           pleineLargeur
           disabled={issue === null}
+          chargement={envoi}
           raisonDesactivation="Choisis d'abord l'issue de ta démarche : c'est elle qui nous sert à corriger la checklist."
           className="min-h-action"
+          onClick={() => void cloturer()}
         >
           Clôturer mon dossier
         </Button>

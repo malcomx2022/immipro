@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
-import { ficheParSlug, libellePieces } from "@/domain/destinations/fiche";
-import { FICHES } from "@/lib/contenu/destinations";
+import { libellePieces } from "@/domain/destinations/fiche";
+import { ficheParSlugPubliee } from "@/server/lecture/destinations";
 
 /**
  * P-04 — Fiche destination. WF-01, INV-8.
@@ -12,10 +12,26 @@ import { FICHES } from "@/lib/contenu/destinations";
  * La source officielle et la date de vérification sont en tête de fiche, pas
  * en note de bas de page : c'est la première chose à savoir d'une exigence
  * réglementaire. Les réserves disent ce que la fiche n'affirme pas.
+ *
+ * La page n'est plus pré-générée : la liste des fiches vient de la base, et
+ * la figer au build ferait survivre une fiche dépubliée jusqu'au prochain
+ * déploiement. Une minute de fraîcheur suffit, et une relecture échue la
+ * retire de l'affichage dans la minute (RG-14.1).
  */
-export function generateStaticParams() {
-  return FICHES.map((f) => ({ slug: f.slug }));
-}
+/**
+ * Rendu à la demande, et non au build.
+ *
+ * Deux raisons, et la seconde compte autant que la première. Les fiches
+ * viennent de la base : les pré-générer figerait au déploiement une liste
+ * qu'une dépublication doit pouvoir vider en minutes (RG-14.1). Et surtout,
+ * **le build ne doit pas exiger de base de données** — l'image Docker se
+ * construit en intégration continue, où il n'y en a pas, et un build qui
+ * réclame Postgres est un build qui casse le jour où on en a le plus besoin.
+ *
+ * Le cache a sa place, mais dans la couche de lecture, où pages et routes le
+ * partagent — pas dans une pré-génération qui déplace le problème au build.
+ */
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -23,7 +39,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const fiche = ficheParSlug(FICHES, slug);
+  const fiche = await ficheParSlugPubliee(slug);
   if (!fiche) return { title: "Destination introuvable" };
   return {
     title: `${fiche.pays} — ${fiche.intitule}`,
@@ -37,7 +53,7 @@ export default async function PageDestination({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const fiche = ficheParSlug(FICHES, slug);
+  const fiche = await ficheParSlugPubliee(slug);
   if (!fiche) notFound();
 
   return (

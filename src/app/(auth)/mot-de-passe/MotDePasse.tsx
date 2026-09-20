@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useId, useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
@@ -10,18 +11,36 @@ import {
   libelleConcordance,
   motDePasseRecevable,
 } from "@/domain/comptes/mot-de-passe";
+import {
+  codeComplet,
+  LONGUEUR_CODE,
+  normaliserCode,
+} from "@/domain/comptes/code-verification";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { JaugeMotDePasse } from "../JaugeMotDePasse";
 
 /**
- * A-04 — Mot de passe, en trois étapes.
+ * A-04 — Mot de passe, en deux étapes.
  *
- * `demande` → `envoye` après l'envoi, `nouveau` quand l'utilisateur revient
- * par le lien reçu (`?etape=nouveau&jeton=…`). Chaque étape a son titre, et
- * le titre porte `id="contenu"` : le lien d'évitement suit l'étape affichée.
+ * `demande` → `nouveau` après l'envoi. Chaque étape a son titre, et le titre
+ * porte `id="contenu"` : le lien d'évitement suit l'étape affichée.
+ *
+ * **Un code, pas un lien.** Le prototype prévoyait un lien à suivre et une
+ * étape « J'ai suivi le lien » qui ne vérifiait rien : elle avançait sur un
+ * clic, sans que personne ait ouvert quoi que ce soit. Le serveur émet un
+ * code à six chiffres, comme pour la vérification d'adresse (A-03), et pour
+ * la même raison — l'email arrive sur le téléphone qui affiche le
+ * formulaire, et un code se recopie sans le quitter. Un seul mécanisme pour
+ * deux parcours voisins, plutôt que deux.
+ *
+ * L'espace de recherche d'un code à six chiffres est borné par ailleurs :
+ * cinq essais, dix minutes, et tout code précédent annulé à l'émission du
+ * suivant.
  */
-type Etape = "demande" | "envoye" | "nouveau";
+type Etape = "demande" | "nouveau";
 
-const ETAPES: readonly Etape[] = ["demande", "envoye", "nouveau"];
+const ETAPES: readonly Etape[] = ["demande", "nouveau"];
 
 const estEtape = (valeur: string | null): valeur is Etape =>
   valeur !== null && (ETAPES as readonly string[]).includes(valeur);
@@ -35,6 +54,7 @@ export function MotDePasse() {
 }
 
 function Etapes() {
+  const router = useRouter();
   const parametres = useSearchParams();
   const depuisLien = parametres.get("etape");
   const [etape, setEtape] = useState<Etape>(
@@ -42,13 +62,42 @@ function Etapes() {
   );
 
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const idJauge = useId();
 
   const longueurOk = motDePasseRecevable(motDePasse);
   const identiques = concordent(motDePasse, confirmation);
-  const nouveauPret = longueurOk && identiques;
+  const codeOk = codeComplet(code);
+  const nouveauPret = longueurOk && identiques && codeOk;
+
+  async function demander() {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler("/api/comptes/mot-de-passe", {
+      corps: { email: email.trim() },
+    });
+    setEnvoi(false);
+    // La réponse est la même que l'adresse ait un compte ou non : ce
+    // formulaire ne doit pas servir à savoir qui est client.
+    if (resultat.ok) setEtape("nouveau");
+    else setEchec(resultat.echec);
+  }
+
+  async function enregistrer() {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler("/api/comptes/mot-de-passe", {
+      methode: "PUT",
+      corps: { email: email.trim(), code: normaliserCode(code), motDePasse },
+    });
+    setEnvoi(false);
+    if (resultat.ok) router.push("/connexion");
+    else setEchec(resultat.echec);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
@@ -61,7 +110,7 @@ function Etapes() {
           <>
             <Entete
               titre="Réinitialise ton mot de passe"
-              texte="Entre l'adresse email de ton compte. Nous t'envoyons un lien valable une heure."
+              texte="Entre l'adresse email de ton compte. Nous t'envoyons un code à six chiffres, valable dix minutes."
             />
             <Input
               libelle="Adresse email"
@@ -74,33 +123,7 @@ function Etapes() {
             <p className="text-pretty text-13 text-ink-500">
               Ton dossier et tes pièces ne sont pas affectés par cette opération.
             </p>
-          </>
-        ) : null}
-
-        {etape === "envoye" ? (
-          <>
-            <span
-              aria-hidden="true"
-              className="flex h-24 w-24 items-center justify-center rounded-full bg-ink-100"
-            >
-              <span className="h-5 w-5 rounded-full bg-success" />
-            </span>
-            <Entete
-              titre="Lien envoyé"
-              texte="Ouvre le message envoyé à ton adresse et suis le lien. Il expire dans une heure."
-            />
-            <div className="flex flex-col items-start gap-2.5 rounded-lg bg-ink-100 p-4">
-              <p className="text-pretty text-14 text-ink-700">
-                Sur une connexion lente, l&apos;email peut mettre deux à trois
-                minutes. Pense aux courriers indésirables.
-              </p>
-              <Button
-                variante="secondaire"
-                className="h-11 rounded-full px-3.5 text-14"
-              >
-                Renvoyer le lien
-              </Button>
-            </div>
+            {echec ? <BlocEchec echec={echec} /> : null}
           </>
         ) : null}
 
@@ -108,7 +131,17 @@ function Etapes() {
           <>
             <Entete
               titre="Choisis un nouveau mot de passe"
-              texte="Au moins dix caractères. Évite une date de naissance ou un numéro de téléphone."
+              texte="Un code à six chiffres vient de partir à ton adresse. Il est valable dix minutes."
+            />
+            <Input
+              libelle="Code reçu par email"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              classNameControle="font-mono tracking-code"
+              aide="Sur une connexion lente, l'email peut mettre deux à trois minutes. Pense aux courriers indésirables."
+              value={code}
+              onChange={(e) => setCode(normaliserCode(e.target.value))}
             />
             <div className="flex flex-col gap-1.5">
               <Input
@@ -133,8 +166,11 @@ function Etapes() {
               onChange={(e) => setConfirmation(e.target.value)}
             />
             <p className="text-pretty text-13 text-ink-500">
-              Tes autres appareils connectés seront déconnectés.
+              Tous tes appareils connectés seront déconnectés, celui-ci compris.
+              C&apos;est le geste qu&apos;on fait après avoir perdu un téléphone :
+              il serait sans effet si l&apos;appareil perdu restait connecté.
             </p>
+            {echec ? <BlocEchec echec={echec} /> : null}
           </>
         ) : null}
       </div>
@@ -148,19 +184,10 @@ function Etapes() {
             raisonDesactivation={
               email ? undefined : "Renseignez l'adresse email de votre compte."
             }
-            onClick={() => setEtape("envoye")}
+            chargement={envoi}
+            onClick={() => void demander()}
           >
-            Envoyer le lien
-          </Button>
-        ) : null}
-
-        {etape === "envoye" ? (
-          <Button
-            pleineLargeur
-            className="min-h-action"
-            onClick={() => setEtape("nouveau")}
-          >
-            J&apos;ai suivi le lien
+            Envoyer le code
           </Button>
         ) : null}
 
@@ -169,13 +196,17 @@ function Etapes() {
             pleineLargeur
             className="min-h-action"
             disabled={!nouveauPret}
+            chargement={envoi}
             raisonDesactivation={
               nouveauPret
                 ? undefined
-                : !longueurOk
-                  ? "Le mot de passe doit faire au moins dix caractères."
-                  : "Les deux saisies doivent être identiques."
+                : !codeOk
+                  ? `Saisissez les ${LONGUEUR_CODE} chiffres reçus par email.`
+                  : !longueurOk
+                    ? "Le mot de passe doit faire au moins dix caractères."
+                    : "Les deux saisies doivent être identiques."
             }
+            onClick={() => void enregistrer()}
           >
             Enregistrer le mot de passe
           </Button>

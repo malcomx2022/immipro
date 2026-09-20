@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ChoixDeLaPiece } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/ChoixDeLaPiece";
 import { Redaction } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/Redaction";
-import PageRelecture from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/relecture/page";
+import { Relecture } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/relecture/Relecture";
+import { REMARQUES_MOTIVATION } from "@/lib/contenu/redaction";
 import { Alertes } from "@/app/(app)/(dossier)/notifications/Alertes";
 import { PropositionPartenaire } from "@/app/(app)/(dossier)/dossiers/[id]/PropositionPartenaire";
 import { dossierParId } from "@/lib/contenu/dossiers";
@@ -179,17 +180,26 @@ describe("R-03 — Éditeur et versions", () => {
 });
 
 describe("R-04 — Analyse critique", () => {
-  const params = Promise.resolve({ id: "nl-4471", type: "lettre-motivation" });
+  // La page lit la base ; le composant rend. Les remarques du contenu de
+  // référence suffisent à vérifier l'écran, sans base de données.
+  const relecture = () => (
+    <Relecture
+      dossier={dossierParId("nl-4471")!}
+      type="lettre-motivation"
+      remarques={REMARQUES_MOTIVATION}
+      relectureLe="2026-09-11"
+    />
+  );
 
   it("met l'incohérence en tête et montre les deux valeurs", async () => {
-    render(await PageRelecture({ params }));
+    render(relecture());
     expect(screen.getByText("Incohérence entre pièces")).toBeDefined();
     expect(screen.getByText("juillet 2026")).toBeDefined();
     expect(screen.getByText("18 septembre 2026")).toBeDefined();
   });
 
   it("résume sans noter la lettre ni prédire la décision", async () => {
-    const { container } = render(await PageRelecture({ params }));
+    const { container } = render(relecture());
     const texte = container.textContent ?? "";
     expect(texte).toContain("dont une incohérence avec une autre pièce");
     // Le nombre de mots annoncé ne peut plus contredire le texte affiché.
@@ -201,7 +211,7 @@ describe("R-04 — Analyse critique", () => {
   });
 
   it("porte la date de relecture et rappelle qu'elle ne remplace personne", async () => {
-    const { container } = render(await PageRelecture({ params }));
+    const { container } = render(relecture());
     expect(container.textContent).toMatch(/Information vérifiée le 11\/09\/2026/);
     expect(container.textContent).toContain("ne remplace pas la lecture d'un consultant");
   });

@@ -46,6 +46,13 @@ src/server/
   vue/
     dossier.ts       Prisma → types du domaine que les écrans consomment déjà.
     destinations.ts  Règle → destination évaluable par le simulateur.
+  lecture/
+    destinations.ts  Fiches publiées, vedettes, comparateur.
+    dossiers.ts      Tableau de bord, checklist, complétude, échéancier, analyse.
+    alertes.ts       Alertes d'un candidat, divergence à arbitrer.
+    consultants.ts   Annuaire habilité, créneaux disponibles.
+    redaction.ts     Pièces à rédiger, versions, remarques.
+    backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
   jobs/
     worker.ts        Branchement pg-boss et cadences.
     analyse.ts       WF-06. Déterministe d'abord, IA pour l'extraction seule.
@@ -55,6 +62,36 @@ src/server/
     divergence.ts    WF-11. Rien n'est migré d'office.
   courrier.ts        Courriers transactionnels. Transport non branché.
 ```
+
+## Une assemblée, deux entrées
+
+`lecture/` est appelé par **les pages serveur et les routes**. C'est la seule
+règle de ce découpage, et elle a une raison : deux chemins vers la même
+donnée divergent, et c'est l'écran qui finit par mentir.
+
+Une page serveur appelle directement, sans passer par HTTP. S'interroger
+soi-même coûte un aller-retour, oblige à réémettre le cookie de session, et
+fait dépendre le rendu de sa propre disponibilité. Les routes restent pour
+les écrans interactifs — qui appellent avec `src/lib/api.ts` — et pour un
+client qui ne serait pas cette application.
+
+Le partage page / composant suit la même logique partout : `page.tsx` lit et
+garde l'accès, `Composant.tsx` rend. C'est ce qui permet de vérifier un
+écran sans base de données, et une lecture sans rendu.
+
+## Garder l'accès
+
+Une page protégée ne vérifie rien elle-même : la garde est au **gabarit**.
+`(dossier)/layout.tsx` exige une session, `(admin)/layout.tsx` exige au moins
+le rôle veilleur, et chaque page du back-office resserre selon ce qu'elle
+montre. Un écran ajouté demain sous l'un de ces groupes est protégé sans que
+personne y pense — c'est exactement le genre d'oubli qui ouvre un dossier à
+qui n'est pas connecté.
+
+Les pages redirigent, les routes refusent avec le contrat d'échec : une page
+n'a pas de corps JSON à rendre, une API n'a pas à renvoyer une redirection à
+un client qui attend un objet. La redirection porte `suite`, pour que
+quelqu'un dont la session a expiré revienne là où il allait.
 
 ## Écrire une route
 
@@ -95,9 +132,19 @@ faire semblant :
 ## Vérifier
 
 ```
-npm run check          # lint, typecheck, 666 tests, vocabulaire
+npm run check          # lint, typecheck, 678 tests, vocabulaire
 npm run db:garde-fous  # 16 écritures interdites, essayées une par une
+npm run seed:rules     # les quatre règles de référence
+npm run seed:demo      # une candidate, un veilleur, un administrateur
 ```
+
+`seed:demo` est le seul moyen de **voir** les écrans. Il crée une candidate
+avec un dossier en cours et un brouillon, des pièces dans plusieurs états,
+une analyse, une alerte et un consultant habilité — plus un compte par rôle,
+parce que la seule façon de vérifier le moindre privilège est d'ouvrir les
+écrans avec chacun et de constater ce qui se ferme. Il refuse de tourner en
+production : un jeu de démonstration écrit dans une base réelle y laisse un
+compte au mot de passe connu.
 
 `tests/api-invariants.test.ts` relit les routes **comme un texte** : composeur
 obligatoire, dispense de débit réservée aux webhooks signés, aucun barème
