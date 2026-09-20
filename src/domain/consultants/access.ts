@@ -141,3 +141,45 @@ export function evenementLecture(
  * réglée, et personne ne penserait à le retirer.
  */
 export const ACCORD_DUREE_JOURS = 14;
+
+/**
+ * Un accord vu depuis « Mes consentements » — A-05, RG-12.2.
+ *
+ * L'accord était annoncé révocable à trois endroits — la mention de T-04,
+ * la case de T-05, et depuis le lot I.E le courrier de confirmation — et
+ * rien ne permettait de le retirer. Les deux liens qui prétendaient y mener
+ * menaient au profil, qui n'en parle pas.
+ *
+ * Trois états, et ils ne se valent pas : un accord retiré l'a été par le
+ * candidat, un accord échu s'est fermé tout seul à la date convenue. Les
+ * confondre ferait croire à un geste qu'on n'a pas fait.
+ */
+export type EtatPartage = "actif" | "retire" | "echu";
+
+export function etatDuPartage(accord: AccordAcces, expireLe: Date, a: Date = new Date()): EtatPartage {
+  if (accord.revoqueLe != null && accord.revoqueLe <= a) return "retire";
+  return expireLe > a ? "actif" : "echu";
+}
+
+export const LIBELLE_ETAT_PARTAGE: Record<EtatPartage, string> = {
+  actif: "Accès ouvert",
+  retire: "Accès retiré",
+  echu: "Accès échu",
+};
+
+/**
+ * Ce que le retrait fait, et ce qu'il ne fait pas. Dit avant le geste :
+ * quelqu'un qui croit effacer une consultation déjà eue se tromperait sur
+ * ce qu'il obtient.
+ */
+export const MENTION_RETRAIT =
+  "Le retrait ferme l'accès immédiatement. Les consultations déjà inscrites au journal restent lisibles : c'est ce qui permet de savoir ce qui a été vu, et quand.";
+
+export const PARTAGES_VIDES =
+  "Aucun consultant n'a accès à tes dossiers. Un accès s'ouvre quand tu prends rendez-vous, et se referme seul à la date convenue.";
+
+/** « jusqu'au 5 octobre 2026 », « échu le 5 octobre 2026 », selon l'état. */
+export function libelleEcheance(etat: EtatPartage, jour: string): string {
+  if (etat === "retire") return "Retiré";
+  return etat === "actif" ? `Jusqu'au ${jour}` : `Échu le ${jour}`;
+}

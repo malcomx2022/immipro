@@ -267,6 +267,9 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "piece.consultation": "ACCES_PIECE",
   "piece.purge": "ACCES_PIECE",
   "dossier.consultation": "ACCES_PIECE",
+  // Le retrait d'un accord de partage porte sur ce qu'un tiers pouvait
+  // lire : il se classe avec les accès aux pièces, pas avec le compte.
+  "partage.retrait": "ACCES_PIECE",
   "compte.suspension": "COMPTE",
   "compte.retablissement": "COMPTE",
   "compte.suppression": "COMPTE",

@@ -596,6 +596,66 @@ devait confirmer n'existait pas.
   limite d'annulation sans frais ; aucune route ne l'applique, et K.C —
   qui supporte le coût d'un rendez-vous annulé — n'est pas tranché. La
   limite reste une condition opposable, pas encore un geste.
+- **L'accord de partage était annoncé révocable, et ne l'était pas.**
+  ~~Traité au lot suivant.~~ **Fermé — voir ci-dessous.**
+
+### Lot suivant — le retrait de l'accord de partage
+
+Le lot I.E a rendu les accords réels : depuis qu'un rendez-vous s'écrit,
+`ConsultantAccess` porte de vraies lignes. C'est ce qui a rendu visible
+qu'aucune d'elles ne pouvait être retirée.
+
+RG-12.2 dit que l'accord est révocable à tout moment, et trois textes le
+répètent au candidat : la mention de T-04, la description de la case de
+T-05, et le courrier de confirmation écrit au lot précédent. Aucun écran
+ne le permettait, et les deux liens qui prétendaient y mener menaient
+ailleurs.
+
+**Ce qui est fait.** Les accords sont sur A-05, l'écran que la mention
+nomme. C'est leur place : un accord nominatif donné à un consultant est un
+consentement au sens ordinaire — daté, nominatif, révocable — et A-05 est
+déjà l'écran des consentements. Chaque accord porte son état, son
+échéance, et un bouton pour le fermer ; le retrait est journalisé
+(RG-15.1), idempotent, et la requête filtre sur le propriétaire.
+
+**Trois états, et ils ne se valent pas.** Ouvert, échu, retiré. Un accès
+échu s'est fermé tout seul à la date convenue ; un accès retiré l'a été
+par quelqu'un. Les confondre ferait croire à un geste qu'on n'a pas fait —
+et un retrait prononcé après l'échéance reste un retrait.
+
+**Ce que le retrait ne fait pas est dit avant le geste.** Il ferme
+l'accès ; il n'efface pas les consultations déjà inscrites au journal.
+Quelqu'un qui croit effacer ce qui a été vu se tromperait sur ce qu'il
+obtient.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Deux liens nommaient une destination qu'ils n'avaient pas.** « Gérer
+  mes consentements de partage », dans l'annuaire, menait au profil, qui
+  n'en parle pas ; « Mon profil », en tête d'A-05, menait à l'écran de
+  connexion. Les deux adresses sont servies : le test des liens morts ne
+  pouvait rien y voir. C'est un quatrième genre de lien mort, après
+  l'adresse absente, la boucle sur soi et la porte close — le lien qui
+  mène quelque part, mais pas là où son libellé promet. Un test compare
+  maintenant la mention et le titre de l'écran qu'elle nomme.
+- **Une réponse bien formée mais inattendue casse A-05.** L'écran lit
+  `donnees.etat` sans vérifier sa présence ; un 200 d'une autre forme
+  rend l'écran blanc. Découvert en écrivant le double appel de test.
+  Laissé tel quel : c'est le contrat de l'API qui garantit la forme, et
+  s'en défier partout coûterait plus que le défaut.
+
+### Ce qui reste ouvert
+
+- **Aucun consultant ne peut rien lire.** `peutLire` n'a toujours aucun
+  appelant, et pour cause : il n'existe ni rôle `CONSULTANT`, ni écran
+  côté consultant. Le candidat donne donc un accord réel, révocable, à une
+  capacité qui n'existe pas encore. Ouvrir cette surface est le « pack
+  Accompagné, lot 4 » que le modèle de droits annonce, et une décision de
+  produit.
+- **A-05 vit dans le gabarit des comptes.** Y venir depuis l'espace
+  dossier fait perdre la navigation de l'application : il ne reste que le
+  logo et le lien « Mon profil ». Acceptable pour un aller-retour, à
+  revoir le jour où l'écran devient un endroit où l'on passe.
 
 ---
 

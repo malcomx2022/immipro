@@ -2,6 +2,13 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import type { ConsultantHabilite } from "@/domain/consultants/annuaire";
 import type { Creneau } from "@/domain/consultants/rendez-vous";
+import {
+  etatDuPartage,
+  libelleEcheance,
+  type EtatPartage,
+} from "@/domain/consultants/access";
+import { versFiche } from "@/server/acces/regles";
+import { jourEnFrancais } from "@/domain/format/moment";
 import { editorialDe } from "@/lib/contenu/destinations";
 
 /**
@@ -98,4 +105,103 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
     debut: quand.toISOString(),
     disponible: !occupes.has(quand.getTime()),
   }));
+}
+
+export interface Partage {
+  id: string;
+  consultant: string;
+  cabinet: string;
+  /** « Pays-Bas — Séjour pour études », ou le pays seul faute de règle figée. */
+  dossier: string;
+  dossierId: string;
+  /** Jour de l'accord, en français. */
+  donneLe: string;
+  etat: EtatPartage;
+  /** « Jusqu'au 5 octobre 2026 », « Retiré », « Échu le … ». */
+  echeance: string;
+}
+
+/**
+ * Les dossiers qu'un candidat a ouverts à un consultant — A-05, RG-12.2.
+ *
+ * Le filtre sur `application.userId` est dans la requête et non dans une
+ * comparaison qui suit : un accord nomme un consultant, un dossier et une
+ * date, et la liste des accords de quelqu'un d'autre dit avec qui il
+ * prépare son départ.
+ *
+ * Les accords retirés restent : le retrait est un retrait, pas une
+ * suppression, et la ligne prouve que l'accès a existé le jour d'une
+ * consultation. C'est la même règle que pour les consentements d'A-05, dont
+ * cette liste est le prolongement.
+ */
+export async function partagesDuCandidat(
+  userId: string,
+  maintenant = new Date(),
+): Promise<Partage[]> {
+  const accords = await db.consultantAccess.findMany({
+    where: { application: { userId } },
+    include: {
+      consultant: true,
+      application: { include: { visaRule: true } },
+    },
+    orderBy: { grantedAt: "desc" },
+  });
+
+  return accords.map((a) => {
+    const fiche = a.application.visaRule ? versFiche(a.application.visaRule) : null;
+    const etat = etatDuPartage(
+      {
+        dossierId: a.applicationId,
+        consultantId: a.consultantId,
+        donneLe: a.grantedAt,
+        revoqueLe: a.revokedAt,
+      },
+      a.expiresAt,
+      maintenant,
+    );
+    return {
+      id: a.id,
+      consultant: a.consultant.name,
+      cabinet: a.consultant.firm,
+      // Sans règle figée, le dossier n'a pas de nom : le dire vaut mieux
+      // qu'afficher un identifiant.
+      dossier: fiche ? `${fiche.pays} — ${fiche.intitule}` : "Dossier sans destination figée",
+      dossierId: a.applicationId,
+      donneLe: jourEnFrancais(a.grantedAt.toISOString()),
+      etat,
+      echeance: libelleEcheance(
+        etat,
+        jourEnFrancais((a.revokedAt ?? a.expiresAt).toISOString()),
+      ),
+    };
+  });
+}
+
+/**
+ * Retrait d'un accord — RG-12.2, « révocable à tout moment ».
+ *
+ * Idempotent : retirer deux fois ne réécrit pas la date du premier retrait.
+ * Un accord déjà échu se retire quand même sans erreur — le candidat n'a
+ * pas à savoir qu'il s'était fermé tout seul entre-temps.
+ */
+export async function retirerLePartage(
+  id: string,
+  userId: string,
+  maintenant = new Date(),
+): Promise<{ consultant: string; dossierId: string; dejaRetire: boolean }> {
+  const accord = await db.consultantAccess.findFirst({
+    where: { id, application: { userId } },
+    include: { consultant: true },
+  });
+  if (!accord) throw echec("introuvable");
+
+  if (accord.revokedAt) {
+    return { consultant: accord.consultant.name, dossierId: accord.applicationId, dejaRetire: true };
+  }
+
+  await db.consultantAccess.update({
+    where: { id: accord.id },
+    data: { revokedAt: maintenant },
+  });
+  return { consultant: accord.consultant.name, dossierId: accord.applicationId, dejaRetire: false };
 }
