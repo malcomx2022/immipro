@@ -5,7 +5,7 @@ import { Connexion } from "@/app/(auth)/connexion/Connexion";
 import { Verification } from "@/app/(auth)/verification/Verification";
 import { MotDePasse } from "@/app/(auth)/mot-de-passe/MotDePasse";
 import { Consentements } from "@/app/(auth)/consentements/Consentements";
-import { CONSENTEMENTS } from "@/domain/comptes/consentements";
+import { CONSENTEMENTS, ETAT_INITIAL } from "@/domain/comptes/consentements";
 
 const parametres = new URLSearchParams();
 vi.mock("next/navigation", () => ({
@@ -13,8 +13,53 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => parametres,
 }));
 
+const PARTAGES = [
+  {
+    id: "acc-1",
+    consultant: "Marieke Vermeulen",
+    cabinet: "Vermeulen Immigration",
+    dossier: "Pays-Bas — Séjour pour études",
+    dossierId: "nl-4471",
+    donneLe: "17 septembre 2026",
+    etat: "actif" as const,
+    echeance: "Jusqu'au 1er octobre 2026",
+  },
+  {
+    id: "acc-2",
+    consultant: "Karim Benali",
+    cabinet: "Benali & Associés",
+    dossier: "Suisse — Autorisation de séjour pour études",
+    dossierId: "ch-2",
+    donneLe: "2 août 2026",
+    etat: "retire" as const,
+    echeance: "Retiré",
+  },
+];
+
+/**
+ * A-05 lit désormais deux choses : les autorisations générales et les
+ * accords de partage. Le double appel se distingue par l'adresse — servir
+ * la même réponse aux deux rendrait l'état des interrupteurs indéfini.
+ */
+const repondrePartages = (partages: unknown[] = []) => {
+  global.fetch = vi.fn().mockImplementation((url: string) =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve(
+          String(url).includes("/partages")
+            ? { partages }
+            : { consentements: CONSENTEMENTS, etat: { ...ETAT_INITIAL } },
+        ),
+    } as Response),
+  );
+};
+
 beforeEach(() => {
   for (const cle of [...parametres.keys()]) parametres.delete(cle);
+  vi.restoreAllMocks();
+  repondrePartages();
 });
 
 describe("A-01 — Inscription", () => {
@@ -219,5 +264,68 @@ describe("A-05 — Consentements", () => {
     expect(
       screen.getByText(/ne bloque pas ton\s+compte/),
     ).toBeDefined();
+  });
+
+  /**
+   * RG-12.2 — l'accord donné à un consultant est annoncé révocable par
+   * T-04, par la case de T-05 et par le courrier de confirmation. La
+   * mention nomme cet écran-ci, qui ne parlait que des autorisations
+   * générales : il n'existait aucun endroit pour retirer l'accès.
+   */
+  it("liste les dossiers ouverts à un consultant", async () => {
+    repondrePartages(PARTAGES);
+    render(<Consentements />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Dossiers partagés" })).toBeDefined(),
+    );
+    expect(screen.getByText(/Vermeulen Immigration · Pays-Bas/)).toBeDefined();
+    expect(screen.getByText(/Accordé le 17 septembre 2026/)).toBeDefined();
+  });
+
+  it("ne propose de retirer que ce qui est encore ouvert", async () => {
+    repondrePartages(PARTAGES);
+    render(<Consentements />);
+
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: /Retirer l'accès/ })).toHaveLength(1),
+    );
+    // L'accord retiré reste affiché : une liste qui ne montre que l'ouvert
+    // ne permet pas de vérifier qu'on a bien fermé.
+    expect(screen.getByText(/Benali & Associés/)).toBeDefined();
+    expect(screen.getByText(/Accès retiré/)).toBeDefined();
+  });
+
+  it("retire un accès et relit l'état depuis le serveur", async () => {
+    repondrePartages(PARTAGES);
+    render(<Consentements />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Retirer l'accès/ })).toBeDefined(),
+    );
+
+    repondrePartages([{ ...PARTAGES[0]!, etat: "retire", echeance: "Retiré" }, PARTAGES[1]]);
+    fireEvent.click(screen.getByRole("button", { name: /Retirer l'accès/ }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /Retirer l'accès/ })).toBeNull(),
+    );
+    const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-2)!;
+    expect(url).toBe("/api/comptes/partages/acc-1/retrait");
+    expect((options as RequestInit).method).toBe("POST");
+  });
+
+  it("dit ce que le retrait ne fait pas", async () => {
+    repondrePartages(PARTAGES);
+    render(<Consentements />);
+    await waitFor(() => expect(screen.getByText(/Le retrait ferme l'accès/)).toBeDefined());
+    // Quelqu'un qui croit effacer une consultation déjà eue se tromperait.
+    expect(screen.getByText(/restent lisibles/)).toBeDefined();
+  });
+
+  it("aucun partage : l'écran dit quand un accès s'ouvre", async () => {
+    render(<Consentements />);
+    await waitFor(() =>
+      expect(screen.getByText(/Aucun consultant n'a accès à tes dossiers/)).toBeDefined(),
+    );
   });
 });

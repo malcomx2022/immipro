@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/Switch";
@@ -12,6 +12,12 @@ import {
   type CodeConsentement,
   type EtatConsentements,
 } from "@/domain/comptes/consentements";
+import {
+  LIBELLE_ETAT_PARTAGE,
+  MENTION_RETRAIT,
+  PARTAGES_VIDES,
+} from "@/domain/consultants/access";
+import type { Partage } from "@/server/lecture/consultants";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 
@@ -29,6 +35,13 @@ import type { EchecCandidat } from "@/server/http/echecs";
  * est plus une. Tant que la lecture n'a pas abouti, les interrupteurs
  * restent à faux — afficher « accordé » par optimisme, puis se rétracter,
  * serait le pire des deux états.
+ *
+ * **Les accords de partage sont ici aussi (RG-12.2).** Un accord nominatif
+ * donné à un consultant est un consentement au sens ordinaire : daté,
+ * nominatif, révocable. Il était annoncé révocable par T-04, par la case de
+ * T-05 et par le courrier de confirmation, et la mention nommait cet
+ * écran-ci — qui ne parlait que des autorisations générales. Il n'existait
+ * donc aucun endroit pour retirer un accès qu'on avait promis retirable.
  */
 export function Consentements() {
   const [etat, setEtat] = useState<EtatConsentements>({ ...ETAT_INITIAL });
@@ -87,7 +100,10 @@ export function Consentements() {
   return (
     <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
       <div className="flex min-w-0 flex-col gap-5 md:w-[560px] md:flex-none">
-        <Link href="/connexion" className="text-14 font-semibold text-ink-900">
+        {/* Le lien s'appelait « Mon profil » et menait à l'écran de
+            connexion : servi, donc invisible au test des liens morts, et
+            faux pour quiconque est déjà connecté. */}
+        <Link href="/profil" className="text-14 font-semibold text-ink-900">
           Mon profil
         </Link>
 
@@ -139,6 +155,8 @@ export function Consentements() {
           })}
         </ul>
 
+        <Partages />
+
         <div className="flex flex-col gap-2">
           <Link
             href="/compte/mes-donnees"
@@ -182,5 +200,94 @@ export function Consentements() {
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Les dossiers ouverts à un consultant — RG-12.2.
+ *
+ * Les accords retirés et échus restent affichés : le retrait est un
+ * retrait, pas une suppression, et une liste qui ne montre que l'ouvert ne
+ * permet pas de vérifier qu'on a bien fermé. Ils portent leur état, et les
+ * deux ne se confondent pas — un accès échu s'est fermé tout seul, un accès
+ * retiré l'a été par quelqu'un.
+ */
+function Partages() {
+  const [partages, setPartages] = useState<Partage[] | null>(null);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [enCours, setEnCours] = useState<string | null>(null);
+
+  const lire = useCallback(async () => {
+    const r = await appeler<{ partages: Partage[] }>("/api/comptes/partages");
+    if (r.ok) setPartages(r.donnees.partages);
+    else setEchec(r.echec);
+  }, []);
+
+  useEffect(() => {
+    void lire();
+  }, [lire]);
+
+  async function retirer(id: string) {
+    setEnCours(id);
+    setEchec(null);
+    const r = await appeler(`/api/comptes/partages/${id}/retrait`, { corps: {} });
+    setEnCours(null);
+    if (!r.ok) {
+      setEchec(r.echec);
+      return;
+    }
+    // L'état vient du serveur plutôt que d'une écriture optimiste : la date
+    // du retrait est la sienne, et c'est elle qui compte.
+    await lire();
+  }
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-19 font-semibold text-ink-900">Dossiers partagés</h2>
+
+      {echec ? <BlocEchec echec={echec} /> : null}
+
+      {partages === null ? (
+        <p role="status" className="text-14 text-ink-700">
+          Lecture de tes partages en cours.
+        </p>
+      ) : partages.length === 0 ? (
+        <p className="text-pretty text-14 text-ink-700">{PARTAGES_VIDES}</p>
+      ) : (
+        <>
+          <ul className="flex flex-col border-b border-ink-300">
+            {partages.map((partage) => (
+              <li
+                key={partage.id}
+                className="flex flex-col gap-2 border-t border-ink-300 py-4 sm:flex-row sm:items-start sm:gap-4"
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="text-16 font-semibold text-ink-900">
+                    {partage.consultant}
+                  </span>
+                  <span className="text-pretty text-14 text-ink-700">
+                    {partage.cabinet} · {partage.dossier}
+                  </span>
+                  <span className="text-13 text-ink-500">
+                    Accordé le {partage.donneLe} · {LIBELLE_ETAT_PARTAGE[partage.etat]} ·{" "}
+                    {partage.echeance}
+                  </span>
+                </div>
+                {partage.etat === "actif" ? (
+                  <Button
+                    variante="secondaire"
+                    chargement={enCours === partage.id}
+                    onClick={() => void retirer(partage.id)}
+                  >
+                    Retirer l&apos;accès
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <p className="text-pretty text-13 text-ink-500">{MENTION_RETRAIT}</p>
+        </>
+      )}
+    </section>
   );
 }

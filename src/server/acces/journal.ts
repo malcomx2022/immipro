@@ -24,6 +24,7 @@ export type ActionAuditee =
   | "compte.retablissement"
   | "compte.suppression"
   | "compte.export"
+  | "partage.retrait"
   | "paiement.remboursement"
   | "paiement.reconciliation"
   | "regle.publication"

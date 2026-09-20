@@ -162,8 +162,11 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
         {MENTION_HABILITATION}
       </p>
 
+      {/* Le lien menait au profil, qui ne parle pas de partage. « Mes
+          consentements » est l'écran que la mention de T-04 nomme, et c'est
+          là que les accords se retirent désormais (RG-12.2). */}
       <Link
-        href="/profil"
+        href="/consentements"
         className="flex min-h-touch items-center text-14 text-accent-700 underline"
       >
         Gérer mes consentements de partage
