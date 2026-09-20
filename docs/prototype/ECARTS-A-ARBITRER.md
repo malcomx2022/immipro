@@ -1570,11 +1570,85 @@ avec du retard », « sur ton téléphone ». Seul le code USSD, qui affirmait
 une fausse instruction, a été corrigé partout. Réécrire les cinq est un
 travail de rédaction sur six écrans, qu'O.A n'a pas tranché : à arbitrer.
 
-**O.B — Combien de temps garder le motif d'un compte vivant ?** Il part
-avec la suppression, c'est acquis. Mais un refus de 2026 reste lisible en
-2030 sur un compte actif, et personne n'en a l'usage passé la réclamation.
-Une purge à l'échéance — trois mois, un an — relève de la politique de
-rétention et non de ce lot.
+**O.B — Combien de temps garder le motif d'un compte vivant ?**
+~~Une purge à l'échéance relève de la politique de rétention et non de ce
+lot.~~ **Tranché le 20/09/2026 : quatre-vingt-dix jours.**
+
+Le motif détaillé s'efface quatre-vingt-dix jours après l'échec définitif.
+Un dossier ouvert pendant ce délai suspend l'effacement jusqu'à sa
+clôture, puis trente jours de sursis. Le paiement — montant, date, statut,
+référence — suit sa propre politique comptable et n'est pas touché : c'est
+parce que le motif vit dans sa propre colonne que la minimisation est
+réelle plutôt que déclarative.
+
+### Ce que l'application de la décision a trouvé
+
+**Rien ne datait l'échec.** `createdAt` date l'ouverture de la
+transaction, pas son échec, et pour une expiration prononcée par la
+réconciliation il y a des heures entre les deux. Une durée annoncée en
+jours se compte depuis le fait qu'elle mesure : une colonne `failureCauseAt`
+est née, que la base refuse de séparer du motif dans un sens comme dans
+l'autre.
+
+**Le sursis de trente jours, lu littéralement, raccourcissait la
+conservation.** « Puis intervient trente jours plus tard » se lit comme une
+échéance de remplacement : une réclamation ouverte le deuxième jour et
+refermée le cinquième aurait fait disparaître le motif au
+trente-cinquième, soit bien avant les quatre-vingt-dix jours que la même
+décision garantit au support — et ouvrir puis refermer une réclamation
+serait devenu un moyen d'effacer plus tôt que la règle. Les deux échéances
+valent donc ensemble, et c'est la plus tardive qui s'applique. Le sursis ne
+peut qu'ajouter du temps.
+
+**Une des deux branches du litige ne pouvait pas se produire.** La
+première version lisait deux signaux de dossier ouvert : l'écart de
+réconciliation, et le remboursement dû non versé (K.C). Semer le second
+contre PostgreSQL a échoué —
+`transaction_remboursement_du_suppose_un_encaissement` veut `CONFIRMEE` ou
+`REMBOURSEE`, `transaction_motif_seulement_sur_un_echec` veut `ECHOUEE` ou
+`EXPIREE`. Les deux ensembles sont disjoints : une transaction qui porte un
+motif ne peut pas porter d'obligation de remboursement. La branche était
+morte, et une règle qui ne peut pas s'appliquer se relit comme une
+protection qu'on aurait.
+
+**Quatre garde-fous existants passaient pour la mauvaise raison.** Les
+insertions interdites de N.B écrivent `failureCause` sans date : la
+nouvelle contrainte les refusait toutes les quatre en premier, avant celle
+que chacune teste. Le décompte restait à quarante-cinq refus et rien ne
+signalait rien. Elles portent désormais la date, et chacune bute à nouveau
+sur sa propre contrainte — vérifié une par une. Le fichier en compte
+quarante-huit.
+
+**La requête écartait un motif que la règle effaçait.** La purge réduit
+grossièrement par la date avant de laisser le domaine trancher. Elle le
+faisait avec `lt` quand la règle inclut sa borne : un motif échu du jour
+même n'était pas présenté à la règle, et partait le lendemain. Les deux
+côtés avaient raison séparément — c'est le défaut même que le lot des
+conservations existe pour empêcher, arrivé par la requête au lieu de la
+constante.
+
+**Un garde-fou se laissait berner par un import.** Remplacer
+`echeanceEnJours(CONSERVATION_MOTIF_JOURS, …)` par `echeanceEnJours(90, …)`
+ne faisait tomber aucun test : le nom de la constante restait visible dans
+l'import et dans le motif du journal, et « une durée déclarée a un
+exécutant » cherche le nom quelque part dans `src/server`. La conservation
+aurait pu être raccourcie à la constante sans que la purge change d'un
+jour. Aucune échéance ne se calcule plus sur un nombre écrit à la main, et
+un test le tient pour les trois.
+
+**La dégradation est la bonne.** Vérifié à l'écran : un échec dont le motif
+a été effacé retombe sur le refus générique d'O.A — « l'opération a été
+refusée, et la raison ne nous est pas communiquée ». L'écran perd une
+précision, il ne gagne pas une erreur.
+
+*Reste ouvert :* **le sursis de trente jours n'a aucun déclencheur.** Le
+seul dossier qui peut coexister avec un motif est l'écart de
+réconciliation, et rien n'enregistre sa résolution — le bouton « Traiter
+les écarts » de B-04 n'a pas d'action derrière lui. Un écart suspend donc
+tant qu'il est là, ce que la décision demande, mais sa clôture ne se date
+pas. La règle est écrite et vérifiée ; il lui manque l'événement. À
+reprendre avec la résolution des écarts en back-office, qui est un manque
+à elle seule.
 
 **N.C — La case des conditions passe sous la barre d'action.** ~~Elle reste
 atteignable, et c'est la structure du prototype.~~ **Tranché le

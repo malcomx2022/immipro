@@ -81,7 +81,10 @@ export async function reconcilierLesPaiements(
         where: { id: transaction.id },
         // Le motif est celui que la plateforme peut honnêtement prononcer :
         // personne n'a refusé ce paiement, personne n'a répondu (N.B).
-        data: { status: "EXPIREE", failureCause: "DELAI_DEPASSE" },
+        // La date de l'échec est celle de ce passage, pas celle de
+        // l'ouverture : c'est depuis elle que court la conservation du
+        // motif (O.B), et entre les deux il y a le délai de rattrapage.
+        data: { status: "EXPIREE", failureCause: "DELAI_DEPASSE", failureCauseAt: maintenant },
       });
       bilan.expirees += 1;
     }

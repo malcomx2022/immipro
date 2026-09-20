@@ -4,6 +4,11 @@ import { removeObject } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
 import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
 import { CONSERVATION_ANNEES } from "@/domain/backoffice/audit";
+import {
+  CONSERVATION_MOTIF_JOURS,
+  motifEffacable,
+  type EtatDuLitige,
+} from "@/domain/paiement/conservation";
 
 /**
  * Purge des pièces — INV-5, RG-10.1.
@@ -203,12 +208,29 @@ export interface BilanConservation {
   alertes: number;
   ecrituresDAudit: number;
   sessions: number;
+  /** Motifs d'échec de paiement effacés à l'échéance — O.B. */
+  motifsDEchec: number;
 }
 
 /** Le point de coupure d'une durée exprimée en mois. */
 export function echeanceEnMois(mois: number, maintenant: Date): Date {
   const limite = new Date(maintenant);
   limite.setUTCMonth(limite.getUTCMonth() - mois);
+  return limite;
+}
+
+/**
+ * Et celui d'une durée exprimée en jours.
+ *
+ * Contrairement aux mois, les jours n'ont pas de longueur variable : en
+ * UTC, quatre-vingt-dix jours en arrière se calculent aussi bien par
+ * soustraction. Le calendrier est employé quand même, pour que les trois
+ * échéances se lisent de la même façon et qu'aucune ne soit l'exception
+ * qu'on relit deux fois.
+ */
+export function echeanceEnJours(jours: number, maintenant: Date): Date {
+  const limite = new Date(maintenant);
+  limite.setUTCDate(limite.getUTCDate() - jours);
   return limite;
 }
 
@@ -251,5 +273,92 @@ export async function purgerCeQuiEstEchu(
     alertes: alertes.count,
     ecrituresDAudit: audit.count,
     sessions: sessions.count,
+    motifsDEchec: await effacerLesMotifsEchus(maintenant),
   };
+}
+
+/**
+ * Le motif d'un échec de paiement, quatre-vingt-dix jours après — O.B.
+ *
+ * Seul le motif part. Le montant, la date, le statut et la référence
+ * restent : ce sont eux la preuve comptable, et la colonne séparée est
+ * précisément ce qui permet de n'effacer que l'un.
+ *
+ * **Deux étapes plutôt qu'un `updateMany` conditionnel.** La règle n'est
+ * pas une simple date — un dossier ouvert la suspend, une clôture ouvre un
+ * sursis — et l'écrire en SQL l'aurait mise hors de portée des tests, dans
+ * un `where` que rien n'exerce sans base. La requête ne fait donc que
+ * réduire grossièrement : rien de plus récent que quatre-vingt-dix jours
+ * ne peut être échu, quelle que soit la suite. Le domaine tranche le
+ * reste, et c'est lui qu'on teste.
+ */
+async function effacerLesMotifsEchus(maintenant: Date): Promise<number> {
+  const candidats = await db.transaction.findMany({
+    /**
+     * Le plancher, et rien d'autre : l'échéance vaut au moins échec + 90 j,
+     * donc rien en deçà n'est effaçable. Ce qui reste est peu nombreux.
+     *
+     * `lte`, et la borne compte. Avec `lt`, un motif échu du jour même
+     * était écarté avant même d'être soumis à la règle : le domaine le
+     * disait effaçable — la borne est incluse — et la requête ne le
+     * présentait pas. Il partait le lendemain. Vu en exécutant la purge
+     * contre PostgreSQL, invisible aux tests du domaine, qui ont raison
+     * chacun de leur côté. Une réduction grossière n'a le droit d'écarter
+     * que ce que la règle écarterait aussi.
+     */
+    where: { failureCauseAt: { lte: echeanceEnJours(CONSERVATION_MOTIF_JOURS, maintenant) } },
+    select: { id: true, failureCauseAt: true, discrepancy: true },
+  });
+
+  const echus = candidats
+    .filter((t) => t.failureCauseAt && motifEffacable(t.failureCauseAt, litigeDe(t), maintenant))
+    .map((t) => t.id);
+  if (echus.length === 0) return 0;
+
+  const efface = await db.transaction.updateMany({
+    where: { id: { in: echus } },
+    // Les deux ensemble : la base refuse une date d'échec orpheline, et
+    // une transaction sans motif ne se représente plus à la purge.
+    data: { failureCause: null, failureCauseAt: null },
+  });
+
+  await journaliser({
+    acteurId: "systeme:purge",
+    action: "paiement.reconciliation",
+    cible: "transaction:*",
+    motif: `Effacement des motifs d'échec à l'échéance de ${CONSERVATION_MOTIF_JOURS} jours (O.B)`,
+    details: { motifs: efface.count },
+  }).catch(() => undefined);
+
+  return efface.count;
+}
+
+/**
+ * Ce que la plateforme sait d'un dossier ouvert sur un paiement.
+ *
+ * **Un seul état le dit, et ce n'est pas celui qu'on croit.** La première
+ * version en lisait deux — l'écart de réconciliation non résolu, et le
+ * remboursement décidé que personne n'a versé (K.C). Le second est
+ * impossible : `transaction_remboursement_du_suppose_un_encaissement`
+ * exige `CONFIRMEE` ou `REMBOURSEE`, quand
+ * `transaction_motif_seulement_sur_un_echec` exige `ECHOUEE` ou
+ * `EXPIREE`. Les deux ensembles sont disjoints — une transaction qui porte
+ * un motif ne peut pas porter d'obligation de remboursement. La branche
+ * était morte, et une règle qui ne peut pas s'appliquer est pire qu'une
+ * règle absente : elle se relit comme une protection.
+ *
+ * Reste l'écart, qui lui coexiste bel et bien avec un motif : la
+ * réconciliation ouvre l'écart à vingt-quatre heures puis prononce
+ * l'expiration, et son propre commentaire le dit — « l'expiration ne ferme
+ * pas le dossier de la réclamation : l'écart reste ouvert ».
+ *
+ * **Et sa clôture n'est pas datée.** Rien n'enregistre la résolution d'un
+ * écart aujourd'hui : le sursis de trente jours n'a donc aucun déclencheur,
+ * et `closLe` reste nul. Un écart suspend tant qu'il est là, ce qui est
+ * exactement ce que la décision demande d'un dossier ouvert. Le jour où
+ * B-04 saura fermer un écart, il devra le dater, et cette fonction rendra
+ * la date sans que la règle change.
+ */
+function litigeDe(t: { discrepancy: string | null }): EtatDuLitige {
+  return { ouvert: t.discrepancy !== null, closLe: null };
 }

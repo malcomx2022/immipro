@@ -147,7 +147,10 @@ export async function acheverLaSuppression(
     // refusée pour solde un jour de septembre, qui décrit une personne.
     db.transaction.updateMany({
       where: { userId, failureCause: { not: null } },
-      data: { failureCause: null },
+      // La date part avec le motif : `transaction_motif_porte_sa_date`
+      // refuse l'un sans l'autre, et une date d'échec orpheline ne
+      // prouverait rien que `status` ne dise déjà (O.B).
+      data: { failureCause: null, failureCauseAt: null },
     }),
     // RG-12.2 : un partage de dossier ne survit pas au compte qui l'a
     // accordé. Révoqué, pas supprimé — la ligne prouve qu'il a existé le

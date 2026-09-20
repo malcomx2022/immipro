@@ -209,29 +209,56 @@ SELECT refuse(
      VALUES ('pr4','p1','a0','ID','Refus déclaré en 2024',1500,'ABOUTIE', now())$q$);
 
 -- ── N.B · le motif d'un refus ─────────────────────────────────────────────
+--
+-- Chacun de ces quatre porte `failureCauseAt` depuis O.B, et ce n'est pas
+-- une formalité : sans la date, la nouvelle contrainte
+-- `transaction_motif_porte_sa_date` les refusait tous les quatre la
+-- première, et chacun passait pour la mauvaise raison. Le décompte restait
+-- à quarante-cinq refus — un garde-fou vérifié par un autre que le sien ne
+-- vérifie plus rien.
 SELECT refuse(
   'N.B · un motif de refus sur un paiement encaissé',
   $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
-       provider, status, "failureCause")
-     VALUES ('t1','IMP-260920-AAAAAA','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE','REFUS_EMETTEUR')$q$);
+       provider, status, "failureCause", "failureCauseAt")
+     VALUES ('t1','IMP-260920-AAAAAA','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE','REFUS_EMETTEUR',now())$q$);
 
 SELECT refuse(
   'N.B · un motif de refus sur un paiement encore en attente',
   $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
-       provider, status, "failureCause")
-     VALUES ('t2','IMP-260920-BBBBBB','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE','SOLDE_INSUFFISANT')$q$);
+       provider, status, "failureCause", "failureCauseAt")
+     VALUES ('t2','IMP-260920-BBBBBB','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE','SOLDE_INSUFFISANT',now())$q$);
 
 SELECT refuse(
   'N.B · une expiration qui accuserait le payeur',
   $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
-       provider, status, "failureCause")
-     VALUES ('t3','IMP-260920-CCCCCC','u1','essentiel',5000,'XOF','FEDAPAY','EXPIREE','SOLDE_INSUFFISANT')$q$);
+       provider, status, "failureCause", "failureCauseAt")
+     VALUES ('t3','IMP-260920-CCCCCC','u1','essentiel',5000,'XOF','FEDAPAY','EXPIREE','SOLDE_INSUFFISANT',now())$q$);
 
 SELECT refuse(
   'N.B · un échec annoncé par l''émetteur qui se dirait hors délai',
   $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "failureCause", "failureCauseAt")
+     VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE',now())$q$);
+
+-- ── O.B · la conservation du motif ────────────────────────────────────────
+SELECT refuse(
+  'O.B · un motif d''échec sans date, qui échapperait à la purge',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
        provider, status, "failureCause")
-     VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE')$q$);
+     VALUES ('t40','IMP-260920-NNNNNN','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','REFUS_EMETTEUR')$q$);
+
+SELECT refuse(
+  'O.B · une date d''échec sans motif à effacer',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "failureCauseAt")
+     VALUES ('t41','IMP-260920-OOOOOO','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE',now())$q$);
+
+SELECT refuse(
+  'O.B · un échec daté avant l''ouverture de sa transaction',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "createdAt", "failureCause", "failureCauseAt")
+     VALUES ('t42','IMP-260920-PPPPPP','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE',
+       now(), 'REFUS_EMETTEUR', now() - interval '1 hour')$q$);
 
 -- ── M.B · le remboursement ────────────────────────────────────────────────
 SELECT refuse(

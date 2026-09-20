@@ -448,6 +448,17 @@ model Transaction {
   /// une carte a été refusée un jour.
   failureCause PaymentFailure?
 
+  /// Quand l'échec a eu lieu — O.B.
+  ///
+  /// La date de l'échec, et non celle de la transaction : entre l'ouverture
+  /// et l'échec il y a le délai de confirmation, et pour une expiration
+  /// prononcée par la réconciliation, parfois des heures. C'est depuis elle
+  /// que court la conservation de quatre-vingt-dix jours.
+  ///
+  /// Elle ne vit jamais sans le motif ni le motif sans elle : la base le
+  /// refuse. Un motif sans date échapperait à la purge en silence.
+  failureCauseAt DateTime?
+
   /// Rapprochement bancaire : distinct du cycle de paiement. Un silence de
   /// l'opérateur laisse `reconciledAt` nul sans faire basculer `status` en
   /// échec — aucun paiement n'est accusé sur l'absence de réponse d'un tiers.
