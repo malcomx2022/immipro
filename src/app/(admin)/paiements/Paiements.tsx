@@ -95,7 +95,7 @@ export function Paiements({
           </section>
         ) : null}
 
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-6 gap-3">
           <Carte
             intitule="Encaissé aujourd'hui"
             valeur={publiable ? sommes(agregats.encaisse) : "—"}
@@ -127,6 +127,16 @@ export function Paiements({
             intitule="Remboursé aujourd'hui"
             valeur={sommes(agregats.rembourse)}
             detail={`${agregats.rembourses} ${agregats.rembourses > 1 ? "paiements rendus" : "paiement rendu"}`}
+          />
+          {/*
+            K.C — décidé n'est pas versé. La somme est encore sur le compte,
+            et elle est due : sans ce compteur, un remboursement ouvert par
+            une suppression de compte vieillit sans que personne le voie.
+          */}
+          <Carte
+            intitule="Remboursements à verser"
+            valeur={sommes(agregats.remboursementDu)}
+            detail={`${agregats.remboursementsDus} ${agregats.remboursementsDus > 1 ? "décidés, non versés" : "décidé, non versé"}`}
           />
           <Carte
             intitule="Écarts à traiter"
@@ -172,6 +182,9 @@ export function Paiements({
                       {/* La cause sous l'état, et seulement quand l'émetteur
                           l'a donnée. L'état disait « Solde insuffisant » pour
                           tout refus, panne comprise (N.B). */}
+                      {p.motifDuRemboursement ? (
+                        <span className="text-13 text-ink-500">{p.motifDuRemboursement}</span>
+                      ) : null}
                       {p.cause ? (
                         <span className="text-13 text-ink-500">{LIBELLE_CAUSE[p.cause]}</span>
                       ) : null}

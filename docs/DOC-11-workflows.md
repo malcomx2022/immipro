@@ -373,7 +373,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-10.1 : la purge est automatique et indépendante de toute action du candidat (INV-5).
 - RG-10.2 : la purge est annoncée à l'avance et présentée comme une garantie, pas subie comme une perte.
 - RG-10.3 : les motifs de refus déclarés alimentent **l'amélioration des checklists**, jamais un modèle prédictif (INV-1).
-- RG-10.4 : une demande de suppression de compte purge immédiatement les pièces et anonymise les métadonnées, sans attendre l'échéance.
+- RG-10.4 : une demande de suppression de compte purge immédiatement les pièces et anonymise les métadonnées, sans attendre l'échéance. Les écritures strictement nécessaires à la comptabilité et au traitement d'un remboursement en cours sont conservées ou anonymisées, jamais supprimées (K.C).
 
 ---
 
@@ -422,6 +422,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 - RG-12.1 : un consultant n'est référencé qu'après vérification de son habilitation dans la juridiction concernée — RCIC pour le Canada, et l'équivalent applicable ailleurs.
 - RG-12.2 : le partage du dossier est révocable et expire automatiquement.
+- RG-12.5 : *(ajoutée le 20/09/2026, arbitrage K.C)* une suppression de compte annule les rendez-vous à venir et **libère les créneaux immédiatement**, indépendamment du traitement financier. Elle n'annule pas pour autant les conditions commerciales acceptées à la réservation : avant la limite d'annulation stockée avec le rendez-vous, la consultation est remboursée ; après, elle reste due. Un remboursement au-delà de la limite est un geste de support, nommé et motivé — jamais une branche automatique.
 - RG-12.3 : la plateforme est un intermédiaire de mise en relation ; le conseil est délivré par le consultant, sous sa responsabilité.
 - RG-12.4 : toute prestation est rendue par le consultant, jamais par ImmiPro en son nom.
 

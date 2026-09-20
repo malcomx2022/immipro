@@ -17,6 +17,7 @@ import {
   LIBELLE_LIEN_AVANT_SUPPRESSION,
   LIEN_AVANT_SUPPRESSION,
 } from "@/domain/comptes/suppression";
+import { MENTION_DELAI_REMBOURSEMENT } from "@/domain/consultants/annulation";
 
 /**
  * Suppression de compte — A-05, RG-10.4.
@@ -35,7 +36,27 @@ import {
  * renvoi immédiat vers l'accueil laisserait la personne se demander si le
  * geste a été fait.
  */
-export function SuppressionDuCompte({ email }: { email: string }) {
+export interface SuppressionDuCompteProps {
+  email: string;
+  /**
+   * Ce qui arrive aux rendez-vous à venir (K.C), une phrase par cas. Vide
+   * quand il n'y en a aucun : un encadré vide sur un écran de suppression
+   * inquiéterait pour rien.
+   *
+   * Un paragraphe par cas, et non une phrase continue : les deux se
+   * lisaient à la suite, et celui qui coûte de l'argent passait pour la
+   * fin de celui qui n'en coûte pas.
+   */
+  avertissementRendezVous?: readonly string[];
+  /** Vrai dès qu'au moins un remboursement s'ouvrira. */
+  remboursementAttendu?: boolean;
+}
+
+export function SuppressionDuCompte({
+  email,
+  avertissementRendezVous = [],
+  remboursementAttendu = false,
+}: SuppressionDuCompteProps) {
   const [motDePasse, setMotDePasse] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [fait, setFait] = useState(false);
@@ -135,6 +156,24 @@ export function SuppressionDuCompte({ email }: { email: string }) {
           {LIBELLE_LIEN_AVANT_SUPPRESSION}
         </Link>
       </section>
+
+      {/* K.C — les rendez-vous, entre « ce qui reste » et l'avertissement
+          d'irréversibilité : c'est la dernière conséquence à connaître, et
+          la seule qui coûte de l'argent. La suppression du compte n'annule
+          pas les conditions commerciales acceptées à la réservation. */}
+      {avertissementRendezVous.length > 0 ? (
+        <section className="flex flex-col gap-2 rounded-lg border border-ink-300 p-4">
+          <h2 className="text-16 font-semibold text-ink-900">Tes rendez-vous à venir</h2>
+          {avertissementRendezVous.map((phrase) => (
+            <p key={phrase} className="text-pretty text-14 text-ink-700">
+              {phrase}
+            </p>
+          ))}
+          {remboursementAttendu ? (
+            <p className="text-pretty text-13 text-ink-500">{MENTION_DELAI_REMBOURSEMENT}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       <p className="text-pretty text-14 text-ink-700">{AVERTISSEMENT_IRREVERSIBLE}</p>
 

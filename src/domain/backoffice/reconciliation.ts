@@ -18,6 +18,7 @@ import type { CauseRefus } from "@/domain/paiement/echec";
 
 export type EtatRapprochement =
   | "RAPPROCHE"
+  | "REMBOURSEMENT_DU"
   | "REMBOURSE"
   | "EN_ATTENTE"
   | "ECART"
@@ -30,6 +31,10 @@ export const LIBELLE_RAPPROCHEMENT: Record<EtatRapprochement, string> = {
   // défaut : « Écart à traiter », dès la dixième minute (M.B). Un opérateur
   // ouvrait une enquête sur une somme rendue exprès, et le compteur
   // d'écarts la comptait. Rendre l'argent est une issue, pas un désaccord.
+  // K.C — décidé n'est pas versé. Un remboursement dû rangé sous
+  // « Remboursé » ferait croire l'argent parti alors que rien n'est
+  // sorti : c'est une file à traiter, et elle doit se voir comme telle.
+  REMBOURSEMENT_DU: "Remboursement à verser",
   REMBOURSE: "Remboursé",
   EN_ATTENTE: "En attente de rapprochement",
   ECART: "Écart à traiter",
@@ -55,11 +60,15 @@ export interface Paiement {
   etat: EtatRapprochement;
   /** Pourquoi l'émetteur a refusé, quand il l'a dit (N.B). */
   cause?: CauseRefus;
+  /** Pourquoi un remboursement est dû, quand il l'est (K.C). */
+  motifDuRemboursement?: string;
 }
 
 export const estConfirme = (p: Paiement): boolean => p.etat === "RAPPROCHE";
 /** Rendre l'argent n'est pas le refuser : un remboursement n'est pas un échec. */
 export const estRembourse = (p: Paiement): boolean => p.etat === "REMBOURSE";
+/** Décidé, pas encore versé (K.C). C'est une dette, et elle se compte. */
+export const estRemboursementDu = (p: Paiement): boolean => p.etat === "REMBOURSEMENT_DU";
 export const estEnAttente = (p: Paiement): boolean => p.etat === "EN_ATTENTE";
 export const estEnEchec = (p: Paiement): boolean =>
   p.etat === "ECHEC_DELAI" || p.etat === "ECHEC";
@@ -120,12 +129,24 @@ export interface Agregats {
    */
   rembourses: number;
   rembourse: Totaux;
+  /**
+   * Ce qui est décidé et pas encore versé — K.C.
+   *
+   * Une dette, et le seul compteur de ce tableau qui en soit une. Elle ne
+   * se confond ni avec l'encaissé — la somme est encore là — ni avec le
+   * remboursé — elle n'est pas partie. La laisser sans compteur, c'est la
+   * laisser vieillir : un remboursement décidé et jamais versé ne se
+   * signale nulle part ailleurs.
+   */
+  remboursementsDus: number;
+  remboursementDu: Totaux;
 }
 
 export function agreger(paiements: readonly Paiement[]): Agregats {
   const confirmes = paiements.filter(estConfirme);
   const attente = paiements.filter(estEnAttente);
   const rendus = paiements.filter(estRembourse);
+  const dus = paiements.filter(estRemboursementDu);
   return {
     encaisse: parDevise(confirmes),
     confirmes: confirmes.length,
@@ -135,6 +156,8 @@ export function agreger(paiements: readonly Paiement[]): Agregats {
     ecarts: paiements.filter((p) => p.etat === "ECART").length,
     rembourses: rendus.length,
     rembourse: parDevise(rendus),
+    remboursementsDus: dus.length,
+    remboursementDu: parDevise(dus),
   };
 }
 

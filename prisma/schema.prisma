@@ -462,11 +462,27 @@ model Transaction {
   /// pas sans la date, ni la date sans l'état.
   refundedAt DateTime?
 
+  /// Quand un remboursement a été **décidé** — K.C.
+  ///
+  /// À ne pas confondre avec `refundedAt`, et c'est tout l'intérêt de deux
+  /// colonnes : l'une dit qu'on doit rendre l'argent, l'autre qu'il est
+  /// parti. La plateforme n'appelle aucune API de remboursement — le
+  /// fournisseur de paiement n'est pas branché (I.C) — et écrire `REMBOURSEE`
+  /// au moment de la décision annoncerait un virement que personne n'a fait.
+  /// L'obligation s'ouvre ici, se voit en B-04, et c'est la notification
+  /// signée qui la solde.
+  refundDueAt DateTime?
+  /// Pourquoi il est dû, en clair. Une obligation sans motif ne se traite
+  /// pas : l'opérateur qui la voit doit savoir si elle vient de la règle ou
+  /// d'un geste, et lequel.
+  refundBasis String?
+
   credits AnalysisCredit[]
   events  PaymentEvent[]
 
   @@index([status, createdAt])
   @@index([reconciledAt, createdAt])
+  @@index([refundDueAt, refundedAt])
 }
 
 /// Une notification reçue d'un fournisseur — clé d'idempotence, INV-7, M.B.
