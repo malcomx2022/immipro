@@ -2073,13 +2073,67 @@ mieux le constater que le supposer.
 
 ### Ce qui reste à arbitrer
 
-**Q.A — Six pages publiques manquent, dont trois obligatoires.** Retirer
-les liens ne retire pas l'obligation : une plateforme qui traite des
-données personnelles et encaisse des paiements doit publier ses mentions
-légales, sa politique de données et ses conditions. Elles demandent des
-informations d'entreprise et une rédaction juridique qui ne sont pas de
-notre ressort. « Comment ça marche », « À propos » et « Contact » sont du
-marketing, et attendent la même décision : qui les écrit.
+**Q.A — Six pages publiques manquent, dont quatre obligatoires.**
+**Arbitrage d'attribution clos le 20/09/2026**, le contenu des quatre
+pages obligatoires restant suspendu à une validation juridique avant
+l'ouverture au public.
+
+Retirer les liens ne retire pas l'obligation. La question n'était pas
+« faut-il ces pages » mais **qui les écrit**, et c'est elle qui est
+tranchée : mentions légales et conditions à la direction avec un conseil
+juridique, politique de données au responsable conformité avec le même
+conseil, contact aux opérations. Ces quatre-là commandent l'ouverture au
+public. « Comment ça marche » revient au produit — souhaitable avant un
+lancement public, pas bloquant pour un pilote fermé — et « À propos » à la
+direction, sans porte. **Aucun lien n'est rétabli avant que sa page soit
+complète et validée.**
+
+| Page | Responsable | Porte |
+|---|---|---|
+| Mentions légales | Direction et conseil juridique | Ouverture publique |
+| Données personnelles | Conformité et conseil juridique | Ouverture publique |
+| Conditions | Direction et conseil juridique | Ouverture publique |
+| Contact | Opérations et support | Ouverture publique |
+| Comment ça marche | Produit et contenu | Souhaitable |
+| À propos | Direction et marketing | Aucune |
+
+### Ce que l'application de la décision a trouvé
+
+**Contact change de camp, et ce n'est pas un détail.** Le relevé le
+rangeait avec « Comment ça marche » et « À propos », sous l'étiquette
+marketing. Il n'y est pas : une plateforme qui encaisse doit offrir une
+voie de recours réellement relevée, et une adresse qui ne répond pas est
+pire que pas d'adresse. Il passe donc de trois pages bloquantes à quatre.
+
+**Le registre ne comble pas le manque, il le décrit — et un test l'y
+tient.** La tentation d'écrire « un brouillon en attendant » est réelle et
+mauvaise : une phrase plausible dans un fichier du dépôt devient, par
+copie, le texte publié. Le registre porte ce qui manque à chaque page — un
+siège et un numéro d'immatriculation, un contrat, quelqu'un derrière
+l'adresse — et un test refuse qu'il se mette à ressembler à un document
+juridique rédigé.
+
+**Il ne prétend pas davantage qu'une page est validée.** Aucun test ne
+peut vérifier qu'un juriste a relu un texte, et un drapeau « validé »
+serait coché — c'est la leçon de M.C, et elle vaut ici. Ce que le registre
+tient est vérifiable, et c'est la moitié utile de la règle des liens : une
+page déclarée absente l'est réellement, et rien ne pointe vers elle. **Le
+jour où la route apparaît, fût-ce une ébauche, le test tombe** et oblige à
+revenir au registre, là où le responsable et la condition sont écrits. Une
+page à moitié faite ne devient pas liable en silence.
+
+**Le méta-test des arbitrages s'était sur-ajusté une seconde fois.** Il
+exigeait des décisions « sous réserve » la formule « **Décision produit
+provisoire** », qui décrit L.A et M.C — un produit décide, un avis
+extérieur peut le renverser. Q.A n'est pas de cette forme : son
+attribution est close pour de bon, et ce qui reste suspendu est le contenu
+que d'autres doivent écrire. Le faire se décrire comme provisoire aurait
+été faux. C'est exactement le reproche que ce test s'était déjà adressé à
+propos de L.A, revenu par le vocabulaire au lieu de la condition.
+
+**Et les quatre pages bloquantes rejoignent les préalables d'ouverture**,
+plutôt que de vivre dans un troisième registre qui ne se lit avec aucun
+autre. Qui prépare l'ouverture au public lit désormais la même liste.
 
 **Q.B — Le pied de page ne mène plus à une destination précise.** C'était
 sa fonction : donner trois entrées directes vers les pays les plus
