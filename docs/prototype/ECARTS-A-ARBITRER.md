@@ -659,6 +659,65 @@ obtient.
 
 ---
 
+## Annexe I bis · Les durées de conservation annoncées
+
+Lot sans arbitrage : les durées étaient déjà décidées, déjà affichées, et
+deux sur trois n'étaient appliquées par personne. Trouvé en cherchant ce
+que le domaine déclare et que le serveur ne lit pas — la même méthode qui
+avait montré `composantesAbsentes` (I.A) et `peutLire`.
+
+### Ce qui est tranché
+
+**Trois durées, une seule tenue.** Trente jours pour les pièces d'un
+dossier clos (INV-5, RG-10.1), six mois pour les alertes (T-01), cinq ans
+pour le journal d'audit (B-06). La première a son job depuis le socle ; les
+deux autres n'étaient que des phrases. « Elles sont conservées six mois »
+se lit comme un engagement, et une base qui garde tout ne le tient pas.
+
+**Les durées sont lues, jamais recopiées.** La purge lit les constantes qui
+composent les phrases affichées. Une conservation qu'on raccourcit change
+au même endroit que le texte qui l'annonce — sinon les deux divergent sans
+que rien ne le signale, et c'est l'engagement écrit qui devient faux.
+
+**Le mois n'est pas trente jours.** De mars à septembre il y en a cent
+quatre-vingt-quatre, de septembre à mars cent quatre-vingt-un. Une durée
+annoncée en mois se compte en mois, sinon la purge tombe à quelques jours
+de ce qui est écrit — sur une conservation, ces jours-là sont ceux où l'on
+garde ce qu'on a promis d'effacer.
+
+**Le journal se purge par échéance, et par rien d'autre.** Sa propre
+mention dit « aucune entrée ne peut être supprimée ni modifiée depuis
+l'interface ». Une tâche planifiée n'est pas l'interface ; c'est même la
+seule façon de tenir les deux moitiés de la phrase, l'immuabilité et la
+durée. Un test vérifie qu'aucune route ne supprime d'écriture.
+
+**Les sessions échues partent aussi.** Aucune durée n'est annoncée pour
+elles : c'est l'échéance de la session qui fait foi. `lireSession` les
+refuse déjà, mais la ligne gardait le contexte de connexion, que le schéma
+dit conservé « pour qu'un candidat reconnaisse une session qui n'est pas la
+sienne » — une raison qui s'éteint avec la session.
+
+**Le garde-fou.** Un test relève les constantes de conservation déclarées
+dans le domaine et refuse qu'une seule ne soit lue par la couche serveur.
+Les deux façons de l'appliquer sont légitimes — une purge qui lit la durée,
+ou un calcul d'échéance à l'écriture, comme pour les trente jours des
+pièces. Ne l'appliquer nulle part ne l'est pas. Vérifié par mutation :
+remplacer la constante par son nombre fait échouer le test.
+
+### Ce qui reste ouvert
+
+- **La purge de rétention ne se journalise pas.** Les autres tâches rendent
+  un bilan en console ; la purge des pièces, elle, écrit au journal parce
+  qu'elle touche les pièces de quelqu'un. Faut-il une écriture d'audit pour
+  un balayage de nuit qui n'ôte que des lignes échues ? Cela demanderait un
+  code d'action de plus, pour une information dont personne n'a encore
+  exprimé le besoin.
+- **O.B reste entier.** Combien de temps garder le motif d'un refus de
+  paiement sur un compte vivant est toujours une question de politique de
+  rétention : aucune durée n'est décidée, donc aucune n'est à appliquer.
+
+---
+
 ## Annexe J — Branchement des écrans
 
 Les vingt-neuf écrans lisaient `src/lib/contenu`. Ils lisent maintenant la
