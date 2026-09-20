@@ -19,6 +19,22 @@ import { PACKS, RECHARGE_ANALYSES, CONSULTATION } from "@/domain/payments/pricin
  * garde son reçu — l'obligation comptable ne s'efface pas — mais il ne se
  * présente plus comme payé.
  *
+ * **Ce document s'appelle un reçu, et rien d'autre — M.C, le 20/09/2026.**
+ * Il n'est pas présenté comme une facture, et sa référence n'est pas
+ * renommée en numéro de facture. La référence est non séquentielle par
+ * choix : une suite d'entiers dit le nombre de paiements du mois à qui en
+ * voit deux. Or une facture se numérote en continu dans la plupart des
+ * régimes comptables — les deux exigences s'excluent, et ce n'est donc pas
+ * la même pièce.
+ *
+ * Savoir si une facture est requise, ce qu'elle doit porter et selon quelle
+ * séquence relève d'une expertise comptable, pas du produit : cela dépend
+ * du régime, de l'entité qui encaisse et des séries autorisées.
+ * **L'expertise est bloquante avant tout encaissement commercial**
+ * (`domain/exploitation/prealables`). Si une facture est requise, elle sera
+ * un document distinct, avec sa propre numérotation continue ; le reçu
+ * restera utile comme preuve immédiate du paiement.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
@@ -71,7 +87,16 @@ export function libelleDeLAchat(packCode: string): string {
   return PACKS.find((p) => p.code === packCode)?.libelle ?? packCode;
 }
 
-/** Émetteur, sur le reçu comme sur la facture. */
+/**
+ * Émetteur du reçu.
+ *
+ * La mention disait « sur le reçu comme sur la facture » — d'un document
+ * qui n'existe pas, et dont M.C réserve l'existence même à un comptable.
+ * Une phrase de commentaire suffit à installer l'idée qu'il y en a une.
+ *
+ * L'identité elle-même reste à compléter : elle est écrite en dur et sans
+ * numéro d'immatriculation (arbitrage Q.A, ouvert).
+ */
 export const EMETTEUR = "ImmiPro SAS · RCCM Cotonou · service@immipro.bj";
 
 export const MENTION_ATTESTATION =
