@@ -587,11 +587,10 @@ correct.** ~~RG-10.4 demande une anonymisation des métadonnées, et elle
 n'est pas écrite.~~ **Tranché — voir annexe K.** Le compte survit vidé ;
 le reçu lui survit aussi.
 
-**J.C — Les guides et les articles restent éditoriaux.** Ils attendent un
-back-office de publication, qui n'est pas au périmètre. Ce sont les deux
-seuls écrans publics qui ne lisent pas la base, et ils sont les seuls à
-rester pré-générés — ce qui est exactement ce qu'on veut d'un contenu de
-référencement.
+**J.C — Les guides et les articles restent éditoriaux.** ~~Ils attendent un
+back-office de publication, qui n'est pas au périmètre.~~ **Tranché — voir
+annexe P.** B-08 existe, et le vocabulaire interdit protège enfin là où
+`CLAUDE.md` promettait qu'il protège.
 
 ---
 
@@ -1000,3 +999,89 @@ d'entiers dit le nombre de paiements du mois à qui en voit deux). Une
 facture, elle, se numérote en continu dans la plupart des régimes
 comptables. Savoir si ImmiPro doit émettre des factures en plus des reçus,
 et sous quel régime, est une question de comptabilité, pas de produit.
+
+---
+
+## Annexe P · Le back-office de publication
+
+Lot J.C. Il ferme le dernier écran public qui lisait un fichier du dépôt,
+et rend vraie une phrase de `CLAUDE.md` qui ne l'était pas.
+
+### Ce qui est tranché
+
+**P.1 — Le trou n'était pas la lourdeur, c'était le garde-fou.** Qu'un
+guide demande un développeur et un déploiement pour changer une phrase est
+un inconfort. Que `CLAUDE.md` annonce « un administrateur qui saisit une
+promesse dans un guide pays bute sur la même règle qu'un développeur »
+alors qu'aucun écran ne permettait de saisir un guide est autre chose : la
+liste unique avait trois points d'application et se réclamait d'un
+quatrième. Elle en a quatre.
+
+**P.2 — Le brouillon s'enregistre, la publication se refuse.** La nuance
+est dans la phrase de `CLAUDE.md` — « sa **publication** est bloquée » — et
+elle compte. Refuser aussi l'enregistrement empêcherait de sauver un texte
+en cours d'écriture, et pousserait à rédiger dans un traitement de texte
+pour coller à la fin : c'est-à-dire à écrire hors du garde-fou. Les fautes
+s'affichent pendant la saisie, avec la formulation exacte et le champ où la
+corriger.
+
+**P.3 — Rien de dérivable n'est saisi.** Le sommaire d'un guide se tire de
+ses intertitres. Il était écrit à côté d'eux, et un test surveillait la
+duplication — que le prototype avait déjà ratée, en annonçant « Le permis de
+recherche d'emploi », section que le corps ne contenait pas. La durée de
+lecture se compte. La mention « ce guide est informatif » suit le genre.
+Trois champs de moins, trois classes de contradiction qui disparaissent
+avec eux, et un test qu'on supprime parce que le défaut qu'il guettait ne
+peut plus exister.
+
+**P.4 — Régénéré à la demande, pas pré-généré.** L'annexe J voyait dans la
+pré-génération « exactement ce qu'on veut d'un contenu de référencement ».
+Ce qu'on veut, précisément, c'est une page servie en HTML complet et sans
+attente — pas qu'elle soit fabriquée au build, ce qui exigerait une base de
+données là où il n'y en a pas (J.8). Les pages se rendent à la première
+demande, restent en cache une heure, et la publication invalide leur
+adresse. Le référencement y gagne même : une correction est en ligne tout
+de suite, sans déploiement.
+
+**P.5 — Cinq garde-fous de plus, trente-quatre sur trente-quatre.** Une
+publication sans source ni date (INV-8), un brouillon daté, un publié sans
+date, une adresse qui ne tient pas dans une URL, un guide sans pays, un
+article sans rubrique ni signature.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Le refus de publication empruntait un message de questionnaire.**
+  `champs_invalides` titre « Certaines réponses ne sont pas exploitables »
+  et parle de questions, sur un écran de rédaction qui n'en a aucune. Et le
+  document n'est pas invalide : il est bien formé, c'est sa formulation qui
+  ne peut pas s'afficher. Le catalogue porte `publication_refusee`, dont le
+  titre nomme le fait et dont la phrase de conservation rassure sur le seul
+  point qui inquiète — « rien de ce que tu as écrit n'est perdu ».
+- **Un paragraphe de guide se tapait sur une ligne.** Quatre ou cinq lignes
+  de prose dans un champ où l'on ne voit que la fin de ce qu'on écrit : le
+  genre de détail qui pousse à rédiger ailleurs et à coller ensuite —
+  c'est-à-dire, encore une fois, à écrire hors du garde-fou.
+- **« Adresse publique » affichait « pays-bas ».** Le libellé promet une
+  adresse, l'en-tête en montrait une complète deux lignes plus haut, et le
+  champ n'en montrait que le fragment.
+
+### Ce qui reste à arbitrer
+
+**P.A — L'index des guides et des articles n'existe pas.** Il n'y a pas de
+page `/guides` ni `/articles` : les documents ne sont atteignables que par
+leur adresse directe et par les liens du pied de page, qui viennent du
+registre éditorial. Tant qu'il y a deux documents, cela se défend. Au
+dixième, il faudra une page de rubrique — et elle posera la question du
+classement, qui n'est pas la même pour un guide pays que pour un article.
+
+**P.B — Une seule version, pas d'historique.** Une règle est versionnée
+parce qu'un dossier fige la sienne (INV-3) ; un guide n'a rien qui le fige,
+et republier ne casse rien. Mais un texte réécrit efface le précédent sans
+trace, alors que le journal d'audit garde qui a publié et pourquoi. Faut-il
+conserver les versions d'un guide ? C'est une question de gouvernance
+éditoriale, pas de produit.
+
+**P.C — Les images ne sont pas au périmètre.** Les cinq formes de bloc sont
+celles que le prototype dessine, toutes textuelles. Un guide illustré
+demanderait un téléversement, un stockage, une purge — c'est-à-dire tout le
+dispositif des pièces de dossier, pour un besoin qui n'est pas exprimé.

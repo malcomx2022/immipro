@@ -21,7 +21,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:garde-fous": "psql \"$DATABASE_URL\" -f scripts/verifier-garde-fous.sql",
     "db:studio": "prisma studio",
-    "seed:demo": "tsx prisma/seed/demonstration.ts"
+    "seed:demo": "tsx prisma/seed/demonstration.ts",
+    "seed:editorial": "tsx prisma/seed/editorial.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

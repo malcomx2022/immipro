@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ficheParSlug, libellePieces, rangAffiche } from "@/domain/destinations/fiche";
 import { CLASSEMENT, FICHES } from "@/lib/contenu/destinations";
-import { ARTICLES, GUIDES } from "@/lib/contenu/editorial";
 import { formatMontant } from "@/lib/utils";
 
 describe("fiches destination", () => {
@@ -29,16 +28,12 @@ describe("INV-8 — toute information réglementaire porte sa source et sa date"
     }
   });
 
-  it("le classement, les guides et les articles en portent une aussi", () => {
-    const mentions = [
-      CLASSEMENT.mention,
-      ...GUIDES.map((g) => g.mention),
-      ...ARTICLES.map((a) => a.mention),
-    ];
-    for (const m of mentions) {
-      expect(m.source).not.toBe("");
-      expect(Number.isNaN(Date.parse(m.verifieeLe))).toBe(false);
-    }
+  it("le classement en porte une aussi", () => {
+    // Les guides et les articles ne sont plus des constantes du dépôt
+    // (J.C) : c'est la base qui refuse désormais une publication sans
+    // source ni date, et `tests/editorial.test.ts` le vérifie.
+    expect(CLASSEMENT.mention.source).not.toBe("");
+    expect(Number.isNaN(Date.parse(CLASSEMENT.mention.verifieeLe))).toBe(false);
   });
 });
 
@@ -52,21 +47,15 @@ describe("INV-1 — une destination écartée l'est sur un motif vérifiable", (
   });
 });
 
-describe("sommaire des guides", () => {
-  it("chaque entrée de sommaire correspond à un intertitre du corps", () => {
-    for (const guide of GUIDES) {
-      const intertitres = guide.blocs
-        .filter((b) => b.type === "intertitre")
-        .map((b) => (b.type === "intertitre" ? b.texte : ""));
-      for (const entree of guide.sommaire) {
-        // Une entrée sans intertitre correspondant produit un lien mort.
-        if (!intertitres.includes(entree)) {
-          expect(`${guide.slug} — entrée sans ancre : ${entree}`).toBe("");
-        }
-      }
-    }
-  });
-});
+/**
+ * Le test « sommaire des guides » vivait ici. Il vérifiait qu'une entrée de
+ * sommaire correspondait bien à un intertitre du corps — une duplication
+ * qu'il fallait surveiller, et que le prototype avait déjà ratée.
+ *
+ * Le sommaire se déduit maintenant des intertitres (J.C) : la classe de
+ * défaut n'existe plus, et le test qui la guettait non plus. Ce qui reste à
+ * vérifier, c'est la déduction elle-même — `tests/editorial.test.ts`.
+ */
 
 describe("formatMontant — copie du prototype", () => {
   // `Intl` sépare les milliers par une espace fine insécable ; la comparaison

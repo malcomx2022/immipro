@@ -1,10 +1,14 @@
 /**
  * Navigation du back-office — section B, WF-14 à WF-16.
  *
- * Six entrées, dans l'ordre du travail : ce qui change dehors (la veille),
+ * Sept entrées, dans l'ordre du travail : ce qui change dehors (la veille),
  * ce qui bloque un candidat (les pièces en échec), puis les registres. Le
  * journal d'audit est avant-dernier parce qu'on l'ouvre pour vérifier, pas
  * pour agir.
+ *
+ * Les contenus suivent la veille : un guide pays dit la même chose qu'une
+ * règle, en prose, et c'est la même personne qui relit la source puis
+ * réécrit le guide.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
@@ -16,6 +20,7 @@ export interface EntreeAdmin {
 
 export const NAVIGATION_ADMIN: readonly EntreeAdmin[] = [
   { href: "/veille", libelle: "Veille réglementaire" },
+  { href: "/contenus", libelle: "Guides et articles" },
   { href: "/revue", libelle: "Pièces en échec" },
   { href: "/utilisateurs", libelle: "Utilisateurs" },
   { href: "/paiements", libelle: "Paiements" },

@@ -67,6 +67,8 @@ export type CodeEchec =
   | "signature_invalide"
   | "paiement_introuvable"
   | "recu_indisponible"
+  // Contenu éditorial
+  | "publication_refusee"
   // Infrastructure
   | "service_indisponible";
 
@@ -254,6 +256,14 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     // Ni rouge ni ambre : rien n'est en panne, et l'écrire comme une panne
     // ferait chercher un défaut là où il n'y en a pas.
     ton: "limite",
+  },
+  publication_refusee: {
+    statut: 409,
+    titre: "Cette publication est refusée",
+    corps: "Un ou plusieurs textes de ce document ne peuvent pas s'afficher chez le candidat.",
+    conserve: "Le document reste enregistré tel quel : rien de ce que tu as écrit n'est perdu.",
+    action: "Corriger les passages signalés",
+    ton: "echec",
   },
   service_indisponible: {
     statut: 503,

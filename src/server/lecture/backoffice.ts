@@ -271,6 +271,7 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "paiement.remboursement": "PAIEMENT",
   "paiement.reconciliation": "PAIEMENT",
   "regle.publication": "REGLE",
+  "contenu.publication": "REGLE",
   "revue.decision": "ACCES_PIECE",
 };
 

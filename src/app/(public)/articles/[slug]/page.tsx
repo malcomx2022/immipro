@@ -3,14 +3,20 @@ import { notFound } from "next/navigation";
 import { BlocsEditoriaux } from "@/components/ui/BlocsEditoriaux";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
-import { ARTICLES, articleParSlug } from "@/lib/contenu/editorial";
+import { documentPublie } from "@/server/lecture/editorial";
 
 /**
- * P-07 — Article. Gabarit long, colonne unique de 720 px sur desktop.
+ * P-07 — Article. Contenu de référencement.
+ *
+ * Même régime que le guide pays : régénéré à la demande depuis le
+ * back-office (B-08), en cache une heure, et invalidé à la publication. Le
+ * build n'exige aucune base de données (J.8).
+ *
+ * La durée de lecture ne se saisit pas : elle se compte. Annoncer « 6 min »
+ * sur un texte rallongé depuis est un petit mensonge que personne ne
+ * corrige.
  */
-export function generateStaticParams() {
-  return ARTICLES.map((a) => ({ slug: a.slug }));
-}
+export const revalidate = 3600;
 
 export async function generateMetadata({
   params,
@@ -18,7 +24,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const article = articleParSlug(slug);
+  const article = await documentPublie("ARTICLE", slug);
   if (!article) return { title: "Article introuvable" };
   return { title: article.titre, description: article.chapeau };
 }
@@ -29,10 +35,8 @@ export default async function PageArticle({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const article = articleParSlug(slug);
+  const article = await documentPublie("ARTICLE", slug);
   if (!article) notFound();
-
-  const publieLe = new Date(article.publieLe);
 
   return (
     <article className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:py-10">
@@ -51,20 +55,24 @@ export default async function PageArticle({
         <span aria-hidden="true" className="h-9 w-9 flex-none rounded-full bg-ink-100" />
         <span className="flex flex-col">
           <span className="text-14 font-medium text-ink-900">{article.auteur}</span>
-          <time dateTime={article.publieLe} className="text-13 text-ink-500">
-            {new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(publieLe)}
-          </time>
+          {article.publieLe ? (
+            <time dateTime={article.publieLe} className="text-13 text-ink-500">
+              {new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "UTC" }).format(
+                new Date(`${article.publieLe}T00:00:00Z`),
+              )}
+            </time>
+          ) : null}
         </span>
       </div>
 
       <p className="text-pretty text-19 text-ink-900">{article.chapeau}</p>
 
-      <BlocsEditoriaux blocs={article.blocs} />
+      <BlocsEditoriaux blocs={article.corps.blocs} />
 
       <section className="flex flex-col items-start gap-3 rounded-lg bg-ink-100 p-5">
-        <h2 className="text-19 font-semibold text-ink-900">{article.appel.titre}</h2>
-        <p className="text-14 text-ink-700">{article.appel.texte}</p>
-        <LienBouton href={article.appel.href}>{article.appel.action}</LienBouton>
+        <h2 className="text-19 font-semibold text-ink-900">{article.corps.appel.titre}</h2>
+        <p className="text-14 text-ink-700">{article.corps.appel.texte}</p>
+        <LienBouton href={article.corps.appel.href}>{article.corps.appel.action}</LienBouton>
       </section>
 
       <SourceNote source={article.mention.source} verifieeLe={article.mention.verifieeLe}>
