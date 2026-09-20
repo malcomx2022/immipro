@@ -1513,13 +1513,62 @@ refuser.
 
 ### Ce qui reste à arbitrer
 
-**O.A — FedaPay ne dit pas pourquoi, et c'est une limite du rail.** Le
-candidat béninois qui paie en francs CFA verra « ton opérateur n'a pas
-confirmé le paiement » là où le candidat qui paie par carte verra « ton
-solde n'a pas couvert le paiement ». La différence tient au fournisseur,
-pas au produit. Savoir si FedaPay expose un code d'erreur par un autre
-canal — l'API de consultation d'une transaction, plutôt que le webhook —
-demande la documentation que nous n'avons pas encore.
+**O.A — FedaPay ne dit pas pourquoi, et c'est une limite du rail.**
+~~La différence tient au fournisseur, pas au produit.~~ **Tranché pour la
+V1 le 20/09/2026** : le motif reste générique et non accusatoire.
+
+Tant que FedaPay n'expose pas un code fiable et documenté, le produit ne
+déduit pas un solde insuffisant et n'interroge pas une seconde API dans le
+seul but de fabriquer une précision incertaine. La parité entre les rails
+n'est pas plus importante que l'exactitude : « l'opérateur n'a pas
+confirmé » est moins précis, mais ne donne pas une fausse cause. Une étude
+de la documentation dira plus tard si un code stable peut enrichir la
+catégorie interne ; elle ne bloque rien.
+
+### Ce que l'application de la décision a trouvé
+
+**L'accusation ne vivait pas là où le garde-fou la cherchait.** N.B avait
+déjà rendu le titre et le corps honnêtes — « la raison ne nous est pas
+communiquée » — et un test vérifiait ces deux champs. Mais l'encadré
+« ce que tu peux vérifier » s'ouvrait sur **« le solde disponible doit
+couvrir 5 000 F au moment de la confirmation »** : la ligne la plus lue de
+l'écran nommait la cause que les deux autres champs disaient ignorer. Le
+candidat recharge un portefeuille qui n'était pas en cause, réessaie, et
+échoue une seconde fois.
+
+C'est la même leçon qu'en N.C, à un lot d'intervalle : un garde-fou qui
+connaît deux champs sur trois garde deux champs sur trois. Il lit
+maintenant les vérifications, avec une seule phrase nommée en exception —
+« compose le *880# pour consulter ton solde », qui est une action et non
+un diagnostic.
+
+**Le rail n'était pas dans la phrase.** En cherchant ce que le refus
+générique pouvait dire sans cause, un second défaut est apparu : les
+textes d'échec parlaient à tout le monde comme à un payeur Mobile Money.
+Un candidat qui paie par carte en euros — Stripe, code de refus inconnu,
+même case générique — lisait « ton **opérateur** n'a pas confirmé » et
+« compose le **\*880#** », un code USSD d'opérateur béninois. Le rail entre
+désormais dans `echecPourMotif`, et le vocabulaire suit : la banque plutôt
+que l'opérateur, le relevé plutôt que le code USSD.
+
+**Les trois actions utiles sont déjà là.** La décision en nomme trois —
+réessayer, vérifier son portefeuille, employer l'autre grille. Vérifié à
+l'exécution sur les deux rails : le bouton « Réessayer le paiement » et la
+section « Autre moyen de paiement » les portent déjà, et l'encadré porte la
+vérification de l'instrument. Les redire dans l'encadré en aurait fait un
+doublon des commandes situées dessous — c'est la faute de N.A, une règle
+sans domicile recopiée partout où elle sert.
+
+**Un commentaire décrivait un comportement disparu.** L'en-tête de $-05
+annonçait encore « un motif inconnu retombe sur le délai dépassé », que
+N.B avait remplacé. Un commentaire faux se lit comme une intention, et la
+prochaine correction se serait appuyée dessus.
+
+*Reste ouvert :* les cinq autres motifs d'échec supposent toujours le rail
+Mobile Money dans leur prose — « la notification Mobile Money peut arriver
+avec du retard », « sur ton téléphone ». Seul le code USSD, qui affirmait
+une fausse instruction, a été corrigé partout. Réécrire les cinq est un
+travail de rédaction sur six écrans, qu'O.A n'a pas tranché : à arbitrer.
 
 **O.B — Combien de temps garder le motif d'un compte vivant ?** Il part
 avec la suppression, c'est acquis. Mais un refus de 2026 reste lisible en

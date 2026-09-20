@@ -11,6 +11,8 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import type { Rail } from "../payments/rail";
+
 export type MotifEchec =
   | "delai_depasse"
   | "solde_insuffisant"
@@ -99,9 +101,30 @@ export interface Echec {
   verifications: readonly string[];
 }
 
-/** Code USSD de consultation du solde, commun aux deux motifs. */
-const CONSULTER_SOLDE =
-  "Compose le *880# pour consulter ton solde et tes dernières opérations.";
+/**
+ * Où le candidat va voir ses dernières opérations.
+ *
+ * Le `*880#` était donné à tout le monde, y compris à qui paie par carte
+ * en euros : un code USSD d'opérateur béninois n'a rien à faire sur l'écran
+ * d'un paiement par carte. C'est la même faute que celle qu'O.A corrige —
+ * affirmer au candidat quelque chose qui n'est pas vrai de sa situation —
+ * mais du côté du rail plutôt que de la cause.
+ */
+const consulterSesOperations = (rail: Rail): string =>
+  rail === "MOBILE_MONEY"
+    ? "Compose le *880# pour consulter ton solde et tes dernières opérations."
+    : "Le relevé de ta carte indique si une opération a été tentée.";
+
+/**
+ * L'instrument, nommé comme le candidat le nomme — phrase entière et non
+ * simple nom : « portefeuille » est masculin, « carte » féminine, et une
+ * phrase à trous produisait « ton portefeuille Mobile Money est active ».
+ */
+const INSTRUMENT_AUTORISE: Record<Rail, string> = {
+  MOBILE_MONEY:
+    "Vérifie que ton portefeuille Mobile Money est actif et autorisé au paiement marchand.",
+  CARTE: "Vérifie que ta carte est active et autorisée au paiement marchand.",
+};
 
 /**
  * Le numéro est facultatif : ImmiPro ne conserve pas le portefeuille qui
@@ -112,6 +135,7 @@ export function echecPourMotif(
   motif: MotifEchec,
   montant: string,
   numero: string | null,
+  rail: Rail,
 ): Echec {
   if (motif === "delai_depasse") {
     return {
@@ -123,21 +147,46 @@ export function echecPourMotif(
         numero
           ? `Si elle n'est jamais arrivée, vérifie que le ${numero} est bien ton numéro actif.`
           : "Si elle n'est jamais arrivée, vérifie le numéro enregistré sur ton profil.",
-        CONSULTER_SOLDE,
+        consulterSesOperations(rail),
       ],
     };
   }
+  /**
+   * Le refus sans raison — O.A, tranché pour la V1 le 20/09/2026.
+   *
+   * C'est la case où tombe tout ce que le rail ne détaille pas : les trois
+   * états d'échec de FedaPay n'ont pas de code de refus normalisé, et un
+   * code Stripe inconnu retombe ici aussi. Le motif reste **générique et
+   * non accusatoire** : la parité avec l'autre rail n'est pas plus
+   * importante que l'exactitude.
+   *
+   * **Ce qui a été retiré.** La première vérification disait « le solde
+   * disponible doit couvrir 5 000 F au moment de la confirmation ». Le
+   * titre et le corps disaient honnêtement que la raison ne nous est pas
+   * communiquée, puis la ligne la plus lue de l'encadré nommait le solde
+   * comme si on le savait. Une cause fausse n'est pas moins fausse d'être
+   * écrite à l'impératif : le candidat recharge un portefeuille qui
+   * n'était pas en cause, réessaie, et échoue une seconde fois.
+   *
+   * Ce qui reste est vérifiable sans connaître la cause : l'instrument
+   * est-il actif et autorisé, et que montre le relevé. Réessayer et passer
+   * à l'autre grille sont les deux autres actions utiles, et l'écran les
+   * porte déjà en boutons — les redire ici ferait de l'encadré « ce que tu
+   * peux vérifier » un doublon des commandes situées dessous.
+   */
   if (motif === "refus_operateur") {
     return {
-      titre: "Ton opérateur n'a pas confirmé le paiement",
+      titre:
+        rail === "MOBILE_MONEY"
+          ? "Ton opérateur n'a pas confirmé le paiement"
+          : "Ta banque n'a pas confirmé le paiement",
       corps:
         "L'opération a été refusée, et la raison ne nous est pas communiquée. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
       verifications: [
-        `Le solde disponible doit couvrir ${montant} au moment de la confirmation.`,
-        numero
+        numero && rail === "MOBILE_MONEY"
           ? `Vérifie que le ${numero} est bien actif et autorisé au paiement marchand.`
-          : "Vérifie que ton numéro est bien actif et autorisé au paiement marchand.",
-        CONSULTER_SOLDE,
+          : INSTRUMENT_AUTORISE[rail],
+        consulterSesOperations(rail),
       ],
     };
   }
@@ -150,7 +199,7 @@ export function echecPourMotif(
       verifications: [
         "Relancer le paiement en ouvre un nouveau : rien n'est débité deux fois.",
         "Si tu n'as rien annulé, la notification a pu expirer avant ta saisie.",
-        CONSULTER_SOLDE,
+        consulterSesOperations(rail),
       ],
     };
   }
@@ -178,7 +227,7 @@ export function echecPourMotif(
       verifications: [
         "Il n'y a rien à corriger sur ton compte : réessaie dans quelques minutes.",
         "Si cela se répète, l'autre grille passe par un autre prestataire.",
-        CONSULTER_SOLDE,
+        consulterSesOperations(rail),
       ],
     };
   }
@@ -211,7 +260,7 @@ export function echecPourMotif(
     verifications: [
       `Le solde disponible doit couvrir ${montant} au moment de la confirmation.`,
       "Un rechargement met parfois quelques minutes à être pris en compte.",
-      CONSULTER_SOLDE,
+      consulterSesOperations(rail),
     ],
   };
 }

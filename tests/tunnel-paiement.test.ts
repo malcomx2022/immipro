@@ -85,10 +85,10 @@ describe("ce que les écrans nomment quand la base ne sait pas", () => {
   });
 
   it("l'échec renvoie au profil plutôt que de citer un vide", () => {
-    const sans = echecPourMotif("delai_depasse", "15 000 F", null);
+    const sans = echecPourMotif("delai_depasse", "15 000 F", null, "MOBILE_MONEY");
     expect(sans.verifications.join(" ")).toContain("le numéro enregistré sur ton profil");
     expect(sans.verifications.join(" ")).not.toMatch(/le null|le undefined/u);
-    const avec = echecPourMotif("delai_depasse", "15 000 F", "97 •• •• 42");
+    const avec = echecPourMotif("delai_depasse", "15 000 F", "97 •• •• 42", "MOBILE_MONEY");
     expect(avec.verifications.join(" ")).toContain("97 •• •• 42");
   });
 });
@@ -100,7 +100,7 @@ describe("le motif d'échec, quand le fournisseur n'en donne pas", () => {
     // confirmation » — un fait faux, qui envoie vérifier le réseau au lieu
     // du compte (DOC-12 §16 règle 1).
     expect(motifParDefaut("ECHOUEE")).toBe("refus_operateur");
-    const refus = echecPourMotif("refus_operateur", "5 000 F", "97 •• •• 42");
+    const refus = echecPourMotif("refus_operateur", "5 000 F", "97 •• •• 42", "MOBILE_MONEY");
     expect(refus.titre).toBe("Ton opérateur n'a pas confirmé le paiement");
     expect(refus.corps).not.toMatch(/cinq minutes/u);
     // Et il n'accuse pas non plus le solde, qu'on ne connaît pas.
@@ -110,7 +110,7 @@ describe("le motif d'échec, quand le fournisseur n'en donne pas", () => {
 
   it("un délai dépassé n'est prononcé que par la base", () => {
     expect(motifParDefaut("EXPIREE")).toBe("delai_depasse");
-    expect(echecPourMotif("delai_depasse", "5 000 F", null).corps).toMatch(/cinq minutes/u);
+    expect(echecPourMotif("delai_depasse", "5 000 F", null, "MOBILE_MONEY").corps).toMatch(/cinq minutes/u);
   });
 
   it("une transaction encore ouverte dit que la notification manque", () => {
@@ -118,7 +118,7 @@ describe("le motif d'échec, quand le fournisseur n'en donne pas", () => {
     for (const statut of ["INITIEE", "EN_ATTENTE"]) {
       expect(motifParDefaut(statut)).toBe("notification_absente");
     }
-    const absente = echecPourMotif("notification_absente", "5 000 F", null);
+    const absente = echecPourMotif("notification_absente", "5 000 F", null, "MOBILE_MONEY");
     expect(absente.titre).toBe("La notification n'est pas arrivée");
     expect(absente.corps).not.toMatch(/cinq minutes|refusé/u);
   });
@@ -131,7 +131,7 @@ describe("le motif d'échec, quand le fournisseur n'en donne pas", () => {
       "refus_operateur",
       "notification_absente",
     ] as const) {
-      expect(echecPourMotif(motif, "5 000 F", null).corps).toMatch(/conservé/u);
+      expect(echecPourMotif(motif, "5 000 F", null, "MOBILE_MONEY").corps).toMatch(/conservé/u);
     }
   });
 

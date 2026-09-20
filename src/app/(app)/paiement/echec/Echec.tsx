@@ -6,7 +6,7 @@ import { LienBouton } from "@/components/ui/LienBouton";
 import { echecPourMotif, motifDeLEchec, type MotifEchec } from "@/domain/paiement/echec";
 import type { PaiementEnCours } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
-import { actionVersLAutreGrille, mentionDeLAutreGrille } from "@/domain/payments/rail";
+import { actionVersLAutreGrille, mentionDeLAutreGrille, railDe } from "@/domain/payments/rail";
 
 /**
  * $-05 — Échec ou expiration.
@@ -63,7 +63,10 @@ export function Echec({
       ? motif
       : motifDeLEchec(null, paiement.statut);
   const montant = formatMontant(paiement.montant, paiement.devise);
-  const echec = echecPourMotif(retenu, montant, paiement.telephone);
+  // Le rail décide du vocabulaire : on ne dit pas « compose le *880# » à qui
+  // paie par carte, et le refus sans raison nomme la banque plutôt que
+  // l'opérateur (O.A).
+  const echec = echecPourMotif(retenu, montant, paiement.telephone, railDe(paiement.devise));
 
   const dossier = paiement.dossierId;
   const reessai = dossier
