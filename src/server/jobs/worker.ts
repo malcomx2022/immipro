@@ -8,7 +8,7 @@
  * d'incident, sans file de jobs.
  */
 import { getQueue, JOBS } from "@/lib/queue";
-import { purgerLesPiecesEchues } from "./purge";
+import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
 import { reconcilierLesPaiements } from "./reconciliation";
@@ -43,6 +43,10 @@ async function main() {
   await boss.work(JOBS.PURGE_RETENTION, async () => {
     const bilan = await purgerLesPiecesEchues();
     console.info("[purge]", bilan);
+    // Même passe, mêmes horaires : les durées annoncées ailleurs qu'INV-5
+    // — six mois pour les alertes, cinq ans pour le journal — et les
+    // sessions échues, qui ne servent plus rien.
+    console.info("[conservation]", await purgerCeQuiEstEchu());
     // Même passe : une suppression de compte restée à mi-chemin faute de
     // stockage disponible se rattrape ici. Les jours ordinaires, elle ne
     // trouve rien (RG-10.4).

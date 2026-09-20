@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { removeObject } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
+import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
+import { CONSERVATION_ANNEES } from "@/domain/backoffice/audit";
 
 /**
  * Purge des pièces — INV-5, RG-10.1.
@@ -178,4 +180,76 @@ export async function purgerSurDemande(userId: string, maintenant = new Date()):
     data: { purgeDueAt: maintenant },
   });
   return purgerLesPiecesEchues(maintenant, userId);
+}
+
+/**
+ * Les autres durées de conservation, celles qui étaient écrites et que rien
+ * n'appliquait.
+ *
+ * Trois durées sont déclarées dans le domaine et affichées à quelqu'un :
+ * trente jours pour les pièces d'un dossier clos (INV-5), six mois pour les
+ * alertes (T-01), cinq ans pour le journal d'audit (B-06). Seule la
+ * première était tenue. Les deux autres étaient des phrases — « elles sont
+ * conservées six mois » se lit comme un engagement, et une base qui garde
+ * tout ne le tient pas.
+ *
+ * Les durées viennent des constantes qui composent ces phrases, jamais
+ * d'un nombre recopié : une conservation qu'on raccourcit doit changer au
+ * même endroit que le texte qui l'annonce, sinon les deux divergent sans
+ * que rien ne le signale. Un test refuse désormais qu'une durée déclarée
+ * n'ait pas d'exécutant.
+ */
+export interface BilanConservation {
+  alertes: number;
+  ecrituresDAudit: number;
+  sessions: number;
+}
+
+/** Le point de coupure d'une durée exprimée en mois. */
+export function echeanceEnMois(mois: number, maintenant: Date): Date {
+  const limite = new Date(maintenant);
+  limite.setUTCMonth(limite.getUTCMonth() - mois);
+  return limite;
+}
+
+export function echeanceEnAnnees(annees: number, maintenant: Date): Date {
+  const limite = new Date(maintenant);
+  limite.setUTCFullYear(limite.getUTCFullYear() - annees);
+  return limite;
+}
+
+export async function purgerCeQuiEstEchu(
+  maintenant = new Date(),
+): Promise<BilanConservation> {
+  const alertes = await db.notification.deleteMany({
+    where: { createdAt: { lt: echeanceEnMois(CONSERVATION_MOIS, maintenant) } },
+  });
+
+  /**
+   * Le journal se purge par échéance, jamais depuis l'interface — et sa
+   * propre mention le dit ainsi : « aucune entrée ne peut être supprimée ni
+   * modifiée depuis l'interface ». Une tâche planifiée n'est pas
+   * l'interface ; c'est même la seule façon de tenir les deux moitiés de la
+   * phrase, l'immuabilité et la durée.
+   */
+  const audit = await db.auditLog.deleteMany({
+    where: { createdAt: { lt: echeanceEnAnnees(CONSERVATION_ANNEES, maintenant) } },
+  });
+
+  /**
+   * Une session échue ne sert plus à rien : `lireSession` la refuse déjà.
+   * Sa ligne garde pourtant le contexte de connexion, que le schéma dit
+   * conservé « pour qu'un candidat reconnaisse une session qui n'est pas la
+   * sienne » — une raison qui s'éteint avec la session. Aucune durée n'est
+   * annoncée ici : c'est l'échéance de la session elle-même qui fait foi.
+   */
+  const sessions = await db.session.deleteMany({
+    where: { expiresAt: { lt: maintenant } },
+  });
+
+  return {
+    alertes: alertes.count,
+    ecrituresDAudit: audit.count,
+    sessions: sessions.count,
+  };
 }
