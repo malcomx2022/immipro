@@ -49,6 +49,32 @@ export const estPublic = (etat: EtatDocument): boolean => etat === "PUBLIE";
 
 // ── Corps ────────────────────────────────────────────────────────────────
 
+/**
+ * Cinq formes, toutes textuelles — et c'est une décision, pas un état
+ * provisoire : P.C, fermé hors périmètre V1 le 20/09/2026.
+ *
+ * **Pas d'image, et pas d'URL d'image non plus.** Le besoin n'est pas
+ * exprimé, et le coût n'est pas celui d'un champ de plus : un téléversement
+ * d'images apporte le stockage, la sécurité, les formats, les droits
+ * d'utilisation, le texte alternatif, la suppression et peut-être la
+ * transformation — c'est-à-dire presque tout le dispositif des pièces de
+ * dossier, pour un besoin que personne n'a formulé. Une illustration
+ * extérieure appelée par son adresse n'est pas l'échappatoire commode
+ * qu'elle paraît : elle troque ces problèmes contre la pérennité du lien
+ * et la confidentialité du lecteur, dont l'adresse IP partirait chez un
+ * tiers à chaque ouverture du guide.
+ *
+ * **À quelle condition rouvrir.** Pas « quand on aura le temps », mais à
+ * partir de contenus identifiés que ces cinq formes n'expriment pas
+ * correctement. Un cas justifié donnera lieu à un périmètre média conçu
+ * pour lui, avec ses règles ; ajouter un sixième type ici en attendant
+ * ferait entrer l'image par la porte de service.
+ *
+ * L'union est fermée, et trois choses la tiennent : elle refuse un type
+ * inconnu, aucun texte n'est rendu en HTML — React échappe tout — et
+ * l'appel à l'action n'accepte qu'une adresse interne. Des tests les
+ * vérifient toutes les trois.
+ */
 export const blocSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("paragraphe"), texte: z.string().min(1) }),
   z.object({ type: z.literal("intertitre"), texte: z.string().min(1) }),
