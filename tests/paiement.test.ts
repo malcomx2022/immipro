@@ -119,7 +119,7 @@ describe("commande — $-01 et $-02", () => {
 
     const avecPack = { ...base, pack: pack ?? null };
     expect(obstacleAuPaiement(avecPack)).toBe(
-      "Acceptez les conditions d'utilisation pour payer.",
+      "Accepte les conditions d'utilisation pour payer.",
     );
 
     const prete = { ...avecPack, conditionsAcceptees: true };

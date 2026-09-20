@@ -1527,12 +1527,56 @@ avec la suppression, c'est acquis. Mais un refus de 2026 reste lisible en
 Une purge à l'échéance — trois mois, un an — relève de la politique de
 rétention et non de ce lot.
 
-**N.C — La case des conditions passe sous la barre d'action.** Sur un écran
-de 390 px, la barre collante de $-02 recouvre la case qui déverrouille son
-propre bouton tant qu'on n'a pas fait défiler jusqu'en bas. Elle reste
-atteignable, et c'est la structure du prototype — mais faire dépendre
-l'action principale d'un élément que sa propre barre masque mérite une
-décision de maquette, pas un correctif au passage.
+**N.C — La case des conditions passe sous la barre d'action.** ~~Elle reste
+atteignable, et c'est la structure du prototype.~~ **Tranché le
+20/09/2026**, en faveur de la visibilité du consentement.
+
+La case d'acceptation fait partie de la zone d'action, immédiatement
+au-dessus du bouton de paiement. La barre ne recouvre jamais le contrôle
+qui déverrouille son propre bouton. Pas de marge compensatoire calée sur
+une hauteur : la zone d'action contient structurellement le consentement.
+Et si l'ensemble ne tient pas proprement, la barre cesse d'être collante
+sur cet écran — conserver la barre est secondaire, rendre son prérequis
+accessible ne l'est pas.
+
+### Ce que l'application de la décision a trouvé
+
+**Le défaut se mesure, et il a été mesuré.** À 390 × 844, la barre occupait
+715→844 et la case 757→865 : l'élément qui déverrouille le bouton était
+exactement sous le bouton, et débordait sous la ligne de flottaison.
+
+**La barre ne tenait pas, case comprise.** Une fois le consentement placé
+dedans, elle mesurait 245 px — 29 % d'un écran de 390 × 844, et **38 %
+d'un 360 × 640**, avant le bloc d'échec qui la fait grandir au moment
+précis où le candidat cherche la case. La décision prévoyait ce cas : la
+barre cesse d'être collante ici. Sur écran large, la colonne d'action ne
+bouge pas.
+
+Après correction, aux deux largeurs : case et bouton visibles ensemble,
+case immédiatement au-dessus, et rien ne la recouvre — vérifié par
+`elementFromPoint` au centre de la case, pas seulement à l'œil.
+
+**Le garde-fou écrit une heure plus tôt ne voyait pas ce cas, et son
+élargissement non plus.** Le test du tutoiement des boutons désactivés,
+ajouté pendant N.A, ne lisait que la forme littérale
+`raisonDesactivation="…"`. L'écran de paiement porte
+`raisonDesactivation={coche ? undefined : "Acceptez…"}` — une expression —
+et passait à travers : cinq phrases sont sorties en l'élargissant. Une
+fois les expressions lues, l'inscription passait encore, parce qu'elle
+range sa phrase dans un `const raison = …` et que l'expression ne porte
+alors aucune chaîne : une sixième. Le garde-fou résout maintenant les
+constantes et les fonctions du même fichier, et il s'arrête là — suivre
+les imports ferait de lui un compilateur, et ce qui vient d'ailleurs est
+une constante de domaine que le balayage lit dans son propre fichier.
+
+Trois formes d'écriture, trois élargissements, un vouvoiement de plus à
+chaque fois. Un garde-fou ne garde que la forme qu'il connaît.
+
+*Reste ouvert :* la décision mentionne « la case **et son lien** vers les
+conditions ». Le lien n'existe pas, faute de page : les conditions
+générales font partie des trois pages en attente de Q.A. La case nomme
+donc les conditions sans y mener, et un lien mort serait pire. À reprendre
+dès que Q.A tombe.
 
 **M.B — Le remboursement n'a pas d'écrivain.** L'état `REMBOURSEE` est au
 schéma, le reçu sait le présenter, `paiement.remboursement` est une action
