@@ -3,7 +3,13 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { filtrePourCandidat } from "@/server/acces/regles";
 import { evaluerConditions, moisEntre } from "@/domain/dossiers/verification";
-import { classer, POIDS, COMPOSANTES_ABSENTES } from "@/domain/simulateur/classement";
+import {
+  classer,
+  POIDS,
+  COMPOSANTES_ABSENTES,
+  COMPOSANTES_PESEES,
+  perimetreDuClassement,
+} from "@/domain/simulateur/classement";
 import { versXOF, convertible } from "@/domain/format/change";
 import { verdictDeConnexion, aBloquer, libelleEchec, ESSAIS_AVANT_BLOCAGE } from "@/domain/comptes/connexion";
 import { comparer } from "@/server/jobs/divergence";
@@ -233,6 +239,74 @@ describe("WF-01 — classement des destinations", () => {
     expect(COMPOSANTES_ABSENTES).toContain("qualité de vie");
     expect(COMPOSANTES_ABSENTES).toContain("coût de la vie");
     expect(Object.keys(POIDS)).toEqual(["langue", "budget", "facilite", "debouches"]);
+  });
+
+  /**
+   * I.A — le classement dit ce qu'il a pesé et ce qu'il n'a pas pu peser.
+   * Les deux phrases sont dérivées de `POIDS` et de la liste reçue : c'est
+   * ce qui permet de brancher un indice demain sans relire l'écran.
+   */
+  it("les critères pesés sont nommés dans l'ordre de leur poids", () => {
+    expect(COMPOSANTES_PESEES).toEqual([
+      "le niveau de langue exigé",
+      "le budget de la première année",
+      "la facilité administrative",
+      "les débouchés après le diplôme",
+    ]);
+  });
+
+  it("la phrase nomme les critères comparés sans citer aucune part", () => {
+    const { peses } = perimetreDuClassement(COMPOSANTES_ABSENTES);
+    expect(peses).toContain("quatre critères publiés");
+    expect(peses).toContain("le niveau de langue exigé");
+    expect(peses).toContain("les débouchés après le diplôme");
+    // Arbitrage C-09 : la part de chaque critère ordonne, elle ne s'affiche pas.
+    expect(peses).not.toMatch(/\d/u);
+  });
+
+  it("ce qui manque est dit, avec la raison", () => {
+    const { absentes } = perimetreDuClassement(COMPOSANTES_ABSENTES);
+    expect(absentes).toBe(
+      "Deux critères prévus n'y entrent pas, faute d'une source datée : qualité de vie et coût de la vie.",
+    );
+  });
+
+  it("un seul critère manquant s'accorde au singulier", () => {
+    expect(perimetreDuClassement(["coût de la vie"]).absentes).toBe(
+      "Un critère prévu n'y entre pas, faute d'une source datée : coût de la vie.",
+    );
+  });
+
+  /**
+   * Le jour où les six composantes ont une source, la phrase disparaît
+   * d'elle-même : l'écran n'a pas de « sauf si » à retirer à la main.
+   */
+  it("plus rien ne manque, plus rien n'est dit", () => {
+    expect(perimetreDuClassement([]).absentes).toBeNull();
+  });
+
+  /**
+   * Le champ envoyé que personne ne lit.
+   *
+   * `composantesAbsentes` sortait de la route depuis le premier jour et
+   * n'apparaissait dans aucune interface de P-03 : ni le typage ni l'écran
+   * ne le voyaient. Le test compare donc les clés rendues par la route aux
+   * clés déclarées par l'écran, et refuse qu'elles divergent — dans un sens
+   * comme dans l'autre.
+   */
+  it("P-03 déclare exactement ce que /api/simulations renvoie", () => {
+    const route = lire("src/app/api/simulations/route.ts");
+    const rendu = route.slice(route.indexOf("    return {"));
+    const envoyees = [...rendu.matchAll(/^ {6}(\w+):/gmu)].map((m) => m[1]!).sort();
+
+    const ecran = lire("src/app/(public)/resultats/Resultats.tsx");
+    const bloc = ecran.slice(ecran.indexOf("interface Classement {"));
+    const declarees = [...bloc.slice(0, bloc.indexOf("\n}")).matchAll(/^ {2}(\w+)[?]?:/gmu)]
+      .map((m) => m[1]!)
+      .sort();
+
+    expect(envoyees).toContain("composantesAbsentes");
+    expect(declarees).toEqual(envoyees);
   });
 });
 

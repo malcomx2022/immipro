@@ -321,3 +321,81 @@ const libelleCategorie = (c: Categorie) => LIBELLE_CATEGORIE[c];
 
 /** Les trois meilleures, comme l'affiche P-03. */
 export const TROIS_MEILLEURES = 3;
+
+/**
+ * Ce que le classement a pesé, et ce qu'il n'a pas pu peser — I.A.
+ *
+ * `composantesAbsentes` existait déjà, et il ne sortait pas de l'API : le
+ * serveur savait que deux des six composantes de DOC-11 n'avaient été
+ * mesurées par personne, l'appelant le recevait, et P-03 ne le lisait pas.
+ * Le candidat voyait donc un classement présenté comme entier alors que le
+ * système savait qu'il ne l'était pas. C'est exactement ce qu'INV-8 refuse :
+ * une information affichée sans dire d'où elle vient ni jusqu'où elle va.
+ *
+ * Les deux phrases sont **dérivées**, jamais écrites deux fois : la liste
+ * pesée vient de `POIDS`, la liste manquante de l'argument. Brancher demain
+ * un indice de coût de la vie avec sa source retire la seconde phrase sans
+ * qu'on ait à relire l'écran ; ajouter une composante l'ajoute à la
+ * première.
+ *
+ * Aucun poids n'est cité. Un pourcentage sur un écran candidat est refusé
+ * par le vocabulaire interdit, et il le serait de toute façon : la part de
+ * chaque critère ordonne, elle ne s'affiche pas (arbitrage C-09).
+ */
+const INTITULE_COMPOSANTE: Record<keyof typeof POIDS, string> = {
+  langue: "le niveau de langue exigé",
+  budget: "le budget de la première année",
+  facilite: "la facilité administrative",
+  debouches: "les débouchés après le diplôme",
+};
+
+/** Zéro à six : au-delà, le chiffre est plus lisible que la lettre. */
+const EN_TOUTES_LETTRES = ["aucun", "un", "deux", "trois", "quatre", "cinq", "six"];
+
+const nombre = (n: number) => EN_TOUTES_LETTRES[n] ?? String(n);
+
+function enumerer(liste: readonly string[]): string {
+  if (liste.length <= 1) return liste[0] ?? "";
+  return `${liste.slice(0, -1).join(", ")} et ${liste[liste.length - 1]}`;
+}
+
+const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+export interface Perimetre {
+  /** Ce qui a été comparé, nommé. */
+  peses: string;
+  /**
+   * Ce qui manque, ou `null` quand plus rien ne manque — le jour où les six
+   * composantes ont une source, la phrase disparaît d'elle-même.
+   */
+  absentes: string | null;
+}
+
+/**
+ * Les composantes pesées, de la plus lourde à la plus légère. L'ordre suit
+ * `POIDS` sans le dire : citer « le niveau de langue » en premier est exact,
+ * écrire « 30 % » ne l'est pas sur cet écran.
+ */
+export const COMPOSANTES_PESEES: readonly string[] = (
+  Object.keys(POIDS) as (keyof typeof POIDS)[]
+)
+  .sort((a, b) => POIDS[b] - POIDS[a])
+  .map((c) => INTITULE_COMPOSANTE[c]);
+
+export function perimetreDuClassement(absentes: readonly string[]): Perimetre {
+  const combien = COMPOSANTES_PESEES.length;
+  const pluriel = combien > 1 ? "s" : "";
+  return {
+    peses: `Ce classement compare ${nombre(combien)} critère${pluriel} publié${pluriel} : ${enumerer(
+      COMPOSANTES_PESEES,
+    )}.`,
+    absentes:
+      absentes.length === 0
+        ? null
+        : `${majuscule(nombre(absentes.length))} critère${absentes.length > 1 ? "s" : ""} prévu${
+            absentes.length > 1 ? "s" : ""
+          } n'y ${absentes.length > 1 ? "entrent" : "entre"} pas, faute d'une source datée : ${enumerer(
+            absentes,
+          )}.`,
+  };
+}

@@ -9,7 +9,7 @@ import { SourceNote } from "@/components/ui/SourceNote";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import type { Mention } from "@/domain/destinations/fiche";
-import type { Motif } from "@/domain/simulateur/classement";
+import { perimetreDuClassement, type Motif } from "@/domain/simulateur/classement";
 import { resumeReponses, type Reponses } from "@/domain/simulateur/questions";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
@@ -42,12 +42,21 @@ interface Ecartee {
   pays: string;
   motif: string;
   ecart: string;
+  mention?: Mention;
 }
 
+/**
+ * Le contrat de `/api/simulations`, au complet. Il l'était à un champ près,
+ * et ce champ était justement celui qui disait ce que le classement ne
+ * savait pas faire : `composantesAbsentes` sortait du serveur et n'entrait
+ * nulle part. Un champ envoyé que personne ne déclare ne se voit ni au
+ * typage ni à l'écran — `tests/api-invariants` le refuse désormais.
+ */
 interface Classement {
   retenues: Retenue[];
   ecartees: Ecartee[];
   aucuneNePasse: boolean;
+  composantesAbsentes: string[];
 }
 
 type Etat =
@@ -100,7 +109,9 @@ export function Resultats() {
     );
   }
 
-  const { retenues, ecartees, aucuneNePasse } = etat.classement;
+  const { retenues, ecartees, aucuneNePasse, composantesAbsentes } = etat.classement;
+  const perimetre = perimetreDuClassement(composantesAbsentes);
+  const mention = mentionDuClassement([...retenues, ...ecartees]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
@@ -201,17 +212,32 @@ export function Resultats() {
               </li>
             ))}
           </ul>
-          {mentionDuClassement(retenues) ? (
-            <SourceNote
-              source={mentionDuClassement(retenues)!.source}
-              verifieeLe={mentionDuClassement(retenues)!.verifieeLe}
-            >
-              Ce classement compare des exigences publiées ; il ne prédit aucune
-              décision.
-            </SourceNote>
-          ) : null}
         </section>
       ) : null}
+
+      {/*
+        Ce que le classement a pesé, et ce qu'il n'a pas pu peser — I.A.
+        Le bloc vivait dans la section des écartées : une simulation où
+        toutes les destinations passent n'affichait donc aucune source, et
+        celle où aucune ne passe non plus. Il sort ici, où il porte sur
+        l'écran entier.
+      */}
+      <section className="flex flex-col gap-1.5 border-t border-ink-300 pt-4">
+        <p className="text-pretty text-13 text-ink-700">{perimetre.peses}</p>
+        {perimetre.absentes ? (
+          <p className="text-pretty text-13 text-ink-700">{perimetre.absentes}</p>
+        ) : null}
+        {/*
+          La mention ne redit plus ce que la phrase au-dessus vient de
+          nommer : elle garde la seule chose qu'aucune énumération ne porte,
+          la limite de l'exercice (INV-1).
+        */}
+        {mention ? (
+          <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+            Il ne prédit aucune décision de l&apos;administration.
+          </SourceNote>
+        ) : null}
+      </section>
 
       <div className="flex items-center gap-3 border-t border-ink-300 pt-4">
         <p className="flex-1 text-13 text-ink-500">Checklist en aperçu gratuit</p>
@@ -236,9 +262,13 @@ function titre(retenues: number, aucuneNePasse: boolean): string {
  * La mention porte la vérification la plus ancienne des fiches affichées : un
  * classement n'est pas « vérifié aujourd'hui » parce que l'une de ses fiches
  * l'est.
+ *
+ * Elle lit les retenues **et** les écartées : un écart chiffré est une donnée
+ * réglementaire au même titre qu'un rang, et sur l'écran où rien ne passe
+ * c'est la seule qui reste.
  */
-function mentionDuClassement(retenues: readonly Retenue[]): Mention | null {
-  const mentions = retenues.flatMap((r) => (r.mention ? [r.mention] : []));
+function mentionDuClassement(affichees: readonly { mention?: Mention }[]): Mention | null {
+  const mentions = affichees.flatMap((r) => (r.mention ? [r.mention] : []));
   if (mentions.length === 0) return null;
   return {
     source: [...new Set(mentions.map((m) => m.source))].sort().join(", "),

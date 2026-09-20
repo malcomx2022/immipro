@@ -150,6 +150,7 @@ describe("P-03 — Résultats", () => {
         },
       ],
       aucuneNePasse: false,
+      composantesAbsentes: ["qualité de vie", "coût de la vie"],
     });
     window.sessionStorage.setItem(
       "immipro.simulation",
@@ -166,16 +167,23 @@ describe("P-03 — Résultats", () => {
     expect(screen.getByRole("heading", { name: "Pays-Bas" })).toBeDefined();
     // L'écart est chiffré : c'est ce qui rend le manque franchissable.
     expect(screen.getByText(/2 000 000 F au-dessus de ton budget/)).toBeDefined();
-    expect(screen.getByText(/il ne prédit aucune décision/)).toBeDefined();
+    expect(screen.getByText(/ne prédit aucune décision de l'administration/)).toBeDefined();
   });
 
   it("le titre suit le résultat, il n'annonce pas trois destinations quand il n'y en a aucune", async () => {
     repondre({
       retenues: [],
       ecartees: [
-        { code: "NL", pays: "Pays-Bas", motif: "Niveau de langue non atteint.", ecart: "B2 exigé, tu déclares B1." },
+        {
+          code: "NL",
+          pays: "Pays-Bas",
+          motif: "Niveau de langue non atteint.",
+          ecart: "B2 exigé, tu déclares B1.",
+          mention: { source: "ind.nl", verifieeLe: "2026-09-11" },
+        },
       ],
       aucuneNePasse: true,
+      composantesAbsentes: ["qualité de vie", "coût de la vie"],
     });
     window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
     render(<Resultats />);
@@ -203,8 +211,64 @@ describe("P-03 — Résultats", () => {
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeDefined();
   });
 
+  /**
+   * I.A — le classement dit ce qu'il a pesé, et ce qu'il n'a pas pu peser.
+   * Le serveur le savait depuis le premier jour ; l'écran ne le lisait pas.
+   */
+  it("nomme les critères comparés et ceux qui manquent, sans citer de part", async () => {
+    repondre({
+      retenues: [
+        {
+          rang: "1",
+          slug: "pays-bas",
+          code: "NL",
+          pays: "Pays-Bas",
+          motifs: [{ texte: "B2 exigé, tu déclares B2.", favorable: true }],
+          mention: { source: "ind.nl", verifieeLe: "2026-09-11" },
+        },
+      ],
+      ecartees: [],
+      aucuneNePasse: false,
+      composantesAbsentes: ["qualité de vie", "coût de la vie"],
+    });
+    window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
+    const { container } = render(<Resultats />);
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Pays-Bas" })).toBeDefined());
+    expect(screen.getByText(/compare quatre critères publiés/)).toBeDefined();
+    expect(
+      screen.getByText(/Deux critères prévus n'y entrent pas, faute d'une source datée/),
+    ).toBeDefined();
+    // Aucune destination écartée : la source doit tout de même être là.
+    expect(screen.getByText(/ne prédit aucune décision de l'administration/)).toBeDefined();
+    // Arbitrage C-09 : les poids ordonnent, ils ne s'affichent pas.
+    expect(container.textContent ?? "").not.toMatch(/\d+\s?%/u);
+  });
+
+  it("l'écran où rien ne passe porte lui aussi sa source", async () => {
+    repondre({
+      retenues: [],
+      ecartees: [
+        {
+          code: "NL",
+          pays: "Pays-Bas",
+          motif: "Niveau de langue non atteint.",
+          ecart: "B2 exigé, tu déclares B1.",
+          mention: { source: "ind.nl", verifieeLe: "2026-09-11" },
+        },
+      ],
+      aucuneNePasse: true,
+      composantesAbsentes: ["qualité de vie", "coût de la vie"],
+    });
+    window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
+    render(<Resultats />);
+
+    await waitFor(() => expect(screen.getByText("B2 exigé, tu déclares B1.")).toBeDefined());
+    expect(screen.getByText(/source : ind\.nl/)).toBeDefined();
+  });
+
   it("n'annonce aucune décision de l'administration", async () => {
-    repondre({ retenues: [], ecartees: [], aucuneNePasse: true });
+    repondre({ retenues: [], ecartees: [], aucuneNePasse: true, composantesAbsentes: [] });
     window.sessionStorage.setItem(
       "immipro.simulation",
       JSON.stringify({ objectif: "Étudier" }),

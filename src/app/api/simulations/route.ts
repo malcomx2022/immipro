@@ -62,12 +62,20 @@ export const POST = route({
           mention: regle ? mentionDe(regle) : undefined,
         };
       }),
-      ecartees: resultat.ecartees.map((e) => ({
-        code: e.destination.code,
-        pays: e.destination.pays,
-        motif: e.motif,
-        ecart: e.ecart,
-      })),
+      ecartees: resultat.ecartees.map((e) => {
+        const regle = regleDe(e.destination.slug);
+        return {
+          code: e.destination.code,
+          pays: e.destination.pays,
+          motif: e.motif,
+          ecart: e.ecart,
+          // INV-8 aussi ici : un écart chiffré — « 12 000 000 F demandés » —
+          // est une donnée réglementaire. Quand aucune destination ne passe,
+          // l'écran n'affiche que des écartées : sans cette mention, il ne
+          // porte alors plus aucune source.
+          mention: regle ? mentionDe(regle) : undefined,
+        };
+      }),
       // RG-01.3 : l'écran montre les plus proches plutôt qu'un vide.
       aucuneNePasse: resultat.aucuneNePasse,
       composantesAbsentes: resultat.composantesAbsentes,
