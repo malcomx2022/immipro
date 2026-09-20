@@ -8,12 +8,14 @@ import {
   MENTION_HABILITATION,
 } from "@/domain/consultants/annuaire";
 import {
+  FUSEAU_AFFICHAGE,
   MENTION_TENUE,
   TENUE_MINUTES,
   conditions,
   grouperParJour,
   libelleFormat,
   libelleHeure,
+  libelleLimite,
   libelleLimiteAnnulation,
   libelleRendezVous,
   limiteAnnulation,
@@ -147,13 +149,27 @@ describe("T-05 — créneaux et confirmation", () => {
     const jours = grouperParJour(liste);
     const pris = jours[0]!.creneaux.filter((c) => !c.disponible);
     expect(pris).toHaveLength(1);
-    expect(libelleHeure(pris[0]!)).toBe("11 h 30");
+    expect(libelleHeure(pris[0]!)).toBe("12 h 30");
   });
 
+  /**
+   * Les heures ont gagné une heure au lot I.E, et c'est la correction :
+   * les formateurs écrivaient en UTC sous une phrase qui annonçait « les
+   * horaires sont donnés dans ton fuseau, Cotonou ». Un créneau stocké à
+   * 14 h 30 UTC se lit 15 h 30 à Cotonou, et c'est cette heure-là que le
+   * candidat doit retenir.
+   */
   it("nomme l'heure et le jour sans abréviation dans la confirmation", () => {
     const creneau = grouperParJour(liste)[0]!.creneaux[2]!;
-    expect(libelleHeure(creneau)).toBe("15 h 30");
-    expect(libelleRendezVous(creneau)).toBe("Jeudi 17 septembre, 15 h 30");
+    expect(libelleHeure(creneau)).toBe("16 h 30");
+    expect(libelleRendezVous(creneau)).toBe("Jeudi 17 septembre, 16 h 30");
+  });
+
+  it("le fuseau d'affichage est déclaré en un seul endroit", () => {
+    expect(FUSEAU_AFFICHAGE).toBe("Africa/Porto-Novo");
+    // La phrase de l'écran nomme Cotonou : le fuseau doit être le sien, pas
+    // celui du serveur.
+    expect(mentionFuseau("Cotonou", "Amsterdam")).toContain("ton fuseau, Cotonou");
   });
 
   it("calcule la limite d'annulation depuis la grille, pas depuis l'écran", () => {
@@ -166,7 +182,18 @@ describe("T-05 — créneaux et confirmation", () => {
     // Écrite au jour près, la limite ferait annuler trop tard quelqu'un qui
     // s'y fie — et la consultation serait due.
     const creneau = grouperParJour(liste)[0]!.creneaux[2]!;
-    expect(libelleLimiteAnnulation(creneau)).toBe("mercredi 16 septembre à 15 h 30");
+    expect(libelleLimiteAnnulation(creneau)).toBe("mercredi 16 septembre à 16 h 30");
+  });
+
+  /**
+   * Après la réservation, la limite affichée est celle que le serveur a
+   * stockée — la grille peut avoir changé entre-temps, la condition
+   * acceptée ce jour-là, non.
+   */
+  it("la limite stockée s'affiche telle quelle", () => {
+    expect(libelleLimite("2026-09-16T15:30:00.000Z")).toBe(
+      "mercredi 16 septembre à 16 h 30",
+    );
   });
 
   it("reprend le tarif et la durée de la grille", () => {

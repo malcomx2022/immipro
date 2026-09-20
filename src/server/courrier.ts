@@ -1,4 +1,10 @@
 import { VALIDITE_MINUTES } from "@/domain/comptes/code-verification";
+import {
+  libelleFormat,
+  libelleLimiteAnnulation,
+  libelleRendezVous,
+  type Creneau,
+} from "@/domain/consultants/rendez-vous";
 import { verifierTexte, INTERDITS_PARTOUT } from "@/domain/copy/vocabulaire-interdit";
 
 /**
@@ -136,4 +142,62 @@ export const envoyerAlerteCritique = (destinataire: string, destination: string)
 Ton dossier est mis en pause le temps que tu regardes : rien n'est supprimé, et ta checklist actuelle reste celle de la version que tu as figée à l'ouverture.
 
 Ouvre ton dossier pour voir ce qui change et décider.${SIGNATURE}`,
+  });
+
+export interface ConfirmationEntretien {
+  destinataire: string;
+  reference: string;
+  creneau: Creneau;
+  consultant: string;
+  /**
+   * « Pays-Bas — Séjour pour études », ou nul quand le dossier n'a pas
+   * encore de règle figée. La ligne disparaît alors : « Dossier : ton
+   * dossier » ne dit rien que l'objet ne dise déjà.
+   */
+  dossier: string | null;
+  /** Jour où l'accord de partage expire de lui-même, déjà mis en forme. */
+  partageExpireLe: string;
+}
+
+/**
+ * Confirmation d'entretien — T-05, I.E.
+ *
+ * Aucun courrier ne partait : le candidat réservait quarante-cinq minutes
+ * payantes et ne recevait rien, alors que l'écran lui annonçait le
+ * contraire.
+ *
+ * Le partage se fait comme pour l'alerte critique (RG-11.3), et pour la
+ * même raison : **un email ne se recalcule pas à l'ouverture.** Ce qui est
+ * écrit ici est ce qui ne bougera plus — le créneau, la durée, le
+ * consultant, la référence, la limite d'annulation opposable, la date où
+ * l'accord expire. Ce qui bouge — l'état de la checklist, les pièces qui
+ * restent à traiter — n'est pas recopié mais renvoyé au dossier, qui dit
+ * l'état du jour. Relu trois semaines plus tard, un courrier qui
+ * énumérerait les pièces manquantes ferait préparer les mauvaises.
+ *
+ * Les horaires suivent le fuseau d'affichage du parcours, et non celui du
+ * serveur : les deux ont divergé d'une heure tant que les formateurs
+ * écrivaient en UTC sous une phrase qui promettait l'heure locale.
+ */
+export const envoyerConfirmationEntretien = ({
+  destinataire,
+  reference,
+  creneau,
+  consultant,
+  dossier,
+  partageExpireLe,
+}: ConfirmationEntretien) =>
+  expedier({
+    destinataire,
+    objet: `Entretien confirmé — ${libelleRendezVous(creneau)}`,
+    corps: `Ton entretien avec ${consultant} est réservé.
+
+${libelleRendezVous(creneau)} · ${libelleFormat()}
+${dossier ? `Dossier : ${dossier}\n` : ""}Référence : ${reference}
+
+Annulation ou report sans frais jusqu'au ${libelleLimiteAnnulation(creneau)}. Passé ce délai, la consultation est due.
+
+${consultant} accède à ton dossier jusqu'au ${partageExpireLe}, et tu peux retirer cet accord à tout moment.
+
+Ce qu'il reste à préparer avant l'appel change à mesure que tu déposes tes pièces : ouvre ton dossier pour le voir. Ce courrier ne le recopie pas, il serait faux demain.${SIGNATURE}`,
   });

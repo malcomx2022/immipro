@@ -15,6 +15,23 @@ import {
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+/**
+ * Le fuseau dans lequel les horaires sont écrits — I.E.
+ *
+ * Tous les formateurs de ce module écrivaient en UTC pendant que l'écran
+ * annonçait « les horaires sont donnés dans ton fuseau, Cotonou ». Un
+ * créneau de 16 h 30 s'affichait donc « 15 h 30 » sous une phrase qui
+ * promettait l'heure locale : une heure d'écart sur un rendez-vous payé de
+ * quarante-cinq minutes. Le défaut ne se voyait pas à la lecture du code —
+ * chaque `timeZone: "UTC"` était correct en soi — mais seulement en
+ * rapprochant les formateurs de la phrase.
+ *
+ * Une seule constante, parce qu'il faut qu'un seul endroit change le jour
+ * où le fuseau suivra le candidat. Elle vaut pour le Bénin ; la plateforme
+ * s'adresse à plus large, et c'est le point laissé ouvert.
+ */
+export const FUSEAU_AFFICHAGE = "Africa/Porto-Novo";
+
 export interface Creneau {
   /** Début du rendez-vous, ISO avec fuseau. */
   debut: string;
@@ -39,18 +56,32 @@ export interface JourDeCreneaux {
 
 const FORMAT_JOUR = new Intl.DateTimeFormat("fr-FR", {
   weekday: "short",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 const FORMAT_DATE = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
   month: "short",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
+
+/**
+ * La clé de groupement est le jour **tel qu'il s'affiche**, pas le jour
+ * UTC. Les deux divergent d'un créneau de fin de soirée, qui se serait
+ * rangé sous la veille tout en portant la date du lendemain.
+ */
+const FORMAT_CLE = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: FUSEAU_AFFICHAGE,
+});
+
+export const jourAffiche = (iso: string): string => FORMAT_CLE.format(new Date(iso));
 
 /** « 15 h 30 ». */
 export const libelleHeure = (creneau: Creneau): string =>
@@ -60,7 +91,7 @@ export const libelleHeure = (creneau: Creneau): string =>
 export function grouperParJour(creneaux: readonly Creneau[]): JourDeCreneaux[] {
   const jours = new Map<string, JourDeCreneaux>();
   for (const creneau of [...creneaux].sort((a, b) => a.debut.localeCompare(b.debut))) {
-    const cle = creneau.debut.slice(0, 10);
+    const cle = jourAffiche(creneau.debut);
     if (!jours.has(cle)) {
       const date = new Date(creneau.debut);
       jours.set(cle, {
@@ -102,7 +133,7 @@ const FORMAT_LIMITE = new Intl.DateTimeFormat("fr-FR", {
   weekday: "long",
   day: "numeric",
   month: "long",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 
 /**
@@ -112,10 +143,19 @@ const FORMAT_LIMITE = new Intl.DateTimeFormat("fr-FR", {
  * délai, pas en fin de journée. Écrite au jour près, elle ferait annuler
  * trop tard quelqu'un qui s'y fie — et la consultation serait due.
  */
-export function libelleLimiteAnnulation(creneau: Creneau): string {
-  const limite = new Date(limiteAnnulation(creneau));
+export function libelleLimite(iso: string): string {
+  const limite = new Date(iso);
   return `${FORMAT_LIMITE.format(limite)} à ${FORMAT_HEURE.format(limite).replace(":", " h ")}`;
 }
+
+/**
+ * La même limite, calculée depuis le créneau. Avant la réservation, c'est
+ * la seule source ; après, le serveur renvoie la valeur qu'il a stockée, et
+ * c'est elle qui s'affiche — la grille peut avoir changé entre-temps, la
+ * condition acceptée ce jour-là, non.
+ */
+export const libelleLimiteAnnulation = (creneau: Creneau): string =>
+  libelleLimite(limiteAnnulation(creneau));
 
 /**
  * Le décalage entre le fuseau du candidat et celui du consultant, énoncé
@@ -136,7 +176,7 @@ const FORMAT_LONG = new Intl.DateTimeFormat("fr-FR", {
   weekday: "long",
   day: "numeric",
   month: "long",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 
 /** « Jeudi 17 septembre, 15 h 30 ». */
