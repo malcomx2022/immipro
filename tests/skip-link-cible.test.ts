@@ -20,12 +20,20 @@ const RACINES = [
 ];
 
 /**
- * Le back-office pose la cible dans son en-tête partagé plutôt que dans
- * chaque écran : sept registres qui répètent le même titre focalisable
- * finiraient par diverger. Le composant est vérifié une fois, ci-dessous, et
- * une route qui le rend satisfait la règle.
+ * Composants partagés qui posent la cible pour la route qui les rend.
+ *
+ * Le back-office la met dans son en-tête plutôt que dans chacun de ses
+ * sept registres, et les deux index de rubrique — guides et articles — la
+ * mettent dans `Rubrique`, qui les rend tous les deux. Répéter le même
+ * titre focalisable dans chaque écran finirait par diverger. Chaque
+ * porteur est vérifié une fois, ci-dessous.
  */
-const PORTEURS = ["EnteteAdmin"];
+const PORTEURS = ["EnteteAdmin", "Rubrique"];
+
+const FICHIERS_PORTEURS: Record<string, string> = {
+  EnteteAdmin: join("src", "components", "admin", "EnteteAdmin.tsx"),
+  Rubrique: join("src", "components", "ui", "Rubrique.tsx"),
+};
 
 function routes(dir: string, acc: string[] = []): string[] {
   const entrees = readdirSync(dir);
@@ -52,8 +60,8 @@ describe("cible du lien d'évitement", () => {
     expect(dossiers.length).toBeGreaterThanOrEqual(35);
   });
 
-  it("l'en-tête partagé du back-office pose bien la cible", () => {
-    const src = readFileSync(join("src", "components", "admin", "EnteteAdmin.tsx"), "utf8");
+  it.each(PORTEURS)("le composant partagé %s pose bien la cible", (porteur) => {
+    const src = readFileSync(FICHIERS_PORTEURS[porteur]!, "utf8");
     expect(src).toContain('id="contenu"');
     expect(src).toContain("tabIndex={-1}");
   });

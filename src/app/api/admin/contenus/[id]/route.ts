@@ -18,6 +18,19 @@ const CHEMIN: Record<GenreDocument, string> = {
 };
 
 /**
+ * Le document **et** sa rubrique.
+ *
+ * Oublier l'index laisserait un guide publié invisible une heure depuis la
+ * page qui existe pour le trouver — le pire des deux, puisque l'adresse
+ * directe marcherait et que personne ne saurait pourquoi la liste ne le
+ * montre pas.
+ */
+function revalider(genre: GenreDocument, slug: string): void {
+  revalidatePath(`${CHEMIN[genre]}/${slug}`);
+  revalidatePath(CHEMIN[genre]);
+}
+
+/**
  * Édition et publication d'un document éditorial — B-08, J.C.
  *
  * Le vocabulaire interdit est vérifié **à chaque enregistrement** et ne
@@ -79,7 +92,7 @@ export const PUT = route({
     // Un document déjà publié dont on enregistre une correction doit la
     // montrer : la page est en cache, et rien d'autre ne l'invalide.
     if (document.status === "PUBLIE") {
-      revalidatePath(`${CHEMIN[document.kind as GenreDocument]}/${document.slug}`);
+      revalider(document.kind as GenreDocument, document.slug);
     }
 
     // Les fautes sont rendues, pas opposées : elles s'affichent à côté du
@@ -127,7 +140,7 @@ export const POST = route({
         motif: `Retrait — ${corps.motif}`,
         details: { genre: vue.genre, slug: vue.slug },
       });
-      revalidatePath(`${CHEMIN[vue.genre]}/${vue.slug}`);
+      revalider(vue.genre, vue.slug);
       return { etat: "RETIRE" as const };
     }
 
@@ -174,7 +187,7 @@ export const POST = route({
       details: { genre: vue.genre, slug: vue.slug },
     });
 
-    revalidatePath(`${CHEMIN[vue.genre]}/${vue.slug}`);
+    revalider(vue.genre, vue.slug);
     return { etat: "PUBLIE" as const, adresse: `${CHEMIN[vue.genre]}/${vue.slug}` };
   },
 });

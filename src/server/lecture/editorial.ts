@@ -5,9 +5,11 @@ import {
   corpsSchema,
   dureeLecture,
   sommaireDe,
+  ordonner,
   MENTION_SUITE,
   verifierLeDocument,
   type Corps,
+  type EnTete,
   type EtatDocument,
   type FauteEditoriale,
   type GenreDocument,
@@ -101,6 +103,45 @@ export async function adressesPubliees(genre: GenreDocument): Promise<readonly s
     orderBy: { publishedAt: "desc" },
   });
   return docs.map((d) => d.slug);
+}
+
+/**
+ * La rubrique — P.A, P-08 et P-09.
+ *
+ * Le corps est lu pour en tirer la durée de lecture, et pour rien d'autre :
+ * un document dont le corps ne se relit plus n'entre pas dans la liste,
+ * puisqu'il ne s'ouvrirait pas non plus.
+ *
+ * L'ordre est décidé dans le domaine, et il n'est pas le même des deux
+ * côtés. Le tri n'est donc pas en SQL : `ORDER BY` ne sait pas comparer
+ * « Émirats » et « Suisse » en français, et surtout la règle est une
+ * décision de produit, qui se teste sans base.
+ */
+export async function rubrique(genre: GenreDocument): Promise<EnTete[]> {
+  const docs = await db.editorialDoc.findMany({
+    where: { kind: genre, status: "PUBLIE" },
+    orderBy: { publishedAt: "desc" },
+    take: 200,
+  });
+
+  const entetes = docs.flatMap((doc) => {
+    const lu = corpsSchema.safeParse(doc.body);
+    if (!lu.success) return [];
+    return [
+      {
+        genre,
+        slug: doc.slug,
+        titre: doc.title,
+        chapeau: doc.standfirst,
+        surtitre: (genre === "GUIDE" ? doc.countryLabel : doc.section) ?? "—",
+        dureeLecture: dureeLecture(lu.data.blocs),
+        verifieeLe: iso(doc.verifiedAt) ?? "",
+        publieLe: iso(doc.publishedAt) ?? "",
+      } satisfies EnTete,
+    ];
+  });
+
+  return ordonner(entetes, genre);
 }
 
 // ── Back-office ──────────────────────────────────────────────────────────

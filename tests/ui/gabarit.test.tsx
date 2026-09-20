@@ -48,10 +48,19 @@ describe("Footer", () => {
     ).toBeDefined();
   });
 
-  it("classe ses liens en quatre colonnes nommées", () => {
-    render(<Footer />);
-    for (const titre of ["Destinations", "Produit", "Société", "Légal"]) {
-      expect(screen.getByRole("navigation", { name: titre })).toBeDefined();
+  it("classe ses liens en colonnes nommées, et n'en promet aucune vide", () => {
+    // Le nombre de colonnes n'est pas la propriété : c'est qu'aucune ne
+    // soit anonyme, et qu'aucune ne soit là sans lien. Le pied de page a
+    // perdu « Société » et « Légal » le jour où l'on a vu que leurs six
+    // adresses répondaient 404 (annexe Q) ; figer « quatre » aurait fait
+    // échouer la correction plutôt que le défaut.
+    const { container } = render(<Footer />);
+    const colonnes = [...container.querySelectorAll("nav[aria-label]")];
+    expect(colonnes.length).toBeGreaterThan(0);
+    for (const colonne of colonnes) {
+      expect(colonne.getAttribute("aria-label")).toBeTruthy();
+      expect(colonne.querySelectorAll("a").length).toBeGreaterThan(0);
     }
+    expect(screen.getByRole("navigation", { name: "Destinations" })).toBeDefined();
   });
 });

@@ -1067,12 +1067,9 @@ article sans rubrique ni signature.
 
 ### Ce qui reste à arbitrer
 
-**P.A — L'index des guides et des articles n'existe pas.** Il n'y a pas de
-page `/guides` ni `/articles` : les documents ne sont atteignables que par
-leur adresse directe et par les liens du pied de page, qui viennent du
-registre éditorial. Tant qu'il y a deux documents, cela se défend. Au
-dixième, il faudra une page de rubrique — et elle posera la question du
-classement, qui n'est pas la même pour un guide pays que pour un article.
+**P.A — L'index des guides et des articles n'existe pas.** ~~Il n'y a pas de
+page `/guides` ni `/articles`.~~ **Tranché — voir annexe Q.** Les trois
+index existent, et le lot a trouvé bien pire que ce que P.A annonçait.
 
 **P.B — Une seule version, pas d'historique.** Une règle est versionnée
 parce qu'un dossier fige la sienne (INV-3) ; un guide n'a rien qui le fige,
@@ -1085,3 +1082,88 @@ conserver les versions d'un guide ? C'est une question de gouvernance
 celles que le prototype dessine, toutes textuelles. Un guide illustré
 demanderait un téléversement, un stockage, une purge — c'est-à-dire tout le
 dispositif des pièces de dossier, pour un besoin qui n'est pas exprimé.
+
+---
+
+## Annexe Q · Les index, et neuf liens morts
+
+Lot P.A. Il devait ajouter deux pages de rubrique. Il a surtout trouvé que
+l'en-tête et le pied de page promettaient neuf adresses en 404, sur
+**toutes** les pages publiques, depuis le premier lot.
+
+### Ce qui est tranché
+
+**Q.1 — Le test des liens morts ne voyait pas les liens.** Il lisait les
+attributs `href="…"` du JSX. Or une barre de navigation ne s'écrit jamais
+comme ça : elle s'écrit `{ href: "/tarifs", libelle: "Tarifs" }` dans une
+table, qu'un `.map()` transforme en attributs. Le test regardait partout
+sauf à l'endroit où les liens se rassemblent — et c'est précisément
+l'endroit dont une erreur se voit sur chaque écran. Trois des quatre
+entrées de l'en-tête menaient en 404.
+
+**Q.2 — Un guide ne se classe pas comme un article.** C'était la question
+que P.A laissait ouverte. Un article est daté : le plus récent d'abord,
+parce qu'un texte de l'an dernier sur une règle qui a changé depuis n'est
+pas ce qu'on veut lire en premier. Un guide porte un pays, et celui qu'on
+cherche est celui où l'on veut aller, pas le dernier écrit : ordre
+alphabétique, qui a le mérite d'être prévisible — on sait où regarder avant
+d'avoir lu.
+
+**Q.3 — Et la date affichée non plus.** Un guide montre sa date de
+**vérification**, un article sa date de **parution**. Un guide écrit il y a
+deux ans mais revérifié le mois dernier vaut mieux qu'un guide publié le
+mois dernier et jamais relu depuis ; c'est déjà la date qu'INV-8 impose en
+pied de document, la rubrique la remonte pour qu'on choisisse quoi lire sur
+le bon critère.
+
+**Q.4 — Les six pages manquantes ne sont pas écrites, et leurs liens sont
+retirés.** « Comment ça marche », « À propos », « Contact », « Mentions
+légales », « Données personnelles », « Conditions ». Les trois dernières
+demandent un siège, un numéro RCCM, un hébergeur, un contrat : les
+inventer produirait un document juridique faux, ce qui est pire qu'une
+colonne absente. Le lien, lui, promettait déjà ce document sans l'avoir —
+le retirer ne crée pas le manque, il cesse de le cacher.
+
+**Q.5 — Un index sans paramètre ne peut pas être régénéré.** Les pages de
+document gardent leur cache d'une heure : leur segment dynamique n'est
+énumérable par rien, donc Next ne les pré-rend pas au build. Une page
+d'index n'a pas de segment : elle est pré-rendue, la base n'existe pas au
+build (J.8), et la construction échoue. Les trois index sont donc rendus à
+la demande. La différence tient au segment, pas au contenu, et il valait
+mieux le constater que le supposer.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Le pied de page menait à une fiche en 404.** Il nommait trois
+  destinations tirées du registre éditorial, qui connaît les slugs mais
+  pas ce qui est **publié** : « Émirats arabes unis » est au registre et sa
+  règle est en brouillon. Aucun test statique ne peut voir cet état de
+  base ; la cause, si — une liste figée dans un composant partagé. La
+  colonne pointe maintenant vers le catalogue, qui lit la base.
+- **« Consultants partenaires » était une porte close.** L'écran existe,
+  derrière la garde candidat : un visiteur anonyme arrivait sur la page de
+  connexion sans savoir pourquoi. Ce n'est pas un lien mort, c'en est un
+  troisième genre, et le test le refuse désormais — un écran public ne
+  mène pas derrière une garde, sauf vers les portes elles-mêmes.
+- **Le pied de page annonçait « Toutes les fiches » vers `/resultats`**,
+  qui est le classement du simulateur, pas le catalogue. Les deux pages
+  existent maintenant et ne disent pas la même chose : P-02 liste ce qui
+  est couvert, P-03 classe selon des réponses.
+
+### Ce qui reste à arbitrer
+
+**Q.A — Six pages publiques manquent, dont trois obligatoires.** Retirer
+les liens ne retire pas l'obligation : une plateforme qui traite des
+données personnelles et encaisse des paiements doit publier ses mentions
+légales, sa politique de données et ses conditions. Elles demandent des
+informations d'entreprise et une rédaction juridique qui ne sont pas de
+notre ressort. « Comment ça marche », « À propos » et « Contact » sont du
+marketing, et attendent la même décision : qui les écrit.
+
+**Q.B — Le pied de page ne mène plus à une destination précise.** C'était
+sa fonction : donner trois entrées directes vers les pays les plus
+demandés, ce qui vaut pour le référencement interne. Le faire correctement
+demande de lire la base depuis un composant partagé par toutes les pages
+publiques — donc de les rendre toutes dynamiques, y compris le simulateur
+et les tarifs, qui n'ont aucune raison de l'être. La question se rouvrira
+le jour où l'on mesurera ce que le pied de page apporte vraiment.
