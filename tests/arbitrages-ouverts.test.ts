@@ -3,7 +3,17 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { versXOF, convertible, MENTION_NON_COMPARABLE } from "@/domain/format/change";
 import { sansCommentaires } from "@/domain/copy/source";
-import { LIBELLE_JALON, PREALABLES } from "@/domain/exploitation/prealables";
+import {
+  LIBELLE_JALON,
+  PREALABLES,
+  prealablesDe,
+} from "@/domain/exploitation/prealables";
+import {
+  ADRESSES_SANS_PAGE,
+  LIBELLE_PORTE,
+  PAGES_PUBLIQUES,
+  pagesBloquantes,
+} from "@/domain/exploitation/pages-publiques";
 
 /**
  * Les lectures retenues pendant qu'un arbitrage est ouvert.
@@ -397,6 +407,120 @@ describe("M.C (sous réserve) — le document reste un reçu", () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Q.A — qui écrit les six pages publiques manquantes.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Arbitrage d'attribution clos le 20/09/2026, **le contenu des quatre
+ * pages obligatoires restant suspendu à une validation juridique avant
+ * l'ouverture au public**.
+ *
+ * Ce qui est tranché : qui écrit quoi, et laquelle de ces pages commande
+ * une porte de lancement. Ce qui ne l'est pas, et ne peut pas l'être ici :
+ * leur texte. Des mentions légales demandent un siège et un numéro
+ * d'immatriculation, des conditions demandent un contrat — les inventer
+ * produirait un document juridique faux, ce qui est pire qu'une page
+ * absente.
+ *
+ * Le registre ne prétend donc pas qu'une page est validée : aucun test ne
+ * peut le vérifier, et un drapeau « validé » serait coché (M.C). Ce qu'il
+ * tient est vérifiable — une page déclarée absente l'est, et rien ne
+ * pointe vers elle.
+ */
+describe("Q.A (sous réserve) — les six pages publiques et leur responsable", () => {
+  const ROUTES = fichiers("src/app", /^page\.tsx$/u).map((f) =>
+    f
+      .replace(/^src\/app/u, "")
+      .replace(/\/page\.tsx$/u, "")
+      .replace(/\/\([^/]*\)/gu, "")
+      .replace(/^$/u, "/"),
+  );
+
+  it("les six pages du relevé sont au registre, avec leur porte", () => {
+    expect(PAGES_PUBLIQUES).toHaveLength(6);
+    expect(pagesBloquantes().map((p) => p.adresse)).toEqual([
+      "/mentions-legales",
+      "/donnees-personnelles",
+      "/conditions",
+      // Le relevé rangeait Contact avec le marketing. Une plateforme qui
+      // encaisse doit offrir une voie de recours réelle : Q.A la reclasse.
+      "/contact",
+    ]);
+  });
+
+  /**
+   * Le responsable est un métier, jamais un nom — même règle que le
+   * registre des préalables, et pour la même raison : les personnes
+   * changent, et un registre qui nomme quelqu'un vieillit au premier
+   * départ.
+   */
+  it("chaque page dit qui l'écrit, et ce qui manque pour l'écrire", () => {
+    for (const page of PAGES_PUBLIQUES) {
+      expect(page.responsable, page.adresse).not.toMatch(/@|\b[A-Z][a-zéèêà]+\s+[A-Z]/u);
+      expect(page.manque.length, page.adresse).toBeGreaterThan(60);
+      expect(LIBELLE_PORTE[page.porte], page.adresse).toBeTruthy();
+      expect(page.adresse, page.adresse).toMatch(/^\/[a-z-]+$/u);
+    }
+  });
+
+  /**
+   * **Le registre et l'arborescence disent la même chose.** C'est la
+   * moitié vérifiable de « aucun lien ne doit être rétabli avant que sa
+   * page soit complète et validée » : tant que la page est au registre,
+   * elle n'existe pas, et le test des liens morts interdit alors d'y
+   * mener. Le jour où quelqu'un crée la route — fût-ce une ébauche — ce
+   * test tombe et l'oblige à revenir ici, là où le responsable et la
+   * condition sont écrits. Une page à moitié faite ne devient pas liable
+   * en silence.
+   */
+  it("aucune page du registre n'est servie : le registre dit ce qui manque", () => {
+    const servies = PAGES_PUBLIQUES.filter((p) => ROUTES.includes(p.adresse));
+    expect(servies.map((p) => p.adresse)).toEqual([]);
+  });
+
+  /** Et rien ne promet ces adresses, ni dans un écran ni dans une table. */
+  it("aucun écran ne promet une page qui n'existe pas", () => {
+    const ecrans = [
+      ...fichiers("src/app", /\.tsx$/u),
+      ...fichiers("src/components", /\.tsx$/u),
+    ];
+    const fautifs: string[] = [];
+    for (const f of ecrans) {
+      const source = readFileSync(f, "utf8");
+      for (const adresse of ADRESSES_SANS_PAGE) {
+        if (new RegExp(`["\`]${adresse}["\`/?#]`, "u").test(source)) {
+          fautifs.push(`${f} → ${adresse}`);
+        }
+      }
+    }
+    expect(fautifs).toEqual([]);
+  });
+
+  /**
+   * Les quatre bloquantes tiennent la même porte que les autres préalables
+   * d'ouverture, et s'y lisent avec eux : trois registres qui ne se
+   * répondent pas valent une prose qui ne se lit pas.
+   */
+  it("la porte de lancement rejoint les préalables d'ouverture", () => {
+    const prealable = PREALABLES.find((p) => p.arbitrage === "Q.A");
+    expect(prealable?.jalon).toBe("OUVERTURE_PUBLIQUE");
+    expect(prealablesDe("OUVERTURE_PUBLIQUE").map((p) => p.arbitrage)).toContain("Q.A");
+  });
+
+  /**
+   * Et le produit n'écrit aucune de ces pages à leur place. Le registre
+   * porte ce qui manque, pas un brouillon de mention légale : une phrase
+   * plausible dans ce fichier deviendrait, par copie, le texte publié.
+   */
+  it("le registre décrit le manque, il ne le comble pas", () => {
+    const source = readFileSync("src/domain/exploitation/pages-publiques.ts", "utf8");
+    // Les marques d'un texte juridique rédigé, plutôt que décrit.
+    expect(source).not.toMatch(/RCCM\s*[:n°]|SIRET|capital social de|Article [1-9]/u);
+    expect(source).not.toMatch(/est édité par|le présent contrat|l'utilisateur s'engage/iu);
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * Le lien avec le document, dans les deux sens.
  * ------------------------------------------------------------------ */
 
@@ -416,7 +540,7 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
    * qu'il faut ne pas perdre de vue. Un troisième état la garde visible,
    * et le test exige qu'elle soit nommée dans le relevé.
    */
-  const SOUS_RESERVE = ["L.A", "M.C"];
+  const SOUS_RESERVE = ["L.A", "M.C", "Q.A"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
@@ -486,7 +610,19 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   it("ceux sous réserve sont au registre, et leur condition y est nommée", () => {
     for (const code of SOUS_RESERVE) {
       const texte = bloc(code);
-      expect(texte, code).toMatch(/\*\*Décision produit provisoire/u);
+      /**
+       * La marque dit « décidé, mais pas fini ». Deux formulations la
+       * portent, et c'est voulu : L.A et M.C ont pris une décision
+       * *provisoire* que l'avis extérieur peut renverser ; Q.A a tranché
+       * son attribution pour de bon, et ce qui reste suspendu est le
+       * contenu que d'autres doivent écrire. Exiger « décision produit
+       * provisoire » de Q.A l'aurait obligée à se décrire faussement —
+       * c'est le sur-ajustement que ce test s'était déjà reproché une
+       * fois, revenu par le vocabulaire au lieu de la condition.
+       */
+      expect(texte, code).toMatch(
+        /\*\*Décision produit provisoire|\*\*Arbitrage d'attribution clos/u,
+      );
       expect(texte, code).not.toMatch(/\*\*Tranché/u);
       expect(CE_FICHIER, code).toContain(`describe("${code} (sous réserve) —`);
 
