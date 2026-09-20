@@ -229,6 +229,7 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
   const resultat = computeCompleteness({
     documents: dossier.documents.map((d) => ({
       code: d.code,
+      libelle: d.label,
       required: d.required,
       status: d.status,
     })),

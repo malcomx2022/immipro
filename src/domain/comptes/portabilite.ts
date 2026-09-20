@@ -46,6 +46,7 @@ export const CE_QUE_CONTIENT: readonly string[] = [
   "Tes dossiers : destination, dates, état de chaque pièce et verdict de chaque analyse.",
   "Les textes que tu as rédigés ici, dans toutes leurs versions.",
   "Tes reçus de paiement, tes analyses consommées et tes autorisations.",
+  "Pour chaque dossier : le palier de complétude, les manques dans l'ordre où ils te sont présentés, et ce qui a pesé pour l'établir.",
 ];
 
 /**
@@ -55,6 +56,10 @@ export const CE_QUE_CONTIENT: readonly string[] = [
 export const CE_QUE_NE_CONTIENT_PAS: readonly string[] = [
   "Les fichiers eux-mêmes — passeport, relevés, diplômes. Ils se téléchargent depuis l'archive de chaque dossier, un par un.",
   "Les pièces déjà purgées : leur contenu n'existe plus, seuls le verdict et sa date restent.",
+  // L.A — la limite est annoncée avant le téléchargement, comme le reste.
+  // Découvrir dans le fichier qu'une chose manque vaut moins que le lire
+  // sur l'écran qui propose de le produire.
+  "La pondération interne des facteurs de complétude. L'export dit ce qui a pesé et dans quel ordre, pas avec quels coefficients.",
 ];
 
 export const MENTION_FORMAT =

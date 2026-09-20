@@ -19,6 +19,14 @@ export type DocumentState =
 
 export interface DocumentInput {
   code: string;
+  /**
+   * Nom lisible de la pièce — « Relevé bancaire ».
+   *
+   * Facultatif par compatibilité, mais toujours fourni en pratique : sans
+   * lui, les messages de repli nomment la pièce par son code, et l'export
+   * de L.A rendait « Il te reste à téléverser : MOT ».
+   */
+  libelle?: string;
   required: boolean;
   status: DocumentState;
 }
@@ -137,21 +145,30 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
 export type CompletenessPublic = Omit<CompletenessResult, "interne">;
 export const versClient = ({ interne: _ignore, ...reste }: CompletenessResult): CompletenessPublic => reste;
 
+/**
+ * Message de repli, quand la pièce n'en porte pas encore de sien.
+ *
+ * Il tutoie, comme tout ce que lit le candidat (DOC-12 §16, règle 5). Trois
+ * de ces phrases vouvoyaient, et personne ne les avait vues : elles ne
+ * s'affichaient nulle part — l'écran montre le message de la pièce. L'export
+ * de L.A les a sorties au jour.
+ */
 function messagePourPiece(d: DocumentInput): string {
+  const nom = d.libelle ?? d.code;
   switch (d.status) {
     case "ATTENDUE":
-      return `Il vous reste à téléverser : ${d.code}.`;
+      return `Il te reste à téléverser : ${nom}.`;
     case "EN_ANALYSE":
-      return `Analyse en cours : ${d.code}.`;
+      return `Analyse en cours : ${nom}.`;
     case "ILLISIBLE":
-      return `Le document ${d.code} n'a pas pu être lu. Reprenez la photo à plat, bien éclairée, sans reflet.`;
+      return `${nom} n'a pas pu être lu. Reprends la photo à plat, bien éclairée, sans reflet.`;
     case "HORS_SUJET":
-      return `Le document téléversé pour ${d.code} ne correspond pas au type attendu.`;
+      return `Le document téléversé pour « ${nom} » ne correspond pas au type attendu.`;
     case "EXPIREE":
-      return `Le document ${d.code} a dépassé sa durée de validité. Téléversez une version récente.`;
+      return `${nom} a dépassé sa durée de validité. Téléverse une version récente.`;
     case "PURGEE":
-      return `Le document ${d.code} a été supprimé conformément à la politique de rétention.`;
+      return `${nom} a été supprimé conformément à la politique de rétention.`;
     default:
-      return `Le document ${d.code} demande une correction.`;
+      return `${nom} demande une correction.`;
   }
 }

@@ -75,7 +75,11 @@ describe("complétude du dossier", () => {
       coherence: 0,
       redaction: 0,
     });
-    expect(r.missing[0]!.message).toMatch(/reprenez la photo/i);
+    // Le message tutoie, comme tout ce que lit le candidat (DOC-12 §16,
+    // règle 5) : trois de ces phrases vouvoyaient, et ne s'affichaient
+    // nulle part — l'export de L.A les a sorties au jour.
+    expect(r.missing[0]!.message).toMatch(/reprends la photo/i);
+    expect(r.missing[0]!.message).not.toMatch(/\bvous\b|ez\b/iu);
     expect(r.missing[0]!.message).not.toMatch(/non conforme/i);
   });
 

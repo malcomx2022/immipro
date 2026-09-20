@@ -5,6 +5,7 @@ import { versFiche, mentionDe } from "@/server/acces/regles";
 import { versPiece } from "@/server/vue/dossier";
 import { LIBELLE_PALIER } from "@/domain/completeness/score";
 import { completudeDesPieces } from "@/domain/dossiers/piece";
+import { expliquerLaCompletude } from "@/domain/completeness/explication";
 import { A_PROPOS, VERSION_EXPORT } from "@/domain/comptes/portabilite";
 import { CONSENTEMENTS } from "@/domain/comptes/consentements";
 import { GENRE_DU_CONSENTEMENT } from "@/server/acces/consentements";
@@ -150,11 +151,35 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
         issue: a.issue,
         // Le barème interne n'est pas ici : l'export rend ce que les écrans
         // disent, un palier et un dénombrement (arbitrage C-09).
+        //
+        // Et, depuis L.A, une explication intelligible des principaux
+        // facteurs. Un palier nu satisfait la portabilité — c'est un
+        // résultat — sans rien dire de la logique qui l'a produit ; la
+        // décision provisoire comble cet écart sans restituer la
+        // pondération, qui n'est pas une donnée fournie par la personne.
         completude: {
           palier: LIBELLE_PALIER[completude.palier],
           conformes: completude.compteurs.conformes,
           obligatoiresManquantes: completude.compteurs.obligatoiresManquantes,
           facultativesManquantes: completude.compteurs.facultativesManquantes,
+          // L'ordre des manques est le seul effet visible de la
+          // pondération, et l'explication le dit : il est donc exporté.
+          //
+          // Le message est celui que le candidat a lu, pas une phrase
+          // régénérée. L'export rendait « Le document REL demande une
+          // correction » là où l'écran disait « ton relevé s'arrête au
+          // 31 juillet, il en faut un de moins de trois mois » : le
+          // résultat effectivement utilisé pour le dossier était remplacé
+          // par un constat nu, que RG-06.3 refuse par ailleurs.
+          manques: completude.missing.map((m) => {
+            const concernee = pieces.find((p) => p.code === m.code);
+            return {
+              piece: concernee?.libelle ?? m.code,
+              message: concernee?.message ?? m.message,
+              bloquant: m.bloquant,
+            };
+          }),
+          explication: expliquerLaCompletude(completude),
         },
         purgePrevueLe: jour(a.purgeDueAt),
         purgeeLe: iso(a.purgedAt),
