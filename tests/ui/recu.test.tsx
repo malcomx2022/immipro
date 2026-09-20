@@ -22,6 +22,7 @@ const PAYE: Donnees = {
   le: "2026-09-11T09:43:00.000Z",
   moyen: "Mobile Money",
   transactionOperateur: "MP260911.0943",
+  rembourseLe: null,
   achat: "Dossier",
   achatCode: "dossier",
   montant: 25_000,
@@ -120,10 +121,26 @@ describe("$-06 — les états où il n'y a pas de reçu", () => {
   });
 
   it("un remboursement garde son reçu mais ferme le renvoi, avec sa raison", () => {
-    const { container } = render(<Recu recu={{ ...PAYE, etat: "rembourse" }} />);
+    const { container } = render(
+      <Recu recu={{ ...PAYE, etat: "rembourse", rembourseLe: "2026-09-14T10:12:00.000Z" }} />,
+    );
     expect(container.textContent).toContain("Total remboursé");
     const bouton = screen.getByRole("button", { name: "Renvoyer par email" });
     expect(bouton.hasAttribute("disabled")).toBe(true);
     expect(container.textContent).toContain(RAISON_RENVOI_FERME);
+  });
+
+  /**
+   * M.B — un reçu est une pièce comptable, et une pièce comptable est
+   * datée. La mention disait qu'un remboursement avait eu lieu sans dire
+   * quand, faute d'une date que rien n'écrivait.
+   */
+  it("le remboursement porte sa date, distincte de celle du paiement", () => {
+    const { container } = render(
+      <Recu recu={{ ...PAYE, etat: "rembourse", rembourseLe: "2026-09-14T10:12:00.000Z" }} />,
+    );
+    expect(container.textContent).toContain("remboursé le 14 septembre 2026, 10 h 12");
+    // La date du paiement reste celle du paiement : les deux se lisent.
+    expect(container.textContent).toContain("11 septembre 2026, 9 h 43");
   });
 });

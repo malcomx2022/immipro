@@ -422,7 +422,15 @@ model Transaction {
   amount        Int
   currency      String            @db.Char(3)
   provider      PaymentProvider
-  /// Clé d'idempotence du webhook (INV-7).
+  /// Identifiant de la transaction chez le fournisseur.
+  ///
+  /// Posé à la première notification et **jamais réécrit** — M.B. Il servait
+  /// aussi de clé d'idempotence, ce qui confondait deux choses : « quelle
+  /// transaction est-ce chez eux » et « ai-je déjà vu cette notification ».
+  /// Chez FedaPay les deux coïncident, et un remboursement portant le même
+  /// identifiant se lisait donc comme un rejeu ; chez Stripe ils diffèrent,
+  /// et le remboursement écrasait la référence que le reçu cite. La clé
+  /// d'idempotence est désormais `PaymentEvent.providerEventId`.
   providerTxId  String?           @unique
   status        TransactionStatus @default(INITIEE)
   createdAt     DateTime          @default(now())
@@ -447,10 +455,44 @@ model Transaction {
   /// Écart constaté, conservé jusqu'à résolution manuelle (B-04).
   discrepancy  String?
 
+  /// Quand l'argent est reparti — M.B.
+  ///
+  /// Un reçu est une pièce comptable : « ce paiement a été remboursé » sans
+  /// date n'en est pas une. La base tient les deux ensemble — l'état ne va
+  /// pas sans la date, ni la date sans l'état.
+  refundedAt DateTime?
+
   credits AnalysisCredit[]
+  events  PaymentEvent[]
 
   @@index([status, createdAt])
   @@index([reconciledAt, createdAt])
+}
+
+/// Une notification reçue d'un fournisseur — clé d'idempotence, INV-7, M.B.
+///
+/// L'idempotence se tenait sur `Transaction.providerTxId`, c'est-à-dire sur
+/// la transaction et non sur l'événement. Une transaction en reçoit
+/// plusieurs — confirmation puis remboursement — et le second se lisait
+/// comme un rejeu du premier chaque fois que le fournisseur réutilisait son
+/// identifiant. La clé porte maintenant sur la notification elle-même.
+///
+/// La ligne est écrite dans la même transaction de base que le changement
+/// d'état : un rejeu bute sur l'unicité et le changement est annulé avec
+/// lui. Elle laisse en outre la trace de ce qui est arrivé et dans quel
+/// ordre, ce que l'ancienne colonne écrasait à chaque notification.
+model PaymentEvent {
+  id              String            @id @default(uuid())
+  providerEventId String            @unique
+  transactionId   String
+  transaction     Transaction       @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  /// L'état annoncé, pas l'état atteint : une notification refusée par la
+  /// table du cycle ne laisse pas de ligne, mais celles qui passent disent
+  /// ce qu'elles ont demandé.
+  announced       TransactionStatus
+  receivedAt      DateTime          @default(now())
+
+  @@index([transactionId, receivedAt])
 }
 
 /// Comptage des tokens, pas des « vérifications » (INV-6).

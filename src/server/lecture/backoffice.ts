@@ -232,6 +232,9 @@ function etatDuRapprochement(
 ): EtatRapprochement {
   if (t.discrepancy) return "ECART";
   if (t.status === "CONFIRMEE") return t.reconciledAt ? "RAPPROCHE" : "EN_ATTENTE";
+  // Avant M.B, `REMBOURSEE` n'était nommé nulle part ici et tombait sur la
+  // dernière ligne : passé dix minutes, « Écart à traiter ».
+  if (t.status === "REMBOURSEE") return "REMBOURSE";
   if (t.status === "EXPIREE") return "ECHEC_DELAI";
   if (t.status === "ECHOUEE") return "ECHEC";
   return aReconcilier(t.createdAt, maintenant) ? "ECART" : "EN_ATTENTE";

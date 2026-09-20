@@ -8,10 +8,12 @@ import {
   MENTION_ECARTS,
   MENTION_TOTAL_SUSPENDU,
   agreger,
+  lignesDeTotal,
   libelleEcarts,
   messageIncidentOperateur,
   totalPubliable,
   type EtatOperateur,
+  type Totaux,
   type Paiement,
 } from "@/domain/backoffice/reconciliation";
 import { formatMontant } from "@/lib/utils";
@@ -50,6 +52,15 @@ export function Paiements({
   journee: string;
 }) {
   const agregats = agreger(paiements);
+  /**
+   * Une somme par monnaie. Les deux rails n'encaissent pas dans la même,
+   * et les additionner produisait un total en francs qui contenait des
+   * euros — l'erreur comptable que ce tableau est censé prévenir.
+   */
+  const sommes = (totaux: Totaux) =>
+    lignesDeTotal(totaux)
+      .map((l) => formatMontant(l.montant, l.devise))
+      .join(" · ");
   const incident = operateur ? messageIncidentOperateur(operateur, heure) : null;
   const publiable = operateur ? totalPubliable(operateur) : false;
 
@@ -84,10 +95,10 @@ export function Paiements({
           </section>
         ) : null}
 
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           <Carte
             intitule="Encaissé aujourd'hui"
-            valeur={publiable ? formatMontant(agregats.encaisse, "XOF") : "—"}
+            valeur={publiable ? sommes(agregats.encaisse) : "—"}
             detail={
               publiable
                 ? `${agregats.confirmes} paiements confirmés`
@@ -96,13 +107,26 @@ export function Paiements({
           />
           <Carte
             intitule="En attente de confirmation"
-            valeur={formatMontant(agregats.enAttente, "XOF")}
+            valeur={sommes(agregats.enAttente)}
             detail={`${agregats.transactionsEnAttente} transactions`}
           />
           <Carte
             intitule="Échecs du jour"
             valeur={String(agregats.echecs)}
-            detail="délai dépassé ou solde insuffisant"
+            // Le détail nommait une cause — « solde insuffisant » — pour
+            // tous les échecs, ce que N.B a retiré de la colonne d'état
+            // juste à côté. Il la nommait encore ici.
+            detail="délai dépassé ou paiement refusé"
+          />
+          {/*
+            Un remboursement sort de l'encaissé, ce qui est juste, et
+            n'entrait dans aucun compteur — une somme rendue disparaissait
+            de la journée (M.B).
+          */}
+          <Carte
+            intitule="Remboursé aujourd'hui"
+            valeur={sommes(agregats.rembourse)}
+            detail={`${agregats.rembourses} ${agregats.rembourses > 1 ? "paiements rendus" : "paiement rendu"}`}
           />
           <Carte
             intitule="Écarts à traiter"

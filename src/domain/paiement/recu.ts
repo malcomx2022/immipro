@@ -85,8 +85,16 @@ export const MENTION_ATTESTATION =
 export const MENTION_PDF =
   "Dans la fenêtre d'impression, choisis « Enregistrer au format PDF » pour en garder un fichier.";
 
-export const MENTION_REMBOURSE =
-  "Ce paiement a été remboursé. Le reçu reste consultable pour ta comptabilité, mais il n'atteste plus d'une somme acquise.";
+/**
+ * Un reçu est une pièce comptable, et une pièce comptable est datée — M.B.
+ *
+ * La mention disait qu'un remboursement avait eu lieu sans dire quand,
+ * c'est-à-dire la seule chose dont une comptabilité a besoin pour le
+ * rapprocher. La date n'existait pas en base tant que rien n'écrivait
+ * l'état ; elle y est maintenant, et la phrase la porte.
+ */
+export const mentionRembourse = (moment: string): string =>
+  `Ce paiement a été remboursé le ${moment}. Le reçu reste consultable pour ta comptabilité, mais il n'atteste plus d'une somme acquise.`;
 
 /** Pourquoi le renvoi est fermé sur un reçu remboursé (règle de désactivation 3). */
 export const RAISON_RENVOI_FERME =

@@ -1017,6 +1017,78 @@ chemin sera-t-il une décision de back-office, un webhook du fournisseur, ou
 les deux ? Tant que la question n'est pas tranchée, la présentation du
 remboursement est vérifiée en essai, pas en production.
 
+*Lot M.B.* La question posée reste entière, et elle porte sur
+l'**initiation** : qui décide de rendre l'argent, depuis quel écran, avec
+quelle trace. Ce qui a été livré est la **réconciliation**, que les deux
+réponses supposent également — INV-7 dit que tout paiement est réconcilié
+par webhook signé, et un remboursement prononcé chez le fournisseur n'y
+arrivait pas.
+
+La cause tenait dans une colonne. `providerTxId` servait à la fois
+d'identifiant de la transaction chez le fournisseur et de clé d'idempotence
+du webhook, c'est-à-dire à désigner deux choses différentes : *de quelle
+transaction parle-t-on* et *ai-je déjà vu cette notification*. Une
+transaction en reçoit plusieurs au cours de sa vie, et les deux rails s'y
+cassaient de façon opposée.
+
+- **FedaPay** renvoie l'entité : `approved` et `refunded` portent le même
+  `entity.id`. Le remboursement se lisait donc comme un rejeu de la
+  confirmation et disparaissait en silence — sur ce rail, aucun
+  remboursement n'était écrivable, par construction.
+- **Stripe** numérote ses objets : l'événement de remboursement cite la
+  charge quand la confirmation citait la session. Le remboursement
+  s'écrivait, mais en remplaçant la référence opérateur qu'un reçu déjà
+  imprimé porte — une pièce comptable dont la référence change après coup.
+
+La clé descend donc sur la notification (`PaymentEvent.providerEventId`,
+unique, écrit dans la même transaction de base que le changement d'état), et
+`providerTxId` redevient ce que son nom dit, posé une fois. La table laisse
+au passage la trace de ce qui est arrivé et dans quel ordre, que l'ancienne
+colonne écrasait à chaque notification.
+
+Le remplacement a découvert une course que l'ancienne clé ne couvrait pas :
+`checkout.session.completed` et `payment_intent.succeeded` décrivent le même
+paiement sous deux identifiants d'objet, et arrivant ensemble ils créditaient
+deux fois. La mise à jour exige désormais l'état qui vient d'être lu ; la
+perdante n'écrit rien.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **B-04 classait un remboursement en « Écart à traiter ».** Faute d'état
+  pour lui, il retombait sur le cas par défaut du rapprochement, qui bascule
+  en écart passé dix minutes. Un opérateur ouvrait donc une enquête sur une
+  somme rendue exprès, et le compteur d'écarts la comptait. Rendre l'argent
+  est une issue, pas un désaccord.
+- **Une somme rendue ne comptait nulle part.** Elle sort de l'encaissé, ce
+  qui est juste, et n'entrait dans aucun autre total : une journée où trois
+  paiements ont été rendus se lisait comme une journée où ils n'avaient
+  jamais eu lieu.
+- **Les totaux additionnaient des francs et des euros.** Vingt-cinq mille
+  francs plus vingt-neuf euros donnaient « 25 029 F ». Le défaut était
+  antérieur au lot et portait déjà sur l'encaissé et l'attente ; il ne s'est
+  vu qu'avec les deux rails côte à côte à l'écran, et ajouter un quatrième
+  total l'aurait recopié. Chaque monnaie a maintenant sa ligne — c'est
+  exactement ce que ce module refuse deux paragraphes plus haut, « un chiffre
+  partiel présenté comme un total ».
+- **« Échecs du jour » expliquait encore « délai dépassé ou solde
+  insuffisant ».** N.B avait retiré cette cause de la colonne d'état juste à
+  côté ; elle était restée dans le sous-titre de la carte.
+- **Le reçu datait le paiement et pas le remboursement**, et sa ligne
+  s'appelait « Date » — sans ambiguïté tant qu'il n'y en avait qu'une. La
+  date existe maintenant en base, la mention la porte, et la ligne s'appelle
+  « Date du paiement ».
+
+### Ce qui reste ouvert après ce lot
+
+- **Qui prononce le remboursement.** La question d'origine, inchangée.
+- **Le pack reste crédité.** Rendre l'argent ne retire pas les analyses déjà
+  ouvertes, et le lot n'y touche pas : les révoquer est une décision de
+  produit, du côté de l'initiation. Les analyses consommées ne se rendent
+  pas de toute façon.
+- **Personne n'est prévenu.** Un reçu confirmé part par courrier ; un
+  remboursement n'en déclenche aucun. Le texte dépend de qui l'a prononcé,
+  donc de la même décision.
+
 **M.C — Le reçu n'a pas de numérotation de facture.** Il porte la référence
 interne de la transaction, qui est non séquentielle par choix (une suite
 d'entiers dit le nombre de paiements du mois à qui en voit deux). Une

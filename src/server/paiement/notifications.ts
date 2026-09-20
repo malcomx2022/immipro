@@ -70,6 +70,15 @@ const ETATS_STRIPE: Record<string, TransactionStatus> = {
 };
 
 export interface Lue {
+  /**
+   * Ce qui se rejoue : la notification — M.B.
+   *
+   * Distinct de `providerTxId`, qui désigne la transaction. Une transaction
+   * reçoit plusieurs notifications au cours de sa vie ; les confondre
+   * faisait passer un remboursement pour un rejeu de la confirmation.
+   */
+  providerEventId: string;
+  /** Ce dont on parle : la transaction chez le fournisseur. */
   providerTxId: string;
   reference: string;
   statut: TransactionStatus;
@@ -94,6 +103,15 @@ export function lireFedaPay(charge: unknown): Lue | null {
   if (!statut) return null;
   const cause = CAUSES_FEDAPAY[etat];
   return {
+    /**
+     * FedaPay renvoie l'entité, pas l'événement : la charge utile n'a pas
+     * d'identifiant de notification, et l'identifiant d'entité est le même
+     * de la confirmation au remboursement. La clé est donc dérivée du
+     * couple entité + état — ce qui distingue les notifications d'une même
+     * transaction, et rend identiques deux envois de la même. Le jour où le
+     * rail expose un identifiant d'événement, c'est lui qu'on lira.
+     */
+    providerEventId: `fedapay:${lu.data.entity.id}:${etat}`,
     providerTxId: `fedapay:${lu.data.entity.id}`,
     reference: lu.data.entity.reference,
     statut,
@@ -139,6 +157,9 @@ export function lireStripe(charge: unknown): Lue | null {
     statut === "ECHOUEE" ? ((code ? CAUSES_STRIPE[code] : undefined) ?? "REFUS_EMETTEUR") : undefined;
 
   return {
+    // Stripe, lui, numérote ses événements : `evt_…` est exactement la clé
+    // que l'idempotence demande, et il en émet un par notification.
+    providerEventId: `stripe:${lu.data.id}`,
     providerTxId: `stripe:${lu.data.data.object.id}`,
     reference: lu.data.data.object.metadata.reference,
     statut,

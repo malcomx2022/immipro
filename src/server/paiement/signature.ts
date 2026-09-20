@@ -14,8 +14,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  *    valeur octet par octet à qui mesure le temps de réponse.
  * 2. **Horodatage vérifié.** Sans fenêtre de tolérance, une notification
  *    authentique capturée aujourd'hui se rejoue dans six mois avec sa
- *    signature valide. L'idempotence par `providerTxId` empêche le double
- *    crédit ; elle n'empêche pas de ressusciter un paiement expiré.
+ *    signature valide. L'idempotence par `PaymentEvent.providerEventId`
+ *    empêche le double crédit ; elle n'empêche pas de ressusciter un
+ *    paiement expiré.
  * 3. **Signature calculée sur les octets reçus.** Le corps est passé en
  *    texte brut : reparsé puis re-sérialisé, il changerait d'espaces et de
  *    l'ordre de ses clés, et aucune signature ne correspondrait plus.

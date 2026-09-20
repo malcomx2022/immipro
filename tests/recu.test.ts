@@ -5,7 +5,7 @@ import {
   LIBELLE_ETAT,
   MENTION_ATTESTATION,
   MENTION_PDF,
-  MENTION_REMBOURSE,
+  mentionRembourse,
   RAISON_RENVOI_FERME,
   confirmationDeRenvoi,
   estAttestable,
@@ -37,7 +37,11 @@ describe("état d'un reçu", () => {
     // La ligne comptable survit au remboursement ; la somme, non.
     expect(etatDuRecu("REMBOURSEE")).toBe("rembourse");
     expect(LIBELLE_ETAT.rembourse).toBe("Remboursé");
-    expect(MENTION_REMBOURSE).toMatch(/n'atteste plus/u);
+    // Une pièce comptable est datée : la mention porte le jour où la somme
+    // est repartie, et pas seulement le fait qu'elle soit repartie (M.B).
+    const mention = mentionRembourse("14 septembre 2026, 10 h 12");
+    expect(mention).toMatch(/n'atteste plus/u);
+    expect(mention).toContain("remboursé le 14 septembre 2026, 10 h 12");
   });
 
   it("un statut inconnu ne devient jamais payé", () => {

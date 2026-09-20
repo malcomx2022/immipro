@@ -18,6 +18,7 @@ import type { CauseRefus } from "@/domain/paiement/echec";
 
 export type EtatRapprochement =
   | "RAPPROCHE"
+  | "REMBOURSE"
   | "EN_ATTENTE"
   | "ECART"
   | "ECHEC_DELAI"
@@ -25,6 +26,11 @@ export type EtatRapprochement =
 
 export const LIBELLE_RAPPROCHEMENT: Record<EtatRapprochement, string> = {
   RAPPROCHE: "Rapproché",
+  // Un remboursement n'avait pas d'état, et retombait donc sur le cas par
+  // défaut : « Écart à traiter », dès la dixième minute (M.B). Un opérateur
+  // ouvrait une enquête sur une somme rendue exprès, et le compteur
+  // d'écarts la comptait. Rendre l'argent est une issue, pas un désaccord.
+  REMBOURSE: "Remboursé",
   EN_ATTENTE: "En attente de rapprochement",
   ECART: "Écart à traiter",
   ECHEC_DELAI: "Délai dépassé",
@@ -52,6 +58,8 @@ export interface Paiement {
 }
 
 export const estConfirme = (p: Paiement): boolean => p.etat === "RAPPROCHE";
+/** Rendre l'argent n'est pas le refuser : un remboursement n'est pas un échec. */
+export const estRembourse = (p: Paiement): boolean => p.etat === "REMBOURSE";
 export const estEnAttente = (p: Paiement): boolean => p.etat === "EN_ATTENTE";
 export const estEnEchec = (p: Paiement): boolean =>
   p.etat === "ECHEC_DELAI" || p.etat === "ECHEC";
@@ -64,25 +72,69 @@ export interface EtatOperateur {
   operateur: string;
 }
 
+/**
+ * Une somme par monnaie — et jamais une somme tout court.
+ *
+ * Les totaux additionnaient des francs et des euros pour les afficher
+ * suivis d'un « F » : vingt-cinq mille francs et vingt-neuf euros
+ * donnaient « 25 029 F ». C'est précisément ce que ce module refuse deux
+ * paragraphes plus haut — un chiffre qui n'est pas ce qu'il annonce. Le
+ * défaut ne s'est vu qu'à l'écran, avec les deux rails côte à côte.
+ */
+export type Totaux = Record<string, number>;
+
+const parDevise = (paiements: readonly Paiement[]): Totaux => {
+  const totaux: Totaux = {};
+  for (const p of paiements) totaux[p.devise] = (totaux[p.devise] ?? 0) + p.montant;
+  return totaux;
+};
+
+/**
+ * Ce qu'une carte affiche : une ligne par monnaie, et « 0 » dans la monnaie
+ * de référence quand il n'y a rien — une carte vide se lit comme une carte
+ * en panne.
+ */
+export const DEVISE_DE_REFERENCE = "XOF";
+
+export function lignesDeTotal(totaux: Totaux): { devise: string; montant: number }[] {
+  const lignes = Object.entries(totaux)
+    .map(([devise, montant]) => ({ devise, montant }))
+    .sort((a, b) => a.devise.localeCompare(b.devise));
+  return lignes.length > 0 ? lignes : [{ devise: DEVISE_DE_REFERENCE, montant: 0 }];
+}
+
 export interface Agregats {
-  encaisse: number;
+  encaisse: Totaux;
   confirmes: number;
-  enAttente: number;
+  enAttente: Totaux;
   transactionsEnAttente: number;
   echecs: number;
   ecarts: number;
+  /**
+   * Ce qui est reparti — M.B.
+   *
+   * Un paiement remboursé sort d'`encaisse`, ce qui est juste : la somme
+   * n'est plus acquise. Mais il ne rentrait alors dans aucun compteur, et
+   * une journée où trois paiements ont été rendus se lisait comme une
+   * journée où ils n'avaient jamais eu lieu.
+   */
+  rembourses: number;
+  rembourse: Totaux;
 }
 
 export function agreger(paiements: readonly Paiement[]): Agregats {
   const confirmes = paiements.filter(estConfirme);
   const attente = paiements.filter(estEnAttente);
+  const rendus = paiements.filter(estRembourse);
   return {
-    encaisse: confirmes.reduce((total, p) => total + p.montant, 0),
+    encaisse: parDevise(confirmes),
     confirmes: confirmes.length,
-    enAttente: attente.reduce((total, p) => total + p.montant, 0),
+    enAttente: parDevise(attente),
     transactionsEnAttente: attente.length,
     echecs: paiements.filter(estEnEchec).length,
     ecarts: paiements.filter((p) => p.etat === "ECART").length,
+    rembourses: rendus.length,
+    rembourse: parDevise(rendus),
   };
 }
 
