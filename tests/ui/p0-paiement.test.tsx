@@ -8,6 +8,7 @@ import { PACKS } from "@/domain/payments/pricing";
 import { DELAI_REESSAI_SECONDES } from "@/domain/paiement/attente";
 import { formatMontant } from "@/lib/utils";
 import { readFileSync } from "node:fs";
+import { LIBELLE_ETAT } from "@/domain/paiement/recu";
 
 const parametres = new URLSearchParams();
 vi.mock("next/navigation", () => ({
@@ -184,10 +185,10 @@ describe("$-05 — Échec", () => {
 describe("$-06 — Reçu", () => {
   it("ne détourne pas la pastille d'état de pièce pour un paiement", () => {
     // « Conforme » qualifie une pièce de dossier ; un paiement est « Payé ».
-    const source = readFileSync("src/app/(app)/paiement/recu/[id]/page.tsx", "utf8");
+    const source = readFileSync("src/app/(app)/paiement/recu/[id]/Recu.tsx", "utf8");
     // On vise l'import, pas le mot : le commentaire qui explique la règle
     // cite le composant, et c'est très bien ainsi.
     expect(source).not.toMatch(/import\s*\{[^}]*StatusBadge/);
-    expect(source).toContain("Payé");
+    expect(LIBELLE_ETAT.paye).toBe("Payé");
   });
 });

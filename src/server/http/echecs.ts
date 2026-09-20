@@ -66,6 +66,7 @@ export type CodeEchec =
   | "devise_figee"
   | "signature_invalide"
   | "paiement_introuvable"
+  | "recu_indisponible"
   // Infrastructure
   | "service_indisponible";
 
@@ -243,6 +244,16 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     conserve: "Ton dossier est conservé en l'état.",
     action: "Revenir à mes paiements",
     ton: "echec",
+  },
+  recu_indisponible: {
+    statut: 409,
+    titre: "Ce reçu n'a pas été envoyé",
+    corps: "L'état de ce paiement ne permet pas d'en établir le courrier.",
+    conserve: "Ton paiement et ton dossier sont inchangés.",
+    action: "Revenir au reçu",
+    // Ni rouge ni ambre : rien n'est en panne, et l'écrire comme une panne
+    // ferait chercher un défaut là où il n'y en a pas.
+    ton: "limite",
   },
   service_indisponible: {
     statut: 503,

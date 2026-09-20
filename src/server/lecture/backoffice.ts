@@ -9,6 +9,7 @@ import type { EcritureAudit, CategorieAudit } from "@/domain/backoffice/audit";
 import type { PieceEnEchec } from "@/domain/backoffice/revue";
 import { aReconcilier } from "@/server/paiement/cycle";
 import { getPack, type Devise } from "@/domain/payments/pricing";
+import { moyenDe } from "@/domain/paiement/recu";
 
 /**
  * Lecture du back-office — B-01 à B-07, WF-14 à WF-16.
@@ -212,7 +213,7 @@ export async function paiements(maintenant = new Date()): Promise<Paiement[]> {
     compte: t.user.email,
     montant: t.amount,
     devise: t.currency,
-    moyen: t.provider === "FEDAPAY" ? "Mobile Money" : "Carte bancaire",
+    moyen: moyenDe(t.provider),
     ...(t.providerTxId ? { transaction: t.providerTxId } : {}),
     recuLe: t.createdAt.toISOString(),
     etat: etatDuRapprochement(t, maintenant),

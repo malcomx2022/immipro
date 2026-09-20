@@ -739,8 +739,103 @@ palier et dénombrement, pas le score — et le point mérite une réponse
 juridique, pas seulement produit.
 
 **L.B — Deux boutons morts restent, sur le reçu de paiement ($-06).**
-« Télécharger » et « Renvoyer par email » ne font rien : ce sont deux
-`<button>` sans gestionnaire sur une page serveur. Ils sortent du périmètre
-de K.B — le premier demande une mise en page imprimable du reçu, le second
-le transport de courrier, qui n'est branché nulle part. Le test des liens
-morts ne les voit pas : ils n'ont pas de `href`.
+~~« Télécharger » et « Renvoyer par email » ne font rien : ce sont deux
+`<button>` sans gestionnaire sur une page serveur.~~ **Tranché — voir
+annexe M.** Les deux font maintenant quelque chose, et le reçu qu'ils
+impriment ou envoient est celui de la base, non plus celui du prototype.
+
+---
+
+## Annexe M · Le reçu de paiement
+
+Lot L.B. Il ferme les deux boutons morts, et découvre que le tunnel de
+paiement n'avait jamais été branché.
+
+### Ce qui est tranché
+
+**M.1 — Un bouton ne pouvait pas être honnête sur un écran qui ne l'est
+pas.** $-06 servait le premier pack de la grille, une date de septembre et
+un numéro d'opérateur écrits en dur — à l'identique pour n'importe quelle
+référence dans l'URL. Imprimer ce document, ou l'envoyer par courrier,
+aurait produit une pièce comptable fausse. Brancher l'écran n'était donc
+pas un élargissement du lot : c'en était la condition. $-04 suivait, parce
+qu'il portait la référence `IMP-2609-4471` qui menait au reçu.
+
+**M.2 — « Télécharger » devient « Imprimer ».** Rien ne descendait ni ne
+descend dans les téléchargements : la fenêtre d'impression s'ouvre, et la
+mention en dessous dit où trouver « Enregistrer au format PDF ». C'est la
+doctrine de L.3, appliquée une seconde fois — le navigateur fait le PDF, et
+aucune bibliothèque de rendu n'entre au dépôt. Le libellé change parce
+qu'un bouton qui annonce un téléchargement qui n'a pas lieu est un bouton
+mort d'une autre façon.
+
+**M.3 — « Renvoyer par email » expédie, et nomme l'adresse atteinte.** La
+route passe par `courrier.ts`, le point de branchement unique (I.C) : le
+transport reste non branché, le courrier est donc journalisé et non
+expédié, exactement comme le reçu d'origine envoyé à la confirmation du
+paiement. La route est en `candidat_verifie` — un montant et une référence
+ne partent pas vers une adresse que personne n'a prouvé lire — et en régime
+`sensible`, parce que chaque clic déclenche un envoi. La confirmation
+affiche l'adresse : c'est le seul moyen de s'apercevoir qu'on attend son
+reçu sur une boîte qu'on ne lit plus.
+
+**M.4 — Un reçu ne s'établit qu'après confirmation, et se défait au
+remboursement.** Une transaction en attente n'a pas de reçu, elle a une
+promesse : l'écran dit lequel des deux, plutôt que d'imprimer « Payé » sur
+un paiement que l'opérateur n'a pas confirmé. Un statut inconnu de la table
+de correspondance tombe du côté sûr — un état ajouté au schéma sans passer
+par le domaine ne produit pas un document qui atteste d'un encaissement. Un
+remboursement garde son reçu, parce que l'obligation comptable ne s'efface
+pas, mais change de mot et ferme le renvoi.
+
+**M.5 — Le reçu nomme le moyen, pas le téléphone.** Le prototype affichait
+« MTN MoMo · 97 •• •• 42 ». Le numéro du portefeuille n'est pas conservé en
+base, et c'est une bonne chose : le reçu dit « Mobile Money ». La référence
+de l'opérateur, elle, n'arrive qu'avec la notification signée — sa ligne
+est absente tant qu'elle n'est pas venue, une ligne vide sur un reçu se
+lisant comme une donnée perdue.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Le refus nommait un autre fait que le corps.** Le renvoi d'un reçu
+  remboursé répondait « Cette étape n'est pas encore ouverte » — le titre
+  générique de `etat_incompatible` — alors que rien n'attend d'être ouvert
+  et que le paiement est venu puis reparti. DOC-12 §16 règle 1 : le titre
+  nomme le fait. Le catalogue porte désormais `recu_indisponible`, de ton
+  `limite` : rien n'est en panne, et l'écrire comme une panne ferait
+  chercher un défaut là où il n'y en a pas. Trouvé en appelant la route,
+  pas en la lisant.
+- **« Dossier / Dossier Pays-Bas ».** Le pack acheté s'appelle « Dossier »,
+  et la ligne de destination répétait le mot juste en dessous. La
+  destination suffit.
+- **Les deux boutons ne tenaient pas côte à côte à 390 px.** « Renvoyer par
+  email » passait sur deux lignes et dépassait la hauteur d'action de la
+  bibliothèque. Ils s'empilent sous 640 px, action principale en premier.
+- **« Pack : 10 analyses supplémentaires ».** L'intitulé de $-04 était
+  « Pack », alors qu'une recharge aboutit sur le même écran. C'est
+  « Achat ».
+
+### Ce qui reste à arbitrer
+
+**M.A — Le tunnel de paiement reste à brancher, sauf ses deux derniers
+écrans.** L'annexe J annonçait vingt-neuf écrans branchés ; $-03 n'en
+faisait pas partie et personne ne l'avait relevé. L'écran d'attente ne
+relève pas le statut — la route `paiements.statut` existe et n'est appelée
+par rien — et ne navigue donc vers $-04 avec aucune référence. Tant que ce
+n'est pas fait, $-04 n'est atteignable qu'en construisant son adresse à la
+main. Ce n'est pas une régression du présent lot : c'est le trou qu'il
+rend visible, et le lot suivant devrait le fermer.
+
+**M.B — Le remboursement n'a pas d'écrivain.** L'état `REMBOURSEE` est au
+schéma, le reçu sait le présenter, `paiement.remboursement` est une action
+journalisable — mais rien ne fait passer une transaction dans cet état. Le
+chemin sera-t-il une décision de back-office, un webhook du fournisseur, ou
+les deux ? Tant que la question n'est pas tranchée, la présentation du
+remboursement est vérifiée en essai, pas en production.
+
+**M.C — Le reçu n'a pas de numérotation de facture.** Il porte la référence
+interne de la transaction, qui est non séquentielle par choix (une suite
+d'entiers dit le nombre de paiements du mois à qui en voit deux). Une
+facture, elle, se numérote en continu dans la plupart des régimes
+comptables. Savoir si ImmiPro doit émettre des factures en plus des reçus,
+et sous quel régime, est une question de comptabilité, pas de produit.

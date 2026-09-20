@@ -74,3 +74,16 @@ export function jourEnFrancais(iso: string): string {
   const texte = FORMAT_JOUR_LONG.format(date);
   return date.getUTCDate() === 1 ? texte.replace(/^1\s/u, "1er ") : texte;
 }
+
+/**
+ * « 11 septembre 2026, 9 h 43 ».
+ *
+ * Un reçu porte l'heure autant que le jour : deux paiements du même jour se
+ * distinguent par elle, et c'est ce qu'on lit à voix haute en réclamation.
+ * `Intl` écrit « 09:43 » ; le français écrit « 9 h 43 », sans zéro de tête.
+ */
+export function momentEnFrancais(iso: string): string {
+  const quand = new Date(iso);
+  const heure = FORMAT_HEURE.format(quand).replace(":", " h ").replace(/^0/u, "");
+  return `${jourEnFrancais(iso)}, ${heure}`;
+}

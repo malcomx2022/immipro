@@ -58,6 +58,7 @@ src/server/
     backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
     partenaires.ts   WF-13. Rien n'est proposable par défaut.
     portabilite.ts   Export du compte et archive d'un dossier.
+    paiements.ts     Reçu d'une transaction, pour $-04, $-06 et son renvoi.
   jobs/
     worker.ts        Branchement pg-boss et cadences.
     analyse.ts       WF-06. Déterministe d'abord, IA pour l'extraction seule.
@@ -149,6 +150,41 @@ après la purge, parce qu'anonymiser d'abord laisserait, en cas de panne du
 stockage, des fichiers sans propriétaire identifiable que plus personne ne
 saurait retrouver. Entre les deux, le compte est « suppression demandée » :
 B-03 l'affiche, et la passe quotidienne de purge le reprend.
+
+## Le reçu, et ce qu'un document comptable impose
+
+`lecture/paiements.ts` sert trois appelants — l'écran de confirmation
+($-04), celui du reçu ($-06) et la route qui renvoie ce reçu par email. La
+raison est la même que partout ailleurs ici, mais elle pèse plus lourd :
+deux écrans qui annoncent deux montants pour un même paiement ne sont pas
+une incohérence d'affichage, c'est un litige.
+
+Trois règles en découlent, et elles vivent dans `domain/paiement/recu.ts`,
+donc sans base ni réseau :
+
+**Un reçu ne s'établit qu'après confirmation.** Une transaction en attente
+n'a pas de reçu, elle a une promesse. Un statut que la table de
+correspondance ne connaît pas ne devient jamais « payé » : l'inconnu tombe
+du côté sûr, parce qu'un état ajouté au schéma sans passer par ici ne doit
+pas produire un document qui atteste d'un encaissement.
+
+**Un remboursement garde son reçu, mais pas sa prétention.** L'obligation
+comptable ne s'efface pas quand l'argent revient ; la pastille et le total
+changent de mot, et le renvoi par email se ferme — le courrier annonce une
+somme encaissée, et elle ne l'est plus.
+
+**Rien n'est inventé de ce que la base ignore.** Le numéro du portefeuille
+qui a payé n'est pas conservé : le reçu nomme le moyen, pas le téléphone.
+La référence de l'opérateur n'arrive qu'avec la notification signée, et sa
+ligne est absente tant qu'elle n'est pas venue — une ligne vide sur un reçu
+se lit comme une donnée perdue.
+
+Le reçu se garde en l'imprimant, comme l'archive d'un dossier : c'est le
+navigateur qui fabrique le PDF, et aucune bibliothèque de rendu n'entre au
+dépôt pour cela. Le renvoi par email passe par `courrier.ts`, point de
+branchement unique ; il n'est pas journalisé, parce qu'un reçu renvoyé ne
+change l'état de rien et part vers la seule adresse que son destinataire
+possède déjà — l'inscrire noierait les accès qui comptent.
 
 ## Écrire une route
 

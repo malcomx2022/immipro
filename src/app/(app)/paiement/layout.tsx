@@ -22,7 +22,9 @@ export default function GabaritPaiement({
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <SkipLink cible="contenu" />
-      <header className="flex items-center gap-6 border-b border-ink-300 px-4 py-4 md:px-12">
+      {/* Le fil des étapes est une aide de navigation : imprimé sur un
+          reçu, il ferait croire à une commande en cours. */}
+      <header className="pas-a-imprimer flex items-center gap-6 border-b border-ink-300 px-4 py-4 md:px-12">
         <Link href="/" className="inline-flex items-center">
           <Image
             src="/brand/immipro-logo-primary.svg"
