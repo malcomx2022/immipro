@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
   LIBELLE_ETAT,
   MENTION_SUITE,
@@ -25,6 +26,15 @@ import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 import { ECHECS } from "@/server/http/echecs";
 
 const lire = (f: string) => readFileSync(f, "utf8");
+
+function fichiers(dir: string, filtre: RegExp, acc: string[] = []): string[] {
+  for (const nom of readdirSync(dir)) {
+    const p = join(dir, nom);
+    if (statSync(p).isDirectory()) fichiers(p, filtre, acc);
+    else if (filtre.test(nom)) acc.push(p.replace(/\\/gu, "/"));
+  }
+  return acc;
+}
 
 /**
  * Le code sans ses commentaires. Ceux du projet citent volontiers ce qu'ils
@@ -400,6 +410,95 @@ describe("ce que le public voit", () => {
     expect(corpsSchema.safeParse({ blocs: [{ type: "paragraphe", texte: "x" }], appel: externe }).success).toBe(
       false,
     );
+  });
+});
+
+/**
+ * P.C — les images restent hors périmètre V1, fermé le 20/09/2026.
+ *
+ * Une décision de ne rien construire ne laisse pas de code derrière elle,
+ * et c'est précisément pourquoi elle a besoin de garde-fous : il n'y a
+ * rien à relire pour s'apercevoir qu'elle a cessé d'être vraie. Ce qui
+ * suit tient la frontière par ses trois côtés — le vocabulaire des blocs,
+ * le rendu du texte, et l'adresse de l'appel à l'action.
+ */
+describe("les images restent hors du périmètre", () => {
+  /**
+   * Le test voisin refuse un type inconnu, ce qui ne suffit pas : ajouter
+   * `image` à l'union le rendrait connu, et il passerait. Le vocabulaire
+   * est donc énuméré, et il est exactement celui des cinq formes
+   * textuelles.
+   */
+  it("le vocabulaire des blocs est clos, et tout y est du texte", () => {
+    const source = lire("src/domain/editorial/document.ts");
+    const union = /export const blocSchema = z\.discriminatedUnion\("type", \[[\s\S]*?\n\]\);/u.exec(
+      source,
+    )![0];
+    const types = [...union.matchAll(/z\.literal\("(\w+)"\)/gu)].map((m) => m[1]);
+    expect(types).toEqual(["paragraphe", "intertitre", "encadre", "citation", "liste"]);
+    // Aucun champ ne porte une adresse de média, sous quelque nom que ce soit.
+    expect(union).not.toMatch(/image|src|url|media|alt|legende|vignette/iu);
+  });
+
+  /**
+   * **Le côté par lequel une image entrerait sans toucher au schéma.** Un
+   * paragraphe est une chaîne libre : rendu en HTML, il suffirait d'y
+   * écrire une balise pour illustrer un guide, et le schéma n'y verrait
+   * rien. React échappe le texte tant qu'on ne le lui demande pas
+   * autrement — c'est cette absence de demande que le test tient.
+   */
+  it("aucun texte éditorial n'est rendu en HTML", () => {
+    const rendu = lire("src/components/ui/BlocsEditoriaux.tsx");
+    expect(rendu).not.toMatch(/dangerouslySetInnerHTML|innerHTML/u);
+    // Et nulle part ailleurs dans le produit, tant qu'à vérifier : c'est le
+    // seul mécanisme par lequel une chaîne saisie devient du balisage.
+    const fautifs = fichiers("src", /\.tsx?$/u).filter((f) =>
+      /dangerouslySetInnerHTML/u.test(lire(f)),
+    );
+    expect(fautifs).toEqual([]);
+  });
+
+  /**
+   * Et le troisième côté : l'adresse interne. Elle est déjà vérifiée plus
+   * haut pour ce qu'elle protège — un guide n'envoie pas ailleurs — mais
+   * elle ferme aussi cette porte-ci, puisqu'une adresse externe est le
+   * premier endroit où poser une image distante.
+   */
+  it("l'appel à l'action n'accepte aucune adresse distante", () => {
+    for (const href of [
+      "https://exemple.test/photo.png",
+      "//exemple.test/photo.png",
+      "data:image/png;base64,iVBORw0KGgo=",
+    ]) {
+      expect(
+        corpsSchema.safeParse({
+          blocs: [{ type: "paragraphe", texte: "x" }],
+          appel: { ...APPEL, href },
+        }).success,
+        href,
+      ).toBe(false);
+    }
+  });
+
+  /**
+   * L'écran et le schéma proposent la même chose. Ils divergeraient sans
+   * bruit : une forme ajoutée au schéma et absente du formulaire serait
+   * invisible, une forme du formulaire absente du schéma serait refusée à
+   * l'enregistrement sans que rien ne dise pourquoi.
+   */
+  it("le formulaire ne propose que ce que le schéma accepte", () => {
+    const ecran = lire("src/app/(admin)/contenus/[id]/EditionContenu.tsx");
+    const formes = [...
+      /const FORMES[\s\S]*?\n\];/u.exec(ecran)![0].matchAll(/valeur: "(\w+)"/gu)
+    ].map((m) => m[1]);
+    expect(formes).toEqual(["paragraphe", "intertitre", "encadre", "citation", "liste"]);
+  });
+
+  /** La condition de réouverture est écrite là où l'on ajouterait un type. */
+  it("la condition de réouverture est posée, et elle n'est pas le temps qui passe", () => {
+    const source = lire("src/domain/editorial/document.ts");
+    expect(source).toMatch(/P\.C, fermé hors périmètre V1/u);
+    expect(source).toMatch(/contenus identifiés/u);
   });
 });
 

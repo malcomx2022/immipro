@@ -1960,10 +1960,49 @@ survivre à son auteur. Les deux chemins ont été vérifiés.
 l'identifiant brut de l'acteur, sur toutes ses lignes. C'est la convention
 existante, et la changer touche une surface qui n'est pas celle de ce lot.
 
-**P.C — Les images ne sont pas au périmètre.** Les cinq formes de bloc sont
-celles que le prototype dessine, toutes textuelles. Un guide illustré
-demanderait un téléversement, un stockage, une purge — c'est-à-dire tout le
-dispositif des pièces de dossier, pour un besoin qui n'est pas exprimé.
+**P.C — Les images ne sont pas au périmètre.** **Fermé hors périmètre V1
+le 20/09/2026.**
+
+Aucun téléversement générique d'images n'est ajouté, et aucune illustration
+extérieure appelée par son adresse : elle troquerait le stockage et la
+sécurité contre la pérennité du lien et la confidentialité du lecteur, dont
+l'adresse IP partirait chez un tiers à chaque ouverture du guide. Le besoin
+sera rouvert **à partir de contenus identifiés** que les cinq formes
+textuelles n'expriment pas correctement — pas quand le temps le permettra.
+Un cas justifié donnera lieu à un périmètre média conçu pour lui.
+
+### Ce que l'application de la décision a trouvé
+
+**La frontière tenait déjà, et c'est ce qu'il fallait vérifier plutôt que
+supposer.** Les cinq formes sont une union fermée, les textes sont rendus
+comme enfants JSX — React les échappe —, l'appel à l'action n'accepte
+qu'une adresse interne, et aucune page publique ne rend d'image pilotée
+par le contenu. Rien n'était à retirer.
+
+**Mais une décision de ne rien construire ne laisse aucun code derrière
+elle**, et c'est précisément ce qui la rend fragile : il n'y a rien à
+relire pour s'apercevoir qu'elle a cessé d'être vraie. Deux des trois
+côtés étaient déjà tenus par des tests — un type inconnu est refusé, une
+adresse externe aussi. Les deux qui manquaient sont ceux par lesquels
+l'image serait entrée :
+
+- **Le vocabulaire des blocs n'était pas énuméré.** Le test existant refuse
+  un type *inconnu* ; ajouter `image` à l'union l'aurait rendu connu, et il
+  serait passé. Les cinq types sont maintenant listés, et aucun champ de
+  bloc ne peut porter un nom d'adresse de média.
+- **Le rendu du texte n'était pas tenu.** Un paragraphe est une chaîne
+  libre : rendu en HTML, il aurait suffi d'y écrire une balise pour
+  illustrer un guide, sans toucher au schéma. Le test refuse désormais
+  `dangerouslySetInnerHTML` dans tout le produit — c'est le seul mécanisme
+  par lequel une chaîne saisie devient du balisage.
+
+**Et l'écran pouvait diverger du schéma sans bruit** : une forme ajoutée au
+schéma et absente du formulaire serait invisible, une forme du formulaire
+absente du schéma serait refusée à l'enregistrement sans que rien ne dise
+pourquoi. Les deux listes sont vérifiées identiques.
+
+La condition de réouverture est écrite là où l'on ajouterait un sixième
+type, et un test refuse qu'elle se dilue en « quand on aura le temps ».
 
 ---
 
