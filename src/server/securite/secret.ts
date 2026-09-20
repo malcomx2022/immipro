@@ -100,6 +100,27 @@ export const codeANChiffres = (n: number): string =>
 export const jeton = (octets = 32): string => randomBytes(octets).toString("base64url");
 
 /**
+ * Suite aléatoire faite pour être dictée à voix haute.
+ *
+ * `base64url` convient à une URL et pas à un téléphone : son alphabet
+ * contient `-` et `_`, qui s'épellent mal et se confondent, et il mêle
+ * `0`/`O` et `1`/`I`/`l`. Une référence de paiement tirée ainsi donnait
+ * `IMP-260920--AJX4Q`, avec deux tirets de suite, à l'usage même pour
+ * lequel elle est dite lisible — la réclamation au téléphone.
+ *
+ * Trente et un caractères, tirés sans biais : `randomInt` rejette le
+ * dernier intervalle incomplet, là où un modulo sur un octet favoriserait
+ * les premières lettres de l'alphabet.
+ */
+const ALPHABET_DICTABLE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+export const suiteDictable = (longueur: number): string =>
+  Array.from(
+    { length: longueur },
+    () => ALPHABET_DICTABLE[randomInt(0, ALPHABET_DICTABLE.length)]!,
+  ).join("");
+
+/**
  * Empreinte d'un jeton ou d'un code, pour le stockage.
  *
  * SHA-256 sans sel, contrairement au mot de passe, et c'est délibéré : le

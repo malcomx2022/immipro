@@ -226,7 +226,14 @@ export function PieceDuDossier({
             {messageQuotaEpuise(volumeRecharge, prixRecharge)}
           </p>
           <div className="flex flex-col gap-2 md:flex-row">
-            <LienBouton href="/paiement/pack" pleineLargeur className="md:w-auto">
+            {/* La recharge n'est pas un pack et ne se choisit donc pas sur
+                $-01, qui le dit lui-même : le lien menait à un écran qui
+                refusait de la vendre. Elle va droit au récapitulatif. */}
+            <LienBouton
+              href={`/paiement/recapitulatif?dossier=${dossier.id}&achat=recharge`}
+              pleineLargeur
+              className="md:w-auto"
+            >
               Recharger {volumeRecharge} analyses
             </LienBouton>
             <Button variante="secondaire" pleineLargeur className="md:w-auto">

@@ -58,7 +58,7 @@ src/server/
     backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
     partenaires.ts   WF-13. Rien n'est proposable par défaut.
     portabilite.ts   Export du compte et archive d'un dossier.
-    paiements.ts     Reçu d'une transaction, pour $-04, $-06 et son renvoi.
+    paiements.ts     Le tunnel ($-01 à $-05) et le reçu ($-04, $-06).
   jobs/
     worker.ts        Branchement pg-boss et cadences.
     analyse.ts       WF-06. Déterministe d'abord, IA pour l'extraction seule.
@@ -185,6 +185,52 @@ dépôt pour cela. Le renvoi par email passe par `courrier.ts`, point de
 branchement unique ; il n'est pas journalisé, parce qu'un reçu renvoyé ne
 change l'état de rien et part vers la seule adresse que son destinataire
 possède déjà — l'inscrire noierait les accès qui comptent.
+
+## Le tunnel de paiement, et ce que la relève n'a pas le droit de conclure
+
+`lecture/paiements.ts` porte trois lectures voisines, et leur séparation
+est le fond du sujet :
+
+- `tunnelDuPaiement` — ce qu'il faut savoir **avant** de débiter : le
+  dossier qu'on ouvre, la devise que son pays suggère, le numéro du compte,
+  et si un pack a déjà été payé. Ce dernier point est lu depuis la
+  transaction et non depuis le statut du dossier : un dossier peut être
+  `ACTIF` sans achat, et c'est bien la transaction confirmée qui dit que le
+  pack est payé.
+- `paiementDuTunnel` — ce que l'attente et l'échec montrent **pendant**.
+- `recuDuPaiement` — le document comptable, **après**.
+
+Les deux dernières lisent la même ligne et ne rendent pas les mêmes
+champs. Le tunnel porte le numéro masqué, parce que « notification envoyée
+au 97 •• •• 42 » désigne l'appareil qu'il faut aller regarder ; le reçu ne
+le porte pas, parce qu'une pièce comptable n'a pas à nommer le portefeuille.
+Une lecture unique aurait fait apparaître le numéro sur le reçu, et aucun
+des deux écrans ne l'aurait signalé.
+
+**Un seul écran ouvre une transaction.** Le récapitulatif appelle
+`POST /api/paiements` et rejoint l'attente avec la référence rendue. Deux
+écrans qui créent une transaction, c'est un double débit en attente
+d'arriver — un test relit les quatre composants du tunnel pour qu'il n'y en
+ait jamais qu'un.
+
+**La relève ne conclut rien.** `$-03` interroge `paiements.statut` toutes
+les trois secondes ; la route lit le statut que le webhook signé fait
+avancer et ne confirme rien elle-même (RG-05.1). Ce que vaut la réponse est
+décidé dans `domain/paiement/attente.ts`, pas dans le composant :
+
+- seul un `CONFIRMEE` conduit à « paiement confirmé » — tout autre état y
+  menant annoncerait un débit que l'opérateur n'a pas fait ;
+- le rebours épuisé ne vaut pas échec : la transaction reste ouverte tant
+  que la base ne l'a pas fermée, et un webhook en retard la confirme encore.
+  L'écran cesse de relever et dit que le délai est dépassé, sans rien
+  affirmer de l'argent ;
+- « délai dépassé » n'est prononcé que si la base l'a prononcé.
+
+**Le motif d'échec vient de l'adresse, sinon de l'état.** Le fournisseur
+transmet parfois une raison ; sinon `motifParDefaut` la déduit du statut.
+Le repli unique sur « délai dépassé » était plus faux que prudent : un
+refus reçu en deux secondes s'annonçait « les cinq minutes se sont
+écoulées », et envoyait vérifier le réseau au lieu du compte.
 
 ## Écrire une route
 

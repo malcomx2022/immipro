@@ -128,9 +128,17 @@ describe("la lecture du reçu", () => {
 
   it("n'invente pas le numéro qui a payé", () => {
     // Il n'est pas conservé : le reçu nomme le moyen, pas le téléphone.
+    // La portée est la lecture du reçu, pas le fichier : les écrans du
+    // tunnel voisinent dedans et citent le numéro à bon droit, parce que
+    // c'est l'appareil qu'ils demandent d'aller regarder.
     const lecture = lire("src/server/lecture/paiements.ts");
+    const recu = lecture.slice(
+      lecture.indexOf("export interface Recu"),
+      lecture.indexOf("export interface Tunnel"),
+    );
     const composant = lire("src/app/(app)/paiement/recu/[id]/Recu.tsx");
-    expect(lecture).not.toMatch(/masquerNumero/u);
+    expect(recu).toMatch(/recuDuPaiement/u);
+    expect(recu).not.toMatch(/masquerNumero|telephone/u);
     expect(composant).not.toMatch(/masquerNumero/u);
   });
 

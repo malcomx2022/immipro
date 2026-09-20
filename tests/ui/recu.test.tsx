@@ -23,6 +23,7 @@ const PAYE: Donnees = {
   moyen: "Mobile Money",
   transactionOperateur: "MP260911.0943",
   achat: "Dossier",
+  achatCode: "dossier",
   montant: 25_000,
   devise: "XOF",
   dossier: { id: "nl-1", pays: "Pays-Bas", intitule: "Séjour pour études (MVV + VVR)" },

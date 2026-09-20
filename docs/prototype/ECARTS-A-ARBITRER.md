@@ -818,13 +818,97 @@ lisant comme une donnée perdue.
 ### Ce qui reste à arbitrer
 
 **M.A — Le tunnel de paiement reste à brancher, sauf ses deux derniers
-écrans.** L'annexe J annonçait vingt-neuf écrans branchés ; $-03 n'en
-faisait pas partie et personne ne l'avait relevé. L'écran d'attente ne
-relève pas le statut — la route `paiements.statut` existe et n'est appelée
-par rien — et ne navigue donc vers $-04 avec aucune référence. Tant que ce
-n'est pas fait, $-04 n'est atteignable qu'en construisant son adresse à la
-main. Ce n'est pas une régression du présent lot : c'est le trou qu'il
-rend visible, et le lot suivant devrait le fermer.
+écrans.** ~~L'annexe J annonçait vingt-neuf écrans branchés ; $-03 n'en
+faisait pas partie et personne ne l'avait relevé.~~ **Tranché — voir
+annexe N.** Les cinq écrans du tunnel lisent la base, la relève appelle la
+route qui existait, et le parcours va de la checklist au reçu sans qu'on
+construise une adresse à la main.
+
+---
+
+## Annexe N · Le tunnel de paiement
+
+Lot M.A. Il ferme le trou que l'annexe M avait rendu visible, et découvre
+que $-01, $-02 et $-05 n'étaient pas branchés non plus.
+
+### Ce qui est tranché
+
+**N.1 — Le tunnel n'était pas à moitié branché, il ne l'était pas du
+tout.** M.A ne nommait que $-03. En le branchant, on constate que $-01
+affichait « Pays-Bas — séjour études » et « le Bénin » pour tout le monde,
+que $-02 vendait le premier pack de la grille quel que soit le dossier, et
+que $-05 citait la référence `IMP-2609-4471`. Les cinq écrans lisent
+maintenant la transaction ou le dossier que l'adresse désigne, et refusent
+celui d'autrui.
+
+**N.2 — Un seul écran ouvre une transaction.** Le récapitulatif, et lui
+seul, appelle la route de création puis rejoint l'attente avec la référence
+rendue. Deux écrans qui créent un paiement, c'est un double débit en
+attente d'arriver ; un test relit les quatre composants du tunnel pour
+qu'il n'y en ait jamais qu'un. « Continuer » sur $-01 est un lien, pas un
+appel : il retient un pack, il ne débite pas.
+
+**N.3 — La relève ne conclut rien, et la décision est dans le domaine.**
+Seul un `CONFIRMEE` conduit à « paiement confirmé » : tout autre état y
+menant annoncerait un débit que l'opérateur n'a pas fait. Le rebours épuisé
+ne vaut pas échec — la transaction reste ouverte tant que la base ne l'a
+pas fermée, et un webhook en retard la confirme encore (RG-05.1). L'écran
+cesse alors de relever et dit que le délai est dépassé, sans rien affirmer
+de l'argent. La navigation remplace au lieu d'empiler : un retour arrière
+depuis $-04 ne doit pas ramener sur une attente qui relèverait un paiement
+déjà abouti.
+
+**N.4 — La porte d'entrée manquait.** $-01 n'était atteignable que depuis
+le bloc de quota épuisé, qui ne concerne qu'un dossier **déjà** ouvert — et
+ce bloc menait aux packs pour acheter une recharge, que l'écran des packs
+dit lui-même ne pas vendre. Un brouillon porte désormais son propre bloc
+sur la checklist, et la recharge va droit au récapitulatif.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Un refus s'annonçait comme un délai dépassé.** Le webhook `declined`
+  arrivait en deux secondes, et $-05 répondait « Les cinq minutes se sont
+  écoulées sans confirmation » : un fait faux, qui envoie vérifier le
+  réseau au lieu du compte. Le repli unique paraissait prudent et ne
+  l'était pas. Deux motifs de plus, chacun ne disant que ce qui est su —
+  « ton opérateur n'a pas confirmé le paiement », sans accuser le solde, et
+  « la notification n'est pas arrivée » pour un paiement encore ouvert.
+- **Le numéro masqué montrait l'indicatif du pays.** `+22997000042` donnait
+  « 22 •• •• 42 » : l'indicatif, que tous les numéros du compte partagent,
+  au lieu du préfixe d'opérateur qui les distingue. Le prototype ne l'avait
+  pas vu, parce qu'il écrivait « 97 •• •• 42 » en dur.
+- **La référence de paiement ne se dictait pas.** `base64url` produisait
+  `IMP-260920--AJX4Q` — deux tirets de suite, et un alphabet qui mêle `0`
+  et `O`, `1` et `I`. C'était l'usage même pour lequel la référence est
+  dite lisible : la réclamation au téléphone. Elle sort maintenant d'un
+  alphabet de trente et un caractères sans ambiguïté.
+- **« Changer de pack » s'affichait sous l'échec d'une recharge**, et
+  menait à un écran qui redirige les dossiers déjà ouverts. Une recharge
+  n'est pas un pack : il n'y avait rien à changer.
+
+### Ce qui reste à arbitrer
+
+**N.A — Le rail de paiement suit la devise, et rien d'autre.** Francs CFA
+par Mobile Money, euros par carte. Les trois « autres moyens » du
+prototype — Moov Money, carte bancaire, autre numéro Mobile Money —
+supposaient un choix d'opérateur qui n'est modélisé nulle part :
+`provider` se déduit de la devise à la création. Ils cèdent la place à la
+seule alternative réelle, changer de grille. Reste à savoir si le produit
+veut un choix d'opérateur, ce qui suppose que FedaPay en expose un.
+
+**N.B — La raison d'un refus n'est pas conservée.** Le cycle la reçoit du
+fournisseur et ne l'écrit nulle part ; $-05 la déduit donc du statut.
+Conserver `discrepancy` ou un champ voisin permettrait de dire « solde
+insuffisant » quand c'est le cas, au lieu de s'en tenir à « la raison ne
+nous est pas communiquée ». C'est une question de rétention autant que de
+produit : le motif d'un refus bancaire est une donnée sensible.
+
+**N.C — La case des conditions passe sous la barre d'action.** Sur un écran
+de 390 px, la barre collante de $-02 recouvre la case qui déverrouille son
+propre bouton tant qu'on n'a pas fait défiler jusqu'en bas. Elle reste
+atteignable, et c'est la structure du prototype — mais faire dépendre
+l'action principale d'un élément que sa propre barre masque mérite une
+décision de maquette, pas un correctif au passage.
 
 **M.B — Le remboursement n'a pas d'écrivain.** L'état `REMBOURSEE` est au
 schéma, le reçu sait le présenter, `paiement.remboursement` est une action
