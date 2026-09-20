@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SuppressionDuCompte } from "@/app/(auth)/compte/suppression/SuppressionDuCompte";
-import { PropositionPartenaire } from "@/app/(app)/(dossier)/dossiers/[id]/PropositionPartenaire";
-import { PARTENAIRE, MOTIF_PARTENAIRE } from "@/lib/contenu/alertes";
+import { Services } from "@/app/(app)/(dossier)/services/Services";
+import { dossierParId } from "@/lib/contenu/dossiers";
 import { CE_QUI_RESTE } from "@/domain/comptes/suppression";
 
 const reponse = (corps: unknown, statut = 200) =>
@@ -113,92 +113,65 @@ describe("Suppression de compte", () => {
 });
 
 /**
- * T-03 — l'issue est enregistrée, WF-13.
+ * T-06 — la redirection est tracée, WF-13. K.A tranché le 20/09/2026.
  *
- * Le composant se rend sans ligne de suivi (les tests de P1 le font), mais
- * dès qu'il en a une, chaque issue part au serveur : c'est ce qui rend
- * « ne plus me proposer » vrai plus d'une seconde.
+ * L'écran a changé de surface ; la trace, elle, ne change pas. « Commission
+ * au résultat » suppose de savoir quelle offre a été ouverte, et une
+ * redirection non enregistrée est une commission que personne ne saurait
+ * rattacher — le partenaire n'ayant aucune raison de nous croire sur parole.
  */
-describe("T-03 — suivi de la proposition", () => {
-  it("enregistre le refus définitif sans faire attendre", async () => {
+const DOSSIER = dossierParId("nl-4471")!;
+
+const OFFRE = {
+  id: "ref-1",
+  partenaire: {
+    id: "p1",
+    nom: "Cabinet Adjovi & Associés",
+    ville: "Cotonou",
+    qualification: "courtier agréé, 9 ans d'exercice",
+    destinations: ["NL"],
+  },
+  motif: {
+    constat: "Ton dossier demande une pièce : assurance maladie.",
+    raison: "Nous ne la fournissons pas nous-mêmes ; un partenaire le fait.",
+  },
+  etape: "assurance_maladie",
+  genre: "ASSURANCE_SANTE" as const,
+  url: "https://exemple.invalid/assurance",
+};
+
+describe("T-06 — suivi de l'offre", () => {
+  it("enregistre la redirection avant d'ouvrir le site du partenaire", async () => {
     const appels: string[] = [];
     global.fetch = vi.fn((url: string, init?: RequestInit) => {
       appels.push(`${url} ${init?.body as string}`);
-      return reponse({ etat: "DECLINEE" });
+      return reponse({ etat: "REDIRIGEE", url: OFFRE.url });
     }) as unknown as typeof fetch;
+    const ouvertures: string[] = [];
+    vi.spyOn(window, "open").mockImplementation((u) => {
+      ouvertures.push(String(u));
+      return null;
+    });
 
-    render(
-      <PropositionPartenaire
-        partenaire={PARTENAIRE}
-        motif={MOTIF_PARTENAIRE}
-        dossierId="nl-4471"
-        referenceId="ref-1"
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Ne plus me proposer de consultant" }),
-    );
+    render(<Services dossier={DOSSIER} offres={[OFFRE]} autorise />);
+    fireEvent.click(screen.getByRole("link", { name: "Ouvrir le site du partenaire" }));
 
-    // L'écran a déjà répondu : il n'attend pas le serveur pour tenir parole.
-    expect(screen.getByText(/Nous ne te proposerons plus de partenaire/)).toBeDefined();
     await waitFor(() => expect(appels).toHaveLength(1));
     expect(appels[0]).toContain("/api/dossiers/nl-4471/partenaires/ref-1");
-    expect(appels[0]).toContain("NE_PLUS_PROPOSER");
+    expect(appels[0]).toContain("CRENEAUX");
+    // L'ordre compte : la trace d'abord, la fenêtre ensuite.
+    await waitFor(() => expect(ouvertures).toEqual([OFFRE.url]));
   });
 
-  it("n'annonce pas le tarif d'un consultant sous un courtier", () => {
-    // Trouvé à l'écran, pas en relisant le code : la carte affichait
-    // « Premier entretien : 20 000 F, 45 minutes » sous une assurance
-    // maladie, et renvoyait vers l'annuaire des consultants.
-    render(
-      <PropositionPartenaire
-        partenaire={{
-          id: "p1",
-          nom: "Cabinet Adjovi & Associés",
-          ville: "Cotonou",
-          qualification: "courtier agréé, 9 ans d'exercice",
-          destinations: ["NL"],
-        }}
-        motif={{
-          constat: "Ton dossier demande une pièce : assurance maladie.",
-          raison: "Nous ne la fournissons pas nous-mêmes ; un partenaire le fait.",
-        }}
-        dossierId="nl-4471"
-        genre="ASSURANCE_SANTE"
-        url="https://exemple.invalid/assurance"
-      />,
-    );
-    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
-      "Un partenaire peut te fournir cette pièce",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    const dialogue = screen.getByRole("dialog");
-    expect(dialogue.textContent).not.toContain("Premier entretien");
-    expect(dialogue.textContent).not.toContain("45 minutes");
-
-    // La redirection sort du site, et l'écran le dit avant d'y envoyer.
-    const lien = screen.getByRole("link", { name: "Ouvrir le site du partenaire" });
-    expect(lien.getAttribute("href")).toBe("https://exemple.invalid/assurance");
-    expect(lien.getAttribute("rel")).toContain("sponsored");
-    expect(lien.getAttribute("target")).toBe("_blank");
-
-    // Et la divulgation de commission reste, quel que soit le partenaire.
-    expect(dialogue.textContent).toContain("commission");
-  });
-
-  it("n'appelle rien sans ligne de suivi", () => {
-    const fetchEspion = vi.fn();
+  it("n'ouvre aucune fenêtre tant que rien n'est enregistré", () => {
+    const fetchEspion = vi.fn(() => new Promise<Response>(() => {}));
     global.fetch = fetchEspion as unknown as typeof fetch;
-    render(
-      <PropositionPartenaire
-        partenaire={PARTENAIRE}
-        motif={MOTIF_PARTENAIRE}
-        dossierId="nl-4471"
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continuer sans consultant" }));
-    expect(fetchEspion).not.toHaveBeenCalled();
+    const ouvrir = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<Services dossier={DOSSIER} offres={[OFFRE]} autorise />);
+    fireEvent.click(screen.getByRole("link", { name: "Ouvrir le site du partenaire" }));
+
+    expect(fetchEspion).toHaveBeenCalled();
+    expect(ouvrir).not.toHaveBeenCalled();
   });
 });

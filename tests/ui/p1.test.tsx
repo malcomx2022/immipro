@@ -5,7 +5,7 @@ import { Redaction } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/
 import { Relecture } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/relecture/Relecture";
 import { REMARQUES_MOTIVATION } from "@/lib/contenu/redaction";
 import { Alertes } from "@/app/(app)/(dossier)/notifications/Alertes";
-import { PropositionPartenaire } from "@/app/(app)/(dossier)/dossiers/[id]/PropositionPartenaire";
+import { Services } from "@/app/(app)/(dossier)/services/Services";
 import { dossierParId } from "@/lib/contenu/dossiers";
 import {
   PIECES_REDIGEABLES,
@@ -337,67 +337,102 @@ describe("T-02 — Divergence réglementaire", () => {
   });
 });
 
-describe("T-03 — Proposition partenaire", () => {
-  const rendre = () =>
-    render(
-      <PropositionPartenaire
-        partenaire={PARTENAIRE}
-        motif={MOTIF_PARTENAIRE}
-        dossierId="nl-4471"
-      />,
-    );
+/**
+ * T-06 — Services partenaires. K.A, tranché le 20/09/2026.
+ *
+ * L'arbitrage déplace les offres hors de l'espace dossier. Ce qui se teste
+ * ici n'est donc plus « la carte s'affiche au bon moment » — elle ne
+ * s'affiche plus du tout dans la checklist — mais que les garanties ont
+ * suivi l'offre sur sa nouvelle surface. Elles portaient sur la nature de
+ * l'offre, pas sur l'écran : elles valent donc à l'identique.
+ */
+const OFFRE = {
+  id: "ref-1",
+  partenaire: {
+    id: "p1",
+    nom: "Cabinet Adjovi & Associés",
+    ville: "Cotonou",
+    qualification: "courtier agréé, 9 ans d'exercice",
+    destinations: ["NL"],
+  },
+  motif: {
+    constat: "Ton dossier demande une pièce : assurance maladie.",
+    raison: "Nous ne la fournissons pas nous-mêmes ; un partenaire le fait.",
+  },
+  etape: "assurance_maladie",
+  genre: "ASSURANCE_SANTE" as const,
+  url: "https://exemple.invalid/assurance",
+};
 
-  it("nomme le motif avant de proposer quoi que ce soit", () => {
+describe("T-06 — Services partenaires", () => {
+  const rendre = () =>
+    render(<Services dossier={DOSSIER} offres={[OFFRE]} autorise />);
+
+  it("rattache chaque offre à une pièce que le dossier demande", () => {
     const { container } = rendre();
-    expect(container.textContent).toContain("Ce point dépasse ce que nous savons faire");
-    expect(container.textContent).toContain("refus de visa Schengen en 2024");
+    expect(container.textContent).toContain("Un partenaire peut te fournir cette pièce");
+    expect(container.textContent).toContain("assurance maladie");
   });
 
   it("annonce la commission dans l'écran, au taux porté par la grille", () => {
-    rendre();
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    const dialogue = screen.getByRole("dialog");
-    expect(espaces(dialogue.textContent ?? "")).toContain(
+    const { container } = rendre();
+    expect(espaces(container.textContent ?? "")).toContain(
       `commission de ${espaces(tauxCommissionFormate())} sur cette prestation`,
     );
   });
 
-  it("lit le tarif et la durée dans la grille, pas dans le prototype", () => {
-    rendre();
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    const texte = espaces(screen.getByRole("dialog").textContent ?? "");
-    expect(texte).toContain("20 000 F, 45 minutes");
-    expect(texte).not.toContain("25 000 F");
-  });
-
-  it("dit que refuser ne coûte rien, et le tient", () => {
-    rendre();
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    expect(
-      screen.getByText("Refuser ne change rien à ton dossier ni à ton pack."),
-    ).toBeDefined();
-    expect(
-      screen.getByRole("link", { name: "Voir les créneaux" }).getAttribute("href"),
-    ).toBe("/consultants?dossier=nl-4471");
-    fireEvent.click(screen.getByRole("button", { name: "Continuer sans consultant" }));
-    expect(screen.getByText(/Ton dossier et ton pack sont inchangés/)).toBeDefined();
-  });
-
-  it("respecte un refus définitif", () => {
-    rendre();
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Ne plus me proposer de consultant" }),
+  it("dit que refuser ne coûte rien, et ne demande rien pour partir", () => {
+    const { container } = rendre();
+    expect(container.textContent).toContain(
+      "Refuser ne change rien à ton dossier ni à ton pack.",
     );
-    expect(screen.getByText(/Nous ne te proposerons plus de partenaire/)).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Voir la proposition" })).toBeNull();
+    // Plus de « ne plus me proposer » : rien n'est proposé. L'interrupteur
+    // vit avec les autres consentements, et l'écran y renvoie.
+    expect(screen.queryByRole("button", { name: /ne plus me proposer/iu })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Ne plus voir d'offres de partenaire" }).getAttribute("href"),
+    ).toBe("/consentements");
+  });
+
+  it("signale la nature commerciale du lien avant d'y envoyer", () => {
+    rendre();
+    const lien = screen.getByRole("link", { name: "Ouvrir le site du partenaire" });
+    expect(lien.getAttribute("href")).toBe("https://exemple.invalid/assurance");
+    expect(lien.getAttribute("rel")).toContain("sponsored");
+    expect(lien.getAttribute("target")).toBe("_blank");
+  });
+
+  it("n'annonce pas le tarif d'une consultation sous un courtier", () => {
+    // Trouvé à l'écran au lot WF-13, et la règle survit au déplacement :
+    // la carte annonçait « Premier entretien : 20 000 F, 45 minutes » sous
+    // une assurance maladie.
+    const { container } = rendre();
+    expect(container.textContent).not.toContain("Premier entretien");
+    expect(container.textContent).not.toContain("45 minutes");
   });
 
   it("rappelle qu'ImmiPro n'est pas un cabinet de conseil", () => {
-    rendre();
-    fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
-    expect(screen.getByRole("dialog").textContent).toContain(
+    const { container } = rendre();
+    expect(container.textContent).toContain(
       "ImmiPro n'est pas un cabinet de conseil en immigration",
     );
+  });
+
+  it("dit pourquoi la page est vide, plutôt que de ne rien dire", () => {
+    const { container } = render(
+      <Services dossier={DOSSIER} offres={[]} autorise />,
+    );
+    expect(container.textContent).toContain("Aucun partenaire n'est référencé");
+    expect(container.textContent).toContain("vérification destination par destination");
+  });
+
+  it("dit que l'autorisation est coupée, et où la rétablir", () => {
+    const { container } = render(
+      <Services dossier={DOSSIER} offres={[]} autorise={false} />,
+    );
+    expect(container.textContent).toContain("Tu as coupé les offres de partenaire");
+    expect(
+      screen.getByRole("link", { name: "Ouvrir mes consentements" }).getAttribute("href"),
+    ).toBe("/consentements");
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { Checklist } from "@/app/(app)/(dossier)/dossiers/[id]/Checklist";
+import { aideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { Completude } from "@/app/(app)/(dossier)/dossiers/[id]/completude/Completude";
 import { Echeancier } from "@/app/(app)/(dossier)/dossiers/[id]/echeancier/Echeancier";
 import { ECHEANCES_NL } from "@/lib/contenu/dossiers";
@@ -49,6 +50,34 @@ const rendrePiece = (props: Partial<Parameters<typeof PieceDuDossier>[0]> = {}) 
   );
 
 describe("C-06 — Checklist", () => {
+  /**
+   * K.A, tranché le 20/09/2026 — l'espace dossier porte une aide, jamais
+   * une offre.
+   */
+  it("n'affiche aucune offre commerciale, quoi qu'on lui passe", () => {
+    const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
+    const texte = container.textContent ?? "";
+    expect(texte).not.toMatch(/commission|partenaire|prestation/iu);
+  });
+
+  /**
+   * Trouvé à l'écran, pas en relisant le code : l'encadré d'aide suivait
+   * « Prochaine action : ajouter ton passeport », et se lisait comme la
+   * suite de cette phrase alors qu'il parlait de l'assurance maladie. Une
+   * aide qui ne nomme pas son étape en désigne une autre.
+   */
+  it("l'aide de l'étape nomme la pièce dont elle parle", () => {
+    const aide = aideDeLEtape("assurance_maladie", "Assurance maladie");
+    expect(aide).not.toBeNull();
+    const { container } = render(
+      <Checklist dossier={DOSSIER} pieces={PIECES_NL} aide={aide} />,
+    );
+    const encadre = screen.getByRole("heading", { name: aide!.titre }).parentElement!;
+    expect(encadre.textContent).toContain("Assurance maladie");
+    // Et rien de commercial n'est entré par cette porte.
+    expect(container.textContent).not.toMatch(/commission|partenaire/iu);
+  });
+
   it("affiche un palier et un dénombrement, jamais une note sur cent", async () => {
     const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(screen.getAllByText(LIBELLE_PALIER.INCOMPLET).length).toBeGreaterThan(0);

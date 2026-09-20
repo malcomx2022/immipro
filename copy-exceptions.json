@@ -9,7 +9,7 @@
   "exceptions": [
     {
       "chaine": "ImmiPro perçoit une commission de 15 % sur cette prestation.",
-      "fichier": "src/app/(app)/(dossier)/dossiers/[id]/PropositionPartenaire.tsx",
+      "fichier": "src/app/(app)/(dossier)/services/Services.tsx",
       "motif": "T-03, WF-13 : divulgation du taux de commission sur une prestation partenaire. « Prestation » et non « entretien » : le même écran propose aussi un courtier ou un service d'équivalence de diplôme, chez qui il n'y a pas d'entretien. L'interdit du pourcentage vise la note de dossier (arbitrage C-09), pas un taux de rémunération. Le rendre implicite ou l'écrire en lettres pour passer le garde-fou affaiblirait une obligation de transparence. Le taux vit dans COMMISSION_PARTENAIRE (domain/payments/pricing.ts) et un test vérifie que cette phrase le reprend.",
       "date": "2026-09-18"
     }

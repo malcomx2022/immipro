@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { versXOF, convertible, MENTION_NON_COMPARABLE } from "@/domain/format/change";
+import { sansCommentaires } from "@/domain/copy/source";
 
 /**
  * Les lectures retenues pendant qu'un arbitrage est ouvert.
@@ -71,26 +72,64 @@ describe("L.A — le barème interne ne sort pas, tant que l'article 15 n'a pas 
 });
 
 /* ------------------------------------------------------------------ *
- * K.A — RG-13.1 et RG-13.2 se contredisent
+ * K.A — la proposition commerciale dans la checklist, tranché le 20/09
  * ------------------------------------------------------------------ */
 
-describe("K.A — une seule surface commerciale, tant que la règle n'est pas réécrite", () => {
+describe("K.A (tranché) — l'espace dossier n'héberge aucune offre commerciale", () => {
   /**
-   * RG-13.1 demande une proposition « contextuelle à l'étape » ; RG-13.2
-   * interdit « toute proposition commerciale dans l'espace dossier
-   * lui-même ». L'étape de checklist *est* l'espace dossier. La lecture
-   * retenue est la plus restrictive compatible avec les deux : une seule
-   * proposition, sur le seul écran qui l'affichait déjà.
+   * RG-13.1 demandait une proposition « contextuelle à l'étape » ; RG-13.2
+   * interdisait « toute proposition commerciale dans l'espace dossier ».
+   * L'étape de checklist *est* l'espace dossier, et le garde-fou tenait en
+   * attendant la décision : une seule proposition, sur le seul écran qui
+   * l'affichait déjà.
    *
-   * Sans ce test, une seconde surface s'ajoute un jour sur un autre écran
-   * du dossier, et la lecture restrictive est abandonnée sans que personne
-   * ne l'ait décidé.
+   * La décision ne cherche pas le compromis, elle déplace la frontière :
+   * entre une aide fonctionnelle et une offre commerciale, et non entre
+   * une offre et plusieurs. Le test suit — il ne compte plus les écrans,
+   * il tient la nature de ce qui s'affiche.
    */
-  it("la proposition de partenaire n'est rendue qu'à un seul endroit", () => {
-    const rendus = fichiers("src/app", /\.tsx$/u).filter((f) =>
-      /<PropositionPartenaire\b/u.test(lire(f)),
+  const ESPACE_DOSSIER = fichiers("src/app/(app)/(dossier)/dossiers", /\.tsx$/u);
+
+  it("aucun écran du dossier ne monte une offre", () => {
+    const fautifs = ESPACE_DOSSIER.filter((f) => /<OffrePartenaire\b/u.test(lire(f)));
+    expect(fautifs).toEqual([]);
+  });
+
+  /**
+   * Le vocabulaire plutôt que le composant : une offre réécrite à la main,
+   * sans passer par le composant dédié, resterait une offre.
+   *
+   * Les commentaires sont retirés d'abord — celui qui explique pourquoi une
+   * offre n'a pas sa place ici emploie forcément les mots qu'il proscrit.
+   * Le même balayage sert au garde-fou du vocabulaire interdit.
+   */
+  it("aucun écran du dossier ne parle de prix, de commission ni de partenaire", () => {
+    const commercial = /\b(commission|partenaire|prestation|tarif)\b/iu;
+    const fautifs = ESPACE_DOSSIER.filter((f) => commercial.test(sansCommentaires(lire(f))));
+    expect(fautifs).toEqual([]);
+  });
+
+  /**
+   * Ce qui reste est l'aide que la règle réécrite autorise. Elle explique
+   * quoi faire — et rien de ce qu'elle écrit ne vend quoi que ce soit.
+   */
+  it("l'aide de l'étape ne nomme ni prestataire, ni prix, ni commission", () => {
+    const aide = lire("src/domain/dossiers/aide-de-letape.ts");
+    const textes = [...aide.matchAll(/(titre|corps):\s*\n?\s*"([^"]+)"/gu)].map((m) => m[2]!);
+    expect(textes.length).toBeGreaterThan(4);
+    for (const texte of textes) {
+      expect(texte, texte).not.toMatch(
+        /\b(partenaire|commission|tarif|prix|offre|prestation|\d+\s?(F|€))\b/iu,
+      );
+    }
+  });
+
+  /** L'offre vit sur la surface dédiée, et nulle part ailleurs. */
+  it("la lecture d'affiliation n'est appelée que par la surface dédiée", () => {
+    const appelants = fichiers("src/app", /\.tsx?$/u).filter((f) =>
+      /offresDuDossier\(/u.test(lire(f)),
     );
-    expect(rendus).toEqual(["src/app/(app)/(dossier)/dossiers/[id]/Checklist.tsx"]);
+    expect(appelants).toEqual(["src/app/(app)/(dossier)/services/page.tsx"]);
   });
 });
 
@@ -254,14 +293,14 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   const CE_FICHIER = lire("tests/arbitrages-ouverts.test.ts");
 
   /** Encore ouverts : la lecture est provisoire, le test la tient. */
-  const OUVERTS = ["K.A", "L.A", "N.A"];
+  const OUVERTS = ["L.A", "N.A"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
    * « pas de taux sans source datée » — a plus besoin d'être tenue qu'une
    * lecture provisoire.
    */
-  const TRANCHES = ["I.B", "I.D"];
+  const TRANCHES = ["I.B", "I.D", "K.A"];
 
   /**
    * Le bloc d'un arbitrage s'arrête au suivant, et non au bout de neuf
