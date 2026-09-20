@@ -640,7 +640,50 @@ extraction IA, interrogation des fournisseurs de paiement. Chacune a un point
 de branchement unique et traite son absence plutôt que de faire semblant :
 une pièce non lue part en revue manuelle et l'analyse est rendue, un courrier
 manqué est journalisé, un paiement sans confirmation ouvre un écart au-delà
-de vingt-quatre heures. Aucune n'est simulée.
+de vingt-quatre heures. Aucune n'est simulée. **Tranché le 20/09/2026.**
+
+Les trois n'ont pas le même statut, et c'est tout l'intérêt de la décision :
+les traiter ensemble reviendrait soit à retarder un pilote pour rien, soit à
+ouvrir au public un service dont les courriers ne partent pas.
+
+| Dépendance | Statut |
+|---|---|
+| **Messagerie** | Bloquante avant ouverture publique : vérification, confirmations et notifications doivent réellement parvenir au candidat. |
+| **Paiements** | Bloquante avant tout encaissement réel : un paiement ne peut pas reposer sur le seul retour du navigateur. |
+| **Extraction IA** | Non bloquante pour un pilote, **à condition** que la revue manuelle ait un propriétaire, un délai cible et une file surveillée. |
+
+Et une règle qui tient les trois : **aucun service absent n'est simulé.**
+
+Le choix contractuel des prestataires reste une tâche d'exécution.
+
+### Ce que l'application de la décision a trouvé
+
+Les mécanismes de dégradation existaient bien, tous les trois. Ce qui
+manquait était plus haut : **rien ne distinguait les statuts**, et rien ne
+rendait l'inaptitude visible.
+
+`/api/health` répondait « ok » dès que la base répondait. Elle répondait donc
+« ok » à une installation sans messagerie, dont aucun courrier de
+vérification ne part — et un répartiteur de charge y aurait envoyé du public.
+Une décision qui dit « bloquante » et une adresse d'état qui dit « ok » ne
+peuvent pas coexister.
+
+L'adresse porte maintenant les trois dépendances et leur statut. Une
+bloquante absente rend l'instance inapte, et le 503 le dit à qui surveille
+plutôt qu'à personne. Une facultative absente laisse l'instance en service,
+sous le nom qui convient : `pilote`.
+
+**La condition de surveillance est la partie qui manquait vraiment.** Le
+délai cible existait (quatre heures, WF-15), la file existait, la décision
+inscrivait déjà qui l'avait prise. Mais la file ne se regardait que depuis
+B-05 — c'est-à-dire qu'elle ne surveillait que ceux qui ouvraient l'écran.
+L'état de service porte désormais le nombre de pièces en attente et le
+nombre au-delà du délai : une file qui déborde pendant que l'extraction est
+absente se voit de l'extérieur.
+
+L'aptitude se lit des seules dépendances, jamais du nom de l'environnement :
+une recette à qui il manque un secret de signature est inapte à encaisser,
+qu'elle s'appelle production ou non.
 
 **I.D — L'antivirus de WF-06 n'a pas de service.** L'étape 2 demande une
 analyse antivirus synchrone avant stockage. Les contrôles de format, de
