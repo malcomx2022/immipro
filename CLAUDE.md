@@ -20,10 +20,16 @@
 La liste vit dans `src/domain/copy/vocabulaire-interdit.ts`. Elle est lue par
 `npm run check:copy`, par le test de l'interface candidat, et par la
 validation à l'enregistrement du back-office — B-02 pour les textes d'une
-règle, B-05 pour le message envoyé après une revue manuelle. Une seule liste,
-trois points d'application : un administrateur qui saisit une promesse dans un
-guide pays bute sur la même règle qu'un développeur, et sa publication est
-bloquée tant que la formulation est refusée.
+règle, B-05 pour le message envoyé après une revue manuelle, B-08 pour un
+guide pays ou un article. Une seule liste, quatre points d'application : un
+administrateur qui saisit une promesse dans un guide pays bute sur la même
+règle qu'un développeur, et sa publication est bloquée tant que la
+formulation est refusée.
+
+L'enregistrement d'un brouillon n'est pas bloqué, la publication l'est. Un
+texte en cours d'écriture doit pouvoir être sauvé ; le refuser pousserait à
+rédiger ailleurs et à coller à la fin, c'est-à-dire à écrire hors du
+garde-fou.
 
 Deux portées :
 

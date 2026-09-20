@@ -209,6 +209,38 @@ SELECT refuse(
        provider, status, "failureCause")
      VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE')$q$);
 
+-- ── J.C · la publication éditoriale ───────────────────────────────────────
+SELECT refuse(
+  'INV-8 · un guide publié sans source ni date de vérification',
+  $q$INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body,
+       "countryLabel", "publishedAt", "updatedAt")
+     VALUES ('e1','GUIDE','pays-bas-essai','PUBLIE','Titre','Chapeau','{}'::jsonb,
+       'Pays-Bas', now(), now())$q$);
+
+SELECT refuse(
+  'J.C · un brouillon portant une date de publication',
+  $q$INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body,
+       "countryLabel", "publishedAt", "updatedAt")
+     VALUES ('e2','GUIDE','pays-bas-essai','BROUILLON','Titre','Chapeau','{}'::jsonb,
+       'Pays-Bas', now(), now())$q$);
+
+SELECT refuse(
+  'J.C · une adresse publique qui ne tient pas dans une URL',
+  $q$INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body,
+       "countryLabel", "updatedAt")
+     VALUES ('e3','GUIDE','Pays Bas !','BROUILLON','Titre','Chapeau','{}'::jsonb,
+       'Pays-Bas', now())$q$);
+
+SELECT refuse(
+  'J.C · un guide qui ne nomme pas son pays',
+  $q$INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body, "updatedAt")
+     VALUES ('e4','GUIDE','pays-bas-essai','BROUILLON','Titre','Chapeau','{}'::jsonb, now())$q$);
+
+SELECT refuse(
+  'J.C · un article sans rubrique ni signature',
+  $q$INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body, "updatedAt")
+     VALUES ('e5','ARTICLE','releve-essai','BROUILLON','Titre','Chapeau','{}'::jsonb, now())$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

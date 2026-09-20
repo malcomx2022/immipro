@@ -58,6 +58,7 @@ src/server/
     backoffice.ts    Les sept écrans B, plus l'édition d'une règle.
     partenaires.ts   WF-13. Rien n'est proposable par défaut.
     portabilite.ts   Export du compte et archive d'un dossier.
+    editorial.ts     Guides et articles : le public, et le registre B-08.
     paiements.ts     Le tunnel ($-01 à $-05) et le reçu ($-04, $-06).
   jobs/
     worker.ts        Branchement pg-boss et cadences.
@@ -247,6 +248,41 @@ référence : savoir qu'une carte a été refusée pour solde un jour de
 septembre ne lui sert pas, et décrit une personne. Ce garde-fou-là est
 dans `acces/suppression.ts` et non en base — une contrainte `CHECK`
 n'interroge pas une autre table.
+
+## Les guides et les articles, et le dernier fichier de contenu
+
+`lecture/editorial.ts` sert les deux écrans publics (P-05, P-07) et le
+registre du back-office (B-08). Ils étaient les derniers à lire un fichier
+du dépôt : un guide ne se changeait pas sans un développeur, un
+déploiement et une relecture de code.
+
+Ce n'était pas seulement lourd. `CLAUDE.md` promet que « un administrateur
+qui saisit une promesse dans un guide pays bute sur la même règle qu'un
+développeur, et sa publication est bloquée tant que la formulation est
+refusée ». La phrase décrivait un dispositif qui n'existait pas, faute
+d'écran où saisir un guide. C'est désormais le cas, et avec une nuance qui
+compte : **la liste est vérifiée à chaque enregistrement, et ne bloque que
+la publication.** Refuser aussi le brouillon empêcherait d'enregistrer un
+texte en cours d'écriture et pousserait à rédiger ailleurs pour recoller à
+la fin — c'est-à-dire hors du garde-fou.
+
+**Rien de dérivable n'est saisi.** Le sommaire d'un guide se tire de ses
+intertitres ; il était écrit à côté d'eux, et un test surveillait la
+duplication — que le prototype avait déjà ratée, en annonçant une section
+que le corps ne contenait pas. La durée de lecture se compte. La mention
+« ce guide est informatif » suit le genre. Trois champs de moins, et trois
+classes de contradiction qui disparaissent avec eux.
+
+**Le public ne voit que `PUBLIE`, et le filtrage est dans la requête.** Un
+document retiré qui arriverait jusqu'à l'écran pour y être masqué serait
+déjà sorti de la base.
+
+**Régénéré à la demande, pas pré-généré.** Le build se fait en intégration
+continue, sans base de données (J.8) : `generateStaticParams` ne peut plus
+rien énumérer. Les pages se rendent à la première demande, restent en cache
+une heure, et la publication invalide leur adresse. On garde ce qui
+comptait pour le référencement — une page servie en HTML complet et sans
+attente — sans exiger une base au moment de la construction.
 
 ## Écrire une route
 

@@ -1,4 +1,4 @@
-import type { Bloc } from "@/lib/contenu/editorial";
+import type { Bloc } from "@/domain/editorial/document";
 
 /**
  * Rendu des blocs éditoriaux de P-05 et P-07.

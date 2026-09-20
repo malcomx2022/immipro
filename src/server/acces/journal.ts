@@ -27,6 +27,7 @@ export type ActionAuditee =
   | "paiement.remboursement"
   | "paiement.reconciliation"
   | "regle.publication"
+  | "contenu.publication"
   | "revue.decision";
 
 export interface EcritureAudit {

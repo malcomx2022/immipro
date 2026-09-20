@@ -986,3 +986,59 @@ model PartnerReferral {
   @@index([applicationId, status])
   @@index([partnerId, status, proposedAt])
 }
+
+/// Document éditorial — guide pays (P-05) ou article (P-07), B-08.
+///
+/// Les deux écrans publics lisaient un fichier du dépôt : un guide ne se
+/// changeait pas sans un développeur et un déploiement, et le vocabulaire
+/// interdit ne protégeait personne là où `CLAUDE.md` promet qu'il protège.
+///
+/// Ce qui se dérive du corps n'est pas ici : ni le sommaire, ni la durée de
+/// lecture, ni la mention de fin. Une colonne qui recopie ce qu'un calcul
+/// donne finit par le contredire.
+model EditorialDoc {
+  id     String          @id @default(uuid())
+  kind   EditorialKind
+  /// Adresse publique. Figée après la première publication : un lien
+  /// entrant qui tombe est un lecteur perdu, et c'est tout l'intérêt d'un
+  /// contenu de référencement.
+  slug   String
+  status EditorialStatus @default(BROUILLON)
+
+  title      String
+  /// Chapeau : les deux phrases sous le titre, et la description de la page.
+  standfirst String
+
+  /// Blocs et appel à l'action, validés par `domain/editorial/document.ts`.
+  body Json
+
+  /// INV-8 — toute information réglementaire affichée porte sa source et sa
+  /// date de vérification. La base refuse une publication sans elles.
+  sourceLabel String?
+  verifiedAt  DateTime?
+
+  /// Guide : le pays affiché en surtitre. Article : la rubrique et l'auteur.
+  countryLabel String?
+  section      String?
+  author       String?
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([kind, slug])
+  @@index([kind, status])
+}
+
+enum EditorialKind {
+  GUIDE
+  ARTICLE
+}
+
+enum EditorialStatus {
+  BROUILLON
+  PUBLIE
+  /// Dépublié. La ligne survit : l'adresse a été indexée, et savoir qu'un
+  /// document a existé vaut mieux que de ne plus rien savoir de lui.
+  RETIRE
+}

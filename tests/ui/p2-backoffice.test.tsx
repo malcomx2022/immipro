@@ -25,6 +25,7 @@ import {
   REGLE_BROUILLON,
   REGLE_EN_VIGUEUR,
 } from "@/lib/contenu/backoffice";
+import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 
 vi.mock("next/navigation", () => ({
   notFound: () => {
@@ -48,7 +49,7 @@ const editerRegle = () =>
   );
 
 describe("gabarit back-office", () => {
-  it("porte la navigation des six registres et le lien d'évitement", () => {
+  it("porte la navigation de tous les registres et le lien d'évitement", () => {
     render(
       <BarreAdmin nom="Mireille Agossou" role="Administration" initialesAffichees="MA">
         <h1 id="contenu" tabIndex={-1}>
@@ -58,8 +59,12 @@ describe("gabarit back-office", () => {
     );
     expect(screen.getByRole("link", { name: "Aller au contenu" })).toBeDefined();
     const nav = screen.getByRole("navigation", { name: "Navigation du back-office" });
-    expect(within(nav).getAllByRole("listitem")).toHaveLength(6);
+    // Le compte suit le domaine plutôt qu'un nombre écrit ici : une
+    // entrée ajoutée sans son écran est un défaut, une entrée ajoutée
+    // avec le sien ne doit pas faire échouer le gabarit.
+    expect(within(nav).getAllByRole("listitem")).toHaveLength(NAVIGATION_ADMIN.length);
     expect(within(nav).getByRole("link", { name: "Journal d'audit" })).toBeDefined();
+    expect(within(nav).getByRole("link", { name: "Guides et articles" })).toBeDefined();
   });
 
   it("nomme l'opérateur connecté, jamais un nom écrit en dur", () => {

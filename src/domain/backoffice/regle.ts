@@ -18,8 +18,12 @@ import {
  * que l'administrateur écrit pour le candidat — libellé de checklist,
  * réserve affichée en contexte — passent la même liste que `check:copy` et
  * que le test de l'interface. Sans cela, le garde-fou ne protégeait que le
- * code : un administrateur qui saisissait une promesse dans un guide pays
- * contournait tout le dispositif. C'était le vrai trou.
+ * code.
+ *
+ * Le guide pays, que ce commentaire citait comme l'exemple du trou, n'était
+ * alors éditable par personne : il vivait dans un fichier du dépôt. Il a
+ * son propre point d'application depuis J.C — `domain/editorial/document.ts`,
+ * pour B-08.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
