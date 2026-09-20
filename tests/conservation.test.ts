@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { echeanceEnAnnees, echeanceEnMois } from "@/server/jobs/purge";
+import { echeanceEnAnnees, echeanceEnJours, echeanceEnMois } from "@/server/jobs/purge";
 import { CONSERVATION_MOIS, MENTION_PORTEE } from "@/domain/notifications/alerte";
 import { CONSERVATION_ANNEES, MENTION_IMMUABLE } from "@/domain/backoffice/audit";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
+import {
+  CONSERVATION_MOTIF_JOURS,
+  SURSIS_APRES_CLOTURE_JOURS,
+  echeanceDuMotif,
+  motifEffacable,
+} from "@/domain/paiement/conservation";
 
 /**
  * Une durée de conservation annoncée est tenue.
@@ -41,6 +47,17 @@ describe("le point de coupure suit le calendrier, pas une multiplication", () =>
   it("cinq ans en arrière, années bissextiles comprises", () => {
     expect(echeanceEnAnnees(5, new Date("2029-02-28T03:30:00Z")).toISOString()).toBe(
       "2024-02-28T03:30:00.000Z",
+    );
+  });
+
+  /**
+   * Les jours, eux, n'ont pas de longueur variable en UTC : la vérification
+   * porte sur le passage de mois, qui est là où une soustraction naïve de
+   * numéros de jour se tromperait.
+   */
+  it("quatre-vingt-dix jours en arrière traversent trois mois inégaux", () => {
+    expect(echeanceEnJours(90, new Date("2026-09-20T03:30:00Z")).toISOString()).toBe(
+      "2026-06-22T03:30:00.000Z",
     );
   });
 
@@ -86,6 +103,9 @@ describe("chaque durée déclarée a son exécutant", () => {
     expect(MENTION_PORTEE).toContain(`${CONSERVATION_MOIS} mois`);
     expect(MENTION_IMMUABLE).toContain(`${CONSERVATION_ANNEES} ans`);
     expect(PURGE_JOURS).toBe(30);
+    // O.B : quatre-vingt-dix jours, et trente de sursis après une clôture.
+    expect(CONSERVATION_MOTIF_JOURS).toBe(90);
+    expect(SURSIS_APRES_CLOTURE_JOURS).toBe(30);
   });
 
   /**
@@ -99,6 +119,67 @@ describe("chaque durée déclarée a son exécutant", () => {
     const suppressions = routes.filter((f) => /auditLog\.delete/u.test(readFileSync(f, "utf8")));
     expect(suppressions).toEqual([]);
     expect(PURGE).toContain("auditLog.deleteMany");
+  });
+
+  /**
+   * O.B — le motif d'un échec de paiement s'efface, le paiement reste.
+   *
+   * La purge ne lit pas la règle elle-même : elle réduit grossièrement par
+   * la date, puis laisse le domaine trancher. C'est ce partage qu'on
+   * vérifie ici, parce qu'une règle écrite dans un `where` SQL ne se teste
+   * pas sans base.
+   */
+  it("le motif d'échec a son exécutant, et il appelle le domaine", () => {
+    expect(PURGE).toMatch(/echeanceEnJours\(CONSERVATION_MOTIF_JOURS,/u);
+    expect(PURGE).toContain("motifEffacable");
+    expect(PURGE).toMatch(/failureCause: null, failureCauseAt: null/u);
+  });
+
+  /**
+   * Et le point de coupure se calcule sur la constante, jamais sur un
+   * nombre écrit à la main.
+   *
+   * Trouvé en éprouvant le test précédent : remplacer
+   * `echeanceEnJours(CONSERVATION_MOTIF_JOURS, …)` par
+   * `echeanceEnJours(90, …)` ne le faisait pas tomber, parce que le nom de
+   * la constante restait visible dans l'import et dans le motif du journal.
+   * Le garde-fou du lot — « une durée déclarée a un exécutant » — cherche
+   * lui aussi le nom quelque part dans `src/server`, et se serait laissé
+   * berner de la même façon : la conservation aurait été raccourcie à la
+   * constante sans que la purge change d'un jour.
+   */
+  /**
+   * La réduction grossière n'écarte que ce que la règle écarterait.
+   *
+   * `lt` écartait le motif échu du jour même, que le domaine déclare
+   * effaçable — la borne est incluse. Les deux avaient raison séparément,
+   * et la purge tombait un jour à côté de ce qui est annoncé. C'est le
+   * défaut que ce fichier de tests existe pour empêcher, arrivé par la
+   * requête plutôt que par la constante.
+   */
+  it("la requête n'écarte pas un motif que la règle effacerait", () => {
+    expect(PURGE).toMatch(/failureCauseAt: \{ lte: echeanceEnJours\(/u);
+  });
+
+  it("aucune échéance ne se calcule sur un nombre écrit à la main", () => {
+    const littérales = [...PURGE.matchAll(/echeanceEn(?:Jours|Mois|Annees)\((\d+)/gu)];
+    expect(littérales.map((m) => m[0])).toEqual([]);
+  });
+
+  /**
+   * Ce que la purge **ne** touche pas. Le montant, la date, le statut et la
+   * référence sont la preuve comptable ; c'est parce que le motif vit dans
+   * sa propre colonne qu'on peut n'effacer que lui.
+   */
+  it("elle n'efface que le motif, pas le paiement", () => {
+    const fonction = /async function effacerLesMotifsEchus[\s\S]*?\n\}/u.exec(PURGE)![0];
+    expect(fonction).not.toMatch(/transaction\.deleteMany|transaction\.delete\b/u);
+    const ecriture = /data: \{[^}]*\}/u.exec(
+      fonction.slice(fonction.indexOf("updateMany")),
+    )![0];
+    for (const garde of ["amount", "currency", "reference", "status", "createdAt"]) {
+      expect(ecriture, garde).not.toContain(garde);
+    }
   });
 
   it("une session échue ne se conserve pas sans motif", () => {
@@ -117,5 +198,133 @@ describe("le worker passe les trois purges dans la même tâche", () => {
 
   it("elle reste quotidienne, comme l'annonce DOC-11", () => {
     expect(WORKER).toMatch(/PURGE_RETENTION, "\d+ \d+ \* \* \*"/u);
+  });
+});
+
+/**
+ * O.B, tranché à quatre-vingt-dix jours le 20/09/2026 — le motif d'un
+ * échec de paiement ne se garde pas indéfiniment sur un compte vivant.
+ *
+ * Il partait déjà avec le compte (RG-10.4) ; ici c'est la même règle sur
+ * une horloge. Ce qui se vérifie : la durée ordinaire, la suspension d'un
+ * dossier ouvert, et le sursis après clôture — dont le piège est qu'il ne
+ * doit jamais raccourcir la conservation.
+ */
+describe("le motif d'un échec ne se garde que le temps de la réclamation", () => {
+  const ECHEC = new Date("2026-06-22T10:00:00Z");
+  const SANS_LITIGE = { ouvert: false, closLe: null };
+  const jours = (depuis: Date, n: number) =>
+    new Date(depuis.getTime() + n * 24 * 60 * 60 * 1000);
+
+  it("il tient quatre-vingt-dix jours, puis s'efface", () => {
+    expect(motifEffacable(ECHEC, SANS_LITIGE, jours(ECHEC, 89))).toBe(false);
+    expect(motifEffacable(ECHEC, SANS_LITIGE, jours(ECHEC, 90))).toBe(true);
+    expect(motifEffacable(ECHEC, SANS_LITIGE, jours(ECHEC, 400))).toBe(true);
+  });
+
+  /**
+   * Un dossier ouvert suspend, et sans échéance : rendre une date lointaine
+   * aurait laissé croire qu'on sait quand il se refermera.
+   */
+  it("un dossier ouvert suspend l'effacement, quelle que soit l'ancienneté", () => {
+    const ouvert = { ouvert: true, closLe: null };
+    expect(echeanceDuMotif(ECHEC, ouvert)).toBeNull();
+    expect(motifEffacable(ECHEC, ouvert, jours(ECHEC, 3650))).toBe(false);
+  });
+
+  it("refermé, il s'efface trente jours plus tard", () => {
+    const clos = { ouvert: false, closLe: jours(ECHEC, 200) };
+    expect(motifEffacable(ECHEC, clos, jours(ECHEC, 229))).toBe(false);
+    expect(motifEffacable(ECHEC, clos, jours(ECHEC, 230))).toBe(true);
+  });
+
+  /**
+   * **Le piège de la décision.** « Puis intervient trente jours plus tard »
+   * se lit comme une échéance de remplacement : une réclamation ouverte le
+   * deuxième jour et refermée le cinquième ferait alors disparaître le
+   * motif au trente-cinquième, soit bien avant les quatre-vingt-dix jours
+   * que la même décision garantit au support. Ouvrir puis refermer une
+   * réclamation deviendrait un moyen d'effacer plus tôt que la règle.
+   *
+   * Les deux échéances valent donc ensemble, et c'est la plus tardive qui
+   * s'applique. Le sursis ne peut qu'ajouter du temps.
+   */
+  it("une clôture précoce n'avance jamais l'effacement", () => {
+    const closTot = { ouvert: false, closLe: jours(ECHEC, 5) };
+    expect(motifEffacable(ECHEC, closTot, jours(ECHEC, 35))).toBe(false);
+    expect(motifEffacable(ECHEC, closTot, jours(ECHEC, 89))).toBe(false);
+    expect(motifEffacable(ECHEC, closTot, jours(ECHEC, 90))).toBe(true);
+    expect(echeanceDuMotif(ECHEC, closTot)).toEqual(jours(ECHEC, CONSERVATION_MOTIF_JOURS));
+  });
+
+  /** La borne est incluse : au jour dit, l'effacement a lieu. */
+  it("l'échéance rendue est celle que la règle applique", () => {
+    const echeance = echeanceDuMotif(ECHEC, SANS_LITIGE)!;
+    expect(motifEffacable(ECHEC, SANS_LITIGE, echeance)).toBe(true);
+    expect(motifEffacable(ECHEC, SANS_LITIGE, new Date(echeance.getTime() - 1))).toBe(false);
+  });
+});
+
+/**
+ * Ce que la purge appelle un dossier ouvert.
+ *
+ * Aucun modèle de réclamation n'a été inventé pour l'occasion : un état
+ * existant le dit, et ces tests tiennent qu'on ne s'en invente pas un —
+ * ni qu'on en lise un qui ne peut pas se produire.
+ */
+describe("un dossier ouvert se lit dans ce qui existe déjà", () => {
+  const PURGE = readFileSync("src/server/jobs/purge.ts", "utf8");
+  // Le corps, pas la seule signature : le `}` qui ferme le type du
+  // paramètre est suivi d'une parenthèse, celui de la fonction d'une fin
+  // de ligne. La première version s'arrêtait au premier des deux et ne
+  // lisait donc que la liste des champs — elle aurait passé quoi qu'on
+  // écrive dedans.
+  const litige = /function litigeDe[\s\S]*?\n\}$/mu.exec(PURGE)![0];
+
+  it("un écart de réconciliation non résolu suspend", () => {
+    expect(litige).toMatch(/discrepancy !== null/u);
+  });
+
+  /**
+   * **Et pas le remboursement dû, qui ne peut pas coexister avec un
+   * motif.** Trouvé en exécutant la purge contre PostgreSQL : semer une
+   * transaction en échec portant une obligation de remboursement est
+   * refusé par la base. `transaction_remboursement_du_suppose_un_encaissement`
+   * veut `CONFIRMEE` ou `REMBOURSEE` ; `transaction_motif_seulement_sur_un_echec`
+   * veut `ECHOUEE` ou `EXPIREE`. La branche était morte — et une règle qui
+   * ne peut pas s'appliquer se relit comme une protection qu'on a.
+   *
+   * Les deux contraintes sont lues ici plutôt que recopiées : si l'une des
+   * deux s'élargit un jour, les ensembles pourront se recouper, et ce test
+   * tombera pour dire qu'il faut reconsidérer la branche.
+   */
+  it("le remboursement dû n'est pas lu, parce qu'il ne peut pas se produire", () => {
+    expect(litige).not.toMatch(/refundDueAt|refundedAt/u);
+
+    const motif = readFileSync(
+      "prisma/migrations/20260920000200_motif_de_refus/migration.sql",
+      "utf8",
+    );
+    const remboursement = readFileSync(
+      "prisma/migrations/20260920000600_remboursement_du/migration.sql",
+      "utf8",
+    );
+    expect(motif).toMatch(
+      /transaction_motif_seulement_sur_un_echec[\s\S]*?'ECHOUEE', 'EXPIREE'/u,
+    );
+    expect(remboursement).toMatch(
+      /transaction_remboursement_du_suppose_un_encaissement[\s\S]*?'CONFIRMEE', 'REMBOURSEE'/u,
+    );
+  });
+
+  /**
+   * Rien ne date la résolution d'un écart : le sursis de trente jours n'a
+   * donc aucun déclencheur aujourd'hui, et `closLe` reste nul. Ce n'est
+   * pas la règle qui manque — elle est écrite et vérifiée plus haut —
+   * c'est l'événement de clôture. Le jour où B-04 saura fermer un écart,
+   * il devra le dater.
+   */
+  it("aucune clôture n'est datée, et la purge ne prétend pas le contraire", () => {
+    expect(litige).toMatch(/closLe: null/u);
   });
 });

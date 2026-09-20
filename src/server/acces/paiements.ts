@@ -205,7 +205,9 @@ export async function appliquerLaNotification(
            * mieux vaut ne rien savoir que d'inventer un solde.
            */
           ...(effet.vers === "ECHOUEE" && notification.cause && notification.cause !== "DELAI_DEPASSE"
-            ? { failureCause: notification.cause }
+            // La date accompagne le motif — O.B. C'est depuis elle que court
+            // la conservation, et la base refuse l'un sans l'autre.
+            ? { failureCause: notification.cause, failureCauseAt: new Date() }
             : {}),
         },
       });
