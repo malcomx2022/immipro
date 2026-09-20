@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { SuppressionDuCompte } from "./SuppressionDuCompte";
 import { exigerCandidat } from "@/server/securite/page";
+import { rendezVousQueLaSuppressionAnnule } from "@/server/lecture/consultants";
+import { avertissementSuppression } from "@/domain/consultants/annulation";
 
 /**
  * Suppression de compte — A-05, RG-10.4.
@@ -18,5 +20,15 @@ export const metadata: Metadata = {
 
 export default async function PageSuppression() {
   const acteur = await exigerCandidat("/compte/suppression");
-  return <SuppressionDuCompte email={acteur.email} />;
+  // K.C — ce qui arrive aux rendez-vous à venir, et à ce qui a été payé,
+  // se lit avant le bouton. Découvrir après coup qu'une consultation a été
+  // retenue, c'est avoir été trompé, même quand la retenue est légitime.
+  const rendezVous = await rendezVousQueLaSuppressionAnnule(acteur.id);
+  return (
+    <SuppressionDuCompte
+      email={acteur.email}
+      avertissementRendezVous={avertissementSuppression(rendezVous)}
+      remboursementAttendu={rendezVous.some((r) => r.issue === "REMBOURSABLE")}
+    />
+  );
 }

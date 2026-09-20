@@ -4,6 +4,11 @@ import { fermerToutesLesSessions } from "@/server/securite/session";
 import { journaliser } from "@/server/acces/journal";
 import { purgerSurDemande } from "@/server/jobs/purge";
 import { adresseAnonymisee } from "@/domain/comptes/suppression";
+import {
+  issueDeLAnnulation,
+  MOTIF_REMBOURSEMENT_SUPPRESSION,
+} from "@/domain/consultants/annulation";
+import { ouvrirUnRemboursement } from "@/server/acces/paiements";
 
 /**
  * Suppression de compte — RG-10.4.
@@ -89,6 +94,18 @@ export async function acheverLaSuppression(
     return { dossiers: bilan.dossiers, versions: bilan.versions, anonymise: false };
   }
 
+  // Lus avant, parce que la transaction va les annuler : après, la
+  // condition `status IN (RESERVE, REPORTE)` ne trouverait plus rien, et le
+  // traitement financier ne porterait sur aucun rendez-vous.
+  const aAnnuler = await db.appointment.findMany({
+    where: {
+      application: { userId },
+      startsAt: { gt: maintenant },
+      status: { in: ["RESERVE", "REPORTE"] },
+    },
+    select: { id: true, startsAt: true, freeUntil: true, transactionId: true },
+  });
+
   await db.$transaction([
     db.user.update({
       where: { id: userId },
@@ -139,10 +156,10 @@ export async function acheverLaSuppression(
       where: { application: { userId }, revokedAt: null },
       data: { revokedAt: maintenant },
     }),
-    // Un rendez-vous à venir sur un compte supprimé est un consultant qui
-    // attend quelqu'un qui ne viendra pas. Libérer le créneau est sans
-    // ambiguïté ; savoir qui supporte le coût de l'annulation ne l'est pas,
-    // et cette question reste ouverte (voir ECARTS, annexe K).
+    // K.C — le créneau se libère indépendamment du traitement financier.
+    // Un consultant qui attend quelqu'un qui ne viendra pas perd son heure ;
+    // rien ne justifie de retarder cette libération pour une question
+    // d'argent qui se règle ailleurs, et plus tard.
     db.appointment.updateMany({
       where: {
         application: { userId },
@@ -152,6 +169,30 @@ export async function acheverLaSuppression(
       data: { status: "ANNULE" },
     }),
   ]);
+
+  // Et le traitement financier, qui suit la limite déjà acceptée — jamais
+  // la suppression. Après la transaction de base : ouvrir une obligation de
+  // remboursement ne doit pas pouvoir faire échouer une anonymisation, qui
+  // est la promesse faite au candidat.
+  for (const rendezVous of aAnnuler) {
+    if (issueDeLAnnulation(rendezVous.freeUntil.toISOString(), maintenant) !== "REMBOURSABLE") {
+      continue;
+    }
+    if (!rendezVous.transactionId) continue;
+    const ouverture = await ouvrirUnRemboursement(
+      rendezVous.transactionId,
+      MOTIF_REMBOURSEMENT_SUPPRESSION,
+      maintenant,
+    );
+    if (!ouverture.ouvert) continue;
+    await journaliser({
+      acteurId: "systeme:suppression",
+      action: "paiement.remboursement",
+      cible: `transaction:${rendezVous.transactionId}`,
+      motif: MOTIF_REMBOURSEMENT_SUPPRESSION,
+      details: { rendezVous: rendezVous.id, creneau: rendezVous.startsAt.toISOString() },
+    }).catch(() => undefined);
+  }
 
   await journaliser({
     acteurId: "systeme:suppression",

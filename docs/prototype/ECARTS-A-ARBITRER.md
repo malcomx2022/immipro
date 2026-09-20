@@ -1080,11 +1080,55 @@ L.** Les deux écrans existent, et un test refuse désormais tout lien
 interne qui ne mène nulle part.
 
 **K.C — Qui supporte le coût d'un rendez-vous annulé par une suppression ?**
-La suppression libère les créneaux à venir chez le consultant — c'est sans
-ambiguïté meilleur pour lui que de l'attendre. Mais le créneau est payé et
-la grille prévoit des frais au-delà de vingt-quatre heures
-(`CONSULTATION_ANNULATION_HEURES`). Personne n'a tranché entre rembourser,
-retenir, ou traiter la suppression comme un cas de force majeure.
+~~La suppression libère les créneaux à venir chez le consultant. Mais le
+créneau est payé et la grille prévoit des frais au-delà de vingt-quatre
+heures.~~ **Tranché le 20/09/2026.**
+
+La suppression du compte n'annule pas les conditions commerciales du
+rendez-vous. Avant la limite, il est annulé et remboursé ; après, les frais
+prévus restent dus, sauf geste manuel pour force majeure. Le créneau se
+libère immédiatement, indépendamment du traitement financier. Les écritures
+nécessaires à la comptabilité sont conservées ou anonymisées comme le
+prévoit déjà RG-10.4.
+
+Les deux autres issues avaient chacune leur défaut. Rembourser à tout
+moment ferait de la suppression un contournement des conditions
+d'annulation : il suffirait de supprimer son compte une heure avant pour ne
+rien payer. Retenir systématiquement, même la veille d'un créneau à trois
+semaines, serait plus dur que la règle ordinaire — et la suppression de
+compte est précisément le moment où l'on ne veut pas surprendre.
+
+*Réserve conservée : la rédaction des conditions générales reste à faire
+valider.*
+
+### Ce que l'application de la décision a trouvé
+
+**Décidé n'est pas versé, et la base devait distinguer les deux.** Écrire
+`REMBOURSEE` au moment de la décision aurait annoncé un virement que
+personne n'a fait : aucune API de remboursement n'est branchée (I.C).
+`refundDueAt` ouvre l'obligation, `refundedAt` la solde, et c'est la
+notification signée du fournisseur qui écrit la seconde. Entre les deux, le
+back-office voit une dette — et un compteur, sans quoi un remboursement
+décidé vieillirait sans se signaler nulle part.
+
+**Une dette prime sur un rapprochement réussi.** L'état de rapprochement se
+lisait dans un ordre où `CONFIRMEE` répondait le premier : une transaction
+rapprochée dont on doit l'argent se serait affichée « Rapproché », et
+personne n'aurait rendu la somme. La condition passe devant.
+
+**Le candidat doit lire la retenue avant le bouton, pas après.** L'écran de
+suppression écrit déjà « ce qui reste » avant de confirmer, pour cette
+raison exactement : découvrir après coup qu'une trace subsiste, c'est avoir
+été trompé même quand la trace est légitime. Une consultation retenue est
+du même ordre, en plus cher. L'écran nomme donc chaque rendez-vous à venir
+et dit lequel est remboursé, lequel reste dû, et pourquoi.
+
+**L'ordre des écritures n'est pas indifférent.** L'annulation des créneaux
+vit dans la transaction d'anonymisation ; l'ouverture des remboursements
+vient après. Une obligation qui échouerait ne doit pas faire échouer une
+suppression, qui est la promesse faite au candidat. Et les rendez-vous sont
+lus **avant** d'être annulés : lus après, la condition d'état ne trouverait
+plus rien et le traitement financier ne porterait sur personne.
 
 **K.D — Le premier partenaire reste à signer.** Le modèle porte cinq genres
 — assurance santé, logement, équivalence de diplôme, transfert de fonds,

@@ -252,6 +252,35 @@ SELECT refuse(
        provider, status, "refundedAt")
      VALUES ('t7','IMP-260920-GGGGGG','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now())$q$);
 
+-- ── K.C · le remboursement dû ─────────────────────────────────────────────
+SELECT refuse(
+  'K.C · un remboursement dû sans motif',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundDueAt")
+     VALUES ('t8','IMP-260920-HHHHHH','u1','essentiel',20000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), now())$q$);
+
+SELECT refuse(
+  'K.C · un motif de remboursement sans obligation ouverte',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundBasis")
+     VALUES ('t9','IMP-260920-IIIIII','u1','essentiel',20000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), 'Suppression de compte')$q$);
+
+SELECT refuse(
+  'K.C · un remboursement dû sur un paiement jamais encaissé',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "refundDueAt", "refundBasis")
+     VALUES ('t10','IMP-260920-JJJJJJ','u1','essentiel',20000,'XOF','FEDAPAY','EN_ATTENTE',
+       now(), 'Suppression de compte')$q$);
+
+SELECT refuse(
+  'K.C · un versement antérieur à la décision qui l''ouvre',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundedAt", "refundDueAt", "refundBasis")
+     VALUES ('t11','IMP-260920-KKKKKK','u1','essentiel',20000,'XOF','FEDAPAY','REMBOURSEE',
+       now() - interval '2 days', now() - interval '1 day', now(), 'Geste de support')$q$);
+
 -- ── J.C · la publication éditoriale ───────────────────────────────────────
 SELECT refuse(
   'INV-8 · un guide publié sans source ni date de vérification',

@@ -275,3 +275,43 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
     }),
   ]);
 }
+
+/**
+ * Ouverture d'un remboursement — K.C.
+ *
+ * Elle **décide**, elle ne verse pas. La distinction est la même qu'entre
+ * un engagement et un décaissement, et elle est rendue visible par deux
+ * colonnes : `refundDueAt` dit qu'on doit, `refundedAt` dit qu'on a rendu.
+ * La seconde n'est écrite que par la notification signée du fournisseur
+ * (INV-7) — la plateforme n'appelle aucune API de remboursement, et se
+ * déclarer quitte sans avoir rien versé serait exactement le genre de
+ * simulation qu'I.C interdit.
+ *
+ * Idempotente : une obligation déjà ouverte n'est pas réécrite. Le premier
+ * motif est celui qui a été décidé, et une reprise de job ne doit pas le
+ * remplacer par le sien.
+ */
+export async function ouvrirUnRemboursement(
+  transactionId: string,
+  motif: string,
+  maintenant = new Date(),
+): Promise<{ ouvert: boolean; raison?: string }> {
+  const transaction = await db.transaction.findUnique({
+    where: { id: transactionId },
+    select: { status: true, refundDueAt: true, refundedAt: true },
+  });
+  if (!transaction) return { ouvert: false, raison: "transaction inconnue" };
+  if (transaction.refundedAt) return { ouvert: false, raison: "déjà remboursée" };
+  if (transaction.refundDueAt) return { ouvert: false, raison: "déjà ouverte" };
+  // On ne doit que ce qu'on a encaissé. La base le refuserait ; le dire ici
+  // évite de faire échouer une suppression de compte sur une contrainte.
+  if (transaction.status !== "CONFIRMEE") {
+    return { ouvert: false, raison: "aucun encaissement à rendre" };
+  }
+
+  await db.transaction.update({
+    where: { id: transactionId },
+    data: { refundDueAt: maintenant, refundBasis: motif },
+  });
+  return { ouvert: true };
+}

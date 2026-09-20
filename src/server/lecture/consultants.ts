@@ -1,4 +1,6 @@
 import { db } from "@/lib/db";
+import { issueDeLAnnulation, type IssueAnnulation } from "@/domain/consultants/annulation";
+import { libelleLimite } from "@/domain/consultants/rendez-vous";
 import { echec } from "@/server/http/echecs";
 import type { ConsultantHabilite } from "@/domain/consultants/annuaire";
 import type { Creneau } from "@/domain/consultants/rendez-vous";
@@ -204,4 +206,37 @@ export async function retirerLePartage(
     data: { revokedAt: maintenant },
   });
   return { consultant: accord.consultant.name, dossierId: accord.applicationId, dejaRetire: false };
+}
+
+/**
+ * Les rendez-vous qu'une suppression de compte annulerait — K.C.
+ *
+ * Lue par l'écran de suppression, avant le bouton. Ce qui est décidé ici
+ * n'est pas une prévision : c'est exactement la règle qu'appliquera
+ * `acheverLaSuppression`, sur la même limite stockée. Un écran qui
+ * annoncerait un remboursement que le traitement ne ferait pas serait pire
+ * que le silence.
+ */
+export interface RendezVousAAnnuler {
+  quand: string;
+  issue: IssueAnnulation;
+}
+
+export async function rendezVousQueLaSuppressionAnnule(
+  userId: string,
+  maintenant = new Date(),
+): Promise<RendezVousAAnnuler[]> {
+  const rendezVous = await db.appointment.findMany({
+    where: {
+      application: { userId },
+      startsAt: { gt: maintenant },
+      status: { in: ["RESERVE", "REPORTE"] },
+    },
+    orderBy: { startsAt: "asc" },
+    select: { startsAt: true, freeUntil: true },
+  });
+  return rendezVous.map((r) => ({
+    quand: libelleLimite(r.startsAt.toISOString()),
+    issue: issueDeLAnnulation(r.freeUntil.toISOString(), maintenant),
+  }));
 }

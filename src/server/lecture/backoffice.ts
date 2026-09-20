@@ -216,6 +216,7 @@ export async function paiements(maintenant = new Date()): Promise<Paiement[]> {
     moyen: moyenDe(t.provider),
     ...(t.providerTxId ? { transaction: t.providerTxId } : {}),
     ...(t.failureCause ? { cause: t.failureCause } : {}),
+    ...(t.refundBasis ? { motifDuRemboursement: t.refundBasis } : {}),
     recuLe: t.createdAt.toISOString(),
     etat: etatDuRapprochement(t, maintenant),
   }));
@@ -227,10 +228,16 @@ function etatDuRapprochement(
     reconciledAt: Date | null;
     discrepancy: string | null;
     createdAt: Date;
+    refundDueAt: Date | null;
+    refundedAt: Date | null;
   },
   maintenant: Date,
 ): EtatRapprochement {
   if (t.discrepancy) return "ECART";
+  // K.C — avant tout le reste, parce qu'une somme à rendre prime sur un
+  // rapprochement réussi : une transaction rapprochée dont on doit l'argent
+  // se serait affichée « Rapproché », et personne n'aurait rendu la somme.
+  if (t.refundDueAt && !t.refundedAt) return "REMBOURSEMENT_DU";
   if (t.status === "CONFIRMEE") return t.reconciledAt ? "RAPPROCHE" : "EN_ATTENTE";
   // Avant M.B, `REMBOURSEE` n'était nommé nulle part ici et tombait sur la
   // dernière ligne : passé dix minutes, « Écart à traiter ».
