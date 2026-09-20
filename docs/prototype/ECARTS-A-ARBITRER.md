@@ -656,12 +656,11 @@ une étape, sur le seul écran qui l'affichait déjà, et aucune nouvelle
 surface commerciale — mais la règle est à réécrire dans un sens ou dans
 l'autre.
 
-**K.B — L'export de données n'existe pas.** « Télécharger mes données »
+**K.B — L'export de données n'existe pas.** ~~« Télécharger mes données »
 (A-05) et « Télécharger mon dossier » (C-11) mènent l'un à l'écran
-lui-même, l'autre à une adresse qui répond 404. C'est un bouton mort juste
-avant un geste irréversible, et l'écran de suppression a dû être réécrit
-pour ne pas conseiller un geste impossible. Le portage RGPD est un écran à
-part entière.
+lui-même, l'autre à une adresse qui répond 404.~~ **Tranché — voir annexe
+L.** Les deux écrans existent, et un test refuse désormais tout lien
+interne qui ne mène nulle part.
 
 **K.C — Qui supporte le coût d'un rendez-vous annulé par une suppression ?**
 La suppression libère les créneaux à venir chez le consultant — c'est sans
@@ -677,3 +676,71 @@ destination. Tant qu'aucun contrat n'existe, le taux réel, la devise de
 facturation et le mode de rapprochement des commissions sont des
 hypothèses : `enregistrerLAboutissement` est écrite et n'est appelée par
 rien.
+
+
+---
+
+## Annexe L · Export des données
+
+Lot K.B. Il ferme K.B ; il en ouvre deux autres.
+
+### Ce qui est tranché
+
+**L.1 — Deux sorties, pas une.** « Mes données » répond au droit d'accès et
+de portabilité : du JSON, structuré, relisible par une machine, pour le
+compte entier. « Mon dossier » répond à un geste, pas à un droit — quelqu'un
+qui va clôturer veut garder ce qu'il a réuni avant que la purge l'emporte :
+une page qui s'imprime, dossier par dossier. Un seul fichier aurait mal
+servi les deux.
+
+**L.2 — Les fichiers ne sont dans aucun des deux.** Ils se téléchargent un
+par un, par une URL signée créée au clic et valable cinq minutes (règle
+d'architecture 4). Ce n'est pas un pis-aller : une archive unique de
+plusieurs dizaines de méga-octets, sur une connexion mobile qui coupe,
+échoue au bout de quatre minutes et ne laisse rien. Pièce par pièce, ce qui
+est passé est passé. Et aucune bibliothèque d'archivage n'entre au
+dépôt pour cela.
+
+**L.3 — Le PDF est celui du navigateur.** L'archive s'imprime ; « Imprimer »
+puis « Enregistrer au format PDF » suffit. Une bibliothèque de génération
+pèserait plus que le reste de l'application et rendrait un document moins
+fidèle que la page elle-même.
+
+**L.4 — L'export rend ce que le candidat voit.** Le barème interne de WF-07
+n'y est pas : l'arbitrage C-09 interdit de le montrer, et un nombre sur cent
+lu dans un fichier se retient comme un pronostic aussi sûrement qu'affiché à
+l'écran (INV-1). L'export porte la complétude en palier et en dénombrement.
+
+### Ce que l'écran a montré, et que la relecture du code n'a pas vu
+
+- **Un quatrième bouton mort, après paiement.** « Ouvrir ma checklist »
+  ($-05) pointait sur `/dossiers`, qui n'existe pas — la liste est le
+  tableau de bord. Une page introuvable au moment précis où quelqu'un vient
+  de payer. Trouvé non pas à l'œil mais en écrivant le test qui refuse
+  désormais tout lien interne sans page.
+- **L'archive affichait l'URL entière du référentiel.** Cent trente
+  caractères sur six lignes en 390 px, là où toute l'application affiche le
+  domaine seul (`mentionDe`). L'export, lui, garde l'adresse exacte : un
+  fichier relu par un autre service doit permettre de retrouver la page, et
+  il n'a pas de largeur à tenir.
+- **La règle d'impression emportait le contenu.** Elle masquait `header`,
+  `nav` et `footer` par nom de balise, donc aussi l'en-tête de l'archive —
+  titre, pays, dates — et sa mention de source. La page imprimée commençait
+  à « Pièces (6) ». Visible uniquement en rendant la page en média
+  « print », jamais à l'écran. Le gabarit marque maintenant sa propre chrome.
+
+### Ce qui reste à arbitrer
+
+**L.A — Le barème interne relève-t-il du droit d'accès ?** L'article 20
+(portabilité) ne couvre que les données fournies par la personne, ce qui
+exclut les données calculées. L'article 15 (accès) ne fait pas cette
+distinction. L'export retient la lecture compatible avec l'arbitrage C-09 —
+palier et dénombrement, pas le score — et le point mérite une réponse
+juridique, pas seulement produit.
+
+**L.B — Deux boutons morts restent, sur le reçu de paiement ($-06).**
+« Télécharger » et « Renvoyer par email » ne font rien : ce sont deux
+`<button>` sans gestionnaire sur une page serveur. Ils sortent du périmètre
+de K.B — le premier demande une mise en page imprimable du reçu, le second
+le transport de courrier, qui n'est branché nulle part. Le test des liens
+morts ne les voit pas : ils n'ont pas de `href`.

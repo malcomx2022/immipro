@@ -22,3 +22,45 @@
     @apply border-accent-500 outline-none ring-3 ring-accent-100;
   }
 }
+
+/* ── Impression ────────────────────────────────────────────────────────────
+   L'archive d'un dossier (C-11) se garde en PDF, et le navigateur sait déjà
+   le faire : « Imprimer » puis « Enregistrer au format PDF ». Aucune
+   bibliothèque de génération n'est donc embarquée — elle pèserait plus que
+   le reste de l'application pour produire un document moins fidèle que la
+   page elle-même.
+
+   Ce qui doit disparaître est la navigation : une barre d'onglets et un
+   en-tête de site imprimés occupent une page entière sans rien dire, et le
+   papier n'a pas de liens à suivre.
+
+   Le gabarit marque sa propre chrome avec `.pas-a-imprimer`, et la règle ne
+   devine pas par nom de balise. La première version masquait `header`,
+   `nav` et `footer` : elle emportait aussi l'en-tête de l'archive — son
+   titre, son pays, ses dates — et sa mention de source. Vu seulement en
+   rendant la page en média `print`, jamais à l'écran. */
+@media print {
+  .pas-a-imprimer {
+    display: none !important;
+  }
+
+  /* Le gabarit contraint la largeur pour l'écran ; sur papier, la marge est
+     celle de l'imprimante. */
+  main,
+  .a-imprimer {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Un bloc coupé en deux entre deux pages se relit mal, et une analyse
+     séparée de sa pièce ne veut plus rien dire. */
+  .a-imprimer section,
+  .a-imprimer li {
+    break-inside: avoid;
+  }
+
+  body {
+    background: #fff !important;
+  }
+}
