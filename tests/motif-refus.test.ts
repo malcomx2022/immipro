@@ -1,0 +1,230 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import {
+  LIBELLE_CAUSE,
+  echecPourMotif,
+  motifDeLEchec,
+  motifParDefaut,
+  motifPourLaCause,
+  type CauseRefus,
+  type MotifEchec,
+} from "@/domain/paiement/echec";
+import { lireFedaPay, lireStripe } from "@/server/paiement/notifications";
+import { LIBELLE_RAPPROCHEMENT, estEnEchec } from "@/domain/backoffice/reconciliation";
+
+const lire = (f: string) => readFileSync(f, "utf8");
+
+const CAUSES: readonly CauseRefus[] = [
+  "SOLDE_INSUFFISANT",
+  "REFUS_EMETTEUR",
+  "ANNULE_PAR_LE_PAYEUR",
+  "MOYEN_INVALIDE",
+  "INCIDENT_TECHNIQUE",
+  "DELAI_DEPASSE",
+];
+
+/**
+ * La raison d'un refus — N.B, WF-05.
+ *
+ * Le cycle recevait la raison du fournisseur et ne l'écrivait nulle part.
+ * Ce qui se vérifie ici tient en deux moitiés : que la cause conservée dise
+ * quelque chose d'utile, et qu'elle ne dise **que** cela — ni le texte du
+ * fournisseur, ni un moyen de paiement, ni une accusation par défaut.
+ */
+describe("ce que les rails disent déjà, et qu'on jetait", () => {
+  const fedapay = (statut: string) =>
+    lireFedaPay({ entity: { id: 7, status: statut, reference: "IMP-260920-ABCDEF" } });
+
+  it("FedaPay distingue trois échecs par son seul statut", () => {
+    // L'information était là depuis le début : les trois se lisaient comme
+    // un seul, et $-05 comme B-04 en payaient le prix.
+    expect(fedapay("declined")?.cause).toBe("REFUS_EMETTEUR");
+    expect(fedapay("canceled")?.cause).toBe("ANNULE_PAR_LE_PAYEUR");
+    expect(fedapay("failed")?.cause).toBe("INCIDENT_TECHNIQUE");
+  });
+
+  it("FedaPay ne nomme jamais le solde : il ne le dit pas", () => {
+    // Le rail n'a pas de code de refus normalisé. Inventer « solde
+    // insuffisant » de ce côté serait une accusation sans source.
+    for (const statut of ["declined", "canceled", "failed"]) {
+      expect(fedapay(statut)?.cause).not.toBe("SOLDE_INSUFFISANT");
+    }
+  });
+
+  it("aucune cause n'accompagne un paiement qui aboutit", () => {
+    for (const statut of ["approved", "transferred", "pending", "refunded"]) {
+      expect(fedapay(statut)?.cause).toBeUndefined();
+    }
+  });
+
+  const stripe = (erreur?: Record<string, string>) =>
+    lireStripe({
+      id: "evt_1",
+      type: "payment_intent.payment_failed",
+      data: {
+        object: {
+          id: "pi_1",
+          metadata: { reference: "IMP-260920-ABCDEF" },
+          ...(erreur ? { last_payment_error: erreur } : {}),
+        },
+      },
+    });
+
+  it("Stripe donne un code normalisé, et c'est le seul champ lu", () => {
+    expect(stripe({ decline_code: "insufficient_funds" })?.cause).toBe("SOLDE_INSUFFISANT");
+    expect(stripe({ decline_code: "expired_card" })?.cause).toBe("MOYEN_INVALIDE");
+    expect(stripe({ code: "processing_error" })?.cause).toBe("INCIDENT_TECHNIQUE");
+  });
+
+  it("un code inconnu, ou absent, ne devient pas une accusation", () => {
+    // La valeur par défaut est le refus sans raison : elle n'accuse ni le
+    // solde ni le moyen.
+    expect(stripe({ decline_code: "un_code_qui_n_existe_pas" })?.cause).toBe("REFUS_EMETTEUR");
+    expect(stripe()?.cause).toBe("REFUS_EMETTEUR");
+  });
+
+  it("le message rédigé et la carte ne franchissent pas le schéma", () => {
+    // Ils voyagent dans le même objet que le code. Ce qui n'est pas déclaré
+    // n'atteint pas le code qui écrit en base.
+    const lu = stripe({
+      decline_code: "insufficient_funds",
+      message: "Your card has insufficient funds.",
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      charge: "ch_1",
+    } as Record<string, string>);
+    expect(JSON.stringify(lu)).not.toMatch(/insufficient funds|ch_1/u);
+    expect(Object.keys(lu ?? {}).sort()).toEqual(["cause", "providerTxId", "reference", "statut"]);
+  });
+});
+
+describe("ce que la cause dit au candidat", () => {
+  it("chaque cause a un écran, et chaque écran une phrase", () => {
+    for (const cause of CAUSES) {
+      const motif = motifPourLaCause(cause);
+      const echec = echecPourMotif(motif, "5 000 F", "97 •• •• 42");
+      expect(echec.titre.length).toBeGreaterThan(0);
+      expect(echec.verifications.length).toBeGreaterThan(0);
+      // DOC-12 §16 règle 2 : le corps dit ce qui est conservé.
+      expect(echec.corps).toMatch(/conservé/u);
+    }
+  });
+
+  it("le solde n'est nommé que lorsqu'il est la cause", () => {
+    const accusateurs = CAUSES.filter((c) =>
+      echecPourMotif(motifPourLaCause(c), "5 000 F", null).titre.match(/solde/iu),
+    );
+    expect(accusateurs).toEqual(["SOLDE_INSUFFISANT"]);
+    /**
+     * Le corps non plus — mais la négation compte, comme pour le
+     * vocabulaire interdit : « pas à ton solde » est exactement ce qu'on
+     * veut lire sur un moyen invalide, et ce n'est pas une accusation.
+     */
+    const accuse = (texte: string) => /solde/iu.test(texte) && !/pas à ton solde/iu.test(texte);
+    const nomment = CAUSES.filter((c) =>
+      accuse(echecPourMotif(motifPourLaCause(c), "5 000 F", null).corps),
+    );
+    expect(nomment).toEqual(["SOLDE_INSUFFISANT"]);
+    expect(echecPourMotif("moyen_invalide", "5 000 F", null).corps).toMatch(/pas à ton solde/u);
+  });
+
+  it("deux titres voisins ne se lisent pas l'un pour l'autre", () => {
+    // Vu en comparant deux écrans : « Le paiement n'a pas abouti » pour un
+    // solde et « Le paiement n'a pas pu aboutir » pour une panne. Chacun
+    // nomme maintenant son fait.
+    const titres = CAUSES.map((c) => echecPourMotif(motifPourLaCause(c), "5 000 F", null).titre);
+    expect(new Set(titres).size).toBe(titres.length);
+    expect(echecPourMotif("solde_insuffisant", "5 000 F", null).titre).toMatch(/solde/u);
+    expect(echecPourMotif("incident_technique", "5 000 F", null).titre).toMatch(/panne/u);
+  });
+
+  it("une panne ne se présente pas comme une faute du candidat", () => {
+    const panne = echecPourMotif("incident_technique", "5 000 F", null);
+    expect(panne.corps).toMatch(/pas du tien/u);
+    expect(panne.verifications[0]).toMatch(/rien à corriger/u);
+  });
+
+  it("la cause conservée prime sur la déduction par l'état", () => {
+    expect(motifDeLEchec("SOLDE_INSUFFISANT", "ECHOUEE")).toBe("solde_insuffisant");
+    expect(motifDeLEchec("ANNULE_PAR_LE_PAYEUR", "ECHOUEE")).toBe("annule_par_le_payeur");
+    // Sans cause, la déduction d'avant reprend la main.
+    expect(motifDeLEchec(null, "ECHOUEE")).toBe(motifParDefaut("ECHOUEE"));
+    expect(motifDeLEchec(null, "EXPIREE")).toBe("delai_depasse");
+  });
+
+  it("`notification_absente` n'a pas de cause en base", () => {
+    // Ce n'est pas un refus : c'est l'état d'un paiement dont personne n'a
+    // rien dit. Aucune cause ne doit y conduire.
+    const ecrans = CAUSES.map(motifPourLaCause);
+    expect(ecrans).not.toContain<MotifEchec>("notification_absente");
+  });
+});
+
+describe("ce que le back-office en lit", () => {
+  it("l'état ne nomme plus une cause qu'il ne connaît pas", () => {
+    // Il classait tout échec en « Solde insuffisant », panne comprise.
+    expect(Object.values(LIBELLE_RAPPROCHEMENT)).not.toContain("Solde insuffisant");
+    expect(LIBELLE_RAPPROCHEMENT.ECHEC).toBe("Échec");
+    expect(estEnEchec({ etat: "ECHEC" } as never)).toBe(true);
+  });
+
+  it("la cause est une colonne à part, avec son libellé", () => {
+    for (const cause of CAUSES) {
+      expect(LIBELLE_CAUSE[cause].length).toBeGreaterThan(0);
+    }
+    expect(LIBELLE_CAUSE.SOLDE_INSUFFISANT).toBe("Solde insuffisant");
+  });
+});
+
+describe("ce que la base refuse", () => {
+  const migration = lire("prisma/migrations/20260920000200_motif_de_refus/migration.sql");
+
+  it("un motif sur un paiement encaissé", () => {
+    expect(migration).toMatch(/transaction_motif_seulement_sur_un_echec/u);
+    expect(migration).toMatch(/IN \('ECHOUEE', 'EXPIREE'\)/u);
+  });
+
+  it("une expiration qui jugerait le payeur", () => {
+    expect(migration).toMatch(/transaction_expiration_ne_juge_pas_le_payeur/u);
+  });
+
+  it("un échec annoncé qui se dirait hors délai", () => {
+    expect(migration).toMatch(/transaction_echec_annonce_n_est_pas_un_delai/u);
+  });
+});
+
+describe("ce qui part avec le compte", () => {
+  it("l'anonymisation efface le motif, comme le refus de visa", () => {
+    // Une contrainte CHECK ne peut pas interroger une autre table : le
+    // garde-fou vit dans le service, à côté de `issueReason`.
+    const suppression = lire("src/server/acces/suppression.ts");
+    expect(suppression).toMatch(/failureCause: null/u);
+    expect(suppression.indexOf("issueReason: null")).toBeLessThan(
+      suppression.indexOf("failureCause: null"),
+    );
+  });
+
+  it("l'écran de suppression le dit avant le bouton", () => {
+    const domaine = lire("src/domain/comptes/suppression.ts");
+    expect(domaine).toMatch(/sans ton nom ni la raison d'un refus/u);
+  });
+});
+
+describe("ce qui écrit la colonne", () => {
+  it("le motif ne s'écrit que sur un échec", () => {
+    const acces = lire("src/server/acces/paiements.ts");
+    expect(acces).toMatch(/effet\.vers === "ECHOUEE" && notification\.cause/u);
+  });
+
+  it("une expiration porte le seul motif que la plateforme peut prononcer", () => {
+    const job = lire("src/server/jobs/reconciliation.ts");
+    expect(job).toMatch(/status: "EXPIREE", failureCause: "DELAI_DEPASSE"/u);
+  });
+
+  it("aucun texte de fournisseur n'entre en base", () => {
+    // Le schéma de lecture ne déclare que des codes ; rien qui ressemble à
+    // un message ou à un numéro de carte n'est nommé.
+    const notifications = lire("src/server/paiement/notifications.ts");
+    const schema = notifications.slice(notifications.indexOf("const schemaStripe"));
+    expect(schema).not.toMatch(/message:|last4|network_status/u);
+  });
+});

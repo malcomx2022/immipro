@@ -11,6 +11,7 @@ import {
 import { effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
 import { suiteDictable } from "@/server/securite/secret";
+import type { CauseRefus } from "@/domain/paiement/echec";
 
 /**
  * Paiements — WF-05, INV-7.
@@ -109,6 +110,8 @@ export interface Notification {
   providerTxId: string;
   reference: string;
   statut: TransactionStatus;
+  /** Pourquoi, quand le rail le dit (N.B). */
+  cause?: CauseRefus;
 }
 
 export type IssueNotification =
@@ -153,6 +156,18 @@ export async function appliquerLaNotification(
       status: effet.vers,
       providerTxId: notification.providerTxId,
       ...(effet.crediteLePack ? { confirmedAt: new Date() } : {}),
+      /**
+       * Le motif n'est écrit que sur un échec, et jamais deviné — N.B.
+       *
+       * La base le refuse ailleurs (`transaction_motif_seulement_sur_un_echec`),
+       * et un échec annoncé par l'émetteur ne peut pas porter
+       * `DELAI_DEPASSE` : il a répondu, dans le délai. Un rail qui ne dit
+       * rien laisse la colonne nulle, et $-05 déduit alors de l'état —
+       * mieux vaut ne rien savoir que d'inventer un solde.
+       */
+      ...(effet.vers === "ECHOUEE" && notification.cause && notification.cause !== "DELAI_DEPASSE"
+        ? { failureCause: notification.cause }
+        : {}),
     },
   });
 

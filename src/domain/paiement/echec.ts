@@ -15,7 +15,54 @@ export type MotifEchec =
   | "delai_depasse"
   | "solde_insuffisant"
   | "refus_operateur"
-  | "notification_absente";
+  | "notification_absente"
+  | "annule_par_le_payeur"
+  | "moyen_invalide"
+  | "incident_technique";
+
+/**
+ * Le motif que la base conserve — N.B, `Transaction.failureCause`.
+ *
+ * Distinct de `MotifEchec` à dessein : l'un décrit ce que l'émetteur a
+ * répondu, l'autre ce que l'écran affiche. `notification_absente` n'est pas
+ * une cause de refus, c'est l'état d'un paiement dont personne n'a rien dit
+ * — il n'a donc pas de valeur en base, et ne peut pas en avoir.
+ */
+export type CauseRefus =
+  | "SOLDE_INSUFFISANT"
+  | "REFUS_EMETTEUR"
+  | "ANNULE_PAR_LE_PAYEUR"
+  | "MOYEN_INVALIDE"
+  | "INCIDENT_TECHNIQUE"
+  | "DELAI_DEPASSE";
+
+const ECRAN_POUR_CAUSE: Record<CauseRefus, MotifEchec> = {
+  SOLDE_INSUFFISANT: "solde_insuffisant",
+  REFUS_EMETTEUR: "refus_operateur",
+  ANNULE_PAR_LE_PAYEUR: "annule_par_le_payeur",
+  MOYEN_INVALIDE: "moyen_invalide",
+  INCIDENT_TECHNIQUE: "incident_technique",
+  DELAI_DEPASSE: "delai_depasse",
+};
+
+export const motifPourLaCause = (cause: CauseRefus): MotifEchec => ECRAN_POUR_CAUSE[cause];
+
+/**
+ * Ce que le back-office lit dans la même colonne — B-04.
+ *
+ * Le tableau des paiements classait tout échec en « échec solde », panne
+ * technique et renoncement du payeur compris. Un opérateur qui rappelle un
+ * candidat en lui parlant de son solde alors qu'il a simplement fermé la
+ * page se trompe de conversation.
+ */
+export const LIBELLE_CAUSE: Record<CauseRefus, string> = {
+  SOLDE_INSUFFISANT: "Solde insuffisant",
+  REFUS_EMETTEUR: "Refus de l'émetteur",
+  ANNULE_PAR_LE_PAYEUR: "Annulé par le payeur",
+  MOYEN_INVALIDE: "Moyen de paiement invalide",
+  INCIDENT_TECHNIQUE: "Incident technique",
+  DELAI_DEPASSE: "Délai dépassé",
+};
 
 /**
  * Le motif que l'état de la transaction impose, quand l'adresse n'en porte
@@ -34,6 +81,16 @@ export function motifParDefaut(statut: string): MotifEchec {
   // La transaction est encore ouverte : c'est « je n'ai rien reçu ».
   return "notification_absente";
 }
+
+/**
+ * Le motif de l'écran, la cause conservée l'emportant sur la déduction.
+ *
+ * L'ordre compte. Ce que l'émetteur a répondu vaut mieux que ce que l'état
+ * laisse supposer : sans lui, un refus pour solde et une panne du
+ * prestataire s'affichaient de la même façon.
+ */
+export const motifDeLEchec = (cause: CauseRefus | null, statut: string): MotifEchec =>
+  cause ? motifPourLaCause(cause) : motifParDefaut(statut);
 
 export interface Echec {
   titre: string;
@@ -85,6 +142,47 @@ export function echecPourMotif(
     };
   }
 
+  if (motif === "annule_par_le_payeur") {
+    return {
+      titre: "Le paiement a été annulé",
+      corps:
+        "L'opération a été interrompue avant d'être confirmée — sur ton téléphone, ou en quittant la page de paiement. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+      verifications: [
+        "Relancer le paiement en ouvre un nouveau : rien n'est débité deux fois.",
+        "Si tu n'as rien annulé, la notification a pu expirer avant ta saisie.",
+        CONSULTER_SOLDE,
+      ],
+    };
+  }
+
+  if (motif === "moyen_invalide") {
+    return {
+      titre: "Ce moyen de paiement n'a pas été accepté",
+      corps:
+        "L'émetteur l'a refusé pour une raison qui tient au moyen lui-même, pas à ton solde. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+      verifications: [
+        numero
+          ? `Vérifie que le ${numero} est bien actif et autorisé au paiement marchand.`
+          : "Vérifie que ton moyen de paiement est actif et autorisé au paiement marchand.",
+        "Une carte a une date d'expiration ; un portefeuille, un plafond à activer.",
+        "L'autre grille se règle par un autre moyen, et il fonctionne peut-être.",
+      ],
+    };
+  }
+
+  if (motif === "incident_technique") {
+    return {
+      titre: "Une panne a interrompu le paiement",
+      corps:
+        "Elle est du côté de l'émetteur ou de notre prestataire, pas du tien. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+      verifications: [
+        "Il n'y a rien à corriger sur ton compte : réessaie dans quelques minutes.",
+        "Si cela se répète, l'autre grille passe par un autre prestataire.",
+        CONSULTER_SOLDE,
+      ],
+    };
+  }
+
   if (motif === "notification_absente") {
     return {
       titre: "La notification n'est pas arrivée",
@@ -100,10 +198,16 @@ export function echecPourMotif(
     };
   }
 
+  /**
+   * Solde insuffisant. Le titre nomme le fait (DOC-12 §16 règle 1), et se
+   * distingue au premier coup d'œil de la panne : « le paiement n'a pas
+   * abouti » et « le paiement n'a pas pu aboutir » se ressemblaient assez
+   * pour qu'on ne sache pas lequel on lit.
+   */
   return {
-    titre: "Le paiement n'a pas abouti",
+    titre: "Ton solde n'a pas couvert le paiement",
     corps:
-      "Ton opérateur a refusé l'opération pour solde insuffisant. Ton dossier est conservé en l'état.",
+      "Ton opérateur a refusé l'opération pour solde insuffisant. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
     verifications: [
       `Le solde disponible doit couvrir ${montant} au moment de la confirmation.`,
       "Un rechargement met parfois quelques minutes à être pris en compte.",
