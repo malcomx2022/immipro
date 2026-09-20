@@ -1,8 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { notFound, redirect } from "next/navigation";
 import { LienBouton } from "@/components/ui/LienBouton";
-import { PACKS } from "@/domain/payments/pricing";
+import { recuDuPaiement } from "@/server/lecture/paiements";
+import { exigerCandidat } from "@/server/securite/page";
+import { momentEnFrancais } from "@/domain/format/moment";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -12,7 +15,19 @@ import { formatMontant } from "@/lib/utils";
  * — le focus se déplace au changement d'écran, et seulement là). Les trois
  * prochaines étapes sont ordonnées par ce qui est le plus long à corriger,
  * pas par ce qui est le plus facile à faire.
+ *
+ * L'écran vit d'une référence, et n'en invente pas. Il en affichait une
+ * écrite en dur, qui menait à un reçu tout aussi inventé ; il lit
+ * maintenant la transaction que le retour du fournisseur désigne, et
+ * partage cette lecture avec le reçu lui-même — deux écrans qui annoncent
+ * deux montants pour un même paiement sont un litige.
+ *
+ * Une transaction qui n'est pas confirmée n'a rien à faire ici : l'écran du
+ * reçu dit déjà, et dit seul, ce qu'il en est d'un paiement en attente ou
+ * sans suite.
  */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Paiement confirmé",
   description: "Votre dossier est ouvert.",
@@ -24,9 +39,23 @@ const ETAPES_SUIVANTES = [
   "Rédige ta lettre de motivation avec l'entretien guidé, quand le reste est en place.",
 ];
 
-export default function PageConfirme() {
-  const pack = PACKS[0];
-  const reference = "IMP-2609-4471";
+export default async function PageConfirme({
+  searchParams,
+}: {
+  searchParams: Promise<{ tx?: string }>;
+}) {
+  const { tx } = await searchParams;
+  const acteur = await exigerCandidat(
+    tx ? `/paiement/confirme?tx=${encodeURIComponent(tx)}` : "/paiement/confirme",
+  );
+  if (!tx) notFound();
+
+  const recu = await recuDuPaiement(tx, acteur.id).catch(() => null);
+  if (!recu) notFound();
+  if (recu.etat !== "paye") redirect(`/paiement/recu/${encodeURIComponent(tx)}`);
+
+  const montant = formatMontant(recu.montant, recu.devise);
+  const suite = recu.dossier ? `/dossiers/${recu.dossier.id}` : "/tableau-de-bord";
 
   return (
     <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
@@ -47,18 +76,18 @@ export default function PageConfirme() {
             Paiement confirmé
           </h1>
           <p className="text-pretty text-16 text-ink-700">
-            Ton dossier est ouvert.{" "}
-            {pack ? formatMontant(pack.prix.XOF, "XOF") : ""} débités sur ton compte
-            Mobile Money.
+            Ton dossier est ouvert. {montant} débités par {recu.moyen}.
           </p>
         </div>
       </div>
 
       <dl className="flex flex-col gap-2.5 rounded-lg bg-ink-100 p-5">
         {[
-          { intitule: "Référence", valeur: reference, mono: true },
-          { intitule: "Pack", valeur: pack?.libelle ?? "", mono: false },
-          { intitule: "Date", valeur: "11/09/2026 à 9 h 43", mono: false },
+          { intitule: "Référence", valeur: recu.reference, mono: true },
+          // « Achat » et non « Pack » : une recharge d'analyses aboutit
+          // ici aussi, et ce n'est pas un pack.
+          { intitule: "Achat", valeur: recu.achat, mono: false },
+          { intitule: "Date", valeur: momentEnFrancais(recu.le), mono: false },
         ].map((ligne) => (
           <div key={ligne.intitule} className="flex justify-between gap-4 text-14">
             <dt className="text-ink-500">{ligne.intitule}</dt>
@@ -98,11 +127,11 @@ export default function PageConfirme() {
             les checklists vivent sous `/dossiers/[id]`. Le bouton
             renvoyait donc en 404 juste après un paiement — le pire moment
             du parcours pour une page introuvable. */}
-        <LienBouton href="/tableau-de-bord" pleineLargeur className="min-h-action">
+        <LienBouton href={suite} pleineLargeur className="min-h-action">
           Ouvrir ma checklist
         </LienBouton>
         <Link
-          href={`/paiement/recu/${reference}`}
+          href={`/paiement/recu/${encodeURIComponent(recu.reference)}`}
           className="flex min-h-touch items-center justify-center text-14 font-semibold text-ink-900"
         >
           Voir le reçu
