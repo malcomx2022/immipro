@@ -9,6 +9,7 @@
  */
 import { getQueue, JOBS } from "@/lib/queue";
 import { purgerLesPiecesEchues } from "./purge";
+import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
@@ -42,6 +43,11 @@ async function main() {
   await boss.work(JOBS.PURGE_RETENTION, async () => {
     const bilan = await purgerLesPiecesEchues();
     console.info("[purge]", bilan);
+    // Même passe : une suppression de compte restée à mi-chemin faute de
+    // stockage disponible se rattrape ici. Les jours ordinaires, elle ne
+    // trouve rien (RG-10.4).
+    const reprises = await acheverLesSuppressionsEnAttente();
+    if (reprises.reprises > 0) console.info("[suppression]", reprises);
   });
 
   await boss.work(JOBS.VEILLE_ECHEANCE, async () => {

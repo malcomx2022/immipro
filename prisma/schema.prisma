@@ -103,6 +103,20 @@ model User {
   lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
 
+  /// Suppression de compte demandée par le candidat (RG-10.4).
+  ///
+  /// La ligne survit à la suppression, et ce n'est pas une facilité : un
+  /// reçu de paiement pointe dessus et doit lui survivre (C-11 l'annonce au
+  /// candidat, l'obligation comptable l'impose). Ce qui part, c'est tout ce
+  /// qui nomme quelqu'un ; ce qui reste, c'est un compte sans personne.
+  ///
+  /// Deux dates et non une : entre la demande et l'anonymisation, il y a la
+  /// purge des pièces, qui dépend d'un stockage objet susceptible d'être
+  /// indisponible. `deletionRequestedAt` seul est l'état « suppression
+  /// demandée » que B-03 sait afficher et que le job reprend.
+  deletionRequestedAt DateTime?
+  deletedAt           DateTime?
+
   profile       Profile?
   consents      Consent[]
   applications  Application[]
@@ -183,11 +197,23 @@ model Profile {
   updatedAt       DateTime @updatedAt
 }
 
+/// Un consentement par autorisation affichée (A-05).
+///
+/// La première version en regroupait plusieurs sous une même catégorie
+/// juridique : deux autorisations partageaient `MARKETING`, deux autres
+/// `PIECES_IDENTITE`. L'écran lisait alors la dernière ligne de la
+/// catégorie, si bien que retirer l'une affichait l'autre comme retirée.
+/// Une preuve de consentement qui répond pour une autre n'en est pas une.
+///
+/// `tests/schema-domaine.test.ts` compare cette liste au type
+/// `CodeConsentement` du domaine : elles ne peuvent plus diverger.
 enum ConsentKind {
   CGU
-  CONFIDENTIALITE
   PIECES_IDENTITE
-  MARKETING
+  PIECES_FINANCIERES
+  ALERTES_REGLES
+  PARTENAIRES
+  MESURE_AUDIENCE
 }
 
 /// Le consentement au traitement des pièces d'identité est séparé
@@ -265,6 +291,7 @@ model Application {
   migrations    RuleMigration[]
   accesses      ConsultantAccess[]
   appointments  Appointment[]
+  referrals     PartnerReferral[]
 
   @@index([userId, status])
   @@index([visaRuleId])
@@ -811,4 +838,117 @@ model Appointment {
 
   @@unique([consultantId, startsAt])
   @@index([applicationId, startsAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// Affiliation partenaires (WF-13)
+// ═══════════════════════════════════════════════════════════
+
+enum PartnerKind {
+  ASSURANCE_SANTE
+  LOGEMENT
+  EQUIVALENCE_DIPLOME
+  TRANSFERT_FONDS
+  CONSULTANT
+}
+
+/// Partenaire affilié — WF-13.
+///
+/// Rien n'est proposé par défaut. Un partenaire sans activation pour la
+/// destination du dossier n'existe pas pour ce dossier : RG-13.4 demande que
+/// la rétro-commission soit vérifiée destination par destination, et cette
+/// vérification est encadrée voire prohibée selon les pays. Le modèle refuse
+/// donc l'inverse — une activation mondiale par défaut, restreinte ensuite.
+///
+/// Le taux de commission est **stocké sur le partenaire** et recopié sur la
+/// proposition au moment où elle est faite. Le taux annoncé au candidat ce
+/// jour-là est celui qui sera facturé, même si la grille change après.
+model Partner {
+  id            String      @id @default(uuid())
+  name          String
+  kind          PartnerKind
+  city          String?
+  /// Mention affichée telle quelle sous le nom : « agréé, 9 ans d'exercice ».
+  qualification String?
+  /// Destination de la redirection tracée (WF-13, étape 2).
+  url           String
+  /// Taux de commission en points de base : 1500 pour 15 %. Un entier, pour
+  /// que le taux annoncé et le taux facturé soient le même nombre exact.
+  commissionBps Int
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  activations PartnerActivation[]
+  referrals   PartnerReferral[]
+}
+
+/// Activation d'un partenaire sur une destination (RG-13.4).
+///
+/// Même forme qu'`Accreditation` pour les consultants, et pour la même
+/// raison : la vérification porte sur un couple, pas sur un tiers. Une
+/// activation retirée reste en table, datée — l'effacer supprimerait la
+/// preuve qu'elle existait le jour où une redirection a été tracée.
+model PartnerActivation {
+  id          String    @id @default(uuid())
+  partnerId   String
+  partner     Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  countryCode String    @db.Char(2)
+  /// Ce qui a été vérifié : « rétro-commission licite, art. L. 561-2 ».
+  basis       String
+  verifiedAt  DateTime  @db.Date
+  verifiedBy  String
+  revokedAt   DateTime?
+
+  @@unique([partnerId, countryCode])
+  @@index([countryCode, revokedAt])
+}
+
+enum ReferralStatus {
+  PROPOSEE
+  REDIRIGEE
+  ABOUTIE
+  SANS_SUITE
+  DECLINEE
+}
+
+/// Proposition de partenaire et redirection tracée — WF-13, écran T-03.
+///
+/// La ligne existe dès la proposition, pas au clic : une proposition faite
+/// et déclinée est une information, et sans elle on ne mesure que ce qui a
+/// rapporté. C'est aussi ce qui rend « refuser ne coûte rien » vérifiable.
+///
+/// `step` porte l'étape de checklist qui a déclenché la proposition
+/// (RG-13.1). Une ligne sans étape est une réclame hors contexte ; la base
+/// la refuse.
+///
+/// `commissionBps` est recopié du partenaire à la proposition, et
+/// `commissionAmount` n'est écrit qu'à l'aboutissement : la commission est
+/// au résultat, et un montant inscrit d'avance est une créance imaginaire.
+model PartnerReferral {
+  id            String         @id @default(uuid())
+  partnerId     String
+  partner       Partner        @relation(fields: [partnerId], references: [id])
+  applicationId String
+  application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Étape de checklist qui motive la proposition (RG-13.1).
+  step          String
+  /// Situation déclarée par le candidat, telle qu'il l'a saisie (T-03).
+  motive        String
+  status        ReferralStatus @default(PROPOSEE)
+  commissionBps Int
+
+  proposedAt         DateTime  @default(now())
+  redirectedAt       DateTime?
+  settledAt          DateTime?
+  /// Commission perçue, dans la devise du montant facturé par le partenaire.
+  commissionAmount   Int?
+  commissionCurrency String?   @db.Char(3)
+
+  /// Une proposition par partenaire et par étape. Un candidat qui a dit non
+  /// ne se voit pas reproposer la même chose au rechargement de l'écran :
+  /// c'est cette clé qui rend « refuser ne coûte rien » vrai plus d'une
+  /// seconde.
+  @@unique([applicationId, partnerId, step])
+  @@index([applicationId, status])
+  @@index([partnerId, status, proposedAt])
 }

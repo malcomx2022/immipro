@@ -358,7 +358,7 @@ describe("T-03 — Proposition partenaire", () => {
     fireEvent.click(screen.getByRole("button", { name: "Voir la proposition" }));
     const dialogue = screen.getByRole("dialog");
     expect(espaces(dialogue.textContent ?? "")).toContain(
-      `commission de ${espaces(tauxCommissionFormate())} sur cet entretien`,
+      `commission de ${espaces(tauxCommissionFormate())} sur cette prestation`,
     );
   });
 
@@ -389,7 +389,7 @@ describe("T-03 — Proposition partenaire", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Ne plus me proposer de consultant" }),
     );
-    expect(screen.getByText(/Nous ne te proposerons plus de consultant/)).toBeDefined();
+    expect(screen.getByText(/Nous ne te proposerons plus de partenaire/)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Voir la proposition" })).toBeNull();
   });
 

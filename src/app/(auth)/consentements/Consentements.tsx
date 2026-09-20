@@ -147,7 +147,7 @@ export function Consentements() {
             Télécharger mes données
           </Link>
           <Link
-            href="/consentements"
+            href="/compte/suppression"
             className="flex min-h-touch items-center text-14 text-accent-600"
           >
             Supprimer mon compte et mes pièces

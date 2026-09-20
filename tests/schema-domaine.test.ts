@@ -8,6 +8,13 @@ import type { Arbitrage } from "@/domain/notifications/divergence";
 import type { GenreRemarque } from "@/domain/redaction/relecture";
 import type { Decision, MotifEchec } from "@/domain/backoffice/revue";
 import type { NiveauSource } from "@/domain/backoffice/regle";
+import type { CodeConsentement } from "@/domain/comptes/consentements";
+import type { EtatProposition, GenrePartenaire } from "@/domain/partenaires/affiliation";
+import { CONSENTEMENTS } from "@/domain/comptes/consentements";
+import {
+  LIBELLE_ETAT as LIBELLE_ETAT_PROPOSITION,
+  LIBELLE_GENRE as LIBELLE_GENRE_PARTENAIRE,
+} from "@/domain/partenaires/affiliation";
 import { LIBELLE_STATUT } from "@/domain/dossiers/dossier";
 import { LIBELLE_FAMILLE } from "@/domain/dossiers/piece";
 import { LIBELLE_MOTIF } from "@/domain/backoffice/revue";
@@ -132,6 +139,13 @@ describe("le schéma porte les invariants qu'il peut porter", () => {
     "utf8",
   );
 
+  const GARDE_FOUS =
+    MIGRATIONS +
+    readFileSync(
+      "prisma/migrations/20260920000100_garde_fous_suppression_affiliation/migration.sql",
+      "utf8",
+    );
+
   it("le barème interne ne porte plus un nom qui invite à le sérialiser", () => {
     // `completeness` se copiait dans une réponse d'API sans qu'on y pense ;
     // `internalScore` demande un instant de réflexion (arbitrage C-09).
@@ -166,5 +180,73 @@ describe("le schéma porte les invariants qu'il peut porter", () => {
     const bloc = /model ConsultantAccess \{([\s\S]*?)\n\}/u.exec(SCHEMA)![1]!;
     expect(bloc).toMatch(/expiresAt\s+DateTime\s*$/mu);
     expect(bloc).toMatch(/revokedAt\s+DateTime\?/u);
+  });
+
+  it("un compte anonymisé ne peut pas garder un nom (RG-10.4)", () => {
+    for (const contrainte of [
+      "user_suppression_demandee_avant_anonymisation",
+      "user_anonymise_ne_nomme_personne",
+    ]) {
+      expect(GARDE_FOUS, contrainte).toContain(contrainte);
+    }
+  });
+
+  it("une affiliation ne se propose ni hors contexte ni sans vérification (WF-13)", () => {
+    for (const contrainte of [
+      "referral_contexte_non_vide",
+      "partner_taux_de_commission_borne",
+      "referral_commission_au_resultat",
+      "referral_aboutie_est_datee",
+      "referral_redirection_avant_aboutissement",
+      "activation_verification_non_vide",
+    ]) {
+      expect(GARDE_FOUS, contrainte).toContain(contrainte);
+    }
+  });
+});
+
+/**
+ * Trois vocabulaires ajoutés par le lot suppression et affiliation. Le même
+ * garde-fou de dérive : une valeur ajoutée d'un côté sans l'autre échoue
+ * ici, et non le jour où un écran affiche un code technique.
+ */
+describe("suppression de compte et affiliation nomment les mêmes choses", () => {
+  it("genres de partenaire — PartnerKind / GenrePartenaire", () => {
+    const domaine: GenrePartenaire[] = [
+      "ASSURANCE_SANTE",
+      "LOGEMENT",
+      "EQUIVALENCE_DIPLOME",
+      "TRANSFERT_FONDS",
+      "CONSULTANT",
+    ];
+    expect(valeursDeLEnum("PartnerKind")).toEqual(trie(domaine));
+    expect(trie(Object.keys(LIBELLE_GENRE_PARTENAIRE))).toEqual(trie(domaine));
+  });
+
+  it("états de proposition — ReferralStatus / EtatProposition", () => {
+    const domaine: EtatProposition[] = [
+      "PROPOSEE",
+      "REDIRIGEE",
+      "ABOUTIE",
+      "SANS_SUITE",
+      "DECLINEE",
+    ];
+    expect(valeursDeLEnum("ReferralStatus")).toEqual(trie(domaine));
+    expect(trie(Object.keys(LIBELLE_ETAT_PROPOSITION))).toEqual(trie(domaine));
+  });
+
+  /**
+   * Un genre par autorisation. La première version en regroupait plusieurs
+   * par catégorie juridique, et l'écran lisait alors la réponse d'une
+   * autorisation pour une autre. Ce test interdit le regroupement plutôt
+   * que d'en surveiller les effets.
+   */
+  it("consentements — ConsentKind / CodeConsentement", () => {
+    const codes: CodeConsentement[] = CONSENTEMENTS.map((c) => c.code);
+    const base = valeursDeLEnum("ConsentKind");
+    expect(base).toContain("CGU");
+    expect(base.filter((v) => v !== "CGU")).toEqual(
+      trie(codes.map((c) => c.toUpperCase())),
+    );
   });
 });

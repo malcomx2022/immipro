@@ -27,6 +27,11 @@ script nomme celui qui passerait.
 | RG-07.2 | `PRET` sans date de passage, ou l'inverse |
 | RG-12.2 | Un partage de dossier sans échéance postérieure à l'accord |
 | RG-15.1 | Une écriture d'audit sans motif |
+| RG-10.4 | Un compte anonymisé qui garde un nom, un téléphone ou une empreinte |
+| RG-13.1 | Une proposition de partenaire sans étape de checklist ni motif |
+| RG-13.3 | Un taux de commission hors bornes |
+| RG-13.4 | Une activation de partenaire sans vérification nommée |
+| WF-13 | Une commission inscrite avant l'aboutissement, ou un aboutissement sans redirection |
 
 ## Trois choix de modélisation
 
@@ -48,12 +53,32 @@ de WF-07 reste calculé et stocké — le back-office en a besoin. Mais
 `internalScore` demande un instant de réflexion. Le candidat voit un palier
 et un dénombrement (arbitrage C-09), jamais ce nombre.
 
+**Le compte survit à sa suppression, vidé.** `Transaction.userId` ne tombe
+pas en cascade — un reçu doit survivre au compte, et C-11 l'annonce au
+candidat avant qu'il clôture. RG-10.4 demande donc d'**anonymiser** les
+métadonnées, pas de les effacer : `deletedAt` marque la ligne, et deux
+contraintes refusent la demi-mesure, une anonymisation sans demande et une
+anonymisation qui garderait le nom. `deletionRequestedAt` nomme l'état
+intermédiaire — les pièces parties, le compte pas encore vidé — parce que
+la purge dépend d'un stockage objet qui peut être indisponible.
+
+**L'affiliation n'est activée nulle part par défaut.** `Partner` ne se
+propose que sur une destination où `PartnerActivation` atteste une
+vérification : RG-13.4 encadre voire prohibe la rétro-commission selon les
+pays, et le modèle refuse l'inverse — une activation mondiale restreinte
+ensuite. `PartnerReferral` porte l'étape qui motive la proposition
+(RG-13.1) et recopie le taux au moment où elle est faite : le taux annoncé
+ce jour-là est celui qui sera facturé, même si la grille change après.
+
 ## Ce qui n'est pas là, et pourquoi
 
 - **Aucune table de coûts IA agrégés.** B-07 est livré en état vide :
   `AiUsage` enregistre les appels, et les agrégats se calculent. Une table de
   totaux avant la première mesure figerait des hypothèses en données.
 - **Aucun champ de « chances » ni de pronostic**, à aucun niveau (INV-1).
+- **Aucune table d'export de données.** « Télécharger mes données » et le
+  bouton d'archive de C-11 mènent à des adresses qui n'existent pas. Le
+  portage RGPD est un écran à part entière, pas une colonne.
 - **Aucune duplication du référentiel dans le dossier** : `Application`
   pointe la version de règle, elle ne la recopie pas. C'est ce qui permet à
   T-02 de comparer N et N+1 sans reconstituer l'ancienne.
