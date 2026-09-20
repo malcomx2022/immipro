@@ -1119,8 +1119,55 @@ model EditorialDoc {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  versions EditorialVersion[]
+
   @@unique([kind, slug])
   @@index([kind, status])
+}
+
+/// Ce qui était public, et depuis quand — P.B.
+///
+/// Une version par publication, jamais par enregistrement de brouillon :
+/// l'historique de toutes les frappes coûterait cher et ne dirait rien.
+/// Ce qu'on veut savoir tient en une phrase — quel texte un lecteur a-t-il
+/// pu lire le 12 mars — et seule une publication change la réponse.
+///
+/// **Immuable.** Aucun chemin de code ne la réécrit ni ne la supprime :
+/// c'est la même immuabilité que celle du journal d'audit, tenue de la
+/// même façon, par l'absence d'écrivain et par un test qui la vérifie. Une
+/// version qu'on pourrait corriger ne prouverait plus rien.
+///
+/// Restaurer n'est pas ressusciter : republier le texte d'une ancienne
+/// version crée une version de plus, dont le contenu se trouve être
+/// l'ancien. L'histoire ne se réécrit pas, elle s'allonge.
+model EditorialVersion {
+  id    String       @id @default(uuid())
+  docId String
+  doc   EditorialDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  /// Rang de publication, continu par document : la première vaut 1.
+  rang  Int
+
+  title      String
+  standfirst String
+  body       Json
+  /// INV-8 au niveau de la version, et non nullable : ce qui a été public
+  /// portait forcément sa source et sa date, puisque la base l'exigeait
+  /// déjà du document. Une version qui pourrait s'en passer laisserait
+  /// croire qu'un document a pu être publié sans elles.
+  sourceLabel String
+  verifiedAt  DateTime
+
+  countryLabel String?
+  section      String?
+  author       String?
+
+  /// Qui a rendu ce texte public, et pourquoi — le motif du journal.
+  publishedBy String
+  reason      String
+  publishedAt DateTime @default(now())
+
+  @@unique([docId, rang])
+  @@index([docId, publishedAt])
 }
 
 enum EditorialKind {

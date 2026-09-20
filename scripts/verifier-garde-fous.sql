@@ -240,6 +240,31 @@ SELECT refuse(
        provider, status, "failureCause", "failureCauseAt")
      VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE',now())$q$);
 
+-- ── P.B · l'historique des publications ───────────────────────────────────
+SELECT refuse(
+  'P.B · une version publiée sans source (INV-8)',
+  $q$INSERT INTO "EditorialVersion" (id, "docId", rang, title, standfirst, body,
+       "sourceLabel", "verifiedAt", "publishedBy", reason)
+     VALUES ('ev1','d1',1,'Titre','Chapeau','{}'::jsonb,'   ', now(),'op','Publication')$q$);
+
+SELECT refuse(
+  'P.B · une version publiée sans motif',
+  $q$INSERT INTO "EditorialVersion" (id, "docId", rang, title, standfirst, body,
+       "sourceLabel", "verifiedAt", "publishedBy", reason)
+     VALUES ('ev2','d1',1,'Titre','Chapeau','{}'::jsonb,'service-public.fr', now(),'op','  ')$q$);
+
+SELECT refuse(
+  'P.B · une version sans auteur de publication',
+  $q$INSERT INTO "EditorialVersion" (id, "docId", rang, title, standfirst, body,
+       "sourceLabel", "verifiedAt", "publishedBy", reason)
+     VALUES ('ev3','d1',1,'Titre','Chapeau','{}'::jsonb,'service-public.fr', now(),'','Publication')$q$);
+
+SELECT refuse(
+  'P.B · une version de rang nul, qui rendrait « la version 1 » ambigu',
+  $q$INSERT INTO "EditorialVersion" (id, "docId", rang, title, standfirst, body,
+       "sourceLabel", "verifiedAt", "publishedBy", reason)
+     VALUES ('ev4','d1',0,'Titre','Chapeau','{}'::jsonb,'service-public.fr', now(),'op','Publication')$q$);
+
 -- ── O.B · la conservation du motif ────────────────────────────────────────
 SELECT refuse(
   'O.B · un motif d''échec sans date, qui échapperait à la purge',

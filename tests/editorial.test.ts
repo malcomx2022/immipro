@@ -267,12 +267,28 @@ describe("les index de rubrique", () => {
     }
   });
 
-  it("publier invalide le document et sa rubrique", () => {
+  it("tout ce qui change la page publique l'invalide", () => {
     // Oublier l'index laisserait un guide publié invisible une heure
     // depuis la page qui existe pour le trouver.
+    //
+    // Le compte n'est plus une constante à retenir : il suivait le nombre
+    // de chemins, et P.B en a ajouté un — la restauration change aussi ce
+    // que le public lit. Ce qui se vérifie est la règle, pas le total :
+    // chaque branche qui touche au texte public invalide le cache.
     const route = lire("src/app/api/admin/contenus/[id]/route.ts");
     expect(route).toMatch(/revalidatePath\(CHEMIN\[genre\]\)/u);
-    expect(route.match(/revalider\(/gu)?.length).toBe(4);
+    for (const branche of [
+      // Enregistrement d'un document déjà publié.
+      /document\.status === "PUBLIE"[\s\S]*?revalider\(/u,
+      // Retrait.
+      /status: "RETIRE"[\s\S]*?revalider\(/u,
+      // Restauration d'une version sur un document publié.
+      /action === "restaurer"[\s\S]*?revalider\(/u,
+      // Publication.
+      /motif: `Publication —[\s\S]*?revalider\(/u,
+    ]) {
+      expect(route, String(branche)).toMatch(branche);
+    }
   });
 
   it("le pied de page n'énumère plus de destinations", () => {
