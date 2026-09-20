@@ -43,7 +43,7 @@ export function ArchiveDuDossier({ archive }: { archive: Archive }) {
   async function ouvrirLaPiece(pieceId: string) {
     setEnCours(pieceId);
     setEchec(null);
-    const resultat = await appeler<{ apercu: string | null }>(
+    const resultat = await appeler<{ apercu: string | null; mentionApercu: string | null }>(
       `/api/dossiers/${dossier.id}/pieces/${pieceId}`,
     );
     setEnCours(null);
@@ -52,11 +52,15 @@ export function ArchiveDuDossier({ archive }: { archive: Archive }) {
       return;
     }
     if (!resultat.donnees.apercu) {
+      // Deux absences, deux phrases. Une pièce en cours de contrôle revient
+      // toute seule ; une pièce purgée ne revient pas. Écrire « n'est plus
+      // disponible » sur la première ferait redéposer une pièce déjà là.
+      const enAttente = resultat.donnees.mentionApercu;
       setEchec({
-        titre: "Ce fichier n'est plus disponible",
-        corps: MENTION_PIECE_PURGEE,
+        titre: enAttente ? "Ce fichier n'est pas encore consultable" : "Ce fichier n'est plus disponible",
+        corps: enAttente ?? MENTION_PIECE_PURGEE,
         action: "Revenir à la liste",
-        ton: "limite",
+        ton: enAttente ? "attente" : "limite",
       });
       return;
     }

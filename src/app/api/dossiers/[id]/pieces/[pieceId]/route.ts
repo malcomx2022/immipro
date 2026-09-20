@@ -1,7 +1,7 @@
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { dossierDuCandidat } from "@/server/acces/dossiers";
-import { pieceDuDossier, urlDeLecture } from "@/server/acces/pieces";
+import { pieceDuDossier, raisonSansApercu, urlDeLecture } from "@/server/acces/pieces";
 import { versPiece } from "@/server/vue/dossier";
 import { sousTitreDepot, estAPhotographier } from "@/domain/dossiers/piece";
 import { CONSEILS_PHOTO } from "@/domain/dossiers/televersement";
@@ -12,6 +12,9 @@ import { CONSEILS_PHOTO } from "@/domain/dossiers/televersement";
  * L'URL de lecture est signée à la demande et expire en cinq minutes
  * (RG-06.4). Elle n'est jamais stockée : une URL conservée en base serait
  * une URL qui fuit avec la base.
+ *
+ * Elle n'est pas signée du tout tant que la pièce n'est pas sortie de
+ * quarantaine (I.D). `mentionApercu` dit alors pourquoi.
  */
 export const GET = route({
   nom: "piece",
@@ -54,6 +57,10 @@ export const GET = route({
           }
         : null,
       apercu: derniere ? await urlDeLecture(derniere) : null,
+      // I.D — une absence d'aperçu n'a pas toujours la même cause. Une
+      // quarantaine se résout seule en quelques secondes, une purge jamais :
+      // l'écran ne peut pas écrire la bonne phrase s'il ne sait pas laquelle.
+      mentionApercu: derniere ? raisonSansApercu(derniere) : null,
     };
   },
 });

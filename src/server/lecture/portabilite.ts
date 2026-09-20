@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { consultable } from "@/domain/dossiers/quarantaine";
 import { echec } from "@/server/http/echecs";
 import { versFiche, mentionDe } from "@/server/acces/regles";
 import { versPiece } from "@/server/vue/dossier";
@@ -349,7 +350,11 @@ export async function archiveDuDossier(
         famille: d.family,
         etat: d.status,
         constat: d.finding,
-        telechargeable: Boolean(derniere?.objectKey && !derniere.purgedAt),
+        // I.D — un fichier encore en quarantaine ne se télécharge pas plus
+        // depuis l'export que depuis l'écran.
+        telechargeable: Boolean(
+          derniere?.objectKey && !derniere.purgedAt && consultable(derniere.scanState),
+        ),
         purgeeLe: jour(derniere?.purgedAt ?? null),
         textes: d.versions
           .filter((v) => v.body !== null)

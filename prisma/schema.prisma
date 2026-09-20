@@ -535,6 +535,17 @@ model AuditLog {
 /// `checksum` porte RG-06.2 : une pièce re-téléversée à l'identique réutilise
 /// le verdict en cache, sans débit de quota. L'unicité par document le rend
 /// vrai en base plutôt qu'en intention.
+/// États du balayage antivirus — I.D, tranché le 20/09/2026.
+///
+/// L'indisponibilité du moteur n'est pas un état : un fichier que personne
+/// n'a pu lire reste `EN_QUARANTAINE`. Mieux vaut un fichier en attente
+/// qu'un fichier accepté par défaut.
+enum ScanState {
+  EN_QUARANTAINE
+  SAINE
+  INFECTEE
+}
+
 model DocumentVersion {
   id         String   @id @default(uuid())
   documentId String
@@ -557,12 +568,25 @@ model DocumentVersion {
   /// Contenu supprimé, métadonnées conservées (INV-5, RG-10.1).
   purgedAt   DateTime?
 
+  /// Balayage antivirus — I.D. Une version naît en quarantaine : ce n'est
+  /// pas une valeur par défaut de commodité, c'est l'état réel d'un fichier
+  /// que personne n'a encore lu. Une version rédigée n'a pas d'octet à
+  /// balayer ; son état ne décide de rien, puisque c'est `objectKey` qui
+  /// commande l'accès.
+  scanState   ScanState @default(EN_QUARANTAINE)
+  /// Nulle tant que rien n'a été balayé — la contrainte l'impose.
+  scannedAt   DateTime?
+  /// Le nom donné à la menace par le moteur. Écrit pour le back-office,
+  /// jamais montré au candidat : il n'est pas actionnable (RG-06.3).
+  scanFinding String?
+
   analyses DocumentAnalysis[]
   findings CritiqueFinding[]
 
   @@unique([documentId, rank])
   @@unique([documentId, checksum])
   @@index([documentId, uploadedAt])
+  @@index([scanState, uploadedAt])
 }
 
 enum AnalysisVerdict {

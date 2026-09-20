@@ -98,6 +98,30 @@ SELECT refuse(
   $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
      VALUES ('v4','d1',4,'minio/z','abc')$q$);
 
+-- ── I.D · la quarantaine et le balayage ───────────────────────────────────
+SELECT refuse(
+  'I.D · une version déclarée saine sans date de balayage',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum, "scanState")
+     VALUES ('v5','d1',5,'minio/aa','aa1','SAINE')$q$);
+
+SELECT refuse(
+  'I.D · une date de balayage sur une pièce encore en quarantaine',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanState", "scannedAt")
+     VALUES ('v6','d1',6,'minio/bb','bb1','EN_QUARANTAINE', now())$q$);
+
+SELECT refuse(
+  'I.D · une menace nommée sur une version saine',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanState", "scannedAt", "scanFinding")
+     VALUES ('v7','d1',7,'minio/cc','cc1','SAINE', now(), 'Eicar-Test')$q$);
+
+SELECT refuse(
+  'I.D · une version écartée qui garde ses octets',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanState", "scannedAt")
+     VALUES ('v8','d1',8,'minio/dd','dd1','INFECTEE', now())$q$);
+
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
 

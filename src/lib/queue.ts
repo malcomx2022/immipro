@@ -11,6 +11,8 @@ export async function getQueue(): Promise<PgBoss> {
 }
 
 export const JOBS = {
+  /** Balayage antivirus, avant toute promotion (I.D, WF-06 étape 2). */
+  BALAYAGE_PIECE: "document.balayage",
   ANALYSE_DOCUMENT: "document.analyse",
   RECONCILIATION_PAIEMENT: "paiement.reconciliation",
   PURGE_RETENTION: "retention.purge",

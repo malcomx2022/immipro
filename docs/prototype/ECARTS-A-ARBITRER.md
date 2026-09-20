@@ -279,7 +279,7 @@ jamais supprimé sans que la décision soit écrite ici.
 | **K.A** — RG-13.1 et RG-13.2 se contredisent | Une seule proposition, sur le seul écran qui l'affichait | Une seconde surface commerciale dans l'espace dossier |
 | **I.B** — *tranché le 20/09* | Seule la parité fixe du franc CFA convertit ; ailleurs le budget sort du classement | Une seconde parité écrite en dur |
 | **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
-| **I.D** — l'antivirus de WF-06 | Le balayage n'est pas fait, et n'est pas déclaré fait | Un texte ou un champ qui affirmerait qu'un fichier a été analysé |
+| **I.D** — *tranché le 20/09* | Quarantaine, puis balayage, puis promotion — et rien ne sort avant | Un repli vers « saine » quand le moteur ne répond pas, ou un texte qui promet un fichier sain |
 
 Trois tests de plus lient le fichier au relevé : les codes cités doivent
 exister ici, les ouverts ne doivent pas porter la mention « Tranché », et
@@ -685,11 +685,56 @@ L'aptitude se lit des seules dépendances, jamais du nom de l'environnement :
 une recette à qui il manque un secret de signature est inapte à encaisser,
 qu'elle s'appelle production ou non.
 
-**I.D — L'antivirus de WF-06 n'a pas de service.** L'étape 2 demande une
+**I.D — L'antivirus de WF-06 n'a pas de service.** ~~L'étape 2 demande une
 analyse antivirus synchrone avant stockage. Les contrôles de format, de
 taille et de type MIME sont faits ; le balayage antivirus ne l'est pas, et
-il n'est pas non plus déclaré fait. C'est le seul point de WF-06 qui reste
-ouvert.
+il n'est pas non plus déclaré fait.~~ **Tranché le 20/09/2026.**
+
+Tout fichier est d'abord déposé dans une zone de quarantaine dont rien ne
+sort, puis balayé avant d'être promu vers le stockage de confiance. Aucun
+fichier non balayé n'est téléchargeable, prévisualisable ni transmis à
+l'extraction. L'antivirus est un prérequis de mise en production des
+téléversements.
+
+« Avant stockage » ne se tient pas littéralement : le moteur doit bien
+accéder aux octets quelque part, et les octets sont écrits directement dans
+le stockage objet par le navigateur, sans transiter par l'application. La
+frontière utile n'est donc pas avant toute écriture, elle est **avant
+l'admission dans le stockage de confiance**. Les contrôles de nom, de taille
+et de type MIME ne remplacent rien : un PDF de la bonne taille et du bon
+type peut porter une charge, et c'est précisément le cas qu'ils ne voient
+pas. Scanner indisponible, enfin, veut dire fichier en attente, jamais
+fichier accepté par défaut.
+
+### Ce que l'application de la décision a trouvé
+
+**Trois états suffisent, et le quatrième aurait été le défaut.** Un fichier
+est en quarantaine, sain, ou écarté. L'indisponibilité du moteur n'en est
+pas un de plus : un fichier que personne n'a pu lire *reste* en quarantaine.
+C'était la tentation — un état « balayé, probablement sain » pour ne pas
+bloquer un pilote — et c'est exactement ce que la décision refuse.
+
+**Deux seaux plutôt qu'un préfixe.** La quarantaine est un seau distinct, et
+aucune URL de lecture n'y est jamais signée. Un préfixe dans le même seau se
+contourne d'une faute de frappe dans une clé ; une politique de seau non.
+
+**La troisième sortie était l'export.** Écran et aperçu se ferment de la même
+fonction — `urlDeLecture` est la seule qui signe une URL de lecture. L'export
+de portabilité, lui, décidait tout seul : `telechargeable` regardait la clé
+d'objet et la purge, rien d'autre. C'est la sortie qu'on oublie, parce
+qu'elle ne s'affiche pas.
+
+**Le méta-test des arbitrages passait grâce au paragraphe d'à côté.** Le bloc
+d'un arbitrage était découpé au nombre de caractères — neuf cents — si bien
+que celui d'I.D débordait sur celui d'I.E, et que la mention « Tranché » du
+voisin répondait pour lui. Le découpage s'arrête maintenant à l'arbitrage
+suivant. Un test qui passe grâce à la section d'à côté ne teste rien, et
+c'est le genre de défaut qu'un test vert ne signale jamais.
+
+Effet d'exploitation : une instance sans `ANTIVIRUS_URL` refuse les dépôts,
+avec un message qui dit que le contrôle manque, et `/api/health` la déclare
+inapte. Les versions déjà déposées passent en quarantaine — aucune n'a été
+balayée, aucune ne peut donc être déclarée saine.
 
 **I.E — Le courrier de confirmation T-05 attend toujours sa décision.**
 ~~Le point relevé au lot WF-12 n'a pas bougé : un email ne se recalcule pas

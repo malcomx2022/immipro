@@ -4,6 +4,7 @@ import { echec } from "@/server/http/echecs";
 import { presignedGet, presignedPut } from "@/lib/storage";
 import { cleObjet } from "@/server/securite/secret";
 import { refusDuFichier, TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
+import { consultable, mentionApercu } from "@/domain/dossiers/quarantaine";
 
 /**
  * Dépôt et lecture des pièces — WF-06.
@@ -114,10 +115,27 @@ export async function preparerLeDepot(
  * URL de lecture, générée à la demande et jamais stockée (RG-06.4). Une
  * pièce purgée n'en a plus : son contenu n'existe plus, seul le verdict
  * reste.
+ *
+ * Et une pièce non balayée n'en a pas non plus (I.D). La condition est ici
+ * plutôt que dans l'écran : c'est la seule fonction qui signe une URL de
+ * lecture, et une décision de sécurité qui vit dans un rendu se contourne
+ * en appelant la route directement.
  */
 export async function urlDeLecture(version: DocumentVersion): Promise<string | null> {
   if (!version.objectKey || version.purgedAt) return null;
+  if (!consultable(version.scanState)) return null;
   return presignedGet(version.objectKey);
+}
+
+/**
+ * Pourquoi l'aperçu manque, quand il manque. Sans elle, un fichier en
+ * quarantaine et un fichier purgé se ressemblent à l'écran : deux absences
+ * identiques, dont l'une se résout toute seule en quelques secondes et
+ * l'autre jamais.
+ */
+export function raisonSansApercu(version: DocumentVersion): string | null {
+  if (version.purgedAt) return null;
+  return mentionApercu(version.scanState);
 }
 
 export async function enregistrerLaVersion(

@@ -61,6 +61,7 @@ export type CodeEchec =
   // Pièce
   | "fichier_refuse"
   | "piece_deja_deposee"
+  | "televersement_indisponible"
   // Paiement
   | "montant_sous_le_minimum"
   | "devise_figee"
@@ -217,6 +218,15 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     action: "Revenir à la checklist",
     ton: "limite",
   },
+  televersement_indisponible: {
+    statut: 503,
+    titre: "Les dépôts de pièces sont suspendus",
+    corps:
+      "Le contrôle de sécurité des fichiers n'est pas joignable, et aucune pièce n'est acceptée sans lui.",
+    conserve: "Tes pièces déjà déposées ne changent pas, et rien de ce que tu as saisi n'est perdu.",
+    action: "Réessayer plus tard",
+    ton: "attente",
+  },
   montant_sous_le_minimum: {
     statut: 422,
     titre: "Le montant est trop faible pour être encaissé",
@@ -371,6 +381,7 @@ export const INTERROMPENT_UNE_SAISIE: readonly CodeEchec[] = [
   "etat_incompatible",
   "fichier_refuse",
   "piece_deja_deposee",
+  "televersement_indisponible",
   "devise_figee",
   "paiement_introuvable",
   "service_indisponible",

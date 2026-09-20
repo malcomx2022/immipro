@@ -4,6 +4,7 @@ import { payload } from "@/server/acces/regles";
 import { debiterUneAnalyse, rendreUneAnalyse } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { evaluerConditions, type ChampsExtraits } from "@/domain/dossiers/verification";
+import { transmissibleALAnalyse } from "@/domain/dossiers/quarantaine";
 
 /**
  * Analyse d'une pièce — WF-06.
@@ -47,6 +48,10 @@ export async function analyserUnePiece(
     include: { document: { include: { application: { include: { visaRule: true } } } } },
   });
   if (!version || !version.objectKey) return;
+  // I.D — aucun fichier non balayé n'est transmis à l'extraction. Le job
+  // n'est mis en file qu'après promotion ; la condition est là pour le jour
+  // où un autre appelant l'oubliera.
+  if (!transmissibleALAnalyse(version.scanState)) return;
 
   const document = version.document;
   const regle = document.application.visaRule;

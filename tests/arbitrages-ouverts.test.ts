@@ -165,42 +165,83 @@ describe("N.A — le rail se déduit, il ne se choisit pas", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * I.D — l'antivirus de WF-06 n'a pas de service
+ * I.D — l'antivirus de WF-06, tranché le 20/09
  * ------------------------------------------------------------------ */
 
-describe("I.D — rien ne déclare l'analyse antivirus faite", () => {
+describe("I.D (tranché) — rien ne déclare un balayage qui n'a pas eu lieu", () => {
   /**
-   * WF-06 étape 2 demande une analyse antivirus synchrone avant stockage.
-   * Les contrôles de nom, de taille et de type MIME sont faits ; le
-   * balayage ne l'est pas, faute de service.
+   * L'arbitrage est fermé, le garde-fou reste — et il a changé de cible.
    *
-   * La seule chose qui serait pire que l'absence, c'est de la masquer. Ni
-   * le schéma, ni un écran, ni un courrier ne doit affirmer qu'un fichier a
-   * été analysé — un candidat qui le lit en tire une assurance que rien ne
-   * fonde, et un consultant à qui la pièce est transmise aussi.
+   * Il refusait un champ de balayage, parce qu'aucun n'aurait pu être vrai.
+   * Le champ existe désormais, et ce qu'il faut tenir est l'inverse : que
+   * rien ne l'écrive sans qu'un moteur ait lu le fichier. C'est la seule
+   * façon de tricher qui reste, et elle est silencieuse.
    */
-  it("aucun texte n'affirme qu'un fichier a été analysé", () => {
+  it("le balayeur non branché rend l'absence, jamais la santé", () => {
+    const antivirus = lire("src/server/securite/antivirus.ts");
+    expect(antivirus).toMatch(/NON_BRANCHE: Balayeur = async \(\) => null/u);
+    // Aucun repli vers « saine » : ni valeur par défaut, ni court-circuit
+    // quand le moteur ne répond pas.
+    expect(antivirus).not.toMatch(/\?\?\s*\{\s*etat:\s*"SAINE"/u);
+    const balayage = lire("src/server/jobs/balayage.ts");
+    expect(balayage).toMatch(/if \(!verdict\) throw new BalayageIndisponible/u);
+    expect(balayage).not.toMatch(/catch[\s\S]{0,120}"SAINE"/u);
+  });
+
+  /**
+   * La cohérence de l'état ne se garde pas qu'en TypeScript : une date de
+   * balayage absente sur un état décidé le rendrait invérifiable après
+   * coup, et une clé d'objet survivante sur une version infectée resterait
+   * présignable.
+   */
+  it("la base tient l'état, pas seulement le code", () => {
+    const migration = lire(
+      "prisma/migrations/20260920000500_quarantaine_et_balayage/migration.sql",
+    );
+    expect(migration).toContain("document_version_balayage_date");
+    expect(migration).toContain("document_version_menace_seulement_si_infectee");
+    expect(migration).toContain("document_version_infectee_sans_octets");
+    expect(lire("prisma/schema.prisma")).toMatch(/scanState\s+ScanState\s+@default\(EN_QUARANTAINE\)/u);
+  });
+
+  /**
+   * Les trois sorties que la décision ferme : téléchargeable,
+   * prévisualisable, transmis à l'extraction. Chacune passe par la même
+   * fonction du domaine, et une quatrième aura à y passer aussi.
+   */
+  it("aucune des trois sorties ne s'ouvre sans balayage", () => {
+    expect(lire("src/server/acces/pieces.ts")).toMatch(
+      /if \(!consultable\(version\.scanState\)\) return null/u,
+    );
+    expect(lire("src/server/jobs/analyse.ts")).toMatch(
+      /if \(!transmissibleALAnalyse\(version\.scanState\)\) return/u,
+    );
+    expect(lire("src/server/lecture/portabilite.ts")).toMatch(
+      /consultable\(derniere\.scanState\)/u,
+    );
+  });
+
+  /** Sans moteur, le dépôt se refuse — il ne s'accepte pas en attendant. */
+  it("le dépôt refuse ce qu'il ne pourrait pas contrôler", () => {
+    const depot = lire("src/app/api/dossiers/[id]/pieces/[pieceId]/depot/route.ts");
+    expect(depot).toMatch(/if \(!antivirusConfigure\(\)\) throw echec\("televersement_indisponible"\)/u);
+    // Le job d'analyse n'est plus mis en file au dépôt : il l'est après la
+    // promotion, et c'est ce qui rend l'ordre impossible à inverser.
+    expect(depot).toContain("JOBS.BALAYAGE_PIECE");
+    expect(depot).not.toContain("JOBS.ANALYSE_DOCUMENT");
+  });
+
+  /**
+   * Ce que la décision n'autorise toujours pas : promettre. Un état de
+   * balayage est un fait daté ; « fichier sûr » est une assurance, et un
+   * candidat qui la lit en tire ce que rien ne fonde — pas plus qu'un
+   * consultant à qui la pièce est transmise.
+   */
+  it("aucun texte ne promet un fichier sain", () => {
     const affirmations =
-      /\b(analys\w+ antivirus|sans virus|exempt de virus|fichier s[ûu]r|v[ée]rifi[ée] contre les virus)\b/iu;
+      /\b(sans virus|exempt de virus|fichier s[ûu]r|garanti sans|v[ée]rifi[ée] contre les virus)\b/iu;
     const fautifs = SOURCES.filter((f) => affirmations.test(lire(f)));
     expect(fautifs).toEqual([]);
-  });
-
-  it("le schéma ne porte aucun état de balayage qui serait toujours faux", () => {
-    const schema = lire("prisma/schema.prisma");
-    expect(schema).not.toMatch(/\b(scanState|scannedAt|virusScan|malwareScan)\b/u);
-  });
-
-  /**
-   * Les contrôles qui existent sont nommés, et ils s'arrêtent là. Un
-   * quatrième contrôle ajouté ici sans service derrière échouerait à ce
-   * test plutôt que de passer pour un balayage.
-   */
-  it("les contrôles synchrones sont ceux que le code sait faire", () => {
-    const pieces = lire("src/server/acces/pieces.ts");
-    expect(pieces).toContain("MIMES_ACCEPTES");
-    expect(pieces).toContain("refusDuFichier");
-    expect(pieces).not.toMatch(/antivirus|malware/iu);
   });
 });
 
@@ -213,17 +254,29 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
   const CE_FICHIER = lire("tests/arbitrages-ouverts.test.ts");
 
   /** Encore ouverts : la lecture est provisoire, le test la tient. */
-  const OUVERTS = ["I.D", "K.A", "L.A", "N.A"];
+  const OUVERTS = ["K.A", "L.A", "N.A"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
    * « pas de taux sans source datée » — a plus besoin d'être tenue qu'une
    * lecture provisoire.
    */
-  const TRANCHES = ["I.B"];
+  const TRANCHES = ["I.B", "I.D"];
 
-  const bloc = (code: string) =>
-    new RegExp(`\\*\\*${code.replace(".", "\\.")} —[\\s\\S]{0,900}`, "u").exec(ECARTS)![0];
+  /**
+   * Le bloc d'un arbitrage s'arrête au suivant, et non au bout de neuf
+   * cents signes. La première version comptait les caractères : le bloc
+   * d'I.D débordait sur celui d'I.E, si bien que la mention « Tranché »
+   * du voisin répondait pour lui. Un test qui passe grâce au paragraphe
+   * d'à côté ne teste rien.
+   */
+  const bloc = (code: string) => {
+    const depart = ECARTS.search(new RegExp(`\\*\\*${code.replace(".", "\\.")} —`, "u"));
+    expect(depart, code).toBeGreaterThan(-1);
+    const suite = ECARTS.slice(depart + 4);
+    const fin = suite.search(/\*\*[A-Z]\.[A-Z] —/u);
+    return fin === -1 ? suite : suite.slice(0, fin);
+  };
 
   /**
    * Un arbitrage se tranche, et le garde-fou qui le cite devient un
@@ -248,7 +301,7 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
 
   it("les ouverts ne portent pas la mention qui les fermerait", () => {
     for (const code of OUVERTS) {
-      expect(bloc(code).slice(0, 400), code).not.toMatch(/\*\*Tranché/u);
+      expect(bloc(code), code).not.toMatch(/\*\*Tranché/u);
     }
   });
 
