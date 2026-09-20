@@ -42,17 +42,24 @@ const PARTAGES = [
  * la même réponse aux deux rendrait l'état des interrupteurs indéfini.
  */
 const repondrePartages = (partages: unknown[] = []) => {
-  global.fetch = vi.fn().mockImplementation((url: string) =>
-    Promise.resolve({
-      ok: true,
-      status: 200,
-      json: () =>
-        Promise.resolve(
-          String(url).includes("/partages")
-            ? { partages }
-            : { consentements: CONSENTEMENTS, etat: { ...ETAT_INITIAL } },
+  global.fetch = vi.fn().mockImplementation(
+    (url: string) =>
+      new Promise<Response>((resoudre) =>
+        setTimeout(
+          () =>
+            resoudre({
+              ok: true,
+              status: 200,
+              json: () =>
+                Promise.resolve(
+                  String(url).includes("/partages")
+                    ? { partages }
+                    : { consentements: CONSENTEMENTS, etat: { ...ETAT_INITIAL } },
+                ),
+            } as Response),
+          25,
         ),
-    } as Response),
+      ),
   );
 };
 
@@ -276,10 +283,14 @@ describe("A-05 — Consentements", () => {
     repondrePartages(PARTAGES);
     render(<Consentements />);
 
+    // L'attente porte sur ce que la lecture apporte, jamais sur le titre :
+    // celui-ci est rendu avant l'appel, et l'attendre n'attend rien. La
+    // première écriture de ce test passait en local et échouait en
+    // intégration, selon l'ordre des microtâches.
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Dossiers partagés" })).toBeDefined(),
+      expect(screen.getByText(/Vermeulen Immigration · Pays-Bas/)).toBeDefined(),
     );
-    expect(screen.getByText(/Vermeulen Immigration · Pays-Bas/)).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Dossiers partagés" })).toBeDefined();
     expect(screen.getByText(/Accordé le 17 septembre 2026/)).toBeDefined();
   });
 
