@@ -1,5 +1,6 @@
 import type { EditorialDoc } from "@prisma/client";
 import { db } from "@/lib/db";
+import { jourEnFrancais } from "@/domain/format/moment";
 import { echec } from "@/server/http/echecs";
 import {
   corpsSchema,
@@ -186,6 +187,39 @@ export async function documentsEditoriaux(): Promise<LigneDocument[]> {
   });
 }
 
+/**
+ * Une publication passée, telle que le back-office la relit — P.B.
+ *
+ * Le corps voyage avec : « consultable par les administrateurs » veut dire
+ * qu'on peut relire le texte, pas seulement sa date. Les vingt dernières
+ * suffisent — au-delà, ce n'est plus une relecture, c'est une archive, et
+ * elle se lira dans le journal d'audit qui en porte les rangs.
+ */
+export interface VersionPubliee {
+  rang: number;
+  titre: string;
+  chapeau: string;
+  /** `null` si le corps de cette version ne se relit plus. */
+  corps: Corps | null;
+  source: string;
+  verifieeLe: string;
+  /**
+   * Qui a publié, tel qu'on peut le lire.
+   *
+   * La table conserve l'identifiant — durable, comme dans le journal
+   * d'audit : une adresse change, un identifiant non. Mais un historique
+   * qu'on consulte doit nommer quelqu'un, et une colonne d'UUID ne nomme
+   * personne. L'adresse est donc résolue à la lecture, et l'identifiant
+   * reste le repli : un compte supprimé (RG-10.4) n'a plus d'adresse, et
+   * la ligne doit survivre à son auteur.
+   */
+  par: string;
+  motif: string;
+  publieLe: string;
+}
+
+export const VERSIONS_RELUES = 20;
+
 export interface DocumentEnEdition extends LigneDocument {
   chapeau: string;
   corps: Corps | null;
@@ -197,11 +231,28 @@ export interface DocumentEnEdition extends LigneDocument {
   /** Dérivés, montrés en lecture seule pour qu'on voie ce qu'ils valent. */
   sommaire: readonly string[];
   duree: string | null;
+  /** L'historique des publications, la plus récente en tête — P.B. */
+  versions: readonly VersionPubliee[];
 }
 
 export async function documentPourEdition(id: string): Promise<DocumentEnEdition> {
   const doc = await db.editorialDoc.findUnique({ where: { id } });
   if (!doc) throw echec("introuvable");
+
+  const versions = await db.editorialVersion.findMany({
+    where: { docId: id },
+    orderBy: { rang: "desc" },
+    take: VERSIONS_RELUES,
+  });
+
+  const auteurs = new Map(
+    (
+      await db.user.findMany({
+        where: { id: { in: [...new Set(versions.map((v) => v.publishedBy))] } },
+        select: { id: true, email: true },
+      })
+    ).map((u) => [u.id, u.email]),
+  );
 
   const lu = corpsSchema.safeParse(doc.body);
   const corps = lu.success ? lu.data : null;
@@ -228,5 +279,25 @@ export async function documentPourEdition(id: string): Promise<DocumentEnEdition
     auteur: doc.author,
     publieLe: iso(doc.publishedAt),
     modifieLe: doc.updatedAt.toISOString(),
+    versions: versions.map((v) => {
+      // Le corps d'une version se relit comme celui d'un document, et pour
+      // la même raison : une colonne `Json` n'a pas de forme, et celle
+      // d'il y a six mois n'est pas garantie d'être celle d'aujourd'hui.
+      // Une version illisible se dit, elle ne se rend pas à moitié — et
+      // sa ligne reste, parce que savoir qu'une publication a eu lieu
+      // vaut mieux que de ne plus rien savoir d'elle.
+      const luVersion = corpsSchema.safeParse(v.body);
+      return {
+        rang: v.rang,
+        titre: v.title,
+        chapeau: v.standfirst,
+        corps: luVersion.success ? luVersion.data : null,
+        source: v.sourceLabel,
+        verifieeLe: jourEnFrancais(v.verifiedAt.toISOString()),
+        par: auteurs.get(v.publishedBy) ?? v.publishedBy,
+        motif: v.reason,
+        publieLe: v.publishedAt.toISOString(),
+      } satisfies VersionPubliee;
+    }),
   };
 }

@@ -1899,12 +1899,66 @@ article sans rubrique ni signature.
 page `/guides` ni `/articles`.~~ **Tranché — voir annexe Q.** Les trois
 index existent, et le lot a trouvé bien pire que ce que P.A annonçait.
 
-**P.B — Une seule version, pas d'historique.** Une règle est versionnée
-parce qu'un dossier fige la sienne (INV-3) ; un guide n'a rien qui le fige,
-et republier ne casse rien. Mais un texte réécrit efface le précédent sans
-trace, alors que le journal d'audit garde qui a publié et pourquoi. Faut-il
-conserver les versions d'un guide ? C'est une question de gouvernance
-éditoriale, pas de produit.
+**P.B — Une seule version, pas d'historique.** ~~C'est une question de
+gouvernance éditoriale, pas de produit.~~ **Tranché le 20/09/2026** en
+faveur d'un historique des publications uniquement.
+
+Une version immuable à chaque publication, aucune à l'enregistrement d'un
+brouillon. La précédente reste consultable par les administrateurs et peut
+être restaurée ; le journal d'audit référence la version publiée. Ne pas
+figer un guide dans un dossier ne dispense pas de savoir ce qui était
+public : la trace désignait un contenu que la republication avait effacé.
+
+### Ce que l'application de la décision a trouvé
+
+**« À chaque publication » ne voulait pas dire « à chaque clic sur
+Publier ».** La route d'enregistrement invalide le cache de la page dès
+qu'elle écrit sur un document déjà publié : le texte change sous les yeux
+du public à la seconde, sans passer par le bouton. Ne versionner que le
+bouton aurait donné un historique troué **sur le chemin le plus courant**
+— corriger un guide en ligne — tout en promettant une preuve de ce qui
+était public. La règle appliquée est donc : une version à chaque fois que
+ce que le public lit change. Un brouillon n'est lu par personne et n'en
+crée aucune, ce que la décision demande.
+
+Le motif n'y est pas saisi : cette route n'en demande pas, et exiger une
+justification pour corriger une coquille pousserait à ne pas corriger. La
+version porte donc « Correction enregistrée sur un document déjà publié »,
+qui décrit le fait sans prétendre le justifier.
+
+**Restaurer n'est pas ressusciter.** Republier le texte d'une ancienne
+version crée une version de plus, dont le contenu se trouve être l'ancien.
+L'histoire s'allonge, elle ne se réécrit pas — et c'est ce qui permet de
+lire plus tard « le 20 septembre, retour au texte du 3 mars ». Vérifié
+contre PostgreSQL : brouillon → aucune version ; publication → v1 ;
+correction en ligne → v2 ; restauration de la v1 → v3 portant le texte de
+la v1, la v1 elle-même intacte.
+
+**L'immuabilité n'est pas une contrainte SQL, et le dire vaut mieux que le
+laisser croire.** Aucun `CHECK` n'empêche un `UPDATE`, et le dépôt
+n'emploie aucun déclencheur : en introduire un pour cette table seule
+aurait ajouté un mécanisme à connaître là où la table voisine — le journal
+d'audit — tient la même promesse autrement. L'immuabilité tient donc par
+l'absence d'écrivain, et un test refuse tout appel à `editorialVersion` en
+mise à jour ou en suppression. La migration l'écrit noir sur blanc.
+
+**Un champ optionnel aurait fait parler la route dans le mauvais
+vocabulaire.** Le rang à restaurer n'avait de sens que pour une action sur
+trois ; en faire un champ facultatif obligeait la route à le vérifier à la
+main, puis à refuser une requête mal formée avec le vocabulaire d'un refus
+de publication. Un test existant l'a signalé — il interdit précisément
+cette confusion. Une union discriminée met la règle dans le schéma.
+
+**Et deux défauts vus en lisant l'écran, pas le code.** La section rendait
+« veilleur-1 · vérifiée le 2026-09-01 » : un identifiant brut et une date
+ISO au milieu d'une phrase française. La table garde l'identifiant, qui est
+durable ; c'est la lecture qui résout l'adresse, avec l'identifiant en
+repli — un compte supprimé (RG-10.4) n'a plus d'adresse, et la ligne doit
+survivre à son auteur. Les deux chemins ont été vérifiés.
+
+*Observé sans être corrigé :* l'écran du journal d'audit affiche lui aussi
+l'identifiant brut de l'acteur, sur toutes ses lignes. C'est la convention
+existante, et la changer touche une surface qui n'est pas celle de ce lot.
 
 **P.C — Les images ne sont pas au périmètre.** Les cinq formes de bloc sont
 celles que le prototype dessine, toutes textuelles. Un guide illustré

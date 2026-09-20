@@ -26,6 +26,8 @@ import {
   type FauteEditoriale,
 } from "@/domain/editorial/document";
 import { MENTION_AUDIT } from "@/domain/backoffice/navigation";
+import { MENTION_HISTORIQUE } from "@/domain/editorial/historique";
+import { momentEnFrancais } from "@/domain/format/moment";
 import { CHAMP_CONTROLE } from "@/components/ui/champ";
 import { cn } from "@/lib/utils";
 
@@ -121,6 +123,8 @@ export function EditionContenu({ document }: { document: DocumentEnEdition }) {
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [fait, setFait] = useState<string | null>(null);
   const [etat, setEtat] = useState(document.etat);
+  /** La version dont on relit le texte, `null` si aucune — P.B. */
+  const [relue, setRelue] = useState<number | null>(null);
 
   const corps: Corps = { blocs, appel };
   const refus: readonly FauteEditoriale[] = verifierLeDocument({ titre, chapeau }, corps);
@@ -157,21 +161,36 @@ export function EditionContenu({ document }: { document: DocumentEnEdition }) {
     router.refresh();
   }
 
-  async function publier(action: "publier" | "retirer") {
+  async function publier(action: "publier" | "retirer" | "restaurer", version?: number) {
     setEnvoi(true);
     setEchec(null);
     setFait(null);
-    const resultat = await appeler<{ etat: string }>(`/api/admin/contenus/${document.id}`, {
-      corps: { action, motif },
-    });
+    const resultat = await appeler<{ etat: string; restauree?: number }>(
+      `/api/admin/contenus/${document.id}`,
+      { corps: { action, motif, ...(version ? { version } : {}) } },
+    );
     setEnvoi(false);
     if (!resultat.ok) {
       setEchec(resultat.echec);
       return;
     }
     setEtat(resultat.donnees.etat as typeof etat);
-    setFait(action === "publier" ? `Publié — ${adresse}` : "Retiré de la publication.");
+    setFait(
+      action === "publier"
+        ? `Publié — ${adresse}`
+        : action === "retirer"
+          ? "Retiré de la publication."
+          : `Version ${resultat.donnees.restauree} restaurée. Les champs ci-dessus se rechargent.`,
+    );
     setMotif("");
+    // Les champs du formulaire viennent de l'état local : après une
+    // restauration, ils montreraient encore le texte remplacé. Recharger
+    // la page est le seul moyen honnête de les remettre d'accord avec la
+    // base, et c'est ce que `router.refresh()` ne fait pas seul ici.
+    if (action === "restaurer") {
+      globalThis.location.reload();
+      return;
+    }
     router.refresh();
   }
 
@@ -419,6 +438,86 @@ export function EditionContenu({ document }: { document: DocumentEnEdition }) {
             ) : null}
           </div>
         </section>
+
+        {/* P.B — l'historique des publications.
+            Il ne se remplit qu'en publiant : un document jamais publié
+            n'affiche pas une section vide en promettant qu'elle se
+            remplira, il dit ce qu'il faut faire pour qu'elle existe. */}
+        <section className="flex flex-col gap-3 rounded-lg border border-ink-300 bg-white p-5">
+          <h2 className="text-16 font-semibold text-ink-900">Historique des publications</h2>
+          <p className="text-pretty text-13 text-ink-500">{MENTION_HISTORIQUE}</p>
+          {document.versions.length === 0 ? (
+            <p className="text-pretty text-14 text-ink-700">
+              Aucune publication pour l&apos;instant. La première créera la version 1.
+            </p>
+          ) : (
+            <ol className="flex flex-col gap-3">
+              {document.versions.map((v) => (
+                <li
+                  key={v.rang}
+                  className="flex flex-col gap-2 border-t border-ink-300 pt-3 first:border-0 first:pt-0"
+                >
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-14 font-semibold text-ink-900">
+                      Version {v.rang}
+                    </span>
+                    <span className="text-13 text-ink-500">
+                      {momentEnFrancais(v.publieLe)} · {v.par}
+                    </span>
+                  </div>
+                  <p className="text-pretty text-14 text-ink-700">{v.motif}</p>
+                  <p className="text-pretty text-13 text-ink-500">
+                    {v.titre} · source : {v.source}, vérifiée le {v.verifieeLe}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variante="secondaire"
+                      onClick={() => setRelue(relue === v.rang ? null : v.rang)}
+                    >
+                      {relue === v.rang ? "Masquer le texte" : "Relire le texte"}
+                    </Button>
+                    <Button
+                      variante="secondaire"
+                      chargement={envoi}
+                      disabled={motif.trim().length < 3 || v.corps === null}
+                      raisonDesactivation={raisonDeRestauration(motif, v.corps !== null)}
+                      onClick={() => void publier("restaurer", v.rang)}
+                    >
+                      Restaurer cette version
+                    </Button>
+                  </div>
+                  {relue === v.rang ? (
+                    <div className="flex flex-col gap-2 rounded-md bg-ink-100 p-4">
+                      {v.corps === null ? (
+                        <p className="text-pretty text-14 text-ink-700">
+                          Le texte de cette version ne se relit plus. La ligne reste :
+                          elle prouve qu&apos;une publication a eu lieu ce jour-là.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-pretty text-14 font-semibold text-ink-900">
+                            {v.chapeau}
+                          </p>
+                          {v.corps.blocs.map((bloc, i) => (
+                            <p
+                              key={`${v.rang}-${i}`}
+                              className={cn(
+                                "text-pretty text-14 text-ink-700",
+                                bloc.type === "intertitre" && "font-semibold text-ink-900",
+                              )}
+                            >
+                              {bloc.type === "liste" ? bloc.items.join(" · ") : bloc.texte}
+                            </p>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       </div>
     </>
   );
@@ -429,6 +528,16 @@ export function EditionContenu({ document }: { document: DocumentEnEdition }) {
  * L'ordre suit le coût de la correction — la formulation d'abord, parce
  * qu'elle demande de réécrire ; le motif en dernier, parce qu'il se tape.
  */
+/**
+ * Restaurer écrit dans la base et se consigne au journal : c'est une
+ * décision, pas une prévisualisation, et elle se motive comme les autres.
+ */
+function raisonDeRestauration(motif: string, lisible: boolean): string | undefined {
+  if (!lisible) return "Le texte de cette version ne se relit plus : il n'y a rien à restaurer.";
+  if (motif.trim().length < 3) return "Un motif, consigné au journal d'audit.";
+  return undefined;
+}
+
 function raisonDePublication(
   refus: number,
   motif: string,

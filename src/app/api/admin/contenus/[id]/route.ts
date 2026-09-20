@@ -6,11 +6,19 @@ import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { documentPourEdition } from "@/server/lecture/editorial";
 import {
+  MOTIF_CORRECTION_EN_LIGNE,
+  champsDeLaVersion,
+  enregistrerUneVersion,
+} from "@/server/acces/editorial";
+import {
   corpsSchema,
   messageDeRefusEditorial,
   verifierLeDocument,
   type GenreDocument,
 } from "@/domain/editorial/document";
+
+/** Le motif, consigné au journal d'audit : les trois actions l'exigent. */
+const MOTIF = z.string().min(3).max(500);
 
 const CHEMIN: Record<GenreDocument, string> = {
   GUIDE: "/guides",
@@ -62,7 +70,7 @@ export const PUT = route({
     rubrique: z.string().max(80).optional(),
     auteur: z.string().max(80).optional(),
   }),
-  async traiter({ corps, params }) {
+  async traiter({ corps, params, acteur }) {
     const document = await db.editorialDoc.findUnique({ where: { id: params.id } });
     if (!document) throw echec("introuvable");
 
@@ -89,9 +97,33 @@ export const PUT = route({
       },
     });
 
-    // Un document déjà publié dont on enregistre une correction doit la
-    // montrer : la page est en cache, et rien d'autre ne l'invalide.
+    /**
+     * Un document déjà publié dont on enregistre une correction doit la
+     * montrer : la page est en cache, et rien d'autre ne l'invalide.
+     *
+     * **Et cet enregistrement-là est une publication** — P.B. Le texte
+     * change sous les yeux du public à la seconde, sans passer par le
+     * bouton. Ne versionner que le bouton aurait laissé l'historique
+     * troué sur le chemin le plus courant, la correction d'un guide en
+     * ligne, tout en promettant une preuve de ce qui était public.
+     *
+     * Le motif n'est pas demandé ici, parce que cette route n'en demande
+     * pas et qu'exiger une justification pour corriger une coquille
+     * pousserait à ne pas corriger. Il dit donc ce qui s'est passé, ce
+     * qui est déjà plus que rien.
+     */
     if (document.status === "PUBLIE") {
+      const rang = await enregistrerUneVersion(document.id, {
+        par: acteur!.id,
+        motif: MOTIF_CORRECTION_EN_LIGNE,
+      });
+      await journaliser({
+        acteurId: acteur!.id,
+        action: "contenu.publication",
+        cible: `contenu:${document.id}`,
+        motif: MOTIF_CORRECTION_EN_LIGNE,
+        details: { genre: document.kind, slug: document.slug, version: rang },
+      }).catch(() => undefined);
       revalider(document.kind as GenreDocument, document.slug);
     }
 
@@ -105,21 +137,41 @@ export const PUT = route({
 });
 
 /**
- * Publication et retrait — WF-14 dans l'esprit, sans le versionnement.
+ * Publication, retrait et restauration — WF-14 dans l'esprit.
  *
  * Un guide n'a pas de version figée par un dossier : INV-3 ne s'y applique
  * pas, et publier une correction n'alerte personne. Ce qui reste de la
  * publication d'une règle, c'est le refus sur le vocabulaire, l'exigence de
  * source (INV-8) et la ligne de journal.
+ *
+ * **Et, depuis P.B, une version.** Ne pas figer un guide dans un dossier
+ * ne dispense pas de savoir ce qui était public : le journal gardait qui
+ * avait publié et pourquoi, sur un texte que la republication effaçait —
+ * la trace désignait un contenu disparu. Chaque publication en conserve
+ * désormais une copie immuable, que la ligne de journal référence par son
+ * rang, et qu'on peut restaurer.
  */
 export const POST = route({
   nom: "admin.contenu.publication",
   acces: "veilleur",
   limite: "sensible",
-  corps: z.object({
-    action: z.enum(["publier", "retirer"]),
-    motif: z.string().min(3).max(500),
-  }),
+  /**
+   * Une union discriminée, et non un champ optionnel : le rang n'a de sens
+   * que pour la restauration, et le rendre facultatif aurait obligé la
+   * route à vérifier à la main ce que le schéma sait exiger — puis à
+   * refuser une requête mal formée avec le vocabulaire d'un refus de
+   * publication, qui n'en est pas un.
+   */
+  corps: z.discriminatedUnion("action", [
+    z.object({ action: z.literal("publier"), motif: MOTIF }),
+    z.object({ action: z.literal("retirer"), motif: MOTIF }),
+    z.object({
+      action: z.literal("restaurer"),
+      motif: MOTIF,
+      /** Le rang de la version à restaurer — P.B. */
+      version: z.number().int().positive(),
+    }),
+  ]),
   async traiter({ corps, params, acteur }) {
     const vue = await documentPourEdition(params.id!);
 
@@ -142,6 +194,48 @@ export const POST = route({
       });
       revalider(vue.genre, vue.slug);
       return { etat: "RETIRE" as const };
+    }
+
+    /**
+     * Restaurer — P.B. Le texte d'une ancienne version revient sur le
+     * document ; si celui-ci est publié, ce retour est lui-même une
+     * publication et crée une version de plus. L'ancienne version n'est
+     * pas ressuscitée : elle reste où elle est, et l'historique dit « le
+     * 20 septembre, retour au texte du 3 mars ».
+     */
+    if (corps.action === "restaurer") {
+      const version = await db.editorialVersion.findUnique({
+        where: { docId_rang: { docId: vue.id, rang: corps.version } },
+      });
+      if (!version) {
+        throw echec("introuvable");
+      }
+
+      await db.editorialDoc.update({
+        where: { id: vue.id },
+        data: champsDeLaVersion(version),
+      });
+
+      const motif = `Restauration de la version ${version.rang} — ${corps.motif}`;
+      const rang =
+        vue.etat === "PUBLIE"
+          ? await enregistrerUneVersion(vue.id, { par: acteur!.id, motif })
+          : null;
+
+      await journaliser({
+        acteurId: acteur!.id,
+        action: "contenu.publication",
+        cible: `contenu:${vue.id}`,
+        motif,
+        details: {
+          genre: vue.genre,
+          slug: vue.slug,
+          restauree: version.rang,
+          ...(rang ? { version: rang } : {}),
+        },
+      });
+      if (vue.etat === "PUBLIE") revalider(vue.genre, vue.slug);
+      return { etat: vue.etat, restauree: version.rang };
     }
 
     if (!vue.corps) {
@@ -179,15 +273,23 @@ export const POST = route({
       },
     });
 
+    // La version d'abord, la ligne de journal ensuite : c'est elle qui la
+    // référence (P.B), et une ligne citant un rang qui n'existe pas
+    // vaudrait moins que pas de rang du tout.
+    const rang = await enregistrerUneVersion(vue.id, {
+      par: acteur!.id,
+      motif: corps.motif,
+    });
+
     await journaliser({
       acteurId: acteur!.id,
       action: "contenu.publication",
       cible: `contenu:${vue.id}`,
       motif: `Publication — ${corps.motif}`,
-      details: { genre: vue.genre, slug: vue.slug },
+      details: { genre: vue.genre, slug: vue.slug, version: rang },
     });
 
     revalider(vue.genre, vue.slug);
-    return { etat: "PUBLIE" as const, adresse: `${CHEMIN[vue.genre]}/${vue.slug}` };
+    return { etat: "PUBLIE" as const, version: rang, adresse: `${CHEMIN[vue.genre]}/${vue.slug}` };
   },
 });
