@@ -1,17 +1,22 @@
 /**
- * Proposition d'un consultant partenaire — T-03, WF-13.
+ * Ce qu'une offre de partenaire doit dire — T-06, WF-13.
  *
- * L'écran s'ouvre quand le dossier dépasse ce que la plateforme sait faire.
- * Trois règles le tiennent, et aucune n'est négociable :
+ * **K.A, tranché le 20/09/2026.** L'offre ne s'affiche plus dans l'espace
+ * dossier : elle vit sur une surface dédiée, où le candidat vient la
+ * chercher. Ce module ne bouge pas pour autant — les trois règles qu'il
+ * porte tenaient à la nature de l'offre, pas à l'écran qui la montrait :
  *
- * 1. Le motif est nommé. « Tu as déclaré un refus de visa Schengen en 2024 »
- *    dit pourquoi la proposition arrive maintenant ; sans lui, elle se lit
- *    comme une réclame déclenchée au hasard.
+ * 1. Le motif est nommé. « Ton dossier demande une assurance maladie » dit
+ *    à quoi l'offre se rapporte ; sans lui, elle se lit comme une réclame.
  * 2. La commission est annoncée dans l'écran, pas dans les conditions
  *    générales. Une recommandation rémunérée non déclarée est un conflit
  *    d'intérêts, quel que soit le sérieux du partenaire.
- * 3. Refuser ne coûte rien, et l'écran le dit. Une proposition qu'on ne peut
- *    pas décliner sans crainte n'est pas une proposition.
+ * 3. Refuser ne coûte rien, et l'écran le dit. Ce qui a disparu, c'est le
+ *    bouton pour refuser : on ne décline pas ce qui n'est pas proposé.
+ *
+ * Ce qui est parti d'ici avec la décision : les trois issues de l'ancien
+ * écran, et le libellé du tarif de consultation. Une consultation se
+ * réserve dans l'annuaire, qui écrit son propre tarif.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
@@ -51,24 +56,3 @@ export const ENGAGEMENTS: readonly string[] = [
  * « les consultants partenaires » ne désignait personne.
  */
 export const MENTION_INDEPENDANCE = "ImmiPro n'est pas un cabinet de conseil en immigration.";
-
-/**
- * Les trois issues de l'écran. Le refus définitif en est une, et il se
- * respecte.
- *
- * Leurs libellés vivent dans `domain/partenaires/affiliation` : le même
- * écran propose un consultant ou un courtier, et « continuer sans
- * consultant » ne voulait rien dire sous le second.
- */
-export type SuiteProposition = "CRENEAUX" | "CONTINUER_SEUL" | "NE_PLUS_PROPOSER";
-
-/**
- * Une proposition refusée définitivement ne revient pas, quelle que soit la
- * situation déclarée ensuite. Sans cette règle, « ne plus me proposer » ne
- * vaut que jusqu'au prochain déclencheur, et la promesse est fausse.
- */
-export const peutProposer = (refusDefinitif: boolean): boolean => !refusDefinitif;
-
-/** « Premier entretien : 20 000 F, 45 minutes » — montant et durée viennent de la grille. */
-export const libelleOffre = (prixFormate: string, dureeMinutes: number): string =>
-  `Premier entretien : ${prixFormate}, ${dureeMinutes} minutes`;

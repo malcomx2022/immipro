@@ -1,5 +1,6 @@
 import type { Application, Document, DocumentVersion, VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
+import { aidePourLaChecklist, type AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { echec } from "@/server/http/echecs";
 import { versFiche, payload } from "@/server/acces/regles";
 import { versDossier, versPiece } from "@/server/vue/dossier";
@@ -65,6 +66,13 @@ export interface VueDossier {
   pieces: Piece[];
   checklist: ReturnType<typeof grouperPourCompletude>;
   quota: { restantes: number; total: number };
+  /**
+   * Aide fonctionnelle de l'étape en cours, s'il y en a une (K.A). Elle se
+   * calcule ici et non dans `versPiece` : elle se lit sur le code du
+   * référentiel — `assurance_maladie` — que la pastille de l'écran a déjà
+   * réduit à trois lettres.
+   */
+  aide: AideDeLEtape | null;
 }
 
 /** Checklist d'un dossier — C-06. */
@@ -79,6 +87,13 @@ export async function vueDuDossier(id: string, userId: string): Promise<VueDossi
     pieces,
     checklist: grouperPourCompletude(pieces),
     quota: await compteur(brut.id),
+    aide: aidePourLaChecklist(
+      brut.documents.map((d) => ({
+        code: d.code,
+        libelle: d.label,
+        conforme: d.status === "CONFORME",
+      })),
+    ),
   };
 }
 

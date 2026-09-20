@@ -8,33 +8,40 @@ import {
 import { autorisationAccordee } from "@/server/acces/consentements";
 
 /**
- * Lecture des propositions de partenaire — T-03, WF-13.
+ * Lecture des offres de partenaire — WF-13, écran T-06.
  *
- * Quatre conditions doivent tenir ensemble, et aucune n'est cosmétique :
+ * **K.A, tranché le 20/09/2026.** Cette lecture alimentait la checklist :
+ * elle y posait une proposition commerciale au moment où une pièce
+ * manquait. La décision l'en retire, et l'offre vit désormais sur une
+ * surface dédiée, où le candidat va la chercher. Ce qui reste dans l'espace
+ * dossier est une aide fonctionnelle, qui ne nomme ni prestataire ni prix
+ * (`domain/dossiers/aide-de-letape`).
  *
- * - **l'étape** : la proposition est contextuelle, jamais une réclame posée
- *   là où il reste de la place (RG-13.1) ;
+ * Le déplacement n'affaiblit aucune des garanties. Elles portaient sur la
+ * nature de l'offre, pas sur l'écran qui la montre :
+ *
+ * - **l'étape** : chaque offre se rattache à une pièce que le dossier
+ *   demande, et le dit. Une liste sans motif serait un annuaire publicitaire ;
  * - **la destination** : un partenaire n'est activé qu'après vérification,
  *   pays par pays (RG-13.4) ;
- * - **l'autorisation** : le candidat peut ne pas vouloir en recevoir, et
- *   c'est un interrupteur de son profil, pas une case oubliée ;
- * - **le refus définitif** : « ne plus me proposer » vaut pour toujours.
+ * - **l'autorisation** : le candidat peut ne pas vouloir d'offres, et c'est
+ *   un interrupteur de son profil ;
+ * - **le taux** : celui qui est annoncé et celui qui est facturé sont le
+ *   même nombre (RG-13.3).
  *
  * Il n'y a **aucun défaut permissif**. Un partenaire sans activation
- * n'existe pour aucun dossier : tant que personne n'a vérifié la licéité de
- * la rétro-commission sur la destination, rien ne se propose — ce qui est
- * exactement l'état du produit tant que le premier partenaire n'est pas
- * signé.
+ * n'existe pour aucun dossier — ce qui est exactement l'état du produit
+ * tant que le premier partenaire n'est pas signé (K.D).
  */
 
 /**
  * Étape de checklist → genre de partenaire.
  *
- * Les quatre genres de WF-13 se retrouvent un à un dans les codes du
- * référentiel : c'est le référentiel qui dit à quel moment la question se
- * pose, pas une règle écrite à côté. Une destination qui n'exige pas
- * d'assurance n'a pas d'étape `assurance_maladie`, et la question ne se pose
- * donc jamais.
+ * Les quatre genres de service de WF-13 se retrouvent un à un dans les
+ * codes du référentiel : c'est lui qui dit à quel moment la question se
+ * pose, pas une règle écrite à côté. `CONSULTANT` n'y figure pas — un
+ * accompagnement humain ne se rattache pas à une pièce, et il a sa propre
+ * surface depuis WF-12 : l'annuaire.
  */
 export const GENRE_DE_LETAPE: Readonly<Record<string, GenrePartenaire>> = {
   assurance_maladie: "ASSURANCE_SANTE",
@@ -43,37 +50,40 @@ export const GENRE_DE_LETAPE: Readonly<Record<string, GenrePartenaire>> = {
   preuve_fonds: "TRANSFERT_FONDS",
 };
 
-export interface Proposition {
+export interface Offre {
   /** Identifiant de la ligne de suivi, que l'écran renvoie avec son issue. */
   id: string;
   partenaire: Partenaire;
+  /** Ce que le dossier demande, et pourquoi la plateforme ne le fournit pas. */
   motif: MotifProposition;
   /** Étape de checklist qui la motive. */
   etape: string;
-  /**
-   * Ce qui est proposé. L'écran n'affiche pas la même chose pour un
-   * consultant, qui se réserve sur un créneau chez nous au tarif de la
-   * grille, et pour un courtier, qui se rejoint sur son site.
-   */
   genre: GenrePartenaire;
   /** Adresse du partenaire, pour la redirection tracée (WF-13, étape 2). */
   url: string;
 }
 
+export interface OffresDuDossier {
+  /** Faux quand le candidat a retiré l'autorisation : l'écran le dit. */
+  autorise: boolean;
+  offres: readonly Offre[];
+}
+
 /**
- * Proposition en cours pour un dossier, s'il y en a une.
+ * Offres disponibles pour un dossier.
  *
- * **Cette lecture écrit une ligne**, et c'est délibéré. « Redirection
- * tracée » (WF-13, étape 2) ne se mesure que rapportée aux propositions
- * faites : sans ligne à l'affichage, on ne compte que ce qui a rapporté, et
- * une affiliation qu'on n'évalue que sur ses succès ne s'arrête jamais. La
- * clé d'unicité `(dossier, partenaire, étape)` rend l'écriture idempotente :
- * recharger l'écran n'ajoute rien.
+ * **Cette lecture écrit une ligne par offre affichée**, et c'est délibéré.
+ * « Redirection tracée » (WF-13, étape 2) ne se mesure que rapportée aux
+ * offres montrées : sans ligne à l'affichage, on ne compte que ce qui a
+ * rapporté, et une affiliation qu'on n'évalue que sur ses succès ne
+ * s'arrête jamais. La clé d'unicité `(dossier, partenaire, étape)` rend
+ * l'écriture idempotente — revenir sur l'écran n'ajoute rien, et ne
+ * réécrit pas l'issue d'une offre déjà suivie.
  */
-export async function propositionPourLeDossier(
+export async function offresDuDossier(
   applicationId: string,
   userId: string,
-): Promise<Proposition | null> {
+): Promise<OffresDuDossier> {
   const dossier = await db.application.findFirst({
     where: { id: applicationId, userId },
     include: {
@@ -81,36 +91,15 @@ export async function propositionPourLeDossier(
       documents: { select: { code: true, label: true } },
     },
   });
-  if (!dossier?.visaRule) return null;
+  if (!dossier?.visaRule) return { autorise: true, offres: [] };
 
-  // Une proposition déjà tranchée ne revient pas — y compris « continuer
-  // seul », qui vaut pour ce dossier et n'a pas à être redemandé à chaque
-  // passage sur la checklist.
-  const tranchee = await db.partnerReferral.findFirst({
-    where: { applicationId, status: { not: "PROPOSEE" } },
-    orderBy: { proposedAt: "desc" },
-  });
-  if (tranchee) return null;
-
-  const enCours = await db.partnerReferral.findFirst({
-    where: { applicationId, status: "PROPOSEE" },
-    include: { partner: { include: { activations: { where: { revokedAt: null } } } } },
-    orderBy: { proposedAt: "asc" },
-  });
-  if (enCours) {
-    return {
-      id: enCours.id,
-      partenaire: versPartenaire(enCours.partner, enCours.partner.activations),
-      motif: motifDeLEtape(enCours.step, enCours.motive),
-      etape: enCours.step,
-      genre: enCours.partner.kind,
-      url: enCours.partner.url,
-    };
+  if (!(await autorisationAccordee(userId, "partenaires"))) {
+    return { autorise: false, offres: [] };
   }
 
-  if (!(await autorisationAccordee(userId, "partenaires"))) return null;
-
   const pays = dossier.visaRule.countryCode;
+  const offres: Offre[] = [];
+
   for (const piece of dossier.documents) {
     const genre = GENRE_DE_LETAPE[piece.code];
     if (!genre) continue;
@@ -126,10 +115,9 @@ export async function propositionPourLeDossier(
     });
     // Le taux annoncé par l'écran est littéral (RG-13.3) : un partenaire à
     // un autre taux rendrait la phrase fausse, et on préfère ne rien
-    // proposer plutôt que d'annoncer un nombre qui n'est pas celui facturé.
+    // montrer plutôt que d'annoncer un nombre qui n'est pas celui facturé.
     if (!partenaire || !tauxConformeALAnnonce(partenaire.commissionBps)) continue;
 
-    const motif = motifDeLEtape(piece.code, piece.label);
     const ligne = await db.partnerReferral.upsert({
       where: {
         applicationId_partnerId_step: {
@@ -148,17 +136,17 @@ export async function propositionPourLeDossier(
       update: {},
     });
 
-    return {
+    offres.push({
       id: ligne.id,
       partenaire: versPartenaire(partenaire, partenaire.activations),
-      motif,
+      motif: motifDeLEtape(piece.code, piece.label),
       etape: piece.code,
       genre: partenaire.kind,
       url: partenaire.url,
-    };
+    });
   }
 
-  return null;
+  return { autorise: true, offres };
 }
 
 const versPartenaire = (
@@ -177,8 +165,8 @@ const versPartenaire = (
  *
  * Il nomme ce que le candidat a sous les yeux — « ton dossier demande une
  * assurance maladie » — et non un profil deviné. C'est la différence entre
- * une proposition contextuelle et un encart : la première se rattache à
- * quelque chose que la personne reconnaît.
+ * une offre rattachée à un besoin réel et un encart : la première se
+ * rapporte à quelque chose que la personne reconnaît.
  */
 export function motifDeLEtape(etape: string, libelle: string): MotifProposition {
   return {
@@ -186,6 +174,6 @@ export function motifDeLEtape(etape: string, libelle: string): MotifProposition 
     raison:
       GENRE_DE_LETAPE[etape] === "EQUIVALENCE_DIPLOME"
         ? "Un service d'équivalence la délivre plus vite que nous ne saurions t'y aider."
-        : "Nous ne la fournissons pas nous-mêmes ; un partenaire le fait.",
+        : "Nous ne la fournissons pas nous-mêmes\u202f; un partenaire le fait.",
   };
 }

@@ -42,7 +42,6 @@ import {
   mentionArbitrage,
   optionsArbitrage,
 } from "@/domain/notifications/divergence";
-import { libelleOffre, peutProposer } from "@/domain/consultants/proposition";
 import { jourEnFrancais } from "@/domain/format/moment";
 import {
   COMMISSION_PARTENAIRE,
@@ -361,25 +360,19 @@ describe("T-02 — divergence réglementaire", () => {
   });
 });
 
-describe("T-03 — proposition partenaire", () => {
+describe("T-06 — offre de partenaire", () => {
   it("lit le tarif et la durée dans la grille, pas dans l'écran", () => {
     // Le prototype annonçait 25 000 F pour une heure ; l'arbitrage du 13/09
-    // a retenu une consultation de 45 minutes.
+    // a retenu une consultation de 45 minutes. Le libellé qui les assemblait
+    // est parti avec T-03 (K.A) : une consultation se réserve dans
+    // l'annuaire, qui écrit son propre tarif depuis la même grille.
     expect(CONSULTATION_DUREE_MINUTES).toBe(45);
-    expect(libelleOffre("20 000 F", CONSULTATION_DUREE_MINUTES)).toBe(
-      "Premier entretien : 20 000 F, 45 minutes",
-    );
     expect(CONSULTATION.prix.XOF).toBe(20000);
   });
 
   it("porte le taux de commission en code, pas seulement à l'écran", () => {
     expect(COMMISSION_PARTENAIRE).toBe(0.15);
-    expect(tauxCommissionFormate().replace(/[\s  ]/gu, " ")).toBe("15 %");
-  });
-
-  it("respecte un refus définitif", () => {
-    expect(peutProposer(false)).toBe(true);
-    expect(peutProposer(true)).toBe(false);
+    expect(tauxCommissionFormate().replace(/[\s  ]/gu, " ")).toBe("15 %");
   });
 });
 

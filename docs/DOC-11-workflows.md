@@ -427,13 +427,15 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 ### WF-13 — Affiliation partenaires
 
-1. À l'étape de checklist correspondante, proposition contextuelle : assurance santé, logement, service d'équivalence de diplôme, transfert de fonds.
+1. Sur une surface dédiée — tarifs, services, annuaire — les offres disponibles pour la destination du dossier : assurance santé, logement, service d'équivalence de diplôme, transfert de fonds. Chaque offre se rattache à une étape de checklist et le dit.
 2. Redirection tracée, commission au résultat.
 
 **Règles de gestion**
 
-- RG-13.1 : la proposition est **contextuelle à l'étape**, jamais publicitaire hors contexte.
+- RG-13.1 : *(réécrite le 20/09/2026, arbitrage K.A)* à l'étape de checklist, la plateforme affiche une **aide fonctionnelle** — ce qu'il y a à faire pour obtenir la pièce — et jamais une offre. Une offre est **rattachée à une étape** et le dit, mais elle ne s'affiche que sur une surface dédiée, où le candidat vient la chercher.
 - RG-13.2 : aucune proposition commerciale dans l'espace dossier lui-même ni pendant un parcours de paiement.
+
+La version précédente de RG-13.1 demandait une proposition « contextuelle à l'étape » de checklist, ce que RG-13.2 interdisait dans la même phrase : l'étape de checklist *est* l'espace dossier. La frontière ne passe pas entre une proposition et plusieurs, mais entre expliquer quoi faire et vendre une prestation.
 - RG-13.3 : la nature commerciale du lien est signalée.
 - RG-13.4 : la rétro-commission sur recrutement étudiant est vérifiée destination par destination avant activation — elle est encadrée voire prohibée dans certains pays.
 

@@ -276,7 +276,7 @@ jamais supprimé sans que la décision soit écrite ici.
 | Arbitrage | Lecture retenue | Ce que le test refuse |
 |---|---|---|
 | **L.A** — le barème interne relève-t-il du droit d'accès ? | Palier et dénombrement, jamais le nombre (C-09) | Une lecture ou une route qui sérialise `internalScore` |
-| **K.A** — RG-13.1 et RG-13.2 se contredisent | Une seule proposition, sur le seul écran qui l'affichait | Une seconde surface commerciale dans l'espace dossier |
+| **K.A** — *tranché le 20/09* | Une aide fonctionnelle dans le dossier, les offres sur les surfaces dédiées | Une offre, ou son vocabulaire, dans un écran de l'espace dossier |
 | **I.B** — *tranché le 20/09* | Seule la parité fixe du franc CFA convertit ; ailleurs le budget sort du classement | Une seconde parité écrite en dur |
 | **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
 | **I.D** — *tranché le 20/09* | Quarantaine, puis balayage, puis promotion — et rien ne sort avant | Un repli vers « saine » quand le moteur ne répond pas, ou un texte qui promet un fichier sain |
@@ -1024,14 +1024,54 @@ s'affiche pas — c'est l'état normal, pas une panne.
 
 ### Ce qui reste à arbitrer
 
-**K.A — RG-13.1 et RG-13.2 se contredisent.** La première demande une
+**K.A — RG-13.1 et RG-13.2 se contredisent.** ~~La première demande une
 proposition « contextuelle à l'étape » de checklist ; la seconde interdit
 « toute proposition commerciale dans l'espace dossier lui-même ». L'étape de
-checklist *est* l'espace dossier. Le lot a retenu la lecture la plus
-restrictive compatible avec les deux — une seule proposition, rattachée à
-une étape, sur le seul écran qui l'affichait déjà, et aucune nouvelle
-surface commerciale — mais la règle est à réécrire dans un sens ou dans
-l'autre.
+checklist *est* l'espace dossier.~~ **Tranché le 20/09/2026**, en faveur de
+la règle la plus protectrice.
+
+Aucune proposition commerciale n'apparaît dans l'espace dossier ni dans sa
+checklist. RG-13.1 est réécrite : elle autorise une aide contextuelle liée à
+l'étape, et non une offre. Les offres vivent sur les surfaces qui leur sont
+dédiées — tarifs, services, annuaire des consultants.
+
+La décision ne cherche pas le compromis, elle déplace la frontière. La
+distinction utile n'est pas entre une proposition et plusieurs, mais entre
+deux natures : **une aide fonctionnelle** explique quoi faire, **une offre
+commerciale** vend une prestation. L'espace dossier est une surface de
+confiance et d'exécution ; une recommandation rémunérée posée au moment où
+une pièce manque s'y lit comme un péage, quelle que soit sa rédaction.
+
+### Ce que l'application de la décision a trouvé
+
+**Retirer la carte ouvrait un trou que la carte masquait.** Sur les quatre
+étapes concernées — assurance, logement, équivalence de diplôme, preuve de
+fonds — la plateforme ne fournit pas la pièce, et la checklist ne le disait
+nulle part : elle proposait un partenaire, et c'est tout. Sans l'aide
+écrite en remplacement, il serait resté « Assurance maladie — à obtenir »
+sans dire où ni comment, c'est-à-dire un candidat qui attend la plateforme.
+C'est l'aide, et non l'offre, qui manquait vraiment.
+
+**La checklist comptait une offre avant qu'on l'ait regardée.** La lecture
+qui l'alimentait inscrivait une ligne de suivi au simple affichage de
+l'écran — délibérément, pour ne pas ne mesurer que ce qui rapporte. Mais
+rapportée à la décision, cette écriture était elle-même l'acte commercial
+qu'on retire : ouvrir sa checklist enregistrait une proposition. Elle a
+suivi l'offre sur la surface dédiée, où elle garde son sens.
+
+**Deux des trois issues de T-03 n'ont plus de déclencheur.** L'écran offrait
+« voir les créneaux », « continuer seul » et « ne plus me proposer ». Sur une
+page où l'on vient de son plein gré, les deux dernières n'ont plus d'objet :
+on ne décline pas ce qui n'est pas proposé, et l'interrupteur qui coupe les
+offres vit avec les autres consentements. `SANS_SUITE` et `DECLINEE` restent
+des états valides d'une ligne de suivi, et le back-office les lit ; plus
+rien dans l'interface ne les produit.
+
+**Le mot proscrit se trouve d'abord dans le commentaire qui le proscrit.**
+Le garde-fou qui interdit le vocabulaire commercial dans l'espace dossier
+échouait sur le commentaire expliquant pourquoi une offre n'y a pas sa
+place. Il balaie maintenant les sources débarrassées de leurs commentaires,
+comme le fait déjà le contrôle du vocabulaire interdit.
 
 **K.B — L'export de données n'existe pas.** ~~« Télécharger mes données »
 (A-05) et « Télécharger mon dossier » (C-11) mènent l'un à l'écran

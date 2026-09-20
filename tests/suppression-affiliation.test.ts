@@ -162,9 +162,7 @@ describe("WF-13 — proposition de partenaire", () => {
     // Et la phrase de l'écran porte bien ce nombre : c'est une phrase
     // littérale, déclarée en dérogation du garde-fou du vocabulaire, donc
     // rien d'autre qu'un test ne la rattache à la grille.
-    const composant = lire(
-      "src/app/(app)/(dossier)/dossiers/[id]/PropositionPartenaire.tsx",
-    );
+    const composant = lire("src/app/(app)/(dossier)/services/Services.tsx");
     const sansEspaceInsecable = (t: string) => t.replace(/ | /gu, " ");
     expect(sansEspaceInsecable(composant)).toContain(
       `commission de ${sansEspaceInsecable(tauxCommissionFormate())} sur cette prestation`,
@@ -212,18 +210,18 @@ describe("WF-13 — proposition de partenaire", () => {
     expect(commissionDue(0, 1500)).toBe(0);
   });
 
-  it("la proposition n'est montée que par la checklist (RG-13.2)", () => {
-    // « Aucune proposition commerciale pendant un parcours de paiement. »
-    // Plutôt que d'énumérer les écrans de paiement — la liste vieillirait —
-    // on énumère les monteurs : il n'y en a qu'un, et le test tombe le jour
-    // où un second apparaît, quel qu'il soit.
+  it("aucune offre commerciale dans l'espace dossier (RG-13.2, K.A)", () => {
+    // « Aucune proposition commerciale dans l'espace dossier lui-même ni
+    // pendant un parcours de paiement. » Plutôt que d'énumérer les écrans
+    // à protéger — la liste vieillirait — on énumère les monteurs de
+    // l'offre : il n'y en a qu'un, et il est sur la surface dédiée.
     const monteurs = fichiersDe("src/app").filter(
-      (f) =>
-        !f.endsWith("PropositionPartenaire.tsx") &&
-        lire(f).includes("<PropositionPartenaire"),
+      (f) => !f.endsWith("services/Services.tsx") && lire(f).includes("<OffrePartenaire"),
     );
-    expect(monteurs.map((f) => f.replace(/\\/gu, "/"))).toEqual([
-      "src/app/(app)/(dossier)/dossiers/[id]/Checklist.tsx",
-    ]);
+    expect(monteurs.map((f) => f.replace(/\\/gu, "/"))).toEqual([]);
+
+    // Et la checklist, nommément : c'est d'elle que la décision les retire.
+    const checklist = lire("src/app/(app)/(dossier)/dossiers/[id]/Checklist.tsx");
+    expect(checklist).not.toMatch(/commission|tarif|partenaire\b/iu);
   });
 });

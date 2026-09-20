@@ -1,12 +1,14 @@
 /**
- * Affiliation partenaires — WF-13, écran T-03.
+ * Affiliation partenaires — WF-13, écran T-06.
  *
- * Deux étapes seulement dans le workflow : une proposition contextuelle à
- * l'étape de checklist, puis une redirection tracée avec commission au
- * résultat. Tout le reste de ce module sert à empêcher les trois façons
- * dont une affiliation dérape :
+ * Deux étapes seulement dans le workflow : une offre rattachée à une étape
+ * de checklist, puis une redirection tracée avec commission au résultat.
+ * Depuis K.A, tranché le 20/09/2026, l'offre ne s'affiche plus *dans* la
+ * checklist — elle s'y rattache, et se lit sur une surface dédiée. Tout le
+ * reste de ce module sert à empêcher les trois façons dont une affiliation
+ * dérape :
  *
- * 1. **Hors contexte.** Une proposition sans étape ni motif déclaré est une
+ * 1. **Hors contexte.** Une offre sans étape ni motif déclaré est une
  *    réclame (RG-13.1). Le type l'exige, la base le refuse.
  * 2. **Non déclarée.** Le taux annoncé à l'écran et le taux facturé doivent
  *    être le même nombre (RG-13.3). Ils le sont parce qu'un partenaire dont
@@ -55,9 +57,14 @@ export const LIBELLE_ETAT: Record<EtatProposition, string> = {
 };
 
 /**
- * Les trois issues de T-03, traduites en états. Le refus définitif est une
- * issue à part entière : « continuer seul » laisse la porte ouverte, « ne
- * plus me proposer » la ferme, et confondre les deux trahirait la seconde.
+ * Les trois issues, traduites en états.
+ *
+ * Deux d'entre elles n'ont plus de déclencheur depuis K.A : sur une surface
+ * où l'on vient de son plein gré, on ne décline pas ce qui n'est pas
+ * proposé, et l'interrupteur qui coupe les offres vit avec les autres
+ * consentements. `SANS_SUITE` et `DECLINEE` restent des états valides d'une
+ * ligne de suivi — le back-office les lit — et la table reste exhaustive
+ * pour que le jour où une issue revient, elle retrouve son état.
  */
 export const ETAT_APRES: Record<
   "CRENEAUX" | "CONTINUER_SEUL" | "NE_PLUS_PROPOSER",
@@ -76,8 +83,8 @@ export const ETAT_APRES: Record<
 export const COMMISSION_BPS_ANNONCEE = Math.round(COMMISSION_PARTENAIRE * 10_000);
 
 /**
- * Un partenaire n'est proposable par T-03 que si son taux est celui que
- * l'écran écrit en toutes lettres.
+ * Un partenaire n'est montrable que si son taux est celui que l'écran écrit
+ * en toutes lettres.
  *
  * C'est volontairement rigide. L'écran porte une phrase littérale — la
  * transparence exige un nombre, pas une formule interpolée qui échapperait
@@ -114,7 +121,7 @@ export interface Recevabilite {
   activeSurLaDestination: boolean;
   /** Le candidat n'a pas retiré l'autorisation de recevoir des propositions. */
   autorise: boolean;
-  /** Il n'a pas refusé définitivement (T-03, « ne plus me proposer »). */
+  /** Il n'a pas refusé définitivement (« ne plus me proposer »). */
   sansRefusDefinitif: boolean;
   /** Le taux du partenaire est celui qu'annonce l'écran (RG-13.3). */
   tauxConforme: boolean;
@@ -127,7 +134,7 @@ export const estProposable = (r: Recevabilite): boolean =>
  * Ce que l'écran dit, selon ce qui est proposé.
  *
  * Une seule table, exhaustive : ajouter un genre de partenaire oblige à
- * écrire ses six phrases, plutôt qu'à découvrir à l'écran laquelle parlait
+ * écrire ses trois phrases, plutôt qu'à découvrir à l'écran laquelle parlait
  * encore de consultant. Et il a fallu l'écran pour les trouver — sous un
  * courtier en assurance, cette carte annonçait « Premier entretien :
  * 20 000 F, 45 minutes », une commission « sur cet entretien », proposait
@@ -143,37 +150,22 @@ export interface Formulation {
   titre: string;
   /** Action principale. */
   action: string;
-  /** Sortie sans engagement, pour ce dossier. */
-  continuer: string;
-  /** Refus définitif. */
-  refus: string;
   /** Qui répond de la prestation. Jamais ImmiPro (RG-12.3, RG-12.4). */
   responsabilite: string;
-  /**
-   * Le tarif de la grille n'a de sens que pour une consultation. L'afficher
-   * ailleurs annoncerait un montant que personne ne facturera.
-   */
-  tarifDeLaGrille: boolean;
 }
 
 const SERVICE = (quoi: string): Formulation => ({
   titre: "Un partenaire peut te fournir cette pièce",
   action: "Ouvrir le site du partenaire",
-  continuer: "Continuer sans ce partenaire",
-  refus: "Ne plus me proposer de partenaire",
   responsabilite: `Les partenaires ${quoi} sont indépendants et responsables de leurs prestations.`,
-  tarifDeLaGrille: false,
 });
 
 export const FORMULATION: Record<GenrePartenaire, Formulation> = {
   CONSULTANT: {
     titre: "Ce point dépasse ce que nous savons faire",
     action: "Voir les créneaux",
-    continuer: "Continuer sans consultant",
-    refus: "Ne plus me proposer de consultant",
     responsabilite:
       "Les consultants partenaires sont indépendants et responsables de leurs prestations.",
-    tarifDeLaGrille: true,
   },
   ASSURANCE_SANTE: SERVICE("d'assurance"),
   LOGEMENT: SERVICE("de logement"),

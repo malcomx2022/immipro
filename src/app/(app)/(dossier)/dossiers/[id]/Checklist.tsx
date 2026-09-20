@@ -16,9 +16,8 @@ import {
   type Piece,
 } from "@/domain/dossiers/piece";
 import { jourEnFrancais } from "@/domain/format/moment";
-import type { Proposition } from "@/server/lecture/partenaires";
+import type { AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { EnteteDossier } from "./EnteteDossier";
-import { PropositionPartenaire } from "./PropositionPartenaire";
 
 /**
  * C-06 — Dossier, checklist. WF-06.
@@ -35,11 +34,11 @@ import { PropositionPartenaire } from "./PropositionPartenaire";
 export interface ChecklistProps {
   dossier: Dossier;
   pieces: readonly Piece[];
-  /** Proposition de partenaire en cours, s'il y en a une (T-03, WF-13). */
-  proposition?: Proposition | null;
+  /** Aide fonctionnelle de l'étape en cours, s'il y en a une (K.A). */
+  aide?: AideDeLEtape | null;
 }
 
-export function Checklist({ dossier, pieces, proposition }: ChecklistProps) {
+export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
   const id = dossier.id;
   const premiere = premiereATraiter(pieces);
   const mention = dossier.destination.mention;
@@ -98,25 +97,27 @@ export function Checklist({ dossier, pieces, proposition }: ChecklistProps) {
         </section>
       ) : null}
 
-      {/* T-03 : la proposition est rattachée à une étape de la checklist
-          (RG-13.1) et posée après la prochaine action, jamais devant elle.
-          Sans partenaire activé sur la destination, il n'y a rien ici — et
-          c'est l'état normal tant qu'aucun partenaire n'est signé. */}
-      {proposition ? (
-        <PropositionPartenaire
-          partenaire={proposition.partenaire}
-          motif={proposition.motif}
-          dossierId={id}
-          referenceId={proposition.id}
-          genre={proposition.genre}
-          url={proposition.url}
-        />
+      {/* K.A — ce qui se tient ici est une aide, jamais une offre. La
+          distinction n'est pas de degré : expliquer quoi faire relève de
+          l'espace dossier, vendre une prestation n'en relève pas. Les
+          offres vivent sur les surfaces qui leur sont dédiées, où le
+          candidat va les chercher. */}
+      {aide ? (
+        <section className="flex flex-col gap-1.5 rounded-lg border border-ink-300 p-4">
+          <p className="text-13 uppercase tracking-wide text-ink-500">{aide.piece}</p>
+          <h2 className="text-16 font-semibold text-ink-900">{aide.titre}</h2>
+          <p className="text-pretty text-14 text-ink-700">{aide.corps}</p>
+        </section>
       ) : null}
 
       <nav aria-label="Vues du dossier" className="flex flex-wrap gap-2">
         <LienVue href={`/dossiers/${id}/completude`}>Complétude</LienVue>
         <LienVue href={`/dossiers/${id}/redaction`}>Rédiger une pièce</LienVue>
         <LienVue href={`/consultants?dossier=${id}`}>Consultants</LienVue>
+        {/* K.A — une entrée de navigation n'est pas une proposition : elle
+            ne nomme aucun prestataire, aucun prix, et rien ne la déclenche.
+            C'est le candidat qui l'ouvre, comme l'annuaire juste avant. */}
+        <LienVue href={`/services?dossier=${id}`}>Services</LienVue>
         <LienVue href={`/dossiers/${id}/echeancier`}>Échéancier</LienVue>
         <LienVue href={`/dossiers/${id}/cloture`}>Clôturer</LienVue>
       </nav>

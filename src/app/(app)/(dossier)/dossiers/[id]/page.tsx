@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Checklist } from "./Checklist";
 import { vueDuDossier } from "@/server/lecture/dossiers";
-import { propositionPourLeDossier } from "@/server/lecture/partenaires";
 import { exigerCandidat } from "@/server/securite/page";
 
 /**
@@ -38,10 +37,9 @@ export default async function PageChecklist({
   const vue = await vueDuDossier(id, acteur.id).catch(() => null);
   if (!vue) notFound();
 
-  // La proposition est lue après le dossier et jamais en parallèle : sans
-  // dossier lisible, il n'y a rien à proposer, et la lecture inscrit une
-  // ligne de suivi (WF-13, étape 2).
-  const proposition = await propositionPourLeDossier(id, acteur.id);
-
-  return <Checklist dossier={vue.dossier} pieces={vue.pieces} proposition={proposition} />;
+  // K.A — plus aucune lecture d'affiliation ici. L'ancienne inscrivait une
+  // ligne de suivi au simple affichage de la checklist : une proposition
+  // commerciale était donc comptée avant même d'être regardée, dans la
+  // surface d'où la décision les retire.
+  return <Checklist dossier={vue.dossier} pieces={vue.pieces} aide={vue.aide} />;
 }
