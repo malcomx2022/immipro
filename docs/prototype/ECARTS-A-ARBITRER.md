@@ -261,6 +261,42 @@ Relevé pour ne pas le re-signaler à chaque passe :
 
 ---
 
+## Les lectures retenues pendant qu'un arbitrage est ouvert
+
+Un arbitrage se tranche des mois plus tard. D'ici là le code doit bien
+faire quelque chose, et il a retenu à chaque fois la lecture la plus
+prudente. Rien ne tenait ces lectures : la prudence s'érode d'un écran à
+l'autre sans que personne ne le décide, et c'est ainsi qu'une plateforme
+se retrouve à faire ce qu'elle a écrit ne pas faire.
+
+`tests/arbitrages-ouverts.test.ts` les tient. Chacun de ces tests est fait
+pour être **modifié** le jour où l'arbitrage tombe — jamais contourné, et
+jamais supprimé sans que la décision soit écrite ici.
+
+| Arbitrage | Lecture retenue | Ce que le test refuse |
+|---|---|---|
+| **L.A** — le barème interne relève-t-il du droit d'accès ? | Palier et dénombrement, jamais le nombre (C-09) | Une lecture ou une route qui sérialise `internalScore` |
+| **K.A** — RG-13.1 et RG-13.2 se contredisent | Une seule proposition, sur le seul écran qui l'affichait | Une seconde surface commerciale dans l'espace dossier |
+| **I.B** — le budget hors zone euro | Seule la parité fixe du franc CFA convertit ; le reste n'est pas comparé | Une seconde parité écrite en dur |
+| **N.A** — le rail suit la devise | `provider` se déduit à la création | Une route qui accepte un fournisseur venu du client |
+| **I.D** — l'antivirus de WF-06 | Le balayage n'est pas fait, et n'est pas déclaré fait | Un texte ou un champ qui affirmerait qu'un fichier a été analysé |
+
+Deux tests de plus lient le fichier au relevé : les codes cités doivent
+exister ici, et aucun ne doit déjà porter la mention « Tranché ». Un
+arbitrage fermé dont le garde-fou survit continuerait de refuser une
+dérive que la décision vient peut-être d'autoriser.
+
+Vérifié par mutation, une par arbitrage : un barème dans l'export, un
+cours du franc suisse en dur, un `provider` au schéma d'entrée, une
+seconde proposition de partenaire, une mention « fichier sûr ». Les cinq
+échouent.
+
+**Les arbitrages restent entiers.** Aucun de ces tests ne décide quoi que
+ce soit ; ils empêchent seulement que la décision se prenne toute seule,
+par accumulation.
+
+---
+
 ## Ordre d'urgence, par rapport aux lots restants
 
 | Rang | Écart | Bloque | État |
