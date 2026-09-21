@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { CHAMP_CONTROLE } from "@/components/ui/champ";
@@ -15,6 +16,7 @@ import {
   libelleSuivant,
   questionPrecedente,
   questionSuivante,
+  reponseAConserver,
   type Reponses,
 } from "@/domain/redaction/entretien";
 import type { Suggestion, Version } from "@/domain/redaction/versions";
@@ -27,6 +29,8 @@ import {
   parOrdreDeLecture,
   versionCourante,
 } from "@/domain/redaction/versions";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { cn } from "@/lib/utils";
 import { EnteteDossier } from "../../EnteteDossier";
 
@@ -41,10 +45,32 @@ import { EnteteDossier } from "../../EnteteDossier";
  * En 390 px, l'éditeur et les versions se commutent — ils ne tiennent pas
  * ensemble. En 1440 px ils sont côte à côte, ce que la largeur permet : on
  * restaure une version en voyant le texte qu'on remplace.
+ *
+ * ── Ce que l'écran promettait sans le faire ─────────────────────────────
+ *
+ * « Tes réponses sont conservées à mesure : tu peux interrompre
+ * l'entretien et le reprendre. » La phrase était là depuis le début, sous
+ * le champ, et elle était fausse. L'état partait de `{}` à chaque
+ * chargement, rien ne quittait le navigateur, et `InterviewAnswer`
+ * n'était écrite nulle part — seule la purge la connaissait, pour
+ * l'effacer. Un candidat qui répondait à huit questions puis fermait
+ * l'onglet perdait tout, après avoir lu qu'il pouvait s'interrompre.
+ *
+ * **À mesure veut dire à chaque question quittée**, pas à chaque frappe :
+ * une écriture par caractère saturerait le réseau d'un téléphone sur
+ * réseau lent, qui est le cas ordinaire de ce produit. Suivant,
+ * précédent, passer et le passage à l'éditeur enregistrent la réponse
+ * courante avant de bouger.
+ *
+ * **Et une réponse identique ne se réenregistre pas.** Revenir sur une
+ * question pour la relire, sans y toucher, n'écrit rien : c'est ce qui
+ * distingue une navigation d'une modification.
  */
 export interface RedactionProps {
   dossier: Dossier;
   piece: PieceRedigeable;
+  /** Réponses déjà en base : l'entretien reprend où il s'est arrêté. */
+  reponsesEnregistrees: Reponses;
   versions: readonly Version[];
   suggestion?: Suggestion;
   /** Horodatage de rendu, passé par le serveur pour que « il y a 4 minutes » soit stable. */
@@ -56,19 +82,58 @@ type Vue = "ENTRETIEN" | "EDITEUR" | "VERSIONS";
 export function Redaction({
   dossier,
   piece,
+  reponsesEnregistrees,
   versions,
   suggestion,
   maintenant,
 }: RedactionProps) {
   const [vue, setVue] = useState<Vue>(versions.length > 0 ? "EDITEUR" : "ENTRETIEN");
   const [index, setIndex] = useState(0);
-  const [reponses, setReponses] = useState<Reponses>({});
+  const [reponses, setReponses] = useState<Reponses>(reponsesEnregistrees);
   const [suggestionVisible, setSuggestionVisible] = useState(Boolean(suggestion));
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  /**
+   * Ce que le serveur a déjà. Une référence et non un état : elle sert à
+   * décider s'il faut écrire, et une décision d'écriture ne doit pas
+   * provoquer le rendu qui la rappellerait.
+   */
+  const conservees = useRef<Reponses>(reponsesEnregistrees);
 
   const total = piece.questions.length;
   const question = piece.questions[index]!;
   const courante = versionCourante(versions);
   const date = new Date(maintenant);
+
+  /**
+   * Enregistre la réponse courante, puis exécute la suite.
+   *
+   * La navigation n'attend pas le réseau : sur un téléphone lent, bloquer
+   * « Question suivante » le temps d'un aller-retour ferait cliquer deux
+   * fois. L'écriture part, l'écran avance, et un échec s'affiche sans
+   * défaire ce que la personne a saisi — le texte reste dans l'état.
+   */
+  function conserverPuis(suite: () => void) {
+    const texte = reponses[index] ?? "";
+    const rangConserve = index;
+    suite();
+    if (reponseAConserver(texte) === reponseAConserver(conservees.current[rangConserve] ?? "")) {
+      return;
+    }
+    conservees.current = { ...conservees.current, [rangConserve]: texte };
+    void appeler(`/api/dossiers/${dossier.id}/redaction/${piece.type}`, {
+      methode: "PUT",
+      corps: { rang: rangConserve, reponse: texte },
+    }).then((resultat) => {
+      if (resultat.ok) return;
+      // Ce que le serveur a refusé, il ne l'a pas. La référence revient
+      // en arrière pour que la prochaine sortie de question réessaie.
+      const reste = Object.fromEntries(
+        Object.entries(conservees.current).filter(([rang]) => Number(rang) !== rangConserve),
+      );
+      conservees.current = reste;
+      setEchec(resultat.echec);
+    });
+  }
 
   if (vue === "ENTRETIEN") {
     const reponse = reponses[index] ?? "";
@@ -159,6 +224,8 @@ export function Redaction({
           conservées à mesure : tu peux interrompre l&apos;entretien et le reprendre.
         </p>
 
+        {echec ? <BlocEchec echec={echec} annonce /> : null}
+
         <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
           <p className="text-13 text-ink-500">
             {libelleAvancementEntretien(reponses, total)}
@@ -168,7 +235,9 @@ export function Redaction({
               pleineLargeur
               className="min-h-action md:w-auto"
               onClick={() =>
-                dernier ? setVue("EDITEUR") : setIndex(questionSuivante(index, total))
+                conserverPuis(() =>
+                  dernier ? setVue("EDITEUR") : setIndex(questionSuivante(index, total)),
+                )
               }
             >
               {libelleSuivant(index, total)}
@@ -179,7 +248,7 @@ export function Redaction({
               className="md:w-auto"
               disabled={index === 0}
               raisonDesactivation="C'est la première question de l'entretien."
-              onClick={() => setIndex(questionPrecedente(index))}
+              onClick={() => conserverPuis(() => setIndex(questionPrecedente(index)))}
             >
               Question précédente
             </Button>
@@ -188,7 +257,9 @@ export function Redaction({
             variante="lien"
             className="self-center"
             onClick={() =>
-              dernier ? setVue("EDITEUR") : setIndex(questionSuivante(index, total))
+              conserverPuis(() =>
+                dernier ? setVue("EDITEUR") : setIndex(questionSuivante(index, total)),
+              )
             }
           >
             Passer cette question

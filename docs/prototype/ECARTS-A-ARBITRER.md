@@ -2729,3 +2729,85 @@ même défaut que celui corrigé ici, sur un autre écran.
                                   {decision: "ILLISIBLE"}
     pièce   : ILLISIBLE · message conservé · analyzedAt posé
     quota   : ANALYSE_RENDUE +1
+
+### S.3 — L'entretien guidé conserve enfin ses réponses
+
+**La promesse était écrite sous le champ, et elle était fausse.**
+
+> Tes réponses sont conservées à mesure : tu peux interrompre l'entretien
+> et le reprendre.
+
+L'état partait de `{}` à chaque chargement, rien ne quittait le
+navigateur, et `InterviewAnswer` n'était écrite nulle part — seule la
+purge la connaissait, pour l'effacer. Un candidat qui répondait à huit
+questions puis fermait l'onglet perdait tout, **après avoir lu qu'il
+pouvait s'interrompre**. C'est la faute de B-02 et de B-05, mais dite au
+candidat et payée par lui.
+
+La lecture existait pourtant depuis le début : `reponsesDeLEntretien`
+était écrite, testée, et personne ne la passait à l'écran.
+
+**À mesure veut dire à chaque question quittée**, pas à chaque frappe :
+une écriture par caractère saturerait le réseau d'un téléphone lent, qui
+est le cas ordinaire de ce produit. Suivant, précédent, passer et le
+passage à l'éditeur enregistrent avant de bouger. **Et la navigation
+n'attend pas le réseau** — bloquer « Question suivante » le temps d'un
+aller-retour ferait cliquer deux fois. L'écran avance, l'écriture suit,
+et un refus s'affiche sans défaire la saisie.
+
+**Une réponse identique ne se réenregistre pas.** Revenir sur une
+question pour la relire n'écrit rien : c'est ce qui distingue une
+navigation d'une modification, et ce qui évite huit écritures identiques
+par aller-retour dans l'entretien.
+
+**Le client n'envoie que le rang et le texte.** L'intitulé et la section
+décrivent la question posée, pas la réponse donnée ; les laisser voyager
+permettrait d'enregistrer une réponse sous une question jamais posée.
+C'est la règle de B-02, appliquée à un formulaire candidat.
+
+**`lecture` et non `sensible`.** Le régime `sensible` couvre « ce qui
+coûte de l'argent ou du quota, et ce qui devine un secret » : une réponse
+d'entretien ne fait ni l'un ni l'autre, et dix appels par minute
+couperaient un entretien de huit questions en plein milieu.
+
+#### Une sixième dépendance, que personne n'avait nommée
+
+WF-08 reste à moitié écrit, et il faut dire pourquoi. L'entretien tient
+debout seul ; la **mise en forme du texte** et l'**analyse critique**
+demandent un service d'IA qui n'était consigné nulle part. Le registre
+n'avait que `extraction` — « Extraction documentaire par IA » — qui lit
+les pièces déposées. Les deux emploient la même clé et n'ont rien
+d'autre en commun : se tromper sur un montant lu est un défaut de
+lecture, mettre une phrase dans la bouche de quelqu'un est autre chose.
+
+`redaction` rejoint donc les cinq autres, facultative en pilote sous
+trois conditions qui lui sont propres : le candidat sait que le texte
+proposé reste le sien et qu'il le relit, aucune version n'est déposée
+sans relecture, et la limite de l'analyse critique est dite — elle relève
+des incohérences, elle ne juge pas un dossier (INV-1).
+
+#### Ce que l'application de la décision a trouvé
+
+**Le compteur d'avancement ne s'accordait pas.** « 1 réponses sur 8 »,
+visible seulement quand il y a exactement une réponse — c'est-à-dire
+rarement, tant que le compteur repartait de zéro à chaque chargement. Il
+s'affiche maintenant dès l'ouverture, et la faute avec lui. Rendre une
+donnée réelle rend visibles les défauts de ce qui la rapporte.
+
+**Et la mutation qui compte, encore.** Débrancher `conserverPuis` des
+boutons en laissant la fonction intacte plus bas dans le fichier : les
+garde-fous qui lisent le source passent tous. Ceux de R-02 cliquent, et
+ils ont mordu — la leçon de S.1, appliquée avant d'être réapprise.
+
+**Exécuté contre PostgreSQL :**
+
+    deux réponses enregistrées     conservee=true · repondues 1 puis 2
+    réponse vidée                  conservee=false · repondues 1
+    rang 42                        « Cette question n'existe pas dans
+                                     l'entretien de cette pièce. »
+    dossier d'un autre             HTTP 404
+
+    en base : rang 0 · PARCOURS · « Quel diplôme as-tu obtenu, et quand ? »
+              section et intitulé résolus par le serveur, pas envoyés
+
+    au rechargement : le champ porte la réponse, « 1 réponse sur 8 »
