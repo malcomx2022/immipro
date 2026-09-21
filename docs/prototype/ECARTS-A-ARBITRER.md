@@ -3321,3 +3321,95 @@ Deux choses, et je ne les ai pas faites :
 - **l'export PDF et DOCX**, étape 6. L.3 a déjà tranché pour l'archive — le
   PDF est celui du navigateur —, et la même décision vaut probablement ici ;
   elle demande d'être posée.
+
+### S.9 — Le serveur disait la vérité, l'écran ne l'écoutait pas
+
+Deux commandes inertes restaient au registre après S.8. L'une des deux
+n'attendait rien du tout — et ma note à son sujet était fausse.
+
+#### Ma note était fausse, et il faut le dire
+
+J'avais écrit que « Téléverser sans analyse » manquait d'une route **et
+d'une décision sur ce que devient la complétude**. Les deux étaient
+inexacts.
+
+RG-06.5 a tranché depuis le début : *le quota n'interdit pas le dépôt, il
+n'interdit que l'analyse.* Et toute la chaîne l'appliquait déjà — la route
+de dépôt ne refuse rien sur le solde, le balayage relit le solde **après**
+la promotion (entre le dépôt et le balayage, une autre pièce a pu consommer
+la dernière analyse), et sans analyse il remet la pièce en attente et
+recalcule la complétude.
+
+Je l'avais notée en lisant l'absence de `onClick`, sans ouvrir la route.
+C'est exactement l'erreur de S.2, où j'avais écrit que B-03 et B-04
+ouvraient un dossier sans le consigner alors qu'aucun écran n'ouvrait de
+dossier du tout. Un registre qui se remplit sans vérifier devient une liste
+de suppositions.
+
+#### Le vrai défaut : un champ calculé deux fois et lu zéro fois
+
+Les deux appels du dépôt répondent `analyseraLaPiece` — la préparation
+estime, la confirmation décide. **Aucun consommateur dans tout le dépôt.**
+
+Pendant ce temps l'écran affirmait, sans condition :
+
+> Tu peux continuer à remplir ton dossier pendant l'envoi. L'analyse démarre
+> automatiquement à la fin.
+
+Avec un quota épuisé, l'analyse ne démarre jamais. La phrase était fausse
+**au moment précis où la personne dépense ses données mobiles** pour monter
+dix mégaoctets — et elle est affichée pendant l'envoi, donc lue.
+
+Le serveur avait raison, calculait la bonne réponse, et la disait à un écran
+qui ne l'écoutait pas.
+
+#### Et l'état où le bouton mène devait se lire
+
+Brancher le bouton rendait atteignable, exprès, un état qui ne se lisait
+pas : une pièce déposée que le quota a empêché d'analyser revient à
+`ATTENDUE`. La pastille affichait donc **« Attendue »** sur une pièce dont
+le fichier est sur le serveur, à côté d'une action « Remplacer ». Le
+candidat lit qu'on attend toujours sa pièce et la renvoie — en dépensant ses
+données une seconde fois.
+
+L'état se dérive sans champ nouveau, et la dérivation est exacte :
+`ATTENDUE` **et** remède `REMPLACER`. Le remède ne passe à `REMPLACER`
+qu'après un dépôt ; l'état ne revient à `ATTENDUE` qu'après un balayage sain
+sans analyse. Un dépôt analysé finit `CONFORME`, `A_CORRIGER`, `ILLISIBLE`
+ou `HORS_SUJET` ; une pièce jamais déposée garde `TELEVERSER`.
+
+La pastille dit désormais **« Conservée, non vérifiée »** — le fichier
+d'abord, parce que c'est ce qu'on veut savoir quand on vient de payer son
+forfait. La couleur reste celle de l'état : c'est lui qui décide de la place
+de la pièce dans la checklist, et une pièce non vérifiée n'est pas conforme.
+
+**Exécuté contre PostgreSQL :**
+
+    quota 0, avant dépôt   ATTENDUE · TELEVERSER · 0 version
+                           écran : « Ta pièce sera conservée sans être
+                                     analysée »
+
+    après confirmation     EN_ANALYSE · REMPLACER · 1 version
+                           (balayage en cours, la pastille suit l'état)
+
+    après balayage sain    ATTENDUE · REMPLACER · 1 version
+    sans analyse           pastille : « Conservée, non vérifiée »
+
+    avec 3 analyses        écran : « L'analyse démarre automatiquement
+                                     à la fin »
+
+#### Un garde-fou de plus qui ne mordait pas
+
+Le premier jeu de tests vérifiait que la pastille **reçoit** le libellé, en
+lisant le source des deux checklists. Le retirer du composant qui le rend ne
+faisait rien échouer : la propriété passait, et n'était pas affichée. Un test
+qui rend le composant, lui, mord. Cinquième occurrence de cette leçon.
+
+#### Ce qui reste, et pourquoi je ne l'ai pas fait
+
+« Me prévenir dès qu'il y en a un », dans l'annuaire des consultants, reste
+au registre. Elle demande deux choses qu'aucune ligne de code ne décide :
+une messagerie, **bloquante avant ouverture**, et un endroit où consigner
+l'intérêt du candidat — aucune table ne le porte. Promettre « je te
+préviens » sans pouvoir envoyer serait précisément la promesse que cette
+revue a passé huit lots à retirer.

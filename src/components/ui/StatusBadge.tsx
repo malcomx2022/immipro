@@ -33,12 +33,26 @@ const COULEURS: Record<DocumentState, { texte: string; point: string }> = {
 
 export interface StatusBadgeProps {
   etat: DocumentState;
+  /**
+   * Libellé qui remplace celui de l'état, quand l'état seul ne suffit pas.
+   *
+   * Un seul cas aujourd'hui : une pièce déposée que le quota a empêché
+   * d'analyser revient à `ATTENDUE`, et « Attendue » sur une pièce dont le
+   * fichier est arrivé fait la renvoyer. La couleur reste celle de l'état —
+   * c'est lui qui décide de la place de la pièce dans la checklist.
+   */
+  libelle?: string;
   /** `ink` sur fond blanc, `blanc` sur un aplat ink-100. */
   fond?: "ink" | "blanc";
   className?: string;
 }
 
-export function StatusBadge({ etat, fond = "ink", className }: StatusBadgeProps) {
+export function StatusBadge({
+  etat,
+  libelle,
+  fond = "ink",
+  className,
+}: StatusBadgeProps) {
   const couleur = COULEURS[etat];
 
   return (
@@ -51,7 +65,7 @@ export function StatusBadge({ etat, fond = "ink", className }: StatusBadgeProps)
       )}
     >
       <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", couleur.point)} />
-      {LIBELLES[etat]}
+      {libelle ?? LIBELLES[etat]}
     </span>
   );
 }

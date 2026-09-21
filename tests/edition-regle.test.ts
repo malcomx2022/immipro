@@ -260,11 +260,33 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
      * test. Chacune dit ce qui lui manque, comme les registres de B-03,
      * B-04 et B-07.
      */
+    /**
+     * Une seule, et elle demande une décision qu'aucune ligne de code ne
+     * prend : prévenir suppose une messagerie, qui est bloquante avant
+     * ouverture, et un endroit où consigner l'intérêt du candidat. Rien de
+     * tel n'existe, et promettre « je te préviens » sans pouvoir envoyer
+     * serait exactement la promesse que cette revue a passé sept lots à
+     * retirer.
+     */
     "src/app/(app)/(dossier)/consultants/Annuaire.tsx":
-      "« Me prévenir dès qu'il y en a un » — aucune route, et la messagerie n'est pas branchée (bloquante avant ouverture)",
-    "src/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier.tsx":
-      "« Téléverser sans analyse » — aucune route : déposer une pièce sans la faire lire demande de décider ce que devient sa complétude",
+      "« Me prévenir dès qu'il y en a un » — la messagerie n'est pas branchée (bloquante avant ouverture), et rien ne consigne l'intérêt du candidat",
   };
+
+  /**
+   * Ma note sur B-06 était fausse, et il faut le dire.
+   *
+   * J'avais écrit que « Téléverser sans analyse » manquait d'une route et
+   * « d'une décision sur ce que devient la complétude ». Les deux étaient
+   * inexacts : RG-06.5 a tranché depuis le début — le quota n'interdit pas
+   * le dépôt, il n'interdit que l'analyse —, et toute la chaîne
+   * l'appliquait déjà. Le dépôt relit le solde, le balayage promeut le
+   * fichier et remet la pièce en attente sans mettre l'analyse en file.
+   *
+   * Je l'avais notée en lisant l'absence de `onClick`, sans ouvrir la
+   * route. C'est la même erreur qu'en S.2, où j'avais écrit que B-03 et
+   * B-04 ouvraient un dossier sans le consigner alors qu'aucun écran
+   * n'ouvrait de dossier du tout.
+   */
 
   /**
    * Les attributs d'une balise, accolades équilibrées.
