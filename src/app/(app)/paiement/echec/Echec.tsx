@@ -7,6 +7,8 @@ import { echecPourMotif, motifDeLEchec, type MotifEchec } from "@/domain/paiemen
 import type { PaiementEnCours } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 import { actionVersLAutreGrille, mentionDeLAutreGrille, railDe } from "@/domain/payments/rail";
+import { achatDepuisLeCode, ouvrableDepuisLeRecapitulatif } from "@/domain/payments/achat";
+import { corpsDeLEtat } from "@/domain/consultants/tenue";
 
 /**
  * $-05 — Échec ou expiration.
@@ -27,6 +29,18 @@ import { actionVersLAutreGrille, mentionDeLAutreGrille, railDe } from "@/domain/
  * l'étaient aussi au récapitulatif et à la page des packs, chacune à sa
  * façon — et c'est ainsi que les pastilles ont survécu à la correction de
  * cet écran-ci.
+ *
+ * ── Une consultation ne se réessaie pas ici ─────────────────────────
+ *
+ * « Réessayer le paiement » renvoyait au récapitulatif avec le code de
+ * l'achat, quel qu'il soit. Pour une consultation, cela rouvrait un
+ * paiement sans créneau : le rendez-vous tenu a été supprimé avec
+ * l'échec, et la notification signée n'aurait plus rien à confirmer. Le
+ * candidat aurait payé une consultation sans horaire ni consultant.
+ *
+ * C'est le domaine qui dit quels achats le récapitulatif sait ouvrir
+ * (`ouvrableDepuisLeRecapitulatif`), et la consultation repart d'où elle
+ * vient : l'annuaire, où un créneau se tient de nouveau.
  */
 const MOTIFS: readonly MotifEchec[] = [
   "delai_depasse",
@@ -69,11 +83,26 @@ export function Echec({
   const echec = echecPourMotif(retenu, montant, paiement.telephone, railDe(paiement.devise));
 
   const dossier = paiement.dossierId;
-  const reessai = dossier
-    ? `/paiement/recapitulatif?dossier=${dossier}&achat=${paiement.achatCode}&devise=${paiement.devise}`
-    : null;
+  const achat = achatDepuisLeCode(paiement.achatCode);
+  const reessai =
+    dossier && achat && ouvrableDepuisLeRecapitulatif(achat)
+      ? `/paiement/recapitulatif?dossier=${dossier}&achat=${paiement.achatCode}&devise=${paiement.devise}`
+      : null;
   const autreDevise = paiement.devise === "XOF" ? "EUR" : "XOF";
-  const estUnPack = !["recharge", "consultation"].includes(paiement.achatCode);
+  const estUnPack = achat?.type === "pack";
+  /*
+    Le créneau a été libéré avec l'échec — c'est ce que fait
+    `libererLaTenue`. La phrase vient du domaine de la tenue, celui-là
+    même qui décrit l'état : elle dit ce qui a été libéré, et distingue
+    le refus du délai dépassé.
+  */
+  const creneauLibere =
+    achat?.type === "consultation" && dossier
+      ? {
+          phrase: corpsDeLEtat(paiement.statut === "EXPIREE" ? "LIBERE" : "ECHOUE"),
+          adresse: `/consultants?dossier=${dossier}`,
+        }
+      : null;
 
   return (
     <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
@@ -124,6 +153,20 @@ export function Echec({
           Continuer en Découverte
         </LienBouton>
       </section>
+
+      {creneauLibere ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-14 font-semibold text-ink-900">Ton créneau</h2>
+          <p className="text-pretty text-14 text-ink-700">{creneauLibere.phrase}</p>
+          <LienBouton
+            href={creneauLibere.adresse}
+            pleineLargeur
+            className="min-h-action"
+          >
+            Choisir un créneau
+          </LienBouton>
+        </section>
+      ) : null}
 
       {reessai ? (
         <section className="flex flex-col gap-2">

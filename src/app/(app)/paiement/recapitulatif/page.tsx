@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { Recapitulatif } from "./Recapitulatif";
 import { tunnelDuPaiement } from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
-import { getPack, RECHARGE_ANALYSES, CONSULTATION } from "@/domain/payments/pricing";
+import {
+  achatDuParametre,
+  ouvrableDepuisLeRecapitulatif,
+  tarifDe,
+} from "@/domain/payments/achat";
 
 /**
  * $-02 — Récapitulatif. WF-05.
@@ -17,6 +21,10 @@ import { getPack, RECHARGE_ANALYSES, CONSULTATION } from "@/domain/payments/pric
  * elle s'achète, et elle passe par ce même écran. Le montant vient de la
  * grille tarifaire et n'est jamais recopié : c'est le serveur qui le
  * recalculera à la création, et les deux doivent concorder.
+ *
+ * Le paramètre est relu en catégorie par le domaine, et la catégorie
+ * descend telle quelle dans l'écran. Il la redevinait sur le code, et se
+ * trompait de branche pour la consultation.
  */
 export const dynamic = "force-dynamic";
 
@@ -30,35 +38,32 @@ export default async function PageRecapitulatif({
 }: {
   searchParams: Promise<{ dossier?: string; achat?: string; devise?: string }>;
 }) {
-  const { dossier, achat, devise } = await searchParams;
+  const { dossier, achat: parametre, devise } = await searchParams;
   const adresse = `/paiement/recapitulatif?dossier=${encodeURIComponent(dossier ?? "")}`;
   const acteur = await exigerCandidat(dossier ? adresse : "/paiement/recapitulatif");
-  if (!dossier || !achat) notFound();
+  if (!dossier || !parametre) notFound();
 
   const tunnel = await tunnelDuPaiement(dossier, acteur.id).catch(() => null);
   if (!tunnel) notFound();
 
-  const libelle =
-    achat === "recharge"
-      ? RECHARGE_ANALYSES.libelle
-      : achat === "consultation"
-        ? CONSULTATION.libelle
-        : getPack(achat)?.libelle;
+  const achat = achatDuParametre(parametre);
   // Un code d'achat inconnu n'est pas un montant à zéro : c'est une adresse
   // fabriquée, et l'écran ne doit pas proposer de payer quoi que ce soit.
-  if (!libelle) notFound();
+  //
+  // Une consultation non plus, et pour une autre raison : elle se paie
+  // depuis T-05, où un créneau est tenu. Ouverte ici, elle ne citerait
+  // aucun rendez-vous, et la notification signée n'aurait rien à
+  // confirmer (`ouvrableDepuisLeRecapitulatif`).
+  if (!achat || !ouvrableDepuisLeRecapitulatif(achat)) notFound();
 
-  const prix =
-    achat === "recharge"
-      ? RECHARGE_ANALYSES.prix
-      : achat === "consultation"
-        ? CONSULTATION.prix
-        : getPack(achat)!.prix;
+  const tarif = tarifDe(achat);
+  if (!tarif) notFound();
 
   return (
     <Recapitulatif
       tunnel={tunnel}
-      achat={{ code: achat, libelle, prix }}
+      achat={achat}
+      tarif={tarif}
       deviseInitiale={devise === "EUR" || devise === "XOF" ? devise : tunnel.devise}
     />
   );

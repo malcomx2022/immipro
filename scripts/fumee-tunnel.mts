@@ -71,6 +71,7 @@ if (migration.status !== 0) {
 const { db } = await import("../src/lib/db");
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
 const { cleDOuverture } = await import("../src/domain/paiement/ouverture");
+const { tarifDe } = await import("../src/domain/payments/achat");
 const { estAbouti } = await import("../src/server/paiement/cycle");
 type Ouvreur = import("../src/server/paiement/ouvreur").Ouvreur;
 type Ouverture = import("../src/server/paiement/ouvreur").Ouverture;
@@ -361,6 +362,77 @@ try {
     const sienne = await ouvrirLeTunnel(b.userId, ACHAT(b.applicationId), "EUR", ouvreur);
     verifier(sienne.reference !== sien.reference, "il ouvre sa propre transaction");
     verifier(ouvreur.creations.length === 1, "et une création lui est propre");
+  }
+  // ── 8. Les trois achats, tels qu'ils s'enregistrent ─────────────────
+  console.log("\nMontant et code enregistrés, achat par achat");
+  {
+    /*
+      Le récapitulatif envoyait une consultation sous l'étiquette d'un
+      pack. Personne ne s'en plaignait : la ligne s'écrivait, avec le bon
+      montant, et `getPack("consultation")` ne rendant rien, le crédit
+      n'ouvrait aucune contrepartie.
+
+      Ce qui suit lit la ligne écrite en base pour chacune des trois
+      catégories — montant et code — plutôt que ce que la couche d'accès
+      dit avoir écrit.
+    */
+    const cas = [
+      { achat: { type: "pack", code: "dossier" } as const, code: "dossier" },
+      { achat: { type: "recharge" } as const, code: "recharge" },
+      { achat: { type: "consultation" } as const, code: "consultation" },
+    ];
+
+    for (const { achat, code } of cas) {
+      const { userId, applicationId } = await candidat();
+      const attendu = tarifDe(achat)!.prix.EUR;
+      await ouvrirLeTunnel(userId, { ...achat, applicationId }, "EUR", ouvreurSimule());
+
+      const ligne = await db.transaction.findFirstOrThrow({ where: { userId } });
+      verifier(
+        ligne.packCode === code,
+        `${code} — le code enregistré est le sien (${ligne.packCode})`,
+      );
+      verifier(
+        ligne.amount === attendu,
+        `${code} — le montant enregistré vient de la grille (${ligne.amount} attendu ${attendu})`,
+      );
+      verifier(
+        ligne.currency === "EUR" && ligne.provider === "STRIPE",
+        `${code} — le rail suit la devise (${ligne.provider})`,
+      );
+    }
+
+    /*
+      Et la confirmation de chacune fait ce qu'elle doit. Une
+      consultation ouverte sans créneau tenu ne confirme rien — c'est
+      précisément pourquoi le récapitulatif ne l'ouvre pas
+      (`ouvrableDepuisLeRecapitulatif`). On le vérifie plutôt que de le
+      supposer : si cette vérification devenait fausse, c'est que la
+      consultation se serait mise à confirmer un rendez-vous imaginaire.
+    */
+    const { userId, applicationId } = await candidat();
+    const ouvert = await ouvrirLeTunnel(
+      userId,
+      { type: "consultation", applicationId },
+      "EUR",
+      ouvreurSimule(),
+    );
+    const sansCreneau = await db.transaction.findFirstOrThrow({ where: { userId } });
+    const issue = await appliquerLaNotification({
+      providerEventId: `stripe:evt_consultation_${process.pid}`,
+      providerTxId: sansCreneau.providerTxId!,
+      reference: ouvert.reference,
+      statut: "CONFIRMEE" as const,
+    });
+    verifier(issue.issue === "creditee", `la notification s'applique (${issue.issue})`);
+    verifier(
+      (await db.appointment.count({ where: { transactionId: sansCreneau.id } })) === 0,
+      "une consultation sans créneau tenu ne confirme aucun rendez-vous",
+    );
+    verifier(
+      (await db.analysisCredit.count({ where: { applicationId } })) === 0,
+      "et n'ouvre évidemment aucun quota",
+    );
   }
 } finally {
   await db.$disconnect().catch(() => {});

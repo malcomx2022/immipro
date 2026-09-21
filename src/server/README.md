@@ -214,6 +214,29 @@ des deux écrans ne l'aurait signalé.
 d'arriver — un test relit les quatre composants du tunnel pour qu'il n'y en
 ait jamais qu'un.
 
+**Un achat porte sa catégorie, il ne la laisse pas deviner.**
+`domain/payments/achat.ts` est l'union discriminée partagée par l'écran,
+le schéma de la route et la couche d'accès : `pack` avec son code,
+`recharge`, `consultation`. Le récapitulatif recevait auparavant un
+triplet `{ code, libelle, prix }` et redevinait la catégorie sur le
+code — tout ce qui n'était pas `recharge` partait en pack, si bien
+qu'une consultation s'affichait juste et se sérialisait faux (S.24).
+
+Quatre fonctions la traversent, chacune par un `switch` exhaustif :
+`corpsDAchat` (ce qui part sur le fil), `tarifDe` (le montant, pour
+l'écran comme pour le serveur), `codeEnregistre` (ce qu'on écrit dans
+`Transaction.packCode`, avec son inverse `achatDepuisLeCode` juste à
+côté) et `ouvrableDepuisLeRecapitulatif`. Une catégorie ajoutée ne
+compile pas tant que les quatre questions n'ont pas de réponse.
+
+**$-02 n'ouvre pas de consultation**, et c'est la dernière de ces quatre
+questions. Une consultation payée confirme un créneau **tenu**, retrouvé
+par `Appointment.transactionId` ; ouverte depuis le récapitulatif, elle
+ne citerait aucun rendez-vous et la notification signée n'aurait rien à
+confirmer. Elle se paie depuis T-05, où l'horaire existe — et l'écran
+d'échec renvoie une consultation à l'annuaire plutôt qu'au
+récapitulatif, parce que sa tenue a été libérée avec l'échec.
+
 **La relève ne conclut rien.** `$-03` interroge `paiements.statut` toutes
 les trois secondes ; la route lit le statut que le webhook signé fait
 avancer et ne confirme rien elle-même (RG-05.1). Ce que vaut la réponse est

@@ -4925,3 +4925,110 @@ L'écran d'attente de paiement est celui des packs : il dit « ton dossier
 s'ouvre aussitôt », ce qui ne décrit pas un rendez-vous. Le parcours est
 juste, la phrase d'attente est à reprendre pour le cas de la
 consultation.
+
+### S.24 — L'achat s'affichait juste et partait faux
+
+Le récapitulatif ($-02) recevait de sa page un triplet sans catégorie —
+`{ code, libelle, prix }` — et la redevinait au moment d'envoyer :
+
+```ts
+achat: achat.code === "recharge" ? { type: "recharge" } : { type: "pack", code: achat.code }
+```
+
+Une catégorie sur trois était nommée. Les deux autres tombaient dans la
+même branche. `achat=consultation` s'affichait donc correctement — le
+bon libellé, le bon montant, tous deux pris sur la grille — et partait
+sur le fil sous l'étiquette `{ type: "pack", code: "consultation" }`.
+
+Rien ne s'en plaignait, et c'est le plus instructif. Le serveur
+acceptait un pack nommé `consultation`, calculait son montant par une
+autre lecture de la même grille — juste, elle aussi —, enregistrait
+`packCode: "consultation"`, et ouvrait la page du prestataire. Au
+crédit, `getPack("consultation")` ne rendait rien : la fonction sortait
+sans écrire. Somme encaissée, contrepartie nulle, aucune trace d'erreur.
+
+#### Ce n'était pas une inattention
+
+`code: string` autorise toutes les catégories et n'en décrit aucune. Le
+jour où la troisième est arrivée, rien n'a obligé à relire la
+conversion : elle compilait, et son défaut ne se voyait ni à l'écran,
+qui affichait le bon prix, ni en base, qui enregistrait le bon montant.
+Un type qui ne peut pas être faux vaut mieux qu'une relecture attentive.
+
+#### Une union discriminée, et des `switch` exhaustifs
+
+`domain/payments/achat.ts` porte désormais l'union — `pack` avec son
+code, `recharge`, `consultation` — et tout ce qui la traverse le fait
+par un `switch` terminé par `const jamais: never`. Quatre traversées :
+
+| Fonction | Ce qu'elle décide |
+|---|---|
+| `corpsDAchat` | ce qui part sur le fil |
+| `tarifDe` | le libellé et le prix, pour l'écran comme pour le serveur |
+| `codeEnregistre` | le code écrit dans `Transaction.packCode` |
+| `ouvrableDepuisLeRecapitulatif` | si $-02 sait ouvrir cet achat |
+
+Une quatrième catégorie ne compilera pas tant que les quatre questions
+n'auront pas de réponse. C'est la troisième qui ne s'est pas posée.
+
+Le schéma `zod` de la route vient du même module, et la conversion
+forcée qui l'y rattachait — `as Parameters<typeof montantDe>[0]` — a
+disparu : c'est elle qui empêchait le compilateur de comparer les deux
+descriptions. Le crédit relit `packCode` par `achatDepuisLeCode` plutôt
+que par des chaînes en ligne, et son `switch` est exhaustif lui aussi —
+c'est l'endroit où une branche oubliée coûte le plus cher, puisque
+l'argent y est déjà encaissé.
+
+#### La coordination avec la réservation
+
+Corriger la sérialisation seule aurait produit une consultation
+correctement étiquetée, et toujours vide de sens : depuis S.23, une
+consultation payée confirme un créneau **tenu**, retrouvé par
+`Appointment.transactionId`. Ouverte depuis $-02, elle ne cite aucun
+rendez-vous — il n'y a rien à confirmer.
+
+Le chemin n'était pas théorique. $-05 construisait son bouton
+« Réessayer le paiement » avec le code enregistré, quel qu'il soit :
+l'échec d'une consultation renvoyait au récapitulatif, qui aurait ouvert
+un second paiement sans créneau. Le premier échec avait pourtant
+supprimé la tenue.
+
+Deux conséquences, toutes deux portées par le domaine :
+
+- $-02 refuse une consultation (`notFound`) : elle se paie là où
+  l'horaire existe ;
+- $-05 renvoie une consultation à l'annuaire, pas au récapitulatif, et
+  dit ce qui est arrivé au créneau.
+
+#### Deux phrases qui disaient le contraire du code
+
+En branchant $-05, les phrases d'état de `domain/consultants/tenue.ts`
+ont été lues pour la première fois — écrites au lot précédent, elles
+n'avaient aucun appelant.
+
+| Phrase écrite | Ce que le code fait |
+|---|---|
+| « Le créneau reste tenu quelques minutes » | `libererLaTenue` **supprime** le rendez-vous dès l'échec |
+| « ton accord de partage est conservé : tu n'auras pas à le redonner » | la ligne supprimée emportait `consentAt`, et T-05 repart à l'étape de l'accord, case décochée |
+
+Les deux sont corrigées, et elles s'affichent maintenant — une phrase
+que personne ne lit n'est démentie par personne.
+
+#### Vérifié en exécutant
+
+Les trois achats sont cliqués pour de bon dans jsdom, et le corps de la
+requête est ouvert : `{ type: "pack", code }`, `{ type: "recharge" }`,
+`{ type: "consultation" }`. Les trois montants diffèrent, ce qui rend la
+confusion visible — si une consultation avait été tarifée comme un pack,
+rien ne l'aurait trahie.
+
+Sur PostgreSQL réel (`npm run smoke:tunnel`), pour chacune des trois
+catégories : le code et le montant **lus en base** après ouverture. Et
+la démonstration du défaut restant : une consultation ouverte sans
+créneau tenu s'applique, ne confirme aucun rendez-vous et n'ouvre aucun
+quota — c'est exactement ce que $-02 refuse désormais de produire.
+
+Huit mutations, huit rouges. La plus instructive est la dernière : en
+figeant le code enregistré d'une consultation à `recharge`, la fumée
+signale deux échecs, pas un — le code est faux, **et** un quota
+s'ouvre. Une catégorie mal nommée ne se contente pas de mal se nommer.

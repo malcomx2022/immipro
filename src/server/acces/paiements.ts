@@ -12,9 +12,14 @@ import {
   getPack,
   MONTANT_MINIMUM_XOF,
   RECHARGE_ANALYSES,
-  CONSULTATION,
   type Devise,
 } from "@/domain/payments/pricing";
+import {
+  achatDepuisLeCode,
+  codeEnregistre,
+  tarifDe,
+  type Achat as AchatDuDomaine,
+} from "@/domain/payments/achat";
 import { effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
 import { confirmerLaConsultation, libererLaTenue } from "./consultations";
@@ -47,19 +52,37 @@ import type { CauseRefus } from "@/domain/paiement/echec";
  * rejeu n'est pas une transition.
  */
 
-export type Achat =
-  | { type: "pack"; code: string; applicationId: string }
-  | { type: "recharge"; applicationId: string }
-  | { type: "consultation"; applicationId: string };
+/**
+ * L'achat du domaine, rattaché au dossier qu'il ouvre.
+ *
+ * La distribution sur l'union est volontaire : `A & { applicationId }`
+ * appliqué au bloc rendrait `achat.code` plus difficile à réduire, et
+ * surtout n'échouerait plus si l'union du domaine changeait de forme. Ici,
+ * une catégorie ajoutée là-bas apparaît ici sans rien écrire — et les
+ * `switch` exhaustifs du domaine, eux, refusent de compiler tant qu'elle
+ * n'a pas de prix ni de code.
+ */
+type Rattache<A> = A extends unknown ? A & { applicationId: string } : never;
+export type Achat = Rattache<AchatDuDomaine>;
 
+/** Rattache au dossier l'achat reçu de la route, sans conversion forcée. */
+export const rattacher = (achat: AchatDuDomaine, applicationId: string): Achat => ({
+  ...achat,
+  applicationId,
+});
+
+/**
+ * Le montant et le libellé d'un achat, pris sur la grille du domaine.
+ *
+ * La règle des catégories vit dans `domain/payments/achat` : elle était
+ * écrite ici en ternaires, et le récapitulatif en avait sa propre version.
+ * Deux lectures d'une même grille finissent par diverger — celle de
+ * l'écran l'avait déjà fait.
+ */
 export function montantDe(achat: Achat, devise: Devise): { montant: number; libelle: string } {
-  if (achat.type === "pack") {
-    const pack = getPack(achat.code);
-    if (!pack) throw echec("champs_invalides", { champs: { pack: "Ce pack n'existe pas." } });
-    return { montant: pack.prix[devise], libelle: pack.libelle };
-  }
-  const complement = achat.type === "recharge" ? RECHARGE_ANALYSES : CONSULTATION;
-  return { montant: complement.prix[devise], libelle: complement.libelle };
+  const tarif = tarifDe(achat);
+  if (!tarif) throw echec("champs_invalides", { champs: { pack: "Ce pack n'existe pas." } });
+  return { montant: tarif.prix[devise], libelle: tarif.libelle };
 }
 
 /**
@@ -100,7 +123,10 @@ export async function creerOuReprendre(
       reference: referenceInterne(),
       userId,
       applicationId: achat.applicationId,
-      packCode: achat.type === "pack" ? achat.code : achat.type,
+      // La colonne porte le code du pack, ou la catégorie du complément.
+      // La conversion est celle du domaine, exhaustive, et son inverse
+      // (`achatDepuisLeCode`) vit à côté d'elle.
+      packCode: codeEnregistre(achat),
       amount: montant,
       currency: devise,
       // N.A — le rail suit la devise, et la règle vit dans le domaine :
@@ -559,56 +585,81 @@ function estUnDoublon(erreur: unknown): boolean {
 }
 
 /**
- * Crédit du pack — WF-05, étape 7.
+ * Crédit de l'achat — WF-05, étape 7.
  *
- * Le dossier passe en `ACTIF` et le quota d'analyses s'ouvre. Le nombre
- * d'analyses vient de la grille tarifaire, jamais d'une constante recopiée :
- * un pack dont le contenu change doit changer en un seul endroit.
+ * Trois contreparties, une par catégorie, et le `switch` est exhaustif :
+ * une catégorie ajoutée sans contrepartie ne compile pas. C'est l'endroit
+ * où il importe le plus, parce que c'est le seul appelé par la
+ * notification signée — l'argent est déjà encaissé quand on y arrive, et
+ * une branche oubliée se lit « payé, rien reçu ».
+ *
+ * Le code enregistré est relu par le domaine plutôt que comparé à des
+ * chaînes en ligne : la conversion qui l'écrit (`codeEnregistre`) et
+ * celle qui le relit vivent côte à côte, et un code inconnu ne devient
+ * pas un pack par défaut.
  */
 async function crediterLAchat(transaction: Transaction): Promise<void> {
   if (!transaction.applicationId) return;
 
-  if (transaction.packCode === "recharge") {
-    await ouvrirDuQuota({
-      applicationId: transaction.applicationId,
-      analyses: RECHARGE_ANALYSES.volume,
-      motif: "RECHARGE",
-      transactionId: transaction.id,
-      note: RECHARGE_ANALYSES.libelle,
-    });
-    return;
-  }
+  const achat = achatDepuisLeCode(transaction.packCode);
+  // Un code que le domaine ne reconnaît plus — un pack retiré de la
+  // grille, par exemple. Rien n'est crédité au hasard ; la transaction
+  // reste confirmée et lisible en back-office.
+  if (!achat) return;
 
-  /*
-    Une consultation ne crédite pas un quota : elle confirme un
-    rendez-vous et ouvre l'accès du consultant au dossier. C'est le seul
-    endroit d'où cela peut arriver, puisque c'est le seul appelé par la
-    notification signée — ni le retour du navigateur, ni une relève de
-    statut, ni un geste d'opérateur n'y mènent.
-  */
-  if (transaction.packCode === "consultation") {
-    await confirmerLaConsultation(transaction);
-    return;
-  }
-
-  const pack = getPack(transaction.packCode);
-  if (!pack) return;
-
-  await db.$transaction([
-    db.application.update({
-      where: { id: transaction.applicationId },
-      data: { status: "ACTIF" },
-    }),
-    db.analysisCredit.create({
-      data: {
+  switch (achat.type) {
+    case "recharge":
+      await ouvrirDuQuota({
         applicationId: transaction.applicationId,
-        delta: pack.analyses,
-        reason: "ACHAT_PACK",
+        analyses: RECHARGE_ANALYSES.volume,
+        motif: "RECHARGE",
         transactionId: transaction.id,
-        note: `Pack ${pack.libelle}`,
-      },
-    }),
-  ]);
+        note: RECHARGE_ANALYSES.libelle,
+      });
+      return;
+
+    /*
+      Une consultation ne crédite pas un quota : elle confirme un
+      rendez-vous et ouvre l'accès du consultant au dossier. C'est le seul
+      endroit d'où cela peut arriver, puisque c'est le seul appelé par la
+      notification signée — ni le retour du navigateur, ni une relève de
+      statut, ni un geste d'opérateur n'y mènent.
+
+      Elle suppose un créneau tenu, qui cite cette transaction. C'est
+      pourquoi le récapitulatif n'ouvre pas de consultation
+      (`ouvrableDepuisLeRecapitulatif`) : ouverte hors de T-05, elle
+      n'aurait ici aucun rendez-vous à confirmer.
+    */
+    case "consultation":
+      await confirmerLaConsultation(transaction);
+      return;
+
+    case "pack": {
+      const pack = getPack(achat.code);
+      if (!pack) return;
+      await db.$transaction([
+        db.application.update({
+          where: { id: transaction.applicationId },
+          data: { status: "ACTIF" },
+        }),
+        db.analysisCredit.create({
+          data: {
+            applicationId: transaction.applicationId,
+            delta: pack.analyses,
+            reason: "ACHAT_PACK",
+            transactionId: transaction.id,
+            note: `Pack ${pack.libelle}`,
+          },
+        }),
+      ]);
+      return;
+    }
+
+    default: {
+      const jamais: never = achat;
+      throw new Error(`Achat sans contrepartie : ${JSON.stringify(jamais)}`);
+    }
+  }
 }
 
 /**

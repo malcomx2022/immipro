@@ -9,6 +9,7 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import type { Tunnel } from "@/server/lecture/paiements";
 import type { Devise } from "@/domain/payments/pricing";
+import { corpsDAchat, type Achat, type Tarif } from "@/domain/payments/achat";
 import { deroulement, mentionDuRail } from "@/domain/payments/rail";
 import { formatMontant } from "@/lib/utils";
 
@@ -33,14 +34,26 @@ import { formatMontant } from "@/lib/utils";
  * soumission ne crée pas un second paiement — le serveur reprend celui qui
  * est en cours (RG-05, double soumission) —, et le bouton se verrouille
  * pendant l'appel plutôt que de compter sur cette reprise.
+ *
+ * ── Ce que l'écran reçoit, et pourquoi ce n'est plus trois chaînes ──
+ *
+ * `achat` porte la catégorie, `tarif` ce qui s'affiche. La conversion en
+ * corps de requête est celle du domaine (`corpsDAchat`), exhaustive : ce
+ * composant ne redevine plus la catégorie sur le code, ce qu'il faisait —
+ * et il envoyait une consultation sous l'étiquette d'un pack, tout en
+ * affichant le bon libellé et le bon prix.
+ *
+ * Aucun montant n'est écrit ici : le prix vient du tarif, que la page a
+ * pris sur la grille et que le serveur relira sur la même grille.
  */
 export interface RecapitulatifProps {
   tunnel: Tunnel;
-  achat: { code: string; libelle: string; prix: Record<Devise, number> };
+  achat: Achat;
+  tarif: Tarif;
   deviseInitiale: Devise;
 }
 
-export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifProps) {
+export function Recapitulatif({ tunnel, achat, tarif, deviseInitiale }: RecapitulatifProps) {
   const [conditions, setConditions] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -48,7 +61,7 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
   // limites) : elle se choisit sur $-01 et se lit ici, elle ne bascule plus.
   const devise = deviseInitiale;
 
-  const montant = formatMontant(achat.prix[devise], devise);
+  const montant = formatMontant(tarif.prix[devise], devise);
   const autreDevise: Devise = devise === "XOF" ? "EUR" : "XOF";
 
   async function payer() {
@@ -57,7 +70,7 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
     const resultat = await appeler<{ reference: string; url: string }>("/api/paiements", {
       corps: {
         dossierId: tunnel.dossier.id,
-        achat: achat.code === "recharge" ? { type: "recharge" } : { type: "pack", code: achat.code },
+        achat: corpsDAchat(achat),
         devise,
       },
     });
@@ -107,7 +120,7 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
 
         <dl className="flex flex-col">
           {[
-            { intitule: "Achat", valeur: achat.libelle },
+            { intitule: "Achat", valeur: tarif.libelle },
             {
               intitule: "Dossier",
               valeur: `${tunnel.dossier.pays} — ${tunnel.dossier.intitule}`,

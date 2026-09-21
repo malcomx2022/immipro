@@ -60,6 +60,22 @@ export const TITRE_ETAT: Record<EtatDuRendezVous, string> = {
  * le candidat vient peut-être de valider son paiement, et il ne faut ni
  * lui annoncer un rendez-vous qu'il n'a pas encore, ni lui laisser croire
  * que son argent est parti dans le vide.
+ *
+ * ── Deux phrases corrigées le 21/09/2026 ────────────────────────────
+ *
+ * Elles disaient le contraire de ce que le code fait, et personne ne
+ * s'en apercevait parce qu'aucun écran ne les affichait encore.
+ *
+ * L'échec annonçait « le créneau reste tenu quelques minutes ».
+ * `libererLaTenue` **supprime** le rendez-vous dès que la notification
+ * dit `ECHOUEE` : le créneau n'est plus tenu du tout, il est libre — ce
+ * qui est une meilleure nouvelle mal dite, puisqu'un autre candidat peut
+ * le prendre entre-temps.
+ *
+ * L'expiration promettait « ton accord de partage est conservé : tu
+ * n'auras pas à le redonner ». La ligne supprimée emportait `consentAt`
+ * avec elle, et T-05 repart à l'étape de l'accord, case décochée. La
+ * phrase annonçait une commodité qui n'existait pas.
  */
 export function corpsDeLEtat(etat: EtatDuRendezVous, minutes = TENUE_MINUTES): string {
   switch (etat) {
@@ -70,9 +86,9 @@ export function corpsDeLEtat(etat: EtatDuRendezVous, minutes = TENUE_MINUTES): s
     case "CONFIRME":
       return "Le paiement est confirmé, le créneau est réservé à ton nom, et ton consultant a désormais accès à ton dossier.";
     case "ECHOUE":
-      return "Aucune somme n'a été prélevée. Le créneau reste tenu quelques minutes : tu peux réessayer maintenant, ou en choisir un autre.";
+      return "Aucune somme n'a été prélevée, et le créneau est redevenu disponible. Tu peux le reprendre s'il est encore libre, ou en choisir un autre.";
     case "LIBERE":
-      return "Le paiement n'a pas abouti dans le délai, et le créneau est redevenu disponible. Rien n'a été prélevé, et ton accord de partage est conservé : tu n'auras pas à le redonner.";
+      return "Le paiement n'a pas abouti dans le délai, et le créneau est redevenu disponible. Rien n'a été prélevé. Il te faudra redonner ton accord de partage avant de reprendre un créneau.";
   }
 }
 
