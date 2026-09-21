@@ -441,6 +441,24 @@ SELECT refuse(
   $q$INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body, "updatedAt")
      VALUES ('e5','ARTICLE','releve-essai','BROUILLON','Titre','Chapeau','{}'::jsonb, now())$q$);
 
+-- ── La tenue du créneau — arbitrage du 21/09/2026 ───────────────────────
+
+SELECT refuse(
+  'T-05 · un rendez-vous confirmé sans le paiement qui le paie',
+  $q$INSERT INTO "Appointment" (id, reference, "applicationId", "consultantId",
+       "startsAt", "durationMin", status, "freeUntil")
+     SELECT 'rv1', 'RV-ESSAI-1', a.id, c.id, now() + interval '3 days', 45,
+       'RESERVE', now() + interval '2 days'
+       FROM "Application" a, "Consultant" c LIMIT 1$q$);
+
+SELECT refuse(
+  'T-05 · une tenue sans échéance, qui gèlerait le créneau',
+  $q$INSERT INTO "Appointment" (id, reference, "applicationId", "consultantId",
+       "startsAt", "durationMin", status, "freeUntil")
+     SELECT 'rv2', 'RV-ESSAI-2', a.id, c.id, now() + interval '4 days', 45,
+       'TENU', now() + interval '3 days'
+       FROM "Application" a, "Consultant" c LIMIT 1$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

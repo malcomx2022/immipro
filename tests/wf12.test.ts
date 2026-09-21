@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  TENUE_MINUTES,
+  echeanceDeTenue,
+  tenueEchue,
+} from "@/domain/consultants/tenue";
+import {
   annuaireVide,
   filtrerAnnuaire,
   habilitesPour,
@@ -10,7 +15,6 @@ import {
 import {
   FUSEAU_AFFICHAGE,
   MENTION_TENUE,
-  TENUE_MINUTES,
   conditions,
   grouperParJour,
   libelleFormat,
@@ -222,9 +226,25 @@ describe("T-05 — créneaux et confirmation", () => {
     expect(referenceRendezVous(creneau, "adjovi")).not.toBe(reference);
   });
 
-  it("tient le créneau, et le dit", () => {
-    expect(TENUE_MINUTES).toBe(10);
-    expect(MENTION_TENUE).toBe("Le créneau est tenu 10 minutes.");
+  /**
+   * Ce test s'appelait déjà « tient le créneau, et le dit », et ne
+   * vérifiait que la phrase : `TENUE_MINUTES` valait dix, la mention le
+   * répétait, et rien ne tenait quoi que ce soit — le rendez-vous
+   * naissait confirmé, sans paiement ni échéance. Il porte maintenant
+   * sur le mécanisme, et la phrase en découle.
+   */
+  it("tient le créneau, et le dit de la même durée", () => {
+    const debut = new Date("2026-09-21T10:00:00Z");
+    const echeance = echeanceDeTenue(debut);
+    expect((echeance.getTime() - debut.getTime()) / 60_000).toBe(TENUE_MINUTES);
+    expect(MENTION_TENUE).toContain(`${TENUE_MINUTES} minutes`);
+
+    // Avant l'échéance elle tient, après elle ne tient plus rien.
+    expect(tenueEchue(echeance, new Date(echeance.getTime() - 1))).toBe(false);
+    expect(tenueEchue(echeance, new Date(echeance.getTime() + 1))).toBe(true);
+    // Une tenue sans échéance ne tient pas : la base la refuse, et le
+    // domaine ne la considère jamais comme valable.
+    expect(tenueEchue(null, debut)).toBe(true);
   });
 
   it("énonce le décalage de fuseau au lieu de le masquer", () => {

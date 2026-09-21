@@ -102,6 +102,13 @@ jobs:
         run: npm run smoke:reconciliation
       - run: echo "- **Réconciliation** — rattrapage, idempotence et course webhook éprouvés sur base vierge" >> "$GITHUB_STEP_SUMMARY"
 
+      # Deux candidats sur le même créneau à la même milliseconde : c'est la
+      # base qui arbitre, et cela ne se simule pas. Avec la confirmation par
+      # notification signée, la libération, et la suppression de compte.
+      - name: Parcours consultant
+        run: npm run smoke:consultation
+      - run: echo "- **Parcours consultant** — tenue, concurrence sur un créneau et confirmation payée" >> "$GITHUB_STEP_SUMMARY"
+
       # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
       # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.
       - name: Bac à sable des fournisseurs

@@ -4,6 +4,7 @@ import { journaliser } from "@/server/acces/journal";
 import { appliquerLaNotification } from "@/server/acces/paiements";
 import { cleDEvenementDeReconciliation } from "@/domain/paiement/ouverture";
 import { leConsultant, type Consultant } from "@/server/paiement/consultation";
+import { libererLesTenuesEchues } from "@/server/acces/consultations";
 
 /**
  * Réconciliation des paiements — RG-05.4.
@@ -40,6 +41,8 @@ export const HEURES_AVANT_TICKET = 24;
 
 export interface Bilan {
   examinees: number;
+  /** Créneaux rendus disponibles faute de paiement dans le délai de tenue. */
+  tenuesLiberees: number;
   /** États retrouvés chez le fournisseur et appliqués. */
   rattrapees: number;
   expirees: number;
@@ -59,7 +62,19 @@ export async function reconcilierLesPaiements(
     take: 200,
   });
 
-  const bilan: Bilan = { examinees: 0, rattrapees: 0, expirees: 0, ecartsOuverts: 0 };
+  /*
+    Les créneaux tenus dont le délai est passé, d'abord : un candidat qui
+    ferme son onglet ne laisse aucune trace, et sans ce balayage son
+    créneau resterait gelé. Le quart d'heure de ce job est la cadence
+    qu'il faut pour une tenue de vingt minutes.
+  */
+  const bilan: Bilan = {
+    examinees: 0,
+    rattrapees: 0,
+    expirees: 0,
+    ecartsOuverts: 0,
+    tenuesLiberees: await libererLesTenuesEchues(maintenant),
+  };
 
   for (const transaction of enAttente) {
     if (!aReconcilier(transaction.createdAt, maintenant)) continue;

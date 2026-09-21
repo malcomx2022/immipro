@@ -37,6 +37,7 @@ import {
   nomDuFichierAgenda,
   TYPE_AGENDA,
 } from "@/domain/consultants/agenda";
+import { MENTION_ACCES_APRES_PAIEMENT } from "@/domain/consultants/tenue";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { CONSULTATION, deviseParDefaut } from "@/domain/payments/pricing";
@@ -83,6 +84,12 @@ interface Reservation {
   annulationSansFraisJusqua: string;
   consultant: string;
   dossier: string | null;
+  /** Jusqu'à quand le créneau est gardé. Nul quand il est déjà payé. */
+  tenuJusqua: string | null;
+  /** La page hébergée du prestataire. Nulle quand il n'y a plus à payer. */
+  url: string | null;
+  /** Vrai seulement quand la notification signée est passée. */
+  confirme: boolean;
   deja: boolean;
 }
 
@@ -132,6 +139,21 @@ export function PriseDeRendezVous({
       setEchec(resultat.echec);
       return;
     }
+    /*
+      Le créneau est **tenu**, pas réservé. Le navigateur part payer sur
+      la page hébergée du prestataire, et c'est la notification signée
+      qui confirmera — ni ce clic, ni le retour de cette page.
+      Le bouton reste en cours d'envoi : la page va disparaître, et la
+      rendre cliquable pendant la navigation invite au second clic.
+    */
+    if (resultat.donnees.url) {
+      setEnvoi(true);
+      window.location.assign(resultat.donnees.url);
+      return;
+    }
+
+    // Plus rien à payer : ce rendez-vous est déjà confirmé, et le
+    // candidat revient simplement le voir.
     setReservation(resultat.donnees);
     setEtape("CONFIRME");
   }
@@ -340,11 +362,11 @@ export function PriseDeRendezVous({
             }
             onClick={() => creneau && void reserver(creneau)}
           >
-            {creneau ? `Confirmer ${libelleHeure(creneau)}` : "Confirmer un créneau"}
+            {creneau ? `Tenir ${libelleHeure(creneau)} et payer` : "Choisir un créneau"}
           </Button>
           {creneau ? (
             <p aria-live="polite" className="text-13 text-ink-500">
-              {MENTION_TENUE}
+              {MENTION_TENUE} {MENTION_ACCES_APRES_PAIEMENT}
             </p>
           ) : null}
         </div>

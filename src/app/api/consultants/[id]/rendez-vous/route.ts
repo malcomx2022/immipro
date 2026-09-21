@@ -5,35 +5,41 @@ import { echec } from "@/server/http/echecs";
 import { dossierAvecSaRegle } from "@/server/acces/dossiers";
 import { referenceRendezVous, limiteAnnulation } from "@/domain/consultants/rendez-vous";
 import { versFiche } from "@/server/acces/regles";
-import { envoyerConfirmationEntretien } from "@/server/courrier";
-import { jourEnFrancais } from "@/domain/format/moment";
 import { CONSULTATION_DUREE_MINUTES } from "@/domain/payments/pricing";
-import { ACCORD_DUREE_JOURS } from "@/domain/consultants/access";
+import { rattacherLePaiement, tenirLeCreneau } from "@/server/acces/consultations";
+import { ouvrirLeTunnel } from "@/server/acces/paiements";
+import { deviseParDefaut } from "@/domain/payments/pricing";
 
 /**
- * Prise de rendez-vous — T-05, WF-12.
+ * Prise de rendez-vous — T-05, WF-12, arbitrage du 21/09/2026.
  *
- * Trois choses se produisent ensemble, et aucune ne va sans les autres :
- * l'accord de partage, la réservation du créneau, et la limite d'annulation
- * opposable.
+ * ── Ce que cette route faisait, et qu'elle ne fait plus ─────────────
  *
- * **L'accord est obligatoire et borné (RG-12.2).** Il est révocable et
- * expire de lui-même : `expiresAt` n'est pas optionnel, et la base refuse
- * une échéance antérieure à l'accord. Sa durée couvre le rendez-vous et le
- * temps d'un compte rendu, pas davantage.
+ * Elle créait le rendez-vous **et** l'accès au dossier, sans paiement :
+ * `transactionId` restait nul, l'écran annonçait « Rendez-vous confirmé »,
+ * et deux paragraphes plus bas que la consultation était due. Un
+ * consultant lisait le dossier d'un candidat qui n'avait rien réglé.
  *
- * **La référence est déterministe (INV-7).** Une réservation rejouée — deux
- * appuis, un retour arrière — retombe sur la même référence et se heurte à
- * l'unicité plutôt que de créer un second rendez-vous payant.
+ * Elle **tient** désormais le créneau et ouvre le paiement. Rien d'autre.
  *
- * **La limite d'annulation est stockée.** La grille peut changer après la
- * réservation ; la condition acceptée ce jour-là, non.
+ * ── Ce qui se passe, dans l'ordre ───────────────────────────────────
  *
- * **La confirmation part par courriel (I.E).** Elle n'existait pas, et
- * l'écran l'annonçait. Un envoi manqué ne défait pas une réservation déjà
- * écrite : le rendez-vous est pris, l'accord est donné, et c'est l'écran
- * qui en porte la preuve. L'échec se journalise — la réclamation qui
- * arrivera saura quoi chercher.
+ * 1. L'accord de partage est daté — il se prépare avant le paiement, et
+ *    n'ouvre aucun accès (RG-12.2) ;
+ * 2. le créneau est tenu, avec une échéance ; la base arbitre la course
+ *    par l'unicité `(consultant, créneau)` ;
+ * 3. le tunnel de paiement s'ouvre, comme pour un pack, et la page
+ *    hébergée du prestataire est rendue au navigateur ;
+ * 4. la transaction est rattachée à la tenue.
+ *
+ * Le `RESERVE` et l'accès consultant naissent ailleurs : à la
+ * confirmation signée, et à elle seule (RG-05.1, INV-7). La base le tient
+ * — `appointment_reserve_exige_un_paiement` refuse un rendez-vous
+ * confirmé qui ne cite pas de transaction.
+ *
+ * **La confirmation par courriel part à la confirmation**, plus ici : un
+ * courrier qui annonce un rendez-vous avant qu'il soit payé est
+ * exactement ce que cet arbitrage corrige.
  */
 export const POST = route({
   nom: "consultants.rendezvous",
@@ -70,63 +76,69 @@ export const POST = route({
     const fiche = dossier.visaRule ? versFiche(dossier.visaRule) : null;
     const libelleDossier = fiche ? `${fiche.pays} — ${fiche.intitule}` : null;
 
-    const existant = await db.appointment.findUnique({ where: { reference } });
-    if (existant) {
-      // Rejeu : le rendez-vous est le même, et le courrier est déjà parti.
-      // En renvoyer un second ferait douter d'une double réservation.
+    /*
+      L'accord de partage est daté par la tenue. Il dit que le candidat
+      consent, pas que le consultant peut lire : l'accès naît à la
+      confirmation du paiement, et pas une seconde avant.
+    */
+    const tenue = await tenirLeCreneau({
+      applicationId: dossier.id,
+      consultantId: consultant.id,
+      reference,
+      debut,
+      dureeMinutes: CONSULTATION_DUREE_MINUTES,
+      limiteAnnulation: new Date(limiteAnnulation(creneau)),
+    });
+
+    /*
+      Le tunnel ordinaire — même ouverture, même idempotence, même page
+      hébergée. La devise suit le dossier, jamais le navigateur, et le
+      montant est recalculé côté serveur.
+    */
+    // Déjà payé : on le lui montre, sans rouvrir de paiement.
+    if (tenue.confirme) {
       return {
-        reference: existant.reference,
-        debut: existant.startsAt.toISOString(),
-        dureeMinutes: existant.durationMin,
-        annulationSansFraisJusqua: existant.freeUntil.toISOString(),
+        reference: tenue.reference,
+        debut: tenue.debut.toISOString(),
+        dureeMinutes: CONSULTATION_DUREE_MINUTES,
+        annulationSansFraisJusqua: new Date(limiteAnnulation(creneau)).toISOString(),
         consultant: consultant.name,
         dossier: libelleDossier,
+        tenuJusqua: null,
+        url: null,
+        paiement: null,
+        confirme: true,
         deja: true,
       };
     }
 
-    const expire = new Date(debut.getTime() + ACCORD_DUREE_JOURS * 24 * 60 * 60 * 1000);
-
-    const [rendezVous] = await db.$transaction([
-      db.appointment.create({
-        data: {
-          reference,
-          applicationId: dossier.id,
-          consultantId: consultant.id,
-          startsAt: debut,
-          durationMin: CONSULTATION_DUREE_MINUTES,
-          freeUntil: new Date(limiteAnnulation(creneau)),
-        },
-      }),
-      db.consultantAccess.create({
-        data: {
-          applicationId: dossier.id,
-          consultantId: consultant.id,
-          expiresAt: expire,
-        },
-      }),
-    ]);
-
-    await envoyerConfirmationEntretien({
-      destinataire: acteur!.email,
-      reference: rendezVous.reference,
-      creneau,
-      consultant: consultant.name,
-      dossier: libelleDossier,
-      partageExpireLe: jourEnFrancais(expire.toISOString()),
-    }).catch((erreur: unknown) => {
-      console.error(`[courrier] confirmation d'entretien ${reference} non partie`, erreur);
+    const compte = await db.user.findUnique({
+      where: { id: acteur!.id },
+      select: { countryCode: true },
     });
+    const paiement = await ouvrirLeTunnel(
+      acteur!.id,
+      { type: "consultation", applicationId: dossier.id },
+      // La grille suit le pays du compte, comme pour un pack. Le
+      // navigateur ne la choisit pas, et ne la transmet pas.
+      deviseParDefaut(compte?.countryCode),
+    );
+    await rattacherLePaiement(tenue.reference, paiement.transactionId);
 
     return {
-      reference: rendezVous.reference,
-      debut: rendezVous.startsAt.toISOString(),
-      dureeMinutes: rendezVous.durationMin,
-      annulationSansFraisJusqua: rendezVous.freeUntil.toISOString(),
+      reference: tenue.reference,
+      debut: tenue.debut.toISOString(),
+      dureeMinutes: CONSULTATION_DUREE_MINUTES,
+      annulationSansFraisJusqua: new Date(limiteAnnulation(creneau)).toISOString(),
       consultant: consultant.name,
       dossier: libelleDossier,
-      partageExpireLe: expire.toISOString().slice(0, 10),
-      deja: false,
+      /** Jusqu'à quand le créneau est gardé. Il n'est pas réservé. */
+      tenuJusqua: tenue.tenuJusqua?.toISOString() ?? null,
+      /** La page hébergée du prestataire, vérifiée par le tunnel. */
+      url: paiement.url,
+      paiement: paiement.reference,
+      confirme: false,
+      deja: tenue.deja,
     };
   },
 });

@@ -999,6 +999,8 @@ model ConsultantAccess {
 }
 
 enum AppointmentStatus {
+  /// Créneau gardé le temps du paiement. Rien n'est promis, rien n'est ouvert.
+  TENU
   RESERVE
   HONORE
   ANNULE
@@ -1025,7 +1027,21 @@ model Appointment {
   /// la grille. Stockée parce qu'elle est opposable : la grille peut changer
   /// après la réservation, pas la condition acceptée ce jour-là.
   freeUntil     DateTime
+  /// Le paiement qui a confirmé ce rendez-vous.
+  ///
+  /// Un `RESERVE` sans transaction est refusé par la base
+  /// (`appointment_reserve_exige_un_paiement`) : c'est là que se tient
+  /// l'arbitrage, et non dans la bonne volonté des appelants.
   transactionId String?           @unique
+  /// Jusqu'à quand la tenue vaut. Passé ce délai, le créneau se reprend —
+  /// sans quoi un paiement abandonné gèlerait un horaire pour toujours.
+  heldUntil     DateTime?
+  /// Quand l'accord de partage a été donné (RG-12.2).
+  ///
+  /// Il se prépare avant le paiement : il n'y a aucune raison de le
+  /// redemander après. Mais une date d'accord n'est pas une autorisation
+  /// de lecture — l'accès consultant naît à la confirmation, pas ici.
+  consentAt     DateTime?
   createdAt     DateTime          @default(now())
 
   @@unique([consultantId, startsAt])

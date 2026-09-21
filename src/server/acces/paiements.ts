@@ -17,6 +17,7 @@ import {
 } from "@/domain/payments/pricing";
 import { effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
+import { confirmerLaConsultation, libererLaTenue } from "./consultations";
 import { suiteDictable } from "@/server/securite/secret";
 import { fournisseurDe } from "@/domain/payments/rail";
 import {
@@ -147,7 +148,7 @@ export async function ouvrirLeTunnel(
   achat: Achat,
   devise: Devise,
   ouvreur: Ouvreur | null = lOuvreur(devise),
-): Promise<{ reference: string; url: string; reprise: boolean }> {
+): Promise<{ transactionId: string; reference: string; url: string; reprise: boolean }> {
   // Avant la moindre écriture. Un échec honnête vaut mieux qu'une attente
   // impossible, et il ne laisse aucune transaction derrière lui.
   if (!ouvreur) throw echec("paiement_indisponible");
@@ -195,7 +196,12 @@ export async function ouvrirLeTunnel(
     throw echec("ouverture_refusee");
   }
 
-  return { reference: transaction.reference, url: ouverture.session.url, reprise };
+  return {
+    transactionId: transaction.id,
+    reference: transaction.reference,
+    url: ouverture.session.url,
+    reprise,
+  };
 }
 
 /**
@@ -356,6 +362,16 @@ export async function appliquerLaNotification(
     // la notification qui a gagné a fait le travail.
     if (erreur instanceof EtatDejaChange || estUnDoublon(erreur)) return { issue: "rejeu" };
     throw erreur;
+  }
+
+  /*
+    Un paiement de consultation qui n'aboutit pas libère le créneau tenu :
+    le garder gèlerait un horaire que personne ne paiera. Le rendez-vous
+    confirmé, lui, n'est jamais touché ici — une annulation après paiement
+    passe par K.C, qui décide d'un remboursement.
+  */
+  if (maj.packCode === "consultation" && (maj.status === "ECHOUEE" || maj.status === "EXPIREE")) {
+    await libererLaTenue(maj.id).catch(() => undefined);
   }
 
   if (!effet.crediteLePack) return { issue: "appliquee", transaction: maj };
@@ -560,6 +576,18 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
       transactionId: transaction.id,
       note: RECHARGE_ANALYSES.libelle,
     });
+    return;
+  }
+
+  /*
+    Une consultation ne crédite pas un quota : elle confirme un
+    rendez-vous et ouvre l'accès du consultant au dossier. C'est le seul
+    endroit d'où cela peut arriver, puisque c'est le seul appelé par la
+    notification signée — ni le retour du navigateur, ni une relève de
+    statut, ni un geste d'opérateur n'y mènent.
+  */
+  if (transaction.packCode === "consultation") {
+    await confirmerLaConsultation(transaction);
     return;
   }
 

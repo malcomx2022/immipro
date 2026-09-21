@@ -175,7 +175,11 @@ describe("T-05 — Créneaux", () => {
     fireEvent.click(
       within(screen.getAllByRole("radiogroup")[0]!).getByRole("radio", { name: "16 h 30" }),
     );
-    expect(screen.getByText("Le créneau est tenu 10 minutes.")).toBeDefined();
+    const mention = espaces(document.body.textContent ?? "");
+    expect(mention).toContain("Le créneau est tenu 20 minutes, le temps du paiement.");
+    // Et la limite de l'accord, dite avant qu'il serve : il est
+    // enregistré tout de suite, il n'ouvre rien avant le paiement.
+    expect(mention).toContain("ne sera partagé qu'une fois le paiement confirmé");
   });
 
   it("énonce le décalage de fuseau", () => {
@@ -213,8 +217,14 @@ describe("T-05 — Confirmation", () => {
     annulationSansFraisJusqua: "2026-09-16T15:30:00.000Z",
     consultant: "Marieke Vermeulen",
     dossier: "Pays-Bas — Séjour pour études (MVV + VVR)",
+    tenuJusqua: "2026-09-17T14:20:00.000Z",
+    url: "https://checkout.stripe.com/c/pay/cs_essai",
+    confirme: false,
     deja: false,
   };
+
+  /** Le même rendez-vous, une fois la notification signée passée. */
+  const CONFIRMEE = { ...RESERVATION, tenuJusqua: null, url: null, confirme: true, deja: true };
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -239,17 +249,49 @@ describe("T-05 — Confirmation", () => {
     fireEvent.click(
       within(screen.getAllByRole("radiogroup")[0]!).getByRole("radio", { name: "16 h 30" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Confirmer 16 h 30" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tenir 16 h 30 et payer" }));
   };
 
+  /** Le navigateur quitte l'application : on observe la destination. */
+  const partirPayer = () => {
+    const aller = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign: aller },
+    });
+    return aller;
+  };
+
+  /**
+   * Le rendez-vous déjà payé : c'est le seul cas où cet écran affiche
+   * une confirmation. Dans le parcours ordinaire, le navigateur est
+   * parti payer avant d'en voir une.
+   */
   const confirmer = async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(CONFIRMEE),
+    } as Response);
     choisirEtConfirmer();
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("17 septembre"),
     );
   };
 
-  it("réserve pour de bon, avec l'accord de partage", async () => {
+  /**
+   * Le cœur de l'arbitrage : le clic **tient** le créneau et envoie
+   * payer. Il ne confirme rien — aucune confirmation ne s'affiche, et
+   * le navigateur part sur la page hébergée du prestataire.
+   */
+  it("tient le créneau et envoie payer, sans rien confirmer", async () => {
+    const aller = partirPayer();
+    choisirEtConfirmer();
+    await waitFor(() => expect(aller).toHaveBeenCalledWith(RESERVATION.url));
+    expect(screen.queryByText("Rendez-vous confirmé")).toBeNull();
+  });
+
+  it("transmet l'accord de partage avec la tenue", async () => {
     await confirmer();
     const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(url).toBe("/api/consultants/vermeulen/rendez-vous");
