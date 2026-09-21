@@ -36,6 +36,7 @@
 import { z } from "zod";
 import { verifierLUrlHebergee } from "@/domain/paiement/ouverture";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
+import type { Consultant } from "./consultation";
 
 /** Le domaine, pas l'hôte : l'hôte exact n'a pas pu être vérifié. */
 export const DOMAINES = ["fedapay.com"] as const;
@@ -209,3 +210,44 @@ export const adaptateurFedaPay = (
     },
   };
 };
+
+/* ------------------------------------------------------------------ *
+ * Consultation — non opérationnelle, et c'est délibéré.
+ * ------------------------------------------------------------------ */
+
+/**
+ * L'adaptateur de consultation FedaPay existe, et ne consulte rien.
+ *
+ * **Faute de documentation vérifiée, il n'y a pas de traduction
+ * honnête.** Consulter une transaction demande de savoir quels états le
+ * fournisseur prononce, et lesquels de ces états valent confirmation,
+ * attente ou refus. Deviner cette table-là ne coûterait pas un défaut
+ * d'affichage : elle décide si un candidat est crédité, et si un échec
+ * lui est imputé. Un état mal traduit écrirait « paiement refusé » sur
+ * le dossier de quelqu'un que personne n'a refusé.
+ *
+ * `lireFedaPay` traduit déjà des états reçus **en notification signée**,
+ * et cette table-là a été écrite d'après des charges utiles observées.
+ * La consultation est un autre appel, sur un autre objet, dont on n'a
+ * pas la même assurance : la réutiliser telle quelle reviendrait à
+ * supposer que les deux parlent le même vocabulaire.
+ *
+ * L'issue rendue est donc `indisponible`, qui est exacte : le job ne
+ * conclut rien, la transaction suit la règle d'expiration de la
+ * plateforme, et l'écart s'ouvre au délai prévu. C'est ce qui se passait
+ * déjà — rien n'est perdu, et rien n'est inventé.
+ *
+ * Ce qu'il faut pour le brancher : la liste des états de transaction du
+ * fournisseur et la forme de la réponse de consultation, vérifiées
+ * contre le bac à sable (`npm run sandbox:paiement`).
+ */
+export const CONSULTATION_NON_OPERATIONNELLE =
+  "consultation FedaPay non branchée : états du fournisseur non vérifiés";
+
+export const consultantFedaPay = (): Consultant => ({
+  fournisseur: "FEDAPAY",
+  consulter: async () => ({
+    issue: "indisponible",
+    detail: CONSULTATION_NON_OPERATIONNELLE,
+  }),
+});

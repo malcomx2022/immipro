@@ -128,3 +128,21 @@ export const motifDeDivergence = (
  */
 export const cheminDeRetour = (reference: string): string =>
   `/paiement/attente?tx=${encodeURIComponent(reference)}`;
+
+/**
+ * L'identifiant d'événement d'une réconciliation — RG-05.4.
+ *
+ * Déterministe, et dérivé de ce qu'il annonce : deux passes du job qui
+ * lisent le même état chez le fournisseur portent le même identifiant, et
+ * la seconde est reconnue comme un rejeu par la clé unique. Un identifiant
+ * tiré au sort ferait écrire une ligne d'événement à chaque quart d'heure
+ * pour la même nouvelle.
+ *
+ * Préfixé, et donc distinct de celui d'un webhook (`stripe:evt_…`) : la
+ * réconciliation et la notification signée peuvent annoncer la même chose
+ * sans se prendre l'une pour l'autre. Ce n'est pas la clé qui les
+ * départage — c'est la table des transitions, qui refuse de faire
+ * progresser un état déjà atteint.
+ */
+export const cleDEvenementDeReconciliation = (reference: string, statut: string): string =>
+  `reconciliation:${reference}:${statut}`;

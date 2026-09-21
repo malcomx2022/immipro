@@ -388,6 +388,45 @@ Ce qui s'éprouve où :
 | double soumission, reprise, écart de montant, appartenance, ordre webhook / retour | `npm run smoke:tunnel`, sur PostgreSQL avec un ouvreur simulé |
 | exactitude des champs envoyés au fournisseur | `npm run sandbox:paiement`, qui s'abstient et le dit sans clés |
 
+### La réconciliation, et ce qu'elle refuse de conclure
+
+Le webhook peut se perdre. Un candidat débité qui ne voit rien arriver est
+le pire défaut de ce produit. `jobs/reconciliation.ts` interroge désormais
+le fournisseur (RG-05.4), et **applique l'état retrouvé par le même
+service que les webhooks** — `appliquerLaNotification`. Une seule fonction
+écrit un état de paiement et crédite un pack : la réconciliation n'a pas
+son propre chemin d'écriture, donc pas sa propre façon de se tromper. Elle
+hérite au passage de l'idempotence par `PaymentEvent.providerEventId` et de
+la protection contre les courses.
+
+L'identifiant d'événement est **déterministe** —
+`reconciliation:<référence>:<état>` : deux passes qui lisent le même état
+portent la même clé, et la seconde est un rejeu. Il est préfixé, donc
+distinct d'un `stripe:evt_…`, mais ce n'est pas la clé qui départage une
+course avec un webhook : c'est la table des transitions, qui refuse de
+faire progresser un état déjà atteint.
+
+Cinq issues, et leurs frontières sont la règle :
+
+| Issue | Ce que le job en fait |
+|---|---|
+| `connu` | applique l'état, avec la cause **que le fournisseur a donnée** — jamais déduite |
+| `sans_paiement` | rien : une session abandonnée n'est pas une carte rejetée |
+| `introuvable` | ouvre un écart si une session avait été ouverte, rien sinon |
+| `indisponible` | **rien du tout** — une absence de réponse n'est pas un refus bancaire |
+| `incoherent` | ouvre un écart tout de suite, et n'applique rien |
+
+Aucune de ces issues n'expire quoi que ce soit : l'expiration suit
+`aExpirer` et elle seule. Ni Stripe ni FedaPay ne la prononcent.
+
+**FedaPay est explicitement non opérationnel.** Faute de documentation
+vérifiée, il n'y a pas de traduction honnête : deviner quels états valent
+confirmation ou refus déciderait si un candidat est crédité et si un échec
+lui est imputé. L'adaptateur rend `indisponible` avec sa raison — le
+comportement d'avant, sans invention. Ce qu'il faut pour le brancher : la
+liste des états du fournisseur et la forme de la réponse, vérifiées contre
+le bac à sable.
+
 ### Les secrets de paiement, une seule nomenclature
 
 `.env.example` portait `FEDAPAY_SECRET_KEY`, le code demandait

@@ -4766,3 +4766,81 @@ pas fait.
 
 Ce qui est certain : les adaptateurs refusent tout ce qu'ils ne
 reconnaissent pas, et aucun de ces refus n'envoie qui que ce soit payer.
+
+### S.22 — Le filet de RG-05.4 n'attrapait rien
+
+La réconciliation marquait les retards, ouvrait un écart au-delà de
+vingt-quatre heures et expirait ce qui n'aboutissait plus. Elle
+n'interrogeait personne : `interroger` était une fonction qui rendait
+`null`. Un webhook perdu sur un paiement réussi finissait donc en
+`EXPIREE` avec le motif « délai dépassé », sur un paiement que le
+candidat avait bel et bien réglé.
+
+Le fournisseur est maintenant consulté, et l'état retrouvé est appliqué
+par **le même service que les webhooks**. C'est le point de conception qui
+tient le reste : une seule fonction écrit un état de paiement et crédite
+un pack. La réconciliation n'a pas son propre chemin d'écriture, donc pas
+sa propre façon de se tromper — elle hérite de l'idempotence par
+`PaymentEvent.providerEventId` et de la protection contre les courses,
+sans qu'il ait fallu les réécrire.
+
+#### Ce que la consultation a le droit de conclure
+
+| Issue | Ce que le job en fait |
+|---|---|
+| `connu` | applique l'état, avec la cause que le fournisseur a donnée |
+| `sans_paiement` | rien : une session abandonnée n'est pas une carte rejetée |
+| `introuvable` | un écart si une session avait été ouverte, rien sinon |
+| `indisponible` | **rien du tout** |
+| `incoherent` | un écart tout de suite, et rien d'appliqué |
+
+La frontière qui compte est la quatrième. Confondre « le fournisseur n'a
+pas répondu » et « le paiement a été refusé » écrirait un motif d'échec
+sur le dossier de quelqu'un que personne n'a refusé — et ce motif part
+jusque sur son écran. La mutation qui traduit `indisponible` en `ECHOUEE`
+fait rougir deux vérifications.
+
+Aucune issue n'expire quoi que ce soit : l'expiration suit `aExpirer` et
+elle seule, comme avant. Une session que Stripe dit expirée ne prononce
+pas notre expiration.
+
+#### FedaPay reste non opérationnel, et le dit
+
+Faute de documentation vérifiée, il n'y a pas de traduction honnête :
+savoir quels états valent confirmation, attente ou refus décide si un
+candidat est crédité et si un échec lui est imputé. `lireFedaPay` traduit
+déjà des états reçus **en notification signée**, d'après des charges
+utiles observées ; la consultation est un autre appel, sur un autre objet,
+et réutiliser cette table reviendrait à supposer que les deux parlent le
+même vocabulaire.
+
+L'adaptateur existe donc, et rend `indisponible` avec sa raison. Le job ne
+conclut rien, la transaction suit la règle d'expiration de la plateforme,
+l'écart s'ouvre au délai prévu — c'est exactement ce qui se passait avant.
+Rien n'est perdu, et rien n'est inventé. La mutation qui le fait deviner
+un état fait rougir deux tests.
+
+#### Ce que l'exécution a trouvé
+
+Le premier jet du script de fumée donnait au consultant simulé une réponse
+unique pour tout le monde. Or le job balaie **toutes** les transactions en
+attente, pas seulement celle du scénario : l'identifiant de session du
+cinquième scénario s'est écrit sur la transaction du troisième, et la
+contrainte d'unicité l'a dit.
+
+C'était le harnais, pas le produit — mais il valait la peine de le lire :
+un vrai fournisseur répond par transaction, et un simulateur qui répond à
+tous rendrait verts des scénarios qui se marchent dessus. Le consultant
+simulé ne répond plus que pour sa référence.
+
+#### Vérifié en exécutant
+
+Six mutations, six rouges : l'absence de réponse traduite en refus (2
+vérifications), la clé d'événement rendue aléatoire (1 + 1 test), une
+session abandonnée traduite en refus (2 tests), une cause inventée quand
+le code est inconnu (1 test), FedaPay qui se met à deviner (2 tests).
+
+Vingt-neuf vérifications sur PostgreSQL réel : paiement confirmé retrouvé,
+refus retrouvé avec sa cause, rien trouvé, échec temporaire, webhook
+simultané — un seul crédit —, identifiant incohérent, et l'expiration qui
+reste celle de la plateforme.

@@ -64,7 +64,7 @@ const CAUSES_FEDAPAY: Record<string, CauseRefus> = {
  * qu'on en retient. Un code inconnu ne devient pas « solde insuffisant »
  * par défaut — il retombe sur le refus sans raison.
  */
-const CAUSES_STRIPE: Record<string, CauseRefus> = {
+export const CAUSES_STRIPE: Record<string, CauseRefus> = {
   insufficient_funds: "SOLDE_INSUFFISANT",
   card_velocity_exceeded: "SOLDE_INSUFFISANT",
   expired_card: "MOYEN_INVALIDE",

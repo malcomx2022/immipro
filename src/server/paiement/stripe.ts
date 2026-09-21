@@ -24,6 +24,9 @@ import {
   versSousUnite,
 } from "@/domain/paiement/ouverture";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
+import type { Consultant } from "./consultation";
+import { CAUSES_STRIPE } from "./notifications";
+import type { TransactionStatus } from "@prisma/client";
 
 const BASE = "https://api.stripe.com/v1";
 
@@ -155,5 +158,142 @@ export const adaptateurStripe = (cle: string, retourAbsolu: (chemin: string) => 
     if (reponse.statut >= 500) return { issue: "injoignable" };
     if (reponse.statut >= 400) return { issue: "refusee", detail: "session introuvable chez Stripe" };
     return lireLaSession(reponse.charge, reference);
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Consultation — RG-05.4, le rattrapage d'un webhook perdu.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Ce que Stripe dit d'une session, et ce qu'on a le droit d'en conclure.
+ *
+ * Deux objets se lisent ensemble : la session porte `payment_status`, et
+ * l'intention de paiement qu'elle contient porte l'état détaillé et, sur
+ * un refus, son code. L'intention est demandée en expansion pour n'avoir
+ * qu'un appel — une consultation qui en ferait deux doublerait le coût
+ * d'un job qui tourne tous les quarts d'heure.
+ */
+const schemaConsultation = z.object({
+  id: z.string().min(1),
+  payment_status: z.string().nullish(),
+  status: z.string().nullish(),
+  metadata: z.object({ reference: z.string().nullish() }).nullish(),
+  payment_intent: z
+    .union([
+      z.string(),
+      z.object({
+        id: z.string().min(1),
+        status: z.string().nullish(),
+        last_payment_error: z
+          .object({ code: z.string().optional(), decline_code: z.string().optional() })
+          .nullish(),
+      }),
+    ])
+    .nullish(),
+});
+
+/**
+ * L'état de l'intention de paiement, traduit dans le cycle interne.
+ *
+ * `canceled` et `requires_payment_method` sans erreur ne sont pas des
+ * refus : personne n'a rejeté ce paiement, il n'a simplement pas eu
+ * lieu. Les écrire `ECHOUEE` accuserait la carte d'un candidat qui a
+ * seulement fermé l'onglet.
+ */
+export const ETAT_DE_LINTENTION: Record<string, TransactionStatus | "SANS_PAIEMENT"> = {
+  succeeded: "CONFIRMEE",
+  processing: "EN_ATTENTE",
+  requires_action: "EN_ATTENTE",
+  requires_confirmation: "EN_ATTENTE",
+  requires_capture: "EN_ATTENTE",
+  requires_payment_method: "SANS_PAIEMENT",
+  canceled: "SANS_PAIEMENT",
+};
+
+export const consultantStripe = (cle: string): Consultant => ({
+  fournisseur: "STRIPE",
+
+  async consulter(providerTxId, reference) {
+    if (!providerTxId) {
+      // Aucune session n'a été ouverte : il n'y a rien à consulter, et
+      // ce n'est pas une anomalie — la transaction vient de naître.
+      return { issue: "introuvable" };
+    }
+    const identifiant = providerTxId.replace(/^stripe:/u, "");
+    const reponse = await appeler(
+      cle,
+      `/checkout/sessions/${encodeURIComponent(identifiant)}?expand[]=payment_intent`,
+      {},
+    );
+
+    if (!reponse) return { issue: "indisponible", detail: "fournisseur injoignable" };
+    if (reponse.statut >= 500) return { issue: "indisponible", detail: `réponse ${reponse.statut}` };
+    if (reponse.statut === 404) return { issue: "introuvable" };
+    if (reponse.statut >= 400) {
+      // Un 4xx qui n'est pas un 404 est un défaut de notre côté — clé
+      // révoquée, identifiant malformé. On ne prononce rien sur le
+      // paiement pour autant.
+      return { issue: "indisponible", detail: `réponse ${reponse.statut}` };
+    }
+
+    const lu = schemaConsultation.safeParse(reponse.charge);
+    if (!lu.success) return { issue: "indisponible", detail: "session illisible au schéma" };
+
+    /*
+      L'identifiant rendu doit être celui qu'on a demandé, et la
+      référence celle qu'on a posée à l'ouverture. Une réponse qui parle
+      d'autre chose n'est pas une réponse sur notre paiement : on
+      n'applique rien, et l'écart s'ouvre là où il se lit.
+    */
+    if (lu.data.id !== identifiant) {
+      return { issue: "incoherent", detail: "la session rendue n'est pas celle demandée" };
+    }
+    if (lu.data.metadata?.reference && lu.data.metadata.reference !== reference) {
+      return { issue: "incoherent", detail: "la référence interne de la session est une autre" };
+    }
+
+    const intention =
+      typeof lu.data.payment_intent === "object" && lu.data.payment_intent !== null
+        ? lu.data.payment_intent
+        : null;
+
+    // Payé, c'est payé : la session le dit sans ambiguïté, et c'est le
+    // cas qui compte — un webhook perdu sur un paiement réussi.
+    if (lu.data.payment_status === "paid") {
+      return { issue: "connu", statut: "CONFIRMEE", providerTxId: `stripe:${lu.data.id}` };
+    }
+
+    if (intention?.status) {
+      const traduit = ETAT_DE_LINTENTION[intention.status];
+      if (traduit === undefined) {
+        // Un état qu'on ne connaît pas ne se devine pas.
+        return { issue: "indisponible", detail: "état d'intention inconnu" };
+      }
+      if (traduit === "SANS_PAIEMENT") {
+        const erreur = intention.last_payment_error;
+        const code = erreur?.decline_code ?? erreur?.code;
+        if (!erreur) return { issue: "sans_paiement" };
+        /*
+          Là, et seulement là, un refus a été prononcé : l'intention
+          porte l'erreur du dernier essai. La cause vient de sa table, et
+          reste absente si le code n'y figure pas — mieux vaut un refus
+          sans raison qu'une raison inventée (N.B).
+        */
+        return {
+          issue: "connu",
+          statut: "ECHOUEE",
+          providerTxId: `stripe:${lu.data.id}`,
+          ...(code && CAUSES_STRIPE[code] ? { cause: CAUSES_STRIPE[code] } : {}),
+        };
+      }
+      return { issue: "connu", statut: traduit, providerTxId: `stripe:${lu.data.id}` };
+    }
+
+    // Session expirée sans paiement : le fournisseur la connaît, rien
+    // n'a été réglé, personne n'a refusé. L'expiration reste celle de la
+    // plateforme, pas la sienne.
+    if (lu.data.status === "expired") return { issue: "sans_paiement" };
+    return { issue: "sans_paiement" };
   },
 });
