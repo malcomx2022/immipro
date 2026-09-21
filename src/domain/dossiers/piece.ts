@@ -61,6 +61,35 @@ export const LIBELLE_FAMILLE: Record<FamillePiece, string> = {
 export const estConforme = (piece: Piece): boolean => piece.etat === "CONFORME";
 
 /**
+ * Déposée, conservée, jamais analysée — RG-06.5.
+ *
+ * L'état se dérive sans champ nouveau, et la dérivation est exacte :
+ * `remede` ne passe à `REMPLACER` qu'après un dépôt, et l'état ne revient à
+ * `ATTENDUE` qu'après un balayage sain **sans** analyse — c'est le cas du
+ * quota épuisé. Un dépôt analysé finit `CONFORME`, `A_CORRIGER`,
+ * `ILLISIBLE` ou `HORS_SUJET` ; une pièce jamais déposée garde
+ * `TELEVERSER`.
+ *
+ * Sans cette distinction, la pastille affiche « Attendue » sur une pièce
+ * dont le fichier est sur le serveur, à côté d'une action « Remplacer » :
+ * le candidat lit qu'on attend toujours sa pièce et la renvoie. Le lot qui
+ * a branché « Téléverser sans analyse » a rendu cet état atteignable
+ * exprès — il fallait qu'il se lise.
+ */
+export const estDeposeeNonVerifiee = (piece: Piece): boolean =>
+  piece.etat === "ATTENDUE" && piece.remede === "REMPLACER";
+
+/**
+ * La pastille dit ce qui est vrai des deux : le fichier est là, la
+ * vérification n'a pas eu lieu. « Conservée » d'abord, parce que c'est ce
+ * qu'on veut savoir quand on vient de dépenser ses données mobiles.
+ */
+export const LIBELLE_CONSERVEE_NON_VERIFIEE = "Conservée, non vérifiée";
+
+export const MENTION_CONSERVEE_NON_VERIFIEE =
+  "Ton fichier est bien arrivé. Il n'a pas été analysé : tes analyses du pack sont utilisées. Tu peux le relire toi-même, ou recharger des analyses.";
+
+/**
  * Pièce qu'on photographie ou qu'on scanne, par opposition à une pièce qu'on
  * rédige. Les conseils de prise de vue n'ont de sens que pour la première :
  * les afficher sous une lettre de motivation fait douter de tout le reste.

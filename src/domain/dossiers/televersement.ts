@@ -72,6 +72,30 @@ export function mentionPied(etat: EtatTeleversement): string {
 }
 
 /**
+ * Ce que l'écran dit du sort de la pièce pendant l'envoi.
+ *
+ * Il l'affirmait sans condition : « L'analyse démarre automatiquement à la
+ * fin. » Or le serveur répond `analyseraLaPiece` à chacun des deux appels
+ * du dépôt, précisément pour que l'écran sache si elle suivra — et
+ * **personne ne lisait ce champ**. Avec un quota épuisé, le balayage promeut
+ * le fichier et l'analyse ne part jamais : la phrase était fausse au moment
+ * où la personne dépense ses données mobiles.
+ *
+ * RG-06.5 tient les deux formulations : le quota n'interdit pas le dépôt,
+ * il n'interdit que l'analyse. La pièce est conservée dans les deux cas, et
+ * c'est ce qu'il faut dire d'abord.
+ *
+ * Rien pour l'après : la confirmation recharge la page, et c'est l'état
+ * réel de la pièce que le serveur rend alors. Une phrase de plus, gardée
+ * dans l'état du navigateur, dirait ce que la page vient de dire — ou le
+ * contredirait.
+ */
+export const mentionPendantEnvoi = (analysera: boolean): string =>
+  analysera
+    ? "Tu peux continuer à remplir ton dossier pendant l'envoi. L'analyse démarre automatiquement à la fin."
+    : "Tu peux continuer à remplir ton dossier pendant l'envoi. Ta pièce sera conservée sans être analysée : tes analyses du pack sont utilisées.";
+
+/**
  * Pendant l'envoi, le bouton passe en chargement — pas en désactivé. Le
  * libellé reste écrit et `aria-busy` porte l'état : un bouton gris sans
  * explication est un défaut (règle de désactivation 3).

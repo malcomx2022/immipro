@@ -10,6 +10,8 @@ import {
   libelleBlocage,
   lienDePiece,
   type Piece,
+  estDeposeeNonVerifiee,
+  LIBELLE_CONSERVEE_NON_VERIFIEE,
 } from "@/domain/dossiers/piece";
 import { EnteteDossier } from "../EnteteDossier";
 
@@ -142,6 +144,9 @@ function Groupe({
                 code={piece.code}
                 libelle={piece.libelle}
                 etat={piece.etat}
+              libelleEtat={
+                estDeposeeNonVerifiee(piece) ? LIBELLE_CONSERVEE_NON_VERIFIEE : undefined
+              }
                 message={piece.message}
                 mention={libelleAlertePeremption(piece, depotVise) ?? undefined}
                 action={libelleAction(piece)}

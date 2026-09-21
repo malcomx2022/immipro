@@ -20,6 +20,8 @@ interface ChecklistRowBase {
   code: string;
   libelle: string;
   etat: DocumentState;
+  /** Remplace le libellé de l'état quand celui-ci ne dit pas tout. */
+  libelleEtat?: string;
   /** Constat puis action. Absent quand la pièce est conforme. */
   message?: string;
   /** Précision de validité, à côté de la pastille d'état. */
@@ -39,6 +41,7 @@ export function ChecklistRow({
   code,
   libelle,
   etat,
+  libelleEtat,
   message,
   mention,
   action,
@@ -57,7 +60,7 @@ export function ChecklistRow({
       <span className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
         <span className="text-16 font-medium text-ink-900">{libelle}</span>
         <span className="flex flex-wrap items-center gap-2">
-          <StatusBadge etat={etat} />
+          <StatusBadge etat={etat} libelle={libelleEtat} />
           {mention ? <span className="text-13 text-ink-500">{mention}</span> : null}
         </span>
         {message ? (

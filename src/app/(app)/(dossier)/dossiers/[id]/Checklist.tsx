@@ -14,6 +14,8 @@ import {
   premiereATraiter,
   type FamillePiece,
   type Piece,
+  estDeposeeNonVerifiee,
+  LIBELLE_CONSERVEE_NON_VERIFIEE,
 } from "@/domain/dossiers/piece";
 import { jourEnFrancais } from "@/domain/format/moment";
 import type { AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
@@ -203,6 +205,9 @@ function SectionPieces({
               code={piece.code}
               libelle={piece.libelle}
               etat={piece.etat}
+              libelleEtat={
+                estDeposeeNonVerifiee(piece) ? LIBELLE_CONSERVEE_NON_VERIFIEE : undefined
+              }
               message={piece.message}
               mention={libelleAlertePeremption(piece, depotVise) ?? undefined}
               action={libelleAction(piece)}

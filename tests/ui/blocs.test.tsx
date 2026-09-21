@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { Card } from "@/components/ui/Card";
 import { ChecklistRow } from "@/components/ui/ChecklistRow";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { LIBELLE_CONSERVEE_NON_VERIFIEE } from "@/domain/dossiers/piece";
 import { SourceNote } from "@/components/ui/SourceNote";
 import { CompletenessTier, libelleDenombrement } from "@/components/ui/CompletenessTier";
 import type { CompletenessPublic } from "@/domain/completeness/score";
@@ -20,6 +21,28 @@ describe("StatusBadge", () => {
   it("écrit toujours le mot à côté de la couleur", () => {
     render(<StatusBadge etat="A_CORRIGER" />);
     expect(screen.getByText("À corriger")).toBeDefined();
+  });
+
+  /**
+   * Le libellé passé remplace celui de l'état, et la couleur reste celle de
+   * l'état — c'est lui qui décide de la place de la pièce dans la
+   * checklist. Un seul cas l'emploie : une pièce déposée que le quota a
+   * empêché d'analyser revient à `ATTENDUE`, et « Attendue » sur une pièce
+   * dont le fichier est arrivé fait la renvoyer.
+   */
+  it("porte le libellé passé plutôt que celui de l'état", () => {
+    const { container } = render(
+      <StatusBadge etat="ATTENDUE" libelle={LIBELLE_CONSERVEE_NON_VERIFIEE} />,
+    );
+    expect(screen.getByText("Conservée, non vérifiée")).toBeDefined();
+    expect(container.textContent).not.toContain("Attendue");
+    // La couleur suit l'état, pas le libellé.
+    expect(container.querySelector(".bg-ink-500")).not.toBeNull();
+  });
+
+  it("garde le libellé de l'état quand rien n'est passé", () => {
+    render(<StatusBadge etat="ATTENDUE" />);
+    expect(screen.getByText("Attendue")).toBeDefined();
   });
 });
 

@@ -32,6 +32,7 @@ import {
   libelleCta,
   libelleFichier,
   libelleQuota,
+  mentionPendantEnvoi,
   mentionPied,
   messageQuotaEpuise,
   quotaEpuise,
@@ -81,6 +82,17 @@ export function PieceDuDossier({
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [envoyes, setEnvoyes] = useState(0);
   const [refus, setRefus] = useState<string | null>(null);
+  /**
+   * Ce que le serveur a répondu sur le sort de la pièce (RG-06.5).
+   *
+   * Les deux appels du dépôt le portent, et personne ne le lisait : l'écran
+   * annonçait « L'analyse démarre automatiquement à la fin » quel que soit
+   * le quota. Il part d'une estimation locale — le compteur affiché —, puis
+   * suit la réponse du serveur, qui relit le solde : entre le moment où la
+   * page a été rendue et celui où le fichier monte, une autre pièce a pu
+   * consommer la dernière analyse.
+   */
+  const [analysera, setAnalysera] = useState(!quotaEpuise(quota));
   const champ = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -144,15 +156,16 @@ export function PieceDuDossier({
       empreinte,
     };
 
-    const prepare = await appeler<{ depot: { url: string; cle: string } }>(
-      `/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`,
-      { corps: demande },
-    );
+    const prepare = await appeler<{
+      depot: { url: string; cle: string };
+      analyseraLaPiece: boolean;
+    }>(`/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`, { corps: demande });
     if (!prepare.ok) {
       setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
       setEchec(prepare.echec);
       return;
     }
+    setAnalysera(prepare.donnees.analyseraLaPiece);
 
     const monte = await televerser(prepare.donnees.depot.url, brut, setEnvoyes);
     if (!monte) {
@@ -160,7 +173,7 @@ export function PieceDuDossier({
       return;
     }
 
-    const confirme = await appeler(
+    const confirme = await appeler<{ analyseraLaPiece: boolean }>(
       `/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`,
       { methode: "PUT", corps: { ...demande, cle: prepare.donnees.depot.cle } },
     );
@@ -169,6 +182,9 @@ export function PieceDuDossier({
       setEchec(confirme.echec);
       return;
     }
+    // Le serveur relit le solde à la confirmation : c'est sa réponse qui
+    // décide, pas celle de la préparation.
+    setAnalysera(confirme.donnees.analyseraLaPiece);
     router.refresh();
   }
 
@@ -236,7 +252,21 @@ export function PieceDuDossier({
             >
               Recharger {volumeRecharge} analyses
             </LienBouton>
-            <Button variante="secondaire" pleineLargeur className="md:w-auto">
+            {/*
+              Le dépôt sans analyse n'avait pas de route à écrire : RG-06.5
+              l'avait déjà tranché, et toute la chaîne l'appliquait. Le
+              dépôt vérifie le solde, le balayage promeut le fichier et
+              remet la pièce en attente sans mettre l'analyse en file. Seul
+              ce bouton n'était relié à rien — c'est le même geste que
+              « Ajouter la pièce », à ceci près qu'on sait d'avance que
+              l'analyse ne suivra pas.
+            */}
+            <Button
+              variante="secondaire"
+              pleineLargeur
+              className="md:w-auto"
+              onClick={() => void envoyer()}
+            >
               Téléverser sans analyse
             </Button>
           </div>
@@ -266,8 +296,7 @@ export function PieceDuDossier({
               : "Envoi démarré. Ne ferme pas cette page."}
           </p>
           <p className="text-pretty text-13 text-ink-500">
-            Tu peux continuer à remplir ton dossier pendant l&apos;envoi. L&apos;analyse démarre
-            automatiquement à la fin.
+            {mentionPendantEnvoi(analysera)}
           </p>
         </section>
       ) : null}
