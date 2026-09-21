@@ -1,50 +1,56 @@
 /**
- * L'envoi d'une demande de remboursement au fournisseur — arbitrage du
- * 21/09/2026.
+ * Le point de branchement du remboursement sortant.
  *
- * **Il n'est pas branché, et rien ne le simule.** C'est la règle d'I.C :
- * aucun service absent n'est simulé. Un `NON_BRANCHE` qui rendrait
- * « accepté » ferait apparaître des demandes parties que personne n'a
- * envoyées, et la file des obligations se viderait toute seule — c'est le
- * pire des états, parce qu'il a l'air sain.
+ * ── Ce qui a changé, et ce qui n'a surtout pas changé ───────────────
  *
- * Ce qui est écrit ici est ce qui peut l'être sans les clés : le point de
- * branchement, un seul, et la clé d'idempotence qui rend une nouvelle
- * tentative sûre. Le jour où FedaPay et Stripe sont branchés, c'est cette
- * fonction qu'on remplace, et rien d'autre.
+ * Il n'y avait rien : `NON_BRANCHE` rendait `null`, et c'était la
+ * réponse honnête tant qu'aucun adaptateur n'était écrit. Stripe l'est
+ * désormais ; FedaPay ne l'est pas, faute de documentation vérifiée, et
+ * le dit lui-même plutôt que de deviner un format (voir `fedapay.ts`).
+ *
+ * **La règle d'INV-7 est intacte.** Ce module envoie une demande et rend
+ * ce que le fournisseur a répondu. Il n'écrit rien, ne solde aucune
+ * dette, et n'a aucun moyen de le faire : `refundedAt` et `REMBOURSEE`
+ * ne s'écrivent que dans `appliquerLaNotification`, sur notification
+ * signée. Un appel API qui rend 200 ressemble à un remboursement fait —
+ * c'est précisément pourquoi il ne suffit pas.
+ *
+ * ── Le fournisseur ne se devine pas ──────────────────────────────────
+ *
+ * Il se lit sur la colonne `provider` de la transaction, posée à la
+ * création d'après la devise (N.A). Une transaction ouverte chez l'un ne
+ * se rembourse pas chez l'autre — et l'appelant vérifie en plus que
+ * `providerTxId` porte bien le préfixe de ce fournisseur-là
+ * (`defautDIdentifiant`), avant qu'aucun appel ne parte.
  */
 
-import { CLES_SORTANTES, environnementNormalise } from "./secrets";
+import { CLES, CLES_SORTANTES, environnementNormalise } from "./secrets";
+import { remboursementStripe } from "./stripe";
+import { remboursementFedaPay } from "./fedapay";
+import type { Rembourseur } from "./rembourseur";
 
-export interface DemandeDeRemboursement {
-  reference: string;
-  /** L'identifiant de la transaction chez le fournisseur, s'il est connu. */
-  providerTxId: string | null;
-  montant: number;
-  devise: string;
-  /** Dérivée de la référence : deux tentatives portent la même (voir domaine). */
-  cle: string;
+export type { DemandeDeRemboursement, Remboursement, Rembourseur } from "./rembourseur";
+
+/**
+ * Le rembourseur d'un fournisseur, ou `null` quand sa clé manque.
+ *
+ * `null` et « adaptateur non opérationnel » sont deux choses, et
+ * l'appelant les distingue : la première ne produit aucun appel, la
+ * seconde en produit un qui rend `non_configure` avec sa raison. Les
+ * deux laissent la dette due — c'est le reste qui diffère, à savoir ce
+ * que l'opérateur doit faire.
+ */
+export function leRembourseur(
+  fournisseur: "FEDAPAY" | "STRIPE",
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): Rembourseur | null {
+  const lu = environnementNormalise(environnement);
+  if (fournisseur === "FEDAPAY") {
+    return (lu[CLES.FEDAPAY.apiKey] ?? "").trim() ? remboursementFedaPay() : null;
+  }
+  const cle = (lu[CLES.STRIPE.apiKey] ?? "").trim();
+  return cle ? remboursementStripe(cle) : null;
 }
-
-/**
- * Rend l'accusé de réception du fournisseur, ou `null` s'il n'a pas pu
- * être obtenu — service absent, appel en échec, réponse inattendue.
- *
- * `null` n'est pas un refus de rembourser : c'est « la demande n'est pas
- * partie ». La dette reste, la tentative est comptée, et l'appel suivant
- * portera la même clé.
- */
-export type Rembourseur = (demande: DemandeDeRemboursement) => Promise<{ accepteLe: Date } | null>;
-
-export const NON_BRANCHE: Rembourseur = async () => null;
-
-/**
- * Le rembourseur que l'appelant exécutera. Même raison qu'ailleurs :
- * l'état de service compare ce qu'il rend à `NON_BRANCHE` plutôt que de
- * croire une clé d'API sur parole. Une clé renseignée devant cette
- * fonction-ci ne rembourse toujours personne.
- */
-export const leRembourseur = (): Rembourseur => NON_BRANCHE;
 
 /**
  * Les clés sans lesquelles aucune demande ne part — nomenclature unique,
@@ -64,3 +70,25 @@ export const remboursementConfigure = (
   const lu = environnementNormalise(environnement);
   return VARIABLES.every((v) => (lu[v] ?? "").trim() !== "");
 };
+
+/**
+ * La capacité est-elle réellement branchée ?
+ *
+ * **Non, et pour une raison que le code porte.** La question est posée
+ * aux adaptateurs — `operationnel` —, et FedaPay répond non : son format
+ * de remboursement n'a pas pu être vérifié, il ne devine pas. Aucun
+ * appel réseau n'est fait pour le savoir : ce serait interroger un
+ * fournisseur à chaque lecture de l'état de service.
+ *
+ * Il faut **les deux** rails, comme la rédaction demande ses deux
+ * fonctions : un candidat qui a payé en francs CFA ne se rembourse pas
+ * parce que l'euro, lui, est branché. Tant que FedaPay ne l'est pas, la
+ * capacité se lit non branchée — ce qui est la vérité, et ce que la
+ * décision d'exploitation doit voir.
+ *
+ * Un test éprouve `operationnel` contre le comportement des deux
+ * adaptateurs, pour que cette lecture reste une mesure et ne devienne
+ * pas une déclaration qu'on oublie de démentir.
+ */
+export const remboursementBranche = (): boolean =>
+  remboursementStripe("sonde").operationnel && remboursementFedaPay().operationnel;

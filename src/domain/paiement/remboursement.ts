@@ -69,6 +69,140 @@ export const RESTE_A_FAIRE: Record<EtapeRemboursement, string> = {
  */
 export const cleDIdempotence = (reference: string): string => `remboursement:${reference}`;
 
+// ── Ce que le fournisseur répond, et ce qu'on en fait ────────────────────
+
+/**
+ * Les cinq issues d'une demande de remboursement.
+ *
+ * Elles se distinguent parce qu'elles n'appellent pas la même suite, et
+ * les confondre coûte cher dans les deux sens : traiter un refus
+ * définitif comme une erreur passagère fait relancer indéfiniment une
+ * demande que le fournisseur n'exécutera jamais ; traiter une panne
+ * réseau comme un refus classe une dette que personne n'a payée.
+ *
+ * - **`acceptee`** — le fournisseur a pris la demande. Un accusé de
+ *   réception, pas un virement (INV-7) ;
+ * - **`refusee_definitivement`** — il refuse, et réessayer ne changera
+ *   rien : somme déjà rendue de son côté, transaction trop ancienne,
+ *   compte fermé. Il faut un humain ;
+ * - **`temporaire`** — réseau, délai, panne. On ne sait pas si la demande
+ *   est passée : la clé d'idempotence est faite pour ça ;
+ * - **`reponse_illisible`** — il a répondu quelque chose qui n'est pas
+ *   au schéma. On ne devine pas : ni accepté, ni refusé ;
+ * - **`non_configure`** — aucune clé, ou adaptateur non opérationnel.
+ *   Rien n'est parti, et c'est dit.
+ */
+export type IssueDeDemande =
+  | "acceptee"
+  | "refusee_definitivement"
+  | "temporaire"
+  | "reponse_illisible"
+  | "non_configure";
+
+export interface SuiteDeLaTentative {
+  /**
+   * La demande est-elle acceptée ? Seul ce cas pose `refundRequestedAt`.
+   * Tous les autres laissent la dette exactement où elle était.
+   */
+  acceptee: boolean;
+  /**
+   * Faut-il un humain ? Un refus définitif et une réponse illisible, oui :
+   * dans les deux cas la relance automatique tournerait à vide. Une panne
+   * et une absence de clé, non — la première se reprend, la seconde se
+   * configure.
+   */
+  exigeUnHumain: boolean;
+  /** Ce que l'opérateur lit dans la file. */
+  message: string;
+}
+
+/**
+ * La suite d'une tentative, par issue — `switch` exhaustif à dessein.
+ *
+ * Une sixième issue ne compilera pas tant qu'on n'aura pas répondu aux
+ * deux questions qui décident du sort d'une dette : est-elle demandée, et
+ * faut-il quelqu'un ?
+ *
+ * **Aucune issue ne solde la dette.** Elle ne s'éteint que sur
+ * `refundedAt`, écrit par la notification signée — pas ici.
+ */
+export function suiteDeLaTentative(issue: IssueDeDemande): SuiteDeLaTentative {
+  switch (issue) {
+    case "acceptee":
+      return {
+        acceptee: true,
+        exigeUnHumain: false,
+        message:
+          "Le fournisseur a accepté la demande. Tant que sa notification signée n'est pas arrivée, la somme n'est pas rendue.",
+      };
+    case "refusee_definitivement":
+      return {
+        acceptee: false,
+        exigeUnHumain: true,
+        message:
+          "Le fournisseur refuse la demande, et une relance ne changera rien. À reprendre à la main : vérifier si la somme a déjà été rendue de son côté.",
+      };
+    case "temporaire":
+      return {
+        acceptee: false,
+        exigeUnHumain: false,
+        message:
+          "Le fournisseur n'a pas répondu. On ne sait pas si la demande est passée : la reprise portera la même clé, et il y reconnaîtra un rejeu.",
+      };
+    case "reponse_illisible":
+      return {
+        acceptee: false,
+        exigeUnHumain: true,
+        message:
+          "Le fournisseur a répondu quelque chose d'inattendu. Rien n'est conclu — ni accepté, ni refusé — et la demande est à vérifier chez lui.",
+      };
+    case "non_configure":
+      return {
+        acceptee: false,
+        exigeUnHumain: false,
+        message:
+          "Aucune demande n'est partie : le rail de remboursement n'est pas configuré pour ce fournisseur. La dette reste due.",
+      };
+    default: {
+      const jamais: never = issue;
+      throw new Error(`Issue de remboursement non arbitrée : ${JSON.stringify(jamais)}`);
+    }
+  }
+}
+
+/**
+ * L'identifiant du fournisseur est-il présent, et est-il le sien ?
+ *
+ * Les deux rails écrivent la même colonne, préfixée : `stripe:cs_…`,
+ * `fedapay:1234`. Une demande de remboursement envoyée avec
+ * l'identifiant de l'autre rail — ou sans identifiant du tout — ne
+ * rembourse rien et peut, au pire, viser une transaction étrangère.
+ *
+ * On vérifie donc **avant** d'appeler, plutôt que de laisser le
+ * fournisseur répondre « inconnu » et compter cela comme une tentative.
+ */
+export const PREFIXE_FOURNISSEUR: Record<"FEDAPAY" | "STRIPE", string> = {
+  FEDAPAY: "fedapay:",
+  STRIPE: "stripe:",
+};
+
+export type DefautDIdentifiant = "absent" | "autre_fournisseur";
+
+export function defautDIdentifiant(
+  providerTxId: string | null,
+  fournisseur: "FEDAPAY" | "STRIPE",
+): DefautDIdentifiant | null {
+  if (!providerTxId || providerTxId.trim() === "") return "absent";
+  return providerTxId.startsWith(PREFIXE_FOURNISSEUR[fournisseur]) ? null : "autre_fournisseur";
+}
+
+export const MOTIF_IDENTIFIANT: Record<DefautDIdentifiant, string> = {
+  absent:
+    "Aucun identifiant de transaction chez le fournisseur : aucune session n'a jamais été ouverte, il n'y a rien à rembourser chez lui. À reprendre à la main.",
+  autre_fournisseur:
+    "L'identifiant enregistré n'est pas celui du fournisseur de cette transaction. Aucune demande n'est partie : elle viserait un paiement étranger.",
+};
+
 // ── Le quota d'un pack remboursé ─────────────────────────────────────────
 
 export type SuiteDuQuota =

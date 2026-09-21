@@ -3,11 +3,16 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
 import {
+  MOTIF_IDENTIFIANT,
   MOTIF_REVUE_PARTIELLE,
   cleDIdempotence,
+  defautDIdentifiant,
+  suiteDeLaTentative,
   suiteDuQuota,
+  type IssueDeDemande,
 } from "@/domain/paiement/remboursement";
-import { leRembourseur, type Rembourseur } from "@/server/paiement/remboursement";
+import { leRembourseur } from "@/server/paiement/remboursement";
+import type { Rembourseur } from "@/server/paiement/rembourseur";
 import {
   getPack,
   MONTANT_MINIMUM_XOF,
@@ -407,34 +412,63 @@ export async function appliquerLaNotification(
 }
 
 /**
- * Initier un remboursement : la demande part, l'argent non — arbitrage
- * du 21/09/2026.
+ * Initier un remboursement : la demande part, l'argent non — arbitrages
+ * du 21/09/2026 et du 22/09/2026.
  *
  * Le deuxième des trois faits. La décision est déjà prise (K.C, ou un
  * geste d'administrateur) ; ici on retire les droits non consommés, on
- * tente l'envoi, et on compte la tentative. Ce que la fonction **n'**écrit
- * **pas** : `status`, `refundedAt`. Seule la notification signée du
- * fournisseur les écrit (INV-7, M.B).
+ * envoie la demande au fournisseur, et on compte la tentative. Ce que la
+ * fonction **n'**écrit **pas** : `status`, `refundedAt`. Seule la
+ * notification signée du fournisseur les écrit (INV-7, M.B).
  *
- * **Les droits partent à l'initiation, pas à la confirmation.** Entre les
- * deux il peut s'écouler des jours, et laisser un pack utilisable pendant
- * qu'on en rend le prix revient à l'offrir.
+ * **Une demande acceptée n'est pas un versement.** C'est la tentation du
+ * module maintenant que le rail existe : une réponse 200 ressemble à de
+ * l'argent rendu. `refundRequestedAt` dit « il a pris la demande », et
+ * rien de plus ; la dette reste due, visible en B-04, jusqu'à la
+ * notification.
  *
- * **Un échec d'envoi conserve la dette.** `refundRequestedAt` reste nul,
- * la tentative est datée et comptée, et l'appel suivant portera la même
- * clé d'idempotence — le fournisseur y reconnaîtra un rejeu plutôt que
- * d'envoyer l'argent deux fois.
+ * ── La réservation de la tentative, avant tout appel ─────────────────
+ *
+ * Deux reprises concurrentes — un opérateur qui clique deux fois, une
+ * suppression de compte pendant qu'un job relance — appelaient toutes
+ * les deux le fournisseur. La clé d'idempotence l'en protège **chez
+ * lui** ; elle ne protège ni le grand livre, ni le compteur de
+ * tentatives, et elle suppose que le fournisseur l'honore.
+ *
+ * La tentative est donc **réservée** d'abord, par une mise à jour
+ * conditionnée à ce qu'on vient de lire : deux appelants simultanés
+ * lisent le même `refundAttemptedAt`, un seul voit sa condition tenir,
+ * l'autre repart sans rien envoyer. C'est l'arbitrage de la base, la
+ * même mécanique que pour la tenue d'un créneau et la transition d'une
+ * transaction.
+ *
+ * La condition porte aussi sur `refundRequestedAt` et `refundedAt` :
+ * une demande déjà acceptée ne se renvoie pas, et une somme déjà rendue
+ * encore moins.
+ *
+ * ── Ce qui n'envoie rien du tout ─────────────────────────────────────
+ *
+ * Un pack partiellement consommé (revue manuelle), un `providerTxId`
+ * absent ou portant le préfixe de l'autre rail. Dans les trois cas
+ * l'écart s'ouvre et aucune tentative n'est comptée : compter une
+ * tentative qui n'a pas eu lieu ferait croire à une relance en cours.
  */
+export type IssueDInitiation =
+  | IssueDeDemande
+  /** Une autre reprise tient la tentative, ou la demande est déjà acceptée. */
+  | "deja_en_cours"
+  /** Pack entamé : ce que vaut une analyse rendue n'est pas arithmétique. */
+  | "revue_manuelle"
+  /** Identifiant fournisseur absent ou étranger : rien n'est envoyé. */
+  | "identifiant_inutilisable"
+  /** Pas d'obligation, ou somme déjà rendue. */
+  | "sans_objet";
+
 export async function initierLeRemboursement(
   reference: string,
-  envoyer: Rembourseur = leRembourseur(),
+  rembourseur?: Rembourseur | null,
   maintenant = new Date(),
-): Promise<
-  | { issue: "envoyee" }
-  | { issue: "en_attente_d_envoi" }
-  | { issue: "revue_manuelle"; consommees: number }
-  | { issue: "sans_objet" }
-> {
+): Promise<{ issue: IssueDInitiation; detail?: string; consommees?: number }> {
   const transaction = await db.transaction.findUnique({ where: { reference } });
   if (!transaction) throw echec("introuvable");
   // Rien à envoyer : pas d'obligation, ou somme déjà rendue.
@@ -446,66 +480,147 @@ export async function initierLeRemboursement(
       // On ne tranche pas ce que vaut une analyse déjà rendue : c'est une
       // question commerciale. L'écart porte la question à un humain, et
       // aucune demande ne part.
-      await db.transaction.update({
-        where: { id: transaction.id },
-        data: {
-          discrepancy:
-            transaction.discrepancy ??
-            `${MOTIF_REVUE_PARTIELLE} ${suite.consommees} analyse(s) consommée(s) sur ${suite.ouvertes}.`,
-        },
-      });
+      await noterLEcart(
+        transaction.id,
+        `${MOTIF_REVUE_PARTIELLE} ${suite.consommees} analyse(s) consommée(s) sur ${suite.ouvertes}.`,
+      );
       return { issue: "revue_manuelle", consommees: suite.consommees };
     }
-    /**
-     * Le retrait n'a lieu qu'une fois, et la garde n'est pas du luxe.
-     *
-     * Vu en exécutant : deux tentatives d'envoi retiraient deux fois les
-     * mêmes droits, et le solde du dossier passait de trente à moins
-     * trente. La clé d'idempotence protège l'appel au fournisseur — elle
-     * ne protégeait pas le grand livre, qui est pourtant là où une
-     * seconde écriture fait le plus de dégâts. Or un échec d'envoi est le
-     * cas ordinaire tant que le rail n'est pas branché : la deuxième
-     * tentative n'est pas une hypothèse, c'est la suite normale.
-     */
+  }
+
+  /*
+    L'identifiant est vérifié avant tout appel. Absent, il n'y a rien à
+    rembourser chez le fournisseur — aucune session n'a jamais été
+    ouverte. Portant l'autre préfixe, la demande viserait un paiement
+    étranger. Les deux appellent un humain, pas une relance.
+  */
+  const defaut = defautDIdentifiant(transaction.providerTxId, transaction.provider);
+  if (defaut) {
+    await noterLEcart(transaction.id, MOTIF_IDENTIFIANT[defaut]);
+    return { issue: "identifiant_inutilisable", detail: defaut };
+  }
+
+  /*
+    La réservation. `refundAttemptedAt` sert de jeton : la condition
+    porte sur la valeur qu'on vient de lire, si bien qu'un second
+    appelant concurrent ne peut pas l'obtenir. Le compteur s'incrémente
+    dans la même écriture — une tentative réservée est une tentative
+    comptée, même si l'appel qui suit échoue. C'est sa fonction.
+  */
+  const { count } = await db.transaction.updateMany({
+    where: {
+      id: transaction.id,
+      refundedAt: null,
+      refundRequestedAt: null,
+      refundAttemptedAt: transaction.refundAttemptedAt,
+    },
+    data: { refundAttemptedAt: maintenant, refundAttempts: { increment: 1 } },
+  });
+  if (count !== 1) return { issue: "deja_en_cours" };
+
+  /*
+    Les droits partent une fois la tentative réservée, et une seule fois.
+
+    Vu en exécutant au lot précédent : deux tentatives retiraient deux
+    fois les mêmes droits, et le solde du dossier passait de trente à
+    moins trente. La réservation ferme la course ; la garde ci-dessous
+    ferme la répétition séquentielle, et l'index unique partiel de la
+    migration ferme le reste — celui qui viendrait d'un appelant qu'on
+    n'a pas écrit.
+  */
+  if (transaction.applicationId) {
+    const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction.id);
+    /*
+      La lecture préalable n'est pas la garantie — l'index unique partiel
+      l'est —, elle évite seulement de provoquer une violation à chaque
+      reprise ordinaire, qui est le cas fréquent. Une erreur de base
+      journalisée à chaque relance normale finirait par ne plus être lue.
+    */
     const dejaRetire = await db.analysisCredit.findFirst({
       where: { transactionId: transaction.id, reason: "REMBOURSEMENT" },
       select: { id: true },
     });
-    if (suite.retire > 0 && !dejaRetire) {
-      await db.analysisCredit.create({
-        data: {
-          applicationId: transaction.applicationId,
-          delta: -suite.retire,
-          reason: "REMBOURSEMENT",
-          transactionId: transaction.id,
-          note: `Droits retirés à l'initiation du remboursement de ${reference}.`,
-        },
-      });
+    if (suite.suite === "RETRAIT_INTEGRAL" && suite.retire > 0 && !dejaRetire) {
+      await db.analysisCredit
+        .create({
+          data: {
+            applicationId: transaction.applicationId,
+            delta: -suite.retire,
+            reason: "REMBOURSEMENT",
+            transactionId: transaction.id,
+            note: `Droits retirés à l'initiation du remboursement de ${reference}.`,
+          },
+        })
+        // L'unicité a parlé : quelqu'un a retiré ces droits entre notre
+        // lecture et notre écriture. C'est la course qu'elle existe pour
+        // arbitrer, et le solde du candidat en sort juste.
+        .catch((erreur) => {
+          if (!estUnDoublon(erreur)) throw erreur;
+        });
     }
   }
 
-  const accuse = await envoyer({
+  const adaptateur =
+    rembourseur === undefined ? leRembourseur(transaction.provider) : rembourseur;
+  if (!adaptateur) {
+    // Aucune clé pour ce rail : rien ne part, la tentative est comptée,
+    // la dette reste. L'écart n'est pas ouvert — il n'y a rien à
+    // trancher, il y a une variable à renseigner.
+    return { issue: "non_configure", detail: "aucune clé pour ce fournisseur" };
+  }
+
+  const reponse = await adaptateur.demander({
     reference: transaction.reference,
-    providerTxId: transaction.providerTxId,
+    providerTxId: transaction.providerTxId!,
     montant: transaction.amount,
     devise: transaction.currency,
     cle: cleDIdempotence(transaction.reference),
   });
 
-  await db.transaction.update({
-    where: { id: transaction.id },
-    data: {
-      refundAttemptedAt: maintenant,
-      refundAttempts: { increment: 1 },
-      // Posé une seule fois : une demande déjà acceptée le reste, et un
-      // second accusé ne doit pas réécrire la date du premier.
-      ...(accuse && !transaction.refundRequestedAt
-        ? { refundRequestedAt: accuse.accepteLe }
-        : {}),
-    },
-  });
+  const suite = suiteDeLaTentative(reponse.issue);
 
-  return accuse ? { issue: "envoyee" } : { issue: "en_attente_d_envoi" };
+  if (reponse.issue === "acceptee") {
+    /*
+      Posé une seule fois, et conditionné : une demande déjà acceptée le
+      reste, et un second accusé ne réécrit pas la date du premier. Rien
+      d'autre n'est touché — surtout pas `status` ni `refundedAt`.
+    */
+    await db.transaction.updateMany({
+      where: { id: transaction.id, refundRequestedAt: null },
+      data: { refundRequestedAt: reponse.accepteLe },
+    });
+    return { issue: "acceptee", detail: reponse.providerRefundId };
+  }
+
+  // Le domaine et l'adaptateur doivent dire la même chose : seule
+  // `acceptee` est acceptée, et on vient d'en sortir.
+  if (suite.acceptee) throw new Error("issue acceptée hors de la branche d'acceptation");
+
+  /*
+    Ce qui appelle un humain s'écrit en back-office, avec le message du
+    domaine et la forme de la réponse — jamais son corps, jamais un
+    secret. Ce qui se reprend tout seul ne l'ouvre pas : un écart par
+    coupure réseau noierait la file sous des lignes qui se résolvent en
+    relançant.
+  */
+  if (suite.exigeUnHumain) {
+    await noterLEcart(transaction.id, `${suite.message} (${reponse.detail})`);
+  }
+  return { issue: reponse.issue, detail: reponse.detail };
+}
+
+/**
+ * Le premier écart est celui qui reste.
+ *
+ * Une transaction qui en porte déjà un a déjà posé une question à un
+ * humain : l'écraser avec la suivante ferait perdre la première, qui est
+ * en général la plus proche de la cause.
+ */
+async function noterLEcart(transactionId: string, motif: string): Promise<void> {
+  await db.transaction.updateMany({
+    where: { id: transactionId, discrepancy: null },
+    data: { discrepancy: motif },
+  });
 }
 
 /**

@@ -459,6 +459,32 @@ SELECT refuse(
        'TENU', now() + interval '3 days'
        FROM "Application" a, "Consultant" c LIMIT 1$q$);
 
+-- ── Le remboursement sortant — arbitrage du 22/09/2026 ─────────────────
+
+-- Une transaction confirmée dont le remboursement est décidé, et le
+-- retrait de droits qui part à l'initiation. Les deux sont posés pour de
+-- bon : le garde-fou qui suit a besoin d'un premier retrait existant.
+INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+    provider, status, "confirmedAt", "refundDueAt", "refundBasis")
+  VALUES ('t20','IMP-260922-RRRRRR','u1','essentiel',20000,'XOF','FEDAPAY','CONFIRMEE',
+    now() - interval '2 days', now(), 'Geste de support');
+
+INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason, "transactionId")
+  VALUES ('ac1','a0',-10,'REMBOURSEMENT','t20');
+
+-- Les droits non consommés partent une fois, et une seule. Deux reprises
+-- simultanées passaient toutes deux la lecture préalable de l'appelant :
+-- entre la lecture et l'écriture, l'autre était passé.
+SELECT refuse(
+  'K.C · un second retrait de droits sur le même remboursement',
+  $q$INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason, "transactionId")
+     VALUES ('ac2','a0',-10,'REMBOURSEMENT','t20')$q$);
+
+-- Que l'index reste partiel — un octroi de pack coexistant avec le
+-- retrait du même remboursement — s'éprouve dans
+-- `scripts/fumee-remboursement.mts` : ce fichier-ci ne sait dire qu'une
+-- chose, qu'une écriture est refusée.
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

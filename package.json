@@ -23,6 +23,7 @@
     "smoke:tunnel": "tsx scripts/fumee-tunnel.mts",
     "smoke:reconciliation": "tsx scripts/fumee-reconciliation.mts",
     "smoke:consultation": "tsx scripts/fumee-consultation.mts",
+    "smoke:remboursement": "tsx scripts/fumee-remboursement.mts",
     "sandbox:paiement": "tsx scripts/sandbox-paiement.mts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

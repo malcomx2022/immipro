@@ -15,7 +15,8 @@ import {
 } from "@/server/exploitation/capacites";
 import { TRANSPORT_JOURNAL, brancherTransport, envoyerCodeDeVerification } from "@/server/courrier";
 import { NON_BRANCHE as BALAYEUR_NON_BRANCHE, leBalayeur } from "@/server/securite/antivirus";
-import { leRembourseur } from "@/server/paiement/remboursement";
+import { remboursementBranche } from "@/server/paiement/remboursement";
+import { remboursementFedaPay } from "@/server/paiement/fedapay";
 import { lExtracteur } from "@/server/jobs/analyse";
 import { laCritique, leRedacteur } from "@/server/redaction/service";
 
@@ -184,15 +185,23 @@ describe("un `.env` complet devant des points de branchement vides", () => {
    */
   it("et les fonctions que l'appelant obtient ne rendent rien", async () => {
     expect(await leBalayeur()("pieces/essai.pdf")).toBeNull();
+    /*
+      Le remboursement a désormais un adaptateur écrit pour Stripe, et
+      aucun pour FedaPay : la capacité se lit non branchée tant que les
+      deux rails n'y sont pas. Ce que l'appelant obtient sur le rail
+      manquant ne rembourse rien, et le dit — c'est la même mesure, sur
+      un module qui a commencé à se brancher.
+    */
+    expect(remboursementBranche()).toBe(false);
     expect(
-      await leRembourseur()({
+      await remboursementFedaPay().demander({
         reference: "IMP-0001",
-        providerTxId: null,
+        providerTxId: "fedapay:1",
         montant: 1000,
         devise: "XOF",
         cle: "IMP-0001",
       }),
-    ).toBeNull();
+    ).toMatchObject({ issue: "non_configure" });
     expect(await lExtracteur()("pieces/essai.pdf", "PASSEPORT")).toBeNull();
     const matiere = {
       type: "LETTRE_MOTIVATION",

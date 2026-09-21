@@ -9,7 +9,6 @@ import {
   MOTIF_REMBOURSEMENT_SUPPRESSION,
 } from "@/domain/consultants/annulation";
 import { initierLeRemboursement, ouvrirUnRemboursement } from "@/server/acces/paiements";
-import { leRembourseur } from "@/server/paiement/remboursement";
 
 /**
  * Suppression de compte — RG-10.4.
@@ -205,19 +204,24 @@ export async function acheverLaSuppression(
      *
      * C'est le cas déterministe : la limite d'annulation n'était pas
      * dépassée, la somme est due sans qu'aucun humain ait à en décider.
-     * Le rail n'étant pas branché, l'envoi échoue et la dette reste
-     * visible en B-04 — ce qui est exactement l'état honnête, et non un
-     * remboursement qu'on aurait fait croire.
+     * La demande part chez le fournisseur ; elle ne verse rien, et la
+     * dette reste visible en B-04 jusqu'à sa notification signée. Sur
+     * le rail qui n'est pas branché, rien ne part du tout, et c'est dit
+     * dans le journal plutôt que présenté comme un remboursement fait.
      *
      * Comme l'ouverture, l'envoi est hors de la transaction
      * d'anonymisation : un fournisseur injoignable ne doit pas faire
      * échouer une suppression, qui est la promesse faite au candidat.
      */
-    const envoi = await initierLeRemboursement(
-      ouverture.reference,
-      leRembourseur(),
-      maintenant,
-    ).catch(() => null);
+    /*
+      Le rembourseur n'est pas passé : l'initiation le résout elle-même
+      d'après le fournisseur de la transaction. Le nommer ici
+      supposerait un rail, et une consultation payée en euros ne se
+      rembourse pas chez celui des francs CFA.
+    */
+    const envoi = await initierLeRemboursement(ouverture.reference, undefined, maintenant).catch(
+      () => null,
+    );
 
     await journaliser({
       acteurId: "systeme:suppression",

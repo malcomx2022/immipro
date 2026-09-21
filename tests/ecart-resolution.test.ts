@@ -47,10 +47,31 @@ describe("un écart se referme, il ne s'efface pas", () => {
     }
   });
 
-  /** Et aucun code n'efface un écart, nulle part. */
+  /**
+   * Et aucun code n'efface un écart, nulle part.
+   *
+   * La vérification porte sur ce qui est **écrit**, et non sur le
+   * fichier entier : `discrepancy: null` en condition d'une mise à jour
+   * est l'inverse d'un effacement — c'est ce qui fait que le premier
+   * constat reste, parce qu'il empêche le suivant de l'écraser. Le
+   * fichier entier ne sait pas distinguer les deux, et interdire la
+   * lecture pour protéger l'écriture pousserait à écrire la garde
+   * autrement, donc ailleurs.
+   */
   it("rien ne remet le constat à nul", () => {
     for (const f of [ACCES, ROUTE, "src/server/jobs/reconciliation.ts"]) {
-      expect(lire(f), f).not.toMatch(/discrepancy: null/u);
+      const source = lire(f);
+      const ecritures = [...source.matchAll(/\.update\w*\(\{/gu)].map((m) => {
+        const reste = source.slice(m.index!);
+        const debut = reste.indexOf("data: {");
+        return debut === -1 ? "" : reste.slice(debut, reste.indexOf("});", debut));
+      });
+      for (const ecriture of ecritures) {
+        expect(ecriture, f).not.toMatch(/discrepancy: null/u);
+      }
+      // Et la seule manière d'échapper à ce qui précède — un effacement
+      // en SQL brut — n'existe pas non plus.
+      expect(source, f).not.toMatch(/discrepancy"?\s*=\s*NULL/iu);
     }
   });
 });
