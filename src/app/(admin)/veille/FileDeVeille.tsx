@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
@@ -11,8 +15,10 @@ import {
   FILTRES_VEILLE,
   LIBELLE_FILTRE_VEILLE,
   LIBELLE_STATUT_FICHE,
+  MENTION_DEPUBLICATION_A_LECHEANCE,
   MENTION_FILE_VIDE,
-  MENTION_SANS_DEPUBLICATION,
+  MENTION_SOURCE_MUETTE_SANS_EFFET,
+  enRetard,
   collecteComplete,
   filtrerVeille,
   libelleRelecture,
@@ -71,9 +77,33 @@ export interface FileDeVeilleProps {
 }
 
 export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps) {
+  const router = useRouter();
   const [filtre, setFiltre] = useState<FiltreVeille>("EN_RETARD");
   const [recherche, setRecherche] = useState("");
   const [selection, setSelection] = useState<string | null>(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+
+  /**
+   * WF-14 étape 2, branche « inchangé ». Une fiche relue et trouvée
+   * identique restait en retard tant que ce bouton n'écrivait rien, et le
+   * cron de trois heures finissait par la dépublier : le travail était
+   * fait, et le produit se comportait comme s'il ne l'avait pas été.
+   */
+  async function relire(id: string) {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler<{ prochaineLe: string; republiee: boolean }>(
+      "/api/admin/veille",
+      { methode: "PUT", corps: { id } },
+    );
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    router.refresh();
+  }
 
   const visibles = filtrerVeille(fiches, filtre, recherche, aujourdhui);
   const retenue = visibles.find((f) => f.id === selection) ?? visibles[0];
@@ -84,12 +114,6 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
       <EnteteAdmin
         titre="Veille réglementaire"
         resume={resumeVeille(fiches, aujourdhui)}
-        actions={
-          <>
-            <Button variante="secondaire">Journal des collectes</Button>
-            <Button>Nouvelle fiche</Button>
-          </>
-        }
       />
 
       <div className="flex flex-col gap-4 p-6">
@@ -105,12 +129,9 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
               {collecte?.injoignable?.source} n&apos;a pas répondu
             </h2>
             <p className="max-w-[80ch] text-pretty text-14 text-ink-700">{incident}</p>
-            <div className="flex gap-2">
-              <Button variante="secondaire">
-                Relever {collecte?.injoignable?.source}
-              </Button>
-              <Button variante="tertiaire">Déclarer un incident</Button>
-            </div>
+            <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+              {MENTION_SOURCE_MUETTE_SANS_EFFET}
+            </p>
           </section>
         ) : null}
 
@@ -212,9 +233,21 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
                 <LienBouton href={`/regles/${retenue.id}`} pleineLargeur>
                   Ouvrir en édition
                 </LienBouton>
-                <Button variante="secondaire" pleineLargeur>
-                  Marquer comme relue sans changement
+                {echec ? <BlocEchec echec={echec} annonce /> : null}
+                <Button
+                  variante="secondaire"
+                  pleineLargeur
+                  disabled={envoi}
+                  raisonDesactivation="Enregistrement en cours."
+                  onClick={() => relire(retenue.id)}
+                >
+                  {envoi ? "Enregistrement…" : "Marquer comme relue sans changement"}
                 </Button>
+                <p className="text-pretty text-13 text-ink-500">
+                  {enRetard(retenue, aujourdhui)
+                    ? "La fiche repart pour 90 jours et redevient publiée : le retrait ne disait que « personne n'a relu »."
+                    : "La fiche repart pour 90 jours. Aucune version n'est créée."}
+                </p>
               </div>
 
               <p className="text-pretty text-13 text-ink-500">{MENTION_VERSIONNEMENT}</p>
@@ -222,7 +255,9 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
           ) : null}
         </div>
 
-        <p className="text-pretty text-13 text-ink-500">{MENTION_SANS_DEPUBLICATION}</p>
+        <p className="text-pretty text-13 text-ink-500">
+          {MENTION_DEPUBLICATION_A_LECHEANCE}
+        </p>
         {collecte && collecteComplete(collecte) && visibles.length === 0 ? (
           <p className="text-pretty text-13 text-ink-500">{MENTION_FILE_VIDE}</p>
         ) : null}

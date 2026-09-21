@@ -1,12 +1,29 @@
 /**
  * Veille réglementaire — B-01, WF-14.
  *
- * Deux règles tiennent cet écran, et toutes deux sont des refus d'automatisme.
+ * Deux règles tiennent cet écran, et l'une d'elles était écrite à l'envers.
  *
- * **RG-14.3 : rien n'est dépublié automatiquement.** Une source muette ne
- * vaut pas un changement de règle. La ligne garde sa place et la date de sa
- * dernière collecte réussie, les candidats continuent de voir la règle
- * publiée, et c'est un opérateur humain qui décide de la retirer.
+ * **Une source muette ne dépublie rien.** Elle ne vaut pas un changement de
+ * règle : la ligne garde sa place et la date de sa dernière collecte
+ * réussie, les candidats continuent de voir la règle publiée. C'est
+ * l'automatisme que le produit refuse.
+ *
+ * **Mais une relecture en retard dépublie, et toute seule** — RG-14.1 :
+ * « une fiche dont `nextReviewAt` est dépassée repasse automatiquement en
+ * `DRAFT` et disparaît de l'affichage utilisateur. Une donnée non relue ne
+ * peut pas continuer à se présenter comme fiable. » Un cron l'applique
+ * chaque nuit à trois heures.
+ *
+ * Ce module disait le contraire, et l'écran avec lui : « rien n'est
+ * dépublié automatiquement : la décision de retirer une règle appartient à
+ * l'opérateur (RG-14.3) ». Trois erreurs en une phrase — l'affirmation est
+ * fausse, elle cite RG-14.3 qui parle de périodicité et non de
+ * dépublication, et elle rassurait précisément le veilleur que RG-14.1
+ * veut alarmer. Celui qui lisait cette ligne ne s'attendait pas à voir ses
+ * fiches quitter le site public dans la nuit.
+ *
+ * Les deux cas sont distincts et l'écran les sépare désormais : une source
+ * qui ne répond pas, et une fiche que personne n'a relue.
  *
  * **Une file vide est un état normal.** La date du dernier relevé le prouve,
  * et l'écran l'affiche : sans elle, une file vide se lit comme une panne de
@@ -177,5 +194,64 @@ export function messageSourceInjoignable(
 export const MENTION_FILE_VIDE =
   "Une file vide est un état normal, pas une panne de collecte : la date du dernier relevé le prouve.";
 
-export const MENTION_SANS_DEPUBLICATION =
-  "Rien n'est dépublié automatiquement : la décision de retirer une règle appartient à l'opérateur (RG-14.3).";
+/**
+ * Ce que l'écran dit du seul automatisme qui dépublie.
+ *
+ * Il annonçait l'inverse. La phrase est celle que RG-14.1 impose, et elle
+ * nomme l'heure : un veilleur qui voit « en retard de 3 j » doit savoir
+ * que la fiche est déjà sortie de l'affichage candidat, pas le découvrir.
+ */
+export const MENTION_DEPUBLICATION_A_LECHEANCE =
+  "Une fiche dont la relecture est en retard repasse automatiquement en brouillon, chaque nuit à 3 h, et disparaît de l'affichage candidat : une donnée non relue ne peut pas continuer à se présenter comme fiable (RG-14.1).";
+
+/** Et ce qui, lui, ne dépublie rien : une source qui ne répond pas. */
+export const MENTION_SOURCE_MUETTE_SANS_EFFET =
+  "Une source injoignable ne dépublie rien. Les règles affichées restent celles de la dernière collecte réussie : un silence de la source ne vaut pas un changement de règle.";
+
+// ── La relecture sans changement ─────────────────────────────────────────
+
+/**
+ * WF-14 étape 2, branche « inchangé » : le veilleur consulte la source,
+ * compare, et conclut que rien n'a bougé. Pas de nouvelle version —
+ * `verifiedAt` et `nextReviewAt` sont mis à jour, et c'est tout.
+ *
+ * C'est l'issue la plus fréquente de la veille, et le bouton qui la porte
+ * n'était relié à rien. Une fiche relue et trouvée identique restait donc
+ * en retard, jusqu'à ce que le cron de trois heures la dépublie (RG-14.1) :
+ * le travail était fait, et le produit se comportait comme s'il ne l'avait
+ * pas été.
+ */
+
+/** RG-14.3 : périodicité de relecture par défaut, en jours. */
+export const PERIODICITE_RELECTURE_JOURS = 90;
+
+/**
+ * RG-14.3, seconde moitié : « ramenée à 30 jours avant une date connue de
+ * révision ». Les montants IND changent au 1er janvier, et une fiche
+ * relue en novembre ne doit pas dormir jusqu'en février.
+ */
+export const PERIODICITE_AVANT_REVISION_JOURS = 30;
+
+/**
+ * La prochaine échéance, comptée depuis la relecture et non depuis
+ * l'ancienne échéance.
+ *
+ * Repartir de l'ancienne enchaînerait les retards : une fiche relue avec
+ * trois semaines de retard serait déjà à relire dans soixante-neuf jours,
+ * et le retard se reporterait indéfiniment. La relecture a eu lieu ce
+ * jour-là ; c'est de ce jour-là que court la périodicité.
+ */
+export function prochaineRelecture(
+  relueLe: Date,
+  revisionConnue: Date | null,
+): Date {
+  const ordinaire = new Date(relueLe);
+  ordinaire.setUTCDate(ordinaire.getUTCDate() + PERIODICITE_RELECTURE_JOURS);
+  if (!revisionConnue || revisionConnue > ordinaire) return ordinaire;
+
+  // Une révision connue tombe avant l'échéance ordinaire : on se cale
+  // dessus, trente jours avant, sans jamais reculer dans le passé.
+  const anticipee = new Date(revisionConnue);
+  anticipee.setUTCDate(anticipee.getUTCDate() - PERIODICITE_AVANT_REVISION_JOURS);
+  return anticipee > relueLe ? anticipee : ordinaire;
+}

@@ -2888,3 +2888,83 @@ avec lui, et non six mois plus tard. La note dit maintenant cela.
 
     écran   : [Suspendre le compte] désactivé, avec sa raison
               motif, conséquence présents ; les trois boutons morts absents
+
+### S.5 — B-01 disait l'inverse de la règle qu'il citait
+
+**Trois erreurs en une phrase.** L'écran annonçait, sous la file :
+
+> Rien n'est dépublié automatiquement : la décision de retirer une règle
+> appartient à l'opérateur (RG-14.3).
+
+L'affirmation est fausse. RG-14.1 dit l'inverse : « une fiche dont
+`nextReviewAt` est dépassée repasse automatiquement en `DRAFT` et
+disparaît de l'affichage utilisateur. Une donnée non relue ne peut pas
+continuer à se présenter comme fiable. » Un cron l'applique chaque nuit à
+trois heures, et il le fait correctement depuis le début.
+
+La citation est fausse aussi : RG-14.3 parle de périodicité de relecture,
+pas de dépublication.
+
+Et l'effet était le contraire de celui voulu. RG-14.1 existe pour presser
+le veilleur ; la phrase le rassurait. Celui qui la lisait ne s'attendait
+pas à voir ses fiches quitter le site public dans la nuit.
+
+**Deux cas y étaient confondus**, et l'écran les sépare désormais : une
+source qui ne répond pas ne dépublie rien — les règles affichées restent
+celles de la dernière collecte réussie — tandis qu'une fiche que personne
+n'a relue part toute seule. La première phrase était vraie et méritait de
+rester ; c'est de l'avoir étendue à la seconde qui produisait le
+mensonge.
+
+#### La relecture sans changement
+
+« Marquer comme relue sans changement » n'était relié à rien. C'est
+pourtant l'issue la plus fréquente de la veille — WF-14 étape 2, branche
+« inchangé » : `verifiedAt` et `nextReviewAt` mis à jour, pas de nouvelle
+version.
+
+La conséquence de cet oubli n'était pas qu'un bouton inerte : **une fiche
+relue et trouvée identique restait en retard**, et le cron de trois
+heures finissait par la dépublier. Le travail était fait, et le produit
+se comportait comme s'il ne l'avait pas été.
+
+**L'échéance court depuis la relecture, pas depuis l'ancienne échéance.**
+Repartir de l'ancienne enchaînerait les retards : une fiche relue avec
+trois semaines de retard serait déjà à relire dans soixante-neuf jours.
+
+**Une fiche dépubliée par l'échéance redevient publiée.** Le retour en
+brouillon dit « personne n'a relu », pas « cette règle est douteuse » :
+une fois relue, la raison du retrait n'existe plus. Un brouillon en
+préparation, lui, n'est pas republié par une relecture — seule l'échéance
+dépassée est réversible ainsi.
+
+**Pas de ligne d'audit, et c'est voulu.** RG-14.4 désigne la preuve de
+diligence : « chaque version conserve son `sourceUrl`, `verifiedAt` et
+`verifiedBy` ». C'est le champ qui porte qui a relu et quand. En ajouter
+une entrée de journal doublerait la preuve sans l'améliorer, et les deux
+finiraient par diverger.
+
+**La seconde moitié de RG-14.3 est écrite et inatteignable.** « Ramenée à
+30 jours avant une date connue de révision » : aucune colonne ne porte
+cette date. La règle vit entière dans la fonction pure, la route passe
+`null`, et le manque est nommé — inventer une colonne au passage ferait
+décider à une route ce qu'un veilleur doit saisir.
+
+Les quatre autres commandes — journal des collectes, nouvelle fiche,
+relever la source, déclarer un incident — sont parties comme en B-03 :
+aucune route, et la règle de Q.A.
+
+**Exécuté contre PostgreSQL :**
+
+    fiche CH publiée, échéance au 2026-08-31
+    cron de 3 h        → 1 dépubliée · statut DRAFT
+                         (ce que l'écran niait)
+    relecture          → relueLe 2026-09-21 · prochaineLe 2026-12-20
+                         republiee=true
+    en base            → PUBLISHED · verifiedBy veilleur-…@immipro.test
+                         1 version (aucune créée) · 0 ligne de journal
+
+    écran              → « repasse automatiquement en brouillon, chaque
+                           nuit à 3 h … (RG-14.1) »
+                         bouton actif, conséquence adaptée au retard
+                         les quatre boutons morts absents
