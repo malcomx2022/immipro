@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ChoixDuPack } from "@/app/(app)/paiement/pack/ChoixDuPack";
 import { Recapitulatif } from "@/app/(app)/paiement/recapitulatif/Recapitulatif";
 import { Attente } from "@/app/(app)/paiement/attente/Attente";
 import { Echec } from "@/app/(app)/paiement/echec/Echec";
-import { PACKS } from "@/domain/payments/pricing";
+import { CONSULTATION, PACKS, RECHARGE_ANALYSES } from "@/domain/payments/pricing";
+import { corpsDAchat, tarifDe, type Achat } from "@/domain/payments/achat";
+import { corpsDeLEtat } from "@/domain/consultants/tenue";
 import { DELAI_REESSAI_SECONDES } from "@/domain/paiement/attente";
 import { formatMontant } from "@/lib/utils";
 import { readFileSync } from "node:fs";
@@ -123,7 +125,8 @@ describe("$-02 — Récapitulatif", () => {
     const { container } = render(
       <Recapitulatif
         tunnel={TUNNEL}
-        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
         deviseInitiale="XOF"
       />,
     );
@@ -159,7 +162,8 @@ describe("$-02 — Récapitulatif", () => {
     render(
       <Recapitulatif
         tunnel={TUNNEL}
-        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
         deviseInitiale="XOF"
       />,
     );
@@ -170,7 +174,8 @@ describe("$-02 — Récapitulatif", () => {
     render(
       <Recapitulatif
         tunnel={TUNNEL}
-        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
         deviseInitiale="XOF"
       />,
     );
@@ -189,7 +194,8 @@ describe("$-02 — Récapitulatif", () => {
     render(
       <Recapitulatif
         tunnel={TUNNEL}
-        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
         deviseInitiale="XOF"
       />,
     );
@@ -200,7 +206,8 @@ describe("$-02 — Récapitulatif", () => {
     const { container } = render(
       <Recapitulatif
         tunnel={TUNNEL}
-        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
         deviseInitiale="XOF"
       />,
     );
@@ -212,12 +219,129 @@ describe("$-02 — Récapitulatif", () => {
     const { container } = render(
       <Recapitulatif
         tunnel={TUNNEL}
-        achat={{ code: PACKS[0]!.code, libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
         deviseInitiale="XOF"
       />,
     );
     expect(container.textContent).toContain("97 •• •• 42");
     expect(container.textContent).not.toContain("97000042");
+  });
+});
+
+/**
+ * Le corps réellement envoyé, pour chacun des trois achats.
+ *
+ * ── Ce que ce bloc retient ──────────────────────────────────────────
+ *
+ * L'écran affichait une consultation correctement — libellé et montant
+ * venaient de la grille — et l'envoyait sous l'étiquette d'un pack,
+ * parce qu'il redevinait la catégorie sur le code : tout ce qui n'était
+ * pas `recharge` partait en pack.
+ *
+ * Aucun test ne pouvait le voir : ils ne rendaient qu'un pack, et aucun
+ * n'ouvrait le corps de la requête. Ceux-ci cliquent pour de bon, et
+ * lisent ce qui part sur le fil.
+ */
+describe("$-02 — ce qui part quand on clique", () => {
+  const partirPayer = () => {
+    const aller = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign: aller },
+    });
+    return aller;
+  };
+
+  /** Rend l'écran pour un achat, accepte les conditions, et paie. */
+  const payer = async (achat: Achat) => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({ reference: "IMP-260921-ZZZZZZ", url: "https://exemple.test/payer" }),
+    } as unknown as Response);
+    const aller = partirPayer();
+
+    render(
+      <Recapitulatif
+        tunnel={TUNNEL}
+        achat={achat}
+        tarif={tarifDe(achat)!}
+        deviseInitiale="XOF"
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /Payer/u }));
+    await waitFor(() => expect(aller).toHaveBeenCalled());
+
+    const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(url).toBe("/api/paiements");
+    return JSON.parse(String((options as RequestInit).body)) as {
+      dossierId: string;
+      achat: unknown;
+      devise: string;
+    };
+  };
+
+  it("un pack part comme un pack, avec son code", async () => {
+    const corps = await payer({ type: "pack", code: PACKS[0]!.code });
+    expect(corps.achat).toEqual({ type: "pack", code: PACKS[0]!.code });
+    expect(corps).toMatchObject({ dossierId: "nl-1", devise: "XOF" });
+  });
+
+  it("une recharge part comme une recharge, sans code de pack", async () => {
+    const corps = await payer({ type: "recharge" });
+    expect(corps.achat).toEqual({ type: "recharge" });
+  });
+
+  /**
+   * Le défaut, exactement. Avant le correctif, ce corps valait
+   * `{ type: "pack", code: "consultation" }` — le serveur l'acceptait,
+   * l'enregistrait, et n'ouvrait rien en face.
+   */
+  it("une consultation part comme une consultation, jamais comme un pack", async () => {
+    const corps = await payer({ type: "consultation" });
+    expect(corps.achat).toEqual({ type: "consultation" });
+    expect(corps.achat).not.toHaveProperty("code");
+  });
+
+  it("affiche le libellé et le montant de chaque achat, et n'en recopie aucun", async () => {
+    for (const achat of [
+      { type: "pack", code: PACKS[0]!.code },
+      { type: "recharge" },
+      { type: "consultation" },
+    ] as const) {
+      const tarif = tarifDe(achat)!;
+      const { container, unmount } = render(
+        <Recapitulatif tunnel={TUNNEL} achat={achat} tarif={tarif} deviseInitiale="XOF" />,
+      );
+      expect(container.textContent).toContain(tarif.libelle);
+      expect(container.textContent).toContain(formatMontant(tarif.prix.XOF, "XOF"));
+      unmount();
+    }
+
+    // Les trois montants sont distincts : afficher l'un pour l'autre se
+    // verrait. Et aucun n'est écrit dans le composant.
+    const source = readFileSync(
+      "src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx",
+      "utf8",
+    );
+    for (const montant of [PACKS[0]!.prix.XOF, RECHARGE_ANALYSES.prix.XOF, CONSULTATION.prix.XOF]) {
+      expect(source).not.toContain(String(montant));
+    }
+  });
+
+  it("le corps envoyé est celui que le domaine sérialise, sans recomposition", async () => {
+    for (const achat of [
+      { type: "pack", code: PACKS[0]!.code },
+      { type: "recharge" },
+      { type: "consultation" },
+    ] as const) {
+      const corps = await payer(achat);
+      expect(corps.achat).toEqual(corpsDAchat(achat));
+      cleanup();
+    }
   });
 });
 
@@ -326,6 +450,62 @@ describe("$-05 — Échec", () => {
       />,
     );
     expect(container.textContent).not.toMatch(/HTTP|fedapay|stripe|\b50\d\b/i);
+  });
+
+  /**
+   * L'échec d'une consultation — la coordination avec T-05.
+   *
+   * « Réessayer le paiement » renvoyait au récapitulatif avec le code de
+   * l'achat : pour une consultation, cela rouvrait un paiement dont plus
+   * aucun créneau n'était tenu — `libererLaTenue` a supprimé le
+   * rendez-vous avec l'échec. La notification signée n'aurait rien eu à
+   * confirmer, et le candidat aurait payé une consultation sans horaire.
+   */
+  const CONSULTATION_ECHOUEE: PaiementEnCours = {
+    ...EN_COURS,
+    etat: "sans_suite",
+    statut: "ECHOUEE",
+    achat: CONSULTATION.libelle,
+    achatCode: "consultation",
+    montant: CONSULTATION.prix.XOF,
+  };
+
+  it("une consultation échouée ne renvoie jamais au récapitulatif", () => {
+    render(<Echec paiement={CONSULTATION_ECHOUEE} motif={null} />);
+    for (const lien of screen.getAllByRole("link")) {
+      expect(lien.getAttribute("href")).not.toMatch(/\/paiement\/recapitulatif/u);
+    }
+    expect(screen.queryByRole("link", { name: "Réessayer le paiement" })).toBeNull();
+  });
+
+  it("elle renvoie choisir un créneau, et dit que l'ancien est libre", () => {
+    const { container } = render(<Echec paiement={CONSULTATION_ECHOUEE} motif={null} />);
+    expect(
+      screen.getByRole("link", { name: "Choisir un créneau" }).getAttribute("href"),
+    ).toBe("/consultants?dossier=nl-1");
+    expect(container.textContent).toContain(corpsDeLEtat("ECHOUE"));
+    // Rien ne prétend que le créneau est encore gardé : il ne l'est plus.
+    expect(container.textContent).not.toMatch(/créneau reste tenu/u);
+  });
+
+  it("le délai dépassé dit autre chose que le refus", () => {
+    const { container } = render(
+      <Echec paiement={{ ...CONSULTATION_ECHOUEE, statut: "EXPIREE" }} motif={null} />,
+    );
+    expect(container.textContent).toContain(corpsDeLEtat("LIBERE"));
+  });
+
+  it("un pack, lui, se réessaie au récapitulatif", () => {
+    render(
+      <Echec
+        paiement={{ ...EN_COURS, etat: "sans_suite", statut: "ECHOUEE" }}
+        motif={null}
+      />,
+    );
+    expect(
+      screen.getByRole("link", { name: "Réessayer le paiement" }).getAttribute("href"),
+    ).toBe(`/paiement/recapitulatif?dossier=nl-1&achat=${PACKS[0]!.code}&devise=XOF`);
+    expect(screen.queryByRole("link", { name: "Choisir un créneau" })).toBeNull();
   });
 });
 
