@@ -30,6 +30,17 @@ export type Balayeur = (objectKey: string) => Promise<Verdict | null>;
 
 export const NON_BRANCHE: Balayeur = async () => null;
 
+/**
+ * Le balayeur que l'appelant exécutera, demandé au moment de s'en servir.
+ *
+ * L'état de service interroge cette fonction-là, et non une déclaration
+ * tenue à la main : comparer ce qu'elle rend à `NON_BRANCHE` dit si un
+ * adaptateur existe, sans qu'aucun registre puisse survivre au code qu'il
+ * décrit. Le jour du branchement, une seule ligne change ici, et le dépôt
+ * comme l'état de service en tiennent compte au même instant.
+ */
+export const leBalayeur = (): Balayeur => NON_BRANCHE;
+
 /** Les variables sans lesquelles le moteur n'existe pas. Voir `DEPENDANCES`. */
 export const VARIABLES = ["ANTIVIRUS_URL"] as const;
 

@@ -56,12 +56,23 @@ const journaliser: Transport = async (courrier) => {
   console.info(`[courrier] → ${courrier.destinataire} · ${courrier.objet}`);
 };
 
-let transport: Transport = journaliser;
+/**
+ * Le transport par défaut, exporté pour que l'état de service puisse le
+ * reconnaître : tant que `leTransport()` rend celui-ci, aucun courrier ne
+ * part, quelle que soit la valeur de `SMTP_URL`. C'est exactement le cas
+ * qui faisait répondre « ok » à une installation muette.
+ */
+export const TRANSPORT_JOURNAL: Transport = journaliser;
+
+let transport: Transport = TRANSPORT_JOURNAL;
 
 /** Point d'entrée du branchement, et des tests. */
 export const brancherTransport = (nouveau: Transport): void => {
   transport = nouveau;
 };
+
+/** Le transport que `expedier` utilisera, demandé au moment de l'envoi. */
+export const leTransport = (): Transport => transport;
 
 export async function expedier(courrier: Courrier): Promise<void> {
   const fautes = [
@@ -75,7 +86,7 @@ export async function expedier(courrier: Courrier): Promise<void> {
       `INV-2 : courrier refusé, formulation interdite — ${fautes.map((f) => f.extrait).join(", ")}`,
     );
   }
-  await transport(courrier);
+  await leTransport()(courrier);
 }
 
 const SIGNATURE = `

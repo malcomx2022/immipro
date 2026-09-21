@@ -9,7 +9,7 @@ import {
   MOTIF_REMBOURSEMENT_SUPPRESSION,
 } from "@/domain/consultants/annulation";
 import { initierLeRemboursement, ouvrirUnRemboursement } from "@/server/acces/paiements";
-import { NON_BRANCHE } from "@/server/paiement/remboursement";
+import { leRembourseur } from "@/server/paiement/remboursement";
 
 /**
  * Suppression de compte — RG-10.4.
@@ -205,7 +205,7 @@ export async function acheverLaSuppression(
      */
     const envoi = await initierLeRemboursement(
       ouverture.reference,
-      NON_BRANCHE,
+      leRembourseur(),
       maintenant,
     ).catch(() => null);
 

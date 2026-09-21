@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { promouvoir, removeQuarantaine } from "@/lib/storage";
-import { NON_BRANCHE, type Balayeur } from "@/server/securite/antivirus";
+import { leBalayeur, type Balayeur } from "@/server/securite/antivirus";
 import { refusAuControle } from "@/domain/dossiers/quarantaine";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { solde } from "@/server/acces/quota";
@@ -52,7 +52,7 @@ export class BalayageIndisponible extends Error {
 
 export async function balayerUnePiece(
   tache: Tache,
-  balayer: Balayeur = NON_BRANCHE,
+  balayer: Balayeur = leBalayeur(),
 ): Promise<Suite> {
   const version = await db.documentVersion.findUnique({
     where: { id: tache.versionId },

@@ -41,11 +41,17 @@ export type Extracteur = (
   attendu: string,
 ) => Promise<{ champs: ChampsExtraits; jetonsEntree: number; jetonsSortie: number } | null>;
 
-const NON_BRANCHE: Extracteur = async () => null;
+export const EXTRACTEUR_NON_BRANCHE: Extracteur = async () => null;
+
+/**
+ * L'extracteur que le job exécutera. L'état de service interroge la même
+ * fonction : ce qu'il annonce et ce qui tournera ne peuvent pas diverger.
+ */
+export const lExtracteur = (): Extracteur => EXTRACTEUR_NON_BRANCHE;
 
 export async function analyserUnePiece(
   tache: Tache,
-  extraire: Extracteur = NON_BRANCHE,
+  extraire: Extracteur = lExtracteur(),
 ): Promise<void> {
   const version = await db.documentVersion.findUnique({
     where: { id: tache.versionId },
