@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Confirmation en cours",
-  description: "Confirmez le paiement sur votre téléphone.",
+  description: "Confirme le paiement pour ouvrir ton pack.",
 };
 
 export default async function PageAttente({

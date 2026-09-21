@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Récapitulatif",
-  description: "Vérifiez le montant et le moyen de paiement avant de confirmer.",
+  description: "Vérifie le montant et le moyen de paiement avant de confirmer.",
 };
 
 export default async function PageRecapitulatif({

@@ -201,7 +201,7 @@ function Etapes() {
               nouveauPret
                 ? undefined
                 : !codeOk
-                  ? `Saisissez les ${LONGUEUR_CODE} chiffres reçus par email.`
+                  ? `Saisis les ${LONGUEUR_CODE} chiffres reçus par email.`
                   : !longueurOk
                     ? "Le mot de passe doit faire au moins dix caractères."
                     : "Les deux saisies doivent être identiques."

@@ -462,7 +462,11 @@ export function EditionContenu({ document }: { document: DocumentEnEdition }) {
                       Version {v.rang}
                     </span>
                     <span className="text-13 text-ink-500">
-                      {momentEnFrancais(v.publieLe)} · {v.par}
+                      {momentEnFrancais(v.publieLe)} · {v.par.libelle}
+                    </span>
+                    {/* L'identifiant durable reste lisible, en second. */}
+                    <span className="font-mono text-13 text-ink-500">
+                      {v.par.identifiant}
                     </span>
                   </div>
                   <p className="text-pretty text-14 text-ink-700">{v.motif}</p>

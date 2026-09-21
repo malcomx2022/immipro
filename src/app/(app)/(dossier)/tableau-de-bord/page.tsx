@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Mes dossiers",
-  description: "Vos dossiers en cours et la prochaine action de chacun.",
+  description: "Tes dossiers en cours et la prochaine action de chacun.",
 };
 
 export default async function PageTableauDeBord() {

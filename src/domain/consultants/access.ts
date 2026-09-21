@@ -50,7 +50,7 @@ export const LIBELLE_PORTEE: Record<PorteeLecture, string> = {
   analyse: "Le résultat de leur analyse",
   checklist: "Ta checklist",
   echeancier: "Ton échéancier",
-  echanges: "Vos échanges dans ImmiPro",
+  echanges: "Tes échanges dans ImmiPro",
 };
 
 /**

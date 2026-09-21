@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Paiement confirmé",
-  description: "Votre dossier est ouvert.",
+  description: "Ton dossier est ouvert.",
 };
 
 const ETAPES_SUIVANTES = [

@@ -8,9 +8,9 @@ import { Resultats } from "./Resultats";
  * décision de l'administration, et l'écrit (INV-1).
  */
 export const metadata: Metadata = {
-  title: "Vos destinations",
+  title: "Tes destinations",
   description:
-    "Les destinations qui correspondent à vos réponses, avec le coût de la première année et ce qu'il faut prouver.",
+    "Les destinations qui correspondent à tes réponses, avec le coût de la première année et ce qu'il faut prouver.",
 };
 
 export default function PageResultats() {

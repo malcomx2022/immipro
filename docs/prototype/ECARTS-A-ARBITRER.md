@@ -2229,7 +2229,7 @@ celles qui ne lisent rien.
 
 ## Annexe R · Les constats accumulés, arbitrés
 
-Cinq manques relevés au fil des lots, qu'aucune décision ne couvrait.
+Cinq manques relevés au fil des lots, qu’aucune décision ne couvrait.
 Arbitrés le 21/09/2026, et traités un par un.
 
 ### R.1 — La résolution des écarts en back-office
@@ -2360,3 +2360,186 @@ interdit désormais la seconde.
 Avec un rail branché, les deux tentatives rendent `envoyee`, la date de
 demande ne bouge pas à la seconde, la clé est identique aux deux, et le
 statut reste `CONFIRMEE` : seul le webhook signé écrit le versement.
+
+### R.3 — La prose adaptée au rail
+
+**Tranché : le motif est commun aux deux rails, sa prose ne l'est pas.**
+
+O.A avait adapté un motif d'échec sur sept. Les six autres continuaient de
+parler Mobile Money à un payeur par carte en euros : « la notification
+Mobile Money peut arriver avec du retard », « vérifie que le 97 •• •• 42
+est bien ton numéro actif », « compose le *880# ». Aucun de ces conseils
+n'est exécutable par quelqu'un qui paie par carte, et le dernier est un
+code d'opérateur béninois.
+
+Ce que chaque rail a le droit de nommer — Mobile Money : portefeuille,
+opérateur, téléphone, notification ; carte : banque, carte, relevé,
+confirmation bancaire. Et les interdits, qui sont le vrai garde-fou :
+aucun texte de carte ne mentionne une notification Mobile Money, un
+opérateur, un téléphone, un code USSD ou un portefeuille, et « banque »
+ne s'écrit pas sur un échec Mobile Money, où aucune banque n'intervient.
+Une phrase partagée reste neutre — c'est la condition pour être partagée,
+et un test vérifie que les phrases identiques d'un rail à l'autre ne
+nomment aucun instrument.
+
+Les phrases sont écrites en entier de chaque côté plutôt qu'assemblées
+autour d'un nom variable : c'est la leçon d'O.A, où « ton portefeuille
+Mobile Money est active » est sorti d'une phrase à trous.
+
+**Le texte Mobile Money n'a pas bougé d'un caractère.** Sept motifs,
+quatorze écrans, et seule la moitié carte est neuve.
+
+#### Ce que l'application de la décision a trouvé
+
+**Le même défaut vivait une page plus tôt.** La décision porte sur les
+motifs d'échec, mais les deux devises mènent à `/paiement/attente`, et
+$-03 n'y parlait que Mobile Money : « Confirme le paiement sur ton
+téléphone » en titre, « Saisis ton code PIN » sous lui, « vérifié auprès
+de l'opérateur » dans le rebours, et les trois étapes du fil. Le titre
+d'un écran est la phrase la plus lue de l'écran. Corriger $-05 en
+laissant $-03 aurait réparé l'écran d'après en gardant celui d'avant :
+l'interdit s'applique où il est vrai, pas où il a été énoncé.
+
+**Le garde-fou du JSX ne gardait rien.** Il lisait `extraireChaines`,
+c'est-à-dire les chaînes entre guillemets. En remettant « Confirme le
+paiement sur ton téléphone » à la place de `{TITRE_ATTENTE[rail]}`, les
+dix tests passaient encore : un texte JSX n'est pas une chaîne, et c'est
+pourtant la façon la plus naturelle d'écrire une phrase dans un
+composant. Le garde connaissait la forme pour laquelle il avait été
+écrit — N.C, O.B, Q.A, R.1 et R.2 ont chacun donné la leçon sous un
+autre visage. Il lit maintenant tout le source, commentaires retirés.
+
+**Et un mot juste dans un écran faux.** « Je n'ai rien reçu », le lien
+d'échappement de $-03, ne contient aucun terme proscrit : les deux listes
+le laissent passer. Il décrit pourtant une notification qu'on attend, et
+par carte rien ne s'envoie — une page s'affiche, ou elle ne s'affiche
+pas. Vu à l'écran, pas en test. Une prose adaptée au rail ne se réduit
+pas à éviter des mots : elle décrit ce qui se passe réellement de ce
+côté-là.
+
+**Les quatorze écrans, lus au navigateur** contre une base réelle, un
+paiement XOF et un paiement EUR du même compte :
+
+    $-03  XOF   Confirme le paiement sur ton téléphone
+                Saisis ton code PIN sur la notification…
+                vérifié auprès de l'opérateur · Je n'ai rien reçu
+          EUR   Confirme le paiement auprès de ta banque
+                Valide la demande de confirmation que ta banque…
+                vérifié auprès de ta banque · La confirmation ne s'affiche pas
+
+    $-05  XOF   sept motifs · *880#, notification, numéro, portefeuille
+          EUR   sept motifs · relevé, page de confirmation, carte, banque
+
+### R.4 — L'identité de l'acteur au journal d'audit
+
+**Tranché : l'identifiant reste dans la donnée, il n'est plus le libellé.**
+
+B-06 affichait `7f3c1a02-…` dans une colonne intitulée « Acteur ». Un
+identifiant n'est pas un nom, et une colonne qui promet une personne doit
+en nommer une : un contrôleur qui relit six mois de journal voyait
+trente-six identifiants sans savoir si c'était le même opérateur.
+
+L'identifiant durable ne bouge pas de la table — c'est lui qui garantit
+que deux opérateurs portant le même nom, ou ayant porté la même adresse à
+six mois d'écart, ne seront pas confondus. La décision porte sur sa
+présentation : nom d'abord, identifiant dessous, là où on le cherche
+quand on enquête.
+
+Trois replis, et ils ne disent pas la même chose :
+
+| Cas | Libellé | Ce que ça dit |
+|---|---|---|
+| Compte résolu | son nom, ou son adresse | c'est cette personne |
+| Compte supprimé | « Compte supprimé » | la personne est partie, la trace reste |
+| Résolution échouée | « Acteur non résolu » | on ne sait pas, et on le dit |
+
+Le troisième est celui qui manquait : un identifiant qui ne résout pas
+s'affichait tel quel, c'est-à-dire comme un nom de personne. Dire « je ne
+sais pas » vaut mieux que présenter une clé primaire comme quelqu'un.
+
+#### Ce que l'application de la décision a trouvé
+
+**`candidat:` n'était pas une forme prévue.** Le journal affichait
+`candidat:7f3c1a02-…`, un préfixe collé à une clé primaire, en guise de
+nom — et l'origine de la ligne disait « back-office », parce que le
+préfixe retombait sur le cas par défaut. Une suppression demandée par un
+candidat depuis son espace se lisait donc comme une action
+d'administrateur, ce qu'un contrôle lirait de travers.
+
+**L'historique éditorial portait le même défaut, et son commentaire
+disait le contraire.** `par: auteurs.get(…) ?? v.publishedBy` était
+documenté « un compte supprimé n'a plus d'adresse, l'identifiant est le
+repli ». Il ne retombait pas : RG-10.4 anonymise l'adresse sans supprimer
+la ligne, donc l'historique affichait `supprime-x7k2@…`, qui nomme moins
+que rien. Le repli ne servait que le cas où la ligne manque vraiment, et
+il y affichait une clé primaire. Un test affirmait cette forme ; il
+affirmait une explication fausse.
+
+**Un identifiant affiché deux fois.** Vu à l'écran : une tâche planifiée
+donnait « systeme:purge » sur deux lignes, l'une sous l'autre, puisque son
+identifiant **est** son nom — et dans un vrai journal ces lignes-là sont
+les plus nombreuses. L'identifiant ne se répète plus quand il est déjà le
+libellé.
+
+**Les sept formes, lues au navigateur** contre une base réelle :
+
+    Koffi Houngbo            56e8efee-…              back-office
+    ops-ainfql@immipro.test  9dfc665b-…              back-office
+    Compte supprimé          815443ea-…              back-office
+    Awa Diallo               candidat:efaa7d4e-…     espace candidat
+    Acteur non résolu        aa000000-…              back-office
+    systeme:purge                                    tâche planifiée
+    webhook:MOBILE_MONEY                             webhook
+
+### R.5 — Le tutoiement, voix générale des contenus candidat
+
+**Tranché : le tutoiement n'est pas un cas particulier des boutons
+désactivés.**
+
+DOC-12 §16 règle 5 le demandait déjà, et le produit l'appliquait par
+endroits. Il s'applique désormais partout où l'on s'adresse à un
+candidat ou à un visiteur : l'espace candidat, le tunnel de paiement, les
+erreurs et confirmations, les courriels transactionnels, les guides et
+articles, les pages publiques de présentation, et les textes de pied de
+page adressés au lecteur.
+
+**Le back-office garde sa voix**, professionnelle et neutre, de
+préférence sans interpellation personnelle : son lecteur est un opérateur
+au travail. Et les corps juridiques de Q.A pourront employer le registre
+retenu par le conseil juridique — l'exception s'arrête au corps du
+document, les intitulés de navigation et les explications autour de lui
+restent au tutoiement. Les six pages n'existent pas encore ; la ligne
+d'exception est écrite pour que celui qui les rédigera trouve
+l'autorisation déjà accordée plutôt qu'un garde-fou à contourner.
+
+**Vingt-et-une occurrences corrigées**, dont le titre de la page
+d'accueil.
+
+#### Ce que l'application de la décision a trouvé
+
+**Le garde-fou cherchait la mauvaise chose.** Celui de N.C lisait
+`raisonDesactivation`, et il avait fallu l'élargir trois fois — littéral,
+puis expression JSX, puis constante déclarée dans le même fichier —
+chacune sortant un vouvoiement de plus. Il ne pouvait pas voir les
+autres, parce qu'il suivait une forme syntaxique plutôt qu'une surface.
+Son remplaçant lit tout le source de chaque surface candidat,
+commentaires retirés, et un texte JSX y compte comme un littéral : le
+lecteur ne fait pas la différence. Il a trouvé du premier coup les
+occurrences que quatre lots successifs avaient laissées.
+
+**Deux d'entre elles n'étaient pas des chaînes.** Le `<h1>` de la page
+d'accueil — « Où pouvez-vous étudier ou travailler ? », la première
+phrase du produit — et une relance sur l'écran des résultats. Un balayage
+des littéraux ne les voyait pas ; c'est la même leçon qu'en R.3, deux
+lots plus tôt, sur un autre sujet.
+
+**Et un vouvoiement en cachait un du rail.** La description de
+`/paiement/attente` disait « Confirmez le paiement sur votre
+téléphone » : un `metadata` n'est pas un composant, et le garde-fou de
+R.3 ne lisait que les composants. Un payeur par carte lisait donc la
+version Mobile Money dans l'onglet de son navigateur. La phrase est
+désormais tutoyée **et** neutre — une description de page ne connaît pas
+la transaction — et le garde-fou du rail lit aussi les `page.tsx`.
+
+**Les onze pages publiques, relues au navigateur** — titres, descriptions
+et corps — sans une occurrence restante.

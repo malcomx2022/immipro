@@ -99,7 +99,7 @@ export function Footer({ className }: FooterProps) {
 
       <p className="border-t border-ink-300 pt-4 text-13 text-ink-500">
         ImmiPro n&apos;est pas un cabinet de conseil en immigration et ne dépose aucun
-        dossier à votre place.
+        dossier à ta place.
       </p>
     </footer>
   );

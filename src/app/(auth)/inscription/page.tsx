@@ -10,7 +10,7 @@ import { Inscription } from "./Inscription";
  */
 export const metadata: Metadata = {
   title: "Créer un compte",
-  description: "Créez votre compte ImmiPro pour ouvrir et suivre un dossier.",
+  description: "Crée ton compte ImmiPro pour ouvrir et suivre un dossier.",
 };
 
 export default function PageInscription() {

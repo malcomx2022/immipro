@@ -26,7 +26,7 @@ export async function generateMetadata({
   return {
     title: "Rédaction assistée",
     description:
-      "Choisir la pièce à rédiger : nous posons les questions, le texte se met en forme à partir de vos réponses.",
+      "Choisir la pièce à rédiger : nous posons les questions, le texte se met en forme à partir de tes réponses.",
   };
 }
 

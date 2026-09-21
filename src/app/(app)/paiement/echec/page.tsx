@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Paiement non abouti",
-  description: "Aucun montant n'a été débité. Votre dossier est conservé.",
+  description: "Aucun montant n'a été débité. Ton dossier est conservé.",
 };
 
 export default async function PageEchec({

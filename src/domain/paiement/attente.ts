@@ -1,16 +1,31 @@
 /**
- * Attente de confirmation Mobile Money — WF-05, écran $-03.
+ * Attente de confirmation — WF-05, écran $-03.
  *
- * Cinq minutes pour confirmer, une relève de l'opérateur toutes les trois
- * secondes, et « Réessayer » qui apparaît au bout de quatre-vingt-dix
- * secondes : avant ce délai, proposer de relancer pousse à payer deux fois.
+ * Cinq minutes pour confirmer, une relève toutes les trois secondes, et
+ * « Réessayer » qui apparaît au bout de quatre-vingt-dix secondes : avant
+ * ce délai, proposer de relancer pousse à payer deux fois.
  *
  * La variante retenue est le fil d'étapes, pas l'anneau qui tourne : un
  * anneau tourne aussi bien quand rien n'arrive, c'est le signal exact d'une
  * page bloquée. Le fil montre trois états qui avancent.
  *
+ * **Les deux rails passent par cet écran** — les deux devises mènent à
+ * `/paiement/attente`. Il ne parlait pourtant que Mobile Money : un payeur
+ * par carte en euros lisait « Confirme le paiement sur ton téléphone » et
+ * « Saisis ton code PIN », sur un rail où il n'y a ni téléphone ni code
+ * PIN. Le titre d'un écran est la phrase la plus lue de l'écran, et
+ * celle-ci envoyait attendre une notification qui ne viendrait jamais.
+ *
+ * C'est l'interdit de l'arbitrage du 21/09/2026, hors des six motifs
+ * d'échec où il a été énoncé : aucun texte de carte ne mentionne une
+ * notification Mobile Money, un opérateur, un téléphone, un code USSD ou
+ * un portefeuille. Le corriger en $-05 et le laisser en $-03 aurait
+ * réparé l'écran d'après en gardant celui d'avant.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
+
+import type { Rail } from "../payments/rail";
 
 export const DUREE_ATTENTE_SECONDES = 5 * 60;
 export const PERIODE_RELEVE_SECONDES = 3;
@@ -38,14 +53,69 @@ export function etatDeLEtape(etape: EtapeAttente): EtatEtape {
 }
 
 /**
+ * Ce que l'écran dit en tête, selon le rail.
+ *
+ * Phrases entières des deux côtés, comme en $-05 : une phrase à trous
+ * autour du nom de l'émetteur produit les accords faux qu'O.A a déjà
+ * payés une fois.
+ */
+export const TITRE_ATTENTE: Record<Rail, string> = {
+  MOBILE_MONEY: "Confirme le paiement sur ton téléphone",
+  CARTE: "Confirme le paiement auprès de ta banque",
+};
+
+export const CONSIGNE_ATTENTE: Record<Rail, string> = {
+  MOBILE_MONEY: "Saisis ton code PIN sur la notification que ton opérateur vient d'envoyer.",
+  CARTE: "Valide la demande de confirmation que ta banque vient d'afficher.",
+};
+
+/** « vérifié auprès de … il y a 2 s » — auprès de qui, justement. */
+export const AUPRES_DE: Record<Rail, string> = {
+  MOBILE_MONEY: "vérifié auprès de l'opérateur",
+  CARTE: "vérifié auprès de ta banque",
+};
+
+/**
+ * Le lien d'échappement, quand la confirmation ne vient pas.
+ *
+ * Il ne contient aucun mot interdit, et c'est exactement pourquoi il a
+ * survécu à la correction du reste de l'écran : « Je n'ai rien reçu »
+ * décrit une notification qu'on attend sur son téléphone. Par carte, rien
+ * ne s'envoie — une page s'affiche, ou elle ne s'affiche pas. Le lien
+ * disait donc au payeur de chercher quelque chose qui n'existe pas, deux
+ * lignes après qu'on lui a expliqué où regarder.
+ *
+ * La liste de mots proscrits ne pouvait pas le voir. Une prose adaptée au
+ * rail ne se réduit pas à éviter des mots : elle décrit ce qui se passe
+ * réellement de ce côté-là.
+ */
+export const RIEN_RECU: Record<Rail, string> = {
+  MOBILE_MONEY: "Je n'ai rien reçu",
+  CARTE: "La confirmation ne s'affiche pas",
+};
+
+/**
  * Le numéro est facultatif : ImmiPro ne conserve pas le portefeuille qui
  * paie, et un compte sans téléphone renseigné n'en a aucun à montrer.
  * Écrire « au null » vaudrait moins que ne pas le nommer.
+ *
+ * Il ne se cite que sur le rail qui en a un. Un payeur par carte n'a pas
+ * de numéro chez nous, et n'en attend aucun à cette étape.
  */
-export const LIBELLES_ETAPES: Record<EtapeAttente, (numero: string | null) => string> = {
-  notification: (numero) =>
-    numero ? `Notification envoyée au ${numero}` : "Notification envoyée sur ton téléphone",
-  code: () => "Tu saisis ton code PIN sur ton téléphone",
+export const LIBELLES_ETAPES: Record<
+  EtapeAttente,
+  (numero: string | null, rail: Rail) => string
+> = {
+  notification: (numero, rail) => {
+    if (rail === "CARTE") return "Demande de confirmation transmise à ta banque";
+    return numero ? `Notification envoyée au ${numero}` : "Notification envoyée sur ton téléphone";
+  },
+  code: (_numero, rail) =>
+    rail === "CARTE"
+      ? "Tu valides la demande auprès de ta banque"
+      : "Tu saisis ton code PIN sur ton téléphone",
+  // La dernière étape ne nomme personne : elle parle de nous, et elle est
+  // vraie des deux côtés.
   confirmation: () => "Nous recevons la confirmation, ton pack s'ouvre",
 };
 
@@ -67,7 +137,7 @@ export const attenteExpiree = (ecoulees: number): boolean =>
 export const reessaiPropose = (ecoulees: number): boolean =>
   ecoulees >= DELAI_REESSAI_SECONDES;
 
-/** « vérifié auprès de l'opérateur il y a 2 s ». Décoratif, `aria-hidden`. */
+/** Les secondes de « vérifié auprès de … il y a 2 s ». Décoratif, `aria-hidden`. */
 export const secondesDepuisReleve = (ecoulees: number): number =>
   Math.max(0, Math.trunc(ecoulees)) % PERIODE_RELEVE_SECONDES;
 

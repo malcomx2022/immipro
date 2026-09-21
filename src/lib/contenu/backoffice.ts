@@ -387,7 +387,11 @@ export const ECRITURES_AUDIT: readonly EcritureAudit[] = [
   {
     id: "a-1",
     horodatage: "2026-09-18T09:41:00Z",
-    acteur: "M. Agossou",
+    acteur: {
+      genre: "PERSONNE",
+      libelle: "M. Agossou",
+      identifiant: "8f21c4d0-1a7e-4c33-9b05-2ee1f0a77c31",
+    },
     categorie: "ACCES_PIECE",
     action: "Ouverture d'une pièce",
     objet: "Dossier NL-4471 · Photo d'identité",
@@ -397,7 +401,11 @@ export const ECRITURES_AUDIT: readonly EcritureAudit[] = [
   {
     id: "a-2",
     horodatage: "2026-09-18T09:12:00Z",
-    acteur: "système",
+    acteur: {
+      genre: "PROCESSUS",
+      libelle: "webhook:MOBILE_MONEY",
+      identifiant: "webhook:MOBILE_MONEY",
+    },
     categorie: "PAIEMENT",
     action: "Rapprochement automatique",
     objet: "IMP-2609-4471",
@@ -407,7 +415,11 @@ export const ECRITURES_AUDIT: readonly EcritureAudit[] = [
   {
     id: "a-3",
     horodatage: "2026-09-17T16:22:00Z",
-    acteur: "K. Houngbo",
+    acteur: {
+      genre: "PERSONNE",
+      libelle: "K. Houngbo",
+      identifiant: "3c0b9a5e-7d42-48f1-83aa-14b6c9d2e507",
+    },
     categorie: "REGLE",
     action: "Enregistrement d'un brouillon",
     objet: "Allemagne / Séjour études · version 5",
@@ -417,7 +429,11 @@ export const ECRITURES_AUDIT: readonly EcritureAudit[] = [
   {
     id: "a-4",
     horodatage: "2026-09-16T11:04:00Z",
-    acteur: "M. Agossou",
+    acteur: {
+      genre: "PERSONNE",
+      libelle: "M. Agossou",
+      identifiant: "8f21c4d0-1a7e-4c33-9b05-2ee1f0a77c31",
+    },
     categorie: "COMPTE",
     action: "Recréditement d'analyses",
     objet: "l.gbaguidi@email.com",
@@ -427,7 +443,11 @@ export const ECRITURES_AUDIT: readonly EcritureAudit[] = [
   {
     id: "a-5",
     horodatage: "2026-09-08T07:03:00Z",
-    acteur: "système",
+    acteur: {
+      genre: "PROCESSUS",
+      libelle: "webhook:MOBILE_MONEY",
+      identifiant: "webhook:MOBILE_MONEY",
+    },
     categorie: "PAIEMENT",
     action: "Rapprochement automatique",
     objet: "IMP-2608-4390",

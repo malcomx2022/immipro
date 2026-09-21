@@ -77,11 +77,13 @@ describe("ce que l'écran fait de la relève", () => {
 
 describe("ce que les écrans nomment quand la base ne sait pas", () => {
   it("le fil d'étapes se passe d'un numéro qui n'existe pas", () => {
-    expect(LIBELLES_ETAPES.notification("97 •• •• 42")).toBe(
+    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "MOBILE_MONEY")).toBe(
       "Notification envoyée au 97 •• •• 42",
     );
-    expect(LIBELLES_ETAPES.notification(null)).toBe("Notification envoyée sur ton téléphone");
-    expect(LIBELLES_ETAPES.notification(null)).not.toMatch(/null|undefined/u);
+    expect(LIBELLES_ETAPES.notification(null, "MOBILE_MONEY")).toBe(
+      "Notification envoyée sur ton téléphone",
+    );
+    expect(LIBELLES_ETAPES.notification(null, "MOBILE_MONEY")).not.toMatch(/null|undefined/u);
   });
 
   it("l'échec renvoie au profil plutôt que de citer un vide", () => {

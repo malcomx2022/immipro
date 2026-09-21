@@ -205,7 +205,7 @@ describe("A-04 — Mot de passe", () => {
     // La raison affichée est celle du premier manque dans l'ordre de lecture
     // de l'écran : le code vient avant les mots de passe.
     expect(enregistrer).toHaveAccessibleDescription(
-      "Saisissez les 6 chiffres reçus par email.",
+      "Saisis les 6 chiffres reçus par email.",
     );
     fireEvent.change(screen.getByLabelText("Code reçu par email"), {
       target: { value: "531044" },

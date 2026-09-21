@@ -9,6 +9,8 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import type { ActeurLisible } from "./acteur";
+
 export type CategorieAudit = "PAIEMENT" | "REGLE" | "ACCES_PIECE" | "COMPTE";
 
 export const LIBELLE_CATEGORIE: Record<CategorieAudit, string> = {
@@ -29,7 +31,12 @@ export interface EcritureAudit {
   id: string;
   /** Horodatage, ISO. */
   horodatage: string;
-  acteur: string;
+  /**
+   * Qui a agi — libellé lisible d'abord, identifiant durable ensuite
+   * (arbitrage du 21/09/2026). Une chaîne unique ne pouvait pas porter
+   * les deux, et c'est l'identifiant qui gagnait.
+   */
+  acteur: ActeurLisible;
   categorie: CategorieAudit;
   action: string;
   objet: string;
