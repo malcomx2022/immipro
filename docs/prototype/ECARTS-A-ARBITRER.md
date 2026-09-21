@@ -3524,3 +3524,116 @@ nouveau, ce qui est le résultat qu'on espère d'un élargissement.
 Onze dans le back-office, deux de plus dans l'espace candidat trouvées en
 élargissant le balayage, et celle-ci. Le registre reste, vide : c'est lui
 qui refusera la prochaine.
+
+### S.11 — WF-08 étape 6 : les deux sorties
+
+Dernière étape de WF-08 restée non faite : « Export PDF et DOCX ». Les deux
+moitiés n'appellent pas la même réponse, et c'est tout le lot.
+
+#### Le PDF est celui du navigateur, et L.3 l'avait déjà dit
+
+> Une bibliothèque de génération pèserait plus que le reste de
+> l'application et rendrait un document moins fidèle que la page
+> elle-même. *(L.3, pour l'archive d'un dossier)*
+
+Le raisonnement vaut ici sans changement. Une page d'impression rend le
+texte, « Imprimer » puis « Enregistrer au format PDF » suffit.
+
+Une page **à part** de l'éditeur, et c'est le point à ne pas rater :
+l'éditeur porte un champ de saisie depuis S.8, et un `textarea` imprimé
+rend une boîte grise coupée à sa hauteur d'écran. Le texte s'imprime comme
+un texte, avec `whitespace-pre-line` — les retours à la ligne du candidat
+sont les siens.
+
+Ce qui disparaît porte `pas-a-imprimer` : le lien de retour et la consigne.
+La règle ne devine pas par nom de balise — c'est la correction de L.3, où
+masquer `header` emportait l'en-tête de l'archive elle-même.
+
+#### Le DOCX ne peut pas suivre cette voie
+
+Personne n'imprime un fichier Word, et une université qui demande un
+document **modifiable** ne se contente pas d'un PDF. L.3 ne couvre donc pas
+cette moitié.
+
+Un DOCX est une archive ZIP de trois fichiers XML. Les produire ne demande
+aucune dépendance : le XML s'écrit en fonction pure du texte, et l'archive
+se scelle avec le `zlib` de la plateforme. C'est la discipline de L.2, qui
+refusait une bibliothèque d'archivage pour empaqueter des pièces —
+**refuser la dépendance, pas la fonction.**
+
+Le partage suit la règle d'architecture : le XML est pur et vit dans
+`domain/redaction/docx.ts` ; le scellement emploie `zlib` et vit dans
+`server/redaction/zip.ts`. Un ZIP dans sa forme la plus simple — en-tête
+local, octets compressés, répertoire central, enregistrement de fin. Ni
+Zip64, ni chiffrement, ni répertoires : trois petits fichiers, et c'est
+tout ce que ce module verra jamais.
+
+**L'archive est datée de la version, pas de la demande.** Deux exports du
+même texte rendent les mêmes octets, et un fichier retrouvé six mois plus
+tard dit quand la lettre a été écrite.
+
+#### RG-08.1 voyage dans le fichier
+
+C'est l'invariant du lot, et il vaut pour les deux sorties. La mention
+d'aide à la rédaction est **dans** le document, en pied :
+
+> Ce texte est une aide à la rédaction. Il part de tes réponses, tu le
+> relis et tu le modifies : la pièce que tu déposes est la tienne, et elle
+> relève de ta responsabilité.
+
+En tête, elle serait lue avant la lettre et la présenterait comme un
+brouillon. En pied, elle dit ce que le lecteur a sous les yeux après
+l'avoir lu. Et elle sert précisément là : le document sort de la
+plateforme, il sera lu par quelqu'un qui n'a pas vu l'écran.
+
+#### Ne pas nommer ce qui n'est pas là, jusque dans un format de fichier
+
+La première version référençait des styles `w:pStyle` — `Titre`,
+`Intertitre` — qu'aucun `styles.xml` ne définissait. Un traitement de texte
+les ignore silencieusement : le document pointait vers ce qui n'existait
+pas. Embarquer une feuille de styles pour trois niveaux demanderait une
+pièce et une relation de plus, pour un résultat que le gras et l'italique
+rendent déjà. La mise en forme est donc directe.
+
+C'est la discipline des dix lots précédents, appliquée à un format binaire.
+
+#### Vérifié en ouvrant l'archive, pas en lisant une chaîne
+
+    unzip -t            les trois pièces OK, aucun défaut de compression
+    [Content_Types].xml wordprocessingml.document.main+xml
+    _rels/.rels         → word/document.xml
+    word/document.xml   XML bien formé
+
+    le document tel qu'un traitement de texte le lira
+      [titre     ] Lettre de motivation
+      [intertitre] MOTIVATION
+      [corps     ] Je souhaite étudier à Groningue, en <sciences> & …
+      [intertitre] FINANCEMENT
+      [corps     ] Ma famille finance mes études.
+      [mention   ] Ce texte est une aide à la rédaction. …
+
+    chevrons du candidat échappés     oui
+    aucune balise ouverte par le texte oui
+    date de l'archive                 2026-09-21 09:30 — celle de la version
+    déterminisme                      deux appels, octets identiques
+
+**Ce que je n'ai pas pu vérifier** : ouvrir le fichier dans Word ou
+LibreOffice. L'archive est un ZIP valide, ses pièces se décompressent, leur
+CRC est juste et leur XML est conforme à WordprocessingML — mais aucun
+traitement de texte n'a lu ce fichier. C'est la première chose à faire
+avant de compter cette étape comme close.
+
+#### Deux garde-fous qui lisaient la mauvaise copie
+
+Le CRC et les tailles sont écrits **deux fois** dans un ZIP — en-tête local
+et fiche centrale — et c'est la copie **locale** qu'un lecteur vérifie. Ma
+première lecture de test ne contrôlait que la fiche centrale : corrompre le
+CRC local passait au vert, alors qu'`unzip` rejette l'archive. Un garde-fou
+qui lit l'autre copie que le lecteur réel — la même leçon que sur les
+écrans, cette fois sur un format binaire.
+
+Et deux autres, de la famille déjà connue : le refus d'exporter une pièce
+vide était vérifié par la présence d'une chaîne, que neutraliser la
+condition laissait en place ; la mention de RG-08.1 était vérifiée par la
+présence de son nom, que la ligne d'import contient. Les deux portent
+maintenant sur la position de la garde et sur l'emploi de la constante.
