@@ -4033,3 +4033,129 @@ affichées, d'où sa place ici plutôt que dans chaque écran » — et cet
 écran-là formatait les siennes lui-même. Le défaut ne se voyait pas tant
 que les options tombaient le 15 et le 2 du mois.
 
+### S.15 — RG-07.4 était écrite, et ne pouvait pas se produire
+
+« Une pièce passant en `EXPIREE` fait régresser le score et repasse le
+dossier de `PRET` à `ACTIF`. » La seconde moitié existait depuis longtemps :
+`recalculerCompletude` efface `readyAt` et redescend le statut dès que la
+complétude retombe. La première n'existait pas.
+
+`DocumentStatus.EXPIREE` n'était écrit **nulle part**. Il n'était que lu —
+par la pastille d'état et par le barème. Toutes les occurrences d'`EXPIREE`
+dans le dépôt appartenaient à `TransactionStatus`, l'énumération des
+paiements, qui porte la même valeur.
+
+Un passeport ou un relevé bancaire pouvait donc expirer sans que rien ne
+bouge : la pièce restait « Conforme », le dossier restait « Prêt à
+déposer », et le tableau de bord annonçait que rien ne bloquait le dépôt.
+C'est l'affirmation la plus coûteuse de la plateforme, sur l'écran qu'on
+ouvre en premier — et personne ne pouvait la voir venir, puisque
+l'échéance était bien en base, écrite au dépôt par `dateDePeremption`.
+
+#### Deux questions, et il ne fallait pas les confondre
+
+`alertePeremption`, corrigée en S.14, répond à : *cette pièce sera-t-elle
+encore valable **le jour du dépôt** ?* Elle prévient sans rien déclasser.
+
+Ce lot répond à l'autre : *cette pièce est-elle encore valable
+**aujourd'hui** ?* Une pièce échue n'est plus une pièce.
+
+    perimeLe    aujourd'hui    dépôt
+       │             │           │        échue : non
+       │             ●───────────┼──▶     prévenue : oui, avant le dépôt
+       ●─────────────┼───────────┼──▶     échue : oui
+
+Strictement avant : une pièce valable « jusqu'au 21 septembre » l'est
+encore le 21 septembre. La déclasser ce jour-là ferait refaire un document
+que l'autorité accepte, ce que le reste du produit passe son temps à
+corriger.
+
+Et seule une pièce **conforme** régresse. Une pièce déjà à corriger n'a
+rien à perdre, et l'étiquette « expirée » remplacerait son message
+actionnable — « ton passeport expire 4 mois après la date de retour, il en
+faut 6 » — par quelque chose de plus vague.
+
+#### Le partage lecture / travail de fond, repris de la veille
+
+`depublierLesFichesEchues` avait déjà posé la règle, en toutes lettres :
+*« sans le filtre, un job en retard laisse passer une donnée périmée ;
+sans le job, le back-office croit publié ce qui ne s'affiche plus. »*
+
+Même partage ici, et pour les mêmes raisons :
+
+- **la vue** déclasse la pièce à l'affichage, requête par requête. Ce n'est
+  pas une seconde vérité : `expiresAt` est déjà en base, la vue l'évalue
+  maintenant plutôt qu'à trois heures du matin. Le remède passe à
+  `REMPLACER` — « Ajouter » sur une ligne où un fichier existe déjà fait
+  chercher ce qu'on a envoyé.
+- **le job** écrit l'état stocké, refait le barème, redescend le dossier et
+  prévient le candidat. `NotificationKind.ECHEANCE` avait lui aussi son
+  premier écrivain à trouver.
+
+Le compilateur a attrapé une faute au passage : `documents.map(versPiece)`
+donnait l'**index du tableau** comme second argument, c'est-à-dire comme
+date du jour. La deuxième pièce de chaque dossier aurait été jugée au
+1er janvier 1970.
+
+#### La garde était satisfaite par une autre table
+
+Ma première garde cherchait `status: "EXPIREE"` n'importe où dans le dépôt.
+Elle est restée **au vert** sur la mutation qui retirait l'écriture du job
+— parce que la réconciliation des paiements écrit `status: "EXPIREE"` sur
+une `Transaction`. Une garde sur un état de **document** qui se contente
+d'un état de transaction ne garde rien.
+
+Neuvième fois de cette session qu'une garde ne connaît que sa forme. Elle
+cherche maintenant l'écriture dans un `db.document.update`, et sa portée
+est dite plutôt que supposée : `CONFORME` et `A_CORRIGER` sont écrits par
+l'analyse à travers une table de correspondance, pas en littéral, et les
+exiger ici ferait échouer la garde sur du code correct.
+
+#### Vérifié en mutant, puis en exécutant
+
+Sept mutations, sept rouges — dont celles qui portent le lot :
+
+    la limite du jour déclasse la pièce                  1 rouge
+    toutes les pièces régressent, pas les conformes      1 rouge
+    la vue ne déclasse plus rien                         2 rouges
+    la vue garde le remède d'origine                     1 rouge
+    la mention reparle au futur d'un fait passé          1 rouge
+    le job n'écrit plus EXPIREE                          1 rouge
+
+Puis l'exécution, sur le dossier de démonstration monté en `PRET` avec une
+pièce dont la validité s'arrêtait au 1er août :
+
+    avant la passe
+      base   statut=PRET  readyAt=posé  barème=75
+      écran  INCOMPLET · ADM=EXPIREE
+             ← la base disait « prêt », l'écran disait « incomplet »
+
+    bilan  {"pieces":1,"dossiers":1,"redescendus":1}
+
+    après la passe
+      base   statut=ACTIF  readyAt=nul  barème=65
+      pièce  admission=EXPIREE
+      alerte « Lettre d'admission inconditionnelle : la validité est
+             dépassée … ton dossier repasse en préparation. Téléverse une
+             version à jour pour la remplacer. »
+
+Le dossier de démonstration a ensuite été remis à l'identique, et l'état
+revérifié en SQL indépendamment du script : cinq pièces dans leurs statuts
+d'origine, aucune échéance résiduelle, une seule notification, celle qui
+préexistait.
+
+#### Ce que l'exécution a montré et que je n'ai pas corrigé
+
+`prochaineAction` compose « Remplacer **ton** lettre d'admission
+inconditionnelle » et « Ajouter **ton** assurance maladie ». Le possessif
+est écrit en dur, et le genre du libellé n'existe nulle part : il n'est ni
+dans `pieces_requises` du référentiel, ni sur `Document`.
+
+Ce n'est pas une ligne à changer. Les trois issues ont chacune un coût :
+porter le genre dans le référentiel demande de reprendre toutes les fiches
+seedées ; revenir à « Remplacer : lettre d'admission » retombe sur la forme
+que le commentaire de cette fonction rejette explicitement — *« se lit
+comme un intitulé de champ »* — ; et deviner le genre sur le libellé est
+faux une fois sur trois. La décision appartient au référentiel, pas à
+l'écran.
+

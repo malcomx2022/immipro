@@ -1,6 +1,7 @@
 import type { CompletenessPublic, DocumentState } from "@/domain/completeness/score";
 import { computeCompleteness, versClient } from "@/domain/completeness/score";
 import { TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
+import { mentionEchue } from "./peremption";
 
 /**
  * Pièce d'une checklist de dossier — C-06, C-07, C-08, C-09 (WF-06, WF-07).
@@ -217,6 +218,25 @@ export function libelleAlertePeremption(piece: Piece, depot?: string): string | 
   return alerte === "AVANT_LE_DEPOT"
     ? `Expire le ${date}, avant le dépôt visé`
     : `Valable jusqu'au ${date}`;
+}
+
+/**
+ * La mention portée par une ligne de checklist, quand il y en a une.
+ *
+ * Deux questions, et une seule ligne pour les dire — d'où ce point unique
+ * plutôt qu'un choix répété sur chaque écran :
+ *
+ * - la pièce est **déjà** hors validité : la ligne dit depuis quand, et
+ *   l'état de la pièce dit le reste ;
+ * - la pièce est valable aujourd'hui mais ne le sera plus au dépôt : la
+ *   ligne prévient, sans rien déclasser.
+ *
+ * L'ordre compte. « Expire le 3 mars, avant le dépôt visé » sur une pièce
+ * expirée depuis un mois parle au futur d'un fait passé.
+ */
+export function mentionDeLaPiece(piece: Piece, depot?: string): string | null {
+  if (piece.etat === "EXPIREE" && piece.perimeLe) return mentionEchue(piece.perimeLe);
+  return libelleAlertePeremption(piece, depot);
 }
 
 /**

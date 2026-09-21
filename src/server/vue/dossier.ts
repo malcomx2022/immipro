@@ -3,6 +3,10 @@ import type { Piece } from "@/domain/dossiers/piece";
 import { completudeDesPieces, premiereATraiter, libelleAction } from "@/domain/dossiers/piece";
 import type { Dossier, StatutDossier } from "@/domain/dossiers/dossier";
 import { dateDeDepot } from "@/domain/dossiers/faisabilite";
+import { estEchue } from "@/domain/dossiers/peremption";
+
+/** Un jour ISO, en UTC — même convention que l'échéancier. */
+const iso = (d: Date) => d.toISOString().slice(0, 10);
 import type { FicheDestination } from "@/domain/destinations/fiche";
 
 /**
@@ -20,14 +24,35 @@ import type { FicheDestination } from "@/domain/destinations/fiche";
  * Il faudrait changer le type du domaine pour faire fuir le chiffre.
  */
 
-export function versPiece(document: Document): Piece {
+/**
+ * `aujourdhui` est passé, jamais lu ici : la vue doit se tester sans
+ * dépendre du jour où le test tourne, comme l'échéancier.
+ */
+export function versPiece(document: Document, aujourdhui = iso(new Date())): Piece {
+  /*
+    Une pièce conforme dont la validité est dépassée n'est plus conforme —
+    et l'écran ne doit pas attendre que le travail de fond passe pour le
+    dire. Le fait est déjà en base : `expiresAt` est écrit au dépôt. Ce
+    n'est donc pas une seconde vérité, c'est la même, évaluée maintenant
+    plutôt qu'à trois heures du matin.
+
+    Le travail de fond, lui, reste nécessaire : c'est lui qui écrit l'état
+    stocké, refait le barème, redescend le dossier de PRET à ACTIF et
+    prévient le candidat. Sans lui, l'écran dirait vrai et la base
+    garderait un dossier « prêt ».
+  */
+  const echue =
+    document.status === "CONFORME" &&
+    document.expiresAt !== null &&
+    estEchue(iso(document.expiresAt), aujourdhui);
+
   return {
     id: document.id,
     code: codeCourt(document.code),
     libelle: document.label,
     famille: document.family,
-    etat: document.status,
-    remede: document.remedy,
+    etat: echue ? "EXPIREE" : document.status,
+    remede: echue ? "REMPLACER" : document.remedy,
     ...(document.feedback ? { message: document.feedback } : {}),
     ...(document.finding ? { constat: document.finding } : {}),
     ...(document.expiresAt ? { perimeLe: document.expiresAt.toISOString().slice(0, 10) } : {}),
@@ -89,8 +114,9 @@ export function versDossier(
   destination: FicheDestination,
   /** Règle **figée** du dossier (INV-3), d'où vient le délai d'instruction. */
   regle: Pick<VisaRule, "rules"> | null,
+  aujourdhui = iso(new Date()),
 ): Dossier {
-  const pieces = documents.map(versPiece);
+  const pieces = documents.map((d) => versPiece(d, aujourdhui));
   /*
     Deux dates, et elles ne se confondent plus.
 

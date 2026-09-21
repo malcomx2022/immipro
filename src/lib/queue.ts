@@ -17,6 +17,8 @@ export const JOBS = {
   RECONCILIATION_PAIEMENT: "paiement.reconciliation",
   PURGE_RETENTION: "retention.purge",
   VEILLE_ECHEANCE: "veille.echeance",
+  /** Déclassement des pièces dont la validité est dépassée (RG-07.4). */
+  PEREMPTION_PIECES: "document.peremption",
   DIVERGENCE_REGLEMENTAIRE: "regle.divergence",
   RAPPEL_ECHEANCIER: "echeancier.rappel",
 } as const;

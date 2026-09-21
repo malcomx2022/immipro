@@ -6,7 +6,7 @@ import { SourceNote } from "@/components/ui/SourceNote";
 import {
   grouperPourCompletude,
   libelleAction,
-  libelleAlertePeremption,
+  mentionDeLaPiece,
   libelleBlocage,
   lienDePiece,
   type Piece,
@@ -149,7 +149,7 @@ function Groupe({
                 estDeposeeNonVerifiee(piece) ? LIBELLE_CONSERVEE_NON_VERIFIEE : undefined
               }
                 message={piece.message}
-                mention={libelleAlertePeremption(piece, depot) ?? undefined}
+                mention={mentionDeLaPiece(piece, depot) ?? undefined}
                 action={libelleAction(piece)}
                 href={lienDePiece(dossierId, piece)}
               />

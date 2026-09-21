@@ -17,7 +17,13 @@ export const GET = route({
   limite: "lecture",
   async traiter({ params, acteur }) {
     const dossier = await dossierAvecPieces(params.id!, acteur!.id);
-    const pieces = dossier.documents.map(versPiece);
+    /*
+      Le jour est fixé une fois pour toute la réponse : passer `versPiece`
+      directement à `map` lui donnerait l'index du tableau comme date, et
+      la deuxième pièce serait jugée au 1er janvier 1970.
+    */
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const pieces = dossier.documents.map((d) => versPiece(d, aujourdhui));
     return {
       completude: completudeDesPieces(pieces),
       blocage: libelleBlocage(pieces),

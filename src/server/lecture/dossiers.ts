@@ -82,7 +82,9 @@ export async function vueDuDossier(id: string, userId: string): Promise<VueDossi
   const fiche = brut.visaRule ? versFiche(brut.visaRule) : null;
   if (!fiche) throw echec("regle_indisponible");
 
-  const pieces = brut.documents.map(versPiece);
+  // Un seul jour pour toute la lecture — et jamais l'index du tableau.
+  const aujourdhui = iso(new Date());
+  const pieces = brut.documents.map((d) => versPiece(d, aujourdhui));
   return {
     dossier: versDossier(brut, brut.documents, fiche, brut.visaRule),
     pieces,
