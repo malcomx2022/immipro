@@ -36,6 +36,14 @@ export type Rembourseur = (demande: DemandeDeRemboursement) => Promise<{ accepte
 
 export const NON_BRANCHE: Rembourseur = async () => null;
 
+/**
+ * Le rembourseur que l'appelant exécutera. Même raison qu'ailleurs :
+ * l'état de service compare ce qu'il rend à `NON_BRANCHE` plutôt que de
+ * croire une clé d'API sur parole. Une clé renseignée devant cette
+ * fonction-ci ne rembourse toujours personne.
+ */
+export const leRembourseur = (): Rembourseur => NON_BRANCHE;
+
 /** Les clés sans lesquelles aucune demande ne part. */
 export const VARIABLES = ["FEDAPAY_API_KEY", "STRIPE_API_KEY"];
 

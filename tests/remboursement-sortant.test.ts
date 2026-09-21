@@ -9,7 +9,7 @@ import {
   etapeDe,
   suiteDuQuota,
 } from "@/domain/paiement/remboursement";
-import { NON_BRANCHE, VARIABLES } from "@/server/paiement/remboursement";
+import { NON_BRANCHE, VARIABLES, leRembourseur } from "@/server/paiement/remboursement";
 
 /**
  * Le rail de remboursement sortant — arbitrage du 21/09/2026.
@@ -61,12 +61,25 @@ describe("le rail n'est pas branché, et rien ne le simule", () => {
     expect(VARIABLES).toEqual(["FEDAPAY_API_KEY", "STRIPE_API_KEY"]);
   });
 
-  /** Un seul point de branchement, comme pour l'antivirus et l'interrogation. */
-  it("un seul point de branchement, et l'initiation le prend en paramètre", () => {
-    const acces = lire(ACCES);
-    expect(acces).toMatch(/envoyer: Rembourseur = NON_BRANCHE/u);
-    const sortant = lire("src/server/paiement/remboursement.ts");
-    expect(sortant).toMatch(/export const NON_BRANCHE: Rembourseur = async \(\) => null/u);
+  /**
+   * Un seul point de branchement, comme pour l'antivirus et l'interrogation
+   * — et l'initiation le demande au résolveur plutôt que de nommer la
+   * fonction non branchée. C'est ce qui permet à l'état de service de
+   * rendre compte de **ce que l'appelant exécutera** : il interroge le même
+   * résolveur.
+   */
+  it("un seul point de branchement, demandé au résolveur", async () => {
+    expect(leRembourseur()).toBe(NON_BRANCHE);
+    expect(
+      await leRembourseur()({
+        reference: "IMP-1",
+        providerTxId: null,
+        montant: 1,
+        devise: "XOF",
+        cle: "k",
+      }),
+    ).toBeNull();
+    expect(lire(ACCES)).toMatch(/envoyer: Rembourseur = leRembourseur\(\)/u);
   });
 
   /** Et il est déclaré au registre des dépendances, avec ce qu'il bloque. */

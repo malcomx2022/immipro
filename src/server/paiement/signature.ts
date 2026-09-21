@@ -90,18 +90,72 @@ export function signatureValide({
   return lu.signatures.some((s) => egalesEnTempsConstant(s, attendue));
 }
 
-export const signatureFedaPay = (requete: Request, corpsBrut: string): boolean =>
+/**
+ * Ce qui distingue un fournisseur d'un autre : le nom de l'en-tête, celui
+ * du champ, et où se lit le secret. Décrit ici plutôt que recopié dans
+ * chaque appel, parce que l'état de service a besoin de fabriquer un
+ * en-tête valide pour éprouver la vérification — et qu'une sonde qui
+ * recopierait ces trois valeurs éprouverait sa propre copie.
+ */
+export interface Fournisseur {
+  cle: string;
+  entete: string;
+  champSignature: string;
+  /**
+   * Le secret, lu à l'appel. L'environnement est un paramètre pour que la
+   * sonde de l'état de service puisse éprouver exactement ce chemin-ci sur
+   * l'environnement qu'elle examine — et non un second chemin écrit pour
+   * elle, qui ne prouverait que lui-même.
+   */
+  secret: (environnement?: Readonly<Record<string, string | undefined>>) => string | undefined;
+}
+
+export const FEDAPAY: Fournisseur = {
+  cle: "fedapay",
+  entete: "x-fedapay-signature",
+  champSignature: "s",
+  secret: (environnement = process.env) => environnement.FEDAPAY_WEBHOOK_SECRET,
+};
+
+export const STRIPE: Fournisseur = {
+  cle: "stripe",
+  entete: "stripe-signature",
+  champSignature: "v1",
+  secret: (environnement = process.env) => environnement.STRIPE_WEBHOOK_SECRET,
+};
+
+export const FOURNISSEURS: readonly Fournisseur[] = [FEDAPAY, STRIPE];
+
+export const verifierPour = (
+  fournisseur: Fournisseur,
+  requete: Request,
+  corpsBrut: string,
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): boolean =>
   signatureValide({
-    entete: requete.headers.get("x-fedapay-signature"),
+    entete: requete.headers.get(fournisseur.entete),
     corpsBrut,
-    secret: process.env.FEDAPAY_WEBHOOK_SECRET,
-    champSignature: "s",
+    secret: fournisseur.secret(environnement),
+    champSignature: fournisseur.champSignature,
   });
 
+export const signatureFedaPay = (requete: Request, corpsBrut: string): boolean =>
+  verifierPour(FEDAPAY, requete, corpsBrut);
+
 export const signatureStripe = (requete: Request, corpsBrut: string): boolean =>
-  signatureValide({
-    entete: requete.headers.get("stripe-signature"),
-    corpsBrut,
-    secret: process.env.STRIPE_WEBHOOK_SECRET,
-    champSignature: "v1",
-  });
+  verifierPour(STRIPE, requete, corpsBrut);
+
+/**
+ * Fabrique l'en-tête qu'un fournisseur enverrait pour ce corps-là. Sert à
+ * la sonde de l'état de service, et à rien d'autre : c'est un calcul
+ * local, sans appel réseau et sans écriture.
+ */
+export const enteteSignee = (
+  fournisseur: Fournisseur,
+  corpsBrut: string,
+  secret: string,
+  horodatage: number,
+): string =>
+  `t=${horodatage},${fournisseur.champSignature}=${createHmac("sha256", secret)
+    .update(`${horodatage}.${corpsBrut}`, "utf8")
+    .digest("hex")}`;

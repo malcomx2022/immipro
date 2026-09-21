@@ -324,15 +324,47 @@ fichiers pour qu'aucune autre route ne prenne la dispense.
 
 ## Ce qui n'est pas branché, et pourquoi c'est dit
 
-Trois dépendances extérieures n'ont pas de clé dans `.env.example`. Chacune a
-un point de branchement unique, et chacune traite son absence plutôt que de
-faire semblant :
+Chaque dépendance extérieure a un **point de branchement unique**, et chacune
+traite son absence plutôt que de faire semblant :
 
 | Dépendance | Point de branchement | Sans elle |
 |---|---|---|
-| Messagerie | `courrier.ts`, `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois |
-| Extraction IA | `jobs/analyse.ts`, `Extracteur` | La pièce part en revue manuelle et l'analyse est rendue — jamais déclarée conforme sans lecture |
-| Fournisseurs de paiement | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
+| Messagerie | `courrier.ts`, `leTransport` / `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois |
+| Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D) |
+| Extraction IA | `jobs/analyse.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture |
+| Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien |
+| Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
+| Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
+
+### Configuré n'est pas branché
+
+`/api/health` lisait `process.env`. Une variable renseignée valait dépendance
+présente, et l'adresse répondait « ok » — sur une installation dont aucun
+courrier ne part et dont aucune pièce n'est balayée.
+
+Un **résolveur** par point de branchement (`leBalayeur`, `lExtracteur`…) rend
+la fonction que l'appelant exécutera. `server/exploitation/capacites.ts`
+interroge ces résolveurs-là et compare ce qu'ils rendent à leur fonction non
+branchée : la présence d'un adaptateur se déduit, elle ne se déclare pas. Le
+jour du branchement, une ligne change dans le point de branchement, et
+l'appelant comme l'état de service en tiennent compte au même instant.
+
+Six capacités, et il en faut trois pour atteindre la dernière :
+
+| Capacité | Ce qu'elle dit |
+|---|---|
+| `IMPLEMENTATION_ABSENTE` | aucun adaptateur — quelles que soient les variables |
+| `NON_CONFIGUREE` | adaptateur présent, configuration absente |
+| `CONFIGUREE_NON_VERIFIEE` | configuré, aucune sonde concluante |
+| `OPERATIONNELLE` | adaptateur, configuration, sonde — les trois |
+| `DEGRADEE` | facultative indisponible, le repli fonctionne |
+| `EN_PANNE` | attendue et injoignable |
+
+Une bloquante n'est acquittée que par `OPERATIONNELLE`. Les sondes sont
+locales et sans effet de bord : aucun courrier, aucun appel de fournisseur,
+aucun jeton d'IA, aucune écriture. La seule concluante aujourd'hui signe un
+corps connu et vérifie que la fonction qu'appellent les routes de webhook
+accepte la bonne signature **et refuse** une signature altérée.
 
 ## Vérifier
 

@@ -7,7 +7,7 @@ import {
   cleDIdempotence,
   suiteDuQuota,
 } from "@/domain/paiement/remboursement";
-import { NON_BRANCHE, type Rembourseur } from "@/server/paiement/remboursement";
+import { leRembourseur, type Rembourseur } from "@/server/paiement/remboursement";
 import {
   getPack,
   MONTANT_MINIMUM_XOF,
@@ -256,7 +256,7 @@ export async function appliquerLaNotification(
  */
 export async function initierLeRemboursement(
   reference: string,
-  envoyer: Rembourseur = NON_BRANCHE,
+  envoyer: Rembourseur = leRembourseur(),
   maintenant = new Date(),
 ): Promise<
   | { issue: "envoyee" }

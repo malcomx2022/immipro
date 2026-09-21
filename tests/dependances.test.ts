@@ -4,7 +4,6 @@ import { join } from "node:path";
 import {
   DEPENDANCES,
   configuree,
-  etatDesDependances,
   fileTenue,
   LIBELLE_STATUT,
   messageDeSurveillance,
@@ -20,19 +19,6 @@ import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
  * façon reviendrait soit à retarder un pilote pour rien, soit à ouvrir au
  * public un service dont les courriers ne partent pas.
  */
-
-const RIEN = {};
-const TOUT = {
-  SMTP_URL: "smtp://exemple",
-  FEDAPAY_WEBHOOK_SECRET: "s",
-  STRIPE_WEBHOOK_SECRET: "s",
-  ANTIVIRUS_URL: "http://exemple",
-  ANTHROPIC_API_KEY: "k",
-  // Le rail de remboursement — arbitrage du 21/09/2026. Encaisser sans
-  // savoir rendre est un engagement à sens unique.
-  FEDAPAY_API_KEY: "k",
-  STRIPE_API_KEY: "k",
-};
 
 describe("les six dépendances n'ont pas le même statut", () => {
   it("chacune est déclarée avec ce que son absence bloque", () => {
@@ -96,75 +82,28 @@ describe("les six dépendances n'ont pas le même statut", () => {
   });
 });
 
-describe("l'aptitude se lit des dépendances, pas du nom de l'environnement", () => {
-  it("tout branché : prête", () => {
-    expect(etatDesDependances(TOUT).aptitude).toBe("PRETE");
-  });
-
-  /**
-   * Le cas du pilote : l'extraction manque, et rien d'autre. C'est
-   * exactement ce que la décision autorise.
-   */
-  it("seule la clé d'IA manque : pilote", () => {
-    const etat = etatDesDependances({ ...TOUT, ANTHROPIC_API_KEY: "" });
-    expect(etat.aptitude).toBe("PILOTE");
-    // Une seule variable, deux dépendances : c'est pourquoi elles sont
-    // déclarées séparément. Leurs conditions de pilote ne sont pas les
-    // mêmes, et un jour leurs clés pourraient ne plus l'être non plus.
-    expect(etat.manquantes).toEqual(["extraction", "redaction"]);
-    expect(etat.bloquantes).toEqual([]);
-  });
-
-  it("la messagerie manque : inapte à ouvrir", () => {
-    const etat = etatDesDependances({ ...TOUT, SMTP_URL: "" });
-    expect(etat.aptitude).toBe("INAPTE");
-    expect(etat.bloquantes).toEqual(["messagerie"]);
-  });
-
-  it("un secret de signature manque : inapte à encaisser", () => {
-    expect(etatDesDependances({ ...TOUT, STRIPE_WEBHOOK_SECRET: "  " }).bloquantes).toEqual([
-      "paiements",
-    ]);
-  });
-
-  /**
-   * Et le rail sortant bloque aussi l'encaissement. C'est la dépendance
-   * la plus facile à oublier, parce que son absence ne se voit pas tant
-   * que personne ne demande à être remboursé — puis elle se voit d'un
-   * coup, sur une obligation que rien ne peut solder.
-   */
-  it("sans clé d'envoi, on ne sait pas rendre : inapte à encaisser", () => {
-    expect(etatDesDependances({ ...TOUT, FEDAPAY_API_KEY: "" }).bloquantes).toEqual([
-      "remboursement",
-    ]);
-  });
-
-  /**
-   * I.D — l'antivirus absent n'est pas une dégradation acceptable : il n'y
-   * a rien à faire à la place d'un balayage, sinon refuser le fichier.
-   */
-  it("l'antivirus manque : inapte à recevoir une pièce", () => {
-    const etat = etatDesDependances({ ...TOUT, ANTIVIRUS_URL: "" });
-    expect(etat.aptitude).toBe("INAPTE");
-    expect(etat.bloquantes).toEqual(["antivirus"]);
-  });
-
-  it("rien n'est branché : les quatre bloquantes sont nommées", () => {
-    const etat = etatDesDependances(RIEN);
-    expect(etat.aptitude).toBe("INAPTE");
-    expect(etat.bloquantes).toEqual([
-      "messagerie",
-      "paiements",
-      "antivirus",
-      "remboursement",
-    ]);
-  });
-
+/**
+ * L'aptitude ne se lit plus ici. Elle se lisait des variables
+ * d'environnement, et c'était le défaut : `SMTP_URL` renseignée devant un
+ * module qui journalise sans expédier faisait déclarer la messagerie
+ * présente. Ce qu'une variable établit — et rien de plus — se teste en
+ * dessous ; ce que les dépendances savent réellement faire se teste dans
+ * `capacites.test.ts`.
+ */
+describe("une variable dit l'intention, pas la capacité", () => {
   it("une variable vide ne vaut pas une variable renseignée", () => {
     const messagerie = DEPENDANCES[0]!;
     expect(configuree(messagerie, { SMTP_URL: "smtp://x" })).toBe(true);
     expect(configuree(messagerie, { SMTP_URL: "   " })).toBe(false);
     expect(configuree(messagerie, {})).toBe(false);
+  });
+
+  it("toutes les variables sont exigées, pas seulement la première", () => {
+    const paiements = DEPENDANCES.find((d) => d.cle === "paiements")!;
+    expect(configuree(paiements, { FEDAPAY_WEBHOOK_SECRET: "s" })).toBe(false);
+    expect(
+      configuree(paiements, { FEDAPAY_WEBHOOK_SECRET: "s", STRIPE_WEBHOOK_SECRET: "s" }),
+    ).toBe(true);
   });
 });
 
@@ -193,7 +132,7 @@ describe("la file de revue est la condition de l'exception", () => {
     const sante = readFileSync("src/app/api/health/route.ts", "utf8");
     expect(sante).toContain("DELAI_CIBLE_HEURES");
     expect(sante).toContain("manualReview.count");
-    expect(sante).toContain("etatDesDependances");
+    expect(sante).toContain("etatDesCapacites");
     // Une bloquante absente doit se voir de l'extérieur, pas seulement se lire.
     expect(sante).toContain("503");
   });

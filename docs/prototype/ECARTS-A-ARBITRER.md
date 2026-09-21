@@ -4480,3 +4480,105 @@ PostgreSQL 16 réel, dans l'ordre exact du workflow.
 Si le dépôt exige un contrôle nommé `verifier` pour fusionner, le nom change
 avec ce lot : la CI appelle désormais un workflow réutilisable, et le
 contrôle s'appelle `valider / valider`.
+
+### S.19 — « Configurée » n'a jamais voulu dire « sait faire »
+
+`/api/health` lisait `process.env`. Une variable renseignée valait
+dépendance présente, et l'adresse répondait `ok`. Or cinq des six points de
+branchement rendent `null` quoi qu'on mette dans le `.env` : le transport
+de courrier journalise sans expédier, et le balayeur, l'extracteur, le
+rédacteur et le rembourseur ne sont pas écrits.
+
+Mesuré, sur le même environnement — toutes les variables renseignées avec
+des valeurs plausibles :
+
+    ancienne règle  →  PRETE   ·  status "ok"           ·  HTTP 200
+    nouvelle règle  →  INAPTE  ·  status "indisponible" ·  HTTP 503
+
+Le 200 était la réponse à une installation dont aucun code de vérification
+ne part, dont aucune pièce n'est balayée et qui ne sait rembourser
+personne. C'est la faute que le produit refuse partout ailleurs — aucun
+service absent n'est simulé —, portée cette fois sur l'adresse dont le rôle
+est précisément de ne pas mentir.
+
+#### Six capacités, et trois conditions pour la dernière
+
+| Capacité | Ce qu'elle dit |
+|---|---|
+| `IMPLEMENTATION_ABSENTE` | aucun adaptateur, quelles que soient les variables |
+| `NON_CONFIGUREE` | adaptateur présent, configuration absente |
+| `CONFIGUREE_NON_VERIFIEE` | configuré, aucune sonde concluante |
+| `OPERATIONNELLE` | adaptateur, configuration, sonde — les trois |
+| `DEGRADEE` | facultative indisponible, le repli fonctionne |
+| `EN_PANNE` | attendue et injoignable |
+
+L'ordre est la règle : la question de l'adaptateur précède celle de la
+configuration, qui précède celle de la vérification. Une bloquante n'est
+acquittée que par `OPERATIONNELLE` — « configurée mais non vérifiée » est
+exactement l'état que produisait une variable factice, et exactement celui
+qui passait pour prêt.
+
+#### Comment on sait qu'un adaptateur existe
+
+Pas par un registre tenu à la main : il survivrait au code qu'il décrit,
+et c'est ce genre de déclaration qui a produit le défaut. Chaque point de
+branchement expose un **résolveur** — `leBalayeur`, `lExtracteur`,
+`leRembourseur`, `leTransport`, `leRedacteur` — qui rend la fonction que
+l'appelant exécutera. Les appelants ont été rebranchés dessus, et l'état de
+service interroge le même résolveur, en comparant ce qu'il rend à la
+fonction non branchée du module.
+
+La conséquence se teste : brancher un vrai transport par
+`brancherTransport` fait passer la messagerie de `IMPLEMENTATION_ABSENTE` à
+`CONFIGUREE_NON_VERIFIEE`, et le courrier suivant emprunte ce transport-là.
+Le jour du branchement, une seule ligne change, et les deux en tiennent
+compte au même instant.
+
+#### Le seul adaptateur écrit, et sa sonde
+
+Sur les six, `paiements` est le seul dont l'adaptateur existe : la
+vérification de signature HMAC de `signature.ts`, appelée par les deux
+routes de webhook. Sa sonde est entièrement locale — elle signe un corps
+connu avec le secret configuré, passe l'en-tête à **la fonction que la
+route appelle**, et vérifie qu'elle accepte la bonne signature et refuse
+une signature altérée. Poser les deux questions est nécessaire : une
+vérification qui accepte tout accepterait aussi la bonne.
+
+Cela prouve que la vérification fonctionne avec ce secret-là. Cela ne
+prouve pas que le fournisseur enverra ce format, et rien de local ne le
+pourrait ; la capacité ne prétend rien de plus.
+
+Le type y oblige : la forme « adaptateur écrit » d'un point de branchement
+**exige** une sonde. On ne peut pas déclarer un adaptateur présent sans
+fournir de quoi l'éprouver, et sans sonde concluante la capacité s'arrête à
+`CONFIGUREE_NON_VERIFIEE`.
+
+**Rien de coûteux ne part de l'adresse d'état** : aucun courrier, aucun
+appel de fournisseur, aucun jeton d'IA, aucune écriture. Une sonde ne
+tourne même pas devant un adaptateur absent ou non configuré — le jour où
+l'une d'elles parlera à un service, elle ne le fera pas à vide.
+
+#### La base et la file de revue étaient une seule mesure
+
+Le `SELECT 1` et les deux comptages de la file vivaient dans le même
+`try` : un comptage en échec faisait déclarer la base muette, et une base
+déclarée muette ne disait rien de la file. Deux diagnostics opposés sous un
+seul mot.
+
+Séparés, et vérifiés sur une base jetable à qui l'on a retiré la table de
+revue :
+
+    db      : up
+    revue   : { lisible: false, message: "La file de revue n'a pas pu être lue." }
+
+#### Vérifié en exécutant
+
+Cinq mutations, cinq rouges : la capacité qui ignore l'adaptateur (4 tests),
+l'aptitude qui se contente d'une bloquante configurée (3), la sonde qui ne
+refuse plus la signature altérée (1), l'état qui déclare la messagerie
+branchée (2), la rédaction qui se contente d'une de ses deux fonctions (1).
+
+Puis l'exécution, par le vrai point d'entrée HTTP, avec un environnement
+entièrement renseigné : `503`, trois bloquantes nommées — messagerie,
+antivirus, remboursement —, `paiements` seul en `OPERATIONNELLE` avec sa
+sonde concluante, et la file de revue lisible et tenue.
