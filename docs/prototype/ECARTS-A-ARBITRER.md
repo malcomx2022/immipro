@@ -1139,13 +1139,45 @@ suppression, qui est la promesse faite au candidat. Et les rendez-vous sont
 lus **avant** d'être annulés : lus après, la condition d'état ne trouverait
 plus rien et le traitement financier ne porterait sur personne.
 
-**K.D — Le premier partenaire reste à signer.** Le modèle porte cinq genres
-— assurance santé, logement, équivalence de diplôme, transfert de fonds,
-consultant — et le jeu de démonstration en active un seul, sur une seule
-destination. Tant qu'aucun contrat n'existe, le taux réel, la devise de
-facturation et le mode de rapprochement des commissions sont des
-hypothèses : `enregistrerLAboutissement` est écrite et n'est appelée par
-rien.
+**K.D — Le premier partenaire reste à signer.** **Tranché le 21/09/2026 :
+aucune activation avant contrat réel.**
+
+Aucun partenaire, aucun taux de commission et aucun parcours partenaire
+n'est activé en production avant la signature d'un contrat. Le jeu de
+démonstration reste utilisable en démonstration et en test seulement ; en
+production, l'absence d'activation explicite continue de rendre le
+partenaire invisible. Ni taux par défaut inventé, ni partenaire de
+démonstration pris pour un partenaire réel.
+
+Le premier contrat devra fixer au minimum : le genre de prestation, les
+destinations couvertes, le taux ou le montant de la commission, la devise
+de facturation, le fait générateur, le traitement des annulations et
+remboursements, la méthode et la périodicité du rapprochement, et les
+dates d'entrée en vigueur et de fin.
+
+### Ce que l'application de la décision a trouvé
+
+**Les trois interdits tenaient déjà, et par trois mécanismes différents.**
+Le filtre d'activation est dans la requête — `activations: { some: {
+countryCode: pays, revokedAt: null } }` — et non dans l'affichage ; le jeu
+de démonstration refuse de s'écrire quand `NODE_ENV` vaut `production` ;
+`enregistrerLAboutissement` n'a aucun appelant. Rien n'était à corriger,
+et c'est ce qu'il fallait vérifier plutôt que supposer.
+
+**Aucun des trois ne se voit en relisant un écran**, et c'est ce qui les
+rend fragiles : une requête dont on retire une ligne, un garde de
+démarrage qu'on désactive « le temps d'un essai », une fonction qu'on
+branche parce qu'elle est écrite. Chacun a désormais son test, et les
+quatre sont éprouvés par mutation — le quatrième sort le nom du fichier
+qui a branché la fonction.
+
+**Le registre énumère ce que le contrat doit fixer ; il ne modélise pas un
+contrat.** Inventer un modèle `PartnerContract` maintenant reviendrait à
+deviner la forme d'un accord qui n'existe pas, et ses colonnes prendraient
+des valeurs par défaut — exactement ce que K.D interdit. Un test refuse
+d'ailleurs qu'un chiffre s'y glisse : un taux d'exemple écrit là
+deviendrait, par copie, le taux appliqué. C'est la faute que Q.A évitait
+sur les mentions légales, au même endroit du raisonnement.
 
 
 ---
