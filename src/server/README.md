@@ -337,11 +337,18 @@ faire semblant :
 ## Vérifier
 
 ```
-npm run check          # lint, typecheck, 678 tests, vocabulaire
-npm run db:garde-fous  # 16 écritures interdites, essayées une par une
-npm run seed:rules     # les quatre règles de référence
-npm run seed:demo      # une candidate, un veilleur, un administrateur
+npm run check             # lint, typecheck, tests, vocabulaire
+npm run smoke:migrations  # la base reconstruite depuis zéro, garde-fous compris
+npm run db:garde-fous     # 62 écritures interdites, essayées une par une
+npm run smoke:worker      # le paquet du worker, exécuté pour de bon
+npm run seed:rules        # les quatre règles de référence
+npm run seed:demo         # une candidate, un veilleur, un administrateur
 ```
+
+`db:garde-fous` échoue désormais quand une contrainte manque : le fichier
+SQL, seul, rend `0` quoi qu'il arrive — chaque bloc provoque exprès une
+violation, il ne peut pas s'arrêter à la première. La ligne « ACCEPTÉ » se
+perdait au milieu de soixante autres.
 
 `seed:demo` est le seul moyen de **voir** les écrans. Il crée une candidate
 avec un dossier en cours et un brouillon, des pièces dans plusieurs états,

@@ -125,6 +125,12 @@ model User {
   notifications Notification[]
   sessions      Session[]
   secrets       AuthSecret[]
+
+  /// La reprise des suppressions restées à mi-chemin (RG-10.4) balaie
+  /// exactement ces deux colonnes, une fois par nuit, sur toute la table.
+  /// L'index existait en base depuis la migration qui a créé les colonnes,
+  /// sans être déclaré ici : un prochain `migrate dev` l'aurait supprimé.
+  @@index([deletionRequestedAt, deletedAt])
 }
 
 /// Session serveur, révocable.

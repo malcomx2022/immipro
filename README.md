@@ -92,6 +92,42 @@ accepte réellement un job. `DATABASE_URL` doit désigner le serveur.
 
 ---
 
+## La porte de qualité
+
+Rien ne part en production sans être passé par
+[`.github/workflows/validation.yml`](.github/workflows/validation.yml). La
+CI et le déploiement appellent **le même** fichier : ce qui bloque une
+proposition bloque une image, et le déploiement ne peut pas être plus
+indulgent que la revue. Aucune étape n'y porte `continue-on-error`.
+
+| Étape | Ce qu'elle refuse de laisser passer |
+|---|---|
+| `npm ci` | une dépendance qui dérive du verrou |
+| `npm run check` | lint, types, tests, vocabulaire interdit |
+| `npm run build` | un projet testé mais qui ne construit pas |
+| `prisma validate` | un schéma syntaxiquement invalide |
+| `npm run smoke:migrations` | une migration cassée, une dérive entre `schema.prisma` et ce que les migrations produisent, un garde-fou absent |
+| `npm run smoke:worker -- --base` | un paquet worker absent, amputé, ou incapable de démarrer sur une base vierge |
+| l'image, avant sa poussée | une commande de `docker-compose.prod.yml` qui ne démarre pas dans l'image |
+
+Les trois derniers tournent aussi en local, sur n'importe quel serveur
+PostgreSQL :
+
+```bash
+DATABASE_URL=postgresql://immipro:immipro@localhost:5432/immipro \
+  npm run smoke:migrations
+```
+
+Chacun crée et supprime la base jetable dont il a besoin ; aucune base
+existante n'est touchée. `npm run db:garde-fous`, lui, s'applique à la base
+que `DATABASE_URL` désigne et échoue si une contrainte manque.
+
+L'image est construite **une fois**, éprouvée, puis poussée telle quelle :
+les commandes des conteneurs sont vérifiées contre l'empreinte qui partira,
+pas contre une reconstruction.
+
+---
+
 ## Organisation du code
 
 ```
