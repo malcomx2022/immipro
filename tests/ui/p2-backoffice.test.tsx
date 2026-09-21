@@ -145,12 +145,84 @@ describe("B-01 — File de veille", () => {
     expect(container.textContent).toContain("jamais affiché (INV-4)");
   });
 
-  it("garde la ligne d'une source muette et dit ce qui reste publié", () => {
+  /**
+   * Ce test affirmait « Rien n'est dépublié automatiquement », et c'était
+   * faux : RG-14.1 dépublie toute fiche dont la relecture est en retard,
+   * et un cron l'applique chaque nuit à trois heures. L'écran confondait
+   * deux cas distincts — une source qui ne répond pas, et une fiche que
+   * personne n'a relue — et les disait tous deux inoffensifs.
+   */
+  it("une source muette ne dépublie rien, et l'écran le dit", () => {
     const { container } = rendre(COLLECTE_PARTIELLE);
     expect(container.textContent).toContain("13 sources sur 14 relevées");
     expect(container.textContent).toContain("ind.nl n'a pas répondu");
     expect(container.textContent).toContain("Elles restent publiées");
-    expect(container.textContent).toContain("Rien n'est dépublié automatiquement");
+    expect(container.textContent).toContain("Une source injoignable ne dépublie rien");
+  });
+
+  /** L'autre cas, celui que l'écran taisait. */
+  it("une relecture en retard dépublie, et l'écran le dit aussi", () => {
+    const { container } = rendre();
+    expect(container.textContent).toContain("repasse automatiquement en brouillon");
+    expect(container.textContent).toContain("3 h");
+    expect(container.textContent).toContain("RG-14.1");
+    // L'ancienne phrase, qui rassurait précisément là où il faut alarmer.
+    expect(container.textContent).not.toContain("Rien n'est dépublié automatiquement");
+  });
+
+  /**
+   * WF-14 étape 2, branche « inchangé » — et ces tests cliquent, parce
+   * que lire le source ne suffit pas (leçon de S.1).
+   *
+   * Tant que ce bouton n'écrivait rien, une fiche relue et trouvée
+   * identique restait en retard, et le cron de trois heures finissait par
+   * la dépublier : le travail était fait, et le produit se comportait
+   * comme s'il ne l'avait pas été.
+   */
+  it("marquer relue part au serveur", async () => {
+    appels.length = 0;
+    rafraichir.mockClear();
+    reponse = { ok: true };
+    rendre();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Marquer comme relue sans changement/u }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.methode).toBe("PUT");
+    expect(appels[0]!.url).toBe("/api/admin/veille");
+    expect(appels[0]!.corps).toHaveProperty("id");
+    expect(rafraichir).toHaveBeenCalled();
+  });
+
+  it("un refus s'affiche plutôt que de se perdre", async () => {
+    appels.length = 0;
+    reponse = { ok: false };
+    rendre();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Marquer comme relue sans changement/u }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+  });
+
+  /** Les quatre boutons sans route sont partis, comme en B-03. */
+  it("n'offre plus ce que le produit ne sait pas faire", () => {
+    rendre(COLLECTE_PARTIELLE);
+    for (const disparu of [
+      /Journal des collectes/u,
+      /Nouvelle fiche/u,
+      /^Relever /u,
+      /Déclarer un incident/u,
+    ]) {
+      expect(screen.queryByRole("button", { name: disparu }), String(disparu)).toBeNull();
+    }
   });
 
   it("annonce qu'une publication versionne et alerte", () => {

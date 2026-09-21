@@ -236,9 +236,6 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
    * le jour où l'écran écrit ; aucune ne s'ajoute sans être discutée.
    */
   const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
-    // Aucune route : la collecte automatique des sources n'existe pas, et
-    // l'écran le dit déjà en toutes lettres.
-    "src/app/(admin)/veille/FileDeVeille.tsx": "aucune route de collecte",
     // Aucune route : les plafonds sont calculés, jamais modifiables.
     "src/app/(admin)/couts-ia/CoutsIa.tsx": "aucune route de plafond",
     // Les quatre boutons d'export du back-office. Aucun code d'export
