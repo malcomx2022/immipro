@@ -4,10 +4,21 @@ import { MesDonnees } from "@/app/(auth)/compte/mes-donnees/MesDonnees";
 import { ArchiveDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/archive/ArchiveDuDossier";
 import type { Archive } from "@/server/lecture/portabilite";
 
-const reponse = (corps: unknown, statut = 200) =>
+/**
+ * Les en-têtes en font partie : c'est d'elles que `telechargerFichier`
+ * tire le nom du fichier, le serveur connaissant le périmètre exact. Un
+ * stock sans en-têtes ne représentait aucune réponse réelle, et il a fallu
+ * que le lecteur s'y casse pour qu'on le remarque.
+ */
+const reponse = (corps: unknown, statut = 200, nomDeFichier?: string) =>
   Promise.resolve({
     ok: statut < 400,
     status: statut,
+    headers: new Headers(
+      nomDeFichier
+        ? { "content-disposition": `attachment; filename="${nomDeFichier}"` }
+        : {},
+    ),
     json: () => Promise.resolve(corps),
     blob: () => Promise.resolve(new Blob([JSON.stringify(corps)])),
   } as Response);

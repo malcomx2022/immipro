@@ -9,6 +9,7 @@ import {
 } from "@/domain/rules/schema";
 import { sansCommentaires } from "@/domain/copy/source";
 import { COMMANDES_ATTENDUES } from "@/domain/backoffice/couts";
+import { COMMANDES_ATTENDUES_B04 } from "@/domain/backoffice/reconciliation";
 
 const lire = (f: string) => readFileSync(f, "utf8");
 
@@ -236,14 +237,20 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
    * Chaque écran encore muet, avec ce qui lui manque. Une entrée disparaît
    * le jour où l'écran écrit ; aucune ne s'ajoute sans être discutée.
    */
-  const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
-    // Les boutons d'export du back-office. Aucun code d'export n'existe
-    // dans le dépôt. B-07 portait le quatrième : il en est sorti avec S.6,
-    // et « Modifier les plafonds » avec lui — les trois seuils sont des
-    // constantes, et deux d'entre eux sont des règles de gestion.
-    "src/app/(admin)/journal/Journal.tsx": "aucun export",
-    "src/app/(admin)/paiements/Paiements.tsx": "aucun export, aucun rapprochement manuel",
-  };
+  /**
+   * Le registre est vide, et c'est la fin de la revue.
+   *
+   * Les sept écrans du back-office portaient onze commandes inertes. Six
+   * lots les ont branchées ou retirées ; S.7 a pris les deux dernières —
+   * les exports de B-06 et B-04 —, écrit l'écrivain de CSV qui manquait au
+   * dépôt, et retiré le rapprochement manuel, qui n'a personne à
+   * interroger.
+   *
+   * Le registre reste, vide. Le supprimer retirerait le garde-fou avec la
+   * liste : c'est lui qui refuse le prochain bouton qui ne part nulle part,
+   * et il n'a plus rien à tolérer.
+   */
+  const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {};
 
   /**
    * Les attributs d'une balise, accolades équilibrées.
@@ -296,6 +303,22 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
     const b02 = "src/app/(admin)/regles/[id]/EditionRegle.tsx";
     expect(Object.keys(EN_ATTENTE_DE_BRANCHEMENT)).not.toContain(b02);
     expect(inertes(lire(b02))).toEqual([]);
+  });
+
+  /**
+   * Les deux derniers, et ils sortent par les deux chemins : B-06 et
+   * l'export de B-04 sont branchés, le rapprochement manuel est retiré.
+   */
+  it("B-06 et B-04 n'y sont plus", () => {
+    for (const ecran of [
+      "src/app/(admin)/journal/Journal.tsx",
+      "src/app/(admin)/paiements/Paiements.tsx",
+    ]) {
+      expect(inertes(lire(ecran)), ecran).toEqual([]);
+    }
+    expect(COMMANDES_ATTENDUES_B04.map((c) => c.libelle)).toEqual([
+      "Lancer le rapprochement",
+    ]);
   });
 
   /**

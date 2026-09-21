@@ -64,6 +64,34 @@ vi.mock("@/lib/api", () => ({
     );
   },
 }));
+/**
+ * Les téléchargements — S.7.
+ *
+ * Même raison que le mock ci-dessus : « Exporter la période » pouvait
+ * afficher « Préparation… » et ne rien demander à personne. Les appels
+ * sont enregistrés pour qu'un test lise l'URL partie, avec son périmètre.
+ */
+const telechargements: { url: string; nom: string }[] = [];
+let reponseDuTelechargement: { ok: boolean } = { ok: true };
+vi.mock("@/lib/telechargement", () => ({
+  telechargerFichier: (url: string, nom: string) => {
+    telechargements.push({ url, nom });
+    return Promise.resolve(
+      reponseDuTelechargement.ok
+        ? { ok: true, donnees: undefined }
+        : {
+            ok: false,
+            echec: {
+              titre: "Le fichier n'a pas pu être préparé",
+              corps: "Motif de test.",
+              conserve: "Rien n'a changé.",
+              action: "Réessayer",
+              ton: "echec",
+            },
+          },
+    );
+  },
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: rafraichir }),
   notFound: () => {
@@ -651,6 +679,7 @@ describe("B-04 — Paiements", () => {
         paiements={PAIEMENTS}
         operateur={OPERATEUR}
         journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
       />,
     );
     expect(espaces(container.textContent ?? "")).toContain("60 000 F");
@@ -663,6 +692,7 @@ describe("B-04 — Paiements", () => {
         paiements={PAIEMENTS}
         operateur={OPERATEUR_MUET}
         journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
       />,
     );
     expect(container.textContent).toContain("ne répond plus");
@@ -671,12 +701,92 @@ describe("B-04 — Paiements", () => {
     expect(espaces(container.textContent ?? "")).not.toContain("60 000 F");
   });
 
+  /**
+   * Le bouton partait dans le vide. Il pouvait afficher « Préparation… »
+   * indéfiniment sans qu'aucune requête soit sortie : c'est la leçon de
+   * S.1, et elle ne se voit qu'en cliquant.
+   */
+  it("l'export du grand livre part, avec la journée en ISO", async () => {
+    telechargements.length = 0;
+    reponseDuTelechargement = { ok: true };
+    render(
+      <Paiements
+        paiements={PAIEMENTS}
+        operateur={OPERATEUR}
+        journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Exporter le grand livre/ }));
+    });
+    expect(telechargements).toHaveLength(1);
+    expect(telechargements[0]!.url).toBe("/api/admin/paiements/export?jour=2026-09-18");
+    expect(telechargements[0]!.nom).toBe("immipro-grand-livre-2026-09-18.csv");
+  });
+
+  /**
+   * L'export part même pendant l'incident : ce sont ses totaux que le
+   * serveur retient, pas ses lignes. Retenir le fichier entier ferait
+   * croire que la journée n'existe pas.
+   */
+  it("l'export reste possible pendant l'incident", async () => {
+    telechargements.length = 0;
+    render(
+      <Paiements
+        paiements={PAIEMENTS}
+        operateur={OPERATEUR_MUET}
+        journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
+      />,
+    );
+    const bouton = screen.getByRole("button", { name: /Exporter le grand livre/ });
+    expect(bouton).toHaveProperty("disabled", false);
+    await act(async () => {
+      fireEvent.click(bouton);
+    });
+    expect(telechargements).toHaveLength(1);
+  });
+
+  it("affiche le refus du serveur sans inventer sa propre formulation", async () => {
+    telechargements.length = 0;
+    reponseDuTelechargement = { ok: false };
+    const { container } = render(
+      <Paiements
+        paiements={PAIEMENTS}
+        operateur={OPERATEUR}
+        journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Exporter le grand livre/ }));
+    });
+    reponseDuTelechargement = { ok: true };
+    expect(container.textContent).toContain("Le fichier n'a pas pu être préparé");
+  });
+
+  /** Aucune route, et `interrogation` n'est pas branchée. */
+  it("ne propose plus un rapprochement manuel qui n'existe pas", () => {
+    render(
+      <Paiements
+        paiements={PAIEMENTS}
+        operateur={OPERATEUR}
+        journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /rapprochement/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Rapprocher/ })).toBeNull();
+  });
+
   it("garde les paiements en attente, transaction inconnue", () => {
     render(
       <Paiements
         paiements={PAIEMENTS}
         operateur={OPERATEUR_MUET}
         journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
       />,
     );
     expect(screen.getAllByText("En attente de rapprochement").length).toBeGreaterThan(0);
@@ -698,6 +808,41 @@ describe("B-06 — Journal d'audit", () => {
     expect(container.textContent).toContain(
       "Motif déclaré : revue manuelle après échec d'analyse",
     );
+  });
+
+  /**
+   * La promesse la plus précise de l'écran était celle qu'aucune ligne de
+   * code ne soutenait. Le bouton emporte le périmètre affiché — période
+   * **et** catégories cochées : exporter autre chose que ce qu'on regarde
+   * est la façon la plus simple de rapporter d'un contrôle un fichier qui
+   * ne répond pas à la question posée.
+   */
+  it("l'export emporte la période affichée", async () => {
+    telechargements.length = 0;
+    reponseDuTelechargement = { ok: true };
+    rendre({ du: "2026-09-01", au: "2026-09-30" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Exporter la période/ }));
+    });
+    expect(telechargements).toHaveLength(1);
+    expect(telechargements[0]!.url).toBe(
+      "/api/admin/journal/export?du=2026-09-01&au=2026-09-30",
+    );
+    expect(telechargements[0]!.nom).toBe(
+      "immipro-journal-audit-2026-09-01_2026-09-30.csv",
+    );
+  });
+
+  it("l'export emporte aussi les catégories cochées", async () => {
+    telechargements.length = 0;
+    rendre();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Paiements", pressed: false }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Exporter la période/ }));
+    });
+    expect(telechargements[0]!.url).toContain("categorie=PAIEMENT");
   });
 
   it("ne comble jamais une période vide", () => {

@@ -2623,7 +2623,7 @@ le test, et la liste ne peut que rétrécir.
 | ~~B-03 utilisateurs~~ | ~~`PUT utilisateurs` écrite, écran muet~~ — branché en S.4 |
 | ~~B-01 veille~~ | ~~aucune route~~ — `PUT veille` écrite en S.5 |
 | ~~B-07 coûts IA~~ | ~~les plafonds sont calculés, jamais modifiables~~ — retiré en S.6, l'arbitrage est nommé |
-| B-06 journal · B-04 paiements | aucun export, aucun rapprochement manuel |
+| ~~B-06 journal · B-04 paiements~~ | ~~aucun export, aucun rapprochement manuel~~ — exports écrits en S.7, rapprochement retiré |
 
 ### S.3 — Ce que la revue a relevé et qui reste ouvert
 
@@ -2640,7 +2640,8 @@ branchées. La corrélation dit ce qu'elle dit.
 
 **Les exports n'existent pas.** Quatre boutons les promettent, et pas une
 ligne de CSV dans le dépôt. B-06 promet pourtant qu'exporter une période
-vide atteste l'absence d'écriture.
+vide atteste l'absence d'écriture. *(Réglé en S.6 pour B-07 et en S.7 pour
+les deux derniers ; l'écrivain de CSV manquait au dépôt.)*
 
 Hors du code, le registre est à jour : zéro arbitrage ouvert, trois
 réserves extérieures (L.A, M.C, Q.A), six pages publiques dont quatre
@@ -3062,3 +3063,126 @@ et B-06.
 
 L'exécution a trouvé un défaut de plus, que onze mutations n'avaient pas
 attrapé : « sur 1 dossiers ». Il n'y avait pas de test, il y en a un.
+
+### S.7 — Les exports n'existaient pas, et le dépôt n'avait pas d'écrivain
+
+Dernier point de la revue. Quatre boutons promettaient un fichier depuis le
+début et **pas une ligne de CSV n'existait dans le dépôt** — B-07 en a rendu
+un en S.6, les deux derniers sont ici, et le quatrième est parti avec lui.
+
+Les deux promesses restantes étaient les plus précises de tout le
+back-office, et c'est ce qui les rendait coûteuses :
+
+> L'export d'une période vide reste possible : il produit un fichier
+> attestant l'absence d'écriture. *(B-06, à l'écran)*
+
+> Un chiffre partiel présenté comme un total est une erreur comptable, et
+> elle se propage **dans l'export puis dans le rapport**. *(B-04, dans le
+> domaine)*
+
+La première décrivait le contenu d'un fichier que personne ne pouvait
+produire. La seconde nommait l'export comme le lieu où la faute devient
+durable — et l'export n'existait pas, si bien que la règle n'était tenue
+qu'à l'écran, là où elle coûte le moins cher. Un total faux affiché
+disparaît au rechargement ; le même dans un fichier part au comptable et
+revient dans un rapport six semaines plus tard, sans l'encadré rouge qui
+disait pourquoi il était faux.
+
+#### L'écrivain de CSV, et les trois choses qu'un `join(";")` ne tient pas
+
+**Une cellule ne devient jamais une formule.** Un tableur exécute le
+contenu d'une cellule qui commence par `=`, `+`, `-`, `@`, une tabulation
+ou un retour chariot. Les deux exports portent du texte libre : le motif
+qu'un opérateur a saisi en suspendant un compte, le constat d'un écart, la
+référence rendue par un opérateur de paiement. Un motif commençant par
+`=HYPERLINK(…)` s'exécuterait à l'ouverture, sur le poste d'un contrôleur,
+avec ses droits.
+
+Le texte est donc préfixé d'une apostrophe — et **les nombres ne passent
+pas par là** : un montant négatif commence légitimement par `-`, et le
+neutraliser en ferait du texte qu'aucune somme ne reprendrait. D'où une
+cellule typée plutôt que devinée au contenu.
+
+**Le séparateur et la virgule décimale vont ensemble.** Point-virgule et
+décimales à la virgule : c'est ce qu'attend un tableur en français, et
+c'est un contrôleur français qui ouvre le fichier. Avec une virgule pour
+séparateur, « 1 234,50 » couperait la ligne en deux.
+
+**La marque d'octets, sans quoi les accents tombent.** Sans BOM, Excel lit
+l'UTF-8 comme du Latin-1 : « Écritures » devient « Ã‰critures ». Le fichier
+resterait juste et paraîtrait cassé.
+
+#### Ce que chaque export refuse
+
+| Export | Ce qu'il refuse de faire |
+|---|---|
+| B-06 | se taire sur une période vide — l'en-tête atteste l'absence, parce qu'un fichier vide se confond avec un export qui a échoué |
+| B-06 | se plafonner à deux cents lignes comme la lecture d'écran : un export tronqué en silence est une attestation fausse |
+| B-04 | porter un total pendant un incident de l'opérateur, tout en gardant ses lignes — elles sont exactes |
+| B-04 | additionner des francs et des euros : une somme par monnaie, jamais une somme tout court |
+
+Le plafond est devenu un paramètre **obligatoire** du lecteur, avec
+`"aucun"` écrit en clair. Un paramètre facultatif se laisse oublier, et
+l'oubli irait dans le sens du danger.
+
+Les deux routes sont au régime `sensible` et non `lecture` — elles
+rassemblent en un fichier tout ce qu'un périmètre contient, ce qu'un accès
+volé chercherait à obtenir d'un seul appel — et **journalisées avant de
+produire le fichier** : après coup, un export qui échoue à l'écriture ne
+laisserait aucune trace, et c'est celui-là qu'on voudrait voir.
+
+#### Le rapprochement manuel est parti
+
+Le second bouton de B-04 proposait « Lancer le rapprochement » ou
+« Rapprocher à la main » selon l'état de l'opérateur, et rien derrière. Le
+second libellé était le plus trompeur : il offrait la seule chose qui
+aurait servi pendant un incident. Rapprocher demande d'interroger
+l'opérateur, et `interrogation` n'est pas branchée — il n'y a personne à
+interroger. Nommé dans `COMMANDES_ATTENDUES_B04`.
+
+#### Trois garde-fous qui ne mordaient pas
+
+Le premier lisait le source brut pour vérifier le régime de limitation — et
+l'en-tête de la route **explique justement** pourquoi il est « sensible » et
+non « lecture ». Le garde-fou était satisfait par sa propre prose : passer
+la route en `limite: "lecture"` ne le faisait pas broncher. Troisième fois
+de cette revue, et troisième fois que la réponse est `sansCommentaires`.
+
+Le deuxième vérifiait que `journaliser(` apparaît avant `new Response(`.
+Envelopper l'appel dans une fonction jamais appelée le laissait au même
+endroit du fichier. C'est l'**attente** qui fait la trace, pas la position.
+
+Le troisième gardait « une seule requête d'identités pour deux cents
+lignes » en lisant le corps de `journal()`. Ce lot a déplacé ce corps dans
+un lecteur partagé, et le garde-fou est passé au vert en trouvant une
+fonction devenue vide. Il porte maintenant sur le lecteur, et vérifie que
+les deux entrées y passent sans requête à elles.
+
+**Exécuté contre PostgreSQL**, avec un motif hostile écrit en base :
+
+    journal, 2 écritures  → en-tête : période, catégories, « Écritures;2 »
+                            motif =HYPERLINK(…) rendu "'=HYPERLINK(""…"")"
+                            — préfixé, entre guillemets, inerte
+
+    période vide          → « Écritures;0 » + attestation d'absence
+                            colonnes présentes : un contrôleur voit ce qui
+                            aurait été rempli
+
+    grand livre, ok       → Total encaissé (EUR);29,50
+                            Total encaissé (XOF);15000
+    grand livre, muet     → Total encaissé;« Total non calculé : … »
+                            les deux lignes de paiement, inchangées
+
+L'exécution a trouvé un défaut qu'aucune des dix-sept mutations
+n'attrapait : l'en-tête gardait une ligne vide à la place de l'attestation
+quand il n'y avait rien à attester, ce qui ajoutait une rangée vide au
+tableur et donnait aux deux fichiers des en-têtes de hauteurs différentes.
+Visible en ouvrant les deux côte à côte, jamais dans une assertion sur le
+contenu.
+
+#### Le registre des commandes inertes est vide
+
+Les sept écrans du back-office portaient onze commandes qui ne partaient
+nulle part. Six lots les ont branchées ou retirées. Le registre reste,
+vide : le supprimer retirerait le garde-fou avec la liste, et c'est lui qui
+refusera le prochain bouton qui ne mène à rien.

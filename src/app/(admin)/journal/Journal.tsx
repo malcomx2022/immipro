@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
+import { telechargerFichier } from "@/lib/telechargement";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
 import {
   CATEGORIES,
@@ -10,6 +13,7 @@ import {
   MENTION_IMMUABLE,
   MENTION_MOTIF_ACCES,
   diagnostiquerPeriode,
+  nomDeLExport,
   filtrerAudit,
   type CategorieAudit,
   type EcritureAudit,
@@ -29,6 +33,18 @@ import { cn } from "@/lib/utils";
  * L'export d'une période vide reste possible : il produit un fichier qui
  * atteste l'absence d'écriture, ce qui est précisément ce qu'un contrôle
  * demande.
+ *
+ * ── Et cette promesse n'était tenue par rien ────────────────────────────
+ *
+ * « Exporter la période » n'était relié à aucune route, et aucune ligne de
+ * CSV n'existait dans le dépôt. La phrase la plus précise de l'écran était
+ * celle qu'aucun code ne soutenait : elle décrivait le contenu d'un fichier
+ * que personne ne pouvait produire.
+ *
+ * Le bouton emporte désormais le périmètre affiché — la période **et** les
+ * catégories cochées. Exporter autre chose que ce qu'on regarde est la
+ * façon la plus simple de rapporter d'un contrôle un fichier qui ne répond
+ * pas à la question posée.
  */
 const FORMAT_HORODATAGE = new Intl.DateTimeFormat("fr-FR", {
   day: "2-digit",
@@ -48,6 +64,25 @@ export function Journal({
   periode: Periode;
 }) {
   const [categories, setCategories] = useState<CategorieAudit[]>([]);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+
+  /**
+   * L'export porte le périmètre affiché, pas le journal entier : la
+   * période et les catégories cochées partent dans la requête.
+   */
+  async function exporter() {
+    setEnvoi(true);
+    setEchec(null);
+    const parametres = new URLSearchParams({ du: periode.du, au: periode.au });
+    for (const categorie of categories) parametres.append("categorie", categorie);
+    const resultat = await telechargerFichier(
+      `/api/admin/journal/export?${parametres}`,
+      nomDeLExport(periode),
+    );
+    setEnvoi(false);
+    if (!resultat.ok) setEchec(resultat.echec);
+  }
 
   const visibles = filtrerAudit(ecritures, periode, categories);
   const vide = diagnostiquerPeriode(ecritures, periode, categories, (iso) =>
@@ -64,10 +99,21 @@ export function Journal({
       <EnteteAdmin
         titre="Journal d'audit"
         resume={`${MENTION_IMMUABLE} ${visibles.length} ${visibles.length > 1 ? "entrées" : "entrée"} sur la période.`}
-        actions={<Button variante="secondaire">Exporter la période</Button>}
+        actions={
+          <Button
+            variante="secondaire"
+            disabled={envoi}
+            raisonDesactivation="Préparation du fichier en cours."
+            onClick={exporter}
+          >
+            {envoi ? "Préparation…" : "Exporter la période"}
+          </Button>
+        }
       />
 
       <div className="flex flex-col gap-4 p-6">
+        {echec ? <BlocEchec echec={echec} annonce /> : null}
+
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-14 text-ink-700">
             Du {jourEnFrancais(periode.du)} au {jourEnFrancais(periode.au)}

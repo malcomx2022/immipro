@@ -365,10 +365,65 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "regle.publication": "REGLE",
   "contenu.publication": "REGLE",
   "revue.decision": "ACCES_PIECE",
+  /**
+   * Les deux exports du back-office.
+   *
+   * Aucune des quatre catégories de WF-15 ne nomme l'administration du
+   * journal lui-même : le grand livre se range avec les paiements sans
+   * difficulté, l'export du journal n'a pas d'endroit juste. Il est classé
+   * ici plutôt que laissé au repli — un opérateur qui filtre sur
+   * « Comptes » doit au moins le voir, et un classement décidé se relit,
+   * là où un classement hérité d'un `??` ne se remarque jamais.
+   */
+  "paiements.export": "PAIEMENT",
+  "journal.export": "COMPTE",
 };
 
+/**
+ * Les écritures d'une période, sans plafond.
+ *
+ * `journal()` en prend deux cents : c'est une lecture d'écran, et deux
+ * cents lignes remplissent un tableau. Un export n'a pas le même droit —
+ * tronqué en silence, il serait une attestation fausse, et c'est
+ * exactement ce qu'un contrôle vient chercher. Les bornes sont incluses,
+ * comme celles de `filtrerAudit`.
+ */
+/**
+ * Le plafond est dit, jamais omis.
+ *
+ * Un paramètre facultatif se laisse oublier, et l'oubli irait dans le sens
+ * du danger : un export plafonné en silence est une attestation fausse.
+ * `"aucun"` s'écrit, se lit dans la diff, et se vérifie.
+ */
+type Plafond = number | "aucun";
+
+export async function journalDeLaPeriode(periode: {
+  du: string;
+  au: string;
+}): Promise<EcritureAudit[]> {
+  return lireLeJournal("aucun", {
+    createdAt: {
+      gte: new Date(`${periode.du}T00:00:00.000Z`),
+      lt: new Date(new Date(`${periode.au}T00:00:00.000Z`).getTime() + 86_400_000),
+    },
+  });
+}
+
+/** Deux cents lignes remplissent un tableau : c'est une lecture d'écran. */
 export async function journal(filtre?: CategorieAudit): Promise<EcritureAudit[]> {
-  const lignes = await db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
+  const lignes = await lireLeJournal(200);
+  return lignes.filter((e) => (filtre ? e.categorie === filtre : true));
+}
+
+async function lireLeJournal(
+  plafond: Plafond,
+  where?: { createdAt: { gte: Date; lt: Date } },
+): Promise<EcritureAudit[]> {
+  const lignes = await db.auditLog.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    ...(plafond === "aucun" ? {} : { take: plafond }),
+  });
 
   /**
    * Les identités, en une requête pour deux cents lignes.
@@ -413,8 +468,7 @@ export async function journal(filtre?: CategorieAudit): Promise<EcritureAudit[]>
         detail: l.reason,
         origine: origineDe(l.actorId),
       };
-    })
-    .filter((e) => (filtre ? e.categorie === filtre : true));
+    });
 }
 
 /**
