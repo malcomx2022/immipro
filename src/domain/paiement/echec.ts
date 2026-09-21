@@ -8,6 +8,27 @@
  * vérifier. Aucun code technique n'apparaît côté candidat : le back-office y
  * a droit, parce que son lecteur agit dessus.
  *
+ * **Le motif est commun aux deux rails, sa prose ne l'est pas** — arbitrage
+ * du 21/09/2026. O.A avait adapté le refus sans raison ; les cinq autres
+ * motifs continuaient de parler Mobile Money à un payeur par carte.
+ *
+ * Ce que chaque rail a le droit de nommer :
+ *
+ * | Rail | Vocabulaire |
+ * |---|---|
+ * | Mobile Money | portefeuille, opérateur, téléphone, notification |
+ * | Carte | banque, carte, relevé, confirmation bancaire |
+ *
+ * Et les interdits, qui sont le vrai garde-fou : **aucun texte de carte ne
+ * mentionne une notification Mobile Money, un opérateur téléphonique, un
+ * téléphone, un code USSD ou un portefeuille** ; et « banque » ne s'écrit
+ * pas sur un échec Mobile Money, où aucune banque n'intervient. Une phrase
+ * partagée reste neutre — c'est la condition pour être partagée.
+ *
+ * Les phrases sont écrites en entier de chaque côté plutôt qu'assemblées
+ * autour d'un nom variable : la leçon d'O.A, où « ton portefeuille Mobile
+ * Money est active » est sorti d'une phrase à trous.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
@@ -143,10 +164,14 @@ export function echecPourMotif(
       corps:
         "Les cinq minutes se sont écoulées sans confirmation. Ton dossier est conservé, tu peux relancer le paiement maintenant.",
       verifications: [
-        "La notification Mobile Money peut arriver avec du retard sur un réseau lent.",
-        numero
-          ? `Si elle n'est jamais arrivée, vérifie que le ${numero} est bien ton numéro actif.`
-          : "Si elle n'est jamais arrivée, vérifie le numéro enregistré sur ton profil.",
+        rail === "MOBILE_MONEY"
+          ? "La notification Mobile Money peut arriver avec du retard sur un réseau lent."
+          : "La page de confirmation de ta banque met parfois un moment à s'afficher.",
+        rail === "MOBILE_MONEY"
+          ? numero
+            ? `Si elle n'est jamais arrivée, vérifie que le ${numero} est bien ton numéro actif.`
+            : "Si elle n'est jamais arrivée, vérifie le numéro enregistré sur ton profil."
+          : "Si elle ne s'est jamais affichée, vérifie que rien ne bloque la fenêtre qu'elle ouvre.",
         consulterSesOperations(rail),
       ],
     };
@@ -195,10 +220,17 @@ export function echecPourMotif(
     return {
       titre: "Le paiement a été annulé",
       corps:
-        "L'opération a été interrompue avant d'être confirmée — sur ton téléphone, ou en quittant la page de paiement. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+        rail === "MOBILE_MONEY"
+          ? "L'opération a été interrompue avant d'être confirmée — sur ton téléphone, ou en quittant la page de paiement. Aucun montant n'a été débité, et ton dossier est conservé en l'état."
+          : "L'opération a été interrompue avant d'être confirmée — à l'étape de confirmation de ta banque, ou en quittant la page de paiement. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
       verifications: [
+        // Neutre, donc partagée : ni le téléphone ni la banque n'y sont
+        // pour quelque chose, et c'est précisément ce qui la rend juste
+        // des deux côtés.
         "Relancer le paiement en ouvre un nouveau : rien n'est débité deux fois.",
-        "Si tu n'as rien annulé, la notification a pu expirer avant ta saisie.",
+        rail === "MOBILE_MONEY"
+          ? "Si tu n'as rien annulé, la notification a pu expirer avant ta saisie."
+          : "Si tu n'as rien annulé, la page de confirmation de ta banque a pu expirer avant ta saisie.",
         consulterSesOperations(rail),
       ],
     };
@@ -206,14 +238,23 @@ export function echecPourMotif(
 
   if (motif === "moyen_invalide") {
     return {
-      titre: "Ce moyen de paiement n'a pas été accepté",
+      titre:
+        rail === "MOBILE_MONEY"
+          ? "Ce moyen de paiement n'a pas été accepté"
+          : "Cette carte n'a pas été acceptée",
       corps:
-        "L'émetteur l'a refusé pour une raison qui tient au moyen lui-même, pas à ton solde. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+        rail === "MOBILE_MONEY"
+          ? "L'émetteur l'a refusé pour une raison qui tient au moyen lui-même, pas à ton solde. Aucun montant n'a été débité, et ton dossier est conservé en l'état."
+          : "Ta banque l'a refusée pour une raison qui tient à la carte elle-même, pas à ton solde. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
       verifications: [
-        numero
+        rail === "MOBILE_MONEY" && numero
           ? `Vérifie que le ${numero} est bien actif et autorisé au paiement marchand.`
-          : "Vérifie que ton moyen de paiement est actif et autorisé au paiement marchand.",
-        "Une carte a une date d'expiration ; un portefeuille, un plafond à activer.",
+          : INSTRUMENT_AUTORISE[rail],
+        rail === "MOBILE_MONEY"
+          ? "Un portefeuille a un plafond, et le paiement marchand s'y active à part."
+          : "Une carte a une date d'expiration, et le paiement en ligne s'y autorise à part.",
+        // L'autre grille est un fait de tarification, pas de rail : la
+        // phrase ne nomme aucun instrument, et n'a donc pas à varier.
         "L'autre grille se règle par un autre moyen, et il fonctionne peut-être.",
       ],
     };
@@ -225,6 +266,8 @@ export function echecPourMotif(
       corps:
         "Elle est du côté de l'émetteur ou de notre prestataire, pas du tien. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
       verifications: [
+        // Les deux premières lignes ne nomment aucun instrument : une panne
+        // est une panne des deux côtés, et rien n'y est propre au rail.
         "Il n'y a rien à corriger sur ton compte : réessaie dans quelques minutes.",
         "Si cela se répète, l'autre grille passe par un autre prestataire.",
         consulterSesOperations(rail),
@@ -234,15 +277,26 @@ export function echecPourMotif(
 
   if (motif === "notification_absente") {
     return {
-      titre: "La notification n'est pas arrivée",
+      titre:
+        rail === "MOBILE_MONEY"
+          ? "La notification n'est pas arrivée"
+          : "La confirmation de ta banque n'est pas arrivée",
       corps:
-        "Ton opérateur ne l'a pas encore envoyée, ou elle s'est perdue en route. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+        rail === "MOBILE_MONEY"
+          ? "Ton opérateur ne l'a pas encore envoyée, ou elle s'est perdue en route. Aucun montant n'a été débité, et ton dossier est conservé en l'état."
+          : "Ta banque ne l'a pas encore transmise, ou elle s'est perdue en route. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
       verifications: [
-        "Sur un réseau lent, elle met parfois plus d'une minute à arriver.",
-        numero
-          ? `Vérifie que le ${numero} est bien ton numéro actif.`
-          : "Vérifie le numéro enregistré sur ton profil.",
-        "Relancer le paiement en envoie une nouvelle : rien n'est débité deux fois.",
+        rail === "MOBILE_MONEY"
+          ? "Sur un réseau lent, elle met parfois plus d'une minute à arriver."
+          : "Elle met parfois plus d'une minute à nous parvenir.",
+        rail === "MOBILE_MONEY"
+          ? numero
+            ? `Vérifie que le ${numero} est bien ton numéro actif.`
+            : "Vérifie le numéro enregistré sur ton profil."
+          : consulterSesOperations(rail),
+        rail === "MOBILE_MONEY"
+          ? "Relancer le paiement en envoie une nouvelle : rien n'est débité deux fois."
+          : "Relancer le paiement en demande une nouvelle : rien n'est débité deux fois.",
       ],
     };
   }
@@ -256,10 +310,16 @@ export function echecPourMotif(
   return {
     titre: "Ton solde n'a pas couvert le paiement",
     corps:
-      "Ton opérateur a refusé l'opération pour solde insuffisant. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
+      rail === "MOBILE_MONEY"
+        ? "Ton opérateur a refusé l'opération pour solde insuffisant. Aucun montant n'a été débité, et ton dossier est conservé en l'état."
+        : "Ta banque a refusé l'opération pour solde insuffisant. Aucun montant n'a été débité, et ton dossier est conservé en l'état.",
     verifications: [
+      // Le montant et la date de confirmation ne dépendent pas du rail :
+      // la phrase se partage sans rien nommer qui varie.
       `Le solde disponible doit couvrir ${montant} au moment de la confirmation.`,
-      "Un rechargement met parfois quelques minutes à être pris en compte.",
+      rail === "MOBILE_MONEY"
+        ? "Un rechargement met parfois quelques minutes à être pris en compte."
+        : "Une provision qui vient d'arriver met parfois un moment à être disponible.",
       consulterSesOperations(rail),
     ],
   };

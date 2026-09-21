@@ -9,16 +9,21 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import type { PaiementEnCours } from "@/server/lecture/paiements";
 import {
+  AUPRES_DE,
+  CONSIGNE_ATTENTE,
   etatDeLEtape,
   ETAPES_ATTENTE,
   LIBELLES_ETAPES,
   PERIODE_RELEVE_SECONDES,
+  RIEN_RECU,
+  TITRE_ATTENTE,
   attenteExpiree,
   rebours,
   reessaiPropose,
   secondesDepuisReleve,
   suiteDeLAttente,
 } from "@/domain/paiement/attente";
+import { railDe } from "@/domain/payments/rail";
 import { cn, formatMontant } from "@/lib/utils";
 
 /**
@@ -116,6 +121,10 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
   }, [attente.reference, expiree, router]);
 
   const montant = formatMontant(attente.montant, attente.devise);
+  // La devise décide du rail, et le rail de la voix de l'écran : le même
+  // fil d'étapes se lit différemment selon qu'un opérateur ou une banque
+  // est au bout.
+  const rail = railDe(attente.devise);
 
   return (
     <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
@@ -129,12 +138,9 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
           tabIndex={-1}
           className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-32"
         >
-          Confirme le paiement sur ton téléphone
+          {TITRE_ATTENTE[rail]}
         </h1>
-        <p className="text-pretty text-16 text-ink-700">
-          Saisis ton code PIN sur la notification que ton opérateur vient
-          d&apos;envoyer.
-        </p>
+        <p className="text-pretty text-16 text-ink-700">{CONSIGNE_ATTENTE[rail]}</p>
       </div>
 
       {/* Le statut seul est dans la région vivante. */}
@@ -149,7 +155,7 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
         <span className="text-13 text-ink-500">temps restant pour confirmer</span>
         {expiree ? null : (
           <span className="font-mono text-13 text-ink-700">
-            vérifié auprès de l&apos;opérateur il y a {secondesDepuisReleve(ecoulees)} s
+            {AUPRES_DE[rail]} il y a {secondesDepuisReleve(ecoulees)} s
           </span>
         )}
       </div>
@@ -170,7 +176,7 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
                   etat === "a_venir" && "text-ink-500",
                 )}
               >
-                {LIBELLES_ETAPES[etape](attente.telephone)}
+                {LIBELLES_ETAPES[etape](attente.telephone, rail)}
               </span>
             </li>
           );
@@ -198,7 +204,7 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
           href={`/paiement/echec?tx=${encodeURIComponent(attente.reference)}`}
           className="flex min-h-touch items-center justify-center text-14 font-semibold text-accent-600"
         >
-          Je n&apos;ai rien reçu
+          {RIEN_RECU[rail]}
         </Link>
         <Link
           href="/tableau-de-bord"

@@ -2229,7 +2229,7 @@ celles qui ne lisent rien.
 
 ## Annexe R · Les constats accumulés, arbitrés
 
-Cinq manques relevés au fil des lots, qu'aucune décision ne couvrait.
+Cinq manques relevés au fil des lots, qu’aucune décision ne couvrait.
 Arbitrés le 21/09/2026, et traités un par un.
 
 ### R.1 — La résolution des écarts en back-office
@@ -2360,3 +2360,72 @@ interdit désormais la seconde.
 Avec un rail branché, les deux tentatives rendent `envoyee`, la date de
 demande ne bouge pas à la seconde, la clé est identique aux deux, et le
 statut reste `CONFIRMEE` : seul le webhook signé écrit le versement.
+
+### R.3 — La prose adaptée au rail
+
+**Tranché : le motif est commun aux deux rails, sa prose ne l'est pas.**
+
+O.A avait adapté un motif d'échec sur sept. Les six autres continuaient de
+parler Mobile Money à un payeur par carte en euros : « la notification
+Mobile Money peut arriver avec du retard », « vérifie que le 97 •• •• 42
+est bien ton numéro actif », « compose le *880# ». Aucun de ces conseils
+n'est exécutable par quelqu'un qui paie par carte, et le dernier est un
+code d'opérateur béninois.
+
+Ce que chaque rail a le droit de nommer — Mobile Money : portefeuille,
+opérateur, téléphone, notification ; carte : banque, carte, relevé,
+confirmation bancaire. Et les interdits, qui sont le vrai garde-fou :
+aucun texte de carte ne mentionne une notification Mobile Money, un
+opérateur, un téléphone, un code USSD ou un portefeuille, et « banque »
+ne s'écrit pas sur un échec Mobile Money, où aucune banque n'intervient.
+Une phrase partagée reste neutre — c'est la condition pour être partagée,
+et un test vérifie que les phrases identiques d'un rail à l'autre ne
+nomment aucun instrument.
+
+Les phrases sont écrites en entier de chaque côté plutôt qu'assemblées
+autour d'un nom variable : c'est la leçon d'O.A, où « ton portefeuille
+Mobile Money est active » est sorti d'une phrase à trous.
+
+**Le texte Mobile Money n'a pas bougé d'un caractère.** Sept motifs,
+quatorze écrans, et seule la moitié carte est neuve.
+
+#### Ce que l'application de la décision a trouvé
+
+**Le même défaut vivait une page plus tôt.** La décision porte sur les
+motifs d'échec, mais les deux devises mènent à `/paiement/attente`, et
+$-03 n'y parlait que Mobile Money : « Confirme le paiement sur ton
+téléphone » en titre, « Saisis ton code PIN » sous lui, « vérifié auprès
+de l'opérateur » dans le rebours, et les trois étapes du fil. Le titre
+d'un écran est la phrase la plus lue de l'écran. Corriger $-05 en
+laissant $-03 aurait réparé l'écran d'après en gardant celui d'avant :
+l'interdit s'applique où il est vrai, pas où il a été énoncé.
+
+**Le garde-fou du JSX ne gardait rien.** Il lisait `extraireChaines`,
+c'est-à-dire les chaînes entre guillemets. En remettant « Confirme le
+paiement sur ton téléphone » à la place de `{TITRE_ATTENTE[rail]}`, les
+dix tests passaient encore : un texte JSX n'est pas une chaîne, et c'est
+pourtant la façon la plus naturelle d'écrire une phrase dans un
+composant. Le garde connaissait la forme pour laquelle il avait été
+écrit — N.C, O.B, Q.A, R.1 et R.2 ont chacun donné la leçon sous un
+autre visage. Il lit maintenant tout le source, commentaires retirés.
+
+**Et un mot juste dans un écran faux.** « Je n'ai rien reçu », le lien
+d'échappement de $-03, ne contient aucun terme proscrit : les deux listes
+le laissent passer. Il décrit pourtant une notification qu'on attend, et
+par carte rien ne s'envoie — une page s'affiche, ou elle ne s'affiche
+pas. Vu à l'écran, pas en test. Une prose adaptée au rail ne se réduit
+pas à éviter des mots : elle décrit ce qui se passe réellement de ce
+côté-là.
+
+**Les quatorze écrans, lus au navigateur** contre une base réelle, un
+paiement XOF et un paiement EUR du même compte :
+
+    $-03  XOF   Confirme le paiement sur ton téléphone
+                Saisis ton code PIN sur la notification…
+                vérifié auprès de l'opérateur · Je n'ai rien reçu
+          EUR   Confirme le paiement auprès de ta banque
+                Valide la demande de confirmation que ta banque…
+                vérifié auprès de ta banque · La confirmation ne s'affiche pas
+
+    $-05  XOF   sept motifs · *880#, notification, numéro, portefeuille
+          EUR   sept motifs · relevé, page de confirmation, carte, banque
