@@ -1,7 +1,8 @@
-import type { Application, Document } from "@prisma/client";
+import type { Application, Document, VisaRule } from "@prisma/client";
 import type { Piece } from "@/domain/dossiers/piece";
 import { completudeDesPieces, premiereATraiter, libelleAction } from "@/domain/dossiers/piece";
 import type { Dossier, StatutDossier } from "@/domain/dossiers/dossier";
+import { dateDeDepot } from "@/domain/dossiers/faisabilite";
 import type { FicheDestination } from "@/domain/destinations/fiche";
 
 /**
@@ -66,33 +67,54 @@ export function versStatut(statut: Application["status"]): StatutDossier {
   }
 }
 
+/**
+ * `delai_traitement_jours.max`, lu défensivement.
+ *
+ * `rules` est un `jsonb` : le schéma le garantit à l'écriture, il ne le
+ * garantit pas sur une ligne écrite avant lui. Une valeur d'un autre type
+ * vaut absence — et l'absence n'est pas zéro, elle fait retomber le dépôt
+ * sur la date cible, ce que l'appelant sait lire.
+ */
+export function delaiInstructionJours(rules: unknown): number | null {
+  if (typeof rules !== "object" || rules === null) return null;
+  const delai = (rules as Record<string, unknown>).delai_traitement_jours;
+  if (typeof delai !== "object" || delai === null) return null;
+  const max = (delai as Record<string, unknown>).max;
+  return typeof max === "number" && Number.isFinite(max) ? max : null;
+}
+
 export function versDossier(
   dossier: Application,
   documents: readonly Document[],
   destination: FicheDestination,
+  /** Règle **figée** du dossier (INV-3), d'où vient le délai d'instruction. */
+  regle: Pick<VisaRule, "rules"> | null,
 ): Dossier {
   const pieces = documents.map(versPiece);
+  /*
+    Deux dates, et elles ne se confondent plus.
+
+    `targetDate` est la **date cible** — rentrée ou prise de poste : DOC-11
+    WF-09 étape 1 construit l'échéancier « à rebours depuis la date cible
+    (rentrée, prise de poste) », et `echeancesDepuis` en retire le délai
+    d'instruction pour poser l'échéance « dépôt ». La base le confirme :
+    cible au 1er septembre, dépôt au 3 juin.
+
+    Le champ s'appelait `depotVise`, et ce nom a fait trois écrans faux et
+    deux calculs faux — la péremption d'une pièce et la version de règle
+    applicable se décident au jour du **dépôt**. Les deux dates sont donc
+    portées séparément, et chaque appelant choisit la sienne.
+  */
+  const cible = dossier.targetDate?.toISOString().slice(0, 10);
   return {
     id: dossier.id,
     destination,
     statut: versStatut(dossier.status),
-    /*
-      `targetDate` est la **date cible** — rentrée ou prise de poste —, pas
-      la date de dépôt : DOC-11 WF-09 étape 1 construit l'échéancier « à
-      rebours depuis la date cible (rentrée, prise de poste) », et
-      `echeancesDepuis` en retire le délai d'instruction pour poser
-      l'échéance « dépôt ». La base le confirme : cible au 1er septembre,
-      dépôt au 3 juin.
-
-      Le nom de ce champ dit pourtant « dépôt », et c'est de là que vient
-      la divergence — C-10 affichait « Dépôt visé le 1er septembre » au-
-      dessus d'une ligne « Dépôt de la demande — 3 juin ». Les écrans
-      disent maintenant « départ visé ». Le champ n'est pas renommé dans
-      ce lot : il traverse l'export de portabilité et l'alerte de
-      péremption, qui demandent chacun leur propre décision.
-    */
-    ...(dossier.targetDate
-      ? { depotVise: dossier.targetDate.toISOString().slice(0, 10) }
+    ...(cible
+      ? {
+          departVise: cible,
+          depot: dateDeDepot(cible, delaiInstructionJours(regle?.rules)),
+        }
       : {}),
     completude: completudeDesPieces(pieces),
     prochaineAction: prochaineAction(pieces),

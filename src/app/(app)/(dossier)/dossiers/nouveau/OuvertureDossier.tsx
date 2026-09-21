@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { libellePieces, type FicheDestination } from "@/domain/destinations/fiche";
 import { getPack } from "@/domain/payments/pricing";
+import { jourEnFrancais } from "@/domain/format/moment";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { formatMontant } from "@/lib/utils";
@@ -15,14 +16,28 @@ import { formatMontant } from "@/lib/utils";
 /**
  * C-05 — Ouverture de dossier.
  *
- * La date de dépôt commande l'échéancier : c'est la seule question vraiment
+ * La date cible commande l'échéancier : c'est la seule question vraiment
  * nécessaire, et « Je ne sais pas encore » est une réponse valable — forcer
  * une date inventée produirait un échéancier faux.
  *
- * Les deux dates proposées sont calculées depuis aujourd'hui et non écrites
- * en dur. Figées, elles finissent dans le passé et l'écran propose alors des
- * dépôts impossibles — le même défaut que les créneaux de consultant du lot
- * WF-12.
+ * ── La question demandait le dépôt, le champ stockait la rentrée ───────
+ *
+ * L'écran demandait « Quand veux-tu déposer ta demande ? » et proposait le
+ * 15 janvier. La réponse partait dans `Application.targetDate`, que DOC-11
+ * WF-09 étape 1 définit comme la **date cible** — rentrée ou prise de
+ * poste —, et dont `echeancesDepuis` retire le délai d'instruction pour
+ * poser l'échéance de dépôt. Un candidat qui répondait « je dépose le 15
+ * janvier » se voyait donc fixer un dépôt au 17 octobre : tout son
+ * échéancier avançait de quatre-vingt-dix jours.
+ *
+ * Ce n'était pas une étiquette de travers, c'était la mauvaise donnée à la
+ * source. La question porte maintenant sur ce que le champ contient, et
+ * l'écran dit que le dépôt s'en déduira.
+ *
+ * Les dates proposées sont calculées depuis aujourd'hui et non écrites en
+ * dur. Figées, elles finissent dans le passé et l'écran propose alors des
+ * départs impossibles — le même défaut que les créneaux de consultant du
+ * lot WF-12.
  */
 interface Rentree {
   valeur: string;
@@ -32,13 +47,6 @@ interface Rentree {
   iso?: string;
 }
 
-const FORMAT_LONG = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
 /** Prochaine occurrence d'un jour et d'un mois, strictement à venir. */
 function prochaine(mois: number, jour: number, aujourdhui: Date): Date {
   const cette = new Date(Date.UTC(aujourdhui.getUTCFullYear(), mois - 1, jour));
@@ -47,20 +55,26 @@ function prochaine(mois: number, jour: number, aujourdhui: Date): Date {
 }
 
 export function datesProposees(aujourdhui = new Date()): Rentree[] {
-  const janvier = prochaine(1, 15, aujourdhui);
-  const mai = prochaine(5, 2, aujourdhui);
+  /*
+    Les deux rentrées, et non plus les deux fenêtres de dépôt. Le champ
+    porte la date cible ; proposer des dates de dépôt y écrivait une
+    rentrée de janvier, dont l'échéancier déduisait ensuite un dépôt en
+    octobre de l'année précédente.
+  */
+  const septembre = prochaine(9, 1, aujourdhui);
+  const fevrier = prochaine(2, 1, aujourdhui);
   return [
     {
-      valeur: "janvier",
-      libelle: FORMAT_LONG.format(janvier),
-      description: "rentrée de septembre suivante",
-      iso: janvier.toISOString().slice(0, 10),
+      valeur: "septembre",
+      libelle: jourEnFrancais(septembre.toISOString()),
+      description: "rentrée de septembre",
+      iso: septembre.toISOString().slice(0, 10),
     },
     {
-      valeur: "mai",
-      libelle: FORMAT_LONG.format(mai),
-      description: "rentrée de février suivante",
-      iso: mai.toISOString().slice(0, 10),
+      valeur: "fevrier",
+      libelle: jourEnFrancais(fevrier.toISOString()),
+      description: "rentrée de février",
+      iso: fevrier.toISOString().slice(0, 10),
     },
     {
       valeur: "inconnu",
@@ -121,12 +135,18 @@ export function OuvertureDossier({
         </p>
       </div>
 
-      <RadioGroup
-        libelle="Quand veux-tu déposer ta demande ?"
-        valeur={date}
-        onChangement={setDate}
-        options={DATES}
-      />
+      <div className="flex flex-col gap-2">
+        <RadioGroup
+          libelle="Quand veux-tu être sur place ?"
+          valeur={date}
+          onChangement={setDate}
+          options={DATES}
+        />
+        <p className="text-pretty text-13 text-ink-500">
+          Rentrée ou prise de poste. La date de dépôt s&apos;en déduit : elle
+          recule du délai d&apos;instruction annoncé par la procédure.
+        </p>
+      </div>
 
       <Input
         libelle="Établissement visé"
@@ -175,7 +195,7 @@ export function OuvertureDossier({
           disabled={date === null}
           chargement={envoi}
           raisonDesactivation={
-            date === null ? "Choisis une date de dépôt visée, même approximative." : undefined
+            date === null ? "Choisis une date de départ visée, même approximative." : undefined
           }
           onClick={() => void ouvrir()}
         >

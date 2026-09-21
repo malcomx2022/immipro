@@ -3,6 +3,8 @@ import { Alertes } from "./Alertes";
 import { db } from "@/lib/db";
 import { alertesDuCandidat, divergenceAArbitrer } from "@/server/lecture/alertes";
 import { exigerCandidat } from "@/server/securite/page";
+import { delaiInstructionJours } from "@/server/vue/dossier";
+import { dateDeDepot } from "@/domain/dossiers/faisabilite";
 
 /**
  * T-01 — Alertes, et T-02 en surface d'arbitrage. WF-11.
@@ -31,16 +33,29 @@ export default async function PageNotifications() {
     db.ruleMigration.findFirst({
       where: { decision: null, application: { userId: acteur.id } },
       orderBy: { createdAt: "asc" },
-      include: { application: { select: { targetDate: true } } },
+      include: {
+        application: {
+          select: { targetDate: true, visaRule: { select: { rules: true } } },
+        },
+      },
     }),
   ]);
+
+  const depart = migration?.application.targetDate?.toISOString().slice(0, 10);
+  const delai = delaiInstructionJours(migration?.application.visaRule?.rules);
 
   const divergence = migration
     ? await divergenceAArbitrer(migration.id, acteur.id).then((vue) => ({
         pays: vue.destination,
         ancienne: vue.ancienne,
         nouvelle: vue.nouvelle,
-        depotVise: migration.application.targetDate?.toISOString().slice(0, 10),
+        /*
+          Le dépôt, et non la date cible : c'est le jour du dépôt qui
+          décide de la version applicable. L'écran annonçait la nouvelle
+          version — et le montant supplémentaire à réunir — sur un dossier
+          qui déposera avant son entrée en vigueur.
+        */
+        ...(depart ? { depot: dateDeDepot(depart, delai) } : {}),
         detecteeLe: migration.createdAt.toISOString().slice(0, 10),
         verifieeLe: vue.nouvelle.publieeLe,
         source: "référentiel ImmiPro",

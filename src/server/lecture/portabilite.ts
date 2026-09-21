@@ -146,7 +146,7 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
           : null,
         statut: a.status,
         ouvertLe: iso(a.createdAt),
-        depotVise: jour(a.targetDate),
+        departVise: jour(a.targetDate),
         deposeLe: iso(a.submittedAt),
         issue: a.issue,
         // Le barème interne n'est pas ici : l'export rend ce que les écrans
@@ -305,7 +305,12 @@ export interface Archive {
     code: string;
     statut: string;
     ouvertLe: string;
-    depotVise: string | null;
+    /**
+     * Date cible — rentrée ou prise de poste. La clé s'appelait
+     * `depotVise` : c'est le dépôt qui se déduit d'elle, pas l'inverse,
+     * et l'archive affichait donc la rentrée sous l'étiquette « dépôt ».
+     */
+    departVise: string | null;
     purgePrevueLe: string | null;
     purgeeLe: string | null;
   };
@@ -355,7 +360,7 @@ export async function archiveDuDossier(
       code: fiche?.code ?? a.visaRule?.countryCode ?? "—",
       statut: a.status,
       ouvertLe: iso(a.createdAt)!,
-      depotVise: jour(a.targetDate),
+      departVise: jour(a.targetDate),
       purgePrevueLe: jour(a.purgeDueAt),
       purgeeLe: jour(a.purgedAt),
     },

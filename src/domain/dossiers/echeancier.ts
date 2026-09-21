@@ -2,7 +2,7 @@
  * Échéancier du dossier — C-10, WF-09.
  *
  * Un calendrier à rebours, pas une liste de rappels : chaque date est
- * calculée depuis le dépôt visé, et les pièces périssables s'y demandent au
+ * calculée depuis la date de dépôt, et les pièces périssables s'y demandent au
  * plus tôt, jamais au plus tard. Un relevé bancaire obtenu trop tôt est
  * périmé le jour du dépôt, et le candidat le refait pour rien.
  *
@@ -135,13 +135,13 @@ export function resumeEcheancier(
  * Date à laquelle demander une pièce périssable au plus tôt.
  *
  * Une pièce de validité `validiteMois` doit être encore valable le jour du
- * dépôt : la demander avant `depotVise - validiteMois`, c'est la refaire.
+ * dépôt : la demander avant `depot - validiteMois`, c'est la refaire.
  * C'est la règle que le prototype énonce en toutes lettres sur le relevé
  * bancaire — « il doit avoir moins de trois mois le jour du dépôt » — sans
  * la calculer.
  */
-export function dateAuPlusTot(depotVise: string, validiteMois: number): string {
-  const [a, m, j] = depotVise.slice(0, 10).split("-").map(Number);
+export function dateAuPlusTot(depot: string, validiteMois: number): string {
+  const [a, m, j] = depot.slice(0, 10).split("-").map(Number);
   const d = new Date(Date.UTC(a!, m! - 1 - validiteMois, j!));
   return d.toISOString().slice(0, 10);
 }

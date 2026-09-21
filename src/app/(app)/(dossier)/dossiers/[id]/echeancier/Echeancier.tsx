@@ -53,7 +53,7 @@ export function Echeancier({
   const id = dossier.id;
   const mention = dossier.destination.mention;
 
-  if (!dossier.depotVise || echeances.length === 0) {
+  if (!dossier.departVise || echeances.length === 0) {
     return <SansEcheancier dossierId={id} />;
   }
 
@@ -79,10 +79,10 @@ export function Echeancier({
           que c'est lui qui commande les pièces.
         */}
         <p className="text-16 text-ink-700">
-          Départ visé le {jourEnFrancais(dossier.depotVise)}
+          Départ visé le {jourEnFrancais(dossier.departVise)}
         </p>
         <p className="text-14 font-medium text-ink-900">
-          {`Dépôt le ${jourEnFrancais(verdict.depot ?? dossier.depotVise)} — ${libelleCompteARebours(aujourdhui, verdict.depot ?? dossier.depotVise).toLowerCase()}`}
+          {`Dépôt le ${jourEnFrancais(verdict.depot ?? dossier.departVise)} — ${libelleCompteARebours(aujourdhui, verdict.depot ?? dossier.departVise).toLowerCase()}`}
         </p>
         <p className="text-14 text-ink-700">{resumeEcheancier(echeances, aujourdhui)}</p>
       </div>
@@ -91,7 +91,7 @@ export function Echeancier({
         dossierId={id}
         verdict={verdict}
         proposition={proposition}
-        dateCible={dossier.depotVise}
+        dateCible={dossier.departVise}
         aujourdhui={aujourdhui}
       />
 

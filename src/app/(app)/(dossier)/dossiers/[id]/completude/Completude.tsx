@@ -65,14 +65,14 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
         titre="Ce qui bloque le dépôt"
         pieces={bloquantes}
         dossierId={id}
-        depotVise={dossier.depotVise}
+        depot={dossier.depot}
         vide="Aucune pièce obligatoire ne manque."
       />
       <Groupe
         titre="À traiter ensuite"
         pieces={ensuite}
         dossierId={id}
-        depotVise={dossier.depotVise}
+        depot={dossier.depot}
         vide="Les pièces complémentaires sont toutes traitées."
       />
 
@@ -115,13 +115,14 @@ function Groupe({
   titre,
   pieces,
   dossierId,
-  depotVise,
+  depot,
   vide,
 }: {
   titre: string;
   pieces: readonly Piece[];
   dossierId: string;
-  depotVise?: string;
+  /** Date de **dépôt** : c'est ce jour-là qu'une pièce doit être valable. */
+  depot?: string;
   vide: string;
 }) {
   return (
@@ -148,7 +149,7 @@ function Groupe({
                 estDeposeeNonVerifiee(piece) ? LIBELLE_CONSERVEE_NON_VERIFIEE : undefined
               }
                 message={piece.message}
-                mention={libelleAlertePeremption(piece, depotVise) ?? undefined}
+                mention={libelleAlertePeremption(piece, depot) ?? undefined}
                 action={libelleAction(piece)}
                 href={lienDePiece(dossierId, piece)}
               />

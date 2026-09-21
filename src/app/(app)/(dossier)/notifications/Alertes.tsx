@@ -38,7 +38,7 @@ export interface AlertesProps {
     pays: string;
     ancienne: VersionRegle;
     nouvelle: VersionRegle;
-    depotVise?: string;
+    depot?: string;
     detecteeLe: string;
     verifieeLe: string;
     source: string;

@@ -37,7 +37,7 @@ const ARCHIVE: Archive = {
     code: "NL",
     statut: "ACTIF",
     ouvertLe: "2026-09-01T10:00:00.000Z",
-    depotVise: "2027-09-01",
+    departVise: "2027-09-01",
     purgePrevueLe: "2026-10-20",
     purgeeLe: null,
   },

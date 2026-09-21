@@ -185,12 +185,22 @@ export function completudeDesPieces(
  * demander, alors que la pièce passe. Les deux situations sont distinctes et
  * appellent des gestes différents : l'une se refait avant le dépôt, l'autre
  * se surveille seulement si la date de dépôt glisse.
+ *
+ * ── La même fausse alarme, par l'autre bout ────────────────────────────
+ *
+ * La fonction était juste et on lui donnait la mauvaise date : les écrans
+ * passaient `Dossier.depotVise`, qui portait la date **cible** — la
+ * rentrée. Une pièce expirant entre le dépôt et la rentrée était alors
+ * annoncée « avant le dépôt visé », alors qu'elle est valable ce jour-là.
+ * Sur le dossier néerlandais, cette fenêtre fait quatre-vingt-dix jours.
+ *
+ * Le paramètre s'appelle donc `depot`, et rien d'autre ne conviendra.
  */
 export type AlertePeremption = "AUCUNE" | "AVANT_LE_DEPOT" | "APRES_LE_DEPOT";
 
-export function alertePeremption(piece: Piece, depotVise?: string): AlertePeremption {
-  if (!piece.perimeLe || !depotVise) return "AUCUNE";
-  return piece.perimeLe < depotVise ? "AVANT_LE_DEPOT" : "APRES_LE_DEPOT";
+export function alertePeremption(piece: Piece, depot?: string): AlertePeremption {
+  if (!piece.perimeLe || !depot) return "AUCUNE";
+  return piece.perimeLe < depot ? "AVANT_LE_DEPOT" : "APRES_LE_DEPOT";
 }
 
 const FORMAT_JOUR = new Intl.DateTimeFormat("fr-FR", {
@@ -200,8 +210,8 @@ const FORMAT_JOUR = new Intl.DateTimeFormat("fr-FR", {
   timeZone: "UTC",
 });
 
-export function libelleAlertePeremption(piece: Piece, depotVise?: string): string | null {
-  const alerte = alertePeremption(piece, depotVise);
+export function libelleAlertePeremption(piece: Piece, depot?: string): string | null {
+  const alerte = alertePeremption(piece, depot);
   if (alerte === "AUCUNE" || !piece.perimeLe) return null;
   const date = FORMAT_JOUR.format(new Date(`${piece.perimeLe}T00:00:00Z`));
   return alerte === "AVANT_LE_DEPOT"

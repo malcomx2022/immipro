@@ -71,8 +71,15 @@ export function TableauDeBord({ dossiers, prenom, aArbitrer }: TableauDeBordProp
                     </span>
                     <span className="text-13 text-ink-500">
                       {dossier.destination.intitule.split("—")[0]?.trim()}
-                      {dossier.depotVise
-                        ? ` · dépôt le ${new Intl.DateTimeFormat("fr-FR").format(new Date(dossier.depotVise))}`
+                      {/*
+                        La carte annonçait « dépôt le … » en affichant la
+                        date cible, qui est la rentrée : trois mois d'écart
+                        sur un dossier néerlandais. C'est bien le dépôt
+                        qu'elle veut dire — c'est la date qui commande —,
+                        alors elle affiche le dépôt.
+                      */}
+                      {dossier.depot
+                        ? ` · dépôt le ${new Intl.DateTimeFormat("fr-FR").format(new Date(dossier.depot))}`
                         : " · date non fixée"}
                     </span>
                   </span>

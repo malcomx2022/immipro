@@ -3927,3 +3927,109 @@ compte à rebours répétait ce que la phrase venait de nommer, et une
 proposition à deux niveaux de deux-points imbriqués. Les deux portent
 maintenant leur garde.
 
+### S.14 — Un nom de champ, deux calculs faux et quatre écrans faux
+
+S.13 avait trouvé l'étiquette de travers — « Dépôt visé le 1er septembre
+2027 » au-dessus d'une ligne « Dépôt de la demande — 3 juin 2027 » — et
+l'avait corrigée sur le seul écran qu'il touchait, en consignant le reste.
+Le reste est ici, et il ne s'agissait pas que d'étiquettes.
+
+`Application.targetDate` est la **date cible** — rentrée ou prise de poste
+(DOC-11 WF-09 étape 1) —, et le dépôt s'en déduit en retirant le délai
+d'instruction. La vue candidat l'appelait `depotVise`. Sur la procédure
+néerlandaise, la fenêtre entre les deux fait **quatre-vingt-dix jours**, et
+c'est dans cette fenêtre que tout se lit.
+
+#### La question posée au tout début demandait la mauvaise date
+
+C-05 demandait « Quand veux-tu déposer ta demande ? » et proposait le
+15 janvier, décrit comme la « rentrée de septembre suivante ». La réponse
+partait dans `targetDate`, d'où `echeancesDepuis` retire ensuite le délai
+d'instruction. Un candidat qui répondait « je dépose le 15 janvier » se
+voyait donc fixer un dépôt au **17 octobre** : tout son échéancier avançait
+de trois mois.
+
+Ce n'était pas une étiquette de travers, c'était la mauvaise donnée à la
+source. La question porte maintenant sur ce que le champ contient — « Quand
+veux-tu être sur place ? » —, les options sont les rentrées, et l'écran dit
+que le dépôt s'en déduit.
+
+#### Deux calculs se décidaient sur la date de départ
+
+Les deux se décident au jour du **dépôt**, et recevaient la rentrée.
+
+**La péremption d'une pièce.** `alertePeremption` était juste ; on lui
+donnait la mauvaise date. Une pièce expirant le 15 juillet est valable le
+jour du dépôt, le 3 juin — et la checklist annonçait « Expire le 15 juillet
+2027, avant le dépôt visé ». Une fausse alarme qui fait refaire une pièce
+pour rien, c'est-à-dire exactement le défaut que cette fonction avait été
+écrite pour corriger, revenu par l'autre bout.
+
+**La version de règle applicable.** `libelleImpact` comparait la rentrée à
+la date d'entrée en vigueur d'une nouvelle règle. Avec une entrée en vigueur
+au 1er juillet, un dépôt au 3 juin et une rentrée au 1er septembre, l'écran
+annonçait la nouvelle version — et donc un montant supplémentaire à réunir
+— sur un dossier qui déposera avant. Un candidat à qui on annonce 696 €
+de plus qu'il ne doit pas réunir.
+
+#### Quatre écrans nommaient la rentrée « dépôt »
+
+    C-01 tableau de bord   « · dépôt le 01/09/2027 »  →  03/06/2027
+    C-06 checklist         « Dépôt visé : … »         →  « Départ visé : … »
+    C-10 échéancier        corrigé en S.13
+    archive et export      clé `depotVise`            →  `departVise`
+
+La vue porte maintenant les deux dates séparément — `departVise` et
+`depot` —, et chaque appelant choisit la sienne. Le dépôt est calculé une
+fois, par `dateDeDepot`, la même fonction que la faisabilité de S.13.
+
+#### La garde que j'avais écrite ne voyait pas la rechute
+
+Ma première garde relisait les **appels** : aucun `libelleAlertePeremption(…
+departVise …)` dans le dépôt. La mutation « la checklist repasse la date
+cible » est restée au vert — parce que la rechute ne passe pas par un
+appel. L'écran transmet la date par une **propriété** `depot`, et c'est le
+composant qui appelle, avec son paramètre.
+
+C'est la huitième fois de cette session qu'une garde ne connaît que la
+forme pour laquelle elle a été écrite. Elle suit maintenant la donnée là où
+elle circule — rien de ce qui s'appelle `depot` ne reçoit ce qui s'appelle
+« départ », « cible » ou `targetDate` — et une seconde mutation a montré
+que « departVise » ne suffisait pas non plus : la page des alertes
+transmettait une variable locale `depart`. La garde porte sur la racine du
+mot.
+
+Le vrai garde-fou reste le test de comportement : la checklist est rendue
+sur un dossier dont la cible et le dépôt diffèrent, avec une pièce qui
+expire entre les deux, et l'écran ne doit pas crier.
+
+#### Vérifié en mutant, puis en exécutant
+
+Huit mutations, huit rouges après correction des gardes :
+
+    le dépôt redevient la cible                          1 rouge
+    un délai absent devient trente jours                 1 rouge
+    le délai est lu sans vérifier son type               1 rouge
+    la péremption bascule dans l'autre sens              7 rouges
+    la version applicable bascule dans l'autre sens      3 rouges
+    la checklist repasse la date cible                   1 rouge
+    l'écran d'alerte repasse la date cible               1 rouge
+    C-05 redemande une date de dépôt                     1 rouge
+
+Puis l'exécution, sur le dossier de démonstration servi par le vrai
+serveur :
+
+    règle figée                delai_traitement_jours.max = 90
+    GET échéancier             departVise 2027-09-01, dépôt 2027-06-03
+    C-06 checklist             « Départ visé : 1er septembre 2027 »
+    C-01 tableau de bord       « · dépôt le 03/06/2027 »  (était 01/09)
+    C-05 ouverture             « Quand veux-tu être sur place ? »
+                               1er février 2027 · 1er septembre 2027
+
+La lecture de C-05 a montré une dernière chose : les dates s'affichaient
+« 1 février 2027 ». `jourEnFrancais` porte la règle de l'ordinal depuis
+longtemps, en disant en commentaire qu'elle vaut « pour toutes les dates
+affichées, d'où sa place ici plutôt que dans chaque écran » — et cet
+écran-là formatait les siennes lui-même. Le défaut ne se voyait pas tant
+que les options tombaient le 15 et le 2 du mois.
+
