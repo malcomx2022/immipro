@@ -3,24 +3,109 @@ import { SEUIL_MARGE_IA } from "@/domain/payments/pricing";
 /**
  * Supervision des coûts IA — B-07, WF-16.
  *
- * Écran livré en état vide, et c'est une décision, pas un manque : tant que
- * dix dossiers réels n'ont pas alimenté `AiUsage`, aucune valeur n'est
- * affichée. Un chiffre posé ici serait repris comme une spécification, puis
- * comme un budget, puis comme un prix — c'est déjà ce qui s'est passé avec
- * les quotas de tokens des packs.
+ * ── Ce que l'écran mesurait, et ce qu'il inventait ─────────────────────
  *
- * Ce que l'écran affiche donc : le nom exact de chaque métrique, sa source
- * de calcul, et les garde-fous exprimés en ratio — un ratio reste vrai quel
- * que soit le coût réel.
+ * L'écran était livré en état vide, et c'était une décision : tant que dix
+ * dossiers réels n'ont pas alimenté `AiUsage`, aucune valeur n'est affichée.
+ * La décision tient toujours. Ce qui ne tenait pas, c'est **la condition de
+ * sortie de cet état vide**.
+ *
+ * Elle portait sur le nombre de dossiers. Or le seul endroit qui écrit dans
+ * `AiUsage` enregistrait `costMicros: 0` — un zéro littéral, parce qu'aucun
+ * tarif de jeton n'existe dans le dépôt. Le premier dossier analysé faisait
+ * donc quitter l'état vide et affichait « 0,00 F par dossier » et « 0,0 %
+ * au plus haut », face à un plafond de 15 %.
+ *
+ * L'écran devenait faux au moment précis où il recevait des données, et le
+ * mensonge était rassurant : un superviseur lisant 0 % conclut qu'il reste
+ * de la marge. Un tiret ne dit rien ; un zéro affirme.
+ *
+ * ── Ce qui est mesuré, ce qui est tarifé ───────────────────────────────
+ *
+ * Les jetons sont comptés pour de vrai — le lecteur les rend, la table les
+ * garde. **Le prix du jeton, lui, n'est nulle part.** Les deux sont donc
+ * séparés : ce qui se compte s'affiche, ce qui se tarife attend son tarif
+ * et reste absent d'ici là. Aucun service absent n'est simulé (I.C), et un
+ * tarif manquant ne vaut pas zéro.
+ *
+ * Le coût est **recalculé à la lecture**, depuis les jetons conservés et le
+ * tarif du jour. C'est ce que demande WF-16 étape 4 : réviser la grille à
+ * partir des coûts réels suppose de pouvoir repasser une grille sur une
+ * consommation déjà enregistrée.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
+
+// ── Le tarif, ou son absence ───────────────────────────────────────────
+
+export interface TarifIA {
+  /** Prix d'un million de jetons d'entrée, en unités de `devise`. */
+  entreeParMillion: number;
+  /** Prix d'un million de jetons de sortie. */
+  sortieParMillion: number;
+  devise: string;
+}
+
+export const VARIABLES_TARIF = [
+  "AI_TARIF_ENTREE_PAR_MILLION",
+  "AI_TARIF_SORTIE_PAR_MILLION",
+  "AI_TARIF_DEVISE",
+] as const;
+
+/**
+ * Le tarif tel qu'il est configuré, ou `null`.
+ *
+ * Un tarif partiel est un tarif absent : facturer les jetons d'entrée et
+ * pas ceux de sortie donnerait un coût inférieur au vrai, c'est-à-dire
+ * exactement l'erreur qu'on cherche à éviter. Même forme qu'`etatDesDependances` —
+ * l'environnement est passé, jamais lu ici.
+ */
+export function tarifDepuisEnvironnement(
+  environnement: Readonly<Record<string, string | undefined>>,
+): TarifIA | null {
+  const nombre = (cle: string): number | null => {
+    const brut = (environnement[cle] ?? "").trim();
+    if (brut.length === 0) return null;
+    const valeur = Number(brut);
+    return Number.isFinite(valeur) && valeur >= 0 ? valeur : null;
+  };
+
+  const entree = nombre("AI_TARIF_ENTREE_PAR_MILLION");
+  const sortie = nombre("AI_TARIF_SORTIE_PAR_MILLION");
+  const devise = (environnement.AI_TARIF_DEVISE ?? "").trim();
+
+  if (entree === null || sortie === null || devise.length === 0) return null;
+  return { entreeParMillion: entree, sortieParMillion: sortie, devise };
+}
+
+/** Coût de jetons déjà consommés, en micro-unités. `null` sans tarif. */
+export function coutMicrosDesJetons(
+  tarif: TarifIA | null,
+  jetonsEntree: number,
+  jetonsSortie: number,
+): number | null {
+  if (tarif === null) return null;
+  const unites =
+    (jetonsEntree * tarif.entreeParMillion + jetonsSortie * tarif.sortieParMillion) /
+    1_000_000;
+  return Math.round(unites * 1_000_000);
+}
+
+export const MENTION_TARIF_ABSENT =
+  "Aucun tarif de jeton n'est configuré : les jetons sont comptés, le coût ne l'est pas. Un tarif manquant ne vaut pas zéro, et un zéro affiché face à un plafond de 15 % se lirait comme de la marge.";
+
+export const COMMENT_TARIFER =
+  "Relever le prix du million de jetons d'entrée et de sortie sur le relevé de consommation du fournisseur d'inférence, puis renseigner les trois variables de tarif. Le coût des appels déjà enregistrés se calcule alors sans rien réécrire : seuls les jetons sont conservés.";
+
+// ── Les métriques ──────────────────────────────────────────────────────
 
 export interface Metrique {
   cle: string;
   libelle: string;
   /** D'où viendra la valeur. Affiché sous la métrique, à la place du chiffre. */
   source: string;
+  /** Vrai quand la valeur suppose un tarif de jeton. */
+  tarifee: boolean;
   /** Valeur mesurée. `null` tant qu'aucune mesure n'existe. */
   valeur: string | null;
 }
@@ -29,31 +114,44 @@ export const METRIQUES: readonly Metrique[] = [
   {
     cle: "depense-mois",
     libelle: "Dépensé ce mois",
-    source: "somme de AiUsage.costXof sur la période",
+    source: "jetons de AiUsage sur la période, au tarif configuré",
+    tarifee: true,
     valeur: null,
   },
   {
     cle: "cout-par-dossier",
     libelle: "Coût IA par dossier payant",
     source: "indicateur qui conditionne la grille tarifaire",
+    tarifee: true,
+    valeur: null,
+  },
+  {
+    cle: "jetons",
+    libelle: "Jetons consommés",
+    source: "AiUsage.inputTokens + outputTokens, comptés sans tarif",
+    tarifee: false,
     valeur: null,
   },
   {
     cle: "analyses",
     libelle: "Analyses exécutées",
     source: "dont reprises non décomptées au candidat",
+    tarifee: false,
     valeur: null,
   },
   {
     cle: "part-du-pack",
     libelle: "Part du prix du pack",
     source: "seuil d'alerte fixé par RG-16.1",
+    tarifee: true,
     valeur: null,
   },
 ];
 
 export const aucuneMesure = (metriques: readonly Metrique[]): boolean =>
   metriques.every((m) => m.valeur === null);
+
+// ── Les garde-fous ─────────────────────────────────────────────────────
 
 export interface GardeFou {
   libelle: string;
@@ -111,8 +209,202 @@ export function plafondQuotidien(depenses: readonly number[]): number | null {
   return mediane === null ? null : mediane * FACTEUR_PLAFOND_QUOTIDIEN;
 }
 
+// ── L'histogramme quotidien ────────────────────────────────────────────
+
+/** Une journée de consommation. Les jetons se comptent sans tarif. */
+export interface Journee {
+  /** ISO court, `AAAA-MM-JJ`. */
+  jour: string;
+  jetons: number;
+  appels: number;
+}
+
+/**
+ * La série affichée, un point par jour, du plus ancien au plus récent.
+ *
+ * Les jours sans appel valent zéro et restent visibles : c'est ce que la
+ * mention d'état vide promet depuis le début, et les masquer ferait paraître
+ * régulière une consommation qui ne l'est pas — le jour où la file s'arrête
+ * est précisément celui qu'un superviseur doit voir.
+ */
+export function serieQuotidienne(
+  relevees: readonly Journee[],
+  finIso: string,
+  jours: number,
+): readonly Journee[] {
+  const connues = new Map(relevees.map((j) => [j.jour, j]));
+  const fin = Date.parse(`${finIso}T00:00:00Z`);
+  if (Number.isNaN(fin) || jours <= 0) return [];
+
+  return Array.from({ length: jours }, (_, rang) => {
+    const date = new Date(fin - (jours - 1 - rang) * 86_400_000);
+    const jour = date.toISOString().slice(0, 10);
+    return connues.get(jour) ?? { jour, jetons: 0, appels: 0 };
+  });
+}
+
+/** Hauteur d'une barre, en part du maximum de la série. Zéro quand tout est nul. */
+export function hauteurRelative(journee: Journee, serie: readonly Journee[]): number {
+  const maximum = serie.reduce((haut, j) => Math.max(haut, j.jetons), 0);
+  return maximum === 0 ? 0 : journee.jetons / maximum;
+}
+
+export const serieVide = (serie: readonly Journee[]): boolean =>
+  serie.every((j) => j.appels === 0);
+
 export const MENTION_ETAT_VIDE =
   "L'histogramme se remplit dès la première écriture dans AiUsage. Un jour sans appel reste affiché à zéro, pas masqué.";
+
+export const MENTION_HISTOGRAMME_EN_JETONS =
+  "L'histogramme compte des jetons, pas de l'argent : il reste juste que le tarif soit configuré ou non.";
+
+// ── Les dépassements individuels — RG-16.2 ─────────────────────────────
+
+/**
+ * Un dossier dont le coût IA dépasse la part admise du prix du pack.
+ *
+ * L'écran n'en montrait aucun : il réduisait la série à « X % au plus
+ * haut », sans jamais nommer le dossier concerné. RG-16.2 demande une
+ * analyse à chaque dépassement individuel — elle ne peut pas commencer sur
+ * un pourcentage anonyme.
+ */
+export interface Depassement {
+  dossierId: string;
+  pack: string;
+  /** Part du prix du pack consommée en IA, en ratio. */
+  part: number;
+  appels: number;
+}
+
+export const depassements = (
+  candidats: readonly Depassement[],
+  seuil: number = SEUIL_MARGE_IA,
+): readonly Depassement[] =>
+  [...candidats].filter((d) => d.part > seuil).sort((a, b) => b.part - a.part);
+
+export function libelleDepassement(depassement: Depassement): string {
+  const part = new Intl.NumberFormat("fr-FR", {
+    style: "percent",
+    maximumFractionDigits: 1,
+  }).format(depassement.part);
+  return `${part} du prix du pack ${depassement.pack}, sur ${depassement.appels} appel${depassement.appels > 1 ? "s" : ""}`;
+}
+
+export const MENTION_AUCUN_DEPASSEMENT =
+  "Aucun dossier ne dépasse la part admise du prix de son pack.";
+
+export const MENTION_DEPASSEMENTS_NON_CALCULABLES =
+  "Les dépassements individuels ne peuvent pas être relevés sans tarif : c'est un rapport entre un coût et un prix, et le coût manque (RG-16.2).";
+
+export const ANALYSE_ATTENDUE =
+  "Chaque dépassement appelle une analyse : c'est souvent le signe d'un usage détourné ou d'une boucle de correction mal bornée (RG-16.2).";
+
+// ── Les mesures ────────────────────────────────────────────────────────
+
+export interface Mesure {
+  dossiers: number;
+  jetons: number;
+  appels: number;
+  /**
+   * Somme des coûts, en micro-unités de la devise de facturation. `null`
+   * quand aucun tarif n'est configuré — jamais zéro, qui se lirait comme
+   * une dépense nulle.
+   */
+  coutMicros: number | null;
+  /** Plus forte part du prix d'un pack consommée en IA, sur un dossier. */
+  pirePart: number | null;
+  /** La devise du tarif, pour libeller les montants. */
+  devise: string | null;
+}
+
+export function metriquesMesurees(mesure: Mesure): readonly Metrique[] {
+  if (mesure.dossiers === 0) return METRIQUES;
+
+  const nombre = (n: number, decimales = 0) =>
+    new Intl.NumberFormat("fr-FR", {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    }).format(n);
+
+  const valeurs: Record<string, string> = {
+    jetons: `${nombre(mesure.jetons)} jetons`,
+    analyses: `${nombre(mesure.appels)} appels`,
+  };
+
+  if (mesure.coutMicros !== null) {
+    const cout = mesure.coutMicros / 1_000_000;
+    const unite = mesure.devise ?? "";
+    valeurs["depense-mois"] = `${nombre(cout, 2)} ${unite}`.trim();
+    valeurs["cout-par-dossier"] =
+      `${nombre(cout / mesure.dossiers, 2)} ${unite}`.trim() +
+      ` sur ${mesure.dossiers} dossier${mesure.dossiers > 1 ? "s" : ""}`;
+    valeurs["part-du-pack"] =
+      mesure.pirePart === null
+        ? "aucun pack payé"
+        : `${nombre(mesure.pirePart * 100, 1)} % au plus haut`;
+  }
+
+  return METRIQUES.map((m) => ({ ...m, valeur: valeurs[m.cle] ?? null }));
+}
+
+/**
+ * La forme minimale d'une ligne de coût, telle que la mesure la lit.
+ *
+ * Elle est structurelle exprès : la lecture renvoie davantage — le prix du
+ * pack, la devise d'encaissement —, et rien de tout cela n'entre dans un
+ * agrégat. Le domaine n'a pas à connaître la table.
+ */
+export interface LigneMesurable {
+  dossierId: string;
+  appels: number;
+  jetonsEntree: number;
+  jetonsSortie: number;
+  coutMicros: number | null;
+  pack: string | null;
+  partDuPrix: number | null;
+}
+
+/**
+ * L'agrégat affiché par B-07.
+ *
+ * Il vivait dans la page, en quatre `reduce` empilés, et aucun test ne
+ * l'atteignait : remplacer la somme prudente par un `?? 0` ne faisait rien
+ * échouer. C'est la même leçon que dans les lots précédents — un calcul
+ * qu'aucun test ne peut appeler est un calcul que rien ne tient.
+ *
+ * **Une seule ligne non tarifée rend la somme fausse.** Elle vaut alors
+ * `null` : additionner ce qu'on sait facturer avec ce qu'on ne sait pas
+ * donnerait un total inférieur au vrai, présenté comme un total.
+ */
+export function mesureDepuisLesLignes(
+  lignes: readonly LigneMesurable[],
+  devise: string | null,
+): Mesure {
+  const tarifees = lignes.every((l) => l.coutMicros !== null);
+  return {
+    dossiers: lignes.length,
+    jetons: lignes.reduce((n, l) => n + l.jetonsEntree + l.jetonsSortie, 0),
+    appels: lignes.reduce((n, l) => n + l.appels, 0),
+    coutMicros: tarifees
+      ? lignes.reduce((somme, l) => somme + (l.coutMicros ?? 0), 0)
+      : null,
+    pirePart: lignes.reduce<number | null>(
+      (pire, l) => (l.partDuPrix === null ? pire : Math.max(pire ?? 0, l.partDuPrix)),
+      null,
+    ),
+    devise,
+  };
+}
+
+/** Les dossiers dont la part du pack est connue : eux seuls peuvent dépasser. */
+export const candidatsAuDepassement = (
+  lignes: readonly LigneMesurable[],
+): readonly Depassement[] =>
+  lignes.flatMap((l) =>
+    l.partDuPrix === null || l.pack === null
+      ? []
+      : [{ dossierId: l.dossierId, pack: l.pack, part: l.partDuPrix, appels: l.appels }],
+  );
 
 export const COMMENT_SE_REMPLIT =
   "Dix dossiers complets réels passés dans le pipeline, AiUsage enregistré à chaque appel. Une semaine suffit pour obtenir le coût moyen par type de pièce.";
@@ -124,48 +416,6 @@ export const MENTION_SANS_DONNEE_CANDIDAT =
   "Aucune donnée de candidat n'apparaît sur cet écran : seuls les volumes et les coûts sont remontés.";
 
 /**
- * Mesures réelles, quand il y en a.
- *
- * L'écran reste en état vide tant qu'aucun appel IA n'a été enregistré : la
- * décision d'origine tient, et c'est même elle que cette fonction applique.
- * Ce qu'elle ajoute, c'est qu'une fois les dossiers passés, les valeurs
- * s'affichent d'elles-mêmes — sans qu'on ait à revenir remplacer des nulls à
- * la main, ce qui est la façon habituelle dont un écran vide le reste.
- */
-export interface Mesure {
-  dossiers: number;
-  /** Somme des coûts, en micro-unités de la devise de facturation. */
-  coutMicros: number;
-  appels: number;
-  /** Plus forte part du prix d'un pack consommée en IA, sur un dossier. */
-  pireePart: number | null;
-}
-
-export function metriquesMesurees(mesure: Mesure): readonly Metrique[] {
-  if (mesure.dossiers === 0) return METRIQUES;
-
-  const cout = mesure.coutMicros / 1_000_000;
-  const parDossier = cout / mesure.dossiers;
-  const nombre = (n: number, decimales = 0) =>
-    new Intl.NumberFormat("fr-FR", {
-      minimumFractionDigits: decimales,
-      maximumFractionDigits: decimales,
-    }).format(n);
-
-  const valeurs: Record<string, string> = {
-    "depense-mois": `${nombre(cout, 2)} F`,
-    "cout-par-dossier": `${nombre(parDossier, 2)} F sur ${mesure.dossiers} dossiers`,
-    analyses: `${nombre(mesure.appels)} appels`,
-    "part-du-pack":
-      mesure.pireePart === null
-        ? "aucun pack payé"
-        : `${nombre(mesure.pireePart * 100, 1)} % au plus haut`,
-  };
-
-  return METRIQUES.map((m) => ({ ...m, valeur: valeurs[m.cle] ?? null }));
-}
-
-/**
  * Nombre de dossiers réels attendus avant de tenir la grille pour mesurée.
  *
  * Il vient de la note de tarification : les quotas de tokens des packs sont
@@ -173,3 +423,43 @@ export function metriquesMesurees(mesure: Mesure): readonly Metrique[] {
  * d'annoncer où il en est plutôt que de rester muet.
  */
 export const DOSSIERS_POUR_MESURER = 10;
+
+// ── Ce que l'écran ne peut pas faire ───────────────────────────────────
+
+/**
+ * Les deux commandes qui étaient à l'écran sans être reliées à rien.
+ *
+ * Même registre qu'`ACTIONS_ATTENDUES` en B-03 : les retirer sans les
+ * nommer ferait disparaître le besoin avec le bouton. La différence tient
+ * à la première — elle ne manque pas d'une route, elle demande qu'on
+ * décide si elle doit exister.
+ */
+export interface CommandeAttendue {
+  cle: string;
+  libelle: string;
+  manque: string;
+}
+
+export const COMMANDES_ATTENDUES: readonly CommandeAttendue[] = [
+  {
+    cle: "modifier-plafonds",
+    libelle: "Modifier les plafonds",
+    /**
+     * Les trois seuils affichés sont des constantes, et deux d'entre eux
+     * sont des règles de gestion : les 15 % viennent de RG-16.1. Aucune
+     * colonne ne les porte, et c'est cohérent — un plafond réglable depuis
+     * un écran est un plafond que l'exploitation relève le jour où il gêne,
+     * c'est-à-dire le jour où il sert. Ce qui manque n'est donc pas une
+     * route, c'est l'arbitrage : lesquels de ces seuils sont des réglages
+     * et lesquels sont des règles.
+     */
+    manque:
+      "un arbitrage : lesquels de ces seuils sont des réglages, et lesquels restent des règles de gestion",
+  },
+  {
+    cle: "exporter-appels",
+    libelle: "Exporter le détail des appels",
+    // Comme en B-04 et B-06 : aucun code d'export dans le dépôt.
+    manque: "un écrivain de fichier ; aucun export n'existe dans le produit",
+  },
+];
