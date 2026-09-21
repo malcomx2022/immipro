@@ -250,7 +250,21 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
    * liste : c'est lui qui refuse le prochain bouton qui ne part nulle part,
    * et il n'a plus rien à tolérer.
    */
-  const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {};
+  const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
+    /**
+     * Les deux commandes que l'élargissement du balayage a trouvées, dans
+     * la partie du produit que ce garde-fou n'avait jamais regardée.
+     *
+     * Elles ne sont pas du ressort de WF-08 et ne sont pas traitées ici :
+     * les nommer est ce qui les empêche de disparaître avec le vert du
+     * test. Chacune dit ce qui lui manque, comme les registres de B-03,
+     * B-04 et B-07.
+     */
+    "src/app/(app)/(dossier)/consultants/Annuaire.tsx":
+      "« Me prévenir dès qu'il y en a un » — aucune route, et la messagerie n'est pas branchée (bloquante avant ouverture)",
+    "src/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier.tsx":
+      "« Téléverser sans analyse » — aucune route : déposer une pièce sans la faire lire demande de décider ce que devient sa complétude",
+  };
 
   /**
    * Les attributs d'une balise, accolades équilibrées.
@@ -286,13 +300,40 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
     for (const m of code.matchAll(/<Button\b/gu)) {
       const { attrs, fin } = attributs(code, m.index + m[0].length);
       if (/onClick|type="submit"|onSubmit/u.test(attrs)) continue;
+      /**
+       * Un `disabled` **inconditionnel** avec sa raison n'est pas une
+       * commande morte : c'est l'état d'attente d'un écran, et l'autre
+       * branche du ternaire porte l'action. Le premier balayage de
+       * `src/app` accusait ainsi le « Continuer » grisé du choix de pack,
+       * dont la branche active est un lien.
+       *
+       * `disabled={expr}` ne bénéficie pas de l'exemption : un bouton qui
+       * peut redevenir cliquable doit avoir quelque chose à faire quand il
+       * le redevient.
+       */
+      if (/\bdisabled(?!=)/u.test(attrs) && /raisonDesactivation/u.test(attrs)) continue;
       trouvees.push(code.slice(fin, fin + 60).replace(/\s+/gu, " ").trim());
     }
     return trouvees;
   };
 
+  /**
+   * Le garde-fou ne balayait que le back-office — et l'angle mort a duré
+   * six lots.
+   *
+   * `fichiers("src/app/(admin)")` : sept écrans surveillés, et pas une
+   * seule des surfaces que les candidats touchent. R-03 y portait un
+   * « Restaurer » inerte et R-04 un « Corriger le passage » qui ne
+   * corrigeait rien, sans que rien ne s'en aperçoive. Le registre passait
+   * au vert en balayant précisément la partie de l'application qu'on
+   * venait de nettoyer.
+   *
+   * Il balaie maintenant tout `src/app`. C'est la quatrième fois de cette
+   * revue qu'un garde-fou ne connaît que ce pour quoi il a été écrit, et
+   * la première fois que ce qu'il ignorait, c'était la moitié du produit.
+   */
   it("les écrans muets sont exactement ceux du registre", () => {
-    const muets = fichiers("src/app/(admin)")
+    const muets = fichiers("src/app")
       .filter((f) => f.endsWith(".tsx"))
       .filter((f) => inertes(lire(f)).length > 0);
     expect(muets.sort()).toEqual(Object.keys(EN_ATTENTE_DE_BRANCHEMENT).sort());

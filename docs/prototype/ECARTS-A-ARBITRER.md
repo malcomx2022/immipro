@@ -2634,6 +2634,11 @@ existent, le chemin de lecture aussi, les quatre écrans R-01 à R-04
 efface. Un candidat peut répondre à l'entretien guidé : rien n'est
 conservé. C'est le seul workflow entier dont la moitié serveur manque.
 
+*S.3 a branché l'entretien, S.8 les versions — mise en forme, réécriture,
+restauration — et les deux états que R-04 confondait. `CritiqueFinding`
+reste sans écrivain : les remarques demandent le service d'analyse, et
+leur moitié déterministe (RG-08.3) attend `extraction`, pas la rédaction.*
+
 **Six routes admin sur huit n'ont aucun test.** Les deux qui en ont —
 `paiements` et `contenus` — sont exactement les deux qui étaient
 branchées. La corrélation dit ce qu'elle dit.
@@ -3186,3 +3191,133 @@ Les sept écrans du back-office portaient onze commandes qui ne partaient
 nulle part. Six lots les ont branchées ou retirées. Le registre reste,
 vide : le supprimer retirerait le garde-fou avec la liste, et c'est lui qui
 refusera le prochain bouton qui ne mène à rien.
+
+### S.8 — WF-08 : l'éditeur n'éditait pas, et la relecture rendait un avis sans avoir lu
+
+La revue des écrans est close ; ce lot traite ce qu'elle avait laissé
+ouvert. R-03 et R-04 sont des écrans de **lecture sur des données que rien
+n'écrivait**, et tous deux présentaient cette absence comme un état normal.
+
+#### Ce que R-03 montrait
+
+Un onglet « Éditeur », un onglet « Versions », et rien derrière : aucune
+route ne créait de `DocumentVersion`, si bien que `versionCourante` rendait
+toujours `undefined`. L'onglet ne savait d'ailleurs pas éditer — il rendait
+des paragraphes en lecture seule, **sans champ de saisie**. « Restaurer »
+n'était relié à rien.
+
+Trois situations s'y confondaient dans un même écran vide, et elles
+n'appellent pas le même geste :
+
+| Situation | Ce que l'écran disait | Ce qu'il dit |
+|---|---|---|
+| entretien trop court | rien | combien de réponses manquent |
+| réponses prêtes, service branché | rien | « Proposer un premier texte » |
+| réponses prêtes, service absent | rien | ce qui manque, et qu'aucune réponse n'est perdue |
+
+La troisième est celle que le registre des dépendances décrivait **depuis
+S.3** : « aucun texte n'est produit, et aucun n'est inventé : l'écran dit ce
+qui manque plutôt que d'afficher une version vide ». Il ne le disait pas.
+
+#### Ce que R-04 affirmait
+
+> Rien à reprendre sur cette version.
+
+Sur une liste vide. Or aucune analyse n'avait jamais tourné : rien ne créait
+de `CritiqueFinding`, et le service qui les produit n'est pas branché. La
+page rendait donc **un avis favorable sans avoir lu** — et son bandeau de
+source le datait, « relecture automatique ImmiPro, vérifiée le 11
+septembre », sur une relecture qui n'avait pas eu lieu.
+
+C'est le zéro de B-07 sur une autre surface : un vide qui se lit comme un
+constat. Un tiret ne dit rien ; « rien à reprendre » affirme. Les deux vides
+sont désormais distincts — `null` veut dire « pas relu », `[]` veut dire
+« relu, rien à reprendre » —, et le bandeau ne date que ce qui a été lu.
+
+#### Ce que le candidat peut faire sans la clé
+
+La distinction qui structure le lot : **son texte n'a pas besoin du
+modèle.** La mise en forme part des réponses et demande un appel ; la
+réécriture et la restauration sont son texte dans son dossier.
+
+- `mise-en-forme` — appelle le modèle, débite le quota (RG-08.4, INV-6) ;
+- `reecriture` — enregistre son texte, aucun appel, aucun débit ;
+- `restauration` — recopie une version antérieure **en tête**, sans tronquer
+  l'historique : revenir en arrière est un geste de plus, pas l'effacement
+  des suivants.
+
+Une seule route, `z.discriminatedUnion` sur le geste, comme en B-02. Aucune
+des trois ne modifie une version existante : un état passé n'a pas à être
+réécrit, et c'est le retour en arrière qui décide quelqu'un à accepter une
+suggestion.
+
+**Rien n'est débité pour une absence connue d'avance.** Débiter puis rendre
+s'annule, mais ouvre une fenêtre : entre les deux, une interruption coûte
+une analyse au candidat pour un service dont on savait qu'il ne répondrait
+pas. La garde passe avant le débit ; le débit-puis-rendu reste pour le cas
+imprévisible, un service branché dont l'appel n'aboutit pas.
+
+**Sans destination, pas de mise en forme.** Les attendus d'une pièce
+diffèrent fortement d'un pays à l'autre (WF-08 étape 1), et écrire sans les
+connaître produirait le modèle pré-rempli générique que l'étape 3 écarte
+explicitement. Le pays vient de la règle **figée** du dossier (INV-3).
+
+#### La lettre s'affichait deux fois
+
+Les paragraphes étaient rendus en lecture seule sous le champ de saisie : la
+seule raison de cette répétition était d'ancrer la suggestion au bon
+paragraphe. La suggestion nomme désormais la section qu'elle visait, ce qui
+la rattache au bon passage dans un texte que le candidat vient peut-être de
+réorganiser.
+
+#### Le garde-fou des commandes inertes ignorait la moitié du produit
+
+`fichiers("src/app/(admin)")` : sept écrans surveillés, et **pas une seule
+des surfaces que les candidats touchent**. R-03 y portait un « Restaurer »
+inerte et R-04 un « Corriger le passage » qui ne corrigeait rien, sans que
+rien ne s'en aperçoive. Le registre passait au vert en balayant précisément
+la partie de l'application qu'on venait de nettoyer.
+
+Il balaie maintenant tout `src/app`. C'est la quatrième fois de cette revue
+qu'un garde-fou ne connaît que ce pour quoi il a été écrit, et la première
+fois que ce qu'il ignorait était la moitié du produit.
+
+L'élargissement a trouvé **trois** écrans, dont un à tort : le
+« Continuer » grisé du choix de pack est un `disabled` inconditionnel avec
+sa raison, et l'action vit dans l'autre branche du ternaire. Le critère
+l'exempte désormais — mais pas un `disabled={expr}`, qui peut redevenir
+cliquable et doit alors avoir quelque chose à faire. Les deux vraies sont au
+registre : « Me prévenir dès qu'il y en a un » (A-annuaire, la messagerie
+n'est pas branchée) et « Téléverser sans analyse » (C-pièce, aucune route).
+
+**Exécuté contre PostgreSQL :**
+
+    aucune réponse       R-03 : ENTRETIEN_INSUFFISANT · « Réponds encore à
+                                quelques questions »
+                         R-04 : SANS_TEXTE
+
+    trois réponses       R-03 : MISE_EN_FORME_INDISPONIBLE · action : aucune
+    service absent       mise en forme → null, aucune version, aucun débit
+
+    réécriture           R-03 : REDIGEE
+    par le candidat      R-04 : « Cette version n'a pas été analysée … nous
+                                ne te disons pas que ton texte est bon sans
+                                l'avoir lu »
+
+    restauration de v1   v3 « Retour au texte de la version 1 »
+                         v2 · v1 conservées — 3 versions
+                         courante = v3, texte identique à v1
+                         quota : 5 sur 5 — la réécriture n'appelle personne
+
+#### Ce qui reste de WF-08
+
+Deux choses, et je ne les ai pas faites :
+
+- **les recoupements déterministes de RG-08.3.** Une date qui diffère entre
+  la lettre et le relevé de notes est une comparaison de chaînes, et la
+  règle du projet dit que tout ce qui est vérifiable sans IA l'est sans IA.
+  Mais il faut des champs extraits à comparer, et `extraction` n'est pas
+  branchée : le lot dépend d'elle, pas de la rédaction.
+- **l'export PDF et DOCX**, étape 6. L.3 a déjà tranché pour l'archive — le
+  PDF est celui du navigateur —, et la même décision vaut probablement ici ;
+  elle demande d'être posée.

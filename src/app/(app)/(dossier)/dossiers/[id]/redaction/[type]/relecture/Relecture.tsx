@@ -1,12 +1,13 @@
 import type { Dossier } from "@/domain/dossiers/dossier";
-import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
 import {
+  ACTION_RELECTURE,
   CE_QUE_NOUS_NE_JUGEONS_PAS,
   LIBELLE_GENRE,
   MENTION_RELECTURE,
-  resumeRelecture,
+  etatDeLaRelecture,
+  resumeSelonLEtat,
   trierRemarques,
   type Remarque,
 } from "@/domain/redaction/relecture";
@@ -24,19 +25,47 @@ import { EnteteDossier } from "../../../EnteteDossier";
  * relevé de notes ne se voit sur aucune des deux pièces prise seule. C'est
  * pourquoi l'incohérence passe en tête, et affiche les deux valeurs côte à
  * côte plutôt que de décrire l'écart.
+ *
+ * ── L'avis favorable rendu sans avoir lu ────────────────────────────────
+ *
+ * L'écran répondait « Rien à reprendre sur cette version. » sur une liste
+ * vide. Or aucune analyse n'avait jamais tourné : rien ne créait de
+ * `CritiqueFinding`, et le service qui les produit n'est pas branché. La
+ * page rendait donc un avis favorable sans avoir lu, et le bandeau de
+ * source le datait — « relecture automatique ImmiPro, vérifiée le 21
+ * septembre » — sur une relecture qui n'avait pas eu lieu.
+ *
+ * C'est le défaut de B-07 sur une autre surface : un vide qui se lit comme
+ * un constat. Un tiret ne dit rien ; « rien à reprendre » affirme. Les deux
+ * vides sont désormais distincts, et le bandeau ne date que ce qui a été
+ * relu.
  */
 export interface RelectureProps {
   dossier: Dossier;
   type: string;
-  remarques: readonly Remarque[];
+  /**
+   * `null` quand aucune analyse n'a tourné — jamais `[]`. La distinction
+   * porte tout l'écran : `[]` veut dire « relu, rien à reprendre ».
+   */
+  remarques: readonly Remarque[] | null;
+  /** Une version existe : sans texte, il n'y a rien à analyser. */
+  texteExistant: boolean;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
   relectureLe: string;
 }
 
-export function Relecture({ dossier, type, remarques: brutes, relectureLe }: RelectureProps) {
+export function Relecture({
+  dossier,
+  type,
+  remarques: brutes,
+  texteExistant,
+  relectureLe,
+}: RelectureProps) {
   const id = dossier.id;
-  const remarques = trierRemarques(brutes);
+  const etat = etatDeLaRelecture({ remarques: brutes, texteExistant });
+  const remarques = trierRemarques(brutes ?? []);
   const premiere = remarques[0];
+  const relue = etat === "RELUE" || etat === "RELUE_SANS_REMARQUE";
 
   return (
     <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -54,13 +83,15 @@ export function Relecture({ dossier, type, remarques: brutes, relectureLe }: Rel
         >
           Relecture de ta lettre
         </h1>
-        <p className="text-pretty text-16 text-ink-700">{resumeRelecture(remarques)}</p>
+        <p className="max-w-[80ch] text-pretty text-16 text-ink-700">
+          {resumeSelonLEtat(etat, brutes)}
+        </p>
       </div>
 
       <ul className="flex flex-col gap-4">
         {remarques.map((remarque) => (
           <li key={remarque.id} className="flex">
-            <BlocRemarque remarque={remarque} dossierId={id} />
+            <BlocRemarque remarque={remarque} dossierId={id} type={type} />
           </li>
         ))}
       </ul>
@@ -70,9 +101,17 @@ export function Relecture({ dossier, type, remarques: brutes, relectureLe }: Rel
         <p className="text-pretty text-14 text-ink-700">{CE_QUE_NOUS_NE_JUGEONS_PAS}</p>
       </section>
 
-      <SourceNote source="relecture automatique ImmiPro" verifieeLe={relectureLe}>
-        {MENTION_RELECTURE}
-      </SourceNote>
+      {/*
+        Le bandeau datait une relecture qui n'avait pas eu lieu. Une source
+        et une date d'analyse ne s'affichent que sur une analyse réelle —
+        c'est INV-8 pris au sérieux sur une donnée produite ici plutôt que
+        relevée ailleurs.
+      */}
+      {relue ? (
+        <SourceNote source="relecture automatique ImmiPro" verifieeLe={relectureLe}>
+          {MENTION_RELECTURE}
+        </SourceNote>
+      ) : null}
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row-reverse md:items-center md:justify-between">
         <LienBouton
@@ -80,7 +119,7 @@ export function Relecture({ dossier, type, remarques: brutes, relectureLe }: Rel
           pleineLargeur
           className="min-h-action md:w-auto"
         >
-          {premiere ? premiere.action : "Revenir à l'éditeur"}
+          {premiere ? premiere.action : (ACTION_RELECTURE[etat] ?? "Revenir à l'éditeur")}
         </LienBouton>
         <LienBouton
           href={`/dossiers/${id}`}
@@ -104,9 +143,11 @@ const TONS: Record<Remarque["genre"], string> = {
 function BlocRemarque({
   remarque,
   dossierId,
+  type,
 }: {
   remarque: Remarque;
   dossierId: string;
+  type: string;
 }) {
   return (
     <article
@@ -130,9 +171,19 @@ function BlocRemarque({
       ) : null}
 
       <div className="flex flex-col gap-2 md:flex-row">
-        <Button variante="secondaire" pleineLargeur className="md:w-auto">
+        {/*
+          Un lien vers l'éditeur, et non un bouton inerte : « Corriger le
+          passage » n'était relié à rien, et la correction se fait dans
+          l'éditeur — c'est là que le texte s'écrit.
+        */}
+        <LienBouton
+          href={`/dossiers/${dossierId}/redaction/${type}`}
+          variante="secondaire"
+          pleineLargeur
+          className="md:w-auto"
+        >
           {remarque.action}
-        </Button>
+        </LienBouton>
         {remarque.actionSecondaire ? (
           <LienBouton
             href={`/dossiers/${dossierId}/pieces/releves-de-notes`}

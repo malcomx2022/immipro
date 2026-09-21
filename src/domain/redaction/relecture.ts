@@ -101,3 +101,75 @@ export const CE_QUE_NOUS_NE_JUGEONS_PAS =
 
 export const MENTION_RELECTURE =
   "Elle ne remplace pas la lecture d'un consultant.";
+
+// ── Relu sans remarque, ou jamais relu ─────────────────────────────────
+
+/**
+ * Les deux vides que R-04 confondait, et c'était le plus coûteux des deux
+ * sens.
+ *
+ * `resumeRelecture([])` répondait « Rien à reprendre sur cette version. »
+ * Or aucune analyse n'avait jamais tourné : rien ne créait de
+ * `CritiqueFinding`, le service qui les produit n'est pas branché, et la
+ * page rendait donc **un avis favorable sans avoir lu**. Le candidat
+ * repartait rassuré d'une relecture qui n'avait pas eu lieu.
+ *
+ * C'est le même défaut que le zéro de B-07 : un vide qui se lit comme un
+ * constat. Un tiret ne dit rien ; « rien à reprendre » affirme.
+ */
+export type EtatRelecture =
+  /** Analysée, et rien à reprendre. */
+  | "RELUE_SANS_REMARQUE"
+  /** Analysée, des remarques. */
+  | "RELUE"
+  /** Jamais analysée, et le service qui le fait n'est pas branché. */
+  | "ANALYSE_INDISPONIBLE"
+  /** Il n'y a pas encore de texte à analyser. */
+  | "SANS_TEXTE";
+
+export function etatDeLaRelecture(options: {
+  /** `null` quand aucune analyse n'a tourné — jamais `[]`. */
+  remarques: readonly Remarque[] | null;
+  /** Une version existe. */
+  texteExistant: boolean;
+}): EtatRelecture {
+  if (!options.texteExistant) return "SANS_TEXTE";
+  if (options.remarques === null) return "ANALYSE_INDISPONIBLE";
+  return options.remarques.length === 0 ? "RELUE_SANS_REMARQUE" : "RELUE";
+}
+
+export const RESUME_ANALYSE_INDISPONIBLE =
+  "Cette version n'a pas été analysée. Le service qui relève les incohérences n'est pas branché, et nous ne te disons pas que ton texte est bon sans l'avoir lu.";
+
+export const RESUME_SANS_TEXTE =
+  "Il n'y a pas encore de texte à analyser sur cette pièce.";
+
+/**
+ * Le résumé, dans l'état où la pièce se trouve.
+ *
+ * `resumeRelecture` garde sa signature — elle répond sur une liste de
+ * remarques, et c'est juste. Ce qui manquait, c'est qu'on l'appelait avec
+ * une liste vide dans un cas où il n'y avait pas de liste du tout.
+ */
+export function resumeSelonLEtat(
+  etat: EtatRelecture,
+  remarques: readonly Remarque[] | null,
+): string {
+  if (etat === "SANS_TEXTE") return RESUME_SANS_TEXTE;
+  if (etat === "ANALYSE_INDISPONIBLE") return RESUME_ANALYSE_INDISPONIBLE;
+  return resumeRelecture(remarques ?? []);
+}
+
+/**
+ * Ce que le candidat peut faire, dans chaque état.
+ *
+ * Aucune action quand l'analyse est indisponible : un bouton « Relancer »
+ * qui ne relance rien vaut moins qu'une absence (règle de Q.A), et
+ * l'absence est expliquée juste au-dessus.
+ */
+export const ACTION_RELECTURE: Record<EtatRelecture, string | null> = {
+  RELUE: "Revenir au texte",
+  RELUE_SANS_REMARQUE: "Revenir au texte",
+  ANALYSE_INDISPONIBLE: null,
+  SANS_TEXTE: null,
+};

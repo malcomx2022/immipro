@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { vueDuDossier } from "@/server/lecture/dossiers";
 import { pieceARediger, remarquesDeLaVersion } from "@/server/lecture/redaction";
 import { exigerCandidat } from "@/server/securite/page";
+import { redactionConfiguree } from "@/server/redaction/redacteur";
 
 /**
  * R-04 — Analyse critique. WF-08.
@@ -12,6 +13,11 @@ import { exigerCandidat } from "@/server/securite/page";
  * La relecture porte sur la **dernière** version, et la date affichée est
  * celle de cette version. Une relecture datée d'aujourd'hui sur un texte
  * écrit la semaine dernière ferait croire à une analyse qu'on n'a pas faite.
+ *
+ * `remarques` vaut `null` quand aucune analyse n'a tourné, et jamais `[]` :
+ * la page rendait « Rien à reprendre sur cette version. » alors que rien
+ * n'avait été lu. Une liste vide est un résultat, une absence de liste n'en
+ * est pas un.
  */
 export const dynamic = "force-dynamic";
 
@@ -50,11 +56,21 @@ export default async function PageRelecture({
     select: { id: true, uploadedAt: true },
   });
 
+  /**
+   * Tant que le service d'analyse n'est pas branché, aucune remarque n'a pu
+   * être produite : la liste vide de la base ne veut pas dire « rien à
+   * reprendre ». Le jour où il l'est, une version analysée sans remarque
+   * rendra bien `[]`, et l'écran dira enfin la vérité en le disant.
+   */
+  const remarques =
+    derniere && redactionConfiguree() ? await remarquesDeLaVersion(derniere.id) : null;
+
   return (
     <Relecture
       dossier={vue.dossier}
       type={type}
-      remarques={derniere ? await remarquesDeLaVersion(derniere.id) : []}
+      remarques={remarques}
+      texteExistant={derniere !== null}
       relectureLe={(derniere?.uploadedAt ?? new Date()).toISOString().slice(0, 10)}
     />
   );

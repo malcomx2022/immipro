@@ -4,6 +4,7 @@ import { ChoixDeLaPiece } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/Ch
 import { Redaction } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/Redaction";
 import { Relecture } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/relecture/Relecture";
 import { REMARQUES_MOTIVATION } from "@/lib/contenu/redaction";
+import type { Remarque } from "@/domain/redaction/relecture";
 import { Alertes } from "@/app/(app)/(dossier)/notifications/Alertes";
 import { Services } from "@/app/(app)/(dossier)/services/Services";
 import { dossierParId } from "@/lib/contenu/dossiers";
@@ -52,8 +53,9 @@ vi.mock("@/lib/api", () => ({
 }));
 
 const pousse = vi.fn();
+const rafraichit = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pousse }),
+  useRouter: () => ({ push: pousse, refresh: rafraichit }),
   notFound: () => {
     throw new Error("notFound");
   },
@@ -106,6 +108,7 @@ describe("R-02 — Entretien guidé", () => {
         piece={MOTIVATION}
         reponsesEnregistrees={{}}
         versions={[]}
+        redactionDisponible={false}
         maintenant={MAINTENANT}
       />,
     );
@@ -181,6 +184,7 @@ describe("R-02 — les réponses partent au serveur", () => {
         piece={MOTIVATION}
         reponsesEnregistrees={deja}
         versions={[]}
+        redactionDisponible={false}
         maintenant={MAINTENANT}
       />,
     );
@@ -273,6 +277,7 @@ describe("R-03 — Éditeur et versions", () => {
         reponsesEnregistrees={{}}
         versions={VERSIONS_MOTIVATION}
         suggestion={SUGGESTION_EN_ATTENTE}
+        redactionDisponible={false}
         maintenant={MAINTENANT}
       />,
     );
@@ -312,6 +317,198 @@ describe("R-03 — Éditeur et versions", () => {
   });
 });
 
+/**
+ * R-03 et R-04 — les écritures, et les vides qui parlaient trop.
+ *
+ * Tests qui **cliquent** : c'est la leçon de S.1, et elle vaut ici deux
+ * fois. Un « Restaurer » peut afficher « Restauration… » sans qu'aucune
+ * requête soit partie, et un onglet peut s'appeler « Éditeur » sans porter
+ * de champ de saisie — aucun test lisant le source ne l'aurait vu.
+ */
+describe("R-03 — les versions s'écrivent", () => {
+  const rendre = ({ disponible = false, versions = VERSIONS_MOTIVATION } = {}) => {
+    appels.length = 0;
+    reponse = { ok: true };
+    return render(
+      <Redaction
+        dossier={DOSSIER}
+        piece={MOTIVATION}
+        reponsesEnregistrees={{ 0: "Une.", 1: "Deux.", 2: "Trois.", 3: "Quatre." }}
+        versions={versions}
+        redactionDisponible={disponible}
+        maintenant={MAINTENANT}
+      />,
+    );
+  };
+
+  /**
+   * Sans version, l'écran ouvre sur l'entretien — c'est voulu : la personne
+   * est en train d'y répondre, et l'éditeur est là où elle arrive en le
+   * terminant. La barre d'onglets n'existe que de l'autre côté.
+   */
+  const allerALEditeur = () => {
+    for (let i = 0; i < MOTIVATION.questions.length; i += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Passer cette question" }));
+    }
+  };
+
+  it("porte un vrai champ de saisie, pas des paragraphes en lecture seule", () => {
+    rendre();
+    const champ = screen.getByLabelText("Ton texte");
+    expect(champ.tagName).toBe("TEXTAREA");
+    expect((champ as HTMLTextAreaElement).value.length).toBeGreaterThan(0);
+  });
+
+  it("enregistre une réécriture, et n'enregistre rien d'inchangé", async () => {
+    rendre();
+    const champ = screen.getByLabelText("Ton texte");
+
+    // Inchangé : le bouton porte sa raison et ne part pas.
+    const bouton = screen.getByRole("button", { name: /Enregistrer une version/ });
+    expect(bouton).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Rien n'a changé/)).toBeDefined();
+
+    fireEvent.change(champ, { target: { value: "Un texte entièrement réécrit." } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Enregistrer une version/ }));
+    });
+
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.url).toBe(
+      "/api/dossiers/nl-4471/redaction/lettre-motivation/version",
+    );
+    expect(appels[0]!.methode).toBe("POST");
+    expect(appels[0]!.corps).toEqual({
+      geste: "reecriture",
+      texte: "Un texte entièrement réécrit.",
+    });
+  });
+
+  it("refuse d'enregistrer un texte vide, et dit ce que cela effacerait", () => {
+    rendre();
+    fireEvent.change(screen.getByLabelText("Ton texte"), { target: { value: "  " } });
+    expect(
+      screen.getByRole("button", { name: /Enregistrer une version/ }),
+    ).toHaveProperty("disabled", true);
+    expect(screen.getByText(/effacerait/)).toBeDefined();
+  });
+
+  it("restaure une version antérieure par son rang", async () => {
+    rendre();
+    const restaurer = screen.getAllByRole("button", { name: "Restaurer" });
+    expect(restaurer.length).toBeGreaterThan(0);
+    await act(async () => {
+      fireEvent.click(restaurer[0]!);
+    });
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.corps).toMatchObject({ geste: "restauration" });
+    expect((appels[0]!.corps as { rang: number }).rang).toBeGreaterThan(0);
+  });
+
+  /**
+   * La dégradation que le registre des dépendances décrit, et qu'aucune
+   * ligne ne tenait : l'écran dit ce qui manque plutôt que d'afficher une
+   * version vide.
+   */
+  it("dit que la mise en forme n'est pas disponible, sans proposer de bouton", () => {
+    /**
+     * Sans version, l'écran ouvre sur l'entretien — c'est voulu : la
+     * personne est en train d'y répondre. Le message d'état vit dans
+     * l'éditeur, où elle arrive en finissant l'entretien.
+     */
+    const { container } = rendre({ versions: [] });
+    allerALEditeur();
+    expect(container.textContent).toContain("La mise en forme n'est pas disponible");
+    expect(container.textContent).toContain("rien n'est perdu");
+    expect(screen.queryByRole("button", { name: /Proposer un premier texte/ })).toBeNull();
+    // Et rien ne renvoie vers une analyse d'un texte qui n'existe pas.
+    expect(screen.queryByRole("link", { name: /analyse critique/ })).toBeNull();
+  });
+
+  it("propose la mise en forme quand le service est branché", async () => {
+    rendre({ disponible: true, versions: [] });
+    allerALEditeur();
+    appels.length = 0;
+    const bouton = screen.getByRole("button", { name: /Proposer un premier texte/ });
+    await act(async () => {
+      fireEvent.click(bouton);
+    });
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.corps).toEqual({ geste: "mise-en-forme" });
+  });
+
+  it("porte la mention d'aide à la rédaction sous le champ", () => {
+    const { container } = rendre();
+    expect(container.textContent).toContain("aide à la rédaction");
+    expect(container.textContent).toContain("relève de ta responsabilité");
+  });
+
+  /**
+   * La lettre s'affichait deux fois : le champ n'existait pas, et les
+   * paragraphes étaient rendus en lecture seule sous lui. Une seule
+   * occurrence, dans le champ — zéro voudrait dire que le texte a disparu.
+   */
+  it("n'affiche pas le texte en double", () => {
+    const { container } = rendre();
+    const debut = VERSIONS_MOTIVATION[0]!.paragraphes[0]!.texte.slice(0, 40);
+    const occurrences = (container.textContent ?? "").split(debut).length - 1;
+    expect(occurrences).toBe(1);
+    expect((screen.getByLabelText("Ton texte") as HTMLTextAreaElement).value).toContain(
+      debut,
+    );
+  });
+});
+
+describe("R-04 — un vide ne vaut pas un avis", () => {
+  const rendre = (props: { remarques: readonly Remarque[] | null; texteExistant?: boolean }) =>
+    render(
+      <Relecture
+        dossier={dossierParId("nl-4471")!}
+        type="lettre-motivation"
+        remarques={props.remarques}
+        texteExistant={props.texteExistant ?? true}
+        relectureLe="2026-09-11"
+      />,
+    );
+
+  /**
+   * Le défaut : la page répondait « Rien à reprendre sur cette version. »
+   * alors qu'aucune analyse n'avait tourné, et son bandeau de source le
+   * datait. Un avis favorable rendu sans avoir lu.
+   */
+  it("ne rend aucun avis quand rien n'a été analysé", () => {
+    const { container } = rendre({ remarques: null });
+    expect(container.textContent).not.toContain("Rien à reprendre");
+    expect(container.textContent).toContain("sans l'avoir lu");
+    // Le bandeau ne date pas une relecture qui n'a pas eu lieu.
+    expect(container.textContent).not.toContain("2026");
+    expect(container.textContent).not.toContain("relecture automatique ImmiPro");
+  });
+
+  it("dit « rien à reprendre » seulement après avoir lu", () => {
+    const { container } = rendre({ remarques: [] });
+    expect(container.textContent).toContain("Rien à reprendre");
+    expect(container.textContent).toContain("relecture automatique ImmiPro");
+  });
+
+  it("dit qu'il n'y a pas encore de texte", () => {
+    const { container } = rendre({ remarques: null, texteExistant: false });
+    expect(container.textContent).toContain("pas encore de texte à analyser");
+    expect(container.textContent).not.toContain("Rien à reprendre");
+  });
+
+  /** « Corriger le passage » n'était relié à rien : c'est un lien vers l'éditeur. */
+  it("mène à l'éditeur depuis chaque remarque", () => {
+    rendre({ remarques: REMARQUES_MOTIVATION });
+    const liens = screen
+      .getAllByRole("link")
+      .map((l) => l.getAttribute("href"))
+      .filter((h) => h === "/dossiers/nl-4471/redaction/lettre-motivation");
+    expect(liens.length).toBeGreaterThan(1);
+    expect(screen.queryByRole("button", { name: /Corriger le passage/ })).toBeNull();
+  });
+});
+
 describe("R-04 — Analyse critique", () => {
   // La page lit la base ; le composant rend. Les remarques du contenu de
   // référence suffisent à vérifier l'écran, sans base de données.
@@ -320,6 +517,7 @@ describe("R-04 — Analyse critique", () => {
       dossier={dossierParId("nl-4471")!}
       type="lettre-motivation"
       remarques={REMARQUES_MOTIVATION}
+      texteExistant
       relectureLe="2026-09-11"
     />
   );
