@@ -16,6 +16,12 @@ import type { EcritureAudit, CategorieAudit } from "@/domain/backoffice/audit";
 import type { PieceEnEchec } from "@/domain/backoffice/revue";
 import { aReconcilier } from "@/server/paiement/cycle";
 import { getPack, type Devise } from "@/domain/payments/pricing";
+import {
+  coutMicrosDesJetons,
+  tarifDepuisEnvironnement,
+  type Journee,
+  type TarifIA,
+} from "@/domain/backoffice/couts";
 import { moyenDe } from "@/domain/paiement/recu";
 
 /**
@@ -451,21 +457,43 @@ export async function fileDeRevue(): Promise<PieceEnEchec[]> {
   });
 }
 
-/** Coûts IA — B-07, RG-16.1. */
+/**
+ * Coûts IA — B-07, RG-16.1 et RG-16.2.
+ *
+ * Le coût est **recalculé ici**, depuis les jetons conservés et le tarif du
+ * jour ; `AiUsage.costMicros` n'est pas lu. Deux raisons, et la seconde est
+ * la plus importante :
+ *
+ *  - WF-16 étape 4 demande de réviser la grille tarifaire à partir des
+ *    coûts réels, ce qui suppose de pouvoir repasser une grille sur une
+ *    consommation déjà enregistrée ;
+ *  - les lignes écrites avant qu'un tarif existe portent un zéro. Les
+ *    sommer reviendrait à présenter comme gratuit ce qu'on ne savait pas
+ *    encore facturer.
+ *
+ * Sans tarif, le coût vaut `null` d'un bout à l'autre de la chaîne — jamais
+ * zéro, qui s'afficherait comme une dépense nulle face à un plafond.
+ */
 export interface LigneDeCout {
   dossierId: string;
   appels: number;
-  coutMicros: number;
+  jetonsEntree: number;
+  jetonsSortie: number;
+  /** `null` sans tarif configuré. */
+  coutMicros: number | null;
   pack: string | null;
   prixPack: number | null;
   devise: string | null;
+  /** Part du prix du pack, ratio. `null` sans tarif ou sans pack payé. */
   partDuPrix: number | null;
 }
 
-export async function coutsParDossier(): Promise<LigneDeCout[]> {
+export async function coutsParDossier(
+  tarif: TarifIA | null = tarifDepuisEnvironnement(process.env),
+): Promise<LigneDeCout[]> {
   const usages = await db.aiUsage.groupBy({
     by: ["applicationId"],
-    _sum: { costMicros: true },
+    _sum: { inputTokens: true, outputTokens: true },
     _count: { _all: true },
   });
 
@@ -482,20 +510,51 @@ export async function coutsParDossier(): Promise<LigneDeCout[]> {
       const achat = dossiers.find((d) => d.id === u.applicationId)?.transactions[0];
       const pack = achat ? getPack(achat.packCode) : undefined;
       const prix = pack && achat ? pack.prix[achat.currency as Devise] : null;
-      const coutMicros = u._sum.costMicros ?? 0;
+      const jetonsEntree = u._sum.inputTokens ?? 0;
+      const jetonsSortie = u._sum.outputTokens ?? 0;
+      const coutMicros = coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie);
       return [
         {
           dossierId: u.applicationId,
           appels: u._count._all,
+          jetonsEntree,
+          jetonsSortie,
           coutMicros,
           pack: pack?.code ?? null,
           prixPack: prix,
           devise: achat?.currency ?? null,
-          partDuPrix: prix ? coutMicros / 1_000_000 / prix : null,
+          partDuPrix:
+            prix && coutMicros !== null ? coutMicros / 1_000_000 / prix : null,
         },
       ];
     })
     .sort((a, b) => (b.partDuPrix ?? 0) - (a.partDuPrix ?? 0));
+}
+
+/**
+ * Consommation quotidienne — l'histogramme de B-07.
+ *
+ * En jetons, pas en argent : c'est la seule grandeur qui reste juste que le
+ * tarif soit configuré ou non. Les jours sans appel ne sont pas renvoyés ;
+ * c'est `serieQuotidienne` qui les remet à zéro, parce que combler un trou
+ * est une décision d'affichage et qu'elle se teste sans base de données.
+ */
+export async function consommationParJour(depuis: Date): Promise<Journee[]> {
+  const usages = await db.aiUsage.findMany({
+    where: { createdAt: { gte: depuis } },
+    select: { createdAt: true, inputTokens: true, outputTokens: true },
+  });
+
+  const parJour = new Map<string, Journee>();
+  for (const u of usages) {
+    const jour = iso(u.createdAt);
+    const cumul = parJour.get(jour) ?? { jour, jetons: 0, appels: 0 };
+    cumul.jetons += u.inputTokens + u.outputTokens;
+    cumul.appels += 1;
+    parJour.set(jour, cumul);
+  }
+
+  return [...parJour.values()].sort((a, b) => a.jour.localeCompare(b.jour));
 }
 
 /** Une règle du back-office, par identifiant — B-02. */

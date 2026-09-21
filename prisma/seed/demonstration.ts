@@ -4,6 +4,10 @@ import { checklistDepuis, echeancesDepuis } from "../../src/server/acces/dossier
 import { payload } from "../../src/server/acces/regles";
 import { getPack } from "../../src/domain/payments/pricing";
 import { COMMISSION_BPS_ANNONCEE } from "../../src/domain/partenaires/affiliation";
+import {
+  coutMicrosDesJetons,
+  tarifDepuisEnvironnement,
+} from "../../src/domain/backoffice/couts";
 
 /**
  * Jeu de démonstration — développement seulement.
@@ -219,7 +223,11 @@ async function main() {
         operation: `analyse:${fonds.code}`,
         inputTokens: 4200,
         outputTokens: 310,
-        costMicros: 18_400,
+        // Le coût sort du tarif configuré, jamais d'un chiffre posé ici : un
+        // montant inventé dans le jeu de démonstration fait croire que B-07
+        // sait tarifer alors qu'il attend encore ses trois variables.
+        costMicros:
+          coutMicrosDesJetons(tarifDepuisEnvironnement(process.env), 4200, 310) ?? 0,
       },
     });
   }

@@ -8,6 +8,7 @@ import {
   type VisaRulesPayload,
 } from "@/domain/rules/schema";
 import { sansCommentaires } from "@/domain/copy/source";
+import { COMMANDES_ATTENDUES } from "@/domain/backoffice/couts";
 
 const lire = (f: string) => readFileSync(f, "utf8");
 
@@ -236,10 +237,10 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
    * le jour où l'écran écrit ; aucune ne s'ajoute sans être discutée.
    */
   const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
-    // Aucune route : les plafonds sont calculés, jamais modifiables.
-    "src/app/(admin)/couts-ia/CoutsIa.tsx": "aucune route de plafond",
-    // Les quatre boutons d'export du back-office. Aucun code d'export
-    // n'existe dans le dépôt.
+    // Les boutons d'export du back-office. Aucun code d'export n'existe
+    // dans le dépôt. B-07 portait le quatrième : il en est sorti avec S.6,
+    // et « Modifier les plafonds » avec lui — les trois seuils sont des
+    // constantes, et deux d'entre eux sont des règles de gestion.
     "src/app/(admin)/journal/Journal.tsx": "aucun export",
     "src/app/(admin)/paiements/Paiements.tsx": "aucun export, aucun rapprochement manuel",
   };
@@ -295,6 +296,21 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
     const b02 = "src/app/(admin)/regles/[id]/EditionRegle.tsx";
     expect(Object.keys(EN_ATTENTE_DE_BRANCHEMENT)).not.toContain(b02);
     expect(inertes(lire(b02))).toEqual([]);
+  });
+
+  /**
+   * B-07 en est sorti par retrait, pas par branchement — et les deux
+   * comptent. Un bouton qui ne part nulle part vaut moins qu'une absence :
+   * ce qui lui manque est nommé dans `COMMANDES_ATTENDUES`, où il se relit.
+   */
+  it("B-07 n'y est plus, et ce qui lui manque est nommé", () => {
+    const b07 = "src/app/(admin)/couts-ia/CoutsIa.tsx";
+    expect(Object.keys(EN_ATTENTE_DE_BRANCHEMENT)).not.toContain(b07);
+    expect(inertes(lire(b07))).toEqual([]);
+    expect(COMMANDES_ATTENDUES.map((c) => c.libelle)).toEqual([
+      "Modifier les plafonds",
+      "Exporter le détail des appels",
+    ]);
   });
 
   /** Chaque entrée dit ce qui lui manque, pas seulement qu'elle manque. */
@@ -407,5 +423,60 @@ describe("aucune action auditée n'est déclarée sans être écrite", () => {
     const ecran = sansCommentaires(lire("src/app/(admin)/revue/RevueDesPieces.tsx"));
     expect(ecran).not.toMatch(/page 1 sur|aperçu de la pièce/iu);
     expect(ecran).toContain("apercu.url");
+  });
+});
+
+/**
+ * S.6 — le zéro qui se faisait passer pour une mesure.
+ *
+ * Le seul écrivain de `AiUsage` enregistrait `costMicros: 0`, faute de
+ * tarif de jeton. B-07 sommait cette colonne : le premier dossier analysé
+ * faisait quitter l'état vide et affichait « 0,00 F par dossier » sous un
+ * plafond de 15 %. Un tiret ne dit rien ; un zéro affirme.
+ *
+ * Deux propriétés tiennent la correction, et elles se lisent dans le code
+ * plutôt que dans un rendu :
+ *
+ *  1. la lecture ne somme plus `costMicros` — elle recalcule depuis les
+ *     jetons conservés, pour qu'une ligne écrite avant le tarif ne compte
+ *     pas comme gratuite ;
+ *  2. l'écriture passe par le tarif au lieu de poser un littéral.
+ *
+ * Le critère porte sur la fonction appelée, pas sur une forme d'écriture —
+ * c'est ce qui avait fini par marcher pour les actions auditées en S.2,
+ * après deux critères syntaxiques qui accusaient du code correct.
+ */
+describe("B-07 — un coût manquant ne vaut jamais zéro", () => {
+  const LECTURE = "src/server/lecture/backoffice.ts";
+  const ECRITURE = "src/server/jobs/analyse.ts";
+
+  it("la lecture ne somme plus la colonne de coût", () => {
+    const code = sansCommentaires(lire(LECTURE));
+    const bloc = code.slice(
+      code.indexOf("export async function coutsParDossier"),
+      code.indexOf("export async function consommationParJour"),
+    );
+    expect(bloc.length).toBeGreaterThan(200);
+    expect(bloc).not.toContain("costMicros");
+    expect(bloc).toContain("coutMicrosDesJetons");
+  });
+
+  it("l'écriture tarife ses jetons au lieu de poser un littéral", () => {
+    const code = sansCommentaires(lire(ECRITURE));
+    expect(code).toContain("aiUsage.create");
+    expect(code).toContain("coutMicrosDesJetons");
+    expect(code).not.toMatch(/costMicros:\s*\d/u);
+  });
+
+  /**
+   * Le jeu de démonstration écrivait 18 400 micro-unités pour 4 510 jetons.
+   * Un montant inventé y fait croire que B-07 sait tarifer alors qu'il
+   * attend ses trois variables, et c'est précisément sur la démonstration
+   * qu'une capacité absente se prend pour acquise.
+   */
+  it("la démonstration n'invente aucun montant", () => {
+    const code = sansCommentaires(lire("prisma/seed/demonstration.ts"));
+    expect(code).toContain("coutMicrosDesJetons");
+    expect(code).not.toMatch(/costMicros:\s*\d+_/u);
   });
 });

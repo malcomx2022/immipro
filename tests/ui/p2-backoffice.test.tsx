@@ -8,7 +8,13 @@ import { Utilisateurs } from "@/app/(admin)/utilisateurs/Utilisateurs";
 import { Paiements } from "@/app/(admin)/paiements/Paiements";
 import { Journal } from "@/app/(admin)/journal/Journal";
 import { CoutsIa } from "@/app/(admin)/couts-ia/CoutsIa";
-import { METRIQUES } from "@/domain/backoffice/couts";
+import {
+  METRIQUES,
+  metriquesMesurees,
+  serieQuotidienne,
+  type Depassement,
+  type Journee,
+} from "@/domain/backoffice/couts";
 import {
   COLLECTE,
   COLLECTE_PARTIELLE,
@@ -702,38 +708,153 @@ describe("B-06 — Journal d'audit", () => {
   });
 });
 
+/**
+ * B-07 — les états de l'écran de coûts.
+ *
+ * Trois situations, et elles ne disent pas la même chose : rien
+ * d'enregistré, des appels enregistrés sans tarif, des appels enregistrés
+ * avec tarif. C'est la deuxième qui manquait — l'écran y affichait « 0,00 F »
+ * et « 0,0 % au plus haut » sous un plafond de 15 %.
+ */
+const SERIE_VIDE: readonly Journee[] = serieQuotidienne([], "2026-09-21", 14);
+const SERIE_PLEINE: readonly Journee[] = serieQuotidienne(
+  [
+    { jour: "2026-09-19", jetons: 12_000, appels: 3 },
+    { jour: "2026-09-21", jetons: 4_500, appels: 1 },
+  ],
+  "2026-09-21",
+  14,
+);
+const CANDIDATS: readonly Depassement[] = [
+  { dossierId: "dossier-trop-cher", pack: "DOSSIER", part: 0.22, appels: 9 },
+  { dossierId: "dossier-sage", pack: "ESSENTIEL", part: 0.04, appels: 2 },
+];
+
+const coutsIa = (props: Partial<Parameters<typeof CoutsIa>[0]> = {}) =>
+  render(
+    <CoutsIa
+      metriques={METRIQUES}
+      serie={SERIE_VIDE}
+      candidats={[]}
+      tarife={false}
+      {...props}
+    />,
+  );
+
 describe("B-07 — Coûts IA", () => {
   it("n'affiche aucune valeur, et dit pourquoi", () => {
-    const { container } = render(<CoutsIa metriques={METRIQUES} />);
+    const { container } = coutsIa();
     expect(container.textContent).toContain("Aucune mesure enregistrée");
-    expect(container.textContent).toContain("un chiffre posé ici serait repris comme une spécification");
-    expect(screen.getAllByText("—").length).toBe(4);
+    expect(container.textContent).toContain(
+      "un chiffre posé ici serait repris comme une spécification",
+    );
+    expect(screen.getAllByText("—").length).toBe(METRIQUES.length);
   });
 
   it("nomme les métriques et leur source de calcul", () => {
-    const { container } = render(<CoutsIa metriques={METRIQUES} />);
-    expect(container.textContent).toContain("somme de AiUsage.costXof sur la période");
+    const { container } = coutsIa({ tarife: true });
+    expect(container.textContent).toContain("AiUsage.inputTokens + outputTokens");
     expect(container.textContent).toContain("Coût IA par dossier payant");
   });
 
   it("exprime les garde-fous en ratio, avec leur conséquence", () => {
-    const { container } = render(<CoutsIa metriques={METRIQUES} />);
+    const { container } = coutsIa();
     expect(espaces(container.textContent ?? "")).toContain("15 % du prix du pack");
     expect(container.textContent).toContain("le pack est vendu trop bas");
     expect(container.textContent).toContain("3 × la médiane des 7 derniers jours");
     expect(container.textContent).toContain("la file passe en revue humaine");
   });
 
-  it("désactive l'export en disant qu'il n'y a rien à exporter", () => {
-    render(<CoutsIa metriques={METRIQUES} />);
-    expect(
-      screen.getByRole("button", { name: /Exporter le détail des appels/ }),
-    ).toHaveProperty("disabled", true);
-    expect(screen.getByText(/il n'y a rien à exporter/)).toBeDefined();
+  it("ne montre aucune donnée de candidat", () => {
+    const { container } = coutsIa();
+    expect(container.textContent).toContain("Aucune donnée de candidat");
   });
 
-  it("ne montre aucune donnée de candidat", () => {
-    const { container } = render(<CoutsIa metriques={METRIQUES} />);
-    expect(container.textContent).toContain("Aucune donnée de candidat");
+  // ── Le défaut de S.6 : des appels enregistrés, aucun tarif ────────────
+
+  it("ne présente jamais un coût nul quand le tarif manque", () => {
+    const { container } = coutsIa({
+      tarife: false,
+      metriques: metriquesMesurees({
+        dossiers: 3,
+        jetons: 16_500,
+        appels: 4,
+        coutMicros: null,
+        pirePart: null,
+        devise: null,
+      }),
+      serie: SERIE_PLEINE,
+    });
+
+    const texte = espaces(container.textContent ?? "");
+    expect(texte).toContain("Les coûts ne sont pas calculés");
+    expect(texte).toContain("Un tarif manquant ne vaut pas zéro");
+    // Les trois métriques tarifées restent au tiret ; les deux comptées, non.
+    expect(screen.getAllByText("—").length).toBe(3);
+    expect(texte).toContain("16 500 jetons");
+    expect(texte).toContain("4 appels");
+    expect(texte).not.toMatch(/0,00\s/);
+    expect(texte).not.toContain("0,0 % au plus haut");
+  });
+
+  it("ne relève aucun dépassement sans tarif, et le dit", () => {
+    const { container } = coutsIa({ tarife: false, candidats: CANDIDATS });
+    expect(container.textContent).toContain(
+      "ne peuvent pas être relevés sans tarif",
+    );
+    expect(container.textContent).not.toContain("dossier-trop-cher");
+  });
+
+  it("nomme le dossier qui dépasse, une fois le tarif posé", () => {
+    const { container } = coutsIa({ tarife: true, candidats: CANDIDATS });
+    expect(container.textContent).toContain("dossier-trop-cher");
+    expect(espaces(container.textContent ?? "")).toContain("22 % du prix du pack DOSSIER");
+    expect(container.textContent).toContain("appelle une analyse");
+    // Celui qui reste sous le seuil n'encombre pas la liste.
+    expect(container.textContent).not.toContain("dossier-sage");
+  });
+
+  it("affiche les montants dans la devise du tarif", () => {
+    const { container } = coutsIa({
+      tarife: true,
+      metriques: metriquesMesurees({
+        dossiers: 2,
+        jetons: 9_000,
+        appels: 3,
+        coutMicros: 1_250_000,
+        pirePart: 0.03,
+        devise: "XOF",
+      }),
+    });
+    const texte = espaces(container.textContent ?? "");
+    expect(texte).toContain("1,25 XOF");
+    expect(texte).toContain("3,0 % au plus haut");
+    expect(texte).not.toContain("Les coûts ne sont pas calculés");
+  });
+
+  // ── L'histogramme ─────────────────────────────────────────────────────
+
+  it("ne prétend pas avoir des appels quand il n'en a aucun", () => {
+    const { container } = coutsIa({ serie: SERIE_VIDE });
+    expect(container.textContent).toContain("Aucun appel enregistré");
+  });
+
+  it("garde le jour sans appel dans la série, à zéro", () => {
+    coutsIa({ serie: SERIE_PLEINE });
+    const barres = screen.getByRole("list", { name: /Jetons consommés par jour/ });
+    const lu = espaces(barres.textContent ?? "");
+    expect(barres.children).toHaveLength(14);
+    expect(lu).toContain("aucun appel");
+    expect(lu).toContain("12 000 jetons, 3 appels");
+    // Le singulier : « 1 appels » se lit sur l'écran, pas dans un test de plus.
+    expect(lu).toMatch(/4 500 jetons, 1 appel$/);
+  });
+
+  // ── Les deux commandes retirées ───────────────────────────────────────
+
+  it("ne propose plus de modifier des plafonds qui ne se modifient pas", () => {
+    coutsIa({ tarife: true });
+    expect(screen.queryByRole("button", { name: /Modifier les plafonds/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Exporter/ })).toBeNull();
   });
 });

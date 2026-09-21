@@ -2619,10 +2619,10 @@ le test, et la liste ne peut que rétrécir.
 
 | Écran | Ce qui manque |
 |---|---|
-| B-05 revue | `POST revue/[id]` écrite, écran muet |
-| B-03 utilisateurs | `PUT utilisateurs` écrite, écran muet |
-| B-01 veille | aucune route : la collecte automatique des sources n'existe pas |
-| B-07 coûts IA | aucune route : les plafonds sont calculés, jamais modifiables |
+| ~~B-05 revue~~ | ~~`POST revue/[id]` écrite, écran muet~~ — branché en S.2 |
+| ~~B-03 utilisateurs~~ | ~~`PUT utilisateurs` écrite, écran muet~~ — branché en S.4 |
+| ~~B-01 veille~~ | ~~aucune route~~ — `PUT veille` écrite en S.5 |
+| ~~B-07 coûts IA~~ | ~~les plafonds sont calculés, jamais modifiables~~ — retiré en S.6, l'arbitrage est nommé |
 | B-06 journal · B-04 paiements | aucun export, aucun rapprochement manuel |
 
 ### S.3 — Ce que la revue a relevé et qui reste ouvert
@@ -2968,3 +2968,97 @@ aucune route, et la règle de Q.A.
                            nuit à 3 h … (RG-14.1) »
                          bouton actif, conséquence adaptée au retard
                          les quatre boutons morts absents
+
+### S.6 — B-07 devenait faux au moment de recevoir des données
+
+Cet écran avait été livré vide par décision : tant que dix dossiers réels
+n'ont pas alimenté `AiUsage`, aucune valeur n'est affichée. La décision
+tient. **Ce qui ne tenait pas, c'est sa condition de sortie.**
+
+Elle portait sur le nombre de dossiers. Or le seul endroit du produit qui
+écrit dans `AiUsage` enregistrait `costMicros: 0` — un zéro littéral,
+parce qu'aucun tarif de jeton n'existe dans le dépôt. Le premier dossier
+analysé faisait donc quitter l'état vide et affichait :
+
+    Coût IA par dossier payant   0,00 F sur 1 dossiers
+    Part du prix du pack         0,0 % au plus haut
+
+sous un garde-fou qui annonce 15 % du prix du pack.
+
+L'écran devenait faux à l'instant précis où il recevait des données, et
+son mensonge était **rassurant** : un superviseur qui lit 0 % face à un
+plafond de 15 % conclut qu'il reste de la marge. Un tiret ne dit rien ; un
+zéro affirme. Le jeu de démonstration aggravait le cas — il écrivait
+18 400 micro-unités pour 4 510 jetons, si bien que la seule situation où
+l'écran paraissait savoir tarifer était celle où le montant était inventé.
+
+#### Ce qui se compte, ce qui se tarife
+
+Les jetons sont mesurés pour de vrai : le lecteur les rend, la table les
+garde. **Le prix du jeton, lui, n'est nulle part.** Les deux grandeurs sont
+désormais séparées, et c'est la règle d'I.C appliquée à une donnée plutôt
+qu'à un service : aucun service absent n'est simulé, et un tarif manquant
+ne vaut pas zéro.
+
+| Grandeur | Sans tarif | Avec tarif |
+|---|---|---|
+| Jetons consommés, analyses exécutées | affichés | affichés |
+| Dépense, coût par dossier, part du pack | absents, et l'absence est nommée | affichés dans la devise du tarif |
+| Dépassements individuels | non calculables, et l'écran le dit | le dossier est nommé |
+
+Le coût est **recalculé à la lecture**, depuis les jetons conservés et le
+tarif du jour ; `AiUsage.costMicros` n'est plus lu. Deux raisons, et la
+seconde décide : WF-16 étape 4 demande de réviser la grille à partir des
+coûts réels — donc de repasser une grille sur une consommation déjà
+enregistrée —, et les lignes écrites avant qu'un tarif existe portent un
+zéro qu'il ne faut pas sommer.
+
+Un total partiel n'est jamais présenté comme un total : une seule ligne non
+tarifée rend la somme `null`. C'est la règle déjà tenue en B-06 pendant un
+incident de collecte.
+
+#### Les dépassements individuels, enfin nommés
+
+RG-16.2 demande une analyse à **chaque dépassement individuel**. L'écran
+réduisait la série à « X % au plus haut » sans jamais nommer le dossier
+concerné : une analyse ne commence pas sur un pourcentage anonyme. La
+lecture triait déjà les dossiers par part décroissante — la donnée était
+là, l'écran la jetait.
+
+#### Les deux commandes retirées
+
+« Exporter le détail des appels » part comme les trois autres exports :
+aucun code d'export n'existe dans le dépôt.
+
+« Modifier les plafonds » est d'une autre nature, et c'est ce qui la rend
+intéressante. Les trois seuils affichés sont des constantes, et deux sont
+des règles de gestion — les 15 % viennent de RG-16.1. Ce qui lui manque
+n'est donc pas une route : c'est un arbitrage sur **lesquels de ces seuils
+sont des réglages et lesquels restent des règles**. Un plafond réglable
+depuis un écran est un plafond qu'on relève le jour où il gêne,
+c'est-à-dire le jour où il sert. Les deux sont consignées dans
+`COMMANDES_ATTENDUES`.
+
+B-07 sort ainsi du registre des écrans muets — par retrait, non par
+branchement. Il n'y restait plus que les deux boutons d'export de B-04
+et B-06.
+
+**Exécuté contre PostgreSQL**, 1 118 000 jetons sur 2 dossiers payés :
+
+    sans tarif   Dépensé ce mois              —
+                 Coût IA par dossier payant   —
+                 Jetons consommés             1 118 000 jetons
+                 Analyses exécutées           4 appels
+                 Part du prix du pack         —
+                 dépassements                 aucun
+
+    avec tarif   Dépensé ce mois              2 574,00 XOF
+    1800/9000    Coût IA par dossier payant   1 287,00 XOF sur 2 dossiers
+    XOF          Part du prix du pack         25,7 % au plus haut
+                 dépassements                 b202ac37 · 25,7 %
+
+    en base      costMicros = 0, 0, 0, 0 — la colonne n'est plus lue,
+                 et l'écran ne s'en porte pas plus mal
+
+L'exécution a trouvé un défaut de plus, que onze mutations n'avaient pas
+attrapé : « sur 1 dossiers ». Il n'y avait pas de test, il y en a un.

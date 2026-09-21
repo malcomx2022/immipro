@@ -47,8 +47,19 @@ import {
 } from "@/domain/backoffice/reconciliation";
 import { diagnostiquerPeriode, filtrerAudit } from "@/domain/backoffice/audit";
 import {
+  COMMANDES_ATTENDUES,
   GARDE_FOUS,
   METRIQUES,
+  coutMicrosDesJetons,
+  depassements,
+  hauteurRelative,
+  libelleDepassement,
+  candidatsAuDepassement,
+  mesureDepuisLesLignes,
+  metriquesMesurees,
+  serieQuotidienne,
+  serieVide,
+  tarifDepuisEnvironnement,
   aucuneMesure,
   medianeQuotidienne,
   plafondQuotidien,
@@ -479,6 +490,248 @@ describe("B-07 — coûts IA, livré vide", () => {
   it("ne garde que les sept derniers jours pour le plafond", () => {
     const dix = [1, 1, 1, 100, 110, 120, 130, 140, 150, 160];
     expect(plafondQuotidien(dix)).toBe(130 * 3);
+  });
+  // ── S.6 : ce qui se compte, et ce qui se tarife ─────────────────────
+
+  it("n'a pas de tarif tant que les trois variables ne sont pas là", () => {
+    expect(tarifDepuisEnvironnement({})).toBeNull();
+    // Un tarif partiel est un tarif absent : facturer l'entrée sans la
+    // sortie donnerait un coût inférieur au vrai.
+    expect(
+      tarifDepuisEnvironnement({
+        AI_TARIF_ENTREE_PAR_MILLION: "3",
+        AI_TARIF_DEVISE: "XOF",
+      }),
+    ).toBeNull();
+    expect(
+      tarifDepuisEnvironnement({
+        AI_TARIF_ENTREE_PAR_MILLION: "3",
+        AI_TARIF_SORTIE_PAR_MILLION: "15",
+      }),
+    ).toBeNull();
+    // Une valeur illisible n'est pas lue comme zéro.
+    expect(
+      tarifDepuisEnvironnement({
+        AI_TARIF_ENTREE_PAR_MILLION: "gratuit",
+        AI_TARIF_SORTIE_PAR_MILLION: "15",
+        AI_TARIF_DEVISE: "XOF",
+      }),
+    ).toBeNull();
+  });
+
+  it("lit le tarif complet, et tarife d'entrée et de sortie séparément", () => {
+    const tarif = tarifDepuisEnvironnement({
+      AI_TARIF_ENTREE_PAR_MILLION: "1800",
+      AI_TARIF_SORTIE_PAR_MILLION: "9000",
+      AI_TARIF_DEVISE: "XOF",
+    });
+    expect(tarif).toEqual({
+      entreeParMillion: 1800,
+      sortieParMillion: 9000,
+      devise: "XOF",
+    });
+    // 1 000 000 d'entrée + 1 000 000 de sortie = 10 800 XOF, en micros.
+    expect(coutMicrosDesJetons(tarif, 1_000_000, 1_000_000)).toBe(10_800_000_000);
+    // La sortie coûte cinq fois l'entrée : les confondre fausserait le coût.
+    expect(coutMicrosDesJetons(tarif, 0, 1_000_000)).toBe(9_000_000_000);
+  });
+
+  it("rend null sans tarif, jamais zéro", () => {
+    expect(coutMicrosDesJetons(null, 4200, 310)).toBeNull();
+  });
+
+  /**
+   * Le défaut de S.6, en une assertion.
+   *
+   * L'écran sortait de l'état vide au premier dossier et affichait « 0,00 F
+   * par dossier », parce que l'écrivain de `AiUsage` posait un zéro faute de
+   * tarif. Les jetons se comptent, le coût se tarife : les deux ne quittent
+   * plus l'état vide ensemble.
+   */
+  it("compte les jetons sans tarif, et laisse les montants absents", () => {
+    const mesurees = metriquesMesurees({
+      dossiers: 3,
+      jetons: 16_500,
+      appels: 4,
+      coutMicros: null,
+      pirePart: null,
+      devise: null,
+    });
+    const par = (cle: string) => mesurees.find((m) => m.cle === cle)!;
+
+    expect(par("jetons").valeur).toMatch(/16.500 jetons/);
+    expect(par("analyses").valeur).toBe("4 appels");
+    for (const cle of ["depense-mois", "cout-par-dossier", "part-du-pack"]) {
+      expect(par(cle).valeur, cle).toBeNull();
+      expect(par(cle).tarifee, cle).toBe(true);
+    }
+    expect(aucuneMesure(mesurees)).toBe(false);
+  });
+
+  it("libelle les montants dans la devise du tarif", () => {
+    const mesurees = metriquesMesurees({
+      dossiers: 2,
+      jetons: 9_000,
+      appels: 3,
+      coutMicros: 1_250_000,
+      pirePart: 0.03,
+      devise: "XOF",
+    });
+    const par = (cle: string) => mesurees.find((m) => m.cle === cle)!;
+    expect(par("depense-mois").valeur).toBe("1,25 XOF");
+    expect(par("cout-par-dossier").valeur).toContain("0,63 XOF sur 2 dossiers");
+    // « sur 1 dossiers » s'est lu à l'exécution, pas dans un test.
+    expect(
+      metriquesMesurees({
+        dossiers: 1,
+        jetons: 559_000,
+        appels: 2,
+        coutMicros: 1_287_000_000,
+        pirePart: null,
+        devise: "XOF",
+      }).find((m) => m.cle === "cout-par-dossier")!.valeur,
+    ).toMatch(/sur 1 dossier$/);
+    expect(par("part-du-pack").valeur).toBe("3,0 % au plus haut");
+  });
+
+  it("reste entièrement vide sans aucun dossier", () => {
+    const mesurees = metriquesMesurees({
+      dossiers: 0,
+      jetons: 0,
+      appels: 0,
+      coutMicros: null,
+      pirePart: null,
+      devise: null,
+    });
+    expect(aucuneMesure(mesurees)).toBe(true);
+  });
+
+  // ── L'histogramme ────────────────────────────────────────────────────
+
+  it("comble les jours sans appel par des zéros, sans les masquer", () => {
+    const serie = serieQuotidienne(
+      [{ jour: "2026-09-19", jetons: 12_000, appels: 3 }],
+      "2026-09-21",
+      4,
+    );
+    expect(serie.map((j) => j.jour)).toEqual([
+      "2026-09-18",
+      "2026-09-19",
+      "2026-09-20",
+      "2026-09-21",
+    ]);
+    expect(serie.map((j) => j.appels)).toEqual([0, 3, 0, 0]);
+    expect(serieVide(serie)).toBe(false);
+    expect(serieVide(serieQuotidienne([], "2026-09-21", 4))).toBe(true);
+  });
+
+  it("donne une hauteur nulle au jour sans appel, et pleine au maximum", () => {
+    const serie = serieQuotidienne(
+      [
+        { jour: "2026-09-20", jetons: 6_000, appels: 2 },
+        { jour: "2026-09-21", jetons: 12_000, appels: 3 },
+      ],
+      "2026-09-21",
+      3,
+    );
+    expect(hauteurRelative(serie[0]!, serie)).toBe(0);
+    expect(hauteurRelative(serie[1]!, serie)).toBe(0.5);
+    expect(hauteurRelative(serie[2]!, serie)).toBe(1);
+    // Aucune division par zéro sur une série entièrement nulle.
+    const nulle = serieQuotidienne([], "2026-09-21", 2);
+    expect(hauteurRelative(nulle[0]!, nulle)).toBe(0);
+  });
+
+  // ── Les dépassements individuels, RG-16.2 ────────────────────────────
+
+  it("nomme les dossiers au-delà du seuil, du pire au moindre", () => {
+    const releves = depassements([
+      { dossierId: "a", pack: "ESSENTIEL", part: 0.04, appels: 2 },
+      { dossierId: "b", pack: "DOSSIER", part: 0.22, appels: 9 },
+      { dossierId: "c", pack: "PRO", part: 0.17, appels: 5 },
+      // Exactement au seuil : la règle dit « au-delà ».
+      { dossierId: "d", pack: "PRO", part: 0.15, appels: 4 },
+    ]);
+    expect(releves.map((d) => d.dossierId)).toEqual(["b", "c"]);
+  });
+
+  it("accorde le singulier du nombre d'appels", () => {
+    expect(
+      libelleDepassement({ dossierId: "a", pack: "PRO", part: 0.22, appels: 1 }),
+    ).toMatch(/sur 1 appel$/);
+    expect(
+      libelleDepassement({ dossierId: "a", pack: "PRO", part: 0.22, appels: 2 }),
+    ).toMatch(/sur 2 appels$/);
+  });
+
+  // ── L'agrégat, sorti de la page ──────────────────────────────────────
+
+  /**
+   * Il vivait dans la page, en `reduce` empilés, et aucun test ne
+   * l'atteignait : remplacer la somme prudente par un `?? 0` ne faisait
+   * rien échouer. Un calcul qu'aucun test ne peut appeler est un calcul
+   * que rien ne tient.
+   */
+  const LIGNES = [
+    {
+      dossierId: "a",
+      appels: 3,
+      jetonsEntree: 4000,
+      jetonsSortie: 500,
+      coutMicros: 900_000,
+      pack: "DOSSIER",
+      partDuPrix: 0.22,
+    },
+    {
+      dossierId: "b",
+      appels: 1,
+      jetonsEntree: 1000,
+      jetonsSortie: 100,
+      coutMicros: 200_000,
+      pack: "ESSENTIEL",
+      partDuPrix: 0.03,
+    },
+  ];
+
+  it("agrège jetons, appels et coûts d'un seul endroit", () => {
+    expect(mesureDepuisLesLignes(LIGNES, "XOF")).toEqual({
+      dossiers: 2,
+      jetons: 5600,
+      appels: 4,
+      coutMicros: 1_100_000,
+      pirePart: 0.22,
+      devise: "XOF",
+    });
+  });
+
+  it("refuse de totaliser dès qu'une ligne n'est pas tarifée", () => {
+    const partiel = [LIGNES[0]!, { ...LIGNES[1]!, coutMicros: null }];
+    const mesure = mesureDepuisLesLignes(partiel, "XOF");
+    // Un total partiel présenté comme un total est une erreur comptable, et
+    // elle se propage — c'est la règle déjà tenue en B-06 pendant un incident.
+    expect(mesure.coutMicros).toBeNull();
+    expect(mesure.jetons).toBe(5600);
+  });
+
+  it("ne retient comme dépassables que les dossiers dont la part est connue", () => {
+    const candidats = candidatsAuDepassement([
+      ...LIGNES,
+      { ...LIGNES[0]!, dossierId: "c", partDuPrix: null },
+      { ...LIGNES[0]!, dossierId: "d", pack: null },
+    ]);
+    expect(candidats.map((c) => c.dossierId)).toEqual(["a", "b"]);
+    expect(depassements(candidats).map((c) => c.dossierId)).toEqual(["a"]);
+  });
+
+  // ── Les commandes retirées ───────────────────────────────────────────
+
+  it("nomme ce qui manque à chaque commande retirée", () => {
+    expect(COMMANDES_ATTENDUES).toHaveLength(2);
+    for (const c of COMMANDES_ATTENDUES) {
+      expect(c.manque.length, c.cle).toBeGreaterThan(20);
+      expect(c.libelle.length, c.cle).toBeGreaterThan(5);
+    }
+    expect(COMMANDES_ATTENDUES.map((c) => c.cle)).toContain("modifier-plafonds");
   });
 });
 

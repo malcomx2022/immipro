@@ -5,6 +5,10 @@ import { debiterUneAnalyse, rendreUneAnalyse } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { evaluerConditions, type ChampsExtraits } from "@/domain/dossiers/verification";
 import { transmissibleALAnalyse } from "@/domain/dossiers/quarantaine";
+import {
+  coutMicrosDesJetons,
+  tarifDepuisEnvironnement,
+} from "@/domain/backoffice/couts";
 
 /**
  * Analyse d'une pièce — WF-06.
@@ -104,6 +108,10 @@ export async function analyserUnePiece(
     },
   });
 
+  // Les jetons sont mesurés ; le prix du jeton ne l'est pas tant qu'aucun
+  // tarif n'est configuré. `costMicros` porte alors zéro, et B-07 ne le lit
+  // pas : il recalcule le coût depuis les jetons et le tarif du jour, pour
+  // qu'une ligne écrite avant le tarif ne compte pas comme gratuite.
   await db.aiUsage.create({
     data: {
       userId: document.application.userId,
@@ -111,7 +119,12 @@ export async function analyserUnePiece(
       operation: `analyse:${document.code}`,
       inputTokens: lu.jetonsEntree,
       outputTokens: lu.jetonsSortie,
-      costMicros: 0,
+      costMicros:
+        coutMicrosDesJetons(
+          tarifDepuisEnvironnement(process.env),
+          lu.jetonsEntree,
+          lu.jetonsSortie,
+        ) ?? 0,
     },
   });
 

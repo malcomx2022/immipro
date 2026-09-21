@@ -1,18 +1,32 @@
 import type { Metadata } from "next";
 import { CoutsIa } from "./CoutsIa";
-import { metriquesMesurees } from "@/domain/backoffice/couts";
-import { coutsParDossier } from "@/server/lecture/backoffice";
+import {
+  JOURS_MEDIANE,
+  candidatsAuDepassement,
+  mesureDepuisLesLignes,
+  metriquesMesurees,
+  serieQuotidienne,
+  tarifDepuisEnvironnement,
+} from "@/domain/backoffice/couts";
+import { consommationParJour, coutsParDossier } from "@/server/lecture/backoffice";
 import { exigerAdmin } from "@/server/securite/page";
 
 /**
  * B-07 — Supervision des coûts IA. WF-16.
  *
- * L'écran lit `AiUsage`. La décision d'origine ne change pas — il reste vide
- * tant qu'aucun appel n'a été enregistré — mais il se remplit de lui-même
- * quand les dossiers passeront, sans qu'on ait à revenir remplacer des
- * valeurs à la main. C'est la façon habituelle dont un écran vide le reste.
+ * L'écran lit `AiUsage`, et la décision d'origine ne change pas : il reste
+ * vide tant qu'aucun appel n'a été enregistré. Ce qui change, c'est qu'il ne
+ * quitte plus cet état pour afficher des zéros.
+ *
+ * Le coût d'un appel suppose un tarif de jeton, et aucun tarif n'existe
+ * tant que les trois variables ne sont pas renseignées. Les jetons, eux,
+ * sont comptés depuis toujours. Les deux sont donc passés séparément à
+ * l'écran : ce qui se compte s'affiche, ce qui se tarife attend.
  */
 export const dynamic = "force-dynamic";
+
+/** Deux semaines d'histogramme : de quoi voir la médiane à sept jours bouger. */
+const FENETRE_JOURS = JOURS_MEDIANE * 2;
 
 export const metadata: Metadata = {
   title: "Coûts IA",
@@ -22,19 +36,22 @@ export const metadata: Metadata = {
 
 export default async function PageCoutsIa() {
   await exigerAdmin("/couts-ia");
-  const lignes = await coutsParDossier();
+
+  const tarif = tarifDepuisEnvironnement(process.env);
+  const aujourdhui = new Date();
+  const depuis = new Date(aujourdhui.getTime() - (FENETRE_JOURS - 1) * 86_400_000);
+
+  const [lignes, relevees] = await Promise.all([
+    coutsParDossier(tarif),
+    consommationParJour(depuis),
+  ]);
 
   return (
     <CoutsIa
-      metriques={metriquesMesurees({
-        dossiers: lignes.length,
-        coutMicros: lignes.reduce((n, l) => n + l.coutMicros, 0),
-        appels: lignes.reduce((n, l) => n + l.appels, 0),
-        pireePart: lignes.reduce<number | null>(
-          (pire, l) => (l.partDuPrix === null ? pire : Math.max(pire ?? 0, l.partDuPrix)),
-          null,
-        ),
-      })}
+      metriques={metriquesMesurees(mesureDepuisLesLignes(lignes, tarif?.devise ?? null))}
+      serie={serieQuotidienne(relevees, aujourdhui.toISOString().slice(0, 10), FENETRE_JOURS)}
+      candidats={candidatsAuDepassement(lignes)}
+      tarife={tarif !== null}
     />
   );
 }
