@@ -1,8 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { ListeSelectionnable } from "@/components/admin/ListeSelectionnable";
 import { CHAMP_CONTROLE } from "@/components/ui/champ";
 import { LIBELLES_ETAT_PIECE } from "@/components/ui/StatusBadge";
@@ -13,6 +17,8 @@ import {
   MENTION_DECISION,
   horsDelai,
   libelleAge,
+  obstacleALaDecision,
+  obstacleALOuverture,
   recrediteLeQuota,
   refusDuMessage,
   resumeRevue,
@@ -32,6 +38,36 @@ import { cn } from "@/lib/utils";
  *
  * Aucune pièce n'est préchargée : la file montre le motif d'échec et la
  * trace technique, l'ouverture du document est un acte séparé et tracé.
+ *
+ * ── Ce que l'écran annonçait sans le faire ──────────────────────────────
+ *
+ * **L'ouverture n'était pas tracée.** « Ouvrir la pièce » posait un
+ * drapeau local et affichait un aperçu inventé — « aperçu de la pièce ·
+ * page 1 sur 3 » — qui ne correspondait à aucun fichier. Aucun motif
+ * n'était demandé, aucune ligne n'était écrite : l'action
+ * `piece.consultation` figurait dans la table des actions auditées sans
+ * qu'aucun code ne l'emploie jamais. L'écran affirmait pourtant, trois
+ * lignes plus haut, que l'ouverture était « un acte tracé, avec son
+ * motif » — RG-15.1, contredit par la phrase qui l'énonce.
+ *
+ * **Et la décision ne partait pas non plus.** « Enregistrer et passer à
+ * la suivante » n'était relié à rien. La route existait, validait le
+ * message, journalisait et recréditait le quota ; seule la moitié
+ * cliente manquait. La file de revue est le repli de l'extraction non
+ * branchée : elle est le filet, et elle ne décidait rien.
+ *
+ * **Un motif, deux lignes d'audit.** L'opérateur ouvre la pièce *pour* la
+ * trancher ; lui faire écrire deux justifications du même geste
+ * produirait deux textes dont l'un serait recopié de l'autre. Le motif
+ * est demandé avant l'ouverture — demandé après, il justifierait un accès
+ * déjà eu — et il accompagne ensuite la décision.
+ *
+ * **Deux commandes ont été retirées.** « Rendre l'analyse au candidat »
+ * proposait un choix que le produit n'offre pas : c'est la décision qui
+ * recrédite le quota, et la ligne au-dessus du bouton dit déjà laquelle.
+ * « Voir les pièces traitées » et « Motifs d'échec les plus fréquents »
+ * menaient à des écrans qui n'existent pas — la règle de Q.A, qui a fait
+ * retirer neuf liens du pied de page plutôt que d'inventer leurs pages.
  */
 export function RevueDesPieces({
   pieces,
@@ -41,15 +77,68 @@ export function RevueDesPieces({
   /** Horodatage de rendu : l'âge d'une pièce se calcule, il ne se saisit pas. */
   maintenant: string;
 }) {
+  const router = useRouter();
   const triees = trierParAnciennete(pieces);
   const [selection, setSelection] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision>("A_CORRIGER");
+  const [motif, setMotif] = useState("");
   const [message, setMessage] = useState("");
-  const [ouverte, setOuverte] = useState(false);
+  /** L'aperçu que le serveur a signé — jamais un cadre inventé. */
+  const [apercu, setApercu] = useState<{ url: string | null; raison: string | null } | null>(
+    null,
+  );
+  const [envoi, setEnvoi] = useState<"" | "ouverture" | "decision">("");
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
   const date = new Date(maintenant);
   const retenue = triees.find((p) => p.id === selection) ?? triees[0];
   const refus = refusDuMessage(message, decision);
+  const manqueAvantOuverture = obstacleALOuverture(motif);
+  const manqueAvantDecision = obstacleALaDecision({ motif, decision, message });
+
+  /** Changer de pièce remet tout à zéro, aperçu compris. */
+  function choisir(cle: string | null) {
+    setSelection(cle);
+    setApercu(null);
+    setMotif("");
+    setMessage("");
+    setEchec(null);
+  }
+
+  async function ouvrirLaPiece() {
+    if (!retenue || manqueAvantOuverture) return;
+    setEnvoi("ouverture");
+    setEchec(null);
+    const resultat = await appeler<{ apercu: string | null; raison: string | null }>(
+      `/api/admin/revue/${retenue.id}/consultation`,
+      { corps: { motif } },
+    );
+    setEnvoi("");
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    setApercu({ url: resultat.donnees.apercu, raison: resultat.donnees.raison });
+  }
+
+  async function trancher() {
+    if (!retenue || manqueAvantDecision) return;
+    setEnvoi("decision");
+    setEchec(null);
+    const resultat = await appeler<{ decidee: boolean; quotaRendu: boolean }>(
+      `/api/admin/revue/${retenue.id}`,
+      { corps: { decision, message, motif } },
+    );
+    setEnvoi("");
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    // La pièce tranchée sort de la file : la suivante devient la retenue
+    // au prochain rendu, et rien de la précédente ne doit y survivre.
+    choisir(null);
+    router.refresh();
+  }
 
   if (triees.length === 0) return <FileVide />;
 
@@ -58,7 +147,6 @@ export function RevueDesPieces({
       <EnteteAdmin
         titre="Pièces en échec d'analyse"
         resume={resumeRevue(triees, date)}
-        actions={<Button variante="secondaire">Voir les pièces traitées</Button>}
       />
 
       <div className="flex gap-4 p-6">
@@ -68,11 +156,7 @@ export function RevueDesPieces({
             elements={triees}
             cle={(p) => p.id}
             selection={retenue?.id ?? null}
-            onSelection={(cle) => {
-              setSelection(cle);
-              setOuverte(false);
-              setMessage("");
-            }}
+            onSelection={choisir}
             entete={
               <div className="grid grid-cols-[1fr_1.4fr_6rem_1fr] gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
                 <span>Pièce</span>
@@ -106,18 +190,34 @@ export function RevueDesPieces({
                 {retenue.dossier} · en attente depuis {libelleAge(retenue, date)}
               </p>
 
-              {ouverte ? (
-                <div
-                  aria-hidden="true"
-                  className="flex h-40 items-center justify-center rounded-md bg-ink-100 text-13 text-ink-500"
-                >
-                  aperçu de la pièce · page 1 sur 3
-                </div>
+              {apercu ? (
+                apercu.url ? (
+                  <iframe
+                    src={apercu.url}
+                    title={`Aperçu de ${retenue.piece}`}
+                    className="h-40 w-full rounded-md border border-ink-300 bg-ink-100"
+                  />
+                ) : (
+                  // Ni cadre vide ni page inventée : la raison, telle que
+                  // le serveur l'a donnée — purgée, en quarantaine, ou
+                  // stockage injoignable.
+                  <p
+                    role="status"
+                    className="text-pretty rounded-md bg-ink-100 p-3.5 text-13 text-ink-700"
+                  >
+                    {apercu.raison}
+                  </p>
+                )
               ) : (
                 <div className="flex flex-col items-start gap-2 rounded-md bg-ink-100 p-3.5">
                   <p className="text-pretty text-13 text-ink-700">{MENTION_ACCES_TRACE}</p>
-                  <Button variante="secondaire" onClick={() => setOuverte(true)}>
-                    Ouvrir la pièce
+                  <Button
+                    variante="secondaire"
+                    disabled={manqueAvantOuverture !== null || envoi !== ""}
+                    raisonDesactivation={manqueAvantOuverture ?? "Ouverture en cours."}
+                    onClick={ouvrirLaPiece}
+                  >
+                    {envoi === "ouverture" ? "Ouverture…" : "Ouvrir la pièce"}
                   </Button>
                 </div>
               )}
@@ -134,6 +234,30 @@ export function RevueDesPieces({
               <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
                 Décision
               </h2>
+
+              {/*
+                Le motif vient en premier parce qu'il conditionne
+                l'ouverture : demandé après, il justifierait un accès déjà
+                eu, ce qui n'est pas une justification (RG-15.1).
+              */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="motif" className="text-14 font-medium text-ink-900">
+                  Motif de l&apos;accès et de la décision
+                </label>
+                <textarea
+                  id="motif"
+                  rows={2}
+                  value={motif}
+                  onChange={(e) => setMotif(e.target.value)}
+                  aria-describedby="motif-aide"
+                  className={cn(CHAMP_CONTROLE, "h-auto py-2.5")}
+                />
+                <span id="motif-aide" className="text-pretty text-13 text-ink-500">
+                  Il part au journal d&apos;audit, avec ton identifiant, à
+                  l&apos;ouverture de la pièce comme à la décision. Le candidat ne le
+                  lit pas.
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {DECISIONS.map((cle) => (
                   <button
@@ -186,16 +310,24 @@ export function RevueDesPieces({
                   : "Cette décision ne recrédite pas le quota : la lecture a rendu un résultat."}
               </p>
 
+              {echec ? <BlocEchec echec={echec} annonce /> : null}
+
               <div className="flex flex-col gap-2 border-t border-ink-300 pt-3">
+                {/*
+                  Un seul bouton. « Rendre l'analyse au candidat » en
+                  proposait un second, pour un choix que le produit
+                  n'offre pas : c'est la décision qui recrédite le quota,
+                  et la ligne au-dessus le dit déjà.
+                */}
                 <Button
                   pleineLargeur
-                  disabled={refus !== null}
-                  raisonDesactivation="Le message au candidat doit dire le constat et l'action avant d'être envoyé."
+                  disabled={manqueAvantDecision !== null || envoi !== ""}
+                  raisonDesactivation={manqueAvantDecision ?? "Enregistrement en cours."}
+                  onClick={trancher}
                 >
-                  Enregistrer et passer à la suivante
-                </Button>
-                <Button variante="secondaire" pleineLargeur>
-                  Rendre l&apos;analyse au candidat
+                  {envoi === "decision"
+                    ? "Enregistrement…"
+                    : "Enregistrer et passer à la suivante"}
                 </Button>
               </div>
 
@@ -227,10 +359,6 @@ function FileVide() {
           Les pièces en échec d&apos;analyse d&apos;hier ont toutes été traitées. Les
           nouvelles arrivent ici dans les minutes qui suivent l&apos;échec.
         </p>
-        <div className="flex gap-2 pt-1">
-          <Button variante="secondaire">Voir les pièces traitées</Button>
-          <Button variante="tertiaire">Motifs d&apos;échec les plus fréquents</Button>
-        </div>
         <p className="pt-2 text-pretty text-13 text-ink-500">{MENTION_ACCES_TRACE}</p>
       </div>
     </div>

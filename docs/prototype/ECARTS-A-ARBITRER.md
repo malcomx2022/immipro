@@ -2646,3 +2646,86 @@ Hors du code, le registre est à jour : zéro arbitrage ouvert, trois
 réserves extérieures (L.A, M.C, Q.A), six pages publiques dont quatre
 bloquantes avant ouverture, quatre dépendances non branchées dont la
 dégradation est écrite et testée.
+
+### S.2 — B-05 décide, et trace enfin l'ouverture d'une pièce
+
+**Deux défauts, et le second est un invariant.**
+
+« Enregistrer et passer à la suivante » n'était relié à rien. La route
+existait, validait le message, journalisait et recréditait le quota ;
+seule la moitié cliente manquait. La file de revue est le repli de
+l'extraction non branchée — le filet — et elle ne décidait rien.
+
+**Et « Ouvrir la pièce » ne traçait pas.** RG-15.1 : « Tout accès
+administrateur à une pièce d'identité est journalisé avec motif
+obligatoire. » Le bouton posait un drapeau local, affichait un aperçu
+inventé — « aperçu de la pièce · page 1 sur 3 », qui ne correspondait à
+aucun fichier — et n'écrivait aucune ligne. Aucun motif n'était demandé.
+L'action `piece.consultation` figurait dans la table des actions auditées
+sans qu'aucun code ne l'emploie jamais.
+
+L'écran affirmait pourtant, trois lignes au-dessus du bouton, que
+l'ouverture était « un acte tracé, avec son motif ». La phrase qui énonce
+la règle était contredite par le bouton qu'elle accompagne.
+
+**Un motif, deux lignes d'audit.** L'opérateur ouvre la pièce *pour* la
+trancher ; lui faire écrire deux justifications du même geste produirait
+deux textes dont l'un serait recopié de l'autre. Le motif est demandé
+avant l'ouverture — demandé après, il justifierait un accès déjà eu, ce
+qui n'est pas une justification — et il accompagne ensuite la décision.
+
+**La ligne d'audit part avant l'URL.** Signer d'abord laisserait, si
+l'écriture échoue, un accès réel sans trace. Dans l'autre ordre, un échec
+de signature laisse la trace d'un accès qui n'a rien montré : une trace
+de trop se relit, une trace manquante ne se retrouve pas.
+
+**Aucun aperçu ne s'invente.** L'URL vient de `urlDeLecture`, la seule
+fonction du dépôt qui en signe, et qui porte ses propres refus — pièce
+purgée, pièce non balayée (I.D). Quand le stockage ne répond pas, l'écran
+le dit : « Ton accès est consigné, et rien n'a été affiché. »
+
+**Deux commandes retirées.** « Rendre l'analyse au candidat » proposait un
+choix que le produit n'offre pas : c'est la décision qui recrédite le
+quota, et la ligne au-dessus du bouton dit déjà laquelle. « Voir les
+pièces traitées » et « Motifs d'échec les plus fréquents » menaient à des
+écrans qui n'existent pas — la règle de Q.A, qui a fait retirer neuf liens
+du pied de page plutôt que d'inventer leurs pages.
+
+#### Ce que l'application de la décision a trouvé
+
+**Le garde-fou général a trouvé plus que son sujet.** Écrit pour vérifier
+que `piece.consultation` a un écrivain, il vérifie que *chaque* action
+déclarée en a un — et il a fallu deux essais pour qu'il dise vrai. La
+première version cherchait `action: "<nom>"` : elle a accusé
+`compte.suspension` et `compte.retablissement`, que la route des
+utilisateurs écrit pourtant toutes les deux, par un ternaire que le motif
+ne voyait pas. La seconde cherchait le littéral n'importe où : elle a
+laissé passer `dossier.consultation`, qui n'apparaît que dans la table des
+catégories de B-06 — un lecteur, pas un écrivain. Le critère juste est
+qu'une action est écrite là où `journaliser` est appelé.
+
+C'est la quatrième fois de la série qu'un garde-fou ne connaît que la
+forme pour laquelle il a été écrit, après R.3, R.5 et S.1 — et la
+première où il s'est trompé dans les deux sens, en accusant du code
+correct avant de laisser passer le défaut.
+
+**`dossier.consultation` reste sans écrivain**, et rejoint le registre :
+B-03 et B-04 ouvrent le dossier d'un candidat sans le consigner. C'est le
+même défaut que celui corrigé ici, sur un autre écran.
+
+**Exécuté contre PostgreSQL :**
+
+    ouverture sans motif            HTTP 422   (le schéma refuse)
+    ouverture avec motif            apercu=null
+                                    « le stockage n'a pas répondu.
+                                      Ton accès est consigné, et rien
+                                      n'a été affiché. »
+    message « Non conforme »        refusé — constat sans suite (RG-06.3)
+    décision ILLISIBLE recevable    decidee=true · quotaRendu=true
+
+    journal : piece.consultation  document:6bac5d6c  motif conservé
+                                  {revue, dossier, version: 1}
+              revue.decision      document:6bac5d6c  motif conservé
+                                  {decision: "ILLISIBLE"}
+    pièce   : ILLISIBLE · message conservé · analyzedAt posé
+    quota   : ANALYSE_RENDUE +1

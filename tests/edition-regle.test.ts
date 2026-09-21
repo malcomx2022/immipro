@@ -221,25 +221,21 @@ describe("l'écran ne dit plus rien que le serveur n'ait répondu", () => {
  * `PREALABLES` : une commande inerte hors de cette liste fait échouer le
  * test, et la liste ne peut que rétrécir.
  */
-describe("aucune commande inerte n'apparaît sans être nommée", () => {
-  function fichiers(dir: string, acc: string[] = []): string[] {
-    for (const nom of readdirSync(dir)) {
-      const p = join(dir, nom);
-      if (statSync(p).isDirectory()) fichiers(p, acc);
-      else if (nom.endsWith(".tsx")) acc.push(p.replace(/\\/gu, "/"));
-    }
-    return acc;
+function fichiers(dir: string, acc: string[] = []): string[] {
+  for (const nom of readdirSync(dir)) {
+    const p = join(dir, nom);
+    if (statSync(p).isDirectory()) fichiers(p, acc);
+    else if (/\.tsx?$/u.test(nom)) acc.push(p.replace(/\\/gu, "/"));
   }
+  return acc;
+}
 
+describe("aucune commande inerte n'apparaît sans être nommée", () => {
   /**
    * Chaque écran encore muet, avec ce qui lui manque. Une entrée disparaît
    * le jour où l'écran écrit ; aucune ne s'ajoute sans être discutée.
    */
   const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
-    // La route `POST /api/admin/revue/[id]` existe et décide. L'écran ne
-    // l'appelle pas : la file de revue est le repli de l'IA non branchée,
-    // et elle ne décide rien.
-    "src/app/(admin)/revue/RevueDesPieces.tsx": "POST revue/[id] écrite, écran muet",
     // `PUT /api/admin/utilisateurs` existe. Les actions par ligne ne
     // l'appellent pas.
     "src/app/(admin)/utilisateurs/Utilisateurs.tsx": "PUT utilisateurs écrite, écran muet",
@@ -294,7 +290,9 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
   };
 
   it("les écrans muets sont exactement ceux du registre", () => {
-    const muets = fichiers("src/app/(admin)").filter((f) => inertes(lire(f)).length > 0);
+    const muets = fichiers("src/app/(admin)")
+      .filter((f) => f.endsWith(".tsx"))
+      .filter((f) => inertes(lire(f)).length > 0);
     expect(muets.sort()).toEqual(Object.keys(EN_ATTENTE_DE_BRANCHEMENT).sort());
   });
 
@@ -310,5 +308,98 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
     for (const [ecran, motif] of Object.entries(EN_ATTENTE_DE_BRANCHEMENT)) {
       expect(motif.length, ecran).toBeGreaterThan(10);
     }
+  });
+});
+
+/**
+ * B-05 — l'accès à une pièce est tracé, ou il n'a pas lieu.
+ *
+ * RG-15.1 : « Tout accès administrateur à une pièce d'identité est
+ * journalisé avec motif obligatoire. » L'écran l'annonçait depuis le
+ * début — « l'ouverture d'une pièce est un acte tracé, avec son motif » —
+ * et ne le faisait pas : le bouton posait un drapeau local, affichait un
+ * aperçu inventé, et n'écrivait aucune ligne. L'action
+ * `piece.consultation` figurait dans la table des actions auditées sans
+ * qu'aucun code ne l'emploie jamais.
+ */
+describe("aucune action auditée n'est déclarée sans être écrite", () => {
+  /**
+   * Le garde-fou général, et la raison pour laquelle le défaut a tenu si
+   * longtemps : rien ne reliait la liste des actions à leurs appelants.
+   * Une action qu'on déclare et qu'on n'écrit jamais est une promesse de
+   * traçabilité que personne ne tient.
+   */
+  it("chaque action de la table a au moins un appelant", () => {
+    const declarees = [
+      ...lire("src/server/acces/journal.ts").matchAll(/\| "([a-z]+\.[a-z]+)"/gu),
+    ].map((m) => m[1]!);
+    expect(declarees.length).toBeGreaterThan(8);
+
+    /**
+     * Le littéral, dans un fichier qui journalise — et nulle part ailleurs.
+     *
+     * Deux versions de ce garde-fou se sont trompées avant celle-ci.
+     * La première cherchait `action: "<nom>"` : elle a accusé
+     * `compte.suspension` et `compte.retablissement`, que la route des
+     * utilisateurs écrit pourtant toutes les deux, par un ternaire
+     * `action: corps.suspendre ? … : …` que le motif ne voyait pas. La
+     * seconde cherchait le littéral n'importe où : elle a laissé passer
+     * `dossier.consultation`, qui n'apparaît que dans la table des
+     * catégories de B-06 — un lecteur, pas un écrivain.
+     *
+     * Le critère juste est celui-ci : une action est écrite là où
+     * `journaliser` est appelé. Quatrième fois de la série qu'un
+     * garde-fou ne connaît que la forme pour laquelle il a été écrit,
+     * après R.3, R.5 et S.1 — et la première où il a fallu deux essais.
+     */
+    const corpus = fichiers("src")
+      .filter((f) => !f.endsWith("acces/journal.ts"))
+      .map((f) => sansCommentaires(lire(f)))
+      .filter((code) => code.includes("journaliser("))
+      .join("\n");
+
+    /**
+     * Les actions déclarées que rien n'écrit encore, nommées une par une.
+     * Comme le registre des commandes inertes : la liste ne peut que
+     * rétrécir, et une orpheline de plus fait échouer le test.
+     */
+    const SANS_ECRIVAIN: Record<string, string> = {
+      // L'ouverture du dossier d'un candidat depuis le back-office. B-03
+      // et B-04 affichent des dossiers ; aucun des deux ne consigne
+      // l'accès. `piece.consultation` avait le même défaut, corrigé ici.
+      "dossier.consultation": "B-03 et B-04 ouvrent un dossier sans le consigner",
+    };
+
+    const orphelines = declarees.filter((a) => !corpus.includes(`"${a}"`));
+    expect(orphelines.sort()).toEqual(Object.keys(SANS_ECRIVAIN).sort());
+    expect(orphelines).not.toContain("piece.consultation");
+  });
+
+  it("la route de consultation journalise avant de signer l'URL", () => {
+    const route = lire("src/app/api/admin/revue/[id]/consultation/route.ts");
+    expect(route).toMatch(/action: "piece\.consultation"/u);
+    // L'ordre est la propriété : signer d'abord laisserait, si
+    // l'écriture échoue, un accès réel sans trace.
+    expect(route.indexOf("journaliser(")).toBeLessThan(route.indexOf("urlDeLecture("));
+    expect(route).toMatch(/motif: z\.string\(\)\.trim\(\)\.min\(MOTIF_MINIMUM\)/u);
+  });
+
+  /**
+   * La signature de l'URL reste dans `urlDeLecture`, qui porte ses refus
+   * — pièce purgée, pièce non balayée (I.D). Les refaire dans la route
+   * les dédoublerait, et deux copies d'une décision de sécurité finissent
+   * par diverger.
+   */
+  it("la route ne re-décide pas ce que la signature décide déjà", () => {
+    const route = sansCommentaires(lire("src/app/api/admin/revue/[id]/consultation/route.ts"));
+    expect(route).not.toMatch(/purgedAt|scanState|presignedGet/u);
+    expect(route).toContain("urlDeLecture(version)");
+  });
+
+  /** Et aucun aperçu ne s'invente à l'écran. */
+  it("l'écran n'invente aucun aperçu", () => {
+    const ecran = sansCommentaires(lire("src/app/(admin)/revue/RevueDesPieces.tsx"));
+    expect(ecran).not.toMatch(/page 1 sur|aperçu de la pièce/iu);
+    expect(ecran).toContain("apercu.url");
   });
 });
