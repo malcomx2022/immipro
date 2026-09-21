@@ -1,6 +1,7 @@
 import type { Transaction, TransactionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
+import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
 import {
   getPack,
   MONTANT_MINIMUM_XOF,
@@ -226,6 +227,44 @@ export async function appliquerLaNotification(
 
   await crediterLAchat(maj);
   return { issue: "creditee", transaction: maj };
+}
+
+/**
+ * Refermer un écart de réconciliation — arbitrage du 21/09/2026.
+ *
+ * **Ce qu'elle écrit, et rien d'autre.** Les quatre colonnes de la
+ * résolution. Pas `status`, pas `confirmedAt`, pas `refundedAt`, pas
+ * `refundDueAt` : une action de guichet ne déclare pas un paiement
+ * encaissé ni remboursé, et « remboursement à initier » est une issue,
+ * pas un virement. Seule la notification signée du fournisseur fait
+ * bouger l'argent (INV-7).
+ *
+ * **Et elle n'efface pas `discrepancy`.** Le texte du désaccord reste à
+ * côté de sa réponse : un historique qui ne garde que la conclusion a
+ * perdu la question.
+ *
+ * La date écrite ici est le déclencheur que le sursis d'O.B attendait.
+ */
+export async function resoudreLEcart(
+  reference: string,
+  resolution: Resolution,
+  acteurId: string,
+  maintenant = new Date(),
+): Promise<{ resolu: boolean }> {
+  const transaction = await db.transaction.findUnique({ where: { reference } });
+  if (!transaction) throw echec("introuvable");
+  if (!ecartOuvert(transaction)) return { resolu: false };
+
+  await db.transaction.update({
+    where: { id: transaction.id },
+    data: {
+      discrepancyOutcome: resolution.issue,
+      discrepancyNote: resolution.note.trim(),
+      discrepancyResolvedAt: maintenant,
+      discrepancyResolvedBy: acteurId,
+    },
+  });
+  return { resolu: true };
 }
 
 /**

@@ -1139,13 +1139,45 @@ suppression, qui est la promesse faite au candidat. Et les rendez-vous sont
 lus **avant** d'être annulés : lus après, la condition d'état ne trouverait
 plus rien et le traitement financier ne porterait sur personne.
 
-**K.D — Le premier partenaire reste à signer.** Le modèle porte cinq genres
-— assurance santé, logement, équivalence de diplôme, transfert de fonds,
-consultant — et le jeu de démonstration en active un seul, sur une seule
-destination. Tant qu'aucun contrat n'existe, le taux réel, la devise de
-facturation et le mode de rapprochement des commissions sont des
-hypothèses : `enregistrerLAboutissement` est écrite et n'est appelée par
-rien.
+**K.D — Le premier partenaire reste à signer.** **Tranché le 21/09/2026 :
+aucune activation avant contrat réel.**
+
+Aucun partenaire, aucun taux de commission et aucun parcours partenaire
+n'est activé en production avant la signature d'un contrat. Le jeu de
+démonstration reste utilisable en démonstration et en test seulement ; en
+production, l'absence d'activation explicite continue de rendre le
+partenaire invisible. Ni taux par défaut inventé, ni partenaire de
+démonstration pris pour un partenaire réel.
+
+Le premier contrat devra fixer au minimum : le genre de prestation, les
+destinations couvertes, le taux ou le montant de la commission, la devise
+de facturation, le fait générateur, le traitement des annulations et
+remboursements, la méthode et la périodicité du rapprochement, et les
+dates d'entrée en vigueur et de fin.
+
+### Ce que l'application de la décision a trouvé
+
+**Les trois interdits tenaient déjà, et par trois mécanismes différents.**
+Le filtre d'activation est dans la requête — `activations: { some: {
+countryCode: pays, revokedAt: null } }` — et non dans l'affichage ; le jeu
+de démonstration refuse de s'écrire quand `NODE_ENV` vaut `production` ;
+`enregistrerLAboutissement` n'a aucun appelant. Rien n'était à corriger,
+et c'est ce qu'il fallait vérifier plutôt que supposer.
+
+**Aucun des trois ne se voit en relisant un écran**, et c'est ce qui les
+rend fragiles : une requête dont on retire une ligne, un garde de
+démarrage qu'on désactive « le temps d'un essai », une fonction qu'on
+branche parce qu'elle est écrite. Chacun a désormais son test, et les
+quatre sont éprouvés par mutation — le quatrième sort le nom du fichier
+qui a branché la fonction.
+
+**Le registre énumère ce que le contrat doit fixer ; il ne modélise pas un
+contrat.** Inventer un modèle `PartnerContract` maintenant reviendrait à
+deviner la forme d'un accord qui n'existe pas, et ses colonnes prendraient
+des valeurs par défaut — exactement ce que K.D interdit. Un test refuse
+d'ailleurs qu'un chiffre s'y glisse : un taux d'exemple écrit là
+deviendrait, par copie, le taux appliqué. C'est la faute que Q.A évitait
+sur les mentions légales, au même endroit du raisonnement.
 
 
 ---
@@ -2192,3 +2224,67 @@ Il l'est, et pour sa propre raison : il liste les fiches publiées, qu'une
 dépublication doit pouvoir vider en minutes. Ce que Q.B refuse n'est pas
 qu'une page lise la base, c'est qu'un composant partagé rende dynamiques
 celles qui ne lisent rien.
+
+---
+
+## Annexe R · Les constats accumulés, arbitrés
+
+Cinq manques relevés au fil des lots, qu'aucune décision ne couvrait.
+Arbitrés le 21/09/2026, et traités un par un.
+
+### R.1 — La résolution des écarts en back-office
+
+**Tranché : la résolution appartient au back-office, la vérité financière
+non.**
+
+B-04 affichait « Traiter les N écarts » sur un bouton sans action. Un
+écart s'ouvrait au bout de vingt-quatre heures et ne se refermait jamais.
+Il ouvre désormais la file : constat sous les yeux, issue fermée parmi
+quatre, note obligatoire, date, acteur, journalisation. L'écart n'est pas
+effacé — l'historique garde la question à côté de la réponse.
+
+**Une action manuelle ne déclare jamais un paiement encaissé ou
+remboursé.** « Remboursement à initier » est une issue de guichet, pas un
+virement. Seule la notification signée du fournisseur fait bouger l'argent
+(INV-7), et un test le vérifie sur le `data` de l'écriture plutôt que sur
+l'intention du commentaire.
+
+**Et c'est le déclencheur qu'O.B attendait.** O.B avait écrit la règle du
+sursis de trente jours en constatant qu'aucun événement ne pouvait la
+dater. La date de résolution est cet événement : l'échéance du motif
+devient la plus tardive entre quatre-vingt-dix jours après l'échec et
+trente jours après la clôture.
+
+#### Ce que l'application de la décision a trouvé
+
+**Une contrainte CHECK écrite et qui ne gardait rien.** Elle disait
+`btrim("discrepancyNote") <> ''` sur une colonne nullable. Sur `NULL`,
+l'expression vaut `NULL`, et une contrainte CHECK **passe** quand elle
+vaut `NULL` — seul `FALSE` rejette. Une clôture sans note entrait donc en
+base, et le script de vérification l'a **acceptée** : cinquante-six refus
+au lieu de cinquante-sept, un écart d'une ligne dans un décompte qu'on lit
+comme un total. Le `IS NOT NULL` est désormais explicite. Le piège ne vaut
+que pour les colonnes nullables ; ailleurs, la même forme porte sur des
+colonnes `NOT NULL`, où elle est sûre.
+
+**Le compteur ne pouvait toujours pas redescendre après la correction.**
+Vu en refermant un écart dans l'écran : la base portait l'issue, la note
+et la date, et la ligne réaffichait « Écart à traiter » au rechargement.
+La dernière ligne de `etatDuRapprochement` ne lit pas `discrepancy` du
+tout — elle déduit l'écart de l'**âge** de la transaction — et rouvrait
+donc ce que la résolution venait de refermer. Le test unitaire ne voyait
+rien : il vérifiait la première ligne de la fonction, pas la dernière.
+Après correction, le paiement reste « en attente de rapprochement », ce
+qui est vrai, mais sort de la file, parce qu'il a été travaillé.
+
+**La chaîne complète, exécutée contre PostgreSQL :**
+
+    au départ                     motif=DELAI_DEPASSE  écart=présent clos=non
+    purge → 0 motif effacé        (écart ouvert : suspendu)
+    écart refermé il y a 20 j     clos=2026-09-01
+    purge → 0 motif effacé        (sursis en cours)
+    clôture reculée à 31 j
+    purge → 1 motif effacé        motif=null, écart=présent
+
+Montant, statut et référence intacts ; l'issue et la note conservées après
+l'effacement du motif.

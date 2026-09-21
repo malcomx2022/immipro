@@ -18,6 +18,21 @@ import {
 } from "@/domain/backoffice/reconciliation";
 import { formatMontant } from "@/lib/utils";
 import { LIBELLE_CAUSE } from "@/domain/paiement/echec";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
+import { jourEnFrancais } from "@/domain/format/moment";
+import {
+  ISSUES_ECART,
+  LIBELLE_ISSUE,
+  SUITE_DE_L_ISSUE,
+  obstacleALaResolution,
+  type IssueEcart,
+} from "@/domain/backoffice/ecart";
 
 /**
  * B-04 — Paiements et réconciliation. WF-15, INV-7.
@@ -34,6 +49,97 @@ const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
   timeZone: "UTC",
 });
 const heure = (iso: string) => FORMAT_HEURE.format(new Date(iso)).replace(":", " h ");
+
+/**
+ * Le traitement d'un écart — arbitrage du 21/09/2026.
+ *
+ * Le constat d'abord, l'issue ensuite, la note enfin. L'ordre n'est pas
+ * décoratif : choisir une issue sans avoir relu ce que l'écart disait est
+ * la façon la plus simple de refermer un désaccord qu'on n'a pas compris.
+ *
+ * Aucune des quatre issues ne touche à l'argent, et l'écran le dit sous
+ * chacune : « remboursement à initier » est une issue de guichet, pas un
+ * virement.
+ */
+function TraitementDeLEcart({ paiement }: { paiement: Paiement }) {
+  const router = useRouter();
+  const [issue, setIssue] = useState<IssueEcart | "">("");
+  const [note, setNote] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+
+  const resolution = paiement.ecart?.resolution;
+  const obstacle = obstacleALaResolution(
+    { ...(issue ? { issue } : {}), note },
+    !resolution,
+  );
+
+  async function refermer() {
+    if (!issue) return;
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler<{ resolu: boolean }>(
+      `/api/admin/paiements/${paiement.reference}/ecart`,
+      { corps: { issue, note } },
+    );
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-ink-300 bg-white p-5">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="font-mono text-14 text-ink-900">{paiement.reference}</span>
+        <span className="text-13 text-ink-500">
+          {formatMontant(paiement.montant, paiement.devise)} · {paiement.compte}
+        </span>
+      </div>
+      <p className="text-pretty text-14 text-ink-700">{paiement.ecart?.constat}</p>
+
+      {resolution ? (
+        <p className="text-pretty text-13 text-ink-500">
+          Refermé le {jourEnFrancais(resolution.le)} par {resolution.par} —{" "}
+          {LIBELLE_ISSUE[resolution.issue]}. {resolution.note}
+        </p>
+      ) : (
+        <>
+          {echec ? <BlocEchec echec={echec} annonce /> : null}
+          <Select
+            libelle="Issue"
+            value={issue}
+            onChange={(e) => setIssue(e.target.value as IssueEcart)}
+            options={[
+              { valeur: "", libelle: "Choisir une issue" },
+              ...ISSUES_ECART.map((i) => ({ valeur: i, libelle: LIBELLE_ISSUE[i] })),
+            ]}
+          />
+          {issue ? (
+            <p className="text-pretty text-13 text-ink-500">{SUITE_DE_L_ISSUE[issue]}</p>
+          ) : null}
+          <Input
+            libelle="Ce que tu as constaté"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            aide={MENTION_AUDIT}
+          />
+          <Button
+            chargement={envoi}
+            disabled={obstacle !== null}
+            raisonDesactivation={obstacle ?? undefined}
+            onClick={() => void refermer()}
+            className="self-start"
+          >
+            Refermer l&apos;écart
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function Paiements({
   paiements,
@@ -52,6 +158,9 @@ export function Paiements({
   journee: string;
 }) {
   const agregats = agreger(paiements);
+  // La file se déplie sur demande : B-04 est d'abord un tableau de bord,
+  // et le traitement d'un écart est une tâche, pas une lecture.
+  const [fileOuverte, setFileOuverte] = useState(false);
   /**
    * Une somme par monnaie. Les deux rails n'encaissent pas dans la même,
    * et les additionner produisait un total en francs qui contenait des
@@ -196,11 +305,30 @@ export function Paiements({
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-pretty text-13 text-ink-500">{MENTION_ECARTS}</p>
-          <Button disabled={agregats.ecarts === 0} raisonDesactivation="Aucun écart en attente.">
-            {libelleEcarts(agregats)}
-          </Button>
+        {/* Le traitement des écarts — arbitrage du 21/09/2026.
+            Ce bouton n'avait pas d'action derrière lui : le compteur
+            montait et rien ne pouvait le faire redescendre. Il ouvre
+            maintenant la file, chaque écart avec son constat sous les
+            yeux — refermer sans relire reviendrait à signer un texte
+            qu'on n'a pas lu. */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-pretty text-13 text-ink-500">{MENTION_ECARTS}</p>
+            <Button
+              disabled={agregats.ecarts === 0}
+              raisonDesactivation="Aucun écart en attente."
+              onClick={() => setFileOuverte((o) => !o)}
+            >
+              {fileOuverte ? "Masquer la file" : libelleEcarts(agregats)}
+            </Button>
+          </div>
+          {fileOuverte
+            ? paiements
+                .filter((p) => p.etat === "ECART" && p.ecart)
+                .map((p) => (
+                  <TraitementDeLEcart key={p.reference} paiement={p} />
+                ))
+            : null}
         </div>
 
         <p className="text-13 text-ink-500">{MENTION_AUDIT}</p>
