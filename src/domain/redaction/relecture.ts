@@ -12,10 +12,22 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-export type GenreRemarque = "INCOHERENCE" | "A_RENFORCER" | "FORME";
+/**
+ * `INCOHERENCE_DOSSIER` n'existe pas dans l'énumération Prisma, et c'est
+ * voulu : les recoupements déterministes de RG-08.3 se recalculent à
+ * chaque lecture et ne sont jamais stockés. Le genre existe pour ne pas
+ * mentir sur l'origine de l'écart — « entre pièces » annoncerait une
+ * comparaison avec un document joint, et aucun n'a été lu.
+ */
+export type GenreRemarque =
+  | "INCOHERENCE"
+  | "INCOHERENCE_DOSSIER"
+  | "A_RENFORCER"
+  | "FORME";
 
 export const LIBELLE_GENRE: Record<GenreRemarque, string> = {
   INCOHERENCE: "Incohérence entre pièces",
+  INCOHERENCE_DOSSIER: "Écart avec ton dossier",
   A_RENFORCER: "À renforcer",
   FORME: "Remarque de forme",
 };
@@ -43,8 +55,9 @@ export interface Remarque {
 /** L'incohérence passe avant le reste : c'est la seule qui se voit de l'extérieur. */
 const RANG: Record<GenreRemarque, number> = {
   INCOHERENCE: 0,
-  A_RENFORCER: 1,
-  FORME: 2,
+  INCOHERENCE_DOSSIER: 1,
+  A_RENFORCER: 2,
+  FORME: 3,
 };
 
 export const trierRemarques = (remarques: readonly Remarque[]): Remarque[] =>
@@ -52,6 +65,10 @@ export const trierRemarques = (remarques: readonly Remarque[]): Remarque[] =>
 
 export const compterBloquantes = (remarques: readonly Remarque[]): number =>
   remarques.filter((r) => r.genre === "INCOHERENCE").length;
+
+/** Les écarts trouvés sans lire aucune pièce jointe (RG-08.3). */
+export const compterRecoupements = (remarques: readonly Remarque[]): number =>
+  remarques.filter((r) => r.genre === "INCOHERENCE_DOSSIER").length;
 
 /**
  * « Trois points à traiter, dont une incohérence avec une autre pièce de ton
@@ -62,11 +79,31 @@ export function resumeRelecture(remarques: readonly Remarque[]): string {
     return "Rien à reprendre sur cette version.";
   }
   const points = `${remarques.length} ${remarques.length > 1 ? "points à traiter" : "point à traiter"}`;
-  const incoherences = compterBloquantes(remarques);
-  if (incoherences === 0) return `${points}, aucune incohérence avec tes autres pièces.`;
-  return incoherences > 1
-    ? `${points}, dont ${incoherences} incohérences avec d'autres pièces de ton dossier.`
-    : `${points}, dont une incohérence avec une autre pièce de ton dossier.`;
+  const pieces = compterBloquantes(remarques);
+  const dossier = compterRecoupements(remarques);
+  /*
+    Les deux origines se comptent séparément parce qu'elles ne disent pas
+    la même chose. « Une incohérence avec une autre pièce » affirme qu'une
+    pièce a été lue ; un recoupement n'en lit aucune. Les confondre
+    remettrait dans le résumé le mensonge que le genre vient d'en sortir.
+  */
+  const morceaux: string[] = [];
+  if (pieces > 0) {
+    morceaux.push(
+      pieces > 1
+        ? `${pieces} incohérences avec d'autres pièces de ton dossier`
+        : "une incohérence avec une autre pièce de ton dossier",
+    );
+  }
+  if (dossier > 0) {
+    morceaux.push(
+      dossier > 1
+        ? `${dossier} écarts avec les informations de ton dossier`
+        : "un écart avec les informations de ton dossier",
+    );
+  }
+  if (morceaux.length === 0) return `${points}, aucune incohérence avec tes autres pièces.`;
+  return `${points}, dont ${morceaux.join(" et ")}.`;
 }
 
 /**
@@ -122,7 +159,17 @@ export type EtatRelecture =
   | "RELUE_SANS_REMARQUE"
   /** Analysée, des remarques. */
   | "RELUE"
-  /** Jamais analysée, et le service qui le fait n'est pas branché. */
+  /**
+   * Le fond n'a pas été analysé, mais les recoupements déterministes de
+   * RG-08.3 ont tourné — ils ne dépendent d'aucun service.
+   *
+   * Cet état existe parce que les deux autres mentaient chacun dans un
+   * sens : « analyse indisponible » effaçait des écarts réellement
+   * trouvés, et « relue » aurait donné pour lu un texte dont personne
+   * n'avait jugé le fond.
+   */
+  | "RECOUPEE_SEULEMENT"
+  /** Ni analysée ni recoupable : rien n'a été lu, et rien n'était comparable. */
   | "ANALYSE_INDISPONIBLE"
   /** Il n'y a pas encore de texte à analyser. */
   | "SANS_TEXTE";
@@ -132,9 +179,17 @@ export function etatDeLaRelecture(options: {
   remarques: readonly Remarque[] | null;
   /** Une version existe. */
   texteExistant: boolean;
+  /**
+   * Au moins un recoupement déterministe a pu être fait. Faux quand le
+   * dossier n'avait rien à comparer — sans règle figée, un résultat vide
+   * ne dit pas « rien ne diverge », il dit qu'on n'a rien regardé.
+   */
+  recoupementsEffectues?: boolean;
 }): EtatRelecture {
   if (!options.texteExistant) return "SANS_TEXTE";
-  if (options.remarques === null) return "ANALYSE_INDISPONIBLE";
+  if (options.remarques === null) {
+    return options.recoupementsEffectues ? "RECOUPEE_SEULEMENT" : "ANALYSE_INDISPONIBLE";
+  }
   return options.remarques.length === 0 ? "RELUE_SANS_REMARQUE" : "RELUE";
 }
 
@@ -143,6 +198,30 @@ export const RESUME_ANALYSE_INDISPONIBLE =
 
 export const RESUME_SANS_TEXTE =
   "Il n'y a pas encore de texte à analyser sur cette pièce.";
+
+/**
+ * Le recoupement a tourné et n'a rien trouvé. La phrase dit les deux :
+ * ce qui a été comparé, et ce qui ne l'a pas été.
+ *
+ * Sans sa seconde moitié, elle retomberait dans le défaut qu'elle corrige :
+ * « rien ne diverge » se lirait comme « ta lettre est bonne », alors que
+ * personne n'en a jugé le fond.
+ */
+export const RESUME_RECOUPEE_SANS_ECART =
+  "Nous avons recoupé ta lettre avec ce que ton dossier sait déjà : rien ne diverge. Le fond, lui, n'a pas été analysé — le service qui le fait n'est pas branché, et nous ne te disons pas que ton texte est bon sans l'avoir lu.";
+
+/**
+ * Le résumé de l'état `RECOUPEE_SEULEMENT`.
+ *
+ * Il ne passe pas par `resumeRelecture` : celui-ci parle de « pièces », et
+ * le recoupement n'en ouvre aucune. Chaque phrase dit donc ce qui a été
+ * comparé, et la seconde ce qui ne l'a pas été.
+ */
+export function resumeRecoupement(remarques: readonly Remarque[]): string {
+  if (remarques.length === 0) return RESUME_RECOUPEE_SANS_ECART;
+  const n = remarques.length;
+  return `${n} ${n > 1 ? "écarts relevés" : "écart relevé"} en recoupant ta lettre avec les informations de ton dossier. Le fond de ta lettre, lui, n'a pas été analysé : le service qui le fait n'est pas branché.`;
+};
 
 /**
  * Le résumé, dans l'état où la pièce se trouve.
@@ -157,6 +236,7 @@ export function resumeSelonLEtat(
 ): string {
   if (etat === "SANS_TEXTE") return RESUME_SANS_TEXTE;
   if (etat === "ANALYSE_INDISPONIBLE") return RESUME_ANALYSE_INDISPONIBLE;
+  if (etat === "RECOUPEE_SEULEMENT") return resumeRecoupement(remarques ?? []);
   return resumeRelecture(remarques ?? []);
 }
 
@@ -170,6 +250,7 @@ export function resumeSelonLEtat(
 export const ACTION_RELECTURE: Record<EtatRelecture, string | null> = {
   RELUE: "Revenir au texte",
   RELUE_SANS_REMARQUE: "Revenir au texte",
+  RECOUPEE_SEULEMENT: "Revenir au texte",
   ANALYSE_INDISPONIBLE: null,
   SANS_TEXTE: null,
 };

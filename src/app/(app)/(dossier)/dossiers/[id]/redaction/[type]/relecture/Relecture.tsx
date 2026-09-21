@@ -11,6 +11,11 @@ import {
   trierRemarques,
   type Remarque,
 } from "@/domain/redaction/relecture";
+import {
+  TITRE_ECARTES,
+  TITRE_RECOUPEMENTS,
+  type Recoupements,
+} from "@/domain/redaction/coherence";
 import { EnteteDossier } from "../../../EnteteDossier";
 
 /**
@@ -39,6 +44,15 @@ import { EnteteDossier } from "../../../EnteteDossier";
  * un constat. Un tiret ne dit rien ; « rien à reprendre » affirme. Les deux
  * vides sont désormais distincts, et le bandeau ne date que ce qui a été
  * relu.
+ *
+ * ── Les recoupements déterministes, RG-08.3 ─────────────────────────────
+ *
+ * Ils tournent toujours, sans service et sans jeton, et l'écran doit donc
+ * distinguer un troisième cas : le fond n'a pas été lu, mais la lettre a
+ * bien été comparée à ce que le dossier sait de lui-même. D'où le pavé qui
+ * nomme ce qui a été recoupé **et** ce qui ne l'a pas été : sans lui, une
+ * liste vide resterait ambiguë, et un candidat croirait sa lettre
+ * confrontée à ses pièces jointes alors qu'aucune n'a été lue.
  */
 export interface RelectureProps {
   dossier: Dossier;
@@ -48,6 +62,11 @@ export interface RelectureProps {
    * porte tout l'écran : `[]` veut dire « relu, rien à reprendre ».
    */
   remarques: readonly Remarque[] | null;
+  /**
+   * Recoupements déterministes (RG-08.3). Toujours calculés : ils ne
+   * dépendent d'aucun service, et leur absence de résultat est un résultat.
+   */
+  recoupements: Recoupements;
   /** Une version existe : sans texte, il n'y a rien à analyser. */
   texteExistant: boolean;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
@@ -58,12 +77,24 @@ export function Relecture({
   dossier,
   type,
   remarques: brutes,
+  recoupements,
   texteExistant,
   relectureLe,
 }: RelectureProps) {
   const id = dossier.id;
-  const etat = etatDeLaRelecture({ remarques: brutes, texteExistant });
-  const remarques = trierRemarques(brutes ?? []);
+  /*
+    Les écarts déterministes rejoignent les remarques de l'analyse dans une
+    seule liste : pour le candidat, une incohérence est une incohérence, et
+    deux listes séparées l'obligeraient à comprendre d'où vient chacune
+    avant de savoir laquelle traiter.
+  */
+  const toutes = texteExistant ? [...(brutes ?? []), ...recoupements.remarques] : [];
+  const etat = etatDeLaRelecture({
+    remarques: brutes === null ? null : toutes,
+    texteExistant,
+    recoupementsEffectues: recoupements.effectues.length > 0,
+  });
+  const remarques = trierRemarques(toutes);
   const premiere = remarques[0];
   const relue = etat === "RELUE" || etat === "RELUE_SANS_REMARQUE";
 
@@ -84,7 +115,7 @@ export function Relecture({
           Relecture de ta lettre
         </h1>
         <p className="max-w-[80ch] text-pretty text-16 text-ink-700">
-          {resumeSelonLEtat(etat, brutes)}
+          {resumeSelonLEtat(etat, toutes)}
         </p>
       </div>
 
@@ -95,6 +126,39 @@ export function Relecture({
           </li>
         ))}
       </ul>
+
+      {/*
+        Ce que le recoupement a couvert, et ce qu'il n'a pas couvert. La
+        seconde liste n'est pas un aveu décoratif : elle est la seule chose
+        qui empêche « rien ne diverge » de se lire comme « tout a été
+        vérifié ». Elle s'affiche donc même quand rien n'a pu être comparé.
+      */}
+      {texteExistant ? (
+        <section className="flex flex-col gap-3 rounded-lg bg-ink-100 p-4">
+          {recoupements.effectues.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-16 font-semibold text-ink-900">{TITRE_RECOUPEMENTS}</h2>
+              <ul className="flex list-disc flex-col gap-1 pl-5">
+                {recoupements.effectues.map((ligne) => (
+                  <li key={ligne} className="text-pretty text-14 text-ink-700">
+                    {ligne}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-16 font-semibold text-ink-900">{TITRE_ECARTES}</h2>
+            <ul className="flex list-disc flex-col gap-1 pl-5">
+              {recoupements.ecartes.map((ligne) => (
+                <li key={ligne} className="text-pretty text-14 text-ink-700">
+                  {ligne}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-1.5 rounded-lg bg-ink-100 p-4">
         <h2 className="text-16 font-semibold text-ink-900">Ce que nous ne jugeons pas</h2>
@@ -136,6 +200,7 @@ export function Relecture({
 
 const TONS: Record<Remarque["genre"], string> = {
   INCOHERENCE: "border-danger",
+  INCOHERENCE_DOSSIER: "border-danger",
   A_RENFORCER: "border-warning",
   FORME: "border-ink-300",
 };
