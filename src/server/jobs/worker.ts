@@ -11,6 +11,7 @@ import { getQueue, JOBS } from "@/lib/queue";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
+import { declasserLesPiecesEchues } from "./peremption";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
@@ -73,10 +74,21 @@ async function main() {
     console.info("[veille]", { depubliees });
   });
 
+  await boss.work(JOBS.PEREMPTION_PIECES, async () => {
+    console.info("[peremption]", await declasserLesPiecesEchues());
+  });
+
   // Cadences de DOC-11 : quinze minutes pour la réconciliation (RG-05.4),
   // une fois par jour pour la veille (WF-14) et la purge (INV-5).
+  //
+  // La péremption passe **avant** la purge : elle déclasse des pièces et
+  // refait des barèmes, et la purge qui suit travaille alors sur un état
+  // à jour. Une pièce expirée aujourd'hui n'est pas pour autant à
+  // supprimer — les deux passes ne se recouvrent pas —, mais l'ordre
+  // évite qu'un bilan de purge cite un dossier « prêt » qui ne l'est plus.
   await boss.schedule(JOBS.RECONCILIATION_PAIEMENT, "*/15 * * * *");
   await boss.schedule(JOBS.VEILLE_ECHEANCE, "0 3 * * *");
+  await boss.schedule(JOBS.PEREMPTION_PIECES, "15 3 * * *");
   await boss.schedule(JOBS.PURGE_RETENTION, "30 3 * * *");
 
   console.log("worker démarré");

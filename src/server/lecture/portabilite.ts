@@ -52,6 +52,9 @@ export interface ExportCompte {
  * et absente de ses versions.
  */
 export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
+  // Un seul jour pour tout l'export : deux dossiers ne se jugent pas à
+  // deux dates parce que la requête a duré.
+  const aujourdhui = iso(new Date())!;
   const compte = await db.user.findUnique({
     where: { id: userId },
     include: {
@@ -124,7 +127,7 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
     })),
     dossiers: compte.applications.map((a) => {
       const fiche = a.visaRule ? versFiche(a.visaRule) : null;
-      const pieces: Piece[] = a.documents.map(versPiece);
+      const pieces: Piece[] = a.documents.map((d) => versPiece(d, aujourdhui));
       const completude = completudeDesPieces(pieces);
       return {
         destination: fiche

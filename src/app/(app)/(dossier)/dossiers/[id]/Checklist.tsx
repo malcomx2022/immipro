@@ -7,7 +7,7 @@ import { SourceNote } from "@/components/ui/SourceNote";
 import {
   LIBELLE_FAMILLE,
   libelleAction,
-  libelleAlertePeremption,
+  mentionDeLaPiece,
   libelleAvancementFamille,
   libelleBlocage,
   lienDePiece,
@@ -215,7 +215,7 @@ function SectionPieces({
                 estDeposeeNonVerifiee(piece) ? LIBELLE_CONSERVEE_NON_VERIFIEE : undefined
               }
               message={piece.message}
-              mention={libelleAlertePeremption(piece, depot) ?? undefined}
+              mention={mentionDeLaPiece(piece, depot) ?? undefined}
               action={libelleAction(piece)}
               href={lienDePiece(dossierId, piece)}
             />
