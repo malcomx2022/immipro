@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { BarreAdmin } from "@/components/admin/BarreAdmin";
 import { FileDeVeille } from "@/app/(admin)/veille/FileDeVeille";
 import { EditionRegle } from "@/app/(admin)/regles/[id]/EditionRegle";
@@ -27,7 +27,39 @@ import {
 } from "@/lib/contenu/backoffice";
 import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 
+const rafraichir = vi.fn();
+/**
+ * L'appel réseau, remplacé — B-02.
+ *
+ * Les garde-fous qui lisent le source ne suffisaient pas ici : brancher
+ * le bouton « Publier » directement sur `setFait("publie")` laisse la
+ * fonction `publier()` intacte dans le fichier, orpheline, et tout test
+ * qui l'inspecte continue de passer. Il faut cliquer pour voir qu'aucune
+ * requête ne part.
+ */
+const appels: { url: string; corps: unknown; methode?: string }[] = [];
+let reponse: { ok: boolean } = { ok: true };
+vi.mock("@/lib/api", () => ({
+  appeler: (url: string, options: { corps?: unknown; methode?: string } = {}) => {
+    appels.push({ url, corps: options.corps, methode: options.methode });
+    return Promise.resolve(
+      reponse.ok
+        ? { ok: true, donnees: {} }
+        : {
+            ok: false,
+            echec: {
+              titre: "Le serveur a refusé",
+              corps: "Motif de test.",
+              conserve: "Ta saisie est là.",
+              action: "Réessayer",
+              ton: "echec",
+            },
+          },
+    );
+  },
+}));
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: rafraichir }),
   notFound: () => {
     throw new Error("notFound");
   },
@@ -37,9 +69,11 @@ const AUJOURDHUI = "2026-09-18";
 const MAINTENANT = "2026-09-18T09:41:00Z";
 const espaces = (t: string) => t.replace(/[\s  ]/gu, " ");
 
-const editerRegle = () =>
+const editerRegle = ({ peutPublier = true } = {}) =>
   render(
     <EditionRegle
+      id="regle-de-test"
+      peutPublier={peutPublier}
       enVigueur={REGLE_EN_VIGUEUR}
       brouillon={REGLE_BROUILLON}
       dossiersConcernes={DOSSIERS_EN_VERSION_4}
@@ -122,6 +156,105 @@ describe("B-01 — File de veille", () => {
   it("annonce qu'une publication versionne et alerte", () => {
     const { container } = rendre();
     expect(container.textContent).toContain("Toute publication crée une version horodatée");
+  });
+});
+
+/**
+ * B-02 écrit vraiment — arbitrage du 21/09/2026, suite de la revue.
+ *
+ * Les deux commandes de l'en-tête n'étaient reliées à rien. « Publier »
+ * posait un drapeau local et l'écran répondait « Publication demandée. La
+ * version 5 devient la référence des nouveaux dossiers », en région
+ * vivante, sans qu'aucune requête soit partie. Un veilleur repartait en
+ * croyant la règle publiée.
+ *
+ * Ces tests cliquent, parce que lire le source ne suffit pas : on peut
+ * rebrancher le bouton sur l'état local en laissant la fonction d'envoi
+ * intacte plus bas dans le fichier, et tout garde-fou qui l'inspecte
+ * passe encore.
+ */
+describe("B-02 — les commandes partent vraiment au serveur", () => {
+  const preparer = ({ ok = true, peutPublier = true } = {}) => {
+    appels.length = 0;
+    rafraichir.mockClear();
+    reponse = { ok };
+    editerRegle({ peutPublier });
+    fireEvent.change(screen.getByLabelText("Motif du changement"), {
+      target: { value: "Relevé de la source officielle du 18 septembre." },
+    });
+  };
+
+  const cliquer = async (nom: RegExp) => {
+    fireEvent.click(screen.getByRole("button", { name: nom }));
+    // Deux tours de boucle : l'enregistrement puis la publication.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+
+  it("enregistrer le brouillon n'envoie que les deux textes édités", async () => {
+    preparer();
+    await cliquer(/Enregistrer le brouillon/u);
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.methode).toBe("PUT");
+    expect(appels[0]!.url).toBe("/api/admin/regles/regle-de-test");
+    // Ni payload, ni source, ni date de relecture : l'écran ne les
+    // affiche pas, il ne les décide pas.
+    expect(appels[0]!.corps).toEqual({
+      champ: "textes",
+      libelleCandidat: REGLE_BROUILLON.libelleCandidat,
+      reserveCandidat: REGLE_BROUILLON.reserveCandidat,
+    });
+  });
+
+  /**
+   * La publication relit le payload en base pour le valider : publier
+   * sans enregistrer mettrait en vigueur le texte d'avant pendant que
+   * l'écran montre celui d'après.
+   */
+  it("publier enregistre d'abord, puis publie", async () => {
+    preparer();
+    await cliquer(/Publier la version/u);
+    expect(appels.map((a) => a.methode ?? "POST")).toEqual(["PUT", "POST"]);
+    expect(appels[1]!.corps).toEqual({
+      motif: "Relevé de la source officielle du 18 septembre.",
+    });
+    expect(rafraichir).toHaveBeenCalled();
+  });
+
+  it("après la réponse, l'écran dit ce qui a été publié", async () => {
+    preparer();
+    await cliquer(/Publier la version/u);
+    expect(screen.getByText(/Version 5 publiée/u)).toBeDefined();
+  });
+
+  /** Le cœur de la correction : rien ne s'annonce sans réponse. */
+  it("un refus du serveur n'annonce aucune publication", async () => {
+    preparer({ ok: false });
+    await cliquer(/Publier la version/u);
+    expect(screen.queryByText(/publiée/u)).toBeNull();
+    expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+    // Et l'enregistrement ayant échoué le premier, la publication n'est
+    // même pas tentée.
+    expect(appels).toHaveLength(1);
+  });
+
+  it("un enregistrement sans publication ne parle pas de publication", async () => {
+    preparer();
+    await cliquer(/Enregistrer le brouillon/u);
+    expect(screen.queryByText(/publiée/u)).toBeNull();
+    expect(screen.getByText(/Brouillon enregistré/u)).toBeDefined();
+  });
+
+  /** RG-14.2 : qui rédige n'est pas qui publie, et l'écran le dit avant le clic. */
+  it("un veilleur ne peut pas publier, et sait pourquoi", async () => {
+    preparer({ peutPublier: false });
+    const bouton = screen.getByRole("button", { name: /Publier la version/u });
+    expect(bouton).toBeDisabled();
+    expect(bouton).toHaveAccessibleDescription(/RG-14\.2/u);
+    await cliquer(/Publier la version/u);
+    expect(appels).toHaveLength(0);
   });
 });
 

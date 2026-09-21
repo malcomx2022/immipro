@@ -32,13 +32,18 @@ export default async function PageEditionRegle({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await exigerVeilleur();
+  const acteur = await exigerVeilleur();
   const { id } = await params;
   const vue = await editionDeLaRegle(id);
   if (!vue) notFound();
 
   return (
     <EditionRegle
+      id={id}
+      // RG-14.2 : la route de publication est réservée à un administrateur.
+      // L'écran lit le même rôle, pour le dire avant le clic plutôt que
+      // de laisser un veilleur enregistrer puis buter sur un refus.
+      peutPublier={acteur.role === "ADMIN"}
       enVigueur={vue.enVigueur}
       brouillon={vue.brouillon}
       dossiersConcernes={vue.dossiersConcernes}

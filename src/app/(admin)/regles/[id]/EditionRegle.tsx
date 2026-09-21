@@ -1,8 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import {
   AIDE_LIBELLE_CANDIDAT,
   AIDE_MOTIF,
@@ -41,31 +45,116 @@ import { CHAMP_CONTROLE } from "@/components/ui/champ";
  * INV-3 reste tenu : publier n'migre aucun dossier. L'effet est montré avant,
  * avec le nombre de dossiers alertés, le nombre mis en arbitrage, et zéro
  * migration — le type lui-même le dit.
+ *
+ * ── Ce que l'écran annonçait sans le faire ──────────────────────────────
+ *
+ * Les deux commandes de l'en-tête n'étaient reliées à rien. « Enregistrer
+ * le brouillon » ne faisait rien du tout ; « Publier » posait un drapeau
+ * local et l'écran répondait « Publication demandée. La version N devient
+ * la référence des nouveaux dossiers », en région vivante, sans qu'aucune
+ * requête soit partie. Un veilleur repartait en croyant la règle publiée.
+ *
+ * C'est la faute que le produit refuse ailleurs — aucun service absent
+ * n'est simulé (I.C) — et elle portait ici sur l'acte que protège INV-3.
+ * Les routes existaient et journalisaient ; seule la moitié cliente
+ * manquait. Rien ne s'affiche plus qu'après une réponse du serveur.
+ *
+ * **Publier enregistre d'abord.** La publication relit le payload en base
+ * pour le valider : publier sans enregistrer aurait mis en vigueur le
+ * texte d'avant, pendant que l'écran montrait celui d'après. Si
+ * l'enregistrement est refusé, rien n'est publié et le refus s'affiche ;
+ * s'il passe et que la publication échoue, le texte est enregistré et
+ * l'écran le dit, parce que c'est ce qui s'est produit.
  */
 export interface EditionRegleProps {
+  id: string;
   enVigueur: Regle;
   brouillon: Regle;
   dossiersConcernes: number;
   dossiersSousLaNouvelleRegle: number;
   historique: readonly { version: number; le: string; par: string }[];
+  /**
+   * RG-14.2 : qui rédige n'est pas qui publie. La route de publication est
+   * réservée à un administrateur ; l'écran le dit avant le clic plutôt que
+   * de laisser un veilleur enregistrer puis buter sur un refus d'accès.
+   */
+  peutPublier: boolean;
 }
 
 export function EditionRegle({
+  id,
   enVigueur,
   brouillon,
   dossiersConcernes,
   dossiersSousLaNouvelleRegle,
   historique,
+  peutPublier: habiliteAPublier,
 }: EditionRegleProps) {
+  const router = useRouter();
   const [textes, setTextes] = useState<Record<ChampCandidat, string>>({
     libelleCandidat: brouillon.libelleCandidat,
     reserveCandidat: brouillon.reserveCandidat,
   });
   const [motif, setMotif] = useState("");
-  const [tentative, setTentative] = useState(false);
+  const [envoi, setEnvoi] = useState<"" | "brouillon" | "publication">("");
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  /** Ce qui s'est réellement produit, et rien d'autre. */
+  const [fait, setFait] = useState<null | "enregistre" | "publie">(null);
 
   const fautes = verifierTextesCandidat(textes);
-  const peutPublier = publiable(textes) && motif.trim().length > 0;
+  const textesRecevables = publiable(textes);
+  const peutPublier = textesRecevables && motif.trim().length > 0 && habiliteAPublier;
+
+  /** Le corps de la branche `textes` : ce que l'écran édite, et rien de plus. */
+  const corpsDesTextes = {
+    champ: "textes" as const,
+    libelleCandidat: textes.libelleCandidat,
+    reserveCandidat: textes.reserveCandidat,
+  };
+
+  async function enregistrer(): Promise<boolean> {
+    setEchec(null);
+    setFait(null);
+    const resultat = await appeler<{ version: number }>(`/api/admin/regles/${id}`, {
+      methode: "PUT",
+      corps: corpsDesTextes,
+    });
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return false;
+    }
+    return true;
+  }
+
+  async function enregistrerLeBrouillon() {
+    setEnvoi("brouillon");
+    const ok = await enregistrer();
+    setEnvoi("");
+    if (!ok) return;
+    setFait("enregistre");
+    router.refresh();
+  }
+
+  async function publier() {
+    setEnvoi("publication");
+    if (!(await enregistrer())) {
+      setEnvoi("");
+      return;
+    }
+    const resultat = await appeler<{ publiee: string }>(`/api/admin/regles/${id}`, {
+      corps: { motif },
+    });
+    setEnvoi("");
+    if (!resultat.ok) {
+      // Le texte est enregistré, la publication non. L'écran le dit tel
+      // quel : annoncer l'un sans l'autre serait reproduire le défaut.
+      setFait("enregistre");
+      setEchec(resultat.echec);
+      return;
+    }
+    setFait("publie");
+    router.refresh();
+  }
 
   const differences = comparer(
     enVigueur,
@@ -84,17 +173,34 @@ export function EditionRegle({
         resume={`Brouillon version ${brouillon.version} · version ${enVigueur.version} en vigueur pour ${dossiersConcernes} dossiers`}
         actions={
           <>
-            <Button variante="secondaire">Enregistrer le brouillon</Button>
             <Button
-              disabled={!peutPublier}
+              variante="secondaire"
+              disabled={fautes.length > 0 || envoi !== ""}
               raisonDesactivation={
                 fautes.length > 0
-                  ? "Un texte destiné au candidat est refusé : corrige-le avant de publier."
-                  : "Renseigne le motif du changement : il part au journal d'audit."
+                  ? "Un texte destiné au candidat est refusé : corrige-le avant d'enregistrer."
+                  : "Enregistrement en cours."
               }
-              onClick={() => setTentative(true)}
+              onClick={enregistrerLeBrouillon}
             >
-              Publier la version {brouillon.version}
+              {envoi === "brouillon" ? "Enregistrement…" : "Enregistrer le brouillon"}
+            </Button>
+            <Button
+              disabled={!peutPublier || envoi !== ""}
+              raisonDesactivation={
+                !habiliteAPublier
+                  ? "Publier demande un compte administrateur : qui rédige n'est pas qui publie (RG-14.2)."
+                  : fautes.length > 0
+                    ? "Un texte destiné au candidat est refusé : corrige-le avant de publier."
+                    : motif.trim().length === 0
+                      ? "Renseigne le motif du changement : il part au journal d'audit."
+                      : "Publication en cours."
+              }
+              onClick={publier}
+            >
+              {envoi === "publication"
+                ? "Publication…"
+                : `Publier la version ${brouillon.version}`}
             </Button>
           </>
         }
@@ -262,11 +368,24 @@ export function EditionRegle({
             </ul>
           </section>
 
-          {tentative && peutPublier ? (
+          {echec ? <BlocEchec echec={echec} annonce /> : null}
+
+          {/*
+            Après la réponse du serveur, et elle seule. L'ancienne version
+            de ce bloc s'affichait sur un clic, sans qu'aucune requête soit
+            partie.
+          */}
+          {fait === "publie" ? (
             <p aria-live="polite" className="text-pretty text-13 text-ink-700">
-              Publication demandée. La version {brouillon.version} devient la référence
-              des nouveaux dossiers ; les {effet.dossiersConcernes} dossiers existants
-              gardent la leur.
+              Version {brouillon.version} publiée. Elle devient la référence des
+              nouveaux dossiers ; les {effet.dossiersConcernes} dossiers existants
+              gardent la leur, et la publication est au journal d&apos;audit.
+            </p>
+          ) : null}
+          {fait === "enregistre" ? (
+            <p aria-live="polite" className="text-pretty text-13 text-ink-700">
+              Brouillon enregistré. Rien n&apos;est publié : les candidats lisent
+              toujours la version {enVigueur.version}.
             </p>
           ) : null}
 

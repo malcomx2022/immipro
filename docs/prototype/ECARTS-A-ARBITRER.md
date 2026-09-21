@@ -2543,3 +2543,106 @@ la transaction — et le garde-fou du rail lit aussi les `page.tsx`.
 
 **Les onze pages publiques, relues au navigateur** — titres, descriptions
 et corps — sans une occurrence restante.
+
+## Annexe S · La revue des écrans restants
+
+Faite le 21/09/2026, en confrontant l'inventaire de DOC-12 et les règles
+de DOC-11 au code. **Aucun écran ne manque** : les quarante-cinq codes ont
+tous un fichier, les seize workflows sont représentés, et le worker
+enchaîne balayage, analyse, purge, réconciliation et divergence.
+
+L'écart est ailleurs. **Le back-office est un écran de lecture avec des
+commandes qui ne partent nulle part** : dix-sept boutons inertes sur six
+surfaces, et pour trois d'entre elles la route existe déjà, écrite et
+journalisée, sans appelant.
+
+### S.1 — B-02 annonçait une publication qui n'avait pas lieu
+
+**Le plus grave, et corrigé en premier.** « Enregistrer le brouillon »
+n'était relié à rien. « Publier » posait un drapeau local, et l'écran
+répondait en région vivante :
+
+> Publication demandée. La version 5 devient la référence des nouveaux
+> dossiers ; les 214 dossiers existants gardent la leur.
+
+Aucune requête ne partait. Un veilleur repartait en croyant la règle
+publiée, et les candidats continuaient de lire la version d'avant. C'est
+la faute que le produit refuse partout ailleurs — aucun service absent
+n'est simulé (I.C) — portée sur l'acte que protège INV-3.
+
+Les deux routes existaient depuis le début, avec leurs trois garde-fous
+et leur ligne d'audit. Seule la moitié cliente manquait.
+
+**Ce que l'écran édite, et rien de plus.** B-02 ne montre que deux textes
+destinés au candidat ; lui faire porter le payload complet aurait été le
+plus court, et le plus faux — la copie chargée à l'ouverture de la page
+écraserait à l'enregistrement tout ce qu'un autre veilleur aurait changé
+entre-temps dans les champs que l'écran n'affiche pas. La route reçoit
+donc les deux textes, relit la version en base et les y recolle. Vérifié
+contre PostgreSQL : après enregistrement, `libelle` et `reserves[0]`
+changent, les conditions et les pièces requises sont intactes.
+
+**Publier enregistre d'abord.** La publication relit le payload en base
+pour le valider : publier sans enregistrer aurait mis en vigueur le texte
+d'avant pendant que l'écran montrait celui d'après. Si l'enregistrement
+est refusé, rien n'est publié ; s'il passe et que la publication échoue,
+l'écran dit les deux, parce que c'est ce qui s'est produit.
+
+**RG-14.2 se voit avant le clic.** Enregistrer est ouvert au veilleur,
+publier ne l'est pas. Le bouton porte la raison plutôt que de laisser un
+veilleur enregistrer puis buter sur un refus d'accès.
+
+#### Ce que l'application de la décision a trouvé
+
+**Le garde-fou lisait la fonction, pas le bouton.** Cinq mutations sur
+six mordaient ; celle qui comptait passait. Rebrancher « Publier » sur
+`setFait("publie")` laisse la fonction d'envoi intacte, orpheline, plus
+bas dans le fichier — et tout test qui l'inspecte continue de passer,
+pendant que l'écran est revenu exactement au défaut qu'on venait de
+corriger. Les garde-fous de B-02 cliquent désormais, avec l'appel réseau
+remplacé : lire le source était le mauvais outil pour cette question.
+
+**Et le compteur de la revue elle-même était faux.** Le balayage qui a
+trouvé les boutons inertes lisait `<Button\b[^>]*?>`, et s'arrêtait au
+premier `>` — or `disabled={fautes.length > 0}` en contient un, si bien
+que le `onClick` placé après passait inaperçu. Deux écrans déjà branchés
+ressortaient muets. Le balayage équilibre maintenant les accolades. C'est
+la troisième fois de la série qu'un garde-fou ne connaît que la forme
+pour laquelle il a été écrit, après R.3 et R.5.
+
+### S.2 — Le registre des commandes qui n'écrivent encore rien
+
+Corriger B-02 sans nommer les autres laisserait la même découverte à
+refaire. La liste est donc explicite, comme `copy-exceptions.json` et
+comme `PREALABLES` : une commande inerte hors de cette liste fait échouer
+le test, et la liste ne peut que rétrécir.
+
+| Écran | Ce qui manque |
+|---|---|
+| B-05 revue | `POST revue/[id]` écrite, écran muet |
+| B-03 utilisateurs | `PUT utilisateurs` écrite, écran muet |
+| B-01 veille | aucune route : la collecte automatique des sources n'existe pas |
+| B-07 coûts IA | aucune route : les plafonds sont calculés, jamais modifiables |
+| B-06 journal · B-04 paiements | aucun export, aucun rapprochement manuel |
+
+### S.3 — Ce que la revue a relevé et qui reste ouvert
+
+**WF-08, la rédaction assistée, est en lecture seule.** Les modèles
+existent, le chemin de lecture aussi, les quatre écrans R-01 à R-04
+également — mais aucune route d'écriture, et `InterviewAnswer` comme
+`CritiqueFinding` ne sont écrits nulle part sauf par la purge, qui les
+efface. Un candidat peut répondre à l'entretien guidé : rien n'est
+conservé. C'est le seul workflow entier dont la moitié serveur manque.
+
+**Six routes admin sur huit n'ont aucun test.** Les deux qui en ont —
+`paiements` et `contenus` — sont exactement les deux qui étaient
+branchées. La corrélation dit ce qu'elle dit.
+
+**Les exports n'existent pas.** Quatre boutons les promettent, et pas une
+ligne de CSV dans le dépôt. B-06 promet pourtant qu'exporter une période
+vide atteste l'absence d'écriture.
+
+Hors du code, le registre est à jour : zéro arbitrage ouvert, trois
+réserves extérieures (L.A, M.C, Q.A), six pages publiques dont quatre
+bloquantes avant ouverture, quatre dépendances non branchées dont la
+dégradation est écrite et testée.

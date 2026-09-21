@@ -122,3 +122,33 @@ export function textesCandidat(payload: VisaRulesPayload): { chemin: string; tex
     ...payload.reserves.map((r, i) => ({ chemin: `reserves.${i}`, texte: r })),
   ];
 }
+
+/**
+ * Les deux textes que B-02 édite, réécrits dans le payload.
+ *
+ * C'est l'inverse exact de la projection que la lecture fait déjà :
+ * `libelleCandidat` est `payload.libelle`, `reserveCandidat` la première
+ * réserve. L'écran n'édite que ceux-là, et ne doit pouvoir toucher que
+ * ceux-là — un formulaire qui renverrait le payload entier écraserait au
+ * passage les champs qu'il n'affiche pas, avec la copie qu'il avait au
+ * chargement.
+ *
+ * **Vider la réserve la retire.** C'est la symétrie de la lecture, qui
+ * rend `reserves[0] ?? ""` : un champ vide ne peut signifier qu'une chose,
+ * et faire survivre une réserve que l'opérateur vient d'effacer serait le
+ * contraire de ce qu'il a demandé. Les réserves suivantes ne bougent pas :
+ * le formulaire ne les montre pas, il ne les décide pas.
+ */
+export function avecLesTextesCandidat(
+  payload: VisaRulesPayload,
+  textes: { libelleCandidat: string; reserveCandidat: string },
+): VisaRulesPayload {
+  const libelle = textes.libelleCandidat.trim();
+  const reserve = textes.reserveCandidat.trim();
+  const suivantes = payload.reserves.slice(1);
+  return {
+    ...payload,
+    libelle,
+    reserves: reserve ? [reserve, ...suivantes] : suivantes,
+  };
+}
