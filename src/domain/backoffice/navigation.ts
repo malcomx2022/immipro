@@ -23,6 +23,15 @@ export const NAVIGATION_ADMIN: readonly EntreeAdmin[] = [
   { href: "/contenus", libelle: "Guides et articles" },
   { href: "/revue", libelle: "Pièces en échec" },
   { href: "/utilisateurs", libelle: "Utilisateurs" },
+  /*
+    `/habilitations` et non `/consultants` : le groupe de routes `(admin)`
+    partage l'espace d'adresses de l'application candidat, où
+    `/consultants` est déjà l'annuaire (T-04). Deux pages parallèles sur
+    la même adresse, que `next build` refuse et que les tests ne voyaient
+    pas — le chemin, l'intitulé et le titre de l'écran disent donc la même
+    chose : l'habilitation, ce que WF-15 nomme.
+  */
+  { href: "/habilitations", libelle: "Habilitations" },
   { href: "/paiements", libelle: "Paiements" },
   { href: "/journal", libelle: "Journal d'audit" },
   { href: "/couts-ia", libelle: "Coûts IA" },
