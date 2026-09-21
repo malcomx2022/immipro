@@ -11,6 +11,7 @@ import type { Piece } from "@/domain/dossiers/piece";
 import { grouperPourCompletude } from "@/domain/dossiers/piece";
 import type { Echeance } from "@/domain/dossiers/echeancier";
 import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
+import type { CalendrierAEvaluer } from "@/domain/dossiers/faisabilite";
 import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers/analyse";
 import type { Quota } from "@/domain/dossiers/televersement";
 import { getPack } from "@/domain/payments/pricing";
@@ -127,6 +128,7 @@ export async function quotaDuDossier(applicationId: string): Promise<Quota> {
 export async function echeancierDuDossier(id: string, userId: string): Promise<{
   depotVise: string | null;
   echeances: Echeance[];
+  calendrier: CalendrierAEvaluer;
 }> {
   const dossier = await charger(id, userId);
   const enTable = await db.deadline.findMany({
@@ -173,6 +175,53 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
   return {
     depotVise,
     echeances: [...limites, ...perissables].sort((a, b) => a.date.localeCompare(b.date)),
+    calendrier: calendrierAEvaluer(dossier),
+  };
+}
+
+/**
+ * Ce qu'il faut pour répondre à « le calendrier tient-il ? » — WF-09 étape 4.
+ *
+ * Les délais viennent de la règle **figée** (RG-09.1, INV-3), jamais de la
+ * règle publiée du jour : un dossier ouvert sur un délai de 30 jours se
+ * juge sur 30 jours, même si l'autorité en annonce 60 depuis.
+ *
+ * Les pièces à **rédiger** sont hors du calcul. Leur délai ne dépend
+ * d'aucune autorité : une lettre de motivation ne met pas quarante-cinq
+ * jours à venir, et l'absence de `delai_obtention_jours` sur ces pièces
+ * n'est pas une inconnue — c'est un délai qui n'existe pas. Les compter
+ * mettrait tous les dossiers en « indéterminé », c'est-à-dire nulle part.
+ */
+export interface DossierAEvaluer {
+  targetDate: Date | null;
+  visaRule: VisaRule | null;
+  documents: readonly Pick<
+    Document,
+    "code" | "label" | "status" | "remedy" | "required"
+  >[];
+}
+
+export function calendrierAEvaluer(
+  dossier: DossierAEvaluer,
+  aujourdhui = new Date(),
+): CalendrierAEvaluer {
+  const regle = dossier.visaRule;
+  const p = regle ? payload(regle) : null;
+  const delaiDe = (code: string): number | null =>
+    p?.pieces_requises.find((r) => r.code === code)?.delai_obtention_jours ?? null;
+
+  return {
+    aujourdhui: aujourdhui.toISOString().slice(0, 10),
+    dateCible: dossier.targetDate ? iso(dossier.targetDate) : null,
+    delaiInstructionJours: p?.delai_traitement_jours?.max ?? null,
+    aObtenir: dossier.documents
+      .filter((d) => d.status !== "CONFORME" && d.remedy !== "REDIGER")
+      .map((d) => ({
+        code: d.code,
+        libelle: d.label,
+        delaiJours: delaiDe(d.code),
+        obligatoire: d.required,
+      })),
   };
 }
 

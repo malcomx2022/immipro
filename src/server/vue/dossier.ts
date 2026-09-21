@@ -76,6 +76,21 @@ export function versDossier(
     id: dossier.id,
     destination,
     statut: versStatut(dossier.status),
+    /*
+      `targetDate` est la **date cible** — rentrée ou prise de poste —, pas
+      la date de dépôt : DOC-11 WF-09 étape 1 construit l'échéancier « à
+      rebours depuis la date cible (rentrée, prise de poste) », et
+      `echeancesDepuis` en retire le délai d'instruction pour poser
+      l'échéance « dépôt ». La base le confirme : cible au 1er septembre,
+      dépôt au 3 juin.
+
+      Le nom de ce champ dit pourtant « dépôt », et c'est de là que vient
+      la divergence — C-10 affichait « Dépôt visé le 1er septembre » au-
+      dessus d'une ligne « Dépôt de la demande — 3 juin ». Les écrans
+      disent maintenant « départ visé ». Le champ n'est pas renommé dans
+      ce lot : il traverse l'export de portabilité et l'alerte de
+      péremption, qui demandent chacun leur propre décision.
+    */
     ...(dossier.targetDate
       ? { depotVise: dossier.targetDate.toISOString().slice(0, 10) }
       : {}),

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
@@ -10,7 +9,9 @@ import {
   urgence,
   type Echeance,
 } from "@/domain/dossiers/echeancier";
+import type { DateProposee, Verdict } from "@/domain/dossiers/faisabilite";
 import { jourEnFrancais } from "@/domain/format/moment";
+import { Faisabilite } from "./Faisabilite";
 import { EnteteDossier } from "../EnteteDossier";
 
 /**
@@ -36,9 +37,19 @@ export interface EcheancierProps {
   echeances: readonly Echeance[];
   /** Date du serveur au rendu, ISO `AAAA-MM-JJ`. */
   aujourdhui: string;
+  /** Le calendrier tient-il encore — WF-09 étape 4. */
+  verdict: Verdict;
+  /** La date de repli, seulement quand le calendrier ne tient plus. */
+  proposition: DateProposee | null;
 }
 
-export function Echeancier({ dossier, echeances, aujourdhui }: EcheancierProps) {
+export function Echeancier({
+  dossier,
+  echeances,
+  aujourdhui,
+  verdict,
+  proposition,
+}: EcheancierProps) {
   const id = dossier.id;
   const mention = dossier.destination.mention;
 
@@ -58,14 +69,31 @@ export function Echeancier({ dossier, echeances, aujourdhui }: EcheancierProps) 
         >
           Échéancier
         </h1>
+        {/*
+          Deux dates, et elles ne se confondent plus. L'écran annonçait
+          « Dépôt visé le 1er septembre 2027 » au-dessus d'une ligne
+          « Dépôt de la demande — 3 juin 2027 » : le même mot pour deux
+          dates à trois mois d'écart. La cible est la rentrée (WF-09
+          étape 1) ; le dépôt s'en déduit en retirant le délai
+          d'instruction, et c'est lui que le compte à rebours suit, parce
+          que c'est lui qui commande les pièces.
+        */}
         <p className="text-16 text-ink-700">
-          Dépôt visé le {jourEnFrancais(dossier.depotVise)}
+          Départ visé le {jourEnFrancais(dossier.depotVise)}
         </p>
         <p className="text-14 font-medium text-ink-900">
-          {libelleCompteARebours(aujourdhui, dossier.depotVise)}
+          {`Dépôt le ${jourEnFrancais(verdict.depot ?? dossier.depotVise)} — ${libelleCompteARebours(aujourdhui, verdict.depot ?? dossier.depotVise).toLowerCase()}`}
         </p>
         <p className="text-14 text-ink-700">{resumeEcheancier(echeances, aujourdhui)}</p>
       </div>
+
+      <Faisabilite
+        dossierId={id}
+        verdict={verdict}
+        proposition={proposition}
+        dateCible={dossier.depotVise}
+        aujourdhui={aujourdhui}
+      />
 
       {grouperParMois(echeances).map((mois) => (
         <section key={mois.cle} className="flex flex-col gap-2">
@@ -95,21 +123,29 @@ export function Echeancier({ dossier, echeances, aujourdhui }: EcheancierProps) 
       </SourceNote>
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row md:items-center md:justify-between">
-        {/* Annoncer « rappels activés » sans donner le moyen de les couper
-            serait un réglage subi : la mention renvoie là où il se change. */}
-        <Link
-          href="/profil"
-          className="flex min-h-touch items-center text-14 text-ink-700 underline"
-        >
-          Rappels par email activés — les modifier
-        </Link>
+        {/*
+          La ligne disait « Rappels par email activés — les modifier ». Deux
+          affirmations, fausses toutes les deux : rien n'envoie de rappel —
+          la messagerie transactionnelle n'est pas branchée et aucun travail
+          de fond ne lit l'échéancier —, et le profil ne porte aucun réglage
+          de notification à modifier.
+
+          C'est l'erreur du « rien à reprendre » de R-04 sur une autre
+          surface : un candidat qui croit ses rappels actifs cesse de venir
+          regarder, et rate la date. La phrase dit maintenant ce qui est, et
+          ce qu'il y a à faire en attendant (WF-09 étape 3).
+        */}
+        <p className="max-w-[60ch] text-pretty text-14 text-ink-700">
+          Aucun rappel n&apos;est envoyé pour l&apos;instant, ni par email ni par
+          SMS : reviens sur cet écran pour suivre tes échéances.
+        </p>
         <LienBouton
           href={`/dossiers/${id}`}
           variante="secondaire"
           pleineLargeur
           className="md:w-auto"
         >
-          Changer la date de dépôt
+          Revenir à la checklist
         </LienBouton>
       </div>
     </div>
@@ -166,7 +202,7 @@ function LigneEcheance({
   );
 }
 
-/** Un brouillon n'a pas d'échéancier : il lui manque la date de dépôt. */
+/** Un brouillon n'a pas d'échéancier : il lui manque la date de départ visée. */
 function SansEcheancier({ dossierId }: { dossierId: string }) {
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 py-8">
@@ -175,15 +211,15 @@ function SansEcheancier({ dossierId }: { dossierId: string }) {
         tabIndex={-1}
         className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-32"
       >
-        L&apos;échéancier attend ta date de dépôt
+        L&apos;échéancier attend ta date de départ
       </h1>
       <p className="text-pretty text-16 text-ink-700">
-        Toutes les dates se calculent à rebours du dépôt visé : sans elle, aucune
-        échéance ne peut être posée. Fixe-la, les délais des pièces périssables
-        suivront.
+        Toutes les dates se calculent à rebours de ton départ visé — rentrée ou
+        prise de poste : sans elle, aucune échéance ne peut être posée. Fixe-la,
+        la date de dépôt et les délais des pièces périssables suivront.
       </p>
       <LienBouton href={`/dossiers/${dossierId}`} pleineLargeur className="md:w-auto md:self-start">
-        Fixer la date de dépôt
+        Fixer la date de départ
       </LienBouton>
     </div>
   );

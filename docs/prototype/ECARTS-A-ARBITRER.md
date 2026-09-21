@@ -3787,3 +3787,143 @@ Puis l'exécution, sur le dossier suisse de la base, règle figée à B2 :
       « Nous avons recoupé ta lettre avec ce que ton dossier sait déjà :
         rien ne diverge. Le fond, lui, n'a pas été analysé … »
       aucune remarque, les deux listes affichées
+
+### S.13 — WF-09 : l'échéancier comptait les retards sans jamais conclure
+
+C-10 affichait « 3 échéances sont en retard. » Trois lignes rouges, et rien
+qui dise la seule chose qui compte : qu'avec les délais de sa procédure, la
+date de départ visée n'est plus atteignable. **Un décompte n'est pas un
+diagnostic** — c'est le zéro de B-07 et le « rien à reprendre » de R-04 sur
+une troisième surface, le chiffre tenant lieu de constat.
+
+WF-09 étape 4 demandait les deux moitiés : *« Alerte d'incompatibilité si le
+calendrier ne tient plus, avec proposition de replanification. »* Ni l'une
+ni l'autre n'existait.
+
+#### Ce qui n'est pas connu n'est pas zéro
+
+Toutes les pièces n'ont pas de `delai_obtention_jours` dans la règle figée.
+Sur le dossier de démonstration, trois sur quatre n'en ont pas. Un calcul
+qui compte l'absence comme zéro conclut « ça tient » sur un dossier dont on
+ignore l'essentiel — l'affirmation rassurante, encore elle. D'où quatre
+états, et non deux :
+
+    SANS_DATE            pas de date visée
+    INTENABLE            une pièce obligatoire ne peut plus arriver,
+                         ou la date de dépôt est derrière nous
+    INDETERMINE          rien n'est en retard, mais un délai manque
+    TENABLE              tous les délais sont connus, et tous tiennent
+
+`INDETERMINE` n'est ni un feu vert ni une alerte. Il nomme les pièces dont
+le délai n'est pas annoncé et s'arrête là : *« Ce que nous savons tient ; ce
+que nous ignorons n'est pas compté comme nul. »*
+
+Le cas qu'un simple décompte de retards manquait est `depotPasse` : la ligne
+« Dépôt » n'est pas une pièce à obtenir, et le calendrier peut être mort
+sans qu'aucune pièce soit en retard.
+
+#### Deux comparaisons refusées, pour la même raison qu'en S.12
+
+Un écart inventé coûte plus cher qu'un écart manqué. Deux règles suivent de
+là :
+
+- **le verdict porte sur les pièces obligatoires.** RG-07.2 a déjà tranché
+  la frontière pour la complétude ; le calendrier suit la même. Une pièce
+  complémentaire en retard reste visible dans l'échéancier, elle ne
+  condamne pas la date.
+- **les pièces à rédiger sont hors du calcul.** Une lettre de motivation ne
+  met pas quarante-cinq jours à venir : l'absence de délai n'y est pas une
+  inconnue, c'est un délai qui n'existe pas. Les compter mettrait tous les
+  dossiers en `INDETERMINE`, c'est-à-dire nulle part.
+
+#### La proposition, et ce qu'elle ne prétend pas être
+
+`aujourd'hui + le plus long des délais connus + le délai d'instruction`.
+Une soustraction rendue dans l'autre sens, rien de plus. Elle ne dit pas que
+la demande aboutira (INV-1), et elle dit ce qui lui manque :
+
+> En partant d'aujourd'hui, la première date de départ compatible avec les
+> délais connus est le 19 janvier 2027. C'est un plancher, pas une
+> prévision : 3 pièces obligatoires n'ont pas de délai annoncé, ce qui peut
+> la repousser.
+
+Elle n'apparaît que sur un calendrier intenable. Proposer de repousser une
+date qui tient reviendrait à conseiller d'attendre, et nous ne conseillons
+pas.
+
+#### Deux commandes, et une affirmation, qui ne tenaient à rien
+
+En écrivant l'alerte, l'écran a livré trois choses fausses.
+
+**« Changer la date de dépôt »** menait à la checklist, où rien ne la
+change : `targetDate` n'avait qu'un écrivain, l'ouverture du dossier. Une
+alerte d'incompatibilité sans moyen d'y répondre aurait été une commande
+inerte de plus (règle de Q.A). Le champ est maintenant sur l'écran, et
+`PUT /api/dossiers/[id]/echeancier` recalcule tout l'échéancier **depuis la
+règle figée** (INV-3) en reportant les `doneAt`.
+
+**« Rappels par email activés — les modifier »** affirmait deux choses,
+fausses toutes les deux : rien n'envoie de rappel — la messagerie
+transactionnelle n'est pas branchée, et aucun travail de fond ne lit
+l'échéancier —, et le profil ne porte aucun réglage de notification à
+modifier. Un candidat qui croit ses rappels actifs cesse de venir regarder,
+et rate la date. L'écran dit maintenant qu'aucun rappel n'est envoyé, et ce
+qu'il faut faire en attendant. WF-09 étape 3 reste ouverte, et se voit.
+
+**« Dépôt visé le 1er septembre 2027 »**, au-dessus d'une ligne « Dépôt de
+la demande — 3 juin 2027 ». Le même mot pour deux dates à trois mois
+d'écart. La base tranche : `targetDate` vaut 2027-09-01 et l'échéance
+`depot` 2027-06-03, soit la cible moins le délai d'instruction — exactement
+ce que DOC-11 WF-09 étape 1 décrit, *« à rebours depuis la date cible
+(rentrée, prise de poste) »*. C'est donc l'étiquette qui mentait. C-10, la
+checklist et l'archive disent maintenant « départ visé », et le compte à
+rebours suit le **dépôt**, puisque c'est lui qui commande les pièces.
+
+#### Ce que je n'ai pas fait, et qu'il faut décider
+
+Le champ s'appelle toujours `depotVise` dans la vue, et c'est de ce nom que
+venait la divergence. Le renommer touche trois choses qui demandent chacune
+leur propre décision, et je ne les ai pas prises :
+
+- **`libelleAlertePeremption(piece, depotVise)`** calcule la péremption
+  d'une pièce par rapport à la **cible**, alors qu'une pièce doit être
+  valable le jour du **dépôt**. Une pièce qui expire entre les deux dates
+  est signalée à tort — ou pas signalée, selon le sens de l'écart. C'est un
+  changement de comportement, pas d'étiquette.
+- **l'export de portabilité** publie la clé `depotVise`. La renommer change
+  un format que le candidat a pu télécharger.
+- **C-05** demande « ta date de dépôt visée » en proposant des rentrées.
+  La question elle-même est à réécrire, pas seulement son intitulé.
+
+#### Vérifié en mutant, puis en exécutant
+
+Quatorze mutations, quatorze rouges — dont les quatre qui portent le lot :
+
+    délai inconnu compté comme zéro                      3 rouges
+    l'indétermination devient un feu vert                3 rouges
+    le dépôt passé ne compte plus                        1 rouge
+    une pièce complémentaire condamne la date            1 rouge
+    les pièces à rédiger rentrent dans le calcul         1 rouge
+    la mention des rappels revient                       1 rouge
+
+Puis l'exécution, sur le dossier de démonstration et par le vrai point
+d'entrée HTTP, session en base :
+
+    PUT dateCible=2020-01-01     422, champ dateCible :
+                                 « Choisis une date à venir : calculé à
+                                   rebours d'une date passée, l'échéancier
+                                   place toutes ses étapes derrière nous. »
+    PUT dateCible=aujourd'hui+40 200, échéances recalculées depuis la règle
+                                 figée — dépôt au 2 août 2026, donc passé
+    C-10 après ce changement     « La date de dépôt est passée » …
+                                 « Diplôme le plus élevé (30 jours
+                                   d'obtention, 80 de trop) »
+    remise à 2027-09-01          diplome 2027-05-04 · depot 2027-06-03,
+                                 identiques aux valeurs d'origine
+
+C'est cette lecture qui a trouvé deux formulations qu'aucun test ne voyait :
+« Dépôt le 2 août 2026 — **date de dépôt** dépassée de 50 jours », où le
+compte à rebours répétait ce que la phrase venait de nommer, et une
+proposition à deux niveaux de deux-points imbriqués. Les deux portent
+maintenant leur garde.
+
