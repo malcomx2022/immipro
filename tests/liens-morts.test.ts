@@ -92,6 +92,28 @@ describe("aucun lien interne ne mène nulle part", () => {
     expect(liens.length).toBeGreaterThan(10);
   });
 
+  /**
+   * Le lien qui ne mène nulle part sans en avoir l'air — S.10.
+   *
+   * Le critère ne regardait que les adresses commençant par `/`. Un
+   * `href="#"` est pourtant une commande morte de plus, de la même famille
+   * que le bouton sans `onClick` : il a l'apparence d'un lien, le curseur
+   * d'un lien, et ne fait rien. Trouvé en éprouvant par mutation le retrait
+   * du bouton de l'annuaire — la mutation qui le remplaçait par un
+   * `LienBouton href="#"` passait au vert.
+   *
+   * Le dépôt n'en contient aucun, et ce test le maintient ainsi.
+   */
+  it("aucun lien ne pointe sur une ancre vide ou sur rien", () => {
+    const morts = ECRANS.flatMap((fichier) => {
+      const source = readFileSync(fichier, "utf8");
+      return [...source.matchAll(/href=(?:"(#?)"|\{"(#)"\})/gu)].map(
+        () => fichier,
+      );
+    });
+    expect(morts).toEqual([]);
+  });
+
   it.each(liens)("%s → %s est servi", (_fichier, adresse) => {
     expect(sert(adresse), `${adresse} n'a pas de page`).toBe(true);
   });

@@ -3413,3 +3413,114 @@ une messagerie, **bloquante avant ouverture**, et un endroit où consigner
 l'intérêt du candidat — aucune table ne le porte. Promettre « je te
 préviens » sans pouvoir envoyer serait précisément la promesse que cette
 revue a passé huit lots à retirer.
+
+### S.10 — Un avis qui attendait un événement qui ne peut pas se produire
+
+Dernière entrée du registre des commandes inertes. Elle m'a fait trouver
+autre chose que ce que j'y avais écrit.
+
+#### Ma note était fausse, pour la deuxième fois
+
+J'avais inscrit que « Me prévenir dès qu'il y en a un », dans l'annuaire
+des consultants, attendait la messagerie — bloquante avant ouverture.
+C'était vrai et **hors sujet** : même branchée, la messagerie n'aurait rien
+eu à envoyer.
+
+`Accreditation` — la table qui atteste le titre d'exercice d'un consultant
+dans une juridiction, exigée par RG-12.1 — **n'a aucun écrivain dans le
+produit**. La lecture de l'annuaire filtre précisément sur elle. Rien ne
+peut donc rendre un consultant habilité, et l'avis n'avait pas d'événement
+à attendre. Le blocage n'était pas le canal, c'était le fait.
+
+Deux fois sur deux — ici et pour « Téléverser sans analyse » en S.9 — j'ai
+noté un manque en lisant l'absence d'un `onClick`, sans suivre la chaîne
+jusqu'au bout. Une fois le registre s'est trouvé trop pessimiste, une fois
+trop optimiste. Un registre qui se remplit sans vérifier est une liste de
+suppositions.
+
+#### Le balayage, et ce qu'il a trouvé
+
+Quelles tables aucune ligne de `src/` ne remplit ? Cinq, et elles se
+rangent en deux familles :
+
+| Table | Ce que son absence produit |
+|---|---|
+| `Accreditation` | l'annuaire des consultants est vide pour **toutes** les destinations, et le reste |
+| `PartnerActivation` | aucune offre de partenaire n'est proposée, dans aucun pays |
+| `Consultant`, `Partner`, `SourceCheck` | remplies par le seul jeu de démonstration |
+
+Les deux premières sont des **enregistrements de vérification** : un titre
+d'exercice contrôlé, la licéité d'une commission dans un pays, chacun avec
+son `verifiedAt` et son `verifiedBy`. Les lectures les interrogent pour
+décider ce qu'un candidat voit. Aucune surface ne les crée.
+
+Pour les consultants, la cause est nommable : **WF-12 liste ADM parmi ses
+acteurs** et RG-12.1 fait de l'habilitation un acte d'administration — et
+DOC-12 ne donne aucun écran à cet acteur. B-01 à B-07 couvrent la veille,
+les règles, les comptes, les paiements, la revue, le journal et les coûts.
+L'annuaire n'a pas de back-office.
+
+Un quatrième registre naît de là, à côté de `DEPENDANCES` (ce qu'une clé
+branche) et `PREALABLES` (ce qu'une personne qualifiée tranche) :
+`HABILITATIONS_SANS_ECRIVAIN`, pour ce qu'aucun écran ne sait créer. Le
+balayage qui l'a trouvé est devenu son garde-fou, dans les deux sens —
+une table de vérification sans écrivain doit y être nommée, et une table
+nommée doit rester sans écrivain. Le jour où l'écran existe, le test échoue
+et force à retirer l'entrée.
+
+#### Le contraste, contre PostgreSQL
+
+    base migrée, sans démonstration
+      Consultant 0 · Accreditation 0 · Partner 0 · PartnerActivation 0
+      NL → 0 consultant habilité · 0 offre autorisée
+      CA → 0 · 0        FR → 0 · 0
+
+    après `seed:demo`
+      Consultant 1 · Accreditation 1 · Partner 1 · PartnerActivation 1
+      NL → 1 consultant habilité · 1 offre autorisée
+      CA → 0 · 0        FR → 0 · 0
+
+La démonstration montre un annuaire garni ; la production en montrera un
+vide, à jamais. C'est le piège de S.6 sur une autre table — là, le jeu de
+démonstration inventait un coût que le produit ne savait pas calculer.
+
+#### Ce que l'écran dit maintenant
+
+Le bouton est parti. L'état vide nomme déjà les destinations couvertes
+quand il y en a, et il ajoute pourquoi il n'y en a pas ici : l'habilitation
+se prononce destination par destination, aucune n'est enregistrée, et
+**nous ne t'annonçons pas un rendez-vous que nous ne pouvons pas
+proposer.** Reste l'action qui marche : continuer sans consultant.
+
+La surface des partenaires, elle, disait déjà la même chose depuis le
+début — « Cette page reste vide tant que l'autorisation n'est pas rétablie »,
+« c'est l'état normal, pas une panne ». Le même vide, dit.
+
+#### Trois garde-fous de plus qui ne mordaient pas
+
+Le balayage lui-même s'est trompé deux fois avant d'être juste :
+
+1. il ne connaissait que `db.table.create(` et accusait `Deadline`, écrite
+   en imbriqué à l'ouverture de chaque dossier ;
+2. corrigé pour l'imbriqué, il dérivait la clé de relation du nom du
+   modèle — ce qui marche pour `accreditations` ← `Accreditation` et tombe
+   pour `activations` ← `PartnerActivation`. **Mon test affirmait donc que
+   la démonstration n'écrivait pas `PartnerActivation`, et la base l'a
+   démenti** : elle en contient une. Les clés se lisent maintenant dans le
+   schéma.
+
+Et une mutation a révélé un troisième trou, ailleurs : remplacer le bouton
+retiré par un `LienBouton href="#"` passait au vert. Le garde-fou des liens
+morts ne regardait que les adresses commençant par `/`. Un `href="#"` est
+pourtant une commande morte de plus — l'apparence d'un lien, le curseur
+d'un lien, et rien. Le dépôt n'en contient aucun, et un test l'y maintient.
+
+Le balayage des commandes inertes couvre par la même occasion `<button>`
+en balise nue, et pas seulement le composant : il n'a rien trouvé de
+nouveau, ce qui est le résultat qu'on espère d'un élargissement.
+
+#### Le registre des commandes inertes est vide, sans réserve
+
+Onze dans le back-office, deux de plus dans l'espace candidat trouvées en
+élargissant le balayage, et celle-ci. Le registre reste, vide : c'est lui
+qui refusera la prochaine.
