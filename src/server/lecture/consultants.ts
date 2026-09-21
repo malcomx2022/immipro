@@ -93,11 +93,20 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
     }
   }
 
+  /*
+    Un créneau **tenu** est pris, tant que sa tenue court. L'afficher
+    libre ferait choisir un horaire que l'unicité refusera ensuite : le
+    candidat remplirait l'accord de partage pour buter sur « ce créneau
+    vient d'être pris ». Une tenue échue, elle, ne tient plus rien.
+  */
   const pris = await db.appointment.findMany({
     where: {
       consultantId,
       startsAt: { in: proposes },
-      status: { in: ["RESERVE", "REPORTE"] },
+      OR: [
+        { status: { in: ["RESERVE", "REPORTE"] } },
+        { status: "TENU", heldUntil: { gte: new Date() } },
+      ],
     },
     select: { startsAt: true },
   });

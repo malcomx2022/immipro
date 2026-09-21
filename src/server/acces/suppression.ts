@@ -107,6 +107,16 @@ export async function acheverLaSuppression(
     select: { id: true, startsAt: true, freeUntil: true, transactionId: true },
   });
 
+  /*
+    Les créneaux seulement **tenus** ne sont pas annulés : rien n'a été
+    payé, il n'y a donc ni engagement ni remboursement. Ils sont
+    libérés — les garder gelés priverait d'autres candidats d'horaires
+    que plus personne ne viendra prendre.
+  */
+  await db.appointment.deleteMany({
+    where: { application: { userId }, status: "TENU" },
+  });
+
   await db.$transaction([
     db.user.update({
       where: { id: userId },

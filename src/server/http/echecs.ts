@@ -65,6 +65,7 @@ export type CodeEchec =
   // Paiement
   | "montant_sous_le_minimum"
   | "devise_figee"
+  | "creneau_indisponible"
   | "paiement_indisponible"
   | "ouverture_refusee"
   | "signature_invalide"
@@ -242,6 +243,15 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     corps: "Le paiement a déjà été créé dans une devise, elle reste la sienne.",
     conserve: "Le paiement en cours reste valable.",
     action: "Reprendre le paiement en cours",
+    ton: "limite",
+  },
+  creneau_indisponible: {
+    statut: 409,
+    titre: "Ce créneau vient d'être pris",
+    corps:
+      "Quelqu'un l'a retenu pendant que tu choisissais, ou la tenue que tu avais a expiré.",
+    conserve: "Ton accord de partage est enregistré : tu n'auras pas à le redonner.",
+    action: "Choisir un autre créneau",
     ton: "limite",
   },
   paiement_indisponible: {

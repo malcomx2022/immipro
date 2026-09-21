@@ -1,3 +1,5 @@
+import { TENUE_MINUTES } from "./tenue";
+
 import {
   CONSULTATION_ANNULATION_HEURES,
   CONSULTATION_DUREE_MINUTES,
@@ -39,10 +41,15 @@ export interface Creneau {
   disponible: boolean;
 }
 
-/** Durée pendant laquelle un créneau reste tenu après sélection, en minutes. */
-export const TENUE_MINUTES = 10;
-
-export const MENTION_TENUE = `Le créneau est tenu ${TENUE_MINUTES} minutes.`;
+/**
+ * La durée de tenue vit dans `tenue.ts`, qui la fait tenir.
+ *
+ * Elle était déclarée ici, et cette phrase l'annonçait au candidat —
+ * pendant que rien ne tenait quoi que ce soit : le rendez-vous naissait
+ * confirmé, sans paiement, et aucune échéance n'existait en base. Une
+ * durée affichée que personne n'applique est pire qu'un silence.
+ */
+export const MENTION_TENUE = `Le créneau est tenu ${TENUE_MINUTES} minutes, le temps du paiement.`;
 
 export interface JourDeCreneaux {
   /** `AAAA-MM-JJ`, clé de rendu. */

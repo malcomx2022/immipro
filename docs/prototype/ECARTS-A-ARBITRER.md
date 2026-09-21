@@ -4844,3 +4844,84 @@ Vingt-neuf vérifications sur PostgreSQL réel : paiement confirmé retrouvé,
 refus retrouvé avec sa cause, rien trouvé, échec temporaire, webhook
 simultané — un seul crédit —, identifiant incohérent, et l'expiration qui
 reste celle de la plateforme.
+
+### S.23 — Une consultation se confirmait sans être payée
+
+Le bouton de créneau appelait la réservation, la route créait le
+rendez-vous **et** l'accès consultant, `transactionId` restait nul, et
+l'écran annonçait « Rendez-vous confirmé » — deux paragraphes avant
+d'annoncer que la consultation était due.
+
+Un consultant lisait donc le dossier d'un candidat qui n'avait rien
+réglé, et personne ne pouvait le savoir : rien ne distinguait un
+rendez-vous payé d'un rendez-vous qui ne l'était pas.
+
+#### L'état qui manquait
+
+Entre « je veux ce créneau » et « c'est payé », il y a un état. Il
+n'était pas modélisé — et pourtant l'écran le nommait déjà : une
+constante `TENUE_MINUTES = 10` et une phrase, « Le créneau est tenu 10
+minutes », affichées à chaque sélection. Le test qui les couvrait
+s'appelait « tient le créneau, et le dit » et ne vérifiait que la
+phrase.
+
+`TENU` existe maintenant, avec son échéance, et la durée vit dans le
+module qui la fait tenir. Le test porte sur le mécanisme.
+
+#### Trois écritures, trois moments
+
+| Moment | Ce qui s'écrit |
+|---|---|
+| la tenue | le créneau est gardé, l'accord de partage est daté |
+| le paiement | le tunnel ordinaire, page hébergée comprise |
+| la confirmation signée | `RESERVE`, et l'accès consultant |
+
+L'accord se prépare avant le paiement — il n'y a aucune raison de le
+redemander après — mais **une date d'accord n'est pas une autorisation
+de lecture**. L'accès naît à la confirmation, et pas une seconde avant.
+
+#### La base porte la règle, pas la bonne volonté des appelants
+
+    appointment_reserve_exige_un_paiement
+      CHECK (status <> 'RESERVE' OR "transactionId" IS NOT NULL)
+
+Aucune route, aucun job, aucune reprise manuelle ne peut écrire un
+rendez-vous confirmé qui ne cite pas le paiement qui l'a payé. Le
+second garde-fou exige qu'une tenue porte son échéance : sans elle,
+elle gèlerait le créneau pour toujours.
+
+La migration a dû traiter les rendez-vous déjà écrits sans paiement. On
+ne peut pas leur inventer un règlement : ils redeviennent des tenues
+échues — donc des créneaux libres — et les accès consultant qu'ils
+avaient ouverts sont révoqués. C'est dit dans la migration, en toutes
+lettres.
+
+#### Ce que l'exécution a trouvé
+
+Deux mutations, deux rouges — mais la seconde ne l'était pas au premier
+essai. Retirer la condition d'état de la confirmation ne faisait rougir
+aucune vérification : la garde précoce (« déjà `RESERVE`, rien à
+faire ») masquait la condition interne, que seul un cas concurrent
+atteint. Le scénario manquait, il a été ajouté — deux notifications à la
+même milliseconde, une seule qui confirme, un seul accès ouvert.
+
+#### Vérifié en exécutant
+
+Vingt-quatre vérifications sur PostgreSQL réel, dont la seule qui ne se
+simule pas : **deux candidats sur le même créneau à la même
+milliseconde**. Un seul le tient, l'autre l'apprend au lieu de croire
+avoir réservé, une seule ligne en base, aucun accès ouvert.
+
+Et le reste : rien n'est confirmé sans paiement (y compris quand on
+force la base), la notification signée confirme et ouvre l'accès une
+fois, un paiement échoué libère le créneau qu'un autre reprend, une
+tenue abandonnée est balayée, la transaction et la tenue d'un candidat
+ne servent pas à un autre, et une suppression de compte libère les
+tenues sans ouvrir d'obligation de remboursement pour rien.
+
+#### Ce qui reste à revoir
+
+L'écran d'attente de paiement est celui des packs : il dit « ton dossier
+s'ouvre aussitôt », ce qui ne décrit pas un rendez-vous. Le parcours est
+juste, la phrase d'attente est à reprendre pour le cas de la
+consultation.
