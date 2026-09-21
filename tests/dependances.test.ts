@@ -28,14 +28,22 @@ const TOUT = {
   STRIPE_WEBHOOK_SECRET: "s",
   ANTIVIRUS_URL: "http://exemple",
   ANTHROPIC_API_KEY: "k",
+  // Le rail de remboursement — arbitrage du 21/09/2026. Encaisser sans
+  // savoir rendre est un engagement à sens unique.
+  FEDAPAY_API_KEY: "k",
+  STRIPE_API_KEY: "k",
 };
 
-describe("les quatre dépendances n'ont pas le même statut", () => {
+describe("les cinq dépendances n'ont pas le même statut", () => {
   it("chacune est déclarée avec ce que son absence bloque", () => {
     expect(DEPENDANCES.map((d) => [d.cle, d.statut])).toEqual([
       ["messagerie", "BLOQUANTE_OUVERTURE"],
       ["paiements", "BLOQUANTE_ENCAISSEMENT"],
       ["antivirus", "BLOQUANTE_TELEVERSEMENT"],
+      // Le rail sortant bloque l'encaissement pour la même raison que les
+      // secrets de signature : on ne prend pas d'argent qu'on ne sait pas
+      // rendre, et K.C ouvre des obligations que rien ne solderait.
+      ["remboursement", "BLOQUANTE_ENCAISSEMENT"],
       ["extraction", "FACULTATIVE_PILOTE"],
     ]);
     for (const d of DEPENDANCES) {
@@ -95,6 +103,18 @@ describe("l'aptitude se lit des dépendances, pas du nom de l'environnement", ()
   });
 
   /**
+   * Et le rail sortant bloque aussi l'encaissement. C'est la dépendance
+   * la plus facile à oublier, parce que son absence ne se voit pas tant
+   * que personne ne demande à être remboursé — puis elle se voit d'un
+   * coup, sur une obligation que rien ne peut solder.
+   */
+  it("sans clé d'envoi, on ne sait pas rendre : inapte à encaisser", () => {
+    expect(etatDesDependances({ ...TOUT, FEDAPAY_API_KEY: "" }).bloquantes).toEqual([
+      "remboursement",
+    ]);
+  });
+
+  /**
    * I.D — l'antivirus absent n'est pas une dégradation acceptable : il n'y
    * a rien à faire à la place d'un balayage, sinon refuser le fichier.
    */
@@ -104,10 +124,15 @@ describe("l'aptitude se lit des dépendances, pas du nom de l'environnement", ()
     expect(etat.bloquantes).toEqual(["antivirus"]);
   });
 
-  it("rien n'est branché : les trois bloquantes sont nommées", () => {
+  it("rien n'est branché : les quatre bloquantes sont nommées", () => {
     const etat = etatDesDependances(RIEN);
     expect(etat.aptitude).toBe("INAPTE");
-    expect(etat.bloquantes).toEqual(["messagerie", "paiements", "antivirus"]);
+    expect(etat.bloquantes).toEqual([
+      "messagerie",
+      "paiements",
+      "antivirus",
+      "remboursement",
+    ]);
   });
 
   it("une variable vide ne vaut pas une variable renseignée", () => {

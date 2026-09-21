@@ -2288,3 +2288,75 @@ qui est vrai, mais sort de la file, parce qu'il a été travaillé.
 
 Montant, statut et référence intacts ; l'issue et la note conservées après
 l'effacement du motif.
+
+### R.2 — Le rail de remboursement sortant
+
+**Tranché : trois faits distincts, et aucune simulation du fournisseur.**
+
+K.C ouvrait l'obligation de rembourser, M.B enregistrait la confirmation
+que l'argent était reparti. Entre les deux, rien : la demande envoyée au
+fournisseur n'existait nulle part. Une somme décidée et une demande
+acceptée se lisaient pareil en B-04, et une tentative échouée ne laissait
+aucune trace — personne ne pouvait dire si le silence venait d'un envoi
+jamais fait ou d'un envoi resté sans réponse.
+
+Trois horodatages désormais, dans l'ordre, et aucun ne se substitue à un
+autre : `refundDueAt` (décidé), `refundRequestedAt` (le fournisseur a
+accusé réception), `refundedAt` (sa notification signée dit que l'argent
+est parti — elle seule, INV-7). Un compteur de tentatives accompagne la
+demande, parce qu'un rail qui échoue échoue plusieurs fois.
+
+**Aucun service absent n'est simulé** — la règle d'I.C, appliquée une
+quatrième fois après le balayeur et l'interrogation. Sans clé fournisseur,
+`NON_BRANCHE` rend `null` : l'issue est `en_attente_d_envoi`, la dette
+reste visible dans la file, et rien ne prétend qu'un virement a eu lieu.
+La dépendance `remboursement` rejoint les quatre autres dans
+`dependances.ts`, marquée bloquante pour l'encaissement.
+
+**Les droits partent à l'initiation, pas à la confirmation.** Entre les
+deux il peut s'écouler des jours ; laisser un pack utilisable pendant
+qu'on en rend le prix revient à l'offrir. Et **une consommation partielle
+ne se rembourse jamais automatiquement en entier** : ce que vaut une
+analyse déjà rendue est une question commerciale, pas arithmétique. Le
+cas passe en revue manuelle, sans rien retirer.
+
+La clé d'idempotence est dérivée de la référence, jamais tirée au sort ni
+stockée : deux tentatives portent la même clé, et le fournisseur reconnaît
+la seconde comme un rejeu plutôt que d'envoyer l'argent deux fois.
+
+#### Ce que l'application de la décision a trouvé
+
+**Une contrainte existante refusait le motif neuf.**
+`credit_sens_coherent_avec_motif` énumérait les motifs autorisés à porter
+un `delta` négatif, et `REMBOURSEMENT` n'en faisait pas partie — la
+contrainte est antérieure au besoin. Elle est reprise dans une migration
+dédiée plutôt qu'élargie en douce : la liste des motifs qui retirent des
+droits mérite d'apparaître dans une diff.
+
+**La migration cassait le déploiement, et pas les tests.** PostgreSQL
+refuse (`55P04`) d'**employer** une valeur d'énumération ajoutée dans la
+même transaction que l'`ALTER TYPE ... ADD VALUE`. Le fichier ajoutait
+`REMBOURSEMENT` puis s'en servait aussitôt dans la nouvelle contrainte.
+Rien ne le signalait avant l'exécution réelle contre une base : la
+migration est scindée en deux, `…000200` ajoute, `…000300` emploie.
+
+**Une nouvelle tentative retirait les droits une seconde fois.** L'appel
+au fournisseur était idempotent — la clé y veillait — mais pas l'écriture
+au grand livre qui l'accompagne. Deux tentatives sur un pack de trente
+donnaient un solde de moins trente. Vu en rejouant la demande dans la
+fixture, pas en test : le test vérifiait la clé, c'est-à-dire l'endroit
+déjà protégé. Une ligne `REMBOURSEMENT` existante sur la transaction
+interdit désormais la seconde.
+
+**Les deux chemins, exécutés contre PostgreSQL.** Sans rail branché :
+
+    pack intact      1re : en_attente_d_envoi   2e : en_attente_d_envoi
+                     solde 30 → 0 · tentatives=2 · versée=non
+                     grand livre : ACHAT_PACK +30 · REMBOURSEMENT −30
+    pack entamé      1re : revue_manuelle       2e : revue_manuelle
+                     solde 27 → 27 · tentatives=0 · rien retiré
+                     grand livre : ACHAT_PACK +30 · ANALYSE −1 ×3
+
+Avec un rail branché, les deux tentatives rendent `envoyee`, la date de
+demande ne bouge pas à la seconde, la clé est identique aux deux, et le
+statut reste `CONFIRMEE` : seul le webhook signé écrit le versement.

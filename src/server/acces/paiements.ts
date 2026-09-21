@@ -3,6 +3,12 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
 import {
+  MOTIF_REVUE_PARTIELLE,
+  cleDIdempotence,
+  suiteDuQuota,
+} from "@/domain/paiement/remboursement";
+import { NON_BRANCHE, type Rembourseur } from "@/server/paiement/remboursement";
+import {
   getPack,
   MONTANT_MINIMUM_XOF,
   RECHARGE_ANALYSES,
@@ -230,6 +236,133 @@ export async function appliquerLaNotification(
 }
 
 /**
+ * Initier un remboursement : la demande part, l'argent non — arbitrage
+ * du 21/09/2026.
+ *
+ * Le deuxième des trois faits. La décision est déjà prise (K.C, ou un
+ * geste d'administrateur) ; ici on retire les droits non consommés, on
+ * tente l'envoi, et on compte la tentative. Ce que la fonction **n'**écrit
+ * **pas** : `status`, `refundedAt`. Seule la notification signée du
+ * fournisseur les écrit (INV-7, M.B).
+ *
+ * **Les droits partent à l'initiation, pas à la confirmation.** Entre les
+ * deux il peut s'écouler des jours, et laisser un pack utilisable pendant
+ * qu'on en rend le prix revient à l'offrir.
+ *
+ * **Un échec d'envoi conserve la dette.** `refundRequestedAt` reste nul,
+ * la tentative est datée et comptée, et l'appel suivant portera la même
+ * clé d'idempotence — le fournisseur y reconnaîtra un rejeu plutôt que
+ * d'envoyer l'argent deux fois.
+ */
+export async function initierLeRemboursement(
+  reference: string,
+  envoyer: Rembourseur = NON_BRANCHE,
+  maintenant = new Date(),
+): Promise<
+  | { issue: "envoyee" }
+  | { issue: "en_attente_d_envoi" }
+  | { issue: "revue_manuelle"; consommees: number }
+  | { issue: "sans_objet" }
+> {
+  const transaction = await db.transaction.findUnique({ where: { reference } });
+  if (!transaction) throw echec("introuvable");
+  // Rien à envoyer : pas d'obligation, ou somme déjà rendue.
+  if (!transaction.refundDueAt || transaction.refundedAt) return { issue: "sans_objet" };
+
+  if (transaction.applicationId) {
+    const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction.id);
+    if (suite.suite === "REVUE_MANUELLE") {
+      // On ne tranche pas ce que vaut une analyse déjà rendue : c'est une
+      // question commerciale. L'écart porte la question à un humain, et
+      // aucune demande ne part.
+      await db.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          discrepancy:
+            transaction.discrepancy ??
+            `${MOTIF_REVUE_PARTIELLE} ${suite.consommees} analyse(s) consommée(s) sur ${suite.ouvertes}.`,
+        },
+      });
+      return { issue: "revue_manuelle", consommees: suite.consommees };
+    }
+    /**
+     * Le retrait n'a lieu qu'une fois, et la garde n'est pas du luxe.
+     *
+     * Vu en exécutant : deux tentatives d'envoi retiraient deux fois les
+     * mêmes droits, et le solde du dossier passait de trente à moins
+     * trente. La clé d'idempotence protège l'appel au fournisseur — elle
+     * ne protégeait pas le grand livre, qui est pourtant là où une
+     * seconde écriture fait le plus de dégâts. Or un échec d'envoi est le
+     * cas ordinaire tant que le rail n'est pas branché : la deuxième
+     * tentative n'est pas une hypothèse, c'est la suite normale.
+     */
+    const dejaRetire = await db.analysisCredit.findFirst({
+      where: { transactionId: transaction.id, reason: "REMBOURSEMENT" },
+      select: { id: true },
+    });
+    if (suite.retire > 0 && !dejaRetire) {
+      await db.analysisCredit.create({
+        data: {
+          applicationId: transaction.applicationId,
+          delta: -suite.retire,
+          reason: "REMBOURSEMENT",
+          transactionId: transaction.id,
+          note: `Droits retirés à l'initiation du remboursement de ${reference}.`,
+        },
+      });
+    }
+  }
+
+  const accuse = await envoyer({
+    reference: transaction.reference,
+    providerTxId: transaction.providerTxId,
+    montant: transaction.amount,
+    devise: transaction.currency,
+    cle: cleDIdempotence(transaction.reference),
+  });
+
+  await db.transaction.update({
+    where: { id: transaction.id },
+    data: {
+      refundAttemptedAt: maintenant,
+      refundAttempts: { increment: 1 },
+      // Posé une seule fois : une demande déjà acceptée le reste, et un
+      // second accusé ne doit pas réécrire la date du premier.
+      ...(accuse && !transaction.refundRequestedAt
+        ? { refundRequestedAt: accuse.accepteLe }
+        : {}),
+    },
+  });
+
+  return accuse ? { issue: "envoyee" } : { issue: "en_attente_d_envoi" };
+}
+
+/**
+ * Ce qu'il advient des droits du pack, lu dans le grand livre.
+ *
+ * Les octrois de **cette** transaction d'un côté, les analyses consommées
+ * sur le dossier de l'autre. On ne compte pas les consommations par
+ * transaction parce qu'elles n'en portent pas : une analyse se débite du
+ * solde du dossier, sans savoir quel pack l'a ouverte — et c'est bien
+ * ainsi, un solde n'a pas de couleur.
+ */
+async function suiteDuQuotaDuPack(applicationId: string, transactionId: string) {
+  const [octrois, consommations] = await Promise.all([
+    db.analysisCredit.aggregate({
+      where: { applicationId, transactionId, delta: { gt: 0 } },
+      _sum: { delta: true },
+    }),
+    db.analysisCredit.aggregate({
+      where: { applicationId, reason: "ANALYSE" },
+      _sum: { delta: true },
+    }),
+  ]);
+  const ouvertes = octrois._sum.delta ?? 0;
+  const consommees = Math.abs(consommations._sum.delta ?? 0);
+  return suiteDuQuota(ouvertes, consommees);
+}
+
+/**
  * Refermer un écart de réconciliation — arbitrage du 21/09/2026.
  *
  * **Ce qu'elle écrit, et rien d'autre.** Les quatre colonnes de la
@@ -340,10 +473,13 @@ export async function ouvrirUnRemboursement(
   transactionId: string,
   motif: string,
   maintenant = new Date(),
-): Promise<{ ouvert: boolean; raison?: string }> {
+): Promise<{ ouvert: true; reference: string } | { ouvert: false; raison: string }> {
   const transaction = await db.transaction.findUnique({
     where: { id: transactionId },
-    select: { status: true, refundDueAt: true, refundedAt: true },
+    // La référence sort avec : l'appelant enchaîne sur l'envoi de la
+    // demande, qui s'adresse par référence et non par identifiant — la
+    // relire serait une seconde requête pour une donnée déjà lue.
+    select: { reference: true, status: true, refundDueAt: true, refundedAt: true },
   });
   if (!transaction) return { ouvert: false, raison: "transaction inconnue" };
   if (transaction.refundedAt) return { ouvert: false, raison: "déjà remboursée" };
@@ -358,5 +494,5 @@ export async function ouvrirUnRemboursement(
     where: { id: transactionId },
     data: { refundDueAt: maintenant, refundBasis: motif },
   });
-  return { ouvert: true };
+  return { ouvert: true, reference: transaction.reference };
 }

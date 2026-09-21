@@ -286,6 +286,9 @@ function etatDuRapprochement(
   // K.C — avant tout le reste, parce qu'une somme à rendre prime sur un
   // rapprochement réussi : une transaction rapprochée dont on doit l'argent
   // se serait affichée « Rapproché », et personne n'aurait rendu la somme.
+  // Une demande partie et non confirmée reste une obligation, pas un
+  // remboursement fait : c'est le cas le plus facile à oublier, parce
+  // qu'il ressemble à un succès (arbitrage du 21/09/2026).
   if (t.refundDueAt && !t.refundedAt) return "REMBOURSEMENT_DU";
   if (t.status === "CONFIRMEE") return t.reconciledAt ? "RAPPROCHE" : "EN_ATTENTE";
   // Avant M.B, `REMBOURSEE` n'était nommé nulle part ici et tombait sur la
