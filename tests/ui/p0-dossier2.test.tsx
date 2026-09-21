@@ -5,6 +5,10 @@ import { aideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { Completude } from "@/app/(app)/(dossier)/dossiers/[id]/completude/Completude";
 import { Echeancier } from "@/app/(app)/(dossier)/dossiers/[id]/echeancier/Echeancier";
 import { ECHEANCES_NL } from "@/lib/contenu/dossiers";
+import {
+  evaluerLeCalendrier,
+  premiereDateCibleTenable,
+} from "@/domain/dossiers/faisabilite";
 import { PieceDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier";
 import { Cloture } from "@/app/(app)/(dossier)/dossiers/[id]/cloture/Cloture";
 import {
@@ -250,8 +254,20 @@ describe("C-08 — Résultat d'analyse", () => {
 });
 
 describe("C-10 — Échéancier", () => {
+  /*
+    Le verdict et la proposition sont calculés par le domaine, testé à part.
+    Ici l'écran est rendu sur un calendrier qui tient : ces tests-là portent
+    sur le calendrier lui-même, pas sur l'alerte.
+  */
+  const CALENDRIER = {
+    aujourdhui: AUJOURDHUI,
+    dateCible: DOSSIER.depotVise ?? null,
+    delaiInstructionJours: 60,
+    aObtenir: [],
+  };
+  const VERDICT = evaluerLeCalendrier(CALENDRIER);
   it("groupe les échéances par mois et dit ce que chaque date implique", async () => {
-    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} />);
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Échéancier");
     expect(screen.getByRole("heading", { name: "Octobre 2026" })).toBeDefined();
     expect(container.textContent).toContain(
@@ -260,23 +276,96 @@ describe("C-10 — Échéancier", () => {
   });
 
   it("marque la pièce périssable comme une date au plus tôt", async () => {
-    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} />);
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />);
     expect(container.textContent).toContain("Pièce périssable — date au plus tôt");
   });
 
   it("ne garantit pas les délais administratifs", async () => {
-    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} />);
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />);
     expect(container.textContent).toContain(
       "des moyennes observées, non garanties",
     );
   });
 
+  /**
+   * WF-09 étape 4. L'écran comptait les retards — « 3 échéances sont en
+   * retard » — et ne disait jamais que la date de départ n'était plus
+   * atteignable. Un décompte n'est pas un diagnostic.
+   */
+  it("annonce le calendrier mort, nomme la pièce et propose une date", () => {
+    const mort = {
+      aujourdhui: AUJOURDHUI,
+      // Dépôt à venir : c'est la pièce qui déborde, pas la date de dépôt.
+      dateCible: "2027-09-01",
+      delaiInstructionJours: 60,
+      aObtenir: [
+        {
+          code: "passeport",
+          libelle: "Passeport biométrique",
+          delaiJours: 400,
+          obligatoire: true,
+        },
+      ],
+    };
+    const { container } = render(
+      <Echeancier
+        dossier={DOSSIER}
+        echeances={ECHEANCES_NL}
+        aujourdhui={AUJOURDHUI}
+        verdict={evaluerLeCalendrier(mort)}
+        proposition={premiereDateCibleTenable(mort)}
+      />,
+    );
+    expect(container.textContent).toContain("ne peut plus arriver à temps");
+    expect(container.textContent).toContain("Passeport biométrique");
+    expect(container.textContent).toContain("première date de départ compatible");
+    // Le champ part de la date proposée : rien à recopier.
+    const champ = screen.getByLabelText("Nouvelle date de départ visée") as HTMLInputElement;
+    expect(champ.value).toBe(premiereDateCibleTenable(mort).date);
+    expect(screen.getByRole("button", { name: "Replanifier" })).toBeDefined();
+  });
+
+  /**
+   * La ligne affirmait « Rappels par email activés ». Rien n'envoie de
+   * rappel — la messagerie n'est pas branchée, aucun travail de fond ne lit
+   * l'échéancier — et le profil ne porte aucun réglage à modifier. Un
+   * candidat qui croit ses rappels actifs cesse de venir, et rate la date.
+   */
+  it("n'annonce pas des rappels que personne n'envoie", () => {
+    const { container } = render(
+      <Echeancier
+        dossier={DOSSIER}
+        echeances={ECHEANCES_NL}
+        aujourdhui={AUJOURDHUI}
+        verdict={VERDICT}
+        proposition={null}
+      />,
+    );
+    expect(container.textContent).not.toContain("Rappels par email activés");
+    expect(container.textContent).toContain("Aucun rappel n'est envoyé");
+  });
+
+  /** « Changer la date de dépôt » menait à un écran qui ne la change pas. */
+  it("remplace le lien inerte par le champ qui écrit vraiment", () => {
+    render(
+      <Echeancier
+        dossier={DOSSIER}
+        echeances={ECHEANCES_NL}
+        aujourdhui={AUJOURDHUI}
+        verdict={VERDICT}
+        proposition={null}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: "Changer la date de dépôt" })).toBeNull();
+    expect(screen.getByLabelText("Nouvelle date de départ visée")).toBeDefined();
+  });
+
   it("dit ce qu'il manque au brouillon plutôt que d'afficher un calendrier vide", () => {
     const brouillon = dossierParId("de-8820")!;
     const { container } = render(
-      <Echeancier dossier={brouillon} echeances={[]} aujourdhui={AUJOURDHUI} />,
+      <Echeancier dossier={brouillon} echeances={[]} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />,
     );
-    expect(container.textContent).toContain("L'échéancier attend ta date de dépôt");
+    expect(container.textContent).toContain("L'échéancier attend ta date de départ");
   });
 });
 

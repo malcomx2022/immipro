@@ -255,10 +255,20 @@ describe("C-10 — échéancier", () => {
   it("dit le rebours, et le dépassement quand la date est passée", () => {
     expect(libelleCompteARebours("2026-09-11", "2027-01-15")).toBe("126 jours restants");
     expect(libelleCompteARebours("2027-01-14", "2027-01-15")).toBe("1 jour restant");
-    expect(libelleCompteARebours("2027-01-15", "2027-01-15")).toBe("Dépôt visé aujourd'hui");
-    expect(libelleCompteARebours("2027-01-18", "2027-01-15")).toBe(
-      "Date de dépôt dépassée de 3 jours",
-    );
+    expect(libelleCompteARebours("2027-01-15", "2027-01-15")).toBe("C'est aujourd'hui");
+    expect(libelleCompteARebours("2027-01-18", "2027-01-15")).toBe("Dépassé de 3 jours");
+    /*
+      Le compte à rebours ne nomme pas ce qu'il compte : l'écran le nomme
+      devant lui, et « Dépôt le 2 août — date de dépôt dépassée de 50
+      jours » bégayait. Aucune de ces réponses ne redit « dépôt ».
+    */
+    for (const [a, b] of [
+      ["2026-09-11", "2027-01-15"],
+      ["2027-01-15", "2027-01-15"],
+      ["2027-01-18", "2027-01-15"],
+    ]) {
+      expect(libelleCompteARebours(a!, b!).toLowerCase()).not.toContain("dépôt");
+    }
   });
 
   it("classe une échéance par rapport à aujourd'hui", () => {

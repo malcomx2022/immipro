@@ -41,14 +41,21 @@ const jour = (iso: string): number => {
 export const joursEntre = (depuis: string, jusqua: string): number =>
   Math.round((jour(jusqua) - jour(depuis)) / MS_PAR_JOUR);
 
-/** « 126 jours restants » — le seul compte à rebours de l'écran. */
-export function libelleCompteARebours(aujourdhui: string, depotVise: string): string {
-  const jours = joursEntre(aujourdhui, depotVise);
+/**
+ * « 126 jours restants » — le seul compte à rebours de l'écran.
+ *
+ * Il ne nomme plus ce qu'il compte. Il le nommait — « Date de dépôt
+ * dépassée de 50 jours » — et la phrase composée bégayait dès qu'on le
+ * nommait aussi devant : « Dépôt le 2 août 2026 — date de dépôt dépassée
+ * de 50 jours ». Le compte à rebours dit le délai, l'appelant dit de quoi.
+ */
+export function libelleCompteARebours(aujourdhui: string, echeance: string): string {
+  const jours = joursEntre(aujourdhui, echeance);
   if (jours < 0) {
     const passes = -jours;
-    return `Date de dépôt dépassée de ${passes} ${passes > 1 ? "jours" : "jour"}`;
+    return `Dépassé de ${passes} ${passes > 1 ? "jours" : "jour"}`;
   }
-  if (jours === 0) return "Dépôt visé aujourd'hui";
+  if (jours === 0) return "C'est aujourd'hui";
   return `${jours} ${jours > 1 ? "jours restants" : "jour restant"}`;
 }
 

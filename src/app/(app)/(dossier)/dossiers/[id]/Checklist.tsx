@@ -59,7 +59,7 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
         </h1>
         <p className="text-14 text-ink-700">
           {dossier.depotVise
-            ? `Dépôt visé : ${jourEnFrancais(dossier.depotVise)}`
+            ? `Départ visé : ${jourEnFrancais(dossier.depotVise)}`
             : "Date de dépôt non fixée"}
         </p>
       </div>

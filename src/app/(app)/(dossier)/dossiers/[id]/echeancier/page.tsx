@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Echeancier } from "./Echeancier";
 import { echeancierDuDossier, vueDuDossier } from "@/server/lecture/dossiers";
+import {
+  evaluerLeCalendrier,
+  premiereDateCibleTenable,
+} from "@/domain/dossiers/faisabilite";
 import { exigerCandidat } from "@/server/securite/page";
 
 /**
@@ -39,13 +43,24 @@ export default async function PageEcheancier({
   const vue = await vueDuDossier(id, acteur.id).catch(() => null);
   if (!vue) notFound();
 
-  const { echeances } = await echeancierDuDossier(id, acteur.id);
+  const { echeances, calendrier } = await echeancierDuDossier(id, acteur.id);
+  const verdict = evaluerLeCalendrier(calendrier);
+
+  /*
+    La proposition n'accompagne que l'alerte. Sur un calendrier qui tient,
+    afficher une date de repli reviendrait à suggérer de retarder son
+    départ — un conseil, et nous n'en donnons pas (INV-1).
+  */
+  const proposition =
+    verdict.etat === "INTENABLE" ? premiereDateCibleTenable(calendrier) : null;
 
   return (
     <Echeancier
       dossier={vue.dossier}
       echeances={echeances}
-      aujourdhui={new Date().toISOString().slice(0, 10)}
+      aujourdhui={calendrier.aujourdhui}
+      verdict={verdict}
+      proposition={proposition}
     />
   );
 }

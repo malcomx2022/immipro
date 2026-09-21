@@ -92,7 +92,7 @@ export function ArchiveDuDossier({ archive }: { archive: Archive }) {
           </div>
           {dossier.depotVise ? (
             <div className="flex gap-1.5">
-              <dt className="text-ink-500">Dépôt visé</dt>
+              <dt className="text-ink-500">Départ visé</dt>
               <dd>{jourEnFrancais(dossier.depotVise)}</dd>
             </div>
           ) : null}
