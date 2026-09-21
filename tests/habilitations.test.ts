@@ -96,8 +96,12 @@ describe("aucune table de vérification ne manque au registre", () => {
   it("reconnaît une écriture imbriquée, pas seulement un appel direct", () => {
     expect(aUnEcrivain("Deadline", SOURCES)).toBe(true);
     expect(aUnEcrivain("Application", SOURCES)).toBe(true);
-    // Et ne trouve pas d'écrivain là où il n'y en a pas.
-    expect(aUnEcrivain("Accreditation", SOURCES)).toBe(false);
+    /*
+      Et ne trouve pas d'écrivain là où il n'y en a pas. L'exemple était
+      `Accreditation` : B-09 lui en a donné un, et l'exemple a suivi.
+      C'est le mouvement attendu de ce registre — il se vide.
+    */
+    expect(aUnEcrivain("PartnerActivation", SOURCES)).toBe(false);
   });
 
   /**
@@ -154,7 +158,7 @@ describe("aucune table de vérification ne manque au registre", () => {
   });
 
   it("se lit par table", () => {
-    expect(habilitationDe("Accreditation")?.regle).toBe("RG-12.1");
+    expect(habilitationDe("PartnerActivation")?.regle).toBe("RG-13.3 et l'arbitrage K.A");
     expect(habilitationDe("Transaction")).toBeUndefined();
   });
 

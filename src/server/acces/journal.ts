@@ -35,7 +35,16 @@ export type ActionAuditee =
   // l'intégralité de quelque chose — c'est elle qui dira, après coup,
   // qui a emporté quoi.
   | "journal.export"
-  | "paiements.export";
+  | "paiements.export"
+  // B-09 — l'habilitation d'un consultant et son retrait. RG-12.1 exige la
+  // vérification ; ce sont ces lignes qui disent qui l'a faite, quand, et
+  // sur quoi elle portait. Un retrait date l'accréditation sans l'effacer,
+  // et le journal garde la suite des gestes que la table, elle, écrase.
+  | "consultant.creation"
+  | "consultant.habiliter"
+  | "consultant.retirer"
+  | "consultant.suspendre"
+  | "consultant.retablir";
 
 export interface EcritureAudit {
   acteurId: string;

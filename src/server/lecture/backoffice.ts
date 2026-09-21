@@ -8,12 +8,13 @@ import {
 } from "@/domain/backoffice/acteur";
 import { echec } from "@/server/http/echecs";
 import { payload } from "@/server/acces/regles";
-import { editorialDe } from "@/lib/contenu/destinations";
+import { editorialDe, EDITORIAL } from "@/lib/contenu/destinations";
 import type { FicheSuivie, Collecte, StatutFiche } from "@/domain/backoffice/veille";
 import type { Compte, StatutCompte } from "@/domain/backoffice/comptes";
 import type { Paiement, EtatOperateur, EtatRapprochement } from "@/domain/backoffice/reconciliation";
 import type { EcritureAudit, CategorieAudit } from "@/domain/backoffice/audit";
 import type { PieceEnEchec } from "@/domain/backoffice/revue";
+import type { ConsultantAdministre } from "@/domain/backoffice/consultants";
 import { aReconcilier } from "@/server/paiement/cycle";
 import { getPack, type Devise } from "@/domain/payments/pricing";
 import {
@@ -377,6 +378,20 @@ const CATEGORIE: Record<string, CategorieAudit> = {
    */
   "paiements.export": "PAIEMENT",
   "journal.export": "COMPTE",
+  /**
+   * B-09 — l'habilitation d'un consultant.
+   *
+   * Classée avec les comptes : c'est d'une personne qu'il s'agit, de son
+   * droit d'apparaître et de sa suspension, exactement ce que la
+   * catégorie « Comptes » recouvre déjà pour les candidats. La ranger
+   * sous « Règles » l'aurait mêlée aux publications du référentiel, avec
+   * lesquelles elle n'a rien à voir.
+   */
+  "consultant.creation": "COMPTE",
+  "consultant.habiliter": "COMPTE",
+  "consultant.retirer": "COMPTE",
+  "consultant.suspendre": "COMPTE",
+  "consultant.retablir": "COMPTE",
 };
 
 /**
@@ -708,4 +723,95 @@ function versRegle(regle: {
     libelleCandidat: p.libelle,
     reserveCandidat: p.reserves[0] ?? "",
   };
+}
+
+/**
+ * Consultants et habilitations — B-09, WF-15.
+ *
+ * Toutes les habilitations sont rendues, retirées comprises : un retrait
+ * se date, il ne s'efface pas, et l'écran d'administration est justement
+ * celui où l'on relit ce qui a été fait. L'annuaire candidat, lui, ne sert
+ * que les habilitations en cours — c'est `annuaire()` qui filtre, pas
+ * cette lecture.
+ */
+export async function consultantsAdministres(): Promise<ConsultantAdministre[]> {
+  const consultants = await db.consultant.findMany({
+    include: { accreditations: { orderBy: { countryCode: "asc" } } },
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+  });
+
+  /*
+    « Vérifié par 3911f2ee-… » promet une personne et montre une clé
+    primaire — ce que l'arbitrage du 21/09/2026 a retiré du journal
+    d'audit. Même résolution ici, et le même troisième repli : un
+    identifiant qui ne résout pas se dit « non résolu » plutôt que de
+    passer pour un nom. Le jeu de démonstration en contient un.
+  */
+  const identifiants = [
+    ...new Set(consultants.flatMap((c) => c.accreditations.map((a) => a.verifiedBy))),
+  ];
+  const identites = new Map<string, IdentiteDUnCompte>(
+    (
+      await db.user.findMany({
+        where: { id: { in: identifiants } },
+        select: { id: true, email: true, firstName: true, lastName: true, deletedAt: true },
+      })
+    ).map((u) => [
+      u.id,
+      { prenom: u.firstName, nom: u.lastName, email: u.email, supprime: u.deletedAt !== null },
+    ]),
+  );
+
+  return consultants.map((c) => ({
+    id: c.id,
+    nom: c.name,
+    cabinet: c.firm,
+    ville: c.city,
+    qualification: c.qualification,
+    langues: Array.isArray(c.languages) ? (c.languages as string[]) : [],
+    delaiReponseHeures: c.responseHours,
+    actif: c.active,
+    habilitations: c.accreditations.map((a) => ({
+      code: a.countryCode,
+      pays: editorialDuPays(a.countryCode) ?? a.countryCode,
+      titre: a.title,
+      verifieeLe: iso(a.verifiedAt),
+      verifiePar: acteurLisible(a.verifiedBy, identites.get(a.verifiedBy) ?? null),
+      ...(a.revokedAt ? { retireeLe: iso(a.revokedAt) } : {}),
+    })),
+  }));
+}
+
+/**
+ * Les destinations sur lesquelles un dossier peut s'ouvrir aujourd'hui.
+ *
+ * C'est à celles-là que la couverture se mesure : habiliter quelqu'un sur
+ * un pays que la plateforme n'ouvre pas ne sert aucun candidat, et une
+ * destination ouverte sans consultant est le seul manque qui compte.
+ */
+export async function destinationsOuvertes(): Promise<{ code: string; pays: string }[]> {
+  const regles = await db.visaRule.findMany({
+    where: { status: "PUBLISHED" },
+    select: { countryCode: true },
+    distinct: ["countryCode"],
+    orderBy: { countryCode: "asc" },
+  });
+  return regles.map((r) => ({
+    code: r.countryCode,
+    pays: editorialDuPays(r.countryCode) ?? r.countryCode,
+  }));
+}
+
+/**
+ * Nom lisible d'un pays, depuis la part éditoriale du référentiel.
+ *
+ * Le code seul — « NL » — ne se lit pas sur un écran d'habilitation, où
+ * l'opérateur choisit une juridiction. La première fiche éditoriale du
+ * pays suffit : le nom ne dépend pas de la procédure.
+ */
+function editorialDuPays(countryCode: string): string | null {
+  for (const [cle, edito] of Object.entries(EDITORIAL)) {
+    if (cle.startsWith(`${countryCode}/`)) return edito.pays;
+  }
+  return null;
 }

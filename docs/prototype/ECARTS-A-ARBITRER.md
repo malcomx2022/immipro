@@ -4159,3 +4159,122 @@ comme un intitulé de champ »* — ; et deviner le genre sur le libellé est
 faux une fois sur trois. La décision appartient au référentiel, pas à
 l'écran.
 
+### S.16 — B-09 : l'écran qui manquait à l'annuaire
+
+`Accreditation` était au registre des habilitations sans écrivain depuis
+S.10. `annuaire()` filtre sur les habilitations non révoquées, rien dans le
+produit n'en créait, et l'annuaire des consultants était vide pour toutes
+les destinations — définitivement. Le registre disait aussi ce qui
+manquait : *« il manque un écran, et personne ne l'avait remarqué parce
+qu'un registre vide se lit comme un registre en ordre. »*
+
+WF-15 nomme pourtant le domaine — « Consultants : validation
+d'habilitation, suspension » — et RG-12.1 l'exige. Tout le reste de WF-12
+était écrit et attendait une ligne en base : filtrage par destination,
+créneaux, consentement de partage, rendez-vous, annulation.
+
+#### Ce que l'écran décide, et ce qu'il ne décide pas
+
+S.10 notait que RG-12.1 ne dit pas **ce qui constitue** une preuve de titre
+d'exercice, et en avait fait un blocage. C'est exact et ce n'est pas un
+blocage : un RCIC se vérifie au registre canadien, un avocat à son barreau,
+et la pièce probante diffère d'une juridiction à l'autre. L'écran fait ce
+que le produit sait faire — la même chose que WF-14 fait d'une fiche : il
+**enregistre la vérification**. Quel titre, quelle juridiction, quand, par
+qui. Le jugement reste humain ; la trace est le travail du produit.
+
+D'où le rappel au-dessus du formulaire, qui nomme la responsabilité sans
+prétendre définir la preuve, et d'où `verifiedBy` pris **dans la session** :
+un nom saisi dans un champ peut être celui de n'importe qui, et c'est
+justement cette ligne qu'on relira si une habilitation est contestée.
+
+#### La couverture, et non le décompte
+
+L'écran met en tête ce qui appelle une action : *« 1 destination ouverte
+n'a aucun consultant habilité : CA. »* Trois consultants tous habilités au
+Canada laissent les dossiers néerlandais sans personne, et un décompte de
+consultants ne dit rien de cela. Un consultant suspendu ne couvre rien, et
+une habilitation retirée non plus.
+
+Trois états, parce que « actif / inactif » en laissait un sans nom : une
+fiche complète dont toutes les habilitations ont été retirées est active,
+renseignée, et invisible.
+
+    VISIBLE             au moins une habilitation en cours
+    SANS_HABILITATION   actif, mais rien en cours — RG-12.1 ne le référence pas
+    SUSPENDU            invisible quelles que soient ses habilitations
+
+#### Trois gardes du dépôt ont mordu, et elles avaient raison
+
+- **`ActionAuditee`.** Mes appels composaient le nom de l'action —
+  `` `consultant.${geste}` `` —, et le test qui vérifie que toute action
+  déclarée a un appelant est resté rouge : une action composée n'en a
+  jamais. C'est exactement ainsi que les déclarations mortes s'accumulent.
+  Les quatre noms sont maintenant écrits en toutes lettres.
+- **Le registre des habilitations.** Il tient les deux sens, et le second a
+  servi : « une table nommée doit rester sans écrivain ». La première
+  écriture l'a fait échouer et forcé le retrait de l'entrée, avec
+  `Consultant` qui sortait au passage de la liste des tables remplies par
+  la seule démonstration. Un registre qu'on oublie de vider est un registre
+  qui ment.
+- **`next build`**, et lui seul. `/consultants` appartient déjà à
+  l'annuaire candidat : le groupe de routes `(admin)` partage l'espace
+  d'adresses de l'application, et Next refuse deux pages parallèles sur la
+  même adresse. Lint, typecheck et 1 570 tests étaient verts. L'écran est
+  sur `/habilitations` — le chemin, l'intitulé et le titre disent la même
+  chose — et un test compare désormais les adresses des deux groupes.
+
+#### Deux défauts trouvés en lisant l'exécution
+
+**« Vérifié par 3911f2ee-… »**. L'arbitrage du 21/09/2026 avait déjà retiré
+cela du journal d'audit : *« un identifiant n'est pas un nom, et une
+colonne qui s'appelle Acteur promet une personne »*. La colonne « vérifié
+par » promet exactement la même chose. La lecture résout maintenant par le
+même chemin, avec le même troisième repli — le jeu de démonstration porte
+`gislain`, qui n'est pas un identifiant de compte, et l'écran affiche
+« Acteur non résolu » plutôt que de le présenter comme quelqu'un.
+
+**Un retrait refusé s'inscrivait au journal.** Retirer une habilitation
+déjà retirée — l'écran était périmé — renvoyait 409 **et** laissait une
+ligne `consultant.retirer`. Deux retraits s'y lisaient là où un seul avait
+eu lieu, dans le registre qu'on relit précisément quand une habilitation
+est contestée. Les refus se prononcent maintenant avant l'écriture au
+journal, sans renoncer à l'ordre « journal d'abord » pour l'acte qui va
+avoir lieu.
+
+#### Vérifié en mutant, puis en exécutant
+
+Douze mutations, douze rouges — dont celle qui a demandé un cas exprès :
+« la couverture compte les habilitations retirées » restait verte tant
+qu'aucun consultant n'était **visible par ailleurs** tout en ayant une
+habilitation retirée sur une autre destination.
+
+Puis l'exécution, par le vrai point d'entrée HTTP, session d'administrateur
+en base :
+
+    POST création              200 · {"visible": false}
+                               créé sans habilitation, donc hors annuaire
+    PUT titre « R »            422 · champ `titre`
+    PUT habiliter CH           200 · countryCode normalisé depuis « ch »
+    annuaire("CH")             Maître A. Diallo        ← était vide
+    annuaire("NL")             Marieke Visser
+    annuaire("CA")             aucun consultant habilité
+    PUT retirer CH             200
+    annuaire("CH")             aucun consultant habilité
+    PUT retirer CH (bis)       409 · aucune ligne au journal
+    journal                    creation, habiliter, retirer — trois gestes,
+                               trois lignes, chacune avec son motif
+
+La base a ensuite été remise à l'identique : un consultant, une
+accréditation, celles de la démonstration.
+
+#### Ce que l'exécution a montré et que je n'ai pas corrigé
+
+La liste des juridictions affiche **« CA »** entre « Suisse » et
+« Pays-Bas ». Deux règles publiées — `CA/ETUDES` et `NL/ETUDES` — n'ont
+pas d'entrée éditoriale ; la seconde retombe sur « Pays-Bas » parce qu'une
+autre procédure néerlandaise en a une, la première n'a rien. Le repli
+affiche donc le code, ce qui est exact, et l'écran d'administration est le
+lieu où un code se lit — mais une règle publiée sans nom de pays est un
+manque de contenu, pas une décision d'écran. Il relève de la veille.
+
