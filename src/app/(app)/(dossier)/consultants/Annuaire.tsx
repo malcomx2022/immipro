@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { Card } from "@/components/ui/Card";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { ConsultantHabilite, FiltreDelai } from "@/domain/consultants/annuaire";
 import {
   MENTION_HABILITATION,
+  HABILITATION_NON_PRONONCEE,
   SANS_CONSULTANT,
   annuaireVide,
   filtrerAnnuaire,
@@ -87,12 +87,19 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
           <p className="max-w-[70ch] text-pretty text-16 text-ink-700">
             {vide.explication}
           </p>
-          <div className="flex flex-col gap-2 md:flex-row">
-            <Button variante="secondaire">Me prévenir dès qu&apos;il y en a un</Button>
-            <LienBouton href={`/dossiers/${dossier.id}`} variante="tertiaire">
-              Continuer sans consultant
-            </LienBouton>
-          </div>
+          {/*
+            « Me prévenir dès qu'il y en a un » est parti, et pas pour
+            faute de route : rien dans le produit ne peut rendre un
+            consultant habilité — `Accreditation` n'a aucun écrivain, et
+            l'annuaire filtre précisément sur elle. L'avis n'avait pas
+            d'événement à attendre. Le registre des habilitations le dit.
+          */}
+          <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+            {HABILITATION_NON_PRONONCEE}
+          </p>
+          <LienBouton href={`/dossiers/${dossier.id}`} variante="secondaire">
+            Continuer sans consultant
+          </LienBouton>
           <p className="text-pretty text-14 text-ink-700">{SANS_CONSULTANT}</p>
         </section>
       ) : (

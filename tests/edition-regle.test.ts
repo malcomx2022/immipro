@@ -250,30 +250,33 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
    * liste : c'est lui qui refuse le prochain bouton qui ne part nulle part,
    * et il n'a plus rien à tolérer.
    */
-  const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
-    /**
-     * Les deux commandes que l'élargissement du balayage a trouvées, dans
-     * la partie du produit que ce garde-fou n'avait jamais regardée.
-     *
-     * Elles ne sont pas du ressort de WF-08 et ne sont pas traitées ici :
-     * les nommer est ce qui les empêche de disparaître avec le vert du
-     * test. Chacune dit ce qui lui manque, comme les registres de B-03,
-     * B-04 et B-07.
-     */
-    /**
-     * Une seule, et elle demande une décision qu'aucune ligne de code ne
-     * prend : prévenir suppose une messagerie, qui est bloquante avant
-     * ouverture, et un endroit où consigner l'intérêt du candidat. Rien de
-     * tel n'existe, et promettre « je te préviens » sans pouvoir envoyer
-     * serait exactement la promesse que cette revue a passé sept lots à
-     * retirer.
-     */
-    "src/app/(app)/(dossier)/consultants/Annuaire.tsx":
-      "« Me prévenir dès qu'il y en a un » — la messagerie n'est pas branchée (bloquante avant ouverture), et rien ne consigne l'intérêt du candidat",
-  };
+  /**
+   * Le registre est vide, et cette fois sans réserve.
+   *
+   * Les sept écrans du back-office en portaient onze ; l'élargissement du
+   * balayage à `src/app` en a trouvé deux de plus dans l'espace candidat.
+   * La dernière — « Me prévenir dès qu'il y en a un » — est partie en S.10
+   * pour une raison qui n'était pas celle que j'avais notée : rien dans le
+   * produit ne peut rendre un consultant habilité, donc l'avis n'avait pas
+   * d'événement à attendre. Le registre des habilitations le porte
+   * désormais, avec son propre garde-fou.
+   *
+   * Le registre reste, vide. Le supprimer retirerait le garde-fou avec la
+   * liste : c'est lui qui refusera le prochain bouton qui ne mène à rien.
+   */
+  const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {};
 
   /**
-   * Ma note sur B-06 était fausse, et il faut le dire.
+   * Deux de mes notes à ce registre étaient fausses, et il faut le dire.
+   *
+   * La seconde portait sur l'annuaire des consultants : j'avais écrit que
+   * « Me prévenir dès qu'il y en a un » attendait la messagerie. C'était
+   * vrai et hors sujet — `Accreditation` n'a aucun écrivain, et l'annuaire
+   * filtre sur elle : même messagerie branchée, l'avis n'aurait jamais eu
+   * d'occasion de partir. Deux fois sur deux, j'ai noté un manque en
+   * lisant l'absence d'un `onClick`, sans suivre la chaîne jusqu'au bout.
+   *
+   * La première portait sur B-06.
    *
    * J'avais écrit que « Téléverser sans analyse » manquait d'une route et
    * « d'une décision sur ce que devient la complétude ». Les deux étaient
@@ -319,7 +322,16 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
   const inertes = (source: string): string[] => {
     const code = sansCommentaires(source);
     const trouvees: string[] = [];
-    for (const m of code.matchAll(/<Button\b/gu)) {
+    /**
+     * `<Button` **et** `<button` : le composant et la balise nue.
+     *
+     * Le balayage ne connaissait que le composant. Or un `<button>` sans
+     * `onClick` est tout aussi mort, et les écrans en emploient — les
+     * pastilles de filtre, les onglets. Celles-là en ont un ; une qui n'en
+     * aurait pas passait sous le radar. Septième fois de cette revue qu'un
+     * critère ne connaît qu'une des formes qu'il devrait couvrir.
+     */
+    for (const m of code.matchAll(/<[Bb]utton\b/gu)) {
       const { attrs, fin } = attributs(code, m.index + m[0].length);
       if (/onClick|type="submit"|onSubmit/u.test(attrs)) continue;
       /**

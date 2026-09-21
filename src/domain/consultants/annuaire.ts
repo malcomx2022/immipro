@@ -109,6 +109,26 @@ export const SANS_CONSULTANT =
   "Ton dossier avance sans rendez-vous. Les pièces, l'analyse et l'échéancier ne dépendent pas d'un consultant.";
 
 /**
+ * L'état vide n'offre plus d'être prévenu — S.10.
+ *
+ * « Me prévenir dès qu'il y en a un » n'était relié à rien, et je l'avais
+ * inscrit au registre des commandes inertes en notant qu'il attendait la
+ * messagerie. C'était vrai et hors sujet : **rien dans le produit ne peut
+ * rendre un consultant habilité.** `Accreditation` n'a aucun écrivain, et
+ * la lecture de l'annuaire filtre précisément sur elle. Même messagerie
+ * branchée, l'avis n'aurait jamais eu d'occasion de partir.
+ *
+ * Le blocage n'était pas le canal, c'était le fait. Un bouton qui promet un
+ * avis dont l'événement déclencheur n'existe pas vaut moins qu'une absence
+ * (règle de Q.A), et le registre des habilitations dit maintenant pourquoi.
+ *
+ * Ce qui reste est vrai et fait quelque chose : le dossier avance, et les
+ * destinations couvertes sont nommées quand il y en a.
+ */
+export const HABILITATION_NON_PRONONCEE =
+  "L'habilitation d'un consultant est prononcée destination par destination, après vérification de son titre d'exercice local. Aucune n'est enregistrée pour le moment, et nous ne t'annonçons pas un rendez-vous que nous ne pouvons pas proposer.";
+
+/**
  * La mention qui tient tout l'écran : ce que l'habilitation atteste, et ce
  * qu'elle n'atteste pas.
  */
