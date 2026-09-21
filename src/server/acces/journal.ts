@@ -29,7 +29,13 @@ export type ActionAuditee =
   | "paiement.reconciliation"
   | "regle.publication"
   | "contenu.publication"
-  | "revue.decision";
+  | "revue.decision"
+  // Les deux exports du back-office. Emporter un journal entier ou un
+  // grand livre laisse une trace comme n'importe quel autre accès à
+  // l'intégralité de quelque chose — c'est elle qui dira, après coup,
+  // qui a emporté quoi.
+  | "journal.export"
+  | "paiements.export";
 
 export interface EcritureAudit {
   acteurId: string;

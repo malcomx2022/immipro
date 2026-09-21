@@ -16,6 +16,9 @@
 
 import type { CauseRefus } from "@/domain/paiement/echec";
 import type { IssueEcart } from "./ecart";
+import { LIBELLE_ISSUE } from "./ecart";
+import { LIBELLE_CAUSE } from "@/domain/paiement/echec";
+import { nomDatable, nombre, texte, vide, type Cellule } from "@/domain/format/csv";
 
 export type EtatRapprochement =
   | "RAPPROCHE"
@@ -209,3 +212,140 @@ export function libelleEcarts(agregats: Agregats): string {
     ? `Traiter les ${agregats.ecarts} écarts`
     : "Traiter l'écart";
 }
+
+// ── Le grand livre — l'export qui n'existait pas ───────────────────────
+
+/**
+ * L'export du grand livre, et la règle que ce module énonçait déjà.
+ *
+ * `MENTION_TOTAL_SUSPENDU` le dit depuis le début : « un chiffre partiel
+ * présenté comme un total est une erreur comptable, et elle se propage
+ * **dans l'export puis dans le rapport** ». La phrase nommait l'export
+ * comme le lieu où la faute devient durable — et l'export n'existait pas,
+ * si bien que la règle n'était tenue qu'à l'écran, là où elle coûte le
+ * moins cher.
+ *
+ * Un fichier survit à l'incident qui l'a produit. Un total faux affiché
+ * disparaît au rechargement suivant ; le même total dans un fichier part
+ * au comptable et revient dans un rapport six semaines plus tard, sans
+ * l'encadré rouge qui disait pourquoi il était faux.
+ *
+ * Le fichier porte donc toujours ses lignes — elles sont exactes, chaque
+ * paiement est ce qu'il est — et, à la place des totaux, la raison de leur
+ * absence.
+ */
+export const COLONNES_GRAND_LIVRE: readonly string[] = [
+  "Référence",
+  "Reçu le (UTC)",
+  "Compte",
+  "Montant",
+  "Devise",
+  "Moyen",
+  "État",
+  "Référence opérateur",
+  "Cause du refus",
+  "Constat d'écart",
+  "Issue de l'écart",
+];
+
+export const ATTESTATION_TOTAL_SUSPENDU =
+  "Total non calculé : l'opérateur ne répondait pas au moment de l'export, et un total partiel présenté comme un total est une erreur comptable. Les lignes ci-dessous sont exactes ; leur somme ne l'est pas encore.";
+
+export const MENTION_UNE_SOMME_PAR_MONNAIE =
+  "Une somme par monnaie, jamais une somme tout court : additionner des francs et des euros produit un nombre qui n'est ce qu'il annonce dans aucune des deux.";
+
+/** Le grand livre en cellules — en-tête, colonnes, lignes, totaux. */
+export interface GrandLivre {
+  /** Lignes du livre, toutes exactes quel que soit l'état de l'opérateur. */
+  paiements: readonly Paiement[];
+  /** `null` quand aucun rapprochement n'a encore abouti. */
+  operateur: EtatOperateur | null;
+  journee: string;
+}
+
+/**
+ * Les totaux du fichier, ou la raison de leur absence.
+ *
+ * Renvoyer `null` plutôt qu'un tableau vide : un tableau vide se
+ * rendrait en « 0 », et zéro encaissé n'est pas la même information
+ * qu'un total qu'on ne sait pas calculer.
+ */
+export function totauxDeLExport(livre: GrandLivre): { devise: string; montant: number }[] | null {
+  if (livre.operateur === null || !totalPubliable(livre.operateur)) return null;
+  return lignesDeTotal(agreger(livre.paiements).encaisse);
+}
+
+/** Une ligne du livre. Les montants passent par `nombre`, jamais par `texte`. */
+export const ligneDuGrandLivre = (p: Paiement): readonly Cellule[] => [
+  texte(p.reference),
+  texte(p.recuLe),
+  texte(p.compte),
+  // Un montant négatif commence par « - » : neutralisé comme du texte, il
+  // cesserait d'être un nombre pour le tableur, et aucune somme ne le
+  // reprendrait. C'est pourquoi la cellule est typée.
+  nombre(p.montant, p.devise === "EUR" ? 2 : 0),
+  texte(p.devise),
+  texte(p.moyen),
+  texte(LIBELLE_RAPPROCHEMENT[p.etat]),
+  texte(p.transaction ?? ""),
+  texte(p.cause ? LIBELLE_CAUSE[p.cause] : ""),
+  texte(p.ecart?.constat ?? ""),
+  texte(p.ecart?.resolution ? LIBELLE_ISSUE[p.ecart.resolution.issue] : ""),
+];
+
+export function exportDuGrandLivre(
+  livre: GrandLivre,
+): readonly (readonly Cellule[])[] {
+  const totaux = totauxDeLExport(livre);
+
+  return [
+    [texte("Grand livre ImmiPro")],
+    [texte("Journée"), texte(livre.journee)],
+    [texte("Paiements"), nombre(livre.paiements.length)],
+    ...(totaux === null
+      ? [[texte("Total encaissé"), texte(ATTESTATION_TOTAL_SUSPENDU)]]
+      : totaux.map((t) => [
+          texte(`Total encaissé (${t.devise})`),
+          nombre(t.montant, t.devise === "EUR" ? 2 : 0),
+        ])),
+    [texte("Monnaies"), texte(MENTION_UNE_SOMME_PAR_MONNAIE)],
+    [vide],
+    COLONNES_GRAND_LIVRE.map(texte),
+    ...livre.paiements.map(ligneDuGrandLivre),
+  ];
+}
+
+export const nomDuGrandLivre = (jour: string): string =>
+  nomDatable("grand-livre", jour, jour);
+
+/**
+ * Ce que B-04 devrait porter et ne porte pas encore.
+ *
+ * Même registre qu'`ACTIONS_ATTENDUES` en B-03 et `COMMANDES_ATTENDUES`
+ * en B-07 : le bouton part, le besoin reste nommé.
+ */
+export interface CommandeAttendue {
+  cle: string;
+  libelle: string;
+  manque: string;
+}
+
+export const COMMANDES_ATTENDUES_B04: readonly CommandeAttendue[] = [
+  {
+    cle: "rapprochement-manuel",
+    libelle: "Lancer le rapprochement",
+    /**
+     * Le bouton changeait de libellé selon l'état de l'opérateur —
+     * « Lancer » quand il répondait, « Rapprocher à la main » quand il se
+     * taisait — et ne faisait rien dans les deux cas. Le second libellé
+     * était le plus trompeur : il proposait la seule chose qui aurait
+     * servi pendant un incident.
+     *
+     * Rapprocher demande d'interroger l'opérateur, et `interrogation`
+     * n'est pas branchée. Une relance manuelle n'a de sens que le jour où
+     * il y a quelqu'un à relancer.
+     */
+    manque:
+      "l'interrogation de l'opérateur, qui n'est pas branchée : sans elle il n'y a personne à interroger",
+  },
+];

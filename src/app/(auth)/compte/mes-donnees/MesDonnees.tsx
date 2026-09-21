@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
-import { HORS_LIGNE } from "@/lib/api";
+import { telechargerFichier } from "@/lib/telechargement";
 import type { EchecCandidat } from "@/server/http/echecs";
 import {
   CE_QUE_CONTIENT,
@@ -22,9 +22,21 @@ import {
  *
  * Le téléchargement ne passe pas par `appeler()` : celui-ci lit du JSON
  * pour un écran, or ici le succès est un fichier et l'échec seul est du
- * JSON. Les deux cas sont donc traités à la main, mais l'échec reste le
- * contrat du serveur — ce sont les mêmes titres, les mêmes actions.
+ * JSON. La distinction vit maintenant dans `telechargerFichier`, partagée
+ * avec les deux exports du back-office — elle était traitée à la main ici,
+ * et une troisième copie l'attendait. L'échec reste le contrat du serveur :
+ * mêmes titres, mêmes actions.
+ *
+ * Le repli reste celui de cet écran-ci : il tutoie et parle de « ton
+ * compte », là où le back-office vouvoie son opérateur.
  */
+const REFUS_SANS_DETAIL: EchecCandidat = {
+  titre: "L'export n'a pas pu être préparé",
+  corps: "Le serveur a répondu quelque chose d'inattendu.",
+  conserve: "Rien n'a changé sur ton compte.",
+  action: "Réessayer",
+  ton: "echec",
+};
 export interface MesDonneesProps {
   dossiers: readonly { id: string; pays: string; intitule: string }[];
 }
@@ -37,35 +49,17 @@ export function MesDonnees({ dossiers }: MesDonneesProps) {
   async function telecharger() {
     setEnvoi(true);
     setEchec(null);
-    try {
-      const reponse = await fetch("/api/comptes/donnees", { cache: "no-store" });
-      if (!reponse.ok) {
-        const charge: unknown = await reponse.json().catch(() => null);
-        setEchec(
-          (charge as { echec?: EchecCandidat } | null)?.echec ?? {
-            titre: "L'export n'a pas pu être préparé",
-            corps: "Le serveur a répondu quelque chose d'inattendu.",
-            conserve: "Rien n'a changé sur ton compte.",
-            action: "Réessayer",
-            ton: "echec",
-          },
-        );
-        return;
-      }
-
-      const contenu = await reponse.blob();
-      const adresse = URL.createObjectURL(contenu);
-      const lien = document.createElement("a");
-      lien.href = adresse;
-      lien.download = nomDuFichier(new Date().toISOString().slice(0, 10));
-      lien.click();
-      URL.revokeObjectURL(adresse);
-      setFait(true);
-    } catch {
-      setEchec(HORS_LIGNE);
-    } finally {
-      setEnvoi(false);
+    const resultat = await telechargerFichier(
+      "/api/comptes/donnees",
+      nomDuFichier(new Date().toISOString().slice(0, 10)),
+      REFUS_SANS_DETAIL,
+    );
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
     }
+    setFait(true);
   }
 
   return (

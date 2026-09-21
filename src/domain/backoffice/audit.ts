@@ -10,6 +10,7 @@
  */
 
 import type { ActeurLisible } from "./acteur";
+import { nomDatable, nombre, texte, vide, type Cellule } from "@/domain/format/csv";
 
 export type CategorieAudit = "PAIEMENT" | "REGLE" | "ACCES_PIECE" | "COMPTE";
 
@@ -124,3 +125,103 @@ export function diagnostiquerPeriode(
 
 export const MENTION_EXPORT_VIDE =
   "L'export d'une période vide reste possible : il produit un fichier attestant l'absence d'écriture.";
+
+// ── L'export de la période — ce que la mention promettait ──────────────
+
+/**
+ * L'export existe enfin.
+ *
+ * `MENTION_EXPORT_VIDE` promettait depuis le début qu'« exporter une
+ * période vide produit un fichier attestant l'absence d'écriture ». Le
+ * bouton n'était relié à rien : la promesse la plus précise de l'écran
+ * était celle qu'aucune ligne de code ne tenait.
+ *
+ * Une attestation d'absence n'est pas un fichier vide. Un fichier vide se
+ * confond avec un export qui a échoué, et c'est l'inverse de ce qu'un
+ * contrôle demande : il demande une pièce qui dit « sur cette période, ce
+ * périmètre, rien ». D'où l'en-tête, qui parle même quand le corps se tait.
+ */
+export const nomDeLExport = (periode: Periode): string =>
+  nomDatable("journal-audit", periode.du, periode.au);
+
+export const COLONNES_AUDIT: readonly string[] = [
+  "Horodatage (UTC)",
+  "Catégorie",
+  "Action",
+  "Acteur",
+  "Identifiant de l'acteur",
+  "Objet",
+  "Motif",
+  "Origine",
+];
+
+/**
+ * L'en-tête du fichier, avant les colonnes.
+ *
+ * Il dit le périmètre exact : sans lui, un fichier de trois lignes ne
+ * distingue pas « trois écritures sur la période » de « trois écritures
+ * parce qu'un filtre en cachait quarante ». C'est la même exigence que le
+ * diagnostic de période vide tient à l'écran.
+ */
+export function enteteDeLExport(
+  periode: Periode,
+  categories: readonly CategorieAudit[],
+  retenues: number,
+): readonly (readonly Cellule[])[] {
+  const perimetre =
+    categories.length === 0
+      ? "toutes catégories"
+      : categories.map((c) => LIBELLE_CATEGORIE[c]).join(", ");
+
+  return [
+    [texte("Journal d'audit ImmiPro")],
+    [texte("Période"), texte(`du ${periode.du} au ${periode.au}`)],
+    [texte("Catégories"), texte(perimetre)],
+    [texte("Écritures"), nombre(retenues)],
+    [
+      texte("Conservation"),
+      texte(`${CONSERVATION_ANNEES} ans, écritures non modifiables`),
+    ],
+    // L'attestation n'apparaît que lorsqu'il y a une absence à attester.
+    // Une ligne vide tenant sa place ajoutait une rangée vide au tableur —
+    // et l'en-tête n'avait pas la même hauteur selon qu'il attestait ou
+    // non, ce qui ne se voit qu'en ouvrant les deux fichiers côte à côte.
+    ...(retenues === 0 ? [[texte("Attestation"), texte(ATTESTATION_ABSENCE)]] : []),
+    [vide],
+  ];
+}
+
+export const ATTESTATION_ABSENCE =
+  "Aucune écriture sur cette période et ce périmètre. Le journal ne comble jamais une période vide : s'il n'affiche rien, il ne s'est rien passé.";
+
+/**
+ * Une écriture, en cellules.
+ *
+ * L'acteur y tient deux colonnes, comme à l'écran depuis l'arbitrage du
+ * 21/09/2026 : le libellé lisible pour qui relit, l'identifiant durable
+ * pour qui recoupe. Les fondre en une seule perdait l'identifiant, et
+ * c'est lui qui sert dans un contrôle.
+ */
+export const ligneDExport = (e: EcritureAudit): readonly Cellule[] => [
+  texte(e.horodatage),
+  texte(LIBELLE_CATEGORIE[e.categorie]),
+  texte(e.action),
+  texte(e.acteur.libelle),
+  texte(e.acteur.identifiant),
+  texte(e.objet),
+  texte(e.detail),
+  texte(e.origine),
+];
+
+export function exportDuJournal(
+  ecritures: readonly EcritureAudit[],
+  periode: Periode,
+  categories: readonly CategorieAudit[],
+): readonly (readonly Cellule[])[] {
+  const retenues = filtrerAudit(ecritures, periode, categories);
+  return [
+    ...enteteDeLExport(periode, categories, retenues.length),
+    COLONNES_AUDIT.map(texte),
+    ...retenues.map(ligneDExport),
+  ];
+}

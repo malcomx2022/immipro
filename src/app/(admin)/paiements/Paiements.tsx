@@ -8,6 +8,7 @@ import {
   MENTION_ECARTS,
   MENTION_TOTAL_SUSPENDU,
   agreger,
+  nomDuGrandLivre,
   lignesDeTotal,
   libelleEcarts,
   messageIncidentOperateur,
@@ -24,6 +25,7 @@ import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { appeler } from "@/lib/api";
+import { telechargerFichier } from "@/lib/telechargement";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { jourEnFrancais } from "@/domain/format/moment";
 import {
@@ -42,6 +44,27 @@ import {
  * échec et aucun pack n'est fermé. Et pendant l'incident, le total encaissé
  * disparaît — un chiffre partiel présenté comme un total est une erreur
  * comptable, et elle se propage dans l'export puis dans le rapport.
+ *
+ * ── L'export nommé par cette règle n'existait pas ───────────────────────
+ *
+ * « Exporter le grand livre » n'était relié à rien. La règle ci-dessus
+ * désignait pourtant l'export comme le lieu où l'erreur devient durable :
+ * un total faux à l'écran disparaît au rechargement, le même dans un
+ * fichier part au comptable et revient dans un rapport six semaines plus
+ * tard, sans l'encadré qui disait pourquoi il était faux. La règle n'était
+ * donc tenue qu'à l'endroit où elle coûte le moins cher.
+ *
+ * Le fichier porte maintenant ses lignes en toutes circonstances — chaque
+ * paiement est exactement ce qu'il est — et, pendant un incident, la raison
+ * de l'absence des totaux à la place des totaux.
+ *
+ * ── Le rapprochement manuel, lui, est parti ─────────────────────────────
+ *
+ * Le second bouton proposait « Lancer le rapprochement » ou « Rapprocher à
+ * la main » selon l'état de l'opérateur, et rien derrière : aucune route,
+ * et `interrogation` n'est pas branchée. C'est la règle de Q.A — ce qui
+ * manque est nommé dans `COMMANDES_ATTENDUES_B04`, et l'écran continue de
+ * dire ce qu'il dit déjà : le rapprochement automatique reprendra seul.
  */
 const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
@@ -145,6 +168,7 @@ export function Paiements({
   paiements,
   operateur,
   journee,
+  jourIso,
 }: {
   paiements: readonly Paiement[];
   /**
@@ -156,6 +180,8 @@ export function Paiements({
   operateur: EtatOperateur | null;
   /** Libellé de la journée traitée. */
   journee: string;
+  /** La même journée en ISO court : elle borne l'export et nomme le fichier. */
+  jourIso: string;
 }) {
   const agregats = agreger(paiements);
   // La file se déplie sur demande : B-04 est d'abord un tableau de bord,
@@ -172,6 +198,24 @@ export function Paiements({
       .join(" · ");
   const incident = operateur ? messageIncidentOperateur(operateur, heure) : null;
   const publiable = operateur ? totalPubliable(operateur) : false;
+  const [envoiExport, setEnvoiExport] = useState(false);
+  const [echecExport, setEchecExport] = useState<EchecCandidat | null>(null);
+
+  /**
+   * L'export part même pendant un incident : ce sont ses totaux que le
+   * serveur retient, pas ses lignes. Retenir le fichier entier ferait
+   * croire que la journée n'existe pas.
+   */
+  async function exporter() {
+    setEnvoiExport(true);
+    setEchecExport(null);
+    const resultat = await telechargerFichier(
+      `/api/admin/paiements/export?jour=${jourIso}`,
+      nomDuGrandLivre(jourIso),
+    );
+    setEnvoiExport(false);
+    if (!resultat.ok) setEchecExport(resultat.echec);
+  }
 
   return (
     <div className="flex flex-col">
@@ -185,16 +229,20 @@ export function Paiements({
               : `${journee} · dernier rapprochement automatique ${heure(operateur.dernierRapprochement)}`
         }
         actions={
-          <>
-            <Button variante="secondaire">Exporter le grand livre</Button>
-            <Button disabled={!publiable} raisonDesactivation="L'opérateur ne répond pas : le rapprochement automatique reprendra seul.">
-              {publiable ? "Lancer le rapprochement" : "Rapprocher à la main"}
-            </Button>
-          </>
+          <Button
+            variante="secondaire"
+            disabled={envoiExport}
+            raisonDesactivation="Préparation du fichier en cours."
+            onClick={exporter}
+          >
+            {envoiExport ? "Préparation…" : "Exporter le grand livre"}
+          </Button>
         }
       />
 
       <div className="flex flex-col gap-4 p-6">
+        {echecExport ? <BlocEchec echec={echecExport} annonce /> : null}
+
         {incident ? (
           <section className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
             <h2 className="text-16 font-semibold text-ink-900">

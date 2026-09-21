@@ -22,6 +22,11 @@ export default async function PagePaiements() {
       paiements={lignes}
       operateur={operateur}
       journee={`Journée du ${jourEnFrancais(aujourdhui)}`}
+      // Le jour en ISO à côté du libellé : c'est lui qui nomme le fichier
+      // et borne l'export. Le reformater depuis « Journée du 21 septembre
+      // 2026 » côté client marcherait jusqu'au premier changement de
+      // libellé.
+      jourIso={aujourdhui}
     />
   );
 }

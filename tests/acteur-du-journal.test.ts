@@ -170,10 +170,44 @@ describe("la table d'audit garde l'identifiant, pas le libellé", () => {
     const lecture = lire("src/server/lecture/backoffice.ts");
     expect(lecture).toMatch(/acteur: acteurLisible\(l\.actorId/u);
     expect(lecture).toMatch(/deletedAt: true/u);
-    // Une seule requête pour deux cents lignes : le même opérateur signe
-    // la plupart des écritures d'une journée.
-    const fonction = /export async function journal[\s\S]*?\n\}$/mu.exec(lecture)![0];
-    expect([...fonction.matchAll(/db\.user\.findMany/gu)]).toHaveLength(1);
+    /**
+     * Une seule requête d'identités, quel que soit le nombre de lignes :
+     * le même opérateur signe la plupart des écritures d'une journée, et
+     * résoudre ligne par ligne ferait deux cents lectures pour trois
+     * personnes.
+     *
+     * Le critère portait sur le corps de `journal()`. S.7 a déplacé ce
+     * corps dans `lireLeJournal`, partagé avec l'export de période — et
+     * le garde-fou est passé au vert en trouvant une fonction devenue
+     * vide. Il porte maintenant sur la lecture entière : c'est la
+     * propriété qui compte, et elle ne dépend pas de la fonction qui
+     * l'héberge. La même leçon que sur les boutons muets, sur une autre
+     * forme.
+     */
+    const lecteur = /async function lireLeJournal[\s\S]*?\n\}/mu.exec(lecture)![0];
+    expect([...lecteur.matchAll(/db\.user\.findMany/gu)]).toHaveLength(1);
+
+    /**
+     * Et les deux entrées passent par ce lecteur, sans requête à elles :
+     * un second chemin de lecture serait le premier endroit où résoudre
+     * une identité ligne par ligne reviendrait sans se voir.
+     */
+    const declaration = (nom: string): string => {
+      // Du nom jusqu'à la déclaration suivante : un `}` en colonne zéro ne
+      // marque pas la fin d'une fonction dont la signature s'étale sur
+      // plusieurs lignes — `}): Promise<…> {` en porte un.
+      const debut = lecture.indexOf(`function ${nom}(`);
+      const suite = lecture.indexOf("\nexport ", debut);
+      const fin = lecture.indexOf("\nasync function", debut);
+      const bornes = [suite, fin].filter((i) => i > debut);
+      return lecture.slice(debut, Math.min(...bornes, lecture.length));
+    };
+
+    for (const entree of ["journalDeLaPeriode", "journal"]) {
+      const corps = declaration(entree);
+      expect(corps, entree).toContain("lireLeJournal(");
+      expect(corps, entree).not.toContain("db.user.findMany");
+    }
   });
 
   /**
