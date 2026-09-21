@@ -3,7 +3,7 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
-import { ouvrirUnRemboursement } from "@/server/acces/paiements";
+import { initierLeRemboursement, ouvrirUnRemboursement } from "@/server/acces/paiements";
 
 /**
  * Geste de remboursement — B-04, K.C tranché le 20/09/2026.
@@ -47,6 +47,17 @@ export const POST = route({
       });
     }
 
+    /**
+     * L'obligation ouverte, la demande part — arbitrage du 21/09/2026.
+     *
+     * L'initiation retire les droits non consommés et tente l'envoi. Elle
+     * ne verse rien : le rail n'est pas branché, l'appel rend `null`, et
+     * la dette reste visible en B-04. Un pack partiellement consommé ne
+     * part pas du tout — il ouvre un écart, parce que ce que vaut une
+     * analyse déjà rendue est une question commerciale.
+     */
+    const envoi = await initierLeRemboursement(ouverture.reference);
+
     // Journalisé après coup et non avant : une ligne d'audit pour un geste
     // qui n'a pas eu lieu se relit comme un geste refusé sans trace.
     await journaliser({
@@ -54,9 +65,9 @@ export const POST = route({
       action: "paiement.remboursement",
       cible: `transaction:${transaction.id}`,
       motif: corps.motif,
-      details: { origine: "geste_support" },
+      details: { origine: "geste_support", envoi: envoi.issue },
     });
 
-    return { ouvert: true };
+    return { ouvert: true, envoi: envoi.issue };
   },
 });

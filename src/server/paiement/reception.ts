@@ -1,6 +1,6 @@
 import { appliquerLaNotification, type Notification } from "@/server/acces/paiements";
 import { journaliser } from "@/server/acces/journal";
-import { envoyerRecu } from "@/server/courrier";
+import { envoyerRecu, envoyerRemboursementConfirme } from "@/server/courrier";
 import { db } from "@/lib/db";
 import { formatMontant } from "@/lib/utils";
 
@@ -43,6 +43,36 @@ export async function traiterLaNotification(
         );
       }
       return { recue: true, issue: "creditee" };
+    }
+    /**
+     * Le remboursement confirmé — arbitrage du 21/09/2026.
+     *
+     * Une confirmation de remboursement n'ouvre aucun droit : elle arrive
+     * donc ici, sous « appliquée », et non sous « créditée ». C'est **le
+     * seul endroit** où le candidat est prévenu — ni la décision de
+     * rembourser, ni la demande envoyée au fournisseur ne sont l'argent
+     * rendu, et annoncer trop tôt ferait chercher sur un relevé une somme
+     * qui n'y est pas.
+     *
+     * L'échec d'un courrier ne défait pas un remboursement confirmé : la
+     * notification signée a été appliquée, et c'est elle qui fait foi.
+     */
+    case "appliquee": {
+      const transaction = resultat.transaction;
+      if (transaction.status === "REMBOURSEE" && transaction.refundedAt) {
+        const user = await db.user.findUnique({
+          where: { id: transaction.userId },
+          select: { email: true },
+        });
+        if (user) {
+          await envoyerRemboursementConfirme(
+            user.email,
+            transaction.reference,
+            formatMontant(transaction.amount, transaction.currency),
+          ).catch(() => undefined);
+        }
+      }
+      return { recue: true, issue: "appliquee" };
     }
     case "refusee":
       // Une transition impossible n'est pas un incident de transport : elle

@@ -8,7 +8,8 @@ import {
   issueDeLAnnulation,
   MOTIF_REMBOURSEMENT_SUPPRESSION,
 } from "@/domain/consultants/annulation";
-import { ouvrirUnRemboursement } from "@/server/acces/paiements";
+import { initierLeRemboursement, ouvrirUnRemboursement } from "@/server/acces/paiements";
+import { NON_BRANCHE } from "@/server/paiement/remboursement";
 
 /**
  * Suppression de compte — RG-10.4.
@@ -188,12 +189,36 @@ export async function acheverLaSuppression(
       maintenant,
     );
     if (!ouverture.ouvert) continue;
+
+    /**
+     * L'obligation ouverte, la demande part — arbitrage du 21/09/2026.
+     *
+     * C'est le cas déterministe : la limite d'annulation n'était pas
+     * dépassée, la somme est due sans qu'aucun humain ait à en décider.
+     * Le rail n'étant pas branché, l'envoi échoue et la dette reste
+     * visible en B-04 — ce qui est exactement l'état honnête, et non un
+     * remboursement qu'on aurait fait croire.
+     *
+     * Comme l'ouverture, l'envoi est hors de la transaction
+     * d'anonymisation : un fournisseur injoignable ne doit pas faire
+     * échouer une suppression, qui est la promesse faite au candidat.
+     */
+    const envoi = await initierLeRemboursement(
+      ouverture.reference,
+      NON_BRANCHE,
+      maintenant,
+    ).catch(() => null);
+
     await journaliser({
       acteurId: "systeme:suppression",
       action: "paiement.remboursement",
       cible: `transaction:${rendezVous.transactionId}`,
       motif: MOTIF_REMBOURSEMENT_SUPPRESSION,
-      details: { rendezVous: rendezVous.id, creneau: rendezVous.startsAt.toISOString() },
+      details: {
+        rendezVous: rendezVous.id,
+        creneau: rendezVous.startsAt.toISOString(),
+        envoi: envoi?.issue ?? "indisponible",
+      },
     }).catch(() => undefined);
   }
 

@@ -1,4 +1,5 @@
 import { VALIDITE_MINUTES } from "@/domain/comptes/code-verification";
+import { CONFIRMATION_AU_CANDIDAT } from "@/domain/paiement/remboursement";
 import {
   libelleFormat,
   libelleLimiteAnnulation,
@@ -122,6 +123,31 @@ export const envoyerRecu = (destinataire: string, reference: string, montant: st
     corps: `Ton paiement de ${montant} est enregistré sous la référence ${reference}.
 
 Le reçu détaillé est consultable dans ton espace, à tout moment.${SIGNATURE}`,
+  });
+
+/**
+ * Remboursement confirmé — arbitrage du 21/09/2026.
+ *
+ * Envoyé à la **confirmation**, jamais à la décision ni à l'envoi de la
+ * demande : annoncer « c'est remboursé » quand la demande vient seulement
+ * de partir, c'est faire chercher sur un relevé une somme qui n'y est pas
+ * encore, et transformer une bonne nouvelle en inquiétude.
+ *
+ * Il n'annonce aucun délai de notre part — il n'est pas le nôtre — mais
+ * dit que le compte peut mettre quelques jours à le montrer, parce que
+ * c'est la question que le candidat se posera le lendemain.
+ */
+export const envoyerRemboursementConfirme = (
+  destinataire: string,
+  reference: string,
+  montant: string,
+) =>
+  expedier({
+    destinataire,
+    objet: `Remboursement ImmiPro ${reference}`,
+    corps: `${CONFIRMATION_AU_CANDIDAT}
+
+Montant : ${montant}, sous la référence ${reference}, qui ne change pas.${SIGNATURE}`,
   });
 
 /**

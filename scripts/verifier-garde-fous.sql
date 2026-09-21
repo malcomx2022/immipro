@@ -240,6 +240,41 @@ SELECT refuse(
        provider, status, "failureCause", "failureCauseAt")
      VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE',now())$q$);
 
+-- ── Rail de remboursement · les trois faits dans l'ordre ─────────────────
+SELECT refuse(
+  'Remboursement · une demande envoyée sans obligation ouverte',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundRequestedAt")
+     VALUES ('tr1','IMP-260921-RRRRRR','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), now())$q$);
+
+SELECT refuse(
+  'Remboursement · une tentative sur une somme qu''on ne doit pas',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundAttemptedAt", "refundAttempts")
+     VALUES ('tr2','IMP-260921-SSSSSS','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), now(), 1)$q$);
+
+SELECT refuse(
+  'Remboursement · une demande antérieure à la décision',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundDueAt", "refundBasis", "refundRequestedAt")
+     VALUES ('tr3','IMP-260921-TTTTTT','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), now(), 'Geste', now() - interval '1 hour')$q$);
+
+SELECT refuse(
+  'Remboursement · une tentative datée mais jamais comptée',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundDueAt", "refundBasis", "refundAttemptedAt")
+     VALUES ('tr4','IMP-260921-UUUUUU','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), now(), 'Geste', now())$q$);
+
+SELECT refuse(
+  'Remboursement · un compteur de tentatives négatif',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "refundAttempts")
+     VALUES ('tr5','IMP-260921-VVVVVV','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE',-1)$q$);
+
 -- ── Résolution des écarts · le guichet ne bricole pas une clôture ─────────
 SELECT refuse(
   'Écart · une issue sans date de clôture',

@@ -503,6 +503,23 @@ model Transaction {
   /// L'obligation s'ouvre ici, se voit en B-04, et c'est la notification
   /// signée qui la solde.
   refundDueAt DateTime?
+
+  /// La demande envoyée au fournisseur — arbitrage du 21/09/2026.
+  ///
+  /// Le troisième fait, celui qui manquait. K.C écrit la décision de
+  /// rembourser, M.B écrit la confirmation que l'argent est reparti ;
+  /// entre les deux, personne ne disait si la demande était partie. Une
+  /// obligation ouverte et une demande acceptée se lisaient pareil, et
+  /// une tentative échouée ne laissait aucune trace.
+  ///
+  /// C'est un accusé de réception du fournisseur, jamais un virement :
+  /// seule sa notification signée fait passer la transaction à
+  /// `REMBOURSEE` (INV-7).
+  refundRequestedAt DateTime?
+  /// La dernière tentative, réussie ou non — une dette dont l'envoi
+  /// échoue reste une dette, et il faut savoir depuis quand on essaie.
+  refundAttemptedAt DateTime?
+  refundAttempts    Int       @default(0)
   /// Pourquoi il est dû, en clair. Une obligation sans motif ne se traite
   /// pas : l'opérateur qui la voit doit savoir si elle vient de la règle ou
   /// d'un geste, et lequel.
@@ -515,6 +532,7 @@ model Transaction {
   @@index([reconciledAt, createdAt])
   @@index([refundDueAt, refundedAt])
   @@index([discrepancyResolvedAt])
+  @@index([refundRequestedAt, refundedAt])
 }
 
 /// L'issue d'un écart de réconciliation — arbitrage du 21/09/2026.
@@ -728,6 +746,10 @@ enum CreditReason {
   ANALYSE
   ANALYSE_RENDUE
   GESTE_COMMERCIAL
+  /// Retrait des droits non consommés à l'initiation d'un remboursement.
+  /// Une écriture négative de plus, jamais une suppression : les analyses
+  /// déjà consommées gardent leurs lignes.
+  REMBOURSEMENT
 }
 
 /// Grand livre du quota d'analyses (INV-6).
