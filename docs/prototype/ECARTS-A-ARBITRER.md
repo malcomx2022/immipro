@@ -2135,10 +2135,60 @@ propos de L.A, revenu par le vocabulaire au lieu de la condition.
 plutôt que de vivre dans un troisième registre qui ne se lit avec aucun
 autre. Qui prépare l'ouverture au public lit désormais la même liste.
 
-**Q.B — Le pied de page ne mène plus à une destination précise.** C'était
-sa fonction : donner trois entrées directes vers les pays les plus
-demandés, ce qui vaut pour le référencement interne. Le faire correctement
-demande de lire la base depuis un composant partagé par toutes les pages
-publiques — donc de les rendre toutes dynamiques, y compris le simulateur
-et les tarifs, qui n'ont aucune raison de l'être. La question se rouvrira
-le jour où l'on mesurera ce que le pied de page apporte vraiment.
+**Q.B — Le pied de page ne mène plus à une destination précise.**
+**Fermé sans liens dynamiques pour la V1, le 20/09/2026.**
+
+Le pied de page reste stable et mène au catalogue. Les trois destinations
+du moment ne reviendront que si des mesures montrent un gain de navigation
+ou de référencement qui justifie le coût. « Les plus demandées »
+demanderait d'ailleurs de définir une période, une mesure, et ce qu'on
+fait d'une fiche qui cesse d'être publiée — trois décisions pour trois
+liens. Une liste codée en dur recréerait à l'identique le défaut trouvé en
+P.A : elle ne sait pas ce qui est publié.
+
+### Ce que l'application de la décision a trouvé
+
+**Un des trois mécanismes sur lesquels la décision s'appuie n'existait
+pas.** Elle dit que les liens profonds sont assurés par le catalogue, les
+pages éditoriales **et le plan du site**. Les deux premiers existaient ; le
+troisième, non. Mieux : `adressesPubliees` avait été écrite pour lui — son
+commentaire dit « pour le plan du site » — et **aucun appelant ne la
+lisait**. Une fonction en attente d'une page qui n'a jamais été faite.
+
+Le plan du site existe maintenant, et c'est exactement le compromis que
+Q.B défend : **une seule route dynamique**, celle dont les moteurs se
+servent pour trouver les pages profondes, au lieu de toutes les pages du
+gabarit.
+
+**Le piège de Q.5, au même endroit et pour la même raison.** Un plan du
+site n'a pas de segment dynamique : Next le pré-rend au build, et le build
+tourne sans base de données. Vérifié en retirant `force-dynamic` :
+
+    Error occurred prerendering page "/sitemap.xml"
+    Error [PrismaClientInitializationError]:
+    error: Environment variable not found: DATABASE_URL.
+
+**La clé d'environnement existait déjà.** J'allais en introduire une
+seconde — `NEXT_PUBLIC_SITE_URL` — alors que `.env.example` porte `APP_URL`
+depuis le premier lot, sans aucun lecteur dans `src/`. Le plan du site est
+son premier.
+
+**Et le domaine ne lit pas l'environnement.** La première version y plaçait
+`process.env.APP_URL` : aucun module de `src/domain/` ne l'avait jamais
+fait, et la règle d'architecture le dit — le domaine ne connaît ni Prisma,
+ni Next, ni le réseau. L'origine est passée à la fonction pure, et c'est la
+route qui la lit.
+
+**Rien de non publié n'y figure**, vérifié contre PostgreSQL sur les quatre
+états : la fiche en brouillon est absente — c'est « Émirats arabes unis »,
+précisément celle qui menait en 404 depuis le pied de page — et le guide en
+brouillon comme l'article retiré le sont aussi. Un plan du site est lu par
+des moteurs : y faire figurer un brouillon serait la version automatisée du
+défaut de P.A.
+
+**Enfin, une supposition fausse rattrapée par la lecture.** Le premier
+garde-fou affirmait que l'accueil n'avait aucune raison d'être dynamique.
+Il l'est, et pour sa propre raison : il liste les fiches publiées, qu'une
+dépublication doit pouvoir vider en minutes. Ce que Q.B refuse n'est pas
+qu'une page lise la base, c'est qu'un composant partagé rende dynamiques
+celles qui ne lisent rien.

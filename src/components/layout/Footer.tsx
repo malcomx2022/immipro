@@ -17,9 +17,20 @@ import { cn } from "@/lib/utils";
  *
  * Le catalogue `/destinations` répond à la question que la colonne posait,
  * et il la lit en base — une seule page dynamique au lieu de toutes.
- */
-/**
- * Ce que le pied de page promet, et que le site tient.
+ *
+ * **Q.B ferme la question pour la V1.** Les trois destinations du moment
+ * ne reviendront que si des mesures montrent un gain de navigation ou de
+ * référencement qui justifie le coût. « Les plus demandées » demanderait
+ * d'ailleurs de définir une période, une mesure, et ce qu'on fait d'une
+ * fiche qui cesse d'être publiée — trois décisions pour trois liens. Les
+ * liens profonds sont assurés ailleurs : par le catalogue, par les pages
+ * éditoriales, et par le plan du site.
+ *
+ * Ce composant reste donc **sans données**. Il n'est pas asynchrone et ne
+ * lit rien : c'est ce qui garde statiques toutes les pages du gabarit, et
+ * un test le vérifie plutôt que de compter sur la relecture.
+ *
+ * ── Ce que le pied de page promet, et que le site tient ──────────────
  *
  * Il portait neuf adresses qui répondaient 404 — « Comment ça marche »,
  * « À propos », « Contact », et les trois pages légales — sur **toutes** les
@@ -61,8 +72,6 @@ export interface FooterProps {
 }
 
 export function Footer({ className }: FooterProps) {
-  const colonnes = COLONNES;
-
   return (
     <footer className={cn("flex flex-col gap-6 bg-ink-100 px-4 py-8 md:px-12", className)}>
       <Image
@@ -74,7 +83,7 @@ export function Footer({ className }: FooterProps) {
       />
 
       <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
-        {colonnes.map((colonne) => (
+        {COLONNES.map((colonne) => (
           <nav key={colonne.titre} aria-label={colonne.titre} className="flex flex-col gap-2.5">
             <span className="text-13 font-semibold uppercase tracking-wider text-ink-900">
               {colonne.titre}
