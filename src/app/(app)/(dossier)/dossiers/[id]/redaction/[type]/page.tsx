@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Redaction } from "./Redaction";
 import { vueDuDossier } from "@/server/lecture/dossiers";
-import { pieceARediger, versionsDeLaPiece } from "@/server/lecture/redaction";
+import {
+  pieceARediger,
+  reponsesDeLEntretien,
+  versionsDeLaPiece,
+} from "@/server/lecture/redaction";
 import { exigerCandidat } from "@/server/securite/page";
 
 /**
@@ -48,6 +52,10 @@ export default async function PagePieceRedigee({
     <Redaction
       dossier={vue.dossier}
       piece={piece}
+      // L'entretien reprend où il s'est arrêté. La lecture existait
+      // depuis le début ; personne ne la passait à l'écran, et l'état
+      // repartait de zéro à chaque chargement.
+      reponsesEnregistrees={await reponsesDeLEntretien(piece.documentId)}
       versions={await versionsDeLaPiece(piece.documentId)}
       maintenant={new Date().toISOString()}
     />

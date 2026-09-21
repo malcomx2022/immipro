@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { ChoixDeLaPiece } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/ChoixDeLaPiece";
 import { Redaction } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/Redaction";
 import { Relecture } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/relecture/Relecture";
@@ -20,6 +20,36 @@ import {
   REGLE_NOUVELLE,
 } from "@/lib/contenu/alertes";
 import { tauxCommissionFormate } from "@/domain/payments/pricing";
+
+/**
+ * L'appel réseau, remplacé — R-02.
+ *
+ * Les garde-fous qui lisent le source ne suffisent pas : on peut
+ * débrancher `conserverPuis` des boutons en laissant la fonction intacte
+ * plus bas dans le fichier, et tout test qui l'inspecte passe encore.
+ * C'est la leçon de S.1, sur B-02.
+ */
+const appels: { url: string; corps: unknown; methode?: string }[] = [];
+let reponse: { ok: boolean } = { ok: true };
+vi.mock("@/lib/api", () => ({
+  appeler: (url: string, options: { corps?: unknown; methode?: string } = {}) => {
+    appels.push({ url, corps: options.corps, methode: options.methode });
+    return Promise.resolve(
+      reponse.ok
+        ? { ok: true, donnees: {} }
+        : {
+            ok: false,
+            echec: {
+              titre: "Le serveur a refusé",
+              corps: "Motif de test.",
+              conserve: "Ta saisie est là.",
+              action: "Réessayer",
+              ton: "echec",
+            },
+          },
+    );
+  },
+}));
 
 const pousse = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -74,6 +104,7 @@ describe("R-02 — Entretien guidé", () => {
       <Redaction
         dossier={DOSSIER}
         piece={MOTIVATION}
+        reponsesEnregistrees={{}}
         versions={[]}
         maintenant={MAINTENANT}
       />,
@@ -132,12 +163,114 @@ describe("R-02 — Entretien guidé", () => {
   });
 });
 
+/**
+ * R-02 conserve vraiment — revue de septembre 2026, S.3.
+ *
+ * « Tes réponses sont conservées à mesure : tu peux interrompre
+ * l'entretien et le reprendre. » La phrase était sous le champ depuis le
+ * début, et elle était fausse : l'état partait de `{}`, rien ne quittait
+ * le navigateur, et `InterviewAnswer` n'était écrite nulle part.
+ */
+describe("R-02 — les réponses partent au serveur", () => {
+  const preparer = ({ ok = true, deja = {} as Record<number, string> } = {}) => {
+    appels.length = 0;
+    reponse = { ok };
+    render(
+      <Redaction
+        dossier={DOSSIER}
+        piece={MOTIVATION}
+        reponsesEnregistrees={deja}
+        versions={[]}
+        maintenant={MAINTENANT}
+      />,
+    );
+  };
+
+  const cliquer = async (nom: RegExp) => {
+    fireEvent.click(screen.getByRole("button", { name: nom }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+
+  const repondre = (texte: string) =>
+    fireEvent.change(screen.getByLabelText("Ta réponse"), { target: { value: texte } });
+
+  it("quitter une question enregistre la réponse", async () => {
+    preparer();
+    repondre("J'ai choisi ce programme pour son laboratoire de robotique.");
+    await cliquer(/Question suivante|Aller à l'éditeur/u);
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.methode).toBe("PUT");
+    expect(appels[0]!.url).toBe("/api/dossiers/nl-4471/redaction/lettre-motivation");
+    expect(appels[0]!.corps).toEqual({
+      rang: 0,
+      reponse: "J'ai choisi ce programme pour son laboratoire de robotique.",
+    });
+  });
+
+  /** La saisie n'écrit pas : une requête par caractère saturerait un réseau lent. */
+  it("taper n'envoie rien", () => {
+    preparer();
+    repondre("Une première phrase");
+    repondre("Une première phrase, puis une deuxième");
+    expect(appels).toHaveLength(0);
+  });
+
+  /**
+   * Revenir sur une question pour la relire, sans y toucher, n'écrit
+   * rien : c'est ce qui distingue une navigation d'une modification.
+   */
+  it("une réponse inchangée ne repart pas", async () => {
+    preparer({ deja: { 0: "Déjà répondu la semaine dernière." } });
+    await cliquer(/Question suivante|Aller à l'éditeur/u);
+    expect(appels).toHaveLength(0);
+  });
+
+  it("l'entretien reprend sur ce qui est déjà en base", () => {
+    preparer({ deja: { 0: "Déjà répondu la semaine dernière." } });
+    expect(screen.getByLabelText("Ta réponse")).toHaveValue(
+      "Déjà répondu la semaine dernière.",
+    );
+  });
+
+  /** Passer une question efface ce qu'elle contenait, et ne garde rien de vide. */
+  it("vider une réponse la retire", async () => {
+    preparer({ deja: { 0: "Une réponse à effacer." } });
+    repondre("");
+    await cliquer(/Passer cette question/u);
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.corps).toEqual({ rang: 0, reponse: "" });
+  });
+
+  /**
+   * La navigation n'attend pas le réseau : bloquer « Question suivante »
+   * le temps d'un aller-retour ferait cliquer deux fois sur un téléphone
+   * lent. L'écran avance, l'écriture suit.
+   */
+  it("l'écran avance sans attendre la réponse", async () => {
+    preparer();
+    repondre("Une réponse.");
+    await cliquer(/Question suivante|Aller à l'éditeur/u);
+    expect(screen.getByText(/Question 2 sur/u)).toBeDefined();
+  });
+
+  it("un refus s'affiche, et la saisie reste", async () => {
+    preparer({ ok: false });
+    repondre("Une réponse que le serveur va refuser.");
+    await cliquer(/Question suivante|Aller à l'éditeur/u);
+    expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+  });
+});
+
 describe("R-03 — Éditeur et versions", () => {
   const rendre = () =>
     render(
       <Redaction
         dossier={DOSSIER}
         piece={MOTIVATION}
+        reponsesEnregistrees={{}}
         versions={VERSIONS_MOTIVATION}
         suggestion={SUGGESTION_EN_ATTENTE}
         maintenant={MAINTENANT}

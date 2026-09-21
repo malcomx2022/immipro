@@ -34,7 +34,7 @@ const TOUT = {
   STRIPE_API_KEY: "k",
 };
 
-describe("les cinq dépendances n'ont pas le même statut", () => {
+describe("les six dépendances n'ont pas le même statut", () => {
   it("chacune est déclarée avec ce que son absence bloque", () => {
     expect(DEPENDANCES.map((d) => [d.cle, d.statut])).toEqual([
       ["messagerie", "BLOQUANTE_OUVERTURE"],
@@ -45,6 +45,12 @@ describe("les cinq dépendances n'ont pas le même statut", () => {
       // rendre, et K.C ouvre des obligations que rien ne solderait.
       ["remboursement", "BLOQUANTE_ENCAISSEMENT"],
       ["extraction", "FACULTATIVE_PILOTE"],
+      // La sixième, trouvée par la revue de septembre 2026 : WF-08 était
+      // en lecture seule, et le service qui met en forme les pièces
+      // rédigées n'était consigné nulle part. Il partage la clé de
+      // l'extraction sans partager son objet — lire un montant et écrire
+      // une phrase que le candidat signera ne se ratent pas pareil.
+      ["redaction", "FACULTATIVE_PILOTE"],
     ]);
     for (const d of DEPENDANCES) {
       expect(LIBELLE_STATUT[d.statut], d.cle).toBeTruthy();
@@ -65,12 +71,28 @@ describe("les cinq dépendances n'ont pas le même statut", () => {
   });
 
   /** L'exception de l'extraction est conditionnelle, et ses conditions sont écrites. */
-  it("la seule facultative porte ses conditions", () => {
+  /**
+   * Une dépendance facultative n'est facultative que sous conditions, et
+   * les conditions se nomment. Sans elles, « facultative en pilote »
+   * voudrait dire « on s'en passe », ce qui n'est pas la même chose.
+   */
+  it("chaque facultative porte ses conditions", () => {
     const facultatives = DEPENDANCES.filter((d) => d.statut === "FACULTATIVE_PILOTE");
-    expect(facultatives).toHaveLength(1);
-    expect(facultatives[0]!.conditions).toHaveLength(3);
-    expect(facultatives[0]!.conditions!.join(" ")).toMatch(/délai cible/u);
-    expect(facultatives[0]!.conditions!.join(" ")).toMatch(/surveillée/u);
+    expect(facultatives.map((d) => d.cle)).toEqual(["extraction", "redaction"]);
+    for (const d of facultatives) {
+      expect(d.conditions, d.cle).toHaveLength(3);
+    }
+
+    const extraction = facultatives.find((d) => d.cle === "extraction")!;
+    expect(extraction.conditions!.join(" ")).toMatch(/délai cible/u);
+    expect(extraction.conditions!.join(" ")).toMatch(/surveillée/u);
+
+    // La rédaction a les siennes, et elles portent sur ce qui la
+    // distingue : un texte proposé reste celui du candidat, il le relit,
+    // et l'analyse critique ne juge pas son dossier (INV-1).
+    const redaction = facultatives.find((d) => d.cle === "redaction")!;
+    expect(redaction.conditions!.join(" ")).toMatch(/relit|relecture/u);
+    expect(redaction.conditions!.join(" ")).toMatch(/elle ne juge pas/u);
   });
 });
 
@@ -83,10 +105,13 @@ describe("l'aptitude se lit des dépendances, pas du nom de l'environnement", ()
    * Le cas du pilote : l'extraction manque, et rien d'autre. C'est
    * exactement ce que la décision autorise.
    */
-  it("seule l'extraction manque : pilote", () => {
+  it("seule la clé d'IA manque : pilote", () => {
     const etat = etatDesDependances({ ...TOUT, ANTHROPIC_API_KEY: "" });
     expect(etat.aptitude).toBe("PILOTE");
-    expect(etat.manquantes).toEqual(["extraction"]);
+    // Une seule variable, deux dépendances : c'est pourquoi elles sont
+    // déclarées séparément. Leurs conditions de pilote ne sont pas les
+    // mêmes, et un jour leurs clés pourraient ne plus l'être non plus.
+    expect(etat.manquantes).toEqual(["extraction", "redaction"]);
     expect(etat.bloquantes).toEqual([]);
   });
 

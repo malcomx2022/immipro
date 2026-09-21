@@ -118,5 +118,37 @@ export const nombreDeReponses = (reponses: Reponses, total: number): number => {
 };
 
 /** « 6 réponses sur 8 » : ce qui reste à répondre avant la mise en forme. */
-export const libelleAvancementEntretien = (reponses: Reponses, total: number): string =>
-  `${nombreDeReponses(reponses, total)} réponses sur ${total}`;
+export const libelleAvancementEntretien = (reponses: Reponses, total: number): string => {
+  // « 1 réponses sur 8 » — l'accord se voyait rarement tant que le
+  // compteur partait de zéro à chaque chargement : il fallait répondre à
+  // exactement une question pour le lire. Depuis que l'entretien reprend
+  // où il s'est arrêté, il s'affiche au chargement.
+  const n = nombreDeReponses(reponses, total);
+  return `${n} réponse${n > 1 ? "s" : ""} sur ${total}`;
+};
+
+// ── La conservation des réponses ─────────────────────────────────────────
+
+/**
+ * Ce que l'entretien conserve d'une réponse — WF-08, R-02.
+ *
+ * L'écran le promet en toutes lettres depuis le début : « Tes réponses
+ * sont conservées à mesure : tu peux interrompre l'entretien et le
+ * reprendre. » Elles ne l'étaient pas. L'état partait de `{}` à chaque
+ * chargement, rien ne quittait le navigateur, et `InterviewAnswer`
+ * n'était écrite nulle part — seule la purge la connaissait, pour
+ * l'effacer. Un candidat qui répondait à huit questions puis fermait
+ * l'onglet perdait tout, après avoir lu qu'il pouvait s'interrompre.
+ *
+ * **Une réponse vide n'est pas une réponse.** Elle ne s'enregistre pas,
+ * et si une réponse existait elle est retirée : c'est la seule lecture
+ * possible d'un champ qu'on vient d'effacer. La même symétrie que pour la
+ * réserve d'une règle en B-02 — ce que la lecture rend, l'écriture le
+ * reprend.
+ *
+ * Passer une question est donc conservé comme tel : aucune ligne. Rien ne
+ * distingue en base « passée » de « jamais atteinte », et rien ne doit
+ * les distinguer — `MENTION_PASSER` dit qu'une question passée pourra
+ * être reprise, pas qu'elle laisse une trace.
+ */
+export const reponseAConserver = (texte: string): string | null => texte.trim() || null;
