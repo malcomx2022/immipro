@@ -32,6 +32,8 @@ import {
   trierParAnciennete,
 } from "@/domain/backoffice/revue";
 import {
+  ACTIONS_ATTENDUES,
+  obstacleALActionCompte,
   actionsPour,
   diagnostiquerRecherche,
   filtrerComptes,
@@ -324,11 +326,55 @@ describe("B-03 — comptes", () => {
     expect(introuvable.message).toContain("« zzzz »");
   });
 
-  it("n'offre que les actions qui ont un sens pour ce compte", () => {
+  /**
+   * La liste était fausse dans les deux sens : elle offrait trois actions
+   * sans route et omettait la seule dont la route existe. Ce qui reste
+   * est ce qui part vraiment au serveur.
+   */
+  it("n'offre que les actions qui ont un sens, et qui existent", () => {
     const actif = COMPTES.find((c) => c.statut === "ACTIF")!;
-    expect(actionsPour(actif).map((a) => a.cle)).toEqual(["recrediter"]);
+    expect(actionsPour(actif).map((a) => a.cle)).toEqual(["suspendre"]);
     const nonVerifie = COMPTES.find((c) => c.statut === "EMAIL_NON_VERIFIE")!;
-    expect(actionsPour(nonVerifie).map((a) => a.cle)).toContain("renvoyer-verification");
+    expect(actionsPour(nonVerifie).map((a) => a.cle)).toEqual(["suspendre"]);
+    // Une suppression demandée suit son cours : la suspendre en plus ne
+    // ferait que retarder une purge que le candidat a réclamée.
+    const partant = COMPTES.find((c) => c.statut === "SUPPRESSION_DEMANDEE")!;
+    expect(actionsPour(partant)).toEqual([]);
+  });
+
+  it("un compte suspendu n'a qu'une issue : le rétablir", () => {
+    const suspendu = { ...COMPTES[0]!, statut: "SUSPENDU" as const };
+    expect(actionsPour(suspendu).map((a) => a.cle)).toEqual(["retablir"]);
+  });
+
+  /**
+   * Les trois actions retirées de l'écran sont nommées, avec ce qui
+   * manque à chacune. Les retirer sans les nommer ferait disparaître le
+   * besoin avec le bouton.
+   */
+  it("ce qui manque est nommé, pas oublié", () => {
+    expect(ACTIONS_ATTENDUES.map((a) => a.cle).sort()).toEqual([
+      "recrediter",
+      "renvoyer-verification",
+      "suppression",
+    ]);
+    for (const a of ACTIONS_ATTENDUES) {
+      expect(a.manque.length, a.cle).toBeGreaterThan(15);
+    }
+    // Le recrédit n'est pas qu'une route manquante : c'est une décision
+    // commerciale, et elle ne s'invente pas depuis un écran.
+    const recredit = ACTIONS_ATTENDUES.find((a) => a.cle === "recrediter")!;
+    expect(recredit.manque).toMatch(/commerciale/u);
+  });
+
+  /** Le motif part au journal, et une suspension sans motif ne se relit pas. */
+  it("aucune action sans motif suffisant", () => {
+    expect(obstacleALActionCompte("")).toMatch(/Écris pourquoi/u);
+    // « abus » fait quatre caractères ; le seuil en demande dix, pour
+    // qu'un motif dise quelque chose à qui le relira dans six mois.
+    expect(obstacleALActionCompte("abus")).toMatch(/Écris pourquoi/u);
+    expect(obstacleALActionCompte("   espaces   ")).toMatch(/Écris pourquoi/u);
+    expect(obstacleALActionCompte("Compte signalé pour usurpation d'identité.")).toBeNull();
   });
 
   it("résume les comptes avec les demandes de suppression en cours", () => {

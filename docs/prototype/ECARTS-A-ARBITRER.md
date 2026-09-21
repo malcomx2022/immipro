@@ -2811,3 +2811,80 @@ ils ont mordu — la leçon de S.1, appliquée avant d'être réapprise.
               section et intitulé résolus par le serveur, pas envoyés
 
     au rechargement : le champ porte la réponse, « 1 réponse sur 8 »
+
+### S.4 — B-03 offrait ce qu'il ne savait pas faire, et cachait ce qu'il savait
+
+**La liste d'actions était fausse dans les deux sens.**
+
+Elle proposait trois boutons — renvoyer l'email de vérification,
+recréditer des analyses, traiter une demande de suppression — dont aucun
+n'était relié à quoi que ce soit et dont **aucun n'avait de route**. Et
+elle omettait la seule action que le produit sait faire : la suspension,
+dont la route existe depuis le début, journalise son motif et ferme les
+sessions ouvertes.
+
+Un écran qui offre ce qu'il ne peut pas et cache ce qu'il peut se trompe
+deux fois. Ce qui reste est ce qui part vraiment au serveur.
+
+**La conséquence est dite avant le clic.** Suspendre ferme les sessions
+ouvertes — sans quoi la suspension ne prendrait effet qu'à l'expiration
+du cookie, trente jours plus tard. Rétablir ne les rouvre pas. Les deux
+phrases sont sous leur bouton, et l'exécution les a vérifiées.
+
+**Le motif conditionne l'action**, à dix caractères au moins : c'est lui
+qu'on relit quand une suspension est contestée, et « suspendu le 12 » ne
+répond à rien. Même forme qu'en R.1 et en B-05 — la raison plutôt qu'un
+booléen, parce que c'est elle que porte le bouton désactivé.
+
+**Une suppression demandée n'ouvre aucune action.** La suspendre en plus
+ne ferait que retarder une purge que le candidat a réclamée.
+
+**Les trois retirées sont nommées**, avec ce qui manque à chacune, dans
+`ACTIONS_ATTENDUES` — comme `PREALABLES` pour les arbitrages et
+`DEPENDANCES` pour les services. Les retirer sans les nommer ferait
+disparaître le besoin avec le bouton.
+
+| Action | Ce qui lui manque |
+|---|---|
+| Renvoyer l'email de vérification | une route, une action auditée, et la messagerie branchée |
+| Recréditer des analyses | une décision commerciale : combien, à quelles conditions, à la charge de qui |
+| Traiter la demande de suppression | une route de relance ; la reprise automatique existe déjà |
+
+Le recrédit n'est pas qu'une route manquante, et c'est pourquoi il ne
+s'ajoute pas ici. `rendreUneAnalyse` rend **une** analyse identifiée, et
+son idempotence tient à cet identifiant : elle répare une lecture qui n'a
+rien rendu. Un recrédit de guichet n'a pas d'analyse à nommer — c'est un
+geste commercial, et combien, à quelles conditions et à la charge de qui
+sont des décisions qui ne s'inventent pas depuis un écran.
+
+« Exporter la sélection » est parti pour la raison de Q.A : aucun code
+d'export n'existe dans le dépôt.
+
+#### Une correction à la revue elle-même
+
+**Ma note sur `dossier.consultation` était fausse.** S.2 l'avait inscrite
+au registre en disant que « B-03 et B-04 ouvrent un dossier sans le
+consigner ». Vérifié depuis : **aucun écran du back-office n'ouvre le
+dossier d'un candidat.** B-03 en affiche le nombre et dit en toutes
+lettres que les pièces ne sont accessibles que depuis la file de revue ;
+B-04 ne les mentionne pas.
+
+Le défaut n'est donc pas un accès non tracé — c'est une action auditée
+écrite d'avance, pour un écran que le produit n'a pas. Elle reste
+déclarée : le jour où cet écran existera, la ligne d'audit devra partir
+avec lui, et non six mois plus tard. La note dit maintenant cela.
+
+**Exécuté contre PostgreSQL :**
+
+    suspension sans motif        HTTP 422   (le schéma refuse)
+    suspension avec motif        suspendu=true · sessionsFermees=2
+    rétablissement               suspendu=false · sessionsFermees=0
+    en base                      suspendedAt=null · 0 session restante
+                                 — les sessions fermées ne se rouvrent pas,
+                                   ce que la phrase sous le bouton annonce
+
+    journal : compte.suspension      « Compte signalé pour usurpation… »
+              compte.retablissement  « Vérification faite, le signalement… »
+
+    écran   : [Suspendre le compte] désactivé, avec sa raison
+              motif, conséquence présents ; les trois boutons morts absents

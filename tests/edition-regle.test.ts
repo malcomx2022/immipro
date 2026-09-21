@@ -236,9 +236,6 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
    * le jour où l'écran écrit ; aucune ne s'ajoute sans être discutée.
    */
   const EN_ATTENTE_DE_BRANCHEMENT: Record<string, string> = {
-    // `PUT /api/admin/utilisateurs` existe. Les actions par ligne ne
-    // l'appellent pas.
-    "src/app/(admin)/utilisateurs/Utilisateurs.tsx": "PUT utilisateurs écrite, écran muet",
     // Aucune route : la collecte automatique des sources n'existe pas, et
     // l'écran le dit déjà en toutes lettres.
     "src/app/(admin)/veille/FileDeVeille.tsx": "aucune route de collecte",
@@ -364,10 +361,22 @@ describe("aucune action auditée n'est déclarée sans être écrite", () => {
      * rétrécir, et une orpheline de plus fait échouer le test.
      */
     const SANS_ECRIVAIN: Record<string, string> = {
-      // L'ouverture du dossier d'un candidat depuis le back-office. B-03
-      // et B-04 affichent des dossiers ; aucun des deux ne consigne
-      // l'accès. `piece.consultation` avait le même défaut, corrigé ici.
-      "dossier.consultation": "B-03 et B-04 ouvrent un dossier sans le consigner",
+      /**
+       * Déclarée avant la capacité qu'elle audite.
+       *
+       * La première version de cette note disait que B-03 et B-04
+       * ouvraient un dossier sans le consigner. C'est faux, vérifié
+       * depuis : **aucun écran du back-office n'ouvre le dossier d'un
+       * candidat.** B-03 en affiche le nombre et dit en toutes lettres
+       * que les pièces ne sont accessibles que depuis la file de revue ;
+       * B-04 ne les mentionne pas. Le défaut n'est donc pas un accès non
+       * tracé — c'est une action auditée écrite d'avance, pour un écran
+       * que le produit n'a pas.
+       *
+       * Elle reste déclarée parce que le jour où cet écran existera, la
+       * ligne d'audit devra partir avec lui, et non six mois plus tard.
+       */
+      "dossier.consultation": "aucun écran n'ouvre encore le dossier d'un candidat",
     };
 
     const orphelines = declarees.filter((a) => !corpus.includes(`"${a}"`));

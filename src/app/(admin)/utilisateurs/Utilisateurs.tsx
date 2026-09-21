@@ -1,8 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
+import { CHAMP_CONTROLE } from "@/components/ui/champ";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import { Filtres } from "@/components/admin/Filtres";
 import { ListeSelectionnable } from "@/components/admin/ListeSelectionnable";
 import { MENTION_AUDIT } from "@/domain/backoffice/navigation";
@@ -14,11 +19,13 @@ import {
   actionsPour,
   diagnostiquerRecherche,
   filtrerComptes,
+  obstacleALActionCompte,
   resumeComptes,
   type Compte,
   type FiltreCompte,
 } from "@/domain/backoffice/comptes";
 import { jourEnFrancais } from "@/domain/format/moment";
+import { cn } from "@/lib/utils";
 
 /**
  * B-03 — Utilisateurs. WF-15.
@@ -30,22 +37,68 @@ import { jourEnFrancais } from "@/domain/format/moment";
  * Une recherche sans résultat nomme toujours le critère qui exclut le reste.
  * « Aucun résultat » laisse l'opérateur retirer les filtres un à un jusqu'à
  * retrouver le compte qu'il sait exister.
+ *
+ * ── La liste d'actions était fausse dans les deux sens ──────────────────
+ *
+ * Elle proposait trois boutons — renvoyer l'email de vérification,
+ * recréditer des analyses, traiter une demande de suppression — dont
+ * aucun n'était relié à quoi que ce soit et dont aucun n'avait de route.
+ * Et elle omettait **la seule action que le produit sait faire** : la
+ * suspension, dont la route existe depuis le début, journalise son motif
+ * et ferme les sessions ouvertes.
+ *
+ * Un écran qui offre ce qu'il ne peut pas et cache ce qu'il peut se
+ * trompe deux fois. Les trois absentes sont nommées dans
+ * `ACTIONS_ATTENDUES`, avec ce qui manque à chacune : les retirer sans
+ * les nommer ferait disparaître le besoin avec le bouton.
+ *
+ * « Exporter la sélection » est parti pour la raison de Q.A : aucun code
+ * d'export n'existe dans le dépôt, et un bouton qui promet un fichier
+ * qu'aucune ligne ne produit vaut moins qu'une absence.
  */
 export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
+  const router = useRouter();
   const [filtre, setFiltre] = useState<FiltreCompte>("TOUS");
   const [recherche, setRecherche] = useState("");
   const [selection, setSelection] = useState<string | null>(null);
+  const [motif, setMotif] = useState("");
+  const [envoi, setEnvoi] = useState("");
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
   const visibles = filtrerComptes(comptes, filtre, recherche);
   const retenu = visibles.find((c) => c.id === selection) ?? visibles[0];
   const diagnostic = diagnostiquerRecherche(comptes, filtre, recherche);
+  const manque = obstacleALActionCompte(motif);
+
+  /** Changer de compte remet le motif à zéro : il portait sur l'autre. */
+  function choisir(cle: string | null) {
+    setSelection(cle);
+    setMotif("");
+    setEchec(null);
+  }
+
+  async function agir(cle: "suspendre" | "retablir") {
+    if (!retenu || manque) return;
+    setEnvoi(cle);
+    setEchec(null);
+    const resultat = await appeler<{ suspendu: boolean; sessionsFermees: number }>(
+      "/api/admin/utilisateurs",
+      { methode: "PUT", corps: { userId: retenu.id, suspendre: cle === "suspendre", motif } },
+    );
+    setEnvoi("");
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    setMotif("");
+    router.refresh();
+  }
 
   return (
     <div className="flex flex-col">
       <EnteteAdmin
         titre="Utilisateurs"
         resume={resumeComptes(comptes)}
-        actions={<Button variante="secondaire">Exporter la sélection</Button>}
       />
 
       <div className="flex flex-col gap-4 p-6">
@@ -76,7 +129,7 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
               elements={visibles}
               cle={(c) => c.id}
               selection={retenu?.id ?? null}
-              onSelection={setSelection}
+              onSelection={choisir}
               entete={
                 <div className="grid grid-cols-[1.6fr_8rem_4rem_7rem_9rem] gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
                   <span>Compte</span>
@@ -156,13 +209,53 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                 </p>
               </section>
 
-              <div className="flex flex-col gap-2">
+              <section className="flex flex-col gap-3 rounded-lg border border-ink-300 bg-white p-4">
+                <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
+                  Agir sur ce compte
+                </h2>
+
+                {/*
+                  Le motif d'abord : c'est lui qu'on relit quand une
+                  suspension est contestée, et « suspendu le 12 » ne
+                  répond à rien (RG-15.1).
+                */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="motif" className="text-14 font-medium text-ink-900">
+                    Motif de la décision
+                  </label>
+                  <textarea
+                    id="motif"
+                    rows={2}
+                    value={motif}
+                    onChange={(e) => setMotif(e.target.value)}
+                    aria-describedby="motif-aide"
+                    className={cn(CHAMP_CONTROLE, "h-auto py-2.5")}
+                  />
+                  <span id="motif-aide" className="text-pretty text-13 text-ink-500">
+                    Il part au journal d&apos;audit avec ton identifiant. Le titulaire du
+                    compte ne le lit pas.
+                  </span>
+                </div>
+
+                {echec ? <BlocEchec echec={echec} annonce /> : null}
+
                 {actionsPour(retenu).map((action) => (
-                  <Button key={action.cle} variante="secondaire" pleineLargeur>
-                    {action.libelle}
-                  </Button>
+                  <div key={action.cle} className="flex flex-col gap-1.5">
+                    <Button
+                      variante="secondaire"
+                      pleineLargeur
+                      disabled={manque !== null || envoi !== ""}
+                      raisonDesactivation={manque ?? "Envoi en cours."}
+                      onClick={() => agir(action.cle)}
+                    >
+                      {envoi === action.cle ? "Envoi…" : action.libelle}
+                    </Button>
+                    <span className="text-pretty text-13 text-ink-500">
+                      {action.consequence}
+                    </span>
+                  </div>
                 ))}
-              </div>
+              </section>
 
               <p className="text-pretty text-13 text-ink-500">{MENTION_AUDIT}</p>
             </aside>

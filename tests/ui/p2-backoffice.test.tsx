@@ -499,15 +499,70 @@ describe("B-03 — Utilisateurs", () => {
     expect(screen.getByRole("listbox")).toBeDefined();
   });
 
-  it("n'offre que les actions qui ont un sens pour le compte retenu", () => {
+  /**
+   * La liste d'actions était fausse dans les deux sens : trois boutons
+   * sans route, et la suspension — dont la route existe depuis le début —
+   * absente de l'écran.
+   */
+  it("n'offre plus ce que le produit ne sait pas faire", () => {
     rendre();
-    expect(
-      screen.queryByRole("button", { name: "Renvoyer l'email de vérification" }),
-    ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Email non vérifié" }));
-    expect(
-      screen.getByRole("button", { name: "Renvoyer l'email de vérification" }),
-    ).toBeDefined();
+    for (const disparu of [
+      /Renvoyer l'email de vérification/u,
+      /Recréditer des analyses/u,
+      /Traiter la demande de suppression/u,
+      /Exporter la sélection/u,
+    ]) {
+      expect(screen.queryByRole("button", { name: disparu }), String(disparu)).toBeNull();
+    }
+  });
+
+  it("offre la suspension, dont la route existe", () => {
+    rendre();
+    const bouton = screen.getByRole("button", { name: "Suspendre le compte" });
+    expect(bouton).toBeDisabled();
+    expect(bouton).toHaveAccessibleDescription(/Écris pourquoi/u);
+    // La conséquence est dite avant le clic : la suspension ferme les
+    // sessions ouvertes, et l'opérateur doit le savoir.
+    expect(screen.getByText(/Les sessions ouvertes se ferment immédiatement/u)).toBeDefined();
+  });
+
+  /**
+   * Ces tests cliquent, parce que lire le source ne suffit pas : on peut
+   * débrancher le bouton en laissant la fonction intacte plus bas dans le
+   * fichier, et tout garde-fou qui l'inspecte passe encore (leçon de S.1).
+   */
+  it("suspendre part au serveur avec son motif", async () => {
+    appels.length = 0;
+    rafraichir.mockClear();
+    reponse = { ok: true };
+    rendre();
+    fireEvent.change(screen.getByLabelText("Motif de la décision"), {
+      target: { value: "Compte signalé pour usurpation d'identité." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Suspendre le compte" }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.methode).toBe("PUT");
+    expect(appels[0]!.url).toBe("/api/admin/utilisateurs");
+    expect(appels[0]!.corps).toMatchObject({
+      suspendre: true,
+      motif: "Compte signalé pour usurpation d'identité.",
+    });
+    expect(rafraichir).toHaveBeenCalled();
+  });
+
+  it("sans motif, rien ne part", async () => {
+    appels.length = 0;
+    reponse = { ok: true };
+    rendre();
+    fireEvent.click(screen.getByRole("button", { name: "Suspendre le compte" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(appels).toHaveLength(0);
   });
 });
 
