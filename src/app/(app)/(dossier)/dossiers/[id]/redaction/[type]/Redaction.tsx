@@ -567,6 +567,33 @@ export function Redaction({
               Voir l&apos;analyse critique
             </LienBouton>
           ) : null}
+          {/*
+            WF-08 étape 6, les deux sorties. Elles n'apparaissent qu'avec
+            un texte : offrir d'exporter une pièce vide est la promesse que
+            cette revue a passé dix lots à retirer.
+
+            Le DOCX descend dans les téléchargements ; le PDF est celui du
+            navigateur, depuis une page qui s'imprime (L.3). Deux liens et
+            non deux boutons : ni l'un ni l'autre n'écrit quoi que ce soit.
+          */}
+          {courante ? (
+            <>
+              <LienBouton
+                href={`/api/dossiers/${dossier.id}/redaction/${piece.type}/export?format=docx`}
+                variante="secondaire"
+                pleineLargeur
+                className="md:w-auto"
+              >
+                Télécharger en Word
+              </LienBouton>
+              <Link
+                href={`/dossiers/${dossier.id}/redaction/${piece.type}/impression`}
+                className="flex min-h-touch items-center justify-center text-14 text-accent-700 underline"
+              >
+                Version à imprimer
+              </Link>
+            </>
+          ) : null}
           <Link
             href={`/dossiers/${dossier.id}`}
             className="flex min-h-touch items-center justify-center text-14 text-accent-700 underline"
