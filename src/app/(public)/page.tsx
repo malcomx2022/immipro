@@ -43,7 +43,7 @@ const PROMESSES = [
     texte: "Chaque fiche porte sa source officielle et sa date de vérification.",
   },
   {
-    titre: "Votre dossier, pièce par pièce",
+    titre: "Ton dossier, pièce par pièce",
     texte:
       "Une checklist par destination, et ce qu'il faut corriger sur chaque document.",
   },
@@ -64,7 +64,7 @@ export default async function Accueil() {
           tabIndex={-1}
           className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-44"
         >
-          Où pouvez-vous étudier ou travailler&nbsp;?
+          Où peux-tu étudier ou travailler&nbsp;?
         </h1>
         <AccueilSimulateur />
       </section>
@@ -130,7 +130,7 @@ export default async function Accueil() {
       </section>
 
       <p className="text-pretty text-14 text-ink-500">
-        ImmiPro prépare votre dossier. La décision appartient aux autorités du pays
+        ImmiPro prépare ton dossier. La décision appartient aux autorités du pays
         de destination.
       </p>
     </div>

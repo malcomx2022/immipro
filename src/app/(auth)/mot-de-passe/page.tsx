@@ -9,7 +9,7 @@ import { MotDePasse } from "./MotDePasse";
  */
 export const metadata: Metadata = {
   title: "Mot de passe",
-  description: "Réinitialisez le mot de passe de votre compte ImmiPro.",
+  description: "Réinitialise le mot de passe de ton compte ImmiPro.",
 };
 
 export default function PageMotDePasse() {

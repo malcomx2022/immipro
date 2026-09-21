@@ -20,7 +20,7 @@ const TONS: Record<Palier, { texte: string; point: string }> = {
 };
 
 const MENTION_PAR_DEFAUT =
-  "Ce décompte porte sur les pièces de votre dossier. La décision appartient à l'administration du pays de destination.";
+  "Ce décompte porte sur les pièces de ton dossier. La décision appartient à l'administration du pays de destination.";
 
 const pieces = (n: number, singulier: string, pluriel: string) =>
   `${n} ${n > 1 ? pluriel : singulier}`;

@@ -43,7 +43,7 @@ describe("Footer", () => {
     render(<Footer />);
     expect(
       screen.getByText(
-        /n'est pas un cabinet de conseil en immigration et ne dépose aucun dossier à votre place/,
+        /n'est pas un cabinet de conseil en immigration et ne dépose aucun dossier à ta place/,
       ),
     ).toBeDefined();
   });

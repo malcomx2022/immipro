@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Alertes",
   description:
-    "Ce qui a changé sur vos dossiers, ce que cela implique, et d'où vient l'information.",
+    "Ce qui a changé sur tes dossiers, ce que cela implique, et d'où vient l'information.",
 };
 
 export default async function PageNotifications() {

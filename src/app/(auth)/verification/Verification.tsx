@@ -147,7 +147,7 @@ export function Verification() {
           disabled={!complet}
           chargement={envoi}
           raisonDesactivation={
-            complet ? undefined : `Saisissez les ${LONGUEUR_CODE} chiffres du code.`
+            complet ? undefined : `Saisis les ${LONGUEUR_CODE} chiffres du code.`
           }
           onClick={() => void verifier()}
         >

@@ -81,82 +81,16 @@ describe("cn et l'échelle de tailles fermée", () => {
  * tâche : elle lui dit quoi faire pour débloquer le bouton. Elle tutoie,
  * comme tout ce qu'il lit (DOC-12 §16, règle 5).
  *
- * Quatre d'entre elles vouvoyaient — « Choisissez un pack », « Choisissez
- * une date », « Choisissez une réponse » — et rien ne les cherchait. Elles
- * sont sorties au jour en lisant l'écran des packs pendant N.A.
+ * **Le garde-fou qui vivait ici a été retiré, parce qu'il est devenu un
+ * cas particulier de `tests/tutoiement.test.ts`.** Il lisait
+ * `raisonDesactivation`, et il a fallu l'élargir trois fois — littéral,
+ * puis expression JSX, puis constante déclarée dans le même fichier —
+ * chaque fois pour sortir un vouvoiement de plus. Son remplaçant ne suit
+ * plus une forme syntaxique : il lit tout le source des surfaces
+ * candidat, commentaires retirés, et il a trouvé du premier coup les
+ * dix-neuf occurrences que celui-ci ne pouvait pas voir, dont le titre de
+ * la page d'accueil (arbitrage du 21/09/2026).
  *
- * Le test se limite à ce registre. Le vouvoiement subsiste ailleurs, dans
- * les descriptions de page et quelques titres publics, et trancher s'il
- * doit y disparaître est un choix éditorial, pas une correction.
+ * La leçon est consignée là-bas plutôt qu'ici : un garde-fou qui doit
+ * être élargi à chaque découverte cherche la mauvaise chose.
  */
-describe("la raison d'un bouton désactivé tutoie", () => {
-  function fichiers(dir: string, filtre: RegExp, acc: string[] = []): string[] {
-    for (const nom of readdirSync(dir)) {
-      const p = join(dir, nom);
-      if (statSync(p).isDirectory()) fichiers(p, filtre, acc);
-      else if (filtre.test(nom)) acc.push(p.replace(/\\/gu, "/"));
-    }
-    return acc;
-  }
-
-  /** Les littéraux d'une expression JSX. */
-  const chaines = (expression: string): string[] =>
-    [...expression.matchAll(/"([^"]+)"/gu)].map((m) => m[1]!);
-
-  /**
-   * Et ceux que l'expression ne porte pas elle-même.
-   *
-   * `raisonDesactivation={complet ? undefined : raison}` ne contient
-   * aucune chaîne : la phrase vit dans un `const raison = …` plus haut
-   * dans le même fichier. Lire l'expression seule laissait donc passer la
-   * troisième branche de l'inscription, qui vouvoyait encore.
-   *
-   * Deux formes de déclaration, les deux présentes : un `const`, et une
-   * fonction qui rend la phrase — l'édition de contenu procède ainsi.
-   *
-   * La résolution s'arrête au fichier — un garde-fou qui suivrait les
-   * imports serait un compilateur. Ce qui vient d'ailleurs est une
-   * constante de domaine, et le balayage la lira dans son propre fichier.
-   */
-  const declaration = (source: string, nom: string): string => {
-    const constante = new RegExp(`\\bconst ${nom}\\s*(?::[^=]+)?=([\\s\\S]*?);\\n`, "u").exec(source);
-    const fonction = new RegExp(`\\bfunction ${nom}\\s*\\(([\\s\\S]*?)\\n\\}`, "u").exec(source);
-    return `${constante?.[1] ?? ""}\n${fonction?.[1] ?? ""}`;
-  };
-
-  const MOTS_CLES = new Set(["undefined", "null", "true", "false"]);
-  const litteraux = (source: string, expression: string): string[] => {
-    const textes = chaines(expression);
-    const sansChaines = expression.replace(/"[^"]*"/gu, "");
-    for (const id of sansChaines.matchAll(/\b[A-Za-z_$][\w$]*\b/gu)) {
-      if (MOTS_CLES.has(id[0])) continue;
-      textes.push(...chaines(declaration(source, id[0])));
-    }
-    return textes;
-  };
-
-  it("aucune ne vouvoie", () => {
-    const vouvoiement = /\b(vous|votre|vos|[A-ZÉÈ][a-zéèêàç]+ez)\b/u;
-    const fautives: string[] = [];
-    for (const f of fichiers("src", /\.tsx?$/u)) {
-      const source = readFileSync(f, "utf8");
-      // Toutes les formes : littérale, expression JSX, et constante
-      // déclarée dans le même fichier. La première version ne lisait que
-      // `raisonDesactivation="…"` et laissait passer l'écran de paiement ;
-      // la deuxième lisait l'expression et laissait passer l'inscription,
-      // qui range sa phrase dans un `const`. Chaque élargissement a sorti
-      // un vouvoiement de plus — le registre est petit, mais il se cache
-      // derrière une indirection à chaque fois.
-      for (const m of source.matchAll(/raisonDesactivation[=:]\s*(?:"([^"]+)"|\{([^}]*)\})/gu)) {
-        for (const texte of [...(m[1] ? [m[1]] : []), ...litteraux(source, m[2] ?? "")]) {
-          if (vouvoiement.test(texte)) fautives.push(`${f} — ${texte}`);
-        }
-      }
-      // Et les obstacles du domaine, qui alimentent ces mêmes boutons.
-      for (const m of source.matchAll(/return "([^"]*pour continuer\.)"/gu)) {
-        if (vouvoiement.test(m[1]!)) fautives.push(`${f} — ${m[1]!}`);
-      }
-    }
-    expect(fautives).toEqual([]);
-  });
-});

@@ -2490,3 +2490,56 @@ libellé.
     Acteur non résolu        aa000000-…              back-office
     systeme:purge                                    tâche planifiée
     webhook:MOBILE_MONEY                             webhook
+
+### R.5 — Le tutoiement, voix générale des contenus candidat
+
+**Tranché : le tutoiement n'est pas un cas particulier des boutons
+désactivés.**
+
+DOC-12 §16 règle 5 le demandait déjà, et le produit l'appliquait par
+endroits. Il s'applique désormais partout où l'on s'adresse à un
+candidat ou à un visiteur : l'espace candidat, le tunnel de paiement, les
+erreurs et confirmations, les courriels transactionnels, les guides et
+articles, les pages publiques de présentation, et les textes de pied de
+page adressés au lecteur.
+
+**Le back-office garde sa voix**, professionnelle et neutre, de
+préférence sans interpellation personnelle : son lecteur est un opérateur
+au travail. Et les corps juridiques de Q.A pourront employer le registre
+retenu par le conseil juridique — l'exception s'arrête au corps du
+document, les intitulés de navigation et les explications autour de lui
+restent au tutoiement. Les six pages n'existent pas encore ; la ligne
+d'exception est écrite pour que celui qui les rédigera trouve
+l'autorisation déjà accordée plutôt qu'un garde-fou à contourner.
+
+**Vingt-et-une occurrences corrigées**, dont le titre de la page
+d'accueil.
+
+#### Ce que l'application de la décision a trouvé
+
+**Le garde-fou cherchait la mauvaise chose.** Celui de N.C lisait
+`raisonDesactivation`, et il avait fallu l'élargir trois fois — littéral,
+puis expression JSX, puis constante déclarée dans le même fichier —
+chacune sortant un vouvoiement de plus. Il ne pouvait pas voir les
+autres, parce qu'il suivait une forme syntaxique plutôt qu'une surface.
+Son remplaçant lit tout le source de chaque surface candidat,
+commentaires retirés, et un texte JSX y compte comme un littéral : le
+lecteur ne fait pas la différence. Il a trouvé du premier coup les
+occurrences que quatre lots successifs avaient laissées.
+
+**Deux d'entre elles n'étaient pas des chaînes.** Le `<h1>` de la page
+d'accueil — « Où pouvez-vous étudier ou travailler ? », la première
+phrase du produit — et une relance sur l'écran des résultats. Un balayage
+des littéraux ne les voyait pas ; c'est la même leçon qu'en R.3, deux
+lots plus tôt, sur un autre sujet.
+
+**Et un vouvoiement en cachait un du rail.** La description de
+`/paiement/attente` disait « Confirmez le paiement sur votre
+téléphone » : un `metadata` n'est pas un composant, et le garde-fou de
+R.3 ne lisait que les composants. Un payeur par carte lisait donc la
+version Mobile Money dans l'onglet de son navigateur. La phrase est
+désormais tutoyée **et** neutre — une description de page ne connaît pas
+la transaction — et le garde-fou du rail lit aussi les `page.tsx`.
+
+**Les onze pages publiques, relues au navigateur** — titres, descriptions
+et corps — sans une occurrence restante.

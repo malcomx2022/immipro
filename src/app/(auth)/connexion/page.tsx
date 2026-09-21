@@ -9,7 +9,7 @@ import { Connexion } from "./Connexion";
  */
 export const metadata: Metadata = {
   title: "Connexion",
-  description: "Connectez-vous à votre espace ImmiPro.",
+  description: "Connecte-toi à ton espace ImmiPro.",
 };
 
 export default function PageConnexion() {

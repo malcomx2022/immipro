@@ -9,8 +9,8 @@ import { Verification } from "./Verification";
  * règles, mais le dossier reste consultable.
  */
 export const metadata: Metadata = {
-  title: "Vérifier votre adresse email",
-  description: "Saisissez le code à six chiffres reçu par email.",
+  title: "Vérifier ton adresse email",
+  description: "Saisis le code à six chiffres reçu par email.",
 };
 
 export default function PageVerification() {

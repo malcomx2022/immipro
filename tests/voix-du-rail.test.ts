@@ -234,9 +234,23 @@ describe("$-03 — l'écran d'attente tient le même interdit", () => {
 describe("les écrans du tunnel ne réécrivent pas la prose du rail", () => {
   const MOTS_DE_RAIL = /Mobile Money|opérateur|téléphone|portefeuille|\*\d{2,5}#|banque|bancaire/iu;
 
+  /**
+   * Les `page.tsx` en font partie, et c'est là que le défaut a tenu le
+   * plus longtemps. La description de `/paiement/attente` disait
+   * « Confirmez le paiement sur votre téléphone » — un `metadata` n'est
+   * pas un composant, et la première liste n'y regardait pas. Un payeur
+   * par carte lisait donc la version Mobile Money dans l'onglet de son
+   * navigateur et dans les résultats de recherche. Une description de
+   * page ne connaît pas la transaction : elle doit rester neutre, ce qui
+   * est le troisième cas de l'arbitrage.
+   */
   for (const fichier of [
     "src/app/(app)/paiement/attente/Attente.tsx",
+    "src/app/(app)/paiement/attente/page.tsx",
     "src/app/(app)/paiement/echec/Echec.tsx",
+    "src/app/(app)/paiement/echec/page.tsx",
+    "src/app/(app)/paiement/recapitulatif/page.tsx",
+    "src/app/(app)/paiement/confirme/page.tsx",
   ]) {
     it(`${fichier} ne nomme aucun rail en dur`, () => {
       const code = sansCommentaires(lire(fichier));

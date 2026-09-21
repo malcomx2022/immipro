@@ -97,7 +97,7 @@ export function Resultats() {
           tabIndex={-1}
           className="text-24 font-semibold text-ink-900 outline-none md:text-32"
         >
-          Vos destinations
+          Tes destinations
         </h1>
         <BlocEchec echec={etat.echec}>
           <Button onClick={() => void classer(etat.reponses)}>{etat.echec.action}</Button>
@@ -285,10 +285,10 @@ function Chargement() {
         tabIndex={-1}
         className="text-24 font-semibold text-ink-900 outline-none md:text-32"
       >
-        Vos destinations
+        Tes destinations
       </h1>
       <p role="status" className="text-16 text-ink-700">
-        Classement de vos réponses en cours.
+        Classement de tes réponses en cours.
       </p>
       <div aria-hidden="true" className="grid gap-3 md:grid-cols-3">
         {[0, 1, 2].map((i) => (
@@ -325,8 +325,8 @@ function Vide() {
         Aucune réponse à classer pour le moment
       </h1>
       <p className="text-pretty text-16 text-ink-700">
-        Vos réponses ne sont gardées que le temps de la session, sur cet appareil.
-        Reprenez les six questions : il n&apos;y a ni compte à créer, ni attente.
+        Tes réponses ne sont gardées que le temps de la session, sur cet appareil.
+        Reprends les six questions : il n&apos;y a ni compte à créer, ni attente.
       </p>
       <LienBouton href="/simulateur" className="min-h-action">
         Lancer le simulateur

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Mon profil",
-  description: "Ces informations adaptent votre checklist.",
+  description: "Ces informations adaptent ta checklist.",
 };
 
 export default async function PageProfil() {

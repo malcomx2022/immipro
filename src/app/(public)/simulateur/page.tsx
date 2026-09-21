@@ -11,7 +11,7 @@ import { Simulateur } from "./Simulateur";
 export const metadata: Metadata = {
   title: "Simulateur",
   description:
-    "Six questions pour situer votre projet. Aucun compte à créer, aucune réponse conservée après la session.",
+    "Six questions pour situer ton projet. Aucun compte à créer, aucune réponse conservée après la session.",
 };
 
 export default function PageSimulateur() {

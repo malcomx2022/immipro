@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Ouvrir un dossier",
-  description: "Deux informations suffisent pour générer votre checklist.",
+  description: "Deux informations suffisent pour générer ta checklist.",
 };
 
 export default async function PageNouveauDossier({
