@@ -2,6 +2,7 @@ import { z } from "zod";
 import { route } from "@/server/http/route";
 import { consommerUnCode, emettreUnCode } from "@/server/acces/comptes";
 import { envoyerCodeDeVerification } from "@/server/courrier";
+import { suiteDeLEnvoi } from "@/domain/courrier/transport";
 import { echec } from "@/server/http/echecs";
 import { db } from "@/lib/db";
 import { LONGUEUR_CODE, normaliserCode } from "@/domain/comptes/code-verification";
@@ -47,7 +48,16 @@ export const PUT = route({
   limite: "sensible",
   async traiter({ acteur }) {
     const code = await emettreUnCode(acteur!.id, "VERIFICATION_EMAIL");
-    await envoyerCodeDeVerification(acteur!.email, code);
+    const envoi = await envoyerCodeDeVerification(acteur!.email, code);
+    /*
+      L'écran répondait « un nouveau code est parti » quel que soit le
+      sort du courrier — devant un transport muet, il n'en partait
+      aucun, et le candidat attendait un message qui n'existait pas.
+      L'échec est maintenant rendu tel quel : le bloc d'échec dit à quoi
+      s'en tenir, et le code émis reste valable si un envoi finit par
+      passer.
+    */
+    if (!suiteDeLEnvoi(envoi.issue).parti) throw echec("service_indisponible");
     return { envoye: true };
   },
 });

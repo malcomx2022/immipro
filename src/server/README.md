@@ -497,6 +497,37 @@ dépendance figure dans `.env.example` ; vider une variable bloquante
 change ce que `/api/health` observe, ce qui prouve qu'elle a un lecteur
 réel ; et aucun appel à `console` n'interpole la lecture d'un secret.
 
+### Le courrier part, et le journal se tait
+
+`SMTP_URL` lue et valide, les codes de vérification, les
+réinitialisations, les reçus, les confirmations d'entretien et de
+remboursement sont remis à un serveur SMTP (`courrier/smtp.ts`, sur
+`nodemailer`). Absente, la dégradation ne change pas : rien ne part,
+l'appelant l'apprend, et la messagerie reste bloquante pour l'ouverture
+au public.
+
+**Ni l'objet ni le corps n'atteignent le journal.** Pour la moitié des
+courriers, l'objet **est** le secret — `481920 — ton code de
+vérification ImmiPro` — et le transport de repli le recopiait à chaque
+envoi, mettant le code d'ouverture de chaque compte dans un agrégateur
+conservé des semaines. La trace porte le genre du courrier, le domaine
+du destinataire et l'issue : de quoi exploiter un incident sans nommer
+personne. Le genre est donné par l'appelant, jamais déduit du texte.
+
+**`expedier` rend une issue** parmi cinq (`Envoi`, domaine) : envoyé,
+journalisé, non configuré, refusé, injoignable. Seule la coupure est
+renvoyable — on ne sait pas si le message est passé, et un second code
+vaut mieux qu'aucun. Deux routes taisent délibérément l'issue, la
+demande de réinitialisation et la création de compte : elles répondent
+la même chose avec ou sans compte existant, et remonter l'échec dirait
+« cette adresse est cliente ».
+
+**La sonde ne conclut que sur un fait** — un envoi réel, ou un
+`verify()` réel, qui ouvre la connexion et raccroche sans rien remettre.
+Le worker l'appelle au démarrage. `/api/health` ne parle à aucun serveur
+SMTP : cette adresse ne déclenche rien (décision du 21/09), et une
+`SMTP_URL` qui s'analyse ne prouve rien.
+
 ### Rembourser, sans qu'une réponse 200 solde une dette
 
 Trois faits, et un seul écrit le versement : `refundDueAt` dit qu'on

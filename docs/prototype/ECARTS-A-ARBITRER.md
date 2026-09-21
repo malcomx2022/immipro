@@ -5166,3 +5166,142 @@ comptées — mais **le retrait de droits reste unique**, parce que l'index
 tient là où l'appelant ne tenait plus ; et en déclarant FedaPay
 `operationnel: true`, quatre vérifications rougissent d'un coup, dont
 celle de l'état de service — la déclaration ne peut plus mentir seule.
+
+### S.26 — Le code de vérification était dans les journaux
+
+Le transport de courrier n'était pas branché : `expedier` mettait en
+forme, écrivait une ligne au journal, et rendait la main. C'était la
+dégradation honnête, et elle l'est restée tant qu'aucun adaptateur
+n'existait. Ce lot en écrit un — et, en le branchant, en trouve deux
+autres.
+
+#### Ce que la ligne de journal contenait
+
+```
+[courrier] → awa@exemple.test · 481920 — ton code de vérification ImmiPro
+```
+
+L'objet paraissait anodin. Pour la moitié des courriers du produit,
+**l'objet est le secret** : le code de vérification et le code de
+réinitialisation sont dans le sujet, pour qu'on les lise dans la liste
+des messages sans ouvrir. Le transport de repli les recopiait donc au
+journal du serveur — c'est-à-dire, en production, dans un agrégateur
+conservé des semaines, consultable par qui a accès aux journaux, et
+qu'aucune règle de rétention ne balaie (INV-5 ne couvre que les pièces).
+Un code lu là ouvre un compte.
+
+L'adresse complète y était aussi, qui est une donnée nominative à elle
+seule.
+
+Ce qui reste : le **genre** du courrier, le **domaine** du destinataire,
+l'**issue**. De quoi exploiter un incident — « tous les envois vers ce
+domaine échouent » — sans nommer personne ni rien divulguer. Le genre est
+donné par l'appelant et non déduit de l'objet : déduire du texte
+reviendrait à en journaliser un morceau, et un jour ce morceau porterait
+un code.
+
+#### « Un nouveau code est parti » — il n'en partait aucun
+
+`expedier` ne rendait rien. La route de renvoi répondait donc
+`{ envoye: true }` quoi qu'il arrive, et l'écran affichait « Un nouveau
+code est parti. Le précédent ne fonctionne plus. » devant un transport
+muet. Le candidat attendait un message qui n'existait pas, et la
+deuxième phrase était vraie — l'ancien code venait bien d'être annulé.
+
+`expedier` rend maintenant une issue parmi cinq, et la route la lit.
+
+| Issue | Parti ? | Renvoyable ? |
+|---|---|---|
+| `envoye` | oui | — |
+| `injoignable` | on ne sait pas | **oui** — la coupure se reprend |
+| `refuse` | non | non — le serveur a dit non |
+| `non_configure` | non | non — il y a une variable à renseigner |
+| `journalise` | non | non — rien ne partira sans configuration |
+
+**Deux routes taisent délibérément l'issue**, et c'est l'inverse d'un
+oubli : la demande de réinitialisation et la création de compte
+répondent la même chose avec ou sans compte existant. Seule une adresse
+connue produit un courrier — en faire remonter l'échec dirait « cette
+adresse est cliente » à qui essaie des adresses au hasard. La trace part
+au journal, où un opérateur la voit sans que l'essayeur la voie. Un test
+tient les deux règles, parce qu'une seule des deux s'oublie facilement.
+
+#### La bibliothèque, et sa version
+
+`nodemailer`. Parler SMTP à la main demande EHLO, STARTTLS, AUTH,
+l'encodage MIME et l'échappement des en-têtes — le dernier n'est pas une
+commodité : une injection CRLF dans un en-tête ajoute un destinataire à
+un message qu'on croit adresser à une seule personne, et nos objets sont
+composés à l'exécution.
+
+Elle **était déjà dans l'arbre** : `next-auth` la déclare en pair
+facultatif. L'ajouter ne fait donc pas entrer une nouvelle famille de
+code dans le dépôt.
+
+Mais son pair réclame la version 7, qui porte **dix avis de sécurité
+ouverts**, dont deux de gravité haute — parmi eux une complexité
+quadratique de l'analyseur d'adresses, atteignable puisque nos
+destinataires sont des adresses saisies à l'inscription. La 10 les
+corrige. Le conflit est résolu par un `overrides` dans `package.json`,
+et non par `--legacy-peer-deps` : `npm ci` doit reproduire l'arbre de
+`npm install`, et la porte de qualité installe avec `npm ci`.
+
+Au passage : **`next-auth` n'est importé nulle part dans `src/`.** Sa
+présence ne contraignait donc rien de réel — mais elle a failli imposer
+une version vulnérable. À retirer, ou à utiliser ; c'est une décision,
+pas un correctif, et elle sort du cadre de ce lot.
+
+#### La sonde, et ce qu'elle refuse de conclure
+
+`/api/health` ne parle à aucun serveur SMTP, et la décision est
+ancienne : cette adresse est interrogée par un répartiteur de charge, et
+« rien de coûteux n'en part » (arbitrage du 21/09). Ouvrir une connexion
+à chaque appel la contredirait.
+
+La sonde lit donc le **dernier fait** — le dernier envoi réel, ou la
+dernière vérification de connexion réelle. `verify()` ouvre la
+connexion, dit bonjour, s'authentifie, et raccroche sans remettre aucun
+message : le worker l'appelle une fois au démarrage, ce qui suffit à
+établir le fait sans attendre le premier candidat.
+
+**Une `SMTP_URL` qui s'analyse ne conclut rien.** C'est la leçon du
+21/09 appliquée au module qui vient de se brancher : la messagerie reste
+« configurée, non vérifiée » — donc l'instance inapte, donc l'ouverture
+publique bloquée — tant que personne n'a réellement parlé à un serveur.
+Une URL renseignée mais illisible, en revanche, est un fait : elle rend
+la sonde `ECHOUEE` tout de suite, sans attendre un candidat.
+
+Ce que cette lecture **ne** dit **pas** : que le transport fonctionne en
+ce moment. Elle dit ce qui s'est passé la dernière fois qu'on a essayé.
+Le savoir en continu demanderait une sonde périodique, qui n'est pas
+dans ce lot.
+
+#### Vérifié en exécutant
+
+Contre un **vrai serveur SMTP** (`smtp-server` sur un port éphémère de
+la boucle locale, aucun message ne quitte la machine) : le message part
+et arrive tel qu'écrit ; la vérification de connexion n'envoie rien ;
+des identifiants rejetés donnent `refuse` sans que le mot de passe
+paraisse ; les bons passent ; un destinataire refusé n'est pas un envoi,
+seul **et** en refus partiel — ce second cas ne se voyait pas, parce
+qu'un refus unique fait lever, et la branche qui lit `info.rejected`
+n'était donc pas éprouvée ; un serveur injoignable donne `injoignable`
+et non `refuse` ; un serveur qui n'accueille jamais laisse le délai
+trancher.
+
+Sur PostgreSQL réel (`npm run smoke:courrier`, entré dans la porte) : le
+rejeu d'une notification signée ne produit pas un second reçu, quatre
+passages compris — l'idempotence est en amont, dans
+`PaymentEvent.providerEventId`, et c'est cette chaîne-là qu'on éprouve
+plutôt qu'un garde-fou dans le module de courrier, qui protégerait le
+symptôme en laissant passer le double crédit. Et le journal, relu
+pendant l'envoi, ne porte ni le code, ni l'objet, ni l'adresse — tandis
+que le destinataire, lui, reçoit bien son code.
+
+Dix mutations, dix rouges — mais deux ne l'étaient pas au premier essai,
+et les deux disaient la même chose. Supprimer la lecture de
+`info.rejected` ne faisait rougir personne : le test du « destinataire
+refusé » passait par la levée d'exception, pas par cette branche. Et
+faire répondre de nouveau `{ envoye: true }` sans vérifier ne faisait
+rougir personne non plus — la correction la plus visible du lot n'avait
+aucun garde-fou. Un test a été ajouté pour chacune.

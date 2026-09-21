@@ -8,6 +8,8 @@
  * d'incident, sans file de jobs.
  */
 import { getQueue, JOBS, poster } from "@/lib/queue";
+import { noterLeFait } from "@/server/courrier";
+import { verifierLaConnexion } from "@/server/courrier/smtp";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
@@ -96,6 +98,30 @@ async function main() {
   await boss.schedule(JOBS.VEILLE_ECHEANCE, "0 3 * * *");
   await boss.schedule(JOBS.PEREMPTION_PIECES, "15 3 * * *");
   await boss.schedule(JOBS.PURGE_RETENTION, "30 3 * * *");
+
+  /*
+    La sonde du transport de courrier, une fois au démarrage.
+
+    `verify()` ouvre la connexion, dit bonjour, s'authentifie si besoin,
+    et raccroche : **aucun message n'est remis**. C'est ce qui permet de
+    l'appeler ici sans écrire à personne.
+
+    Elle est ici et non dans `/api/health`, parce que cette adresse-là
+    est interrogée par un répartiteur de charge et que la décision de
+    n'en rien faire partir est prise (21/09/2026). Sans ce passage, la
+    messagerie resterait « configurée, non vérifiée » jusqu'au premier
+    courrier réel — c'est-à-dire jusqu'au premier candidat, qui est
+    exactement la personne sur qui on ne veut pas découvrir la panne.
+
+    Son échec n'empêche pas le worker de démarrer : les jobs de paiement
+    et de purge n'ont rien à voir avec le courrier, et les bloquer sur
+    un serveur de messagerie muet ferait d'une panne un arrêt.
+  */
+  const courrier = await verifierLaConnexion().catch(() => null);
+  if (courrier) {
+    noterLeFait(courrier.issue === "envoye");
+    console.info(`[courrier] vérification de la connexion · ${courrier.issue}`);
+  }
 
   console.log("worker démarré");
 }

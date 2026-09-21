@@ -38,6 +38,14 @@ export const POST = route({
     }
 
     const code = await emettreUnCode(user.id, "VERIFICATION_EMAIL");
+    /*
+      Même raison qu'à la réinitialisation : les deux branches de cette
+      route répondent la même chose, et faire échouer celle-ci sur un
+      courrier manqué distinguerait une adresse nouvelle d'une adresse
+      déjà inscrite. Le compte est créé, la session est ouverte, et
+      l'écran de vérification porte « Renvoyer le code » — qui, lui, dit
+      la vérité sur l'envoi.
+    */
     await envoyerCodeDeVerification(user.email, code);
 
     const session = await ouvrirSession(user.id);
