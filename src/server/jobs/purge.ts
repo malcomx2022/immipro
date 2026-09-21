@@ -4,6 +4,7 @@ import { removeObject } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
 import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
 import { CONSERVATION_ANNEES } from "@/domain/backoffice/audit";
+import { ecartOuvert } from "@/domain/backoffice/ecart";
 import {
   CONSERVATION_MOTIF_JOURS,
   motifEffacable,
@@ -307,7 +308,12 @@ async function effacerLesMotifsEchus(maintenant: Date): Promise<number> {
      * que ce que la règle écarterait aussi.
      */
     where: { failureCauseAt: { lte: echeanceEnJours(CONSERVATION_MOTIF_JOURS, maintenant) } },
-    select: { id: true, failureCauseAt: true, discrepancy: true },
+    select: {
+      id: true,
+      failureCauseAt: true,
+      discrepancy: true,
+      discrepancyResolvedAt: true,
+    },
   });
 
   const echus = candidats
@@ -352,13 +358,16 @@ async function effacerLesMotifsEchus(maintenant: Date): Promise<number> {
  * l'expiration, et son propre commentaire le dit — « l'expiration ne ferme
  * pas le dossier de la réclamation : l'écart reste ouvert ».
  *
- * **Et sa clôture n'est pas datée.** Rien n'enregistre la résolution d'un
- * écart aujourd'hui : le sursis de trente jours n'a donc aucun déclencheur,
- * et `closLe` reste nul. Un écart suspend tant qu'il est là, ce qui est
- * exactement ce que la décision demande d'un dossier ouvert. Le jour où
- * B-04 saura fermer un écart, il devra le dater, et cette fonction rendra
- * la date sans que la règle change.
+ * **Et sa clôture est maintenant datée.** O.B écrivait « le jour où B-04
+ * saura fermer un écart, il devra le dater, et cette fonction rendra la
+ * date sans que la règle change ». C'est ce jour : B-04 referme un écart
+ * avec une issue, une note, un acteur et une date, et c'est cette date
+ * qui ouvre le sursis de trente jours. La règle n'a pas changé — seule la
+ * ligne qui rendait `null` faute d'événement.
  */
-function litigeDe(t: { discrepancy: string | null }): EtatDuLitige {
-  return { ouvert: t.discrepancy !== null, closLe: null };
+function litigeDe(t: {
+  discrepancy: string | null;
+  discrepancyResolvedAt: Date | null;
+}): EtatDuLitige {
+  return { ouvert: ecartOuvert(t), closLe: t.discrepancyResolvedAt };
 }

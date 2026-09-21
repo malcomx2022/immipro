@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ecartOuvert } from "@/domain/backoffice/ecart";
 import { echec } from "@/server/http/echecs";
 import { payload } from "@/server/acces/regles";
 import { editorialDe } from "@/lib/contenu/destinations";
@@ -208,6 +209,25 @@ export async function paiements(maintenant = new Date()): Promise<Paiement[]> {
     include: { user: { select: { email: true } } },
   });
 
+  const acteurs = new Map(
+    (
+      await db.user.findMany({
+        where: {
+          id: {
+            in: [
+              ...new Set(
+                transactions
+                  .map((t) => t.discrepancyResolvedBy)
+                  .filter((id): id is string => id !== null),
+              ),
+            ],
+          },
+        },
+        select: { id: true, email: true },
+      })
+    ).map((u) => [u.id, u.email]),
+  );
+
   return transactions.map((t) => ({
     reference: t.reference,
     compte: t.user.email,
@@ -219,6 +239,30 @@ export async function paiements(maintenant = new Date()): Promise<Paiement[]> {
     ...(t.refundBasis ? { motifDuRemboursement: t.refundBasis } : {}),
     recuLe: t.createdAt.toISOString(),
     etat: etatDuRapprochement(t, maintenant),
+    // L'écart voyage avec sa résolution : refermer sans relire le constat
+    // reviendrait à signer un texte qu'on n'a pas sous les yeux. Les
+    // adresses sont résolues comme au journal — l'identifiant durable
+    // reste en base, la lecture en tire une identité lisible.
+    ...(t.discrepancy
+      ? {
+          ecart: {
+            constat: t.discrepancy,
+            ...(t.discrepancyResolvedAt &&
+            t.discrepancyOutcome &&
+            t.discrepancyNote &&
+            t.discrepancyResolvedBy
+              ? {
+                  resolution: {
+                    issue: t.discrepancyOutcome,
+                    note: t.discrepancyNote,
+                    par: acteurs.get(t.discrepancyResolvedBy) ?? t.discrepancyResolvedBy,
+                    le: t.discrepancyResolvedAt.toISOString(),
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
   }));
 }
 
@@ -227,13 +271,18 @@ function etatDuRapprochement(
     status: string;
     reconciledAt: Date | null;
     discrepancy: string | null;
+    discrepancyResolvedAt: Date | null;
     createdAt: Date;
     refundDueAt: Date | null;
     refundedAt: Date | null;
   },
   maintenant: Date,
 ): EtatRapprochement {
-  if (t.discrepancy) return "ECART";
+  // Un écart **refermé** n'est plus un écart à traiter : le texte reste
+  // pour l'historique, mais la file de travail ne doit plus le compter,
+  // sinon le compteur ne redescend jamais et cesse de vouloir dire
+  // quelque chose (arbitrage du 21/09/2026).
+  if (ecartOuvert(t)) return "ECART";
   // K.C — avant tout le reste, parce qu'une somme à rendre prime sur un
   // rapprochement réussi : une transaction rapprochée dont on doit l'argent
   // se serait affichée « Rapproché », et personne n'aurait rendu la somme.
@@ -244,7 +293,22 @@ function etatDuRapprochement(
   if (t.status === "REMBOURSEE") return "REMBOURSE";
   if (t.status === "EXPIREE") return "ECHEC_DELAI";
   if (t.status === "ECHOUEE") return "ECHEC";
-  return aReconcilier(t.createdAt, maintenant) ? "ECART" : "EN_ATTENTE";
+  /**
+   * Une transaction en attente au-delà du délai de rattrapage est un
+   * écart à traiter — **tant que personne ne l'a traitée**.
+   *
+   * Vu en refermant un écart dans l'écran : la base portait bien l'issue,
+   * la note et la date, et la ligne réaffichait « Écart à traiter » au
+   * rechargement. Cette ligne-ci ne lit pas `discrepancy` du tout : elle
+   * déduit l'écart de l'âge, et rouvrait donc ce que la résolution venait
+   * de refermer. Le compteur n'aurait jamais pu redescendre, ce qui est
+   * exactement le défaut que cet arbitrage corrige.
+   *
+   * Le paiement reste « en attente » — c'est vrai, il n'est pas confirmé
+   * — mais il sort de la file de travail, parce qu'il a été travaillé.
+   */
+  const aTraiter = aReconcilier(t.createdAt, maintenant) && t.discrepancyResolvedAt === null;
+  return aTraiter ? "ECART" : "EN_ATTENTE";
 }
 
 /**

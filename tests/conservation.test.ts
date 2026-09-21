@@ -282,7 +282,13 @@ describe("un dossier ouvert se lit dans ce qui existe déjà", () => {
   const litige = /function litigeDe[\s\S]*?\n\}$/mu.exec(PURGE)![0];
 
   it("un écart de réconciliation non résolu suspend", () => {
-    expect(litige).toMatch(/discrepancy !== null/u);
+    expect(litige).toMatch(/ouvert: ecartOuvert\(t\)/u);
+    // Et « ouvert » veut bien dire les deux moitiés : il existe, et
+    // personne ne l'a refermé.
+    const regle = readFileSync("src/domain/backoffice/ecart.ts", "utf8");
+    expect(regle).toMatch(
+      /etat\.discrepancy !== null && etat\.discrepancyResolvedAt === null/u,
+    );
   });
 
   /**
@@ -318,13 +324,15 @@ describe("un dossier ouvert se lit dans ce qui existe déjà", () => {
   });
 
   /**
-   * Rien ne date la résolution d'un écart : le sursis de trente jours n'a
-   * donc aucun déclencheur aujourd'hui, et `closLe` reste nul. Ce n'est
-   * pas la règle qui manque — elle est écrite et vérifiée plus haut —
-   * c'est l'événement de clôture. Le jour où B-04 saura fermer un écart,
-   * il devra le dater.
+   * **Le sursis a enfin son déclencheur.** O.B avait écrit la règle des
+   * trente jours et constaté qu'aucun événement ne pouvait la déclencher :
+   * rien ne datait la résolution d'un écart, et `closLe` rendait `null`.
+   * B-04 referme désormais un écart avec une date, et c'est elle qui
+   * ouvre le sursis. La règle n'a pas bougé d'une ligne — seule la source
+   * de la date.
    */
-  it("aucune clôture n'est datée, et la purge ne prétend pas le contraire", () => {
-    expect(litige).toMatch(/closLe: null/u);
+  it("la clôture d'un écart date le sursis", () => {
+    expect(litige).toMatch(/closLe: t\.discrepancyResolvedAt/u);
+    expect(litige).not.toMatch(/closLe: null/u);
   });
 });

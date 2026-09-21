@@ -2224,3 +2224,67 @@ Il l'est, et pour sa propre raison : il liste les fiches publiées, qu'une
 dépublication doit pouvoir vider en minutes. Ce que Q.B refuse n'est pas
 qu'une page lise la base, c'est qu'un composant partagé rende dynamiques
 celles qui ne lisent rien.
+
+---
+
+## Annexe R · Les constats accumulés, arbitrés
+
+Cinq manques relevés au fil des lots, qu'aucune décision ne couvrait.
+Arbitrés le 21/09/2026, et traités un par un.
+
+### R.1 — La résolution des écarts en back-office
+
+**Tranché : la résolution appartient au back-office, la vérité financière
+non.**
+
+B-04 affichait « Traiter les N écarts » sur un bouton sans action. Un
+écart s'ouvrait au bout de vingt-quatre heures et ne se refermait jamais.
+Il ouvre désormais la file : constat sous les yeux, issue fermée parmi
+quatre, note obligatoire, date, acteur, journalisation. L'écart n'est pas
+effacé — l'historique garde la question à côté de la réponse.
+
+**Une action manuelle ne déclare jamais un paiement encaissé ou
+remboursé.** « Remboursement à initier » est une issue de guichet, pas un
+virement. Seule la notification signée du fournisseur fait bouger l'argent
+(INV-7), et un test le vérifie sur le `data` de l'écriture plutôt que sur
+l'intention du commentaire.
+
+**Et c'est le déclencheur qu'O.B attendait.** O.B avait écrit la règle du
+sursis de trente jours en constatant qu'aucun événement ne pouvait la
+dater. La date de résolution est cet événement : l'échéance du motif
+devient la plus tardive entre quatre-vingt-dix jours après l'échec et
+trente jours après la clôture.
+
+#### Ce que l'application de la décision a trouvé
+
+**Une contrainte CHECK écrite et qui ne gardait rien.** Elle disait
+`btrim("discrepancyNote") <> ''` sur une colonne nullable. Sur `NULL`,
+l'expression vaut `NULL`, et une contrainte CHECK **passe** quand elle
+vaut `NULL` — seul `FALSE` rejette. Une clôture sans note entrait donc en
+base, et le script de vérification l'a **acceptée** : cinquante-six refus
+au lieu de cinquante-sept, un écart d'une ligne dans un décompte qu'on lit
+comme un total. Le `IS NOT NULL` est désormais explicite. Le piège ne vaut
+que pour les colonnes nullables ; ailleurs, la même forme porte sur des
+colonnes `NOT NULL`, où elle est sûre.
+
+**Le compteur ne pouvait toujours pas redescendre après la correction.**
+Vu en refermant un écart dans l'écran : la base portait l'issue, la note
+et la date, et la ligne réaffichait « Écart à traiter » au rechargement.
+La dernière ligne de `etatDuRapprochement` ne lit pas `discrepancy` du
+tout — elle déduit l'écart de l'**âge** de la transaction — et rouvrait
+donc ce que la résolution venait de refermer. Le test unitaire ne voyait
+rien : il vérifiait la première ligne de la fonction, pas la dernière.
+Après correction, le paiement reste « en attente de rapprochement », ce
+qui est vrai, mais sort de la file, parce qu'il a été travaillé.
+
+**La chaîne complète, exécutée contre PostgreSQL :**
+
+    au départ                     motif=DELAI_DEPASSE  écart=présent clos=non
+    purge → 0 motif effacé        (écart ouvert : suspendu)
+    écart refermé il y a 20 j     clos=2026-09-01
+    purge → 0 motif effacé        (sursis en cours)
+    clôture reculée à 31 j
+    purge → 1 motif effacé        motif=null, écart=présent
+
+Montant, statut et référence intacts ; l'issue et la note conservées après
+l'effacement du motif.

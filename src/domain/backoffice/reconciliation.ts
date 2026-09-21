@@ -15,6 +15,7 @@
  */
 
 import type { CauseRefus } from "@/domain/paiement/echec";
+import type { IssueEcart } from "./ecart";
 
 export type EtatRapprochement =
   | "RAPPROCHE"
@@ -62,6 +63,22 @@ export interface Paiement {
   cause?: CauseRefus;
   /** Pourquoi un remboursement est dû, quand il l'est (K.C). */
   motifDuRemboursement?: string;
+  /**
+   * L'écart, et sa résolution si elle a eu lieu — arbitrage du 21/09/2026.
+   *
+   * Les deux voyagent ensemble parce que l'un ne se lit pas sans l'autre :
+   * refermer un écart sans relire ce qu'il disait, c'est signer un texte
+   * qu'on n'a pas sous les yeux.
+   */
+  ecart?: {
+    constat: string;
+    resolution?: {
+      issue: IssueEcart;
+      note: string;
+      par: string;
+      le: string;
+    };
+  };
 }
 
 export const estConfirme = (p: Paiement): boolean => p.etat === "RAPPROCHE";

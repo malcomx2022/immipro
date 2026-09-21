@@ -240,6 +240,47 @@ SELECT refuse(
        provider, status, "failureCause", "failureCauseAt")
      VALUES ('t4','IMP-260920-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','ECHOUEE','DELAI_DEPASSE',now())$q$);
 
+-- ── Résolution des écarts · le guichet ne bricole pas une clôture ─────────
+SELECT refuse(
+  'Écart · une issue sans date de clôture',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, discrepancy, "discrepancyOutcome")
+     VALUES ('te1','IMP-260921-AAAAAA','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE',
+       'Sans confirmation.', 'INCIDENT_TRANSMIS')$q$);
+
+SELECT refuse(
+  'Écart · une clôture sans note',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, discrepancy, "discrepancyOutcome", "discrepancyResolvedAt",
+       "discrepancyResolvedBy")
+     VALUES ('te2','IMP-260921-BBBBBB','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE',
+       'Sans confirmation.', 'INCIDENT_TRANSMIS', now(), 'op')$q$);
+
+SELECT refuse(
+  'Écart · une clôture que personne n''a prononcée',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, discrepancy, "discrepancyOutcome", "discrepancyNote",
+       "discrepancyResolvedAt", "discrepancyResolvedBy")
+     VALUES ('te3','IMP-260921-CCCCCC','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE',
+       'Sans confirmation.', 'INCIDENT_TRANSMIS', 'Relancé le fournisseur.', now(), '   ')$q$);
+
+SELECT refuse(
+  'Écart · une résolution sans écart à résoudre',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "discrepancyOutcome", "discrepancyNote",
+       "discrepancyResolvedAt", "discrepancyResolvedBy")
+     VALUES ('te4','IMP-260921-DDDDDD','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE',
+       'INCIDENT_TRANSMIS', 'Relancé le fournisseur.', now(), 'op')$q$);
+
+SELECT refuse(
+  'Écart · une clôture antérieure à l''ouverture de la transaction',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "createdAt", discrepancy, "discrepancyOutcome", "discrepancyNote",
+       "discrepancyResolvedAt", "discrepancyResolvedBy")
+     VALUES ('te5','IMP-260921-EEEEEE','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE',
+       now(), 'Sans confirmation.', 'INCIDENT_TRANSMIS', 'Relancé.',
+       now() - interval '1 hour', 'op')$q$);
+
 -- ── P.B · l'historique des publications ───────────────────────────────────
 SELECT refuse(
   'P.B · une version publiée sans source (INV-8)',
