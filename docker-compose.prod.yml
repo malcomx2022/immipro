@@ -32,10 +32,22 @@ services:
       - "127.0.0.1:3000:3000"
     networks: [internal]
 
+  # Les acteurs SYS de DOC-11 — purge (INV-5), réconciliation des
+  # paiements (INV-7), veille (RG-14.1), balayage puis analyse, péremption
+  # des pièces (RG-07.4). Service séparé, même image : un travail de fond
+  # dans le processus web partagerait sa mémoire et son cycle de vie.
+  #
+  # `dist/worker.js` est produit par `npm run build` pendant la
+  # construction de l'image, et copié par le Dockerfile. Ce n'est pas du
+  # TypeScript interprété au démarrage, et rien n'est téléchargé à
+  # l'exécution.
+  #
+  # `--enable-source-maps` : la carte est dans l'image, et un worker qui
+  # redémarre en boucle est le cas où une pile lisible se paie.
   worker:
     image: ghcr.io/${GH_OWNER}/immipro:${TAG}
     restart: unless-stopped
-    command: ["node", "dist/worker.js"]
+    command: ["node", "--enable-source-maps", "dist/worker.js"]
     env_file: .env.app
     depends_on:
       postgres: { condition: service_healthy }

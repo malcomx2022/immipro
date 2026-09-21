@@ -8,6 +8,23 @@ on:
 jobs:
   verifier:
     runs-on: ubuntu-latest
+    # Une base réelle, uniquement pour le test de fumée du worker : pg-boss
+    # crée ses files au démarrage, et l'échec « Queue … not found » ne se
+    # voit pas autrement qu'en démarrant vraiment. Le script travaille sur
+    # une base jetable qu'il crée et supprime lui-même.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: immipro
+          POSTGRES_PASSWORD: immipro
+          POSTGRES_DB: immipro
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,3 +39,12 @@ jobs:
         run: npm run test
       - name: Vocabulaire interdit
         run: npm run check:copy
+      # Le worker de production était absent de l'image pendant que tout
+      # le reste était vert : le service bouclait sur « Cannot find
+      # module », et aucune vérification ne regardait de ce côté. Celle-ci
+      # compile le paquet et l'exécute réellement — sans base, puis sur une
+      # base vierge, où se voit la panne suivante : les files pg-boss.
+      - name: Worker de production
+        run: npm run smoke:worker -- --base
+        env:
+          DATABASE_URL: postgresql://immipro:immipro@localhost:5432/immipro
