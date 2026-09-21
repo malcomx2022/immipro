@@ -65,6 +65,8 @@ export type CodeEchec =
   // Paiement
   | "montant_sous_le_minimum"
   | "devise_figee"
+  | "paiement_indisponible"
+  | "ouverture_refusee"
   | "signature_invalide"
   | "paiement_introuvable"
   | "recu_indisponible"
@@ -241,6 +243,24 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     conserve: "Le paiement en cours reste valable.",
     action: "Reprendre le paiement en cours",
     ton: "limite",
+  },
+  paiement_indisponible: {
+    statut: 503,
+    titre: "Le paiement ne peut pas être ouvert",
+    corps:
+      "Notre prestataire de paiement n'a pas répondu, et aucune page de paiement n'a pu être ouverte.",
+    conserve: "Rien n'a été débité et ton panier reste tel quel.",
+    action: "Réessayer",
+    ton: "attente",
+  },
+  ouverture_refusee: {
+    statut: 409,
+    titre: "Ce paiement n'a pas été ouvert",
+    corps:
+      "La somme enregistrée par notre prestataire ne correspond pas à celle affichée, et nous ne t'envoyons pas payer un montant que nous n'avons pas décidé.",
+    conserve: "Rien n'a été débité et ton panier reste tel quel.",
+    action: "Revenir au récapitulatif",
+    ton: "echec",
   },
   signature_invalide: {
     statut: 400,

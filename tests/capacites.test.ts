@@ -30,6 +30,7 @@ import { laCritique, leRedacteur } from "@/server/redaction/service";
 
 /** Un environnement de démonstration : tout est rempli, rien n'est branché. */
 const TOUT_RENSEIGNE = {
+  APP_URL: "https://exemple.test",
   SMTP_URL: "smtp://exemple",
   FEDAPAY_WEBHOOK_SECRET: "secret-fedapay",
   STRIPE_WEBHOOK_SECRET: "secret-stripe",
@@ -155,12 +156,24 @@ describe("un `.env` complet devant des points de branchement vides", () => {
       // Le seul adaptateur écrit : la vérification de signature existe, et
       // sa sonde conclut avec ces secrets-là.
       paiements: "OPERATIONNELLE",
+      /*
+        Le second adaptateur écrit, et le premier dont la capacité
+        plafonne : les clés sont là, l'ouvreur existe, et aucune sonde ne
+        peut l'éprouver sans ouvrir une vraie session chez le
+        fournisseur. « Configurée, non vérifiée » — donc pas prête.
+      */
+      ouverture_paiement: "CONFIGUREE_NON_VERIFIEE",
       antivirus: "IMPLEMENTATION_ABSENTE",
       remboursement: "IMPLEMENTATION_ABSENTE",
       extraction: "IMPLEMENTATION_ABSENTE",
       redaction: "IMPLEMENTATION_ABSENTE",
     });
-    expect(etat.bloquantes).toEqual(["messagerie", "antivirus", "remboursement"]);
+    expect(etat.bloquantes).toEqual([
+      "messagerie",
+      "ouverture_paiement",
+      "antivirus",
+      "remboursement",
+    ]);
   });
 
   /**
@@ -225,8 +238,11 @@ describe("un `.env` complet devant des points de branchement vides", () => {
     expect(constats.find((c) => c.cle === "antivirus")!.capacite).toBe(
       "IMPLEMENTATION_ABSENTE",
     );
-    // Le paiement, lui, a son adaptateur : là, c'est bien la configuration.
+    // Le paiement, lui, a ses adaptateurs : là, c'est bien la configuration.
     expect(constats.find((c) => c.cle === "paiements")!.capacite).toBe("NON_CONFIGUREE");
+    expect(constats.find((c) => c.cle === "ouverture_paiement")!.capacite).toBe(
+      "NON_CONFIGUREE",
+    );
   });
 });
 

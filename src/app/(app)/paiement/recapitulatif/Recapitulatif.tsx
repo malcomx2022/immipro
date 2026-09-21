@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
@@ -42,7 +41,6 @@ export interface RecapitulatifProps {
 }
 
 export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifProps) {
-  const router = useRouter();
   const [conditions, setConditions] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -56,7 +54,7 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
   async function payer() {
     setEnvoi(true);
     setEchec(null);
-    const resultat = await appeler<{ reference: string }>("/api/paiements", {
+    const resultat = await appeler<{ reference: string; url: string }>("/api/paiements", {
       corps: {
         dossierId: tunnel.dossier.id,
         achat: achat.code === "recharge" ? { type: "recharge" } : { type: "pack", code: achat.code },
@@ -64,7 +62,16 @@ export function Recapitulatif({ tunnel, achat, deviseInitiale }: RecapitulatifPr
       },
     });
     if (resultat.ok) {
-      router.push(`/paiement/attente?tx=${encodeURIComponent(resultat.donnees.reference)}`);
+      /*
+        Le navigateur quitte l'application pour la page hébergée du
+        prestataire. `router.push` ne conviendrait pas : ce n'est pas une
+        route d'ici. Le serveur a déjà vérifié cette adresse — https, et
+        sur le domaine du fournisseur — avant de la rendre.
+
+        Le bouton reste désactivé : la page va disparaître, et la rendre
+        de nouveau cliquable pendant la navigation invite au second clic.
+      */
+      window.location.assign(resultat.donnees.url);
       return;
     }
     setEnvoi(false);

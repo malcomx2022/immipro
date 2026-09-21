@@ -4674,3 +4674,173 @@ graphie seule** — le cas d'un déploiement pas encore migré :
 
 Et la valeur des deux clés, cherchée dans l'intégralité du journal du
 serveur : zéro occurrence.
+
+### S.21 — « Payer » n'ouvrait rien chez le fournisseur
+
+La route de création ouvrait une transaction **locale** et rendait sa
+référence. L'écran envoyait alors le candidat sur la page d'attente, qui
+interrogeait une transaction que personne n'allait jamais faire avancer :
+aucune session n'existait chez FedaPay ni chez Stripe, aucun paiement ne
+pouvait être fait, et l'écran tournait cinq minutes avant de conclure à un
+délai dépassé.
+
+WF-05 est maintenant branché de bout en bout, sans toucher à l'invariant :
+**seule la notification signée écrit `CONFIRMEE` et crédite le quota**
+(RG-05.1, INV-7). Ni l'ouverture, ni l'adresse de retour, ni la relève.
+
+#### L'ordre, qui porte deux garanties
+
+**L'ouvreur est réclamé avant la moindre écriture.** Sans clé, le refus est
+immédiat et aucune transaction locale n'est créée. C'est la contrainte
+« pas de transaction orpheline », et elle se vérifie en comptant les lignes
+après un refus : zéro.
+
+**La transaction locale vient ensuite, et elle est reprise.** Sa référence
+est la clé d'idempotence — dérivée, jamais tirée au sort, et distincte de
+celle du remboursement, que la même référence porte aussi. Un second clic
+retrouve la même transaction, donc la même clé, donc la même session.
+
+L'identifiant du fournisseur est enregistré **dès qu'il existe**, y compris
+quand l'URL manque encore : c'est ce que l'issue `creee_sans_url` sert à
+rendre. Sans elle, une coupure entre les deux appels de FedaPay — création
+puis page — perdrait l'identifiant, et la tentative suivante ouvrirait une
+seconde transaction chez eux.
+
+#### Trois refus avant d'envoyer quiconque payer
+
+| Vérification | Ce qu'elle refuse |
+|---|---|
+| l'URL hébergée | absente, relative, en clair, ou sur un domaine étranger |
+| la référence interne | une session qui ne renvoie pas notre référence |
+| le montant et la devise | ce que le fournisseur a enregistré doit être ce qu'on a décidé |
+
+La deuxième est celle qui compte le plus, et elle vient d'une incertitude
+assumée : la forme exacte des champs de FedaPay n'a pas pu être vérifiée
+sans clés. Plutôt que de supposer, l'adaptateur **compare** la référence
+que le fournisseur renvoie à celle qu'on lui a donnée. Si elle ne revient
+pas telle quelle, la notification signée arriverait sans savoir quel
+paiement elle confirme — on refuse avant, plutôt que de laisser un paiement
+réglé sans dossier crédité.
+
+#### Ce que l'exécution a trouvé, et que je n'avais pas vu
+
+Le simulateur rendait le même identifiant de session pour deux
+transactions, et la contrainte d'unicité a parlé. Mon code l'avalait : un
+commentaire disait que « la comparaison du montant reste le garde-fou qui
+compte ». Elle ne comptait pas — les deux transactions portent la même
+somme, et la comparaison passait.
+
+Le candidat serait donc parti payer une session dont la notification signée
+aurait crédité le dossier du voisin. L'ouverture est maintenant **refusée**,
+et l'écart s'ouvre là où il se lit. La mutation qui rétablit l'ancien
+comportement fait rougir le scénario.
+
+Et le garde-fou `application_version_figee` s'est fait entendre en écrivant
+le script : un dossier qui passe à l'actif doit porter la version qu'il a
+figée (INV-3). Le jeu d'essai était incomplet, pas la règle.
+
+#### Vérifié en exécutant
+
+Six mutations, six rouges : la comparaison de montant retirée (2 échecs),
+la reprise remplacée par une seconde création (2), l'ouvreur réclamé après
+l'écriture (1), toute URL acceptée (4 tests), la référence non vérifiée au
+retour (1), le montant envoyé sans conversion (3).
+
+Sur PostgreSQL réel, avec un ouvreur simulé — vingt-cinq vérifications :
+double soumission (une transaction, une création, une reprise), reprise
+après réponse perdue, montant divergent, fournisseur absent, retour du
+navigateur sans notification, notification avant le retour, transaction
+d'un autre candidat.
+
+Et le paquet client, relu après `next build` : aucun des quatre noms de
+secret n'y figure, et aucune adresse d'API de fournisseur non plus.
+
+#### Ce qui n'a pas pu être vérifié ici
+
+**Aucune clé de bac à sable.** La forme exacte des requêtes envoyées à
+FedaPay et à Stripe n'a été confrontée à aucun serveur réel. C'est dit
+dans l'en-tête de `fedapay.ts`, qui est le plus incertain des deux, et
+`npm run sandbox:paiement` existe pour l'éprouver le jour où des clés
+existent — il s'abstient et le dit plutôt que de rendre vert ce qu'il n'a
+pas fait.
+
+Ce qui est certain : les adaptateurs refusent tout ce qu'ils ne
+reconnaissent pas, et aucun de ces refus n'envoie qui que ce soit payer.
+
+### S.22 — Le filet de RG-05.4 n'attrapait rien
+
+La réconciliation marquait les retards, ouvrait un écart au-delà de
+vingt-quatre heures et expirait ce qui n'aboutissait plus. Elle
+n'interrogeait personne : `interroger` était une fonction qui rendait
+`null`. Un webhook perdu sur un paiement réussi finissait donc en
+`EXPIREE` avec le motif « délai dépassé », sur un paiement que le
+candidat avait bel et bien réglé.
+
+Le fournisseur est maintenant consulté, et l'état retrouvé est appliqué
+par **le même service que les webhooks**. C'est le point de conception qui
+tient le reste : une seule fonction écrit un état de paiement et crédite
+un pack. La réconciliation n'a pas son propre chemin d'écriture, donc pas
+sa propre façon de se tromper — elle hérite de l'idempotence par
+`PaymentEvent.providerEventId` et de la protection contre les courses,
+sans qu'il ait fallu les réécrire.
+
+#### Ce que la consultation a le droit de conclure
+
+| Issue | Ce que le job en fait |
+|---|---|
+| `connu` | applique l'état, avec la cause que le fournisseur a donnée |
+| `sans_paiement` | rien : une session abandonnée n'est pas une carte rejetée |
+| `introuvable` | un écart si une session avait été ouverte, rien sinon |
+| `indisponible` | **rien du tout** |
+| `incoherent` | un écart tout de suite, et rien d'appliqué |
+
+La frontière qui compte est la quatrième. Confondre « le fournisseur n'a
+pas répondu » et « le paiement a été refusé » écrirait un motif d'échec
+sur le dossier de quelqu'un que personne n'a refusé — et ce motif part
+jusque sur son écran. La mutation qui traduit `indisponible` en `ECHOUEE`
+fait rougir deux vérifications.
+
+Aucune issue n'expire quoi que ce soit : l'expiration suit `aExpirer` et
+elle seule, comme avant. Une session que Stripe dit expirée ne prononce
+pas notre expiration.
+
+#### FedaPay reste non opérationnel, et le dit
+
+Faute de documentation vérifiée, il n'y a pas de traduction honnête :
+savoir quels états valent confirmation, attente ou refus décide si un
+candidat est crédité et si un échec lui est imputé. `lireFedaPay` traduit
+déjà des états reçus **en notification signée**, d'après des charges
+utiles observées ; la consultation est un autre appel, sur un autre objet,
+et réutiliser cette table reviendrait à supposer que les deux parlent le
+même vocabulaire.
+
+L'adaptateur existe donc, et rend `indisponible` avec sa raison. Le job ne
+conclut rien, la transaction suit la règle d'expiration de la plateforme,
+l'écart s'ouvre au délai prévu — c'est exactement ce qui se passait avant.
+Rien n'est perdu, et rien n'est inventé. La mutation qui le fait deviner
+un état fait rougir deux tests.
+
+#### Ce que l'exécution a trouvé
+
+Le premier jet du script de fumée donnait au consultant simulé une réponse
+unique pour tout le monde. Or le job balaie **toutes** les transactions en
+attente, pas seulement celle du scénario : l'identifiant de session du
+cinquième scénario s'est écrit sur la transaction du troisième, et la
+contrainte d'unicité l'a dit.
+
+C'était le harnais, pas le produit — mais il valait la peine de le lire :
+un vrai fournisseur répond par transaction, et un simulateur qui répond à
+tous rendrait verts des scénarios qui se marchent dessus. Le consultant
+simulé ne répond plus que pour sa référence.
+
+#### Vérifié en exécutant
+
+Six mutations, six rouges : l'absence de réponse traduite en refus (2
+vérifications), la clé d'événement rendue aléatoire (1 + 1 test), une
+session abandonnée traduite en refus (2 tests), une cause inventée quand
+le code est inconnu (1 test), FedaPay qui se met à deviner (2 tests).
+
+Vingt-neuf vérifications sur PostgreSQL réel : paiement confirmé retrouvé,
+refus retrouvé avec sa cause, rien trouvé, échec temporaire, webhook
+simultané — un seul crédit —, identifiant incohérent, et l'expiration qui
+reste celle de la plateforme.

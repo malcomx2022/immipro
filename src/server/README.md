@@ -336,6 +336,97 @@ traite son absence plutôt que de faire semblant :
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
 
+### Le tunnel de paiement, et ce que l'ouverture ne fait pas
+
+Le clic sur « Payer » ouvre une session chez le fournisseur et envoie le
+navigateur sur sa page hébergée. Il ne confirme rien : `CONFIRMEE` et le
+crédit du quota n'ont qu'une source, la notification signée (RG-05.1,
+INV-7). Ni l'ouverture, ni l'adresse de retour, ni la relève de statut.
+
+L'ordre des opérations porte deux garanties :
+
+1. **L'ouvreur est réclamé avant la moindre écriture.** Sans clé, le refus
+   est immédiat et aucune transaction locale n'est créée : une attente que
+   rien ne viendrait clore serait pire qu'un refus.
+2. **La transaction locale vient ensuite, et elle est reprise.** Sa
+   référence est la clé d'idempotence, donc stable d'une tentative à
+   l'autre : un second clic, ou une reprise après une réponse réseau
+   perdue, retrouve la même session au lieu d'en ouvrir une seconde.
+
+L'identifiant du fournisseur est enregistré **dès qu'il existe**, y compris
+quand l'URL manque encore (`creee_sans_url`) : c'est ce qui permet de
+*retrouver* au lieu de recréer. Il ne s'écrase jamais — l'écriture est
+conditionnée à la colonne nulle, ce qui la rend sûre face à une
+notification arrivée entre-temps (M.B). Et si cette session appartient déjà
+à une autre transaction locale, l'ouverture est **refusée** : le candidat
+partirait payer une session dont la notification créditerait le dossier du
+voisin.
+
+Trois refus avant d'envoyer qui que ce soit payer :
+
+| Vérification | Ce qu'elle refuse |
+|---|---|
+| l'URL hébergée | absente, relative, en clair, ou sur un domaine étranger |
+| la référence interne | une session qui ne renvoie pas notre référence — le webhook ne saurait pas quoi confirmer |
+| le montant et la devise | ce que le fournisseur a enregistré doit être ce que la plateforme a décidé |
+
+Le client ne choisit jamais son fournisseur : il suit la devise (N.A), et
+ni le fournisseur ni le montant ne sont reçus du navigateur. Les clés
+sortantes ne sont lues que par `paiement/ouvreurs.ts`, et n'atteignent
+aucun composant client.
+
+**Le franc CFA n'a pas de sous-unité, l'euro si.** 12 € valent 1 200 pour
+Stripe, 5 000 F valent 5 000 pour FedaPay. La conversion vit dans
+`domain/paiement/ouverture.ts` — une erreur d'un facteur cent sur un débit
+réel n'a pas sa place dans un adaptateur que personne ne relit.
+
+Ce qui s'éprouve où :
+
+| Vérification | Où |
+|---|---|
+| forme des requêtes, réponses inattendues, URL, référence, conversion | `tests/tunnel-ouverture.test.ts`, contre un `fetch` simulé |
+| double soumission, reprise, écart de montant, appartenance, ordre webhook / retour | `npm run smoke:tunnel`, sur PostgreSQL avec un ouvreur simulé |
+| exactitude des champs envoyés au fournisseur | `npm run sandbox:paiement`, qui s'abstient et le dit sans clés |
+
+### La réconciliation, et ce qu'elle refuse de conclure
+
+Le webhook peut se perdre. Un candidat débité qui ne voit rien arriver est
+le pire défaut de ce produit. `jobs/reconciliation.ts` interroge désormais
+le fournisseur (RG-05.4), et **applique l'état retrouvé par le même
+service que les webhooks** — `appliquerLaNotification`. Une seule fonction
+écrit un état de paiement et crédite un pack : la réconciliation n'a pas
+son propre chemin d'écriture, donc pas sa propre façon de se tromper. Elle
+hérite au passage de l'idempotence par `PaymentEvent.providerEventId` et de
+la protection contre les courses.
+
+L'identifiant d'événement est **déterministe** —
+`reconciliation:<référence>:<état>` : deux passes qui lisent le même état
+portent la même clé, et la seconde est un rejeu. Il est préfixé, donc
+distinct d'un `stripe:evt_…`, mais ce n'est pas la clé qui départage une
+course avec un webhook : c'est la table des transitions, qui refuse de
+faire progresser un état déjà atteint.
+
+Cinq issues, et leurs frontières sont la règle :
+
+| Issue | Ce que le job en fait |
+|---|---|
+| `connu` | applique l'état, avec la cause **que le fournisseur a donnée** — jamais déduite |
+| `sans_paiement` | rien : une session abandonnée n'est pas une carte rejetée |
+| `introuvable` | ouvre un écart si une session avait été ouverte, rien sinon |
+| `indisponible` | **rien du tout** — une absence de réponse n'est pas un refus bancaire |
+| `incoherent` | ouvre un écart tout de suite, et n'applique rien |
+
+Aucune de ces issues n'expire quoi que ce soit : l'expiration suit
+`aExpirer` et elle seule. Ni Stripe ni FedaPay ne la prononcent.
+
+**FedaPay est explicitement non opérationnel.** Faute de documentation
+vérifiée, il n'y a pas de traduction honnête : deviner quels états valent
+confirmation ou refus déciderait si un candidat est crédité et si un échec
+lui est imputé. L'adaptateur rend `indisponible` avec sa raison — le
+comportement d'avant, sans invention. Ce qu'il faut pour le brancher : la
+liste des états du fournisseur et la forme de la réponse, vérifiées contre
+le bac à sable.
+
 ### Les secrets de paiement, une seule nomenclature
 
 `.env.example` portait `FEDAPAY_SECRET_KEY`, le code demandait

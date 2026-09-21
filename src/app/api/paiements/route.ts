@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { creerOuReprendre, montantDe } from "@/server/acces/paiements";
+import { montantDe, ouvrirLeTunnel } from "@/server/acces/paiements";
 import { dossierDuCandidat } from "@/server/acces/dossiers";
 import { formatMontant } from "@/lib/utils";
 
@@ -14,6 +14,13 @@ import { formatMontant } from "@/lib/utils";
  * Une seconde soumission reprend la transaction en attente au lieu d'en
  * créer une (WF-05, cas limites) : deux transactions pour un paiement
  * faussent la réconciliation et laissent une ligne orpheline en back-office.
+ * Elle reprend aussi la session ouverte chez le fournisseur, par la même
+ * clé d'idempotence — un second clic ne produit pas un second débit.
+ *
+ * **Le fournisseur n'est jamais reçu du client.** Il se déduit de la
+ * devise (N.A), et la devise se relit sur la grille : le corps de la
+ * requête ne porte ni fournisseur, ni montant. Les deux sont recalculés
+ * ici, et le montant rendu est celui que la base a enregistré.
  */
 export const POST = route({
   nom: "paiements.creation",
@@ -34,15 +41,20 @@ export const POST = route({
       typeof montantDe
     >[0];
 
-    const { transaction, reprise } = await creerOuReprendre(acteur!.id, achat, corps.devise);
+    const { montant } = montantDe(achat, corps.devise);
+    const { reference, url, reprise } = await ouvrirLeTunnel(acteur!.id, achat, corps.devise);
 
     return {
-      reference: transaction.reference,
-      montant: transaction.amount,
-      montantFormate: formatMontant(transaction.amount, transaction.currency),
-      devise: transaction.currency,
-      fournisseur: transaction.provider,
-      statut: transaction.status,
+      reference,
+      /**
+       * L'adresse de la page hébergée, vérifiée avant d'être rendue :
+       * https, et sur le domaine du fournisseur. C'est le navigateur qui
+       * s'y rend — rien de ce qui s'y passe ne revient par cette route.
+       */
+      url,
+      montant,
+      montantFormate: formatMontant(montant, corps.devise),
+      devise: corps.devise,
       reprise,
     };
   },

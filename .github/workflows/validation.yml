@@ -88,6 +88,29 @@ jobs:
         run: npm run smoke:worker -- --base
       - run: echo "- **Worker** — paquet exécuté sans base, puis démarré sur une base vierge" >> "$GITHUB_STEP_SUMMARY"
 
+      # Le tunnel de paiement, sur une base réelle et un ouvreur simulé :
+      # double soumission, reprise après réponse perdue, écart de montant,
+      # fournisseur absent, ordre du webhook et du retour navigateur.
+      - name: Tunnel de paiement
+        run: npm run smoke:tunnel
+      - run: echo "- **Tunnel de paiement** — ouverture, reprise et refus éprouvés sur base vierge" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le rattrapage d'un webhook perdu : état retrouvé et appliqué par le
+      # même service que les webhooks, course entre les deux, et la
+      # frontière qui compte — une absence de réponse n'est pas un refus.
+      - name: Réconciliation des paiements
+        run: npm run smoke:reconciliation
+      - run: echo "- **Réconciliation** — rattrapage, idempotence et course webhook éprouvés sur base vierge" >> "$GITHUB_STEP_SUMMARY"
+
+      # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
+      # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.
+      - name: Bac à sable des fournisseurs
+        run: npm run sandbox:paiement
+        env:
+          STRIPE_API_KEY: ${{ secrets.STRIPE_SANDBOX_API_KEY }}
+          FEDAPAY_API_KEY: ${{ secrets.FEDAPAY_SANDBOX_API_KEY }}
+          FEDAPAY_ENVIRONMENT: sandbox
+
       - name: Verdict
         if: always()
         run: |

@@ -105,6 +105,7 @@ describe("le registre des dépendances et `.env.example` disent la même chose",
     expect(bloquantes.map((d) => d.cle)).toEqual([
       "messagerie",
       "paiements",
+      "ouverture_paiement",
       "antivirus",
       "remboursement",
     ]);

@@ -19,6 +19,14 @@ import { effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
 import { suiteDictable } from "@/server/securite/secret";
 import { fournisseurDe } from "@/domain/payments/rail";
+import {
+  cheminDeRetour,
+  cleDOuverture,
+  motifDeDivergence,
+  ouvertureConcorde,
+} from "@/domain/paiement/ouverture";
+import { lOuvreur } from "@/server/paiement/ouvreurs";
+import type { Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 
 /**
@@ -102,6 +110,127 @@ export async function creerOuReprendre(
     },
   });
   return { transaction, reprise: false };
+}
+
+/**
+ * Ouvre le paiement : transaction locale, puis session chez le fournisseur.
+ *
+ * ── L'ordre, et pourquoi il est celui-là ─────────────────────────────
+ *
+ * **L'ouvreur est réclamé en premier, avant toute écriture.** Sans clé,
+ * on refuse tout de suite : une transaction locale créée devant un
+ * fournisseur absent ouvre une attente que rien ne viendra clore, et le
+ * candidat regarde tourner un écran pour un paiement qui n'existe nulle
+ * part.
+ *
+ * **La transaction locale vient ensuite, et elle est reprise.** Sa
+ * référence est la clé d'idempotence : elle doit donc être stable d'une
+ * tentative à l'autre. Un second clic, ou une reprise après une réponse
+ * réseau perdue, retrouve la même transaction, donc la même clé, donc la
+ * même session chez le fournisseur — jamais un second débit.
+ *
+ * **L'identifiant fournisseur est enregistré dès qu'il existe**, y compris
+ * quand l'URL manque encore. C'est ce qui permet à la tentative suivante
+ * de *retrouver* au lieu de recréer. Il ne s'écrase jamais : l'écriture
+ * est conditionnée à la colonne nulle, ce qui la rend sûre même si deux
+ * requêtes arrivent ensemble.
+ *
+ * ── Ce que cette fonction ne fait pas ────────────────────────────────
+ *
+ * Elle ne confirme rien et ne crédite rien. Une session ouverte est une
+ * page où le candidat *pourra* payer. `CONFIRMEE` et le quota n'ont
+ * qu'une source, la notification signée (RG-05.1, INV-7), et l'adresse de
+ * retour du navigateur ne passe même pas par ici.
+ */
+export async function ouvrirLeTunnel(
+  userId: string,
+  achat: Achat,
+  devise: Devise,
+  ouvreur: Ouvreur | null = lOuvreur(devise),
+): Promise<{ reference: string; url: string; reprise: boolean }> {
+  // Avant la moindre écriture. Un échec honnête vaut mieux qu'une attente
+  // impossible, et il ne laisse aucune transaction derrière lui.
+  if (!ouvreur) throw echec("paiement_indisponible");
+
+  const { transaction, reprise } = await creerOuReprendre(userId, achat, devise);
+
+  const ouverture = transaction.providerTxId
+    ? await ouvreur.retrouver(transaction.providerTxId, transaction.reference)
+    : await ouvreur.creer({
+        reference: transaction.reference,
+        // Recalculé par `creerOuReprendre`, jamais reçu du navigateur.
+        montant: transaction.amount,
+        devise,
+        cle: cleDOuverture(transaction.reference),
+        retour: cheminDeRetour(transaction.reference),
+        // Ce que le candidat lit sur la page hébergée : le produit, et
+        // rien qui le nomme. La page appartient au fournisseur.
+        intitule: `ImmiPro — ${montantDe(achat, devise).libelle}`,
+      });
+
+  if (ouverture.issue === "creee_sans_url") {
+    // La session existe chez eux : on garde son identifiant, sinon la
+    // prochaine tentative en ouvrirait une seconde.
+    await noterLIdentifiantFournisseur(transaction.id, ouverture.providerTxId);
+    throw echec("paiement_indisponible");
+  }
+  if (ouverture.issue !== "ouverte") throw echec("paiement_indisponible");
+
+  await noterLIdentifiantFournisseur(transaction.id, ouverture.session.providerTxId);
+
+  /*
+    Le montant et la devise que le fournisseur a enregistrés sont comparés
+    à ceux que la plateforme a décidés. Ils ne devraient jamais diverger ;
+    s'ils divergent, on n'envoie personne payer une somme qu'on n'a pas
+    décidée. L'écart s'ouvre en back-office, le candidat lit un refus.
+  */
+  const attendu = { montant: transaction.amount, devise: transaction.currency };
+  if (!ouvertureConcorde(attendu, ouverture.session)) {
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: {
+        discrepancy: transaction.discrepancy ?? motifDeDivergence(attendu, ouverture.session),
+      },
+    });
+    throw echec("ouverture_refusee");
+  }
+
+  return { reference: transaction.reference, url: ouverture.session.url, reprise };
+}
+
+/**
+ * Écrit l'identifiant du fournisseur, et seulement s'il n'y en a pas.
+ *
+ * `updateMany` avec la colonne nulle en condition, et non un `update`
+ * après lecture : entre la lecture et l'écriture, une notification signée
+ * peut être passée et avoir posé le sien. Celui-là fait foi — M.B dit
+ * qu'il ne se réécrit jamais, parce qu'un reçu déjà imprimé le cite.
+ */
+async function noterLIdentifiantFournisseur(id: string, providerTxId: string): Promise<void> {
+  try {
+    await db.transaction.updateMany({
+      where: { id, providerTxId: null },
+      data: { providerTxId },
+    });
+  } catch {
+    /*
+      La colonne est unique : un conflit signifie que cette session
+      appartient déjà à une **autre** transaction locale.
+      
+      Vu en exécutant, et d'abord avalé : on continuait, et la
+      comparaison du montant ne rattrapait rien puisque les deux
+      transactions portent la même somme. Le candidat serait parti payer
+      une session dont la notification signée créditerait le dossier du
+      voisin. On refuse, et l'écart s'ouvre là où il se lit.
+    */
+    await db.transaction.update({
+      where: { id },
+      data: {
+        discrepancy: `Ouverture refusée : la session ${providerTxId} est déjà rattachée à une autre transaction.`,
+      },
+    });
+    throw echec("ouverture_refusee");
+  }
 }
 
 /**

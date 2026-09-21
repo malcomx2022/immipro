@@ -25,6 +25,10 @@ describe("les six dépendances n'ont pas le même statut", () => {
     expect(DEPENDANCES.map((d) => [d.cle, d.statut])).toEqual([
       ["messagerie", "BLOQUANTE_OUVERTURE"],
       ["paiements", "BLOQUANTE_ENCAISSEMENT"],
+      // Ouvrir un paiement et le confirmer tombent séparément : les
+      // secrets de signature peuvent être en place pendant que la clé
+      // sortante manque.
+      ["ouverture_paiement", "BLOQUANTE_ENCAISSEMENT"],
       ["antivirus", "BLOQUANTE_TELEVERSEMENT"],
       // Le rail sortant bloque l'encaissement pour la même raison que les
       // secrets de signature : on ne prend pas d'argent qu'on ne sait pas
