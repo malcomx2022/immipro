@@ -5,6 +5,7 @@ import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { getQueue, JOBS } from "@/lib/queue";
 import {
+  avecLesTextesCandidat,
   visaRulesSchema,
   SCHEMA_VERSION,
   peutEtrePubliee,
@@ -31,12 +32,35 @@ export const PUT = route({
   nom: "admin.regle.maj",
   acces: "veilleur",
   limite: "sensible",
-  corps: z.object({
-    rules: z.unknown(),
-    sourceUrl: z.string().url().optional(),
-    nextReviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
-    notes: z.string().max(4000).optional(),
-  }),
+  /**
+   * Deux façons d'écrire, et l'écran n'en emploie qu'une.
+   *
+   * B-02 n'édite que les deux textes destinés au candidat ; il n'a jamais
+   * eu le payload entier sous la main, et c'est pour ça que son bouton
+   * « Enregistrer le brouillon » n'était relié à rien. Lui faire porter le
+   * payload complet aurait été le plus court — et le plus faux : la copie
+   * chargée à l'ouverture de la page écraserait, à l'enregistrement, tout
+   * ce qu'un autre veilleur aurait changé entre-temps dans les champs que
+   * l'écran ne montre pas.
+   *
+   * La branche `textes` n'envoie donc que ce qui est édité, et le serveur
+   * la recolle sur la version en base. La branche `payload`, elle, reste
+   * la porte de WF-14 étape 3 pour un éditeur complet.
+   */
+  corps: z.discriminatedUnion("champ", [
+    z.object({
+      champ: z.literal("payload"),
+      rules: z.unknown(),
+      sourceUrl: z.string().url().optional(),
+      nextReviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
+      notes: z.string().max(4000).optional(),
+    }),
+    z.object({
+      champ: z.literal("textes"),
+      libelleCandidat: z.string().trim().min(1).max(300),
+      reserveCandidat: z.string().trim().max(1000),
+    }),
+  ]),
   async traiter({ corps, params, acteur }) {
     const regle = await db.visaRule.findUnique({ where: { id: params.id } });
     if (!regle) throw echec("introuvable");
@@ -46,7 +70,27 @@ export const PUT = route({
       });
     }
 
-    const lu = visaRulesSchema.safeParse(corps.rules);
+    /**
+     * La branche `textes` relit la version en base et n'y remplace que les
+     * deux champs du formulaire. Le reste du payload traverse sans être
+     * recopié par personne — donc sans risque d'être perdu.
+     */
+    const propose =
+      corps.champ === "textes"
+        ? (() => {
+            const enBase = visaRulesSchema.safeParse(regle.rules);
+            if (!enBase.success) return null;
+            return avecLesTextesCandidat(enBase.data, corps);
+          })()
+        : corps.rules;
+
+    if (propose === null) {
+      throw echec("etat_incompatible", {
+        corps: "Le contenu de cette version ne passe plus la validation. Reprends l'édition.",
+      });
+    }
+
+    const lu = visaRulesSchema.safeParse(propose);
     if (!lu.success) {
       throw echec("champs_invalides", {
         champs: Object.fromEntries(
@@ -68,11 +112,15 @@ export const PUT = route({
       data: {
         rules: lu.data as never,
         schemaVersion: SCHEMA_VERSION,
-        ...(corps.sourceUrl ? { sourceUrl: corps.sourceUrl } : {}),
-        ...(corps.nextReviewAt
+        ...(corps.champ === "payload" && corps.sourceUrl
+          ? { sourceUrl: corps.sourceUrl }
+          : {}),
+        ...(corps.champ === "payload" && corps.nextReviewAt
           ? { nextReviewAt: new Date(`${corps.nextReviewAt}T00:00:00Z`) }
           : {}),
-        ...(corps.notes !== undefined ? { notes: corps.notes } : {}),
+        ...(corps.champ === "payload" && corps.notes !== undefined
+          ? { notes: corps.notes }
+          : {}),
         verifiedAt: new Date(),
         verifiedBy: acteur!.email,
       },
