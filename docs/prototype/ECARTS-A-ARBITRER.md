@@ -2636,8 +2636,11 @@ conservé. C'est le seul workflow entier dont la moitié serveur manque.
 
 *S.3 a branché l'entretien, S.8 les versions — mise en forme, réécriture,
 restauration — et les deux états que R-04 confondait. `CritiqueFinding`
-reste sans écrivain : les remarques demandent le service d'analyse, et
-leur moitié déterministe (RG-08.3) attend `extraction`, pas la rédaction.*
+reste sans écrivain : les remarques demandent le service d'analyse.*
+~~*Leur moitié déterministe (RG-08.3) attend `extraction`, pas la
+rédaction.*~~ **Faux, corrigé en S.12** : une partie des recoupements ne
+lit aucune pièce jointe et ne demandait rien. Elle est écrite, et elle ne
+se stocke pas — voir S.12.
 
 **Six routes admin sur huit n'ont aucun test.** Les deux qui en ont —
 `paiements` et `contenus` — sont exactement les deux qui étaient
@@ -3318,6 +3321,10 @@ Deux choses, et je ne les ai pas faites :
   règle du projet dit que tout ce qui est vérifiable sans IA l'est sans IA.
   Mais il faut des champs extraits à comparer, et `extraction` n'est pas
   branchée : le lot dépend d'elle, pas de la rédaction.
+  *Cette conclusion était trop large — S.12 la corrige. Seule la
+  comparaison avec une **pièce jointe** attend `extraction` ; la
+  comparaison avec ce que le dossier sait déjà de lui-même n'attendait
+  rien.*
 - **l'export PDF et DOCX**, étape 6. L.3 a déjà tranché pour l'archive — le
   PDF est celui du navigateur —, et la même décision vaut probablement ici ;
   elle demande d'être posée.
@@ -3637,3 +3644,146 @@ vide était vérifié par la présence d'une chaîne, que neutraliser la
 condition laissait en place ; la mention de RG-08.1 était vérifiée par la
 présence de son nom, que la ligne d'import contient. Les deux portent
 maintenant sur la position de la garde et sur l'emploi de la constante.
+
+### S.12 — RG-08.3 : j'avais déclaré bloqué ce qui ne l'était pas
+
+Le dernier point de WF-08. Je l'avais rangé, en S.8, parmi ce qui attend
+`extraction` : *« il faut des champs extraits à comparer »*. C'était faux,
+et c'est la troisième fois de la session que je conclus à un blocage en
+raisonnant sur une absence au lieu de suivre la chaîne — après le dépôt
+sans analyse en S.9 et l'avis de consultant en S.10.
+
+#### Ce que la règle demande, et ce que j'avais lu
+
+RG-08.3 donne un exemple : *« si la lettre mentionne un financement
+familial et que le relevé est au nom du candidat, l'incohérence est
+signalée »*. J'ai lu l'exemple et j'ai conclu sur la règle. Or WF-08
+étape 4 énonce la règle : *« cohérence avec **le reste du dossier** »*. Et
+le dossier sait, sans qu'aucune pièce jointe soit lue :
+
+- la **destination** sur laquelle il a été ouvert, par sa règle figée ;
+- ce que cette règle figée **demande** — `niveau_langue_min`, entre autres.
+
+La règle d'architecture 2 s'applique alors sans discussion : *tout ce qui
+est vérifiable sans IA l'est sans IA*. Deux recoupements le sont — une
+comparaison de chaînes, aucun jeton débité, aucun service à brancher.
+
+#### Deux recoupements, et deux écartés pour la même raison
+
+Ce qui est écrit :
+
+    la destination      la lettre nomme un autre pays du catalogue
+                        et ne nomme jamais celui du dossier
+    le niveau de langue tous les niveaux CECRL cités sont sous le
+                        minimum de la règle figée
+
+Ce qui ne l'est pas, et pourquoi :
+
+    l'année de rentrée  « à la rentrée 2019 » est aussi bien une lettre
+                        réutilisée qu'un parcours raconté ; rien dans le
+                        texte ne les sépare sans le comprendre
+    les montants        un chiffre dans une lettre désigne aussi bien des
+                        frais de scolarité qu'un budget annuel
+
+La règle qui a décidé les quatre cas est la même : **un écart inventé coûte
+plus cher qu'un écart manqué.** Le candidat qui lit « ta lettre cite la
+France » sur une phrase où il raconte ses études passées en France cessera
+de lire les remarques suivantes, y compris la vraie. Les deux recoupements
+retenus sont donc écrits pour ne se déclencher que sur un faisceau qui ne
+laisse pas d'autre lecture :
+
+- une lettre qui cite la France **et** les Pays-Bas sur un dossier
+  néerlandais raconte un parcours — elle nomme sa destination, rien n'est
+  signalé ;
+- une lettre qui annonce « B1 en allemand et C1 en anglais » satisfait le
+  minimum par l'un des deux, et nous ne savons pas lequel porte la langue
+  du cursus — rien n'est signalé.
+
+Le pays d'origine n'est pas dans le lexique : une lettre écrite depuis
+Cotonou parle du Bénin, et ce n'est pas une incohérence.
+
+#### Ce qui n'est pas recoupé est écrit à l'écran
+
+C'est la moitié qui manquait aux dix lots précédents et que celui-ci ne
+pouvait pas se permettre d'oublier : sans elle, « rien ne diverge » se lit
+comme « tout a été vérifié », et le candidat croit sa lettre confrontée à
+ses pièces jointes alors qu'aucune n'a été ouverte. R-04 affiche donc deux
+listes, et la seconde toujours :
+
+    Ce que nous avons recoupé
+      La destination citée dans ta lettre, comparée à la Suisse — la
+      destination de ce dossier.
+      Le niveau de langue annoncé dans ta lettre, comparé au B2 que
+      demande la procédure figée.
+
+    Ce que nous n'avons pas recoupé
+      Les montants, les noms et les dates portés par tes pièces jointes :
+      leur lecture automatique n'est pas branchée, nous ne comparons donc
+      rien à ce qu'elles contiennent.
+      Les montants cités dans ta lettre : un même chiffre y désigne aussi
+      bien des frais de scolarité qu'un budget annuel, et nous ne
+      signalons pas un écart que nous ne savons pas lire.
+
+La moitié de RG-08.3 que son exemple canonique décrit — la lettre contre le
+relevé — **reste bloquée sur `extraction`**, et c'est maintenant l'écran qui
+le dit, pas seulement une note dans ce document.
+
+#### Un troisième vide, après les deux de S.8
+
+S.8 avait séparé « relu, rien à reprendre » de « jamais relu ». Les
+recoupements en ouvrent un troisième : le fond n'a pas été lu, mais la
+lettre a bien été comparée à ce que le dossier sait. `ANALYSE_INDISPONIBLE`
+aurait effacé des écarts réellement trouvés ; `RELUE_SANS_REMARQUE` aurait
+donné pour lu un fond que personne n'a jugé.
+
+    SANS_TEXTE          pas encore de version
+    ANALYSE_INDISPONIBLE ni analysé, ni rien de comparable
+    RECOUPEE_SEULEMENT  recoupé, fond non analysé
+    RELUE_SANS_REMARQUE analysé, rien à reprendre
+    RELUE               analysé, des remarques
+
+Et le résumé de `RECOUPEE_SEULEMENT` ne passe pas par celui de la
+relecture : ce dernier parle de « pièces », et le recoupement n'en ouvre
+aucune. Même raison pour le genre `INCOHERENCE_DOSSIER`, qui n'existe pas
+dans l'énumération Prisma : « Incohérence entre pièces » annoncerait une
+comparaison qui n'a pas eu lieu.
+
+#### Calculé à la lecture, jamais stocké
+
+Un `CritiqueFinding` écrit en base survivrait à la correction du texte : le
+candidat corrigerait sa lettre et lirait encore l'ancien écart. Les
+recoupements ne coûtent rien — ils se recalculent à chaque affichage. Un
+test le tient : le genre non stocké n'apparaît dans aucun `kind:` du dépôt.
+
+#### Vérifié en mutant, puis en exécutant
+
+Treize mutations, treize rouges — dont celles qui comptent :
+
+    la lettre nomme sa destination → on signale quand même   2 rouges
+    on ne signale jamais                                     6 rouges
+    « tous en dessous » devient « au moins un »              1 rouge
+    « Canadair » redevient le Canada                         1 rouge
+    « recoupé seulement » retombe sur « jamais analysé »     3 rouges
+    zéro écart redevient « rien à reprendre »                2 rouges
+    la ligne des pièces jointes disparaît                    2 rouges
+
+Une garde a failli ne pas mordre pour une raison déjà vue trois fois cette
+session : ma première lecture des niveaux CECRL bornait le motif par des
+groupes, qui **consomment** le séparateur. « B1 et C1 » ne rendait que le
+premier — c'est-à-dire que le second niveau, celui qui désamorce la
+remarque, disparaissait, et la lettre honnête recevait un faux écart. Les
+bornes sont maintenant des assertions.
+
+Puis l'exécution, sur le dossier suisse de la base, règle figée à B2 :
+
+    lettre citant le Canada et un B1
+      « 2 écarts relevés en recoupant ta lettre avec les informations de
+        ton dossier. Le fond de ta lettre, lui, n'a pas été analysé … »
+      Écart avec ton dossier · Ta lettre nomme le Canada, jamais la Suisse
+      Écart avec ton dossier · Ta lettre annonce B1, la procédure demande B2
+      aucun bandeau de source : rien n'a été relu
+
+    lettre citant la Suisse et un C1
+      « Nous avons recoupé ta lettre avec ce que ton dossier sait déjà :
+        rien ne diverge. Le fond, lui, n'a pas été analysé … »
+      aucune remarque, les deux listes affichées

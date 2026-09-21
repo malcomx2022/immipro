@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { DocumentState } from "@/domain/completeness/score";
 import type { StatutDossier } from "@/domain/dossiers/dossier";
 import type { FamillePiece, RemedePiece } from "@/domain/dossiers/piece";
@@ -47,6 +48,15 @@ function valeursDeLEnum(nom: string): string[] {
 }
 
 const trie = (valeurs: readonly string[]) => [...valeurs].sort();
+
+function fichiersTs(dir: string, acc: string[] = []): string[] {
+  for (const nom of readdirSync(dir)) {
+    const p = join(dir, nom);
+    if (statSync(p).isDirectory()) fichiersTs(p, acc);
+    else if (/\.tsx?$/u.test(nom)) acc.push(p);
+  }
+  return acc;
+}
 
 describe("le schéma et le domaine nomment les mêmes choses", () => {
   it("états de pièce — DocumentStatus / DocumentState", () => {
@@ -120,10 +130,32 @@ describe("le schéma et le domaine nomment les mêmes choses", () => {
     expect(valeursDeLEnum("MigrationDecision")).toEqual(trie(decisions));
   });
 
+  /**
+   * L'énumération Prisma couvre ce qui se stocke ; le domaine en nomme un
+   * de plus, et l'écart est voulu. `INCOHERENCE_DOSSIER` porte les
+   * recoupements déterministes de RG-08.3, qui se recalculent à chaque
+   * lecture : les stocker figerait un écart que la correction du texte
+   * vient de lever.
+   *
+   * L'écart est donc borné des deux côtés — toute valeur stockée a son
+   * genre, et le seul genre non stocké est nommé ici. Un genre ajouté au
+   * domaine sans l'être au schéma, ou l'inverse, casse ce test.
+   */
+  const GENRE_NON_STOCKE = "INCOHERENCE_DOSSIER";
+
   it("remarques de relecture — CritiqueKind / GenreRemarque", () => {
-    const genres: GenreRemarque[] = ["INCOHERENCE", "A_RENFORCER", "FORME"];
-    expect(valeursDeLEnum("CritiqueKind")).toEqual(trie(genres));
-    expect(trie(Object.keys(LIBELLE_GENRE))).toEqual(trie(genres));
+    const stockes: GenreRemarque[] = ["INCOHERENCE", "A_RENFORCER", "FORME"];
+    expect(valeursDeLEnum("CritiqueKind")).toEqual(trie(stockes));
+    expect(trie(Object.keys(LIBELLE_GENRE))).toEqual(trie([...stockes, GENRE_NON_STOCKE]));
+  });
+
+  it("le genre non stocké n'est écrit nulle part en base", () => {
+    const sources = fichiersTs("src").map((f) => readFileSync(f, "utf8"));
+    for (const source of sources) {
+      expect(source).not.toMatch(
+        new RegExp(`kind:\\s*["'\`]${GENRE_NON_STOCKE}`, "u"),
+      );
+    }
   });
 
   it("niveaux de source — SourceTier / NiveauSource", () => {

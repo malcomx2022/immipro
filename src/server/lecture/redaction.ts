@@ -3,6 +3,7 @@ import { echec } from "@/server/http/echecs";
 import type { PieceRedigeable } from "@/domain/redaction/entretien";
 import type { Version, Paragraphe } from "@/domain/redaction/versions";
 import type { Remarque, GenreRemarque, Ecart } from "@/domain/redaction/relecture";
+import { destinationNommee, type FaitsDuDossier } from "@/domain/redaction/coherence";
 import { PIECES_REDIGEABLES, pieceRedigeable } from "@/lib/contenu/redaction";
 
 /**
@@ -170,3 +171,40 @@ function ecartsDe(gaps: unknown): readonly [Ecart, Ecart] | null {
 }
 
 export { PIECES_REDIGEABLES };
+
+/**
+ * Ce que le dossier sait de lui-même, pour les recoupements de RG-08.3.
+ *
+ * Tout vient de la règle **figée** (INV-3), et rien de la règle publiée
+ * aujourd'hui : un dossier ouvert sur un minimum B1 se recoupe sur B1,
+ * même si la procédure en demande B2 depuis. Recouper sur la règle
+ * courante ferait apparaître un écart que le candidat n'a pas créé.
+ *
+ * Un code de destination hors du lexique rend `destination: null`, et le
+ * recoupement s'abstient au lieu de deviner — l'écran le dit alors.
+ */
+export async function faitsDuDossier(
+  applicationId: string,
+  userId: string,
+): Promise<FaitsDuDossier> {
+  const dossier = await db.application.findFirst({
+    where: { id: applicationId, userId },
+    select: { visaRule: { select: { countryCode: true, rules: true } } },
+  });
+  const regle = dossier?.visaRule ?? null;
+  return {
+    destination: regle ? (destinationNommee(regle.countryCode) ?? null) : null,
+    niveauLangueMin: regle ? niveauMinimum(regle.rules) : null,
+  };
+}
+
+/**
+ * `rules` est un `jsonb` : il est lu défensivement, et une valeur d'un
+ * autre type vaut absence. Le schéma le garantit à l'écriture, il ne le
+ * garantit pas sur une ligne écrite avant lui.
+ */
+function niveauMinimum(rules: unknown): string | null {
+  if (typeof rules !== "object" || rules === null) return null;
+  const valeur = (rules as Record<string, unknown>).niveau_langue_min;
+  return typeof valeur === "string" && valeur.trim().length > 0 ? valeur : null;
+}

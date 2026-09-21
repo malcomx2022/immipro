@@ -5,6 +5,12 @@ import { Redaction } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/
 import { Relecture } from "@/app/(app)/(dossier)/dossiers/[id]/redaction/[type]/relecture/Relecture";
 import { REMARQUES_MOTIVATION } from "@/lib/contenu/redaction";
 import type { Remarque } from "@/domain/redaction/relecture";
+import {
+  AUCUN_RECOUPEMENT,
+  destinationNommee,
+  recoupements,
+  type Recoupements,
+} from "@/domain/redaction/coherence";
 import { Alertes } from "@/app/(app)/(dossier)/notifications/Alertes";
 import { Services } from "@/app/(app)/(dossier)/services/Services";
 import { dossierParId } from "@/lib/contenu/dossiers";
@@ -460,12 +466,17 @@ describe("R-03 — les versions s'écrivent", () => {
 });
 
 describe("R-04 — un vide ne vaut pas un avis", () => {
-  const rendre = (props: { remarques: readonly Remarque[] | null; texteExistant?: boolean }) =>
+  const rendre = (props: {
+    remarques: readonly Remarque[] | null;
+    texteExistant?: boolean;
+    recoupements?: Recoupements;
+  }) =>
     render(
       <Relecture
         dossier={dossierParId("nl-4471")!}
         type="lettre-motivation"
         remarques={props.remarques}
+        recoupements={props.recoupements ?? AUCUN_RECOUPEMENT}
         texteExistant={props.texteExistant ?? true}
         relectureLe="2026-09-11"
       />,
@@ -497,6 +508,49 @@ describe("R-04 — un vide ne vaut pas un avis", () => {
     expect(container.textContent).not.toContain("Rien à reprendre");
   });
 
+  /**
+   * RG-08.3 — les recoupements déterministes tournent sans service. Un
+   * écart trouvé sans analyse ne doit ni disparaître derrière « cette
+   * version n'a pas été analysée », ni se présenter comme une relecture.
+   */
+  it("montre l'écart recoupé alors que le fond n'a pas été lu", () => {
+    const croisements = recoupements("Je souhaite étudier au Canada.", {
+      destination: destinationNommee("NL")!,
+      niveauLangueMin: "B2",
+    });
+    const { container } = rendre({ remarques: null, recoupements: croisements });
+    expect(container.textContent).toContain("Ta lettre nomme le Canada");
+    expect(container.textContent).toContain("écart relevé");
+    expect(container.textContent).toContain("n'a pas été analysé");
+    // Ni avis favorable, ni bandeau datant une relecture qui n'a pas eu lieu.
+    expect(container.textContent).not.toContain("Rien à reprendre");
+    expect(container.textContent).not.toContain("relecture automatique ImmiPro");
+  });
+
+  /**
+   * Sans cette liste, « rien ne diverge » se lirait comme « tout a été
+   * vérifié », et le candidat croirait ses pièces jointes confrontées à sa
+   * lettre alors qu'aucune n'a été lue.
+   */
+  it("dit ce qui n'a pas été recoupé", () => {
+    const croisements = recoupements("Je souhaite étudier aux Pays-Bas.", {
+      destination: destinationNommee("NL")!,
+      niveauLangueMin: "B2",
+    });
+    const { container } = rendre({ remarques: null, recoupements: croisements });
+    expect(screen.getByText("Ce que nous avons recoupé")).toBeDefined();
+    expect(screen.getByText("Ce que nous n'avons pas recoupé")).toBeDefined();
+    expect(container.textContent).toContain("pièces jointes");
+    expect(container.textContent).toContain("rien ne diverge");
+  });
+
+  /** Rien de comparable : l'écran ne prétend pas avoir recoupé. */
+  it("n'annonce aucun recoupement quand rien n'était comparable", () => {
+    const { container } = rendre({ remarques: null });
+    expect(screen.queryByText("Ce que nous avons recoupé")).toBeNull();
+    expect(container.textContent).toContain("sans l'avoir lu");
+  });
+
   /** « Corriger le passage » n'était relié à rien : c'est un lien vers l'éditeur. */
   it("mène à l'éditeur depuis chaque remarque", () => {
     rendre({ remarques: REMARQUES_MOTIVATION });
@@ -517,6 +571,7 @@ describe("R-04 — Analyse critique", () => {
       dossier={dossierParId("nl-4471")!}
       type="lettre-motivation"
       remarques={REMARQUES_MOTIVATION}
+      recoupements={AUCUN_RECOUPEMENT}
       texteExistant
       relectureLe="2026-09-11"
     />
