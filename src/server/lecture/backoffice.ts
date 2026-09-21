@@ -1,5 +1,11 @@
 import { db } from "@/lib/db";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
+import {
+  acteurLisible,
+  compteDeLActeur,
+  origineDe,
+  type IdentiteDUnCompte,
+} from "@/domain/backoffice/acteur";
 import { echec } from "@/server/http/echecs";
 import { payload } from "@/server/acces/regles";
 import { editorialDe } from "@/lib/contenu/destinations";
@@ -358,21 +364,50 @@ const CATEGORIE: Record<string, CategorieAudit> = {
 export async function journal(filtre?: CategorieAudit): Promise<EcritureAudit[]> {
   const lignes = await db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
 
+  /**
+   * Les identités, en une requête pour deux cents lignes.
+   *
+   * Un même opérateur signe la plupart des écritures d'une journée :
+   * résoudre ligne par ligne ferait deux cents lectures pour trois
+   * personnes. `deletedAt` est lu comme les autres colonnes — c'est lui
+   * qui distingue « Compte supprimé » d'« Acteur non résolu », et les
+   * confondre dirait qu'on a perdu une trace là où le compte a
+   * simplement été effacé à la demande.
+   */
+  const comptes = [
+    ...new Set(lignes.map((l) => compteDeLActeur(l.actorId)).filter((id) => id !== null)),
+  ];
+  const identites = new Map<string, IdentiteDUnCompte>(
+    (
+      await db.user.findMany({
+        where: { id: { in: comptes } },
+        select: { id: true, email: true, firstName: true, lastName: true, deletedAt: true },
+      })
+    ).map((u) => [
+      u.id,
+      {
+        prenom: u.firstName,
+        nom: u.lastName,
+        email: u.email,
+        supprime: u.deletedAt !== null,
+      },
+    ]),
+  );
+
   return lignes
-    .map((l) => ({
-      id: l.id,
-      horodatage: l.createdAt.toISOString(),
-      acteur: l.actorId,
-      categorie: CATEGORIE[l.action] ?? ("COMPTE" as CategorieAudit),
-      action: l.action,
-      objet: l.target,
-      detail: l.reason,
-      origine: l.actorId.startsWith("systeme:")
-        ? "tâche planifiée"
-        : l.actorId.startsWith("webhook:")
-          ? "webhook"
-          : "back-office",
-    }))
+    .map((l) => {
+      const compte = compteDeLActeur(l.actorId);
+      return {
+        id: l.id,
+        horodatage: l.createdAt.toISOString(),
+        acteur: acteurLisible(l.actorId, compte ? (identites.get(compte) ?? null) : null),
+        categorie: CATEGORIE[l.action] ?? ("COMPTE" as CategorieAudit),
+        action: l.action,
+        objet: l.target,
+        detail: l.reason,
+        origine: origineDe(l.actorId),
+      };
+    })
     .filter((e) => (filtre ? e.categorie === filtre : true));
 }
 

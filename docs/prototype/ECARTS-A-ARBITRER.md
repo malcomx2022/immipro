@@ -2429,3 +2429,64 @@ paiement XOF et un paiement EUR du même compte :
 
     $-05  XOF   sept motifs · *880#, notification, numéro, portefeuille
           EUR   sept motifs · relevé, page de confirmation, carte, banque
+
+### R.4 — L'identité de l'acteur au journal d'audit
+
+**Tranché : l'identifiant reste dans la donnée, il n'est plus le libellé.**
+
+B-06 affichait `7f3c1a02-…` dans une colonne intitulée « Acteur ». Un
+identifiant n'est pas un nom, et une colonne qui promet une personne doit
+en nommer une : un contrôleur qui relit six mois de journal voyait
+trente-six identifiants sans savoir si c'était le même opérateur.
+
+L'identifiant durable ne bouge pas de la table — c'est lui qui garantit
+que deux opérateurs portant le même nom, ou ayant porté la même adresse à
+six mois d'écart, ne seront pas confondus. La décision porte sur sa
+présentation : nom d'abord, identifiant dessous, là où on le cherche
+quand on enquête.
+
+Trois replis, et ils ne disent pas la même chose :
+
+| Cas | Libellé | Ce que ça dit |
+|---|---|---|
+| Compte résolu | son nom, ou son adresse | c'est cette personne |
+| Compte supprimé | « Compte supprimé » | la personne est partie, la trace reste |
+| Résolution échouée | « Acteur non résolu » | on ne sait pas, et on le dit |
+
+Le troisième est celui qui manquait : un identifiant qui ne résout pas
+s'affichait tel quel, c'est-à-dire comme un nom de personne. Dire « je ne
+sais pas » vaut mieux que présenter une clé primaire comme quelqu'un.
+
+#### Ce que l'application de la décision a trouvé
+
+**`candidat:` n'était pas une forme prévue.** Le journal affichait
+`candidat:7f3c1a02-…`, un préfixe collé à une clé primaire, en guise de
+nom — et l'origine de la ligne disait « back-office », parce que le
+préfixe retombait sur le cas par défaut. Une suppression demandée par un
+candidat depuis son espace se lisait donc comme une action
+d'administrateur, ce qu'un contrôle lirait de travers.
+
+**L'historique éditorial portait le même défaut, et son commentaire
+disait le contraire.** `par: auteurs.get(…) ?? v.publishedBy` était
+documenté « un compte supprimé n'a plus d'adresse, l'identifiant est le
+repli ». Il ne retombait pas : RG-10.4 anonymise l'adresse sans supprimer
+la ligne, donc l'historique affichait `supprime-x7k2@…`, qui nomme moins
+que rien. Le repli ne servait que le cas où la ligne manque vraiment, et
+il y affichait une clé primaire. Un test affirmait cette forme ; il
+affirmait une explication fausse.
+
+**Un identifiant affiché deux fois.** Vu à l'écran : une tâche planifiée
+donnait « systeme:purge » sur deux lignes, l'une sous l'autre, puisque son
+identifiant **est** son nom — et dans un vrai journal ces lignes-là sont
+les plus nombreuses. L'identifiant ne se répète plus quand il est déjà le
+libellé.
+
+**Les sept formes, lues au navigateur** contre une base réelle :
+
+    Koffi Houngbo            56e8efee-…              back-office
+    ops-ainfql@immipro.test  9dfc665b-…              back-office
+    Compte supprimé          815443ea-…              back-office
+    Awa Diallo               candidat:efaa7d4e-…     espace candidat
+    Acteur non résolu        aa000000-…              back-office
+    systeme:purge                                    tâche planifiée
+    webhook:MOBILE_MONEY                             webhook

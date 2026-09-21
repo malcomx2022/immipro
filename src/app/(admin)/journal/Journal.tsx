@@ -111,7 +111,36 @@ export function Journal({
                   <td className="whitespace-nowrap px-3 py-2 text-13 text-ink-700">
                     {horodatage(e.horodatage)}
                   </td>
-                  <td className="px-3 py-2 text-ink-900">{e.acteur}</td>
+                  {/*
+                    Le libellé d'abord, l'identifiant durable dessous.
+                    L'enquête a besoin des deux : le nom pour savoir de qui
+                    on parle, l'identifiant pour ne pas confondre deux
+                    personnes qui portent le même. Il n'est pas replié
+                    derrière un geste — on le lit en balayant la colonne,
+                    et un détail qu'il faut ouvrir ligne par ligne sur
+                    deux cents lignes n'est pas consultable.
+                  */}
+                  <td className="px-3 py-2">
+                    <span
+                      className={cn(
+                        "block text-ink-900",
+                        e.acteur.genre === "NON_RESOLU" && "italic text-ink-700",
+                      )}
+                    >
+                      {e.acteur.libelle}
+                    </span>
+                    {/*
+                      Sauf quand il est déjà le libellé. Une tâche
+                      planifiée s'affichait « systeme:purge » deux fois,
+                      l'une sous l'autre — et dans un vrai journal ces
+                      lignes-là sont les plus nombreuses.
+                    */}
+                    {e.acteur.identifiant === e.acteur.libelle ? null : (
+                      <span className="block font-mono text-13 text-ink-500">
+                        {e.acteur.identifiant}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-ink-900">{e.action}</td>
                   <td className="px-3 py-2 text-ink-700">{e.objet}</td>
                   <td className="px-3 py-2 text-pretty text-ink-700">{e.detail}</td>

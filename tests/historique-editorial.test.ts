@@ -252,12 +252,23 @@ describe("l'historique se lit, et pas seulement se stocke", () => {
    * La table garde l'identifiant, durable comme dans le journal d'audit :
    * une adresse change, un identifiant non. Mais une colonne d'UUID ne
    * nomme personne, et un historique qu'on consulte doit nommer
-   * quelqu'un. L'adresse est résolue à la lecture, l'identifiant reste le
-   * repli — un compte supprimé (RG-10.4) n'a plus d'adresse, et la ligne
-   * doit survivre à son auteur.
+   * quelqu'un.
+   *
+   * **Ce test affirmait un repli qui n'existait pas.** Il exigeait
+   * `auteurs.get(...) ?? v.publishedBy`, en expliquant qu'un compte
+   * supprimé retomberait sur son identifiant. Il ne retombait pas :
+   * RG-10.4 anonymise l'adresse sans supprimer la ligne, donc `get`
+   * rendait `supprime-x7k2@…`. Le repli ne servait que le cas où la
+   * ligne manque vraiment, et il y affichait une clé primaire en guise
+   * de nom. Les deux cas ont maintenant chacun leur libellé (arbitrage
+   * du 21/09/2026), et c'est la même convention qu'en B-06.
    */
-  it("l'auteur se lit par son adresse, son identifiant en repli", () => {
-    expect(lecture).toMatch(/par: auteurs\.get\(v\.publishedBy\) \?\? v\.publishedBy/u);
+  it("l'auteur se lit par son nom, et chaque échec dit lequel", () => {
+    expect(lecture).toMatch(
+      /par: acteurLisible\(v\.publishedBy, auteurs\.get\(v\.publishedBy\) \?\? null\)/u,
+    );
+    // Le compte est lu avec ce qu'il faut pour distinguer les deux replis.
+    expect(lecture).toMatch(/deletedAt: true/u);
     // Et la table, elle, conserve bien l'identifiant.
     const acces = lire(ACCES);
     expect(acces).toMatch(/publishedBy: publication\.par/u);

@@ -1,4 +1,9 @@
 import type { EditorialDoc } from "@prisma/client";
+import {
+  acteurLisible,
+  type ActeurLisible,
+  type IdentiteDUnCompte,
+} from "@/domain/backoffice/acteur";
 import { db } from "@/lib/db";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { echec } from "@/server/http/echecs";
@@ -209,11 +214,17 @@ export interface VersionPubliee {
    * La table conserve l'identifiant — durable, comme dans le journal
    * d'audit : une adresse change, un identifiant non. Mais un historique
    * qu'on consulte doit nommer quelqu'un, et une colonne d'UUID ne nomme
-   * personne. L'adresse est donc résolue à la lecture, et l'identifiant
-   * reste le repli : un compte supprimé (RG-10.4) n'a plus d'adresse, et
-   * la ligne doit survivre à son auteur.
+   * personne.
+   *
+   * **Les deux replis étaient faux** (arbitrage du 21/09/2026). Le commentaire
+   * d'ici disait qu'un compte supprimé retomberait sur son identifiant ;
+   * il ne retombait pas, parce que RG-10.4 anonymise l'adresse sans
+   * supprimer la ligne — l'historique affichait donc
+   * `supprime-x7k2@…`, qui nomme moins que rien. Et quand la ligne
+   * manquait vraiment, l'identifiant s'affichait à la place d'un nom.
+   * La même convention qu'en B-06 répond aux deux.
    */
-  par: string;
+  par: ActeurLisible;
   motif: string;
   publieLe: string;
 }
@@ -245,13 +256,16 @@ export async function documentPourEdition(id: string): Promise<DocumentEnEdition
     take: VERSIONS_RELUES,
   });
 
-  const auteurs = new Map(
+  const auteurs = new Map<string, IdentiteDUnCompte>(
     (
       await db.user.findMany({
         where: { id: { in: [...new Set(versions.map((v) => v.publishedBy))] } },
-        select: { id: true, email: true },
+        select: { id: true, email: true, firstName: true, lastName: true, deletedAt: true },
       })
-    ).map((u) => [u.id, u.email]),
+    ).map((u) => [
+      u.id,
+      { prenom: u.firstName, nom: u.lastName, email: u.email, supprime: u.deletedAt !== null },
+    ]),
   );
 
   const lu = corpsSchema.safeParse(doc.body);
@@ -294,7 +308,7 @@ export async function documentPourEdition(id: string): Promise<DocumentEnEdition
         corps: luVersion.success ? luVersion.data : null,
         source: v.sourceLabel,
         verifieeLe: jourEnFrancais(v.verifiedAt.toISOString()),
-        par: auteurs.get(v.publishedBy) ?? v.publishedBy,
+        par: acteurLisible(v.publishedBy, auteurs.get(v.publishedBy) ?? null),
         motif: v.reason,
         publieLe: v.publishedAt.toISOString(),
       } satisfies VersionPubliee;
