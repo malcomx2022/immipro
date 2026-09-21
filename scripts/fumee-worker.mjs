@@ -1,0 +1,339 @@
+/**
+ * Test de fumée du worker de production.
+ *
+ * ── Ce qu'il vérifie, et pourquoi pas autrement ───────────────────────
+ *
+ * Le défaut corrigé ici ne se voyait dans aucun test : `npm run check`
+ * était vert pendant que le service `worker` bouclait sur
+ * `Cannot find module '/app/dist/worker.js'`. Chercher un nom de fichier
+ * dans une source n'aurait rien changé — le fichier était bien *nommé*
+ * partout, il n'était simplement jamais *produit*.
+ *
+ * Ce script exécute donc réellement la commande que
+ * `docker-compose.prod.yml` donne au service, dans une arborescence qui
+ * ne contient **que** ce que l'image finale copie. Trois façons de le
+ * faire échouer, et il les distingue :
+ *
+ * | Si le worker était…            | Ce qu'on observerait              |
+ * |---|---|
+ * | absent ou mal nommé            | `Cannot find module`              |
+ * | amputé d'une dépendance        | `MODULE_NOT_FOUND` au démarrage   |
+ * | une fonction morte ou un stub  | sortie 0, sans tentative de connexion |
+ *
+ * Le succès, lui, ne peut pas être feint : sans PostgreSQL, le worker
+ * doit échouer **sur la connexion** et rendre un code non nul. Un
+ * artefact qui s'arrêterait proprement sans rien tenter passerait pour
+ * bon à l'œil nu ; ici il échoue.
+ *
+ * ── Trois modes ──────────────────────────────────────────────────────
+ *
+ *     node scripts/fumee-worker.mjs             arborescence isolée
+ *     node scripts/fumee-worker.mjs --base      + démarrage sur PostgreSQL
+ *     node scripts/fumee-worker.mjs --image     image Docker réelle
+ *
+ * Le premier tourne partout, y compris en intégration continue, sans
+ * démon Docker. Le troisième construit l'image et exécute la commande
+ * dedans : c'est le seul qui prouve le `COPY` du Dockerfile, et il
+ * demande un démon.
+ *
+ * ── Pourquoi un mode avec base ───────────────────────────────────────
+ *
+ * Empaqueter le worker a révélé la panne suivante, que la première
+ * masquait : pg-boss 10 refuse de travailler ou de planifier sur une
+ * file qui n'existe pas en base, et le worker s'arrêtait aussitôt sur
+ * « Queue paiement.reconciliation not found ». Sans base, ce mode-là est
+ * invisible — le worker échoue de toute façon sur la connexion.
+ *
+ * `--base` crée donc une base jetable, vierge, et démarre le paquet
+ * dessus **deux fois** : la première prouve que les files sont créées, la
+ * seconde qu'un redémarrage n'y touche pas. Aucune base existante n'est
+ * modifiée.
+ */
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import {
+  closeSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const RACINE = process.cwd();
+const COMPOSE = join(RACINE, "docker-compose.prod.yml");
+
+/** Port fermé : la connexion doit être refusée tout de suite. */
+const URL_SANS_BASE = "postgresql://fumee:fumee@127.0.0.1:59999/fumee";
+
+const echecs = [];
+const verifier = (condition, message) => {
+  if (condition) console.log(`  ✓ ${message}`);
+  else {
+    console.log(`  ✗ ${message}`);
+    echecs.push(message);
+  }
+};
+
+/**
+ * La commande vient du fichier de déploiement, jamais d'une constante
+ * recopiée ici : c'est ce qui empêche le test et la production de
+ * diverger le jour où l'un des deux change.
+ */
+function commandeDuService(nom) {
+  const yml = readFileSync(COMPOSE, "utf8");
+  const bloc = yml.split(new RegExp(`^  ${nom}:$`, "mu"))[1];
+  if (!bloc) throw new Error(`Service « ${nom} » absent de ${COMPOSE}`);
+  const ligne = bloc.split(/^  \S/mu)[0].match(/^\s*command:\s*\[(.+)\]\s*$/mu);
+  return ligne
+    ? ligne[1].split(",").map((m) => m.trim().replace(/^["']|["']$/gu, ""))
+    : null;
+}
+
+function analyser(resultat, contexte) {
+  const sortie = `${resultat.stdout ?? ""}${resultat.stderr ?? ""}`;
+  verifier(
+    !/Cannot find module|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/u.test(sortie),
+    `${contexte} : aucun module manquant au démarrage`,
+  );
+  verifier(
+    resultat.status !== 0,
+    `${contexte} : sortie non nulle sans PostgreSQL (obtenu ${resultat.status})`,
+  );
+  verifier(
+    /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|connect/u.test(sortie),
+    `${contexte} : l'échec porte sur la connexion, le code a donc bien démarré`,
+  );
+  verifier(
+    !sortie.includes("worker démarré"),
+    `${contexte} : aucun démarrage annoncé sans base`,
+  );
+  if (echecs.length > 0) console.log(`\n--- sortie observée ---\n${sortie.trim()}\n`);
+}
+
+// ── 1. Le déploiement décrit bien deux services distincts ─────────────
+
+console.log("docker-compose.prod.yml");
+const commandeWorker = commandeDuService("worker");
+const commandeApp = commandeDuService("app");
+verifier(Array.isArray(commandeWorker), "le service worker déclare une commande");
+verifier(
+  commandeApp === null,
+  "le service app garde la commande de l'image, il ne lance pas le worker",
+);
+verifier(
+  JSON.stringify(commandeApp) !== JSON.stringify(commandeWorker),
+  "les deux services ne partagent pas la même commande",
+);
+if (!commandeWorker) process.exit(1);
+
+// ── 2. Le build produit ce que la commande nomme ──────────────────────
+
+const artefact = commandeWorker[commandeWorker.length - 1];
+console.log(`\nCompilation → ${artefact}`);
+/*
+  L'artefact est effacé avant d'être reconstruit. Sans cela, le test
+  passait au vert sur un paquet resté d'une exécution précédente : il
+  vérifiait qu'un fichier existe, pas qu'un build le produit — et c'est
+  exactement le genre de vérification que la panne d'origine aurait
+  traversée.
+*/
+rmSync(join(RACINE, "dist"), { recursive: true, force: true });
+verifier(!existsSync(join(RACINE, artefact)), `${artefact} est bien absent avant le build`);
+execFileSync("node", ["scripts/build-worker.mjs"], { cwd: RACINE, stdio: "inherit" });
+verifier(existsSync(join(RACINE, artefact)), `${artefact} existe après le build`);
+
+// ── 3. Exécution dans une arborescence réduite à l'essentiel ──────────
+
+if (!process.argv.includes("--image")) {
+  console.log("\nExécution en arborescence isolée");
+  const bac = mkdtempSync(join(tmpdir(), "fumee-worker-"));
+  try {
+    mkdirSync(join(bac, "dist"), { recursive: true });
+    cpSync(join(RACINE, artefact), join(bac, artefact));
+    /*
+      Seulement les deux dépendances que le paquet laisse dehors. Copier
+      tout `node_modules` rendrait le test complaisant : il passerait
+      alors même si l'image finale n'embarquait rien.
+    */
+    for (const paquet of ["@prisma", ".prisma"]) {
+      const source = join(RACINE, "node_modules", paquet);
+      if (!existsSync(source)) {
+        console.log(`  ✗ node_modules/${paquet} absent — lancer « npx prisma generate »`);
+        process.exit(1);
+      }
+      cpSync(source, join(bac, "node_modules", paquet), { recursive: true });
+    }
+
+    analyser(
+      spawnSync(commandeWorker[0], commandeWorker.slice(1), {
+        cwd: bac,
+        env: { ...process.env, DATABASE_URL: URL_SANS_BASE, NODE_ENV: "production" },
+        encoding: "utf8",
+        timeout: 60_000,
+      }),
+      "arborescence isolée",
+    );
+  } finally {
+    rmSync(bac, { recursive: true, force: true });
+  }
+} else {
+  // ── 3 bis. La même chose, mais dans l'image réellement construite ───
+  console.log("\nConstruction de l'image et exécution dedans");
+  execFileSync("docker", ["build", "-t", "immipro-fumee:worker", "."], {
+    cwd: RACINE,
+    stdio: "inherit",
+  });
+  analyser(
+    spawnSync(
+      "docker",
+      [
+        "run", "--rm", "--network", "none",
+        "-e", `DATABASE_URL=${URL_SANS_BASE}`,
+        "immipro-fumee:worker",
+        ...commandeWorker,
+      ],
+      { encoding: "utf8", timeout: 600_000 },
+    ),
+    "image Docker",
+  );
+}
+
+// ── 4. Démarrage réel sur PostgreSQL, base jetable ───────────────────
+
+if (process.argv.includes("--base")) {
+  const { default: PgBoss } = await import("pg-boss");
+  const { Client } = await import("pg");
+
+  const source = process.env.DATABASE_URL;
+  if (!source) {
+    console.log("\n  ✗ --base demande DATABASE_URL (un serveur, pas une base précise)");
+    process.exit(1);
+  }
+
+  /*
+    Une base jetable plutôt que celle du poste : pg-boss range ses files
+    dans un schéma fixe, on ne peut pas l'isoler autrement, et un test de
+    fumée n'a pas à effacer les jobs en attente de qui le lance.
+  */
+  const nomBase = `immipro_fumee_${process.pid}`;
+  const administration = new URL(source);
+  administration.pathname = "/postgres";
+  const cible = new URL(source);
+  cible.pathname = `/${nomBase}`;
+
+  const executer = async (url, texte) => {
+    const client = new Client({ connectionString: url.toString() });
+    await client.connect();
+    try {
+      return await client.query(texte);
+    } finally {
+      await client.end();
+    }
+  };
+
+  const journal = join(mkdtempSync(join(tmpdir(), "fumee-base-")), "worker.log");
+
+  const demarrerLeWorker = async (tour) => {
+    const fd = openSync(journal, "w");
+    const enfant = spawn(commandeWorker[0], commandeWorker.slice(1), {
+      cwd: RACINE,
+      stdio: ["ignore", fd, fd],
+      env: { ...process.env, DATABASE_URL: cible.toString(), NODE_ENV: "production" },
+    });
+    closeSync(fd);
+
+    let arrete = false;
+    enfant.on("exit", () => {
+      arrete = true;
+    });
+
+    const lire = () => (existsSync(journal) ? readFileSync(journal, "utf8") : "");
+    const limite = Date.now() + 90_000;
+    while (Date.now() < limite && !arrete && !lire().includes("worker démarré")) {
+      await new Promise((suite) => setTimeout(suite, 200));
+    }
+    const sortie = lire();
+
+    if (!arrete) {
+      enfant.kill("SIGTERM");
+      await new Promise((suite) => enfant.once("exit", suite));
+    }
+
+    verifier(sortie.includes("worker démarré"), `${tour} : le worker annonce son démarrage`);
+    verifier(
+      !/Queue .* not found/u.test(sortie),
+      `${tour} : aucune file manquante`,
+    );
+    if (!sortie.includes("worker démarré")) {
+      console.log(`\n--- sortie observée ---\n${sortie.trim()}\n`);
+    }
+  };
+
+  const etat = async () => {
+    // Les files internes de pg-boss ne nous regardent pas.
+    const files = await executer(
+      cible,
+      "select name from pgboss.queue where name not like '\\_\\_pgboss\\_\\_%' order by name",
+    );
+    const plans = await executer(cible, "select name, cron from pgboss.schedule order by name");
+    return {
+      files: files.rows.map((l) => l.name),
+      plans: plans.rows.map((l) => `${l.name} → ${l.cron}`),
+    };
+  };
+
+  console.log(`\nDémarrage sur une base jetable (${nomBase})`);
+  await executer(administration, `DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
+  await executer(administration, `CREATE DATABASE ${nomBase}`);
+
+  try {
+    await demarrerLeWorker("base vierge");
+    const premier = await etat();
+    verifier(premier.files.length > 0, `les files sont créées (${premier.files.length})`);
+    verifier(
+      premier.plans.length > 0,
+      `les cadences sont enregistrées (${premier.plans.join(", ") || "aucune"})`,
+    );
+
+    await demarrerLeWorker("redémarrage");
+    const second = await etat();
+    verifier(
+      JSON.stringify(second.files) === JSON.stringify(premier.files),
+      "un redémarrage ne change pas les files",
+    );
+    verifier(
+      JSON.stringify(second.plans) === JSON.stringify(premier.plans),
+      "un redémarrage ne duplique pas les cadences",
+    );
+
+    /*
+      Le point décisif pour WF-06 et WF-11 : `send` ne lève pas quand la
+      file est inconnue, il rend `null` et le job disparaît. Poster ici,
+      worker arrêté, vérifie que chaque file déclarée accepte réellement
+      un job — c'est ce qui manquait au dépôt d'une pièce.
+    */
+    const producteur = new PgBoss(cible.toString());
+    await producteur.start();
+    try {
+      for (const nom of second.files) {
+        const id = await producteur.send(nom, { fumee: true });
+        verifier(id !== null, `un producteur peut poster sur « ${nom} »`);
+      }
+    } finally {
+      await producteur.stop({ graceful: false });
+    }
+  } finally {
+    await executer(administration, `DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
+  }
+}
+
+console.log(
+  echecs.length === 0
+    ? "\nLe worker de production démarre depuis l'artefact construit."
+    : `\n${echecs.length} vérification(s) en échec.`,
+);
+process.exit(echecs.length === 0 ? 0 : 1);

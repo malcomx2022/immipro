@@ -7,7 +7,7 @@
  * ce qui permet de rejouer une purge ou une réconciliation à la main un soir
  * d'incident, sans file de jobs.
  */
-import { getQueue, JOBS } from "@/lib/queue";
+import { getQueue, JOBS, poster } from "@/lib/queue";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
@@ -18,6 +18,9 @@ import { balayerUnePiece } from "./balayage";
 import { propagerLaPublication } from "./divergence";
 
 async function main() {
+  // `getQueue` déclare les files avant de rendre la main (voir
+  // `src/lib/queue.ts`). pg-boss 10 refuse de travailler ou de planifier
+  // sur une file inconnue, et le worker mourait ici sans rien traiter.
   const boss = await getQueue();
 
   // I.D — le balayage précède l'analyse, et c'est le worker qui les
@@ -29,7 +32,10 @@ async function main() {
     async ([job]) => {
       if (!job) return;
       const suite = await balayerUnePiece(job.data);
-      if (suite === "ANALYSE") await boss.send(JOBS.ANALYSE_DOCUMENT, job.data);
+      // `poster` lève si la mise en file échoue : le balayage n'est alors
+      // pas marqué réussi, et le job est rejoué. Avec `send`, une analyse
+      // perdue aurait laissé la pièce indéfiniment « en analyse ».
+      if (suite === "ANALYSE") await poster(boss, JOBS.ANALYSE_DOCUMENT, job.data);
     },
   );
 

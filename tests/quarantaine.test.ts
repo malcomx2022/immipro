@@ -127,7 +127,12 @@ describe("le balayage précède l'analyse, et rien ne les inverse", () => {
   it("le worker enchaîne, et n'analyse que ce qui a été promu", () => {
     const worker = lire("src/server/jobs/worker.ts");
     expect(worker).toMatch(/JOBS\.BALAYAGE_PIECE/u);
-    expect(worker).toMatch(/if \(suite === "ANALYSE"\) await boss\.send\(JOBS\.ANALYSE_DOCUMENT/u);
+    // La mise en file suit le verdict du balayage et rien d'autre. Le
+    // nom de l'envoyeur peut changer — `poster` refuse aujourd'hui les
+    // pertes silencieuses de pg-boss —, la condition non.
+    expect(worker).toMatch(
+      /if \(suite === "ANALYSE"\) await \w+\((?:boss, )?JOBS\.ANALYSE_DOCUMENT/u,
+    );
     expect(worker.indexOf("JOBS.BALAYAGE_PIECE")).toBeLessThan(
       worker.indexOf("await boss.work<{ applicationId: string; documentId: string; versionId: string }>(\n    JOBS.ANALYSE_DOCUMENT"),
     );

@@ -37,6 +37,59 @@ npm run dev                     # http://localhost:3000
 
 Node 20 LTS (`.nvmrc`).
 
+### Le worker
+
+Les acteurs SYS de DOC-11 — purge, réconciliation des paiements, veille,
+balayage puis analyse des pièces, péremption — tournent dans un **service
+séparé** de l'application web. Un travail de fond logé dans le processus
+qui sert les requêtes partagerait sa mémoire et son cycle de vie.
+
+```bash
+npm run worker                  # en local : TypeScript, rechargé par tsx
+```
+
+En production, rien n'interprète du TypeScript et rien n'est téléchargé au
+démarrage. `npm run build` produit deux artefacts — la sortie `standalone`
+de Next et `dist/worker.js`, un paquet unique compilé par esbuild — et le
+conteneur lance le second :
+
+```bash
+npm run build                   # .next/standalone + dist/worker.js
+node --enable-source-maps dist/worker.js
+```
+
+C'est exactement la commande du service `worker` de
+`docker-compose.prod.yml`, qui partage l'image de l'application. Seuls
+`@prisma/client` et le client généré restent hors du paquet : ils chargent
+leurs moteurs par chemin à l'exécution, et la sortie `standalone` les
+embarque déjà.
+
+Les files de jobs sont déclarées au démarrage de chaque processus
+(`declarerLesFiles`, dans `src/lib/queue.ts`). pg-boss 10 ne les crée plus
+au premier envoi : la table des jobs est partitionnée par file et planifier
+sur une file inconnue échoue, tandis que **poster** sur une file inconnue
+ne lève pas — l'envoi rend `null` et le job disparaît. D'où `poster()`,
+qui refuse ce silence : un dépôt ne peut pas répondre « en cours
+d'analyse » pour un fichier que personne ne balaiera.
+
+```bash
+npm run smoke:worker            # construit le paquet et l'exécute isolé
+npm run smoke:worker -- --base  # + démarrage réel sur PostgreSQL
+npm run smoke:worker -- --image # idem, dans l'image Docker (démon requis)
+```
+
+Le test de fumée lance la commande que le fichier de déploiement déclare,
+dans une arborescence réduite aux seules dépendances que l'image copie.
+Sans PostgreSQL, le worker doit échouer sur la connexion et rendre un code
+non nul : un artefact absent, amputé d'un module ou réduit à une fonction
+morte ne passe pas.
+
+`--base` ajoute l'autre moitié, celle que la première masquait : le paquet
+démarre deux fois sur une base **jetable** — créée et supprimée par le
+script, jamais celle du poste — pour vérifier que les files et les cadences
+sont bien créées, qu'un redémarrage n'y touche pas, et que chaque file
+accepte réellement un job. `DATABASE_URL` doit désigner le serveur.
+
 ---
 
 ## Organisation du code

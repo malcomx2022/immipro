@@ -13,7 +13,7 @@ import {
   versionDeMemeEmpreinte,
 } from "@/server/acces/pieces";
 import { compteur, solde } from "@/server/acces/quota";
-import { getQueue, JOBS } from "@/lib/queue";
+import { getQueue, JOBS, poster } from "@/lib/queue";
 import { antivirusConfigure } from "@/server/securite/antivirus";
 import { MENTION_EN_QUARANTAINE } from "@/domain/dossiers/quarantaine";
 
@@ -117,7 +117,10 @@ export const PUT = route({
     });
 
     const file = await getQueue();
-    await file.send(JOBS.BALAYAGE_PIECE, {
+    // `poster` et non `send` : une mise en file perdue rendrait la réponse
+    // « en cours d'analyse » ci-dessous fausse, et la pièce attendrait un
+    // balayage qui ne viendrait jamais.
+    await poster(file, JOBS.BALAYAGE_PIECE, {
       applicationId: dossier.id,
       documentId: piece.id,
       versionId: version.id,

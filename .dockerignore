@@ -1,0 +1,20 @@
+# Ce qui est reconstruit dans l'image, et ne doit jamais venir de l'hôte.
+#
+# `dist/` en particulier : sans cette ligne, un paquet worker périmé posé
+# sur la machine du développeur entrerait dans l'image par `COPY . .` et
+# masquerait une compilation cassée — précisément la panne que ce dossier
+# a introduite une première fois.
+node_modules
+.next
+dist
+coverage
+
+# Secrets et états locaux.
+.env
+.env.*
+!.env.example
+pgdata
+minio-data
+
+.git
+*.log

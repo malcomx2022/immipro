@@ -3,7 +3,7 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
-import { getQueue, JOBS } from "@/lib/queue";
+import { getQueue, JOBS, poster } from "@/lib/queue";
 import {
   avecLesTextesCandidat,
   visaRulesSchema,
@@ -204,7 +204,9 @@ export const POST = route({
     // rattachés, ni échouer parce que l'un d'eux pose problème.
     if (veille) {
       const file = await getQueue();
-      await file.send(JOBS.DIVERGENCE_REGLEMENTAIRE, {
+      // La réponse annonce `divergenceMiseEnFile` : elle ne doit pas
+      // l'annoncer si rien n'a été mis en file.
+      await poster(file, JOBS.DIVERGENCE_REGLEMENTAIRE, {
         ancienneId: veille.id,
         nouvelleId: regle.id,
       });

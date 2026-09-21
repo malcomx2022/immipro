@@ -4278,3 +4278,105 @@ affiche donc le code, ce qui est exact, et l'écran d'administration est le
 lieu où un code se lit — mais une règle publiée sans nom de pays est un
 manque de contenu, pas une décision d'écran. Il relève de la veille.
 
+
+### S.17 — Le service `worker` n'avait rien à lancer
+
+Le fichier de déploiement donnait au service la commande
+`node dist/worker.js`. Aucune étape ne produisait ce fichier :
+`npm run build` lançait `next build`, TypeScript était configuré en
+`noEmit`, et l'image finale ne contenait que la sortie `standalone` de
+Next. Le conteneur s'arrêtait donc sur `Cannot find module`, et
+`restart: unless-stopped` le relançait indéfiniment.
+
+Ce qui tombait avec lui : la purge de rétention (INV-5), la
+réconciliation des paiements (INV-7, RG-05.4), la veille (RG-14.1),
+l'enchaînement balayage → analyse (I.D) et le déclassement des pièces
+périmées (RG-07.4). Cinq acteurs SYS de DOC-11, aucun signal.
+
+**Le paquet.** `scripts/build-worker.mjs` compile
+`src/server/jobs/worker.ts` en un fichier unique avec esbuild, appelé par
+`npm run build` après `next build`. Un `tsc` avec un `tsconfig` dédié
+aurait été plus simple mais ne réécrit pas l'alias `@/` : les imports
+auraient survécu à la compilation et échoué à l'exécution. Restent hors
+du paquet `@prisma/client` et le client généré, qui chargent leurs
+moteurs par chemin — la sortie `standalone` les embarque déjà, et les
+deux services partagent la même image. Le `Dockerfile` copie `dist/`, un
+`.dockerignore` empêche qu'un `dist/` du poste se glisse dans le
+contexte, et la commande du service gagne `--enable-source-maps`.
+
+#### Ce que la réparation a découvert dessous
+
+Le paquet une fois exécutable, le worker s'arrêtait sur autre chose :
+
+    error: Queue paiement.reconciliation not found
+      constraint: 'schedule_name_fkey'
+
+pg-boss 10 ne crée plus une file au premier usage — la table des jobs est
+partitionnée par nom de file, avec une clé étrangère vers `queue`.
+Personne n'appelait `createQueue`. La panne d'empaquetage cachait la
+seconde : tant que rien ne démarrait, rien ne pouvait échouer plus loin.
+
+Et le versant producteur est pire que le versant worker. Mesuré, sur une
+base jetable :
+
+    send("file.inconnue", {})   →  null        (aucune erreur levée)
+    send("file.connue", {})     →  d571bda1-…
+
+Un `send` sur une file inconnue **ne lève pas** : il rend `null` et le job
+disparaît. Le dépôt d'une pièce (WF-06) ignorait ce retour et répondait
+`EN_ANALYSE` avec la mention de quarantaine — une pièce annoncée en cours
+de balayage que personne n'aurait balayée. Même chose pour
+`divergenceMiseEnFile` à la publication d'une règle (WF-11).
+
+Deux corrections, dans `src/lib/queue.ts` : les files sont déclarées au
+démarrage de **chaque** processus, web compris — le dépôt n'a pas à
+attendre qu'un worker soit passé avant lui — et `poster()` remplace
+`send()` aux trois points d'envoi, en levant plutôt qu'en perdant. Le
+balayage n'est alors pas marqué réussi, et le job est rejoué.
+
+#### Vérifié en exécutant
+
+`npm run smoke:worker` efface `dist/`, reconstruit, puis exécute la
+commande **lue dans `docker-compose.prod.yml`** dans une arborescence
+réduite aux seules dépendances que l'image copie. Sans base, le worker
+doit échouer sur la connexion avec un code non nul : un artefact absent,
+amputé d'un module ou réduit à une fonction morte ne passe pas. `--base`
+ajoute un démarrage réel sur une base vierge, jetable, créée et supprimée
+par le script.
+
+Six mutations, six rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le build ne produit plus rien | `dist/worker.js` absent après le build |
+| la sortie du paquet change de nom | l'artefact nommé par la commande manque |
+| le worker sort proprement sans rien tenter | sortie 0, aucune connexion tentée |
+| `declarerLesFiles` vidée | `Queue … not found`, zéro file, zéro cadence |
+| une seule file déclarée | idem, dès la planification |
+| les `schedule` retirés | zéro cadence enregistrée |
+
+Une septième, essayée, **n'a pas mordu** et ne doit pas être comptée :
+empaqueter `@prisma/client` au lieu de le laisser dehors passe au vert.
+C'est exact — le paquet grossit, il fonctionne quand même. Les deux
+exclusions ne sont donc pas garanties par le test : elles restent un
+choix, motivé par les moteurs chargés par chemin et par la sortie
+`standalone` qui les embarque déjà.
+
+La première n'a pas mordu au premier essai : le test trouvait un
+`dist/worker.js` resté d'une exécution précédente. Il vérifiait qu'un
+fichier existe, pas qu'un build le produit — exactement ce que la panne
+d'origine aurait traversé. L'artefact est maintenant effacé avant, et son
+absence vérifiée.
+
+Sur base réelle, après correction : huit files créées, quatre cadences
+(`*/15 * * * *`, `0 3 * * *`, `15 3 * * *`, `30 3 * * *`), un redémarrage
+qui ne change ni les unes ni les autres, et chacune des huit files accepte
+réellement un job.
+
+#### Ce qui n'a pas pu être vérifié ici
+
+Aucun démon Docker dans cet environnement : le mode `--image`, seul à
+prouver le `COPY` du `Dockerfile`, n'a jamais été exécuté. Ce qui a été
+vérifié à sa place est une reproduction fidèle de la disposition de
+l'image — la sortie `standalone`, `.next/static`, `public`, `dist` — dans
+un répertoire temporaire.
