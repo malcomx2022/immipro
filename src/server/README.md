@@ -336,6 +336,58 @@ traite son absence plutôt que de faire semblant :
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
 
+### Le tunnel de paiement, et ce que l'ouverture ne fait pas
+
+Le clic sur « Payer » ouvre une session chez le fournisseur et envoie le
+navigateur sur sa page hébergée. Il ne confirme rien : `CONFIRMEE` et le
+crédit du quota n'ont qu'une source, la notification signée (RG-05.1,
+INV-7). Ni l'ouverture, ni l'adresse de retour, ni la relève de statut.
+
+L'ordre des opérations porte deux garanties :
+
+1. **L'ouvreur est réclamé avant la moindre écriture.** Sans clé, le refus
+   est immédiat et aucune transaction locale n'est créée : une attente que
+   rien ne viendrait clore serait pire qu'un refus.
+2. **La transaction locale vient ensuite, et elle est reprise.** Sa
+   référence est la clé d'idempotence, donc stable d'une tentative à
+   l'autre : un second clic, ou une reprise après une réponse réseau
+   perdue, retrouve la même session au lieu d'en ouvrir une seconde.
+
+L'identifiant du fournisseur est enregistré **dès qu'il existe**, y compris
+quand l'URL manque encore (`creee_sans_url`) : c'est ce qui permet de
+*retrouver* au lieu de recréer. Il ne s'écrase jamais — l'écriture est
+conditionnée à la colonne nulle, ce qui la rend sûre face à une
+notification arrivée entre-temps (M.B). Et si cette session appartient déjà
+à une autre transaction locale, l'ouverture est **refusée** : le candidat
+partirait payer une session dont la notification créditerait le dossier du
+voisin.
+
+Trois refus avant d'envoyer qui que ce soit payer :
+
+| Vérification | Ce qu'elle refuse |
+|---|---|
+| l'URL hébergée | absente, relative, en clair, ou sur un domaine étranger |
+| la référence interne | une session qui ne renvoie pas notre référence — le webhook ne saurait pas quoi confirmer |
+| le montant et la devise | ce que le fournisseur a enregistré doit être ce que la plateforme a décidé |
+
+Le client ne choisit jamais son fournisseur : il suit la devise (N.A), et
+ni le fournisseur ni le montant ne sont reçus du navigateur. Les clés
+sortantes ne sont lues que par `paiement/ouvreurs.ts`, et n'atteignent
+aucun composant client.
+
+**Le franc CFA n'a pas de sous-unité, l'euro si.** 12 € valent 1 200 pour
+Stripe, 5 000 F valent 5 000 pour FedaPay. La conversion vit dans
+`domain/paiement/ouverture.ts` — une erreur d'un facteur cent sur un débit
+réel n'a pas sa place dans un adaptateur que personne ne relit.
+
+Ce qui s'éprouve où :
+
+| Vérification | Où |
+|---|---|
+| forme des requêtes, réponses inattendues, URL, référence, conversion | `tests/tunnel-ouverture.test.ts`, contre un `fetch` simulé |
+| double soumission, reprise, écart de montant, appartenance, ordre webhook / retour | `npm run smoke:tunnel`, sur PostgreSQL avec un ouvreur simulé |
+| exactitude des champs envoyés au fournisseur | `npm run sandbox:paiement`, qui s'abstient et le dit sans clés |
+
 ### Les secrets de paiement, une seule nomenclature
 
 `.env.example` portait `FEDAPAY_SECRET_KEY`, le code demandait

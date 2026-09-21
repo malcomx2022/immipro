@@ -20,6 +20,8 @@
     "worker": "tsx src/server/jobs/worker.ts",
     "smoke:worker": "node scripts/fumee-worker.mjs",
     "smoke:migrations": "node scripts/migrations.mjs",
+    "smoke:tunnel": "tsx scripts/fumee-tunnel.mts",
+    "sandbox:paiement": "tsx scripts/sandbox-paiement.mts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:garde-fous": "node scripts/garde-fous.mjs",
