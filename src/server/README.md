@@ -336,6 +336,47 @@ traite son absence plutôt que de faire semblant :
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
 
+### Les secrets de paiement, une seule nomenclature
+
+`.env.example` portait `FEDAPAY_SECRET_KEY`, le code demandait
+`FEDAPAY_API_KEY`, et personne ne lisait la première. Un exploitant qui
+remplissait le fichier obtenait une installation déclarée non configurée,
+sans rien pour lui dire laquelle des deux graphies valait.
+
+`<FOURNISSEUR>_<USAGE>`, et l'usage dit le **sens** de l'appel :
+
+| Suffixe | Sens | Ce que c'est |
+|---|---|---|
+| `_API_KEY` | sortant | la clé serveur avec laquelle nous appelons le fournisseur : création, consultation, remboursement |
+| `_WEBHOOK_SECRET` | entrant | le secret avec lequel il signe ce qu'il nous envoie, et dont la vérification fait foi (RG-05.1) |
+| `_ENVIRONMENT` | ni l'un ni l'autre | l'espace visé, `sandbox` ou `live`. Pas un secret |
+
+`_SECRET_KEY` disait « secret » sans dire dans quel sens, alors que le
+secret de webhook en est un aussi ; les deux ne se révoquent pas au même
+endroit. `src/server/paiement/secrets.ts` les nomme, et lui seul.
+
+Ce que chaque usage consomme aujourd'hui :
+
+| Usage | Module | Variables | Branché ? |
+|---|---|---|---|
+| Création de paiement | `acces/paiements.ts` | aucune | non — la transaction est locale, aucune page hébergée n'est encore créée |
+| Webhooks | `paiement/signature.ts` | `*_WEBHOOK_SECRET` | **oui** |
+| Consultation fournisseur | `jobs/reconciliation.ts` | aucune | non — `Interrogation` n'est pas branchée |
+| Remboursement | `paiement/remboursement.ts` | `*_API_KEY` | non — `leRembourseur` rend `null` |
+| Espace FedaPay | — | `FEDAPAY_ENVIRONMENT` | non — l'adaptateur qui le lira n'existe pas |
+
+Les anciens noms sont repliés sur les nouveaux par
+`environnementNormalise`, **seul** endroit qui les connaisse, avec un
+avertissement au journal qui porte le nom et la date de retrait — jamais
+la valeur. Le retrait est daté au 2026-12-31 et un test échoue quand la
+date est passée : une compatibilité sans échéance devient une seconde
+convention.
+
+Trois vérifications tiennent l'ensemble : toute variable exigée par une
+dépendance figure dans `.env.example` ; vider une variable bloquante
+change ce que `/api/health` observe, ce qui prouve qu'elle a un lecteur
+réel ; et aucun appel à `console` n'interpole la lecture d'un secret.
+
 ### Configuré n'est pas branché
 
 `/api/health` lisait `process.env`. Une variable renseignée valait dépendance
