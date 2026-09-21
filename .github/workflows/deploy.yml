@@ -10,28 +10,71 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # La porte, avant tout le reste. Elle vivait dans un workflow séparé qui
+  # tournait *en parallèle* de la construction : une image pouvait donc
+  # partir sur GHCR pendant que les tests viraient au rouge, et le VPS la
+  # tirait. `needs: valider` supprime cette course.
+  valider:
+    uses: ./.github/workflows/validation.yml
+
   build:
+    needs: valider
     runs-on: ubuntu-latest
     permissions: { contents: read, packages: write }
     outputs: { tag: ${{ steps.meta.outputs.tag }} }
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
       - id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+
+      # Construite une fois, chargée localement, éprouvée, puis poussée
+      # telle quelle. Une seconde construction « pour pousser » rendrait la
+      # vérification décorative : ce serait une autre image que celle qu'on
+      # a regardée, même si le cache rend la différence improbable.
+      #
+      # Le cache reste en place — il fait gagner plusieurs minutes — et il
+      # ne peut pas masquer une étape de construction absente : le
+      # `COPY --from=builder /app/dist` échoue si plus rien ne produit le
+      # paquet, et les commandes sont ensuite exécutées depuis l'image, pas
+      # depuis l'arbre de travail.
+      - name: Construire l'image candidate
+        uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/immipro:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/immipro:latest
+          load: true
+          tags: immipro:candidat
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Les commandes que `docker-compose.prod.yml` déclare, exécutées dans
+      # cette image-là : celle du worker, qui doit échouer sur la connexion
+      # et non sur un module manquant, et celle du service `app`, qui est
+      # celle de l'image et doit rester debout.
+      - name: Commandes des conteneurs, contre l'image produite
+        run: npm run smoke:worker -- --image=immipro:candidat
+
+      - name: Pousser l'image validée
+        run: |
+          set -euo pipefail
+          depot="ghcr.io/${{ github.repository_owner }}/immipro"
+          docker tag immipro:candidat "$depot:${{ steps.meta.outputs.tag }}"
+          docker tag immipro:candidat "$depot:latest"
+          docker push "$depot:${{ steps.meta.outputs.tag }}"
+          docker push "$depot:latest"
+          {
+            echo "## Image"
+            echo ""
+            echo "- **Commandes des conteneurs** — worker et \`app\` exécutés depuis l'image"
+            echo "- **Poussée** — \`$depot:${{ steps.meta.outputs.tag }}\`, l'empreinte éprouvée ci-dessus"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: build

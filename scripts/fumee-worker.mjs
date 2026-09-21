@@ -30,11 +30,14 @@
  *     node scripts/fumee-worker.mjs             arborescence isolée
  *     node scripts/fumee-worker.mjs --base      + démarrage sur PostgreSQL
  *     node scripts/fumee-worker.mjs --image     image Docker réelle
+ *     node scripts/fumee-worker.mjs --image=<tag>   image déjà construite
  *
  * Le premier tourne partout, y compris en intégration continue, sans
- * démon Docker. Le troisième construit l'image et exécute la commande
- * dedans : c'est le seul qui prouve le `COPY` du Dockerfile, et il
- * demande un démon.
+ * démon Docker. Les deux derniers exécutent les commandes que le fichier
+ * de déploiement déclare **dans une image** : c'est le seul moyen de
+ * prouver le `COPY` du Dockerfile, et il demande un démon. La forme avec
+ * étiquette prend une image déjà construite, celle que le déploiement
+ * s'apprête à pousser, plutôt que d'en refaire une autre.
  *
  * ── Pourquoi un mode avec base ───────────────────────────────────────
  *
@@ -132,23 +135,35 @@ if (!commandeWorker) process.exit(1);
 
 // ── 2. Le build produit ce que la commande nomme ──────────────────────
 
+const argImage = process.argv.find((a) => a === "--image" || a.startsWith("--image="));
+const imageFournie = argImage?.startsWith("--image=") ? argImage.slice("--image=".length) : null;
+
 const artefact = commandeWorker[commandeWorker.length - 1];
-console.log(`\nCompilation → ${artefact}`);
+
 /*
-  L'artefact est effacé avant d'être reconstruit. Sans cela, le test
-  passait au vert sur un paquet resté d'une exécution précédente : il
-  vérifiait qu'un fichier existe, pas qu'un build le produit — et c'est
-  exactement le genre de vérification que la panne d'origine aurait
-  traversée.
+  Quand une image est fournie, l'artefact à éprouver est celui qu'elle
+  contient : le recompiler ici ne dirait rien de plus, et masquerait au
+  contraire une image dont le contenu diffère de la source. Le paquet est
+  compilé et exécuté dans le job de validation, qui précède.
 */
-rmSync(join(RACINE, "dist"), { recursive: true, force: true });
-verifier(!existsSync(join(RACINE, artefact)), `${artefact} est bien absent avant le build`);
-execFileSync("node", ["scripts/build-worker.mjs"], { cwd: RACINE, stdio: "inherit" });
-verifier(existsSync(join(RACINE, artefact)), `${artefact} existe après le build`);
+if (!imageFournie) {
+  console.log(`\nCompilation → ${artefact}`);
+  /*
+    L'artefact est effacé avant d'être reconstruit. Sans cela, le test
+    passait au vert sur un paquet resté d'une exécution précédente : il
+    vérifiait qu'un fichier existe, pas qu'un build le produit — et c'est
+    exactement le genre de vérification que la panne d'origine aurait
+    traversée.
+  */
+  rmSync(join(RACINE, "dist"), { recursive: true, force: true });
+  verifier(!existsSync(join(RACINE, artefact)), `${artefact} est bien absent avant le build`);
+  execFileSync("node", ["scripts/build-worker.mjs"], { cwd: RACINE, stdio: "inherit" });
+  verifier(existsSync(join(RACINE, artefact)), `${artefact} existe après le build`);
+}
 
 // ── 3. Exécution dans une arborescence réduite à l'essentiel ──────────
 
-if (!process.argv.includes("--image")) {
+if (!argImage) {
   console.log("\nExécution en arborescence isolée");
   const bac = mkdtempSync(join(tmpdir(), "fumee-worker-"));
   try {
@@ -181,25 +196,84 @@ if (!process.argv.includes("--image")) {
     rmSync(bac, { recursive: true, force: true });
   }
 } else {
-  // ── 3 bis. La même chose, mais dans l'image réellement construite ───
-  console.log("\nConstruction de l'image et exécution dedans");
-  execFileSync("docker", ["build", "-t", "immipro-fumee:worker", "."], {
-    cwd: RACINE,
-    stdio: "inherit",
-  });
+  // ── 3 bis. Les commandes du déploiement, dans l'image produite ──────
+  /*
+    `--image=<tag>` prend une image déjà construite au lieu d'en construire
+    une. En intégration continue, c'est ce qui permet de vérifier **celle
+    qui sera poussée** — la même empreinte, pas une reconstruction qui
+    pourrait différer.
+  */
+  let tag = imageFournie;
+  if (tag) {
+    console.log(`\nImage fournie : ${tag}`);
+  } else {
+    tag = "immipro-fumee:worker";
+    console.log("\nConstruction de l'image et exécution dedans");
+    execFileSync("docker", ["build", "-t", tag, "."], { cwd: RACINE, stdio: "inherit" });
+  }
+
   analyser(
     spawnSync(
       "docker",
       [
         "run", "--rm", "--network", "none",
         "-e", `DATABASE_URL=${URL_SANS_BASE}`,
-        "immipro-fumee:worker",
+        tag,
         ...commandeWorker,
       ],
       { encoding: "utf8", timeout: 600_000 },
     ),
-    "image Docker",
+    `image ${tag} · worker`,
   );
+
+  /*
+    Le service `app` ne déclare pas de commande : c'est celle de l'image qui
+    s'applique. Elle n'a jamais été vérifiée contre l'image non plus — et
+    c'est exactement par là que le worker était tombé. Un serveur web qui
+    démarre reste debout : on le lance, on attend, on regarde s'il est
+    encore là.
+  */
+  console.log("\nCommande par défaut de l'image (service app)");
+  /*
+    Sans `--rm` : un conteneur qui s'arrête tout de suite serait effacé
+    avant qu'on puisse constater son arrêt, et le test conclurait à une
+    absence de conteneur plutôt qu'à un démarrage raté. Il est retiré plus
+    bas, dans tous les cas.
+  */
+  const lancement = spawnSync(
+    "docker",
+    ["run", "--detach", "--network", "none", tag],
+    { encoding: "utf8", timeout: 120_000 },
+  );
+  const conteneur = (lancement.stdout ?? "").trim();
+  verifier(lancement.status === 0 && conteneur !== "", "l'image démarre sa commande par défaut");
+  if (conteneur) {
+    try {
+      // Assez pour qu'un module manquant ou une erreur de démarrage ait eu
+      // le temps de tuer le processus ; trop court pour peser en CI.
+      await new Promise((suite) => setTimeout(suite, 12_000));
+      const etat = spawnSync(
+        "docker",
+        ["inspect", "-f", "{{.State.Running}}", conteneur],
+        { encoding: "utf8" },
+      );
+      const journal = spawnSync("docker", ["logs", conteneur], { encoding: "utf8" });
+      const sortie = `${journal.stdout ?? ""}${journal.stderr ?? ""}`;
+      verifier(
+        !/Cannot find module|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/u.test(sortie),
+        "service app : aucun module manquant au démarrage",
+      );
+      verifier(
+        (etat.stdout ?? "").trim() === "true",
+        "service app : le serveur tient debout au lieu de s'arrêter",
+      );
+      if ((etat.stdout ?? "").trim() !== "true") {
+        console.log(`\n--- journal du conteneur ---\n${sortie.trim()}\n`);
+      }
+    } finally {
+      spawnSync("docker", ["rm", "--force", conteneur], { encoding: "utf8" });
+    }
+  }
 }
 
 // ── 4. Démarrage réel sur PostgreSQL, base jetable ───────────────────

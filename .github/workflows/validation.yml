@@ -1,0 +1,100 @@
+# « Tout ce qui doit être vrai avant qu'une image parte. »
+#
+# Ce fichier est appelé par `ci.yml` sur chaque proposition, et par
+# `deploy.yml` avant la construction de l'image. Un seul endroit, deux
+# appelants : une vérification ajoutée ici entre en vigueur des deux côtés,
+# et le déploiement ne peut pas être plus indulgent que la CI.
+#
+# Aucune étape ne porte `continue-on-error`. Une vérification qu'on peut
+# ignorer n'est pas une porte, et la seule chose qu'elle protège est le
+# sentiment d'être protégé.
+
+name: Validation
+
+on:
+  workflow_call:
+
+jobs:
+  valider:
+    runs-on: ubuntu-latest
+    # Une base réelle. Trois choses ne se voient pas autrement : les
+    # migrations appliquées sur une base vide, les garde-fous qu'elles
+    # portent, et le worker qui crée ses files pg-boss au démarrage.
+    # Le serveur seul est fourni ; chaque script crée et supprime la base
+    # jetable dont il a besoin.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: immipro
+          POSTGRES_PASSWORD: immipro
+          POSTGRES_DB: immipro
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U immipro -d immipro"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://immipro:immipro@localhost:5432/immipro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - name: Entête du résumé
+        run: |
+          echo "## Porte de qualité" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      # `npm ci` et non `npm install` : l'installation suit le verrou, elle
+      # ne le réécrit pas. Une dépendance qui dérive fait échouer ici, pas
+      # en production.
+      - name: Installation déterministe
+        run: npm ci
+      - run: npx prisma generate
+
+      - name: Tests, types, lint, vocabulaire
+        run: npm run check
+      - run: echo "- **Tests, types, lint, vocabulaire** — \`npm run check\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # La construction fait partie de la porte : un projet dont les tests
+      # passent mais qui ne construit pas n'est pas déployable. Elle produit
+      # les deux artefacts — la sortie `standalone` et `dist/worker.js`.
+      - name: Construction
+        run: npm run build
+      - run: echo "- **Construction** — \`next build\` + paquet du worker" >> "$GITHUB_STEP_SUMMARY"
+
+      # `prisma validate` lit le schéma sans toucher à une base : l'URL doit
+      # être syntaxiquement valide, rien de plus. Celle du service ferait
+      # croire à une vérification de la base, qui a lieu plus bas.
+      - name: Schéma Prisma
+        run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      - run: echo "- **Schéma** — \`prisma validate\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Base vierge, toutes les migrations, puis trois questions : est-ce
+      # qu'elles s'appliquent, est-ce que `schema.prisma` décrit ce qu'elles
+      # produisent, et est-ce que les garde-fous viennent bien d'elles.
+      - name: Migrations et garde-fous
+        run: npm run smoke:migrations
+      - run: echo "- **Migrations** — reconstruction complète sur base vierge, sans dérive de schéma" >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "- **Garde-fous SQL** — portés par les migrations, pas par la base de développement" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le paquet du worker, exécuté pour de bon : sans base, où il doit
+      # échouer sur la connexion, puis sur une base vierge, où il doit
+      # créer ses files et annoncer son démarrage.
+      - name: Paquet du worker
+        run: npm run smoke:worker -- --base
+      - run: echo "- **Worker** — paquet exécuté sans base, puis démarré sur une base vierge" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verdict
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Validation complète. La construction de l'image peut suivre." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Validation en échec** — aucune image ne sera poussée." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -4380,3 +4380,103 @@ prouver le `COPY` du `Dockerfile`, n'a jamais été exécuté. Ce qui a été
 vérifié à sa place est une reproduction fidèle de la disposition de
 l'image — la sortie `standalone`, `.next/static`, `public`, `dist` — dans
 un répertoire temporaire.
+
+### S.18 — La porte de qualité s'ouvrait à côté du déploiement
+
+`ci.yml` et `deploy.yml` étaient deux workflows **indépendants**, déclenchés
+tous les deux par un `push` sur `main`. Rien ne reliait le second au
+premier : l'image partait sur GHCR pendant que les tests tournaient, et le
+VPS la tirait. Une proposition rouge fusionnée le samedi soir était en
+production avant que la CI ait fini de le dire.
+
+Et la CI elle-même ne regardait ni la construction, ni les migrations, ni
+les commandes des conteneurs.
+
+**Un seul fichier pour les deux.** `validation.yml` est appelé par la CI sur
+chaque proposition et par le déploiement avant la construction. Ce qui
+bloque l'une bloque l'autre, et le déploiement ne peut plus être plus
+indulgent que la revue. `build` porte `needs: valider` ; aucune étape ne
+porte `continue-on-error`.
+
+#### Deux vérifications qui ne pouvaient pas être rouges
+
+**Les garde-fous SQL.** `scripts/verifier-garde-fous.sql` tourne avec
+`ON_ERROR_STOP off` — il le faut, chaque bloc provoque exprès une violation
+— et rend donc `0` quoi qu'il arrive. Une contrainte disparue s'annonçait
+par une ligne « ACCEPTÉ » au milieu de soixante autres, dans une sortie que
+personne ne relit. Le fichier est maintenant lancé par
+`scripts/garde-fous.mjs`, qui compte les refus et échoue s'il en manque un,
+ou si aucune écriture n'a été refusée du tout — le cas d'un fichier appliqué
+à une base qui n'a pas les tables.
+
+**Les migrations.** Personne ne les appliquait jamais sur une base vide. La
+base de développement a été façonnée par des mois de `migrate dev` : elle
+porte ce qu'aucune migration ne crée plus, et masque ce qu'une migration
+oubliée ne crée pas encore. `scripts/migrations.mjs` reconstruit tout sur
+une base jetable, vérifie qu'aucune migration ne reste en attente, compare
+`schema.prisma` à ce que les migrations produisent, puis passe les
+garde-fous sur cette base-là — ce qui prouve qu'ils viennent des migrations
+et non d'un `ALTER TABLE` tapé un jour à la main.
+
+#### Ce que la porte a trouvé en s'ouvrant
+
+Deux dérives entre `schema.prisma` et les migrations, présentes depuis leur
+écriture :
+
+    [*] Changed the `Transaction` table
+      [*] Renamed index `Transaction_refundRequestedAt_idx`
+                      to `Transaction_refundRequestedAt_refundedAt_idx`
+    [*] Changed the `User` table
+      [-] Removed index on columns (deletionRequestedAt, deletedAt)
+
+La seconde est la grave. L'index sur `(deletionRequestedAt, deletedAt)` est
+créé par la migration qui a ajouté les colonnes, et il sert : la reprise des
+suppressions restées à mi-chemin (RG-10.4) balaie exactement ces deux
+colonnes, une fois par nuit, sur toute la table des comptes. Il n'était pas
+déclaré dans `schema.prisma` — un prochain `migrate dev` l'aurait supprimé
+sans que rien ne s'en aperçoive avant que la table grossisse. Il y est
+maintenant.
+
+La première est un nom : l'index posé par le rail de remboursement porte
+deux colonnes et n'en nomme qu'une. Renommé par une migration — opération de
+catalogue, pas de réécriture de table — pour que le nom dise ce que l'index
+couvre, et pour que la base et le schéma s'accordent.
+
+#### L'image, vérifiée avant d'être poussée
+
+Le mode `--image=<tag>` de `scripts/fumee-worker.mjs` prend une image déjà
+construite au lieu d'en construire une : le déploiement construit **une
+fois**, charge l'image, exécute dedans les commandes que
+`docker-compose.prod.yml` déclare, puis pousse cette empreinte-là. Une
+seconde construction « pour pousser » rendrait la vérification décorative —
+ce serait une autre image que celle qu'on a regardée.
+
+Deux commandes, pas une. Celle du worker, qui doit échouer sur la connexion
+et non sur un module manquant. Et celle du service `app`, qui n'est écrite
+nulle part dans le fichier de déploiement puisque c'est celle de l'image :
+le conteneur est lancé, on attend, on regarde s'il est encore debout.
+C'était le trou par lequel le worker était tombé.
+
+Le cache Docker reste en place. Il ne peut pas masquer une étape de
+construction absente : le `COPY --from=builder /app/dist` échoue s'il n'y a
+plus rien à copier, et les commandes sont ensuite exécutées depuis l'image,
+pas depuis l'arbre de travail.
+
+#### Vérifié en exécutant
+
+Trois mutations sur la porte des migrations, trois rouges : un champ ajouté
+à `schema.prisma` sans migration (`[+] Added column`), un garde-fou retiré
+d'une migration (« ACCEPTÉ · RG-10.4 · un compte anonymisé sans demande de
+suppression — la contrainte manque »), une migration invalide (trois
+vérifications tombent d'un coup).
+
+#### Ce qui n'a pas pu être vérifié ici
+
+Toujours aucun démon Docker : les étapes qui éprouvent l'image — la commande
+du worker et celle du service `app` — n'ont jamais été exécutées ailleurs
+qu'en intégration continue. Le reste de la porte a tourné localement, sur un
+PostgreSQL 16 réel, dans l'ordre exact du workflow.
+
+Si le dépôt exige un contrôle nommé `verifier` pour fusionner, le nom change
+avec ce lot : la CI appelle désormais un workflow réutilisable, et le
+contrôle s'appelle `valider / valider`.
