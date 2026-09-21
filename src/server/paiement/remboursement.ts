@@ -14,6 +14,8 @@
  * fonction qu'on remplace, et rien d'autre.
  */
 
+import { CLES_SORTANTES, environnementNormalise } from "./secrets";
+
 export interface DemandeDeRemboursement {
   reference: string;
   /** L'identifiant de la transaction chez le fournisseur, s'il est connu. */
@@ -44,8 +46,21 @@ export const NON_BRANCHE: Rembourseur = async () => null;
  */
 export const leRembourseur = (): Rembourseur => NON_BRANCHE;
 
-/** Les clés sans lesquelles aucune demande ne part. */
-export const VARIABLES = ["FEDAPAY_API_KEY", "STRIPE_API_KEY"];
+/**
+ * Les clés sans lesquelles aucune demande ne part — nomenclature unique,
+ * voir `secrets.ts`. Ce sont les clés **sortantes** : celles avec
+ * lesquelles on appelle le fournisseur, et non celles avec lesquelles il
+ * signe ce qu'il nous envoie.
+ */
+export const VARIABLES: readonly string[] = CLES_SORTANTES;
 
-export const remboursementConfigure = (): boolean =>
-  VARIABLES.every((v) => (process.env[v] ?? "").trim() !== "");
+/**
+ * L'environnement est lu normalisé : l'ancienne graphie `*_SECRET_KEY` est
+ * comprise jusqu'à sa date de retrait, et un seul module la connaît.
+ */
+export const remboursementConfigure = (
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): boolean => {
+  const lu = environnementNormalise(environnement);
+  return VARIABLES.every((v) => (lu[v] ?? "").trim() !== "");
+};

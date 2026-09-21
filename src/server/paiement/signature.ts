@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { CLES } from "./secrets";
 
 /**
  * Vérification de signature des webhooks — INV-7, RG-05.3.
@@ -114,14 +115,14 @@ export const FEDAPAY: Fournisseur = {
   cle: "fedapay",
   entete: "x-fedapay-signature",
   champSignature: "s",
-  secret: (environnement = process.env) => environnement.FEDAPAY_WEBHOOK_SECRET,
+  secret: (environnement = process.env) => environnement[CLES.FEDAPAY.webhook],
 };
 
 export const STRIPE: Fournisseur = {
   cle: "stripe",
   entete: "stripe-signature",
   champSignature: "v1",
-  secret: (environnement = process.env) => environnement.STRIPE_WEBHOOK_SECRET,
+  secret: (environnement = process.env) => environnement[CLES.STRIPE.webhook],
 };
 
 export const FOURNISSEURS: readonly Fournisseur[] = [FEDAPAY, STRIPE];

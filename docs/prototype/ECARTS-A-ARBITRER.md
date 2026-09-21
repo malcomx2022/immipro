@@ -4582,3 +4582,95 @@ Puis l'exécution, par le vrai point d'entrée HTTP, avec un environnement
 entièrement renseigné : `503`, trois bloquantes nommées — messagerie,
 antivirus, remboursement —, `paiements` seul en `OPERATIONNELLE` avec sa
 sonde concluante, et la file de revue lisible et tenue.
+
+### S.20 — Le fichier d'exemple et le code ne nommaient pas la même clé
+
+`.env.example` portait `FEDAPAY_SECRET_KEY` et `STRIPE_SECRET_KEY`. Le
+registre des dépendances et le rail de remboursement demandaient
+`FEDAPAY_API_KEY` et `STRIPE_API_KEY`. **Aucune des quatre n'était lue par
+quoi que ce soit** : les deux premières ne figuraient dans aucun fichier
+de `src/`, les deux secondes n'étaient renseignables nulle part.
+
+Un exploitant qui remplissait consciencieusement le fichier d'exemple
+obtenait donc une installation que `/api/health` déclarait non configurée
+sur le remboursement, sans rien pour lui dire laquelle des deux graphies
+faisait autorité.
+
+#### L'inventaire, par usage
+
+| Usage | Module | Variables | Branché ? |
+|---|---|---|---|
+| Création de paiement | `acces/paiements.ts` | aucune | non — la transaction est locale, aucune page hébergée n'est créée |
+| Webhooks | `paiement/signature.ts` | `*_WEBHOOK_SECRET` | **oui**, le seul |
+| Consultation fournisseur | `jobs/reconciliation.ts` | aucune | non — `Interrogation` n'est pas branchée |
+| Remboursement | `paiement/remboursement.ts` | `*_API_KEY` | non — `leRembourseur` rend `null` |
+| Espace FedaPay | — | `FEDAPAY_ENVIRONMENT` | non — déclaré, lu par personne |
+
+#### La nomenclature
+
+`<FOURNISSEUR>_<USAGE>`, et l'usage dit le **sens** de l'appel :
+`_API_KEY` sort, `_WEBHOOK_SECRET` entre, `_ENVIRONMENT` ne fait ni l'un
+ni l'autre et n'est pas un secret.
+
+`_SECRET_KEY` disait « secret » sans dire dans quel sens, alors que le
+secret de webhook en est un aussi. Une clé sortante et un secret entrant
+ne se révoquent pas au même endroit et ne fuient pas de la même façon ;
+les confondre un soir d'incident coûte des minutes qu'on n'a pas. C'est ce
+qui a tranché entre les deux graphies, plus que l'usage antérieur.
+
+`src/server/paiement/secrets.ts` les nomme, et lui seul : `signature.ts`
+et `remboursement.ts` y lisent leurs noms au lieu de les recopier.
+
+#### La compatibilité, datée
+
+`FEDAPAY_SECRET_KEY` et `STRIPE_SECRET_KEY` restent comprises jusqu'au
+**2026-12-31**, repliées sur les nouveaux noms par `environnementNormalise`
+— seul endroit du dépôt qui les connaisse, si bien que tout ce qui est en
+aval ne peut pas diverger. Quand les deux graphies sont renseignées, la
+nouvelle l'emporte : une migration à moitié faite ne doit pas dépendre de
+l'ordre de lecture.
+
+L'avertissement porte les deux noms et la date, jamais la valeur, ni un
+fragment, ni sa longueur — un journal de serveur se recopie dans un ticket,
+et un ticket se partage. Et la date n'est pas une intention : un test
+échoue quand elle est passée, et son message dit quoi supprimer.
+
+    Le 2026-09-01 est passé. Vider ANCIENS_NOMS dans
+    src/server/paiement/secrets.ts, retirer le bloc « Déprécié » de
+    .env.example, et supprimer ce test avec lui.
+
+#### Ce que l'unification a fait apparaître
+
+`remboursementConfigure()` était exporté et **appelé par personne** —
+`antivirusConfigure` et `redactionConfiguree` ont leurs appelants, pas
+celle-ci. Les clés du remboursement n'avaient donc aucun lecteur réel, ce
+qui est exactement ce que la cinquième vérification demandée devait
+attraper.
+
+La brancher sur la route de remboursement aurait contredit une décision
+close : la dégradation écrite au registre dit que l'initiation a lieu, que
+les droits partent et que la dette reste ouverte. Elle est donc branchée là
+où elle change réellement quelque chose — l'observation des capacités : un
+point de branchement peut désormais fournir sa propre fonction de
+configuration, et le module reste le seul à savoir ce qu'il lui faut. Même
+raison que pour le résolveur.
+
+#### Vérifié en exécutant
+
+Six mutations, six rouges : `.env.example` revenu à l'ancienne graphie (3
+tests), une variable documentée que personne ne lit (3), l'avertissement
+qui révèle la valeur (1), la date de retrait passée (2), un secret
+journalisé dans `signature.ts` (1), la normalisation qui ne replie plus
+rien (3).
+
+Puis l'exécution, par le vrai point d'entrée HTTP, avec **l'ancienne
+graphie seule** — le cas d'un déploiement pas encore migré :
+
+    remboursement → IMPLEMENTATION_ABSENTE | configuree: true
+    [config] FEDAPAY_SECRET_KEY est dépréciée : renommer en FEDAPAY_API_KEY.
+             L'ancien nom cesse d'être lu le 2026-12-31.
+    [config] STRIPE_SECRET_KEY est dépréciée : renommer en STRIPE_API_KEY.
+             L'ancien nom cesse d'être lu le 2026-12-31.
+
+Et la valeur des deux clés, cherchée dans l'intégralité du journal du
+serveur : zéro occurrence.
