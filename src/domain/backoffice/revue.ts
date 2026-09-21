@@ -162,3 +162,68 @@ export const MENTION_DECISION =
 
 export const MENTION_ACCES_TRACE =
   "Aucune pièce de candidat n'est préchargée ici : l'ouverture d'une pièce est un acte tracé, avec son motif.";
+
+// ── Le motif d'accès, et ce qui bloque une décision ──────────────────────
+
+/**
+ * RG-15.1 : « Tout accès administrateur à une pièce d'identité est
+ * journalisé avec motif obligatoire. »
+ *
+ * L'écran l'annonçait déjà — « l'ouverture d'une pièce est un acte tracé,
+ * avec son motif » — et ne le faisait pas : « Ouvrir la pièce » posait un
+ * drapeau local, affichait un aperçu inventé, et n'écrivait aucune ligne.
+ * L'action `piece.consultation` existait dans la table des actions
+ * auditées sans qu'aucun code ne l'emploie jamais.
+ *
+ * Le motif est demandé avant l'ouverture, pas après : demandé après, il
+ * justifierait un accès déjà eu, ce qui n'est pas une justification.
+ */
+export const MOTIF_MINIMUM = 10;
+
+export interface Revue {
+  motif: string;
+  decision: Decision;
+  message: string;
+}
+
+/**
+ * Ce qui manque pour ouvrir la pièce, ou `null` si rien ne manque.
+ *
+ * Un seul motif couvre l'ouverture et la décision : dans cette file,
+ * l'opérateur ouvre la pièce **pour** la trancher, et lui faire écrire
+ * deux justifications du même geste produirait deux textes dont l'un
+ * serait recopié de l'autre. Les deux lignes d'audit le portent chacune.
+ */
+export function obstacleALOuverture(motif: string): string | null {
+  if (motif.trim().length < MOTIF_MINIMUM) {
+    return `Écris pourquoi tu ouvres cette pièce, en ${MOTIF_MINIMUM} caractères au moins. Le motif part au journal d'audit.`;
+  }
+  return null;
+}
+
+/**
+ * Ce qui manque pour trancher, ou `null` si rien ne manque.
+ *
+ * L'ordre suit celui de l'écran, comme en R.1 : le motif, puis le message.
+ * Rendre la raison plutôt qu'un booléen rapporte le texte du bouton
+ * désactivé, qui doit dire quoi faire (DOC-12 §16).
+ */
+export function obstacleALaDecision(revue: Partial<Revue>): string | null {
+  const manqueMotif = obstacleALOuverture(revue.motif ?? "");
+  if (manqueMotif) return manqueMotif;
+  const refus = refusDuMessage(revue.message ?? "", revue.decision ?? "A_CORRIGER");
+  if (refus) return `${refus.raison} ${refus.consigne}`;
+  return null;
+}
+
+/**
+ * Ce que l'écran affiche à la place de l'aperçu, quand il n'y en a pas.
+ *
+ * Une pièce purgée et une pièce en quarantaine sont deux absences
+ * différentes, et `raisonSansApercu` les distingue déjà côté candidat. Ce
+ * repli-ci couvre la troisième : le stockage objet lui-même est
+ * injoignable. Aucun aperçu n'est inventé — c'était le défaut, avec un
+ * « page 1 sur 3 » qui ne correspondait à aucun fichier.
+ */
+export const APERCU_INDISPONIBLE =
+  "La pièce n'a pas pu être ouverte : le stockage n'a pas répondu. Ton accès est consigné, et rien n'a été affiché.";

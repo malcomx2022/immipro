@@ -324,14 +324,20 @@ describe("B-05 — Revue manuelle", () => {
       />,
     );
 
-  it("ne précharge aucune pièce : l'ouverture est un acte séparé", () => {
+  /**
+   * L'écran promettait que l'ouverture était tracée et ne traçait rien :
+   * le bouton posait un drapeau local et affichait « aperçu de la pièce ·
+   * page 1 sur 3 », qui ne correspondait à aucun fichier. Le motif
+   * conditionne désormais l'ouverture, et l'aperçu vient du serveur.
+   */
+  it("ne précharge aucune pièce, et n'en ouvre aucune sans motif", () => {
     const { container } = rendre();
     expect(container.textContent).toContain("l'ouverture d'une pièce est un acte tracé");
-    expect(screen.getByRole("button", { name: "Ouvrir la pièce" })).toBeDefined();
     expect(container.textContent).not.toContain("aperçu de la pièce");
 
-    fireEvent.click(screen.getByRole("button", { name: "Ouvrir la pièce" }));
-    expect(screen.getByText(/aperçu de la pièce/)).toBeDefined();
+    const ouvrir = screen.getByRole("button", { name: "Ouvrir la pièce" });
+    expect(ouvrir).toBeDisabled();
+    expect(ouvrir).toHaveAccessibleDescription(/pourquoi tu ouvres cette pièce/u);
   });
 
   it("refuse « non conforme » seul, comme le code se l'interdit", () => {
@@ -346,6 +352,9 @@ describe("B-05 — Revue manuelle", () => {
 
   it("accepte un message qui dit la mesure puis le geste", () => {
     rendre();
+    fireEvent.change(screen.getByLabelText("Motif de l'accès et de la décision"), {
+      target: { value: "Revue manuelle après échec d'extraction." },
+    });
     fireEvent.change(screen.getByLabelText("Message envoyé au candidat"), {
       target: {
         value:
@@ -356,6 +365,103 @@ describe("B-05 — Revue manuelle", () => {
     expect(
       screen.getByRole("button", { name: /Enregistrer et passer/ }),
     ).toHaveProperty("disabled", false);
+  });
+
+  /**
+   * Les deux commandes partent vraiment — et ces tests cliquent, parce
+   * que lire le source ne suffit pas : on peut rebrancher un bouton sur
+   * l'état local en laissant la fonction d'envoi intacte plus bas dans
+   * le fichier, et tout garde-fou qui l'inspecte passe encore (leçon de
+   * S.1, sur B-02).
+   */
+  describe("l'ouverture et la décision partent au serveur", () => {
+    const preparer = ({ ok = true } = {}) => {
+      appels.length = 0;
+      rafraichir.mockClear();
+      reponse = { ok };
+      rendre();
+      fireEvent.change(screen.getByLabelText("Motif de l'accès et de la décision"), {
+        target: { value: "Revue manuelle après échec d'extraction." },
+      });
+    };
+
+    const cliquer = async (nom: RegExp) => {
+      fireEvent.click(screen.getByRole("button", { name: nom }));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    };
+
+    /** RG-15.1 : l'accès est journalisé avec son motif, ou il n'a pas lieu. */
+    it("ouvrir la pièce appelle la route de consultation, motif compris", async () => {
+      preparer();
+      await cliquer(/Ouvrir la pièce/u);
+      expect(appels).toHaveLength(1);
+      expect(appels[0]!.url).toMatch(/\/api\/admin\/revue\/.+\/consultation$/u);
+      expect(appels[0]!.corps).toEqual({
+        motif: "Revue manuelle après échec d'extraction.",
+      });
+    });
+
+    /**
+     * Et l'aperçu vient du serveur. L'ancien écran en dessinait un —
+     * « page 1 sur 3 » — qui ne correspondait à aucun fichier : c'était
+     * un service absent qu'on simulait, ce que le produit refuse (I.C).
+     */
+    it("aucun aperçu ne s'invente : un refus n'en montre aucun", async () => {
+      preparer({ ok: false });
+      await cliquer(/Ouvrir la pièce/u);
+      expect(screen.queryByTitle(/Aperçu de/u)).toBeNull();
+      expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+    });
+
+    it("trancher envoie la décision, le message et le motif", async () => {
+      preparer();
+      fireEvent.change(screen.getByLabelText("Message envoyé au candidat"), {
+        target: {
+          value:
+            "Ton relevé s'arrête en juin, il en faut trois consécutifs. Demande à ta banque un relevé couvrant juin, juillet et août.",
+        },
+      });
+      await cliquer(/Enregistrer et passer/u);
+      expect(appels).toHaveLength(1);
+      expect(appels[0]!.corps).toEqual({
+        decision: "A_CORRIGER",
+        message:
+          "Ton relevé s'arrête en juin, il en faut trois consécutifs. Demande à ta banque un relevé couvrant juin, juillet et août.",
+        motif: "Revue manuelle après échec d'extraction.",
+      });
+      expect(rafraichir).toHaveBeenCalled();
+    });
+
+    /** Sans motif, rien ne part — ni l'ouverture, ni la décision. */
+    it("sans motif, aucune des deux commandes ne part", async () => {
+      appels.length = 0;
+      reponse = { ok: true };
+      rendre();
+      fireEvent.change(screen.getByLabelText("Message envoyé au candidat"), {
+        target: {
+          value:
+            "Ton relevé s'arrête en juin, il en faut trois consécutifs. Demande à ta banque un relevé couvrant juin, juillet et août.",
+        },
+      });
+      await cliquer(/Ouvrir la pièce/u);
+      await cliquer(/Enregistrer et passer/u);
+      expect(appels).toHaveLength(0);
+    });
+
+    /**
+     * « Rendre l'analyse au candidat » proposait un choix que le produit
+     * n'offre pas : c'est la décision qui recrédite, et la ligne
+     * au-dessus du bouton dit laquelle.
+     */
+    it("aucun second bouton ne propose un choix que la décision a déjà fait", () => {
+      rendre();
+      expect(screen.queryByRole("button", { name: /Rendre l'analyse/u })).toBeNull();
+      expect(screen.queryByRole("button", { name: /pièces traitées/u })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Motifs d'échec/u })).toBeNull();
+    });
   });
 
   it("dit si la décision recrédite le quota du candidat", () => {
