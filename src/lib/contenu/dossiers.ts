@@ -37,6 +37,14 @@ import { ALLEMAGNE, PAYS_BAS } from "./destinations";
 
 const DEPOT_NL = "2027-01-15";
 
+/**
+ * La date **cible** — rentrée —, dépôt plus le délai d'instruction
+ * néerlandais de 90 jours. Le jeu de démonstration portait la date de
+ * dépôt sous le champ de la cible, si bien que les écrans montraient la
+ * même date des deux côtés et que l'écart ne se voyait jamais.
+ */
+const DEPART_NL = "2027-04-15";
+
 export const PIECES_NL: readonly Piece[] = [
   {
     id: "passeport",
@@ -146,7 +154,8 @@ export const DOSSIERS: readonly Dossier[] = [
     id: "nl-4471",
     destination: PAYS_BAS,
     statut: "ACTIF",
-    depotVise: DEPOT_NL,
+    departVise: DEPART_NL,
+    depot: DEPOT_NL,
     completude: completudeDesPieces(PIECES_NL),
     prochaineAction:
       "Remplacer ton passeport, sa validité est trop courte de deux mois.",

@@ -27,8 +27,32 @@ export interface Dossier {
   id: string;
   destination: FicheDestination;
   statut: StatutDossier;
-  /** Date de dépôt visée, ISO. Absente tant qu'elle n'est pas fixée. */
-  depotVise?: string;
+  /**
+   * Date cible — rentrée ou prise de poste, ISO. Absente tant qu'elle n'est
+   * pas fixée.
+   *
+   * Elle s'appelait `depotVise`, et le nom mentait : DOC-11 WF-09 étape 1
+   * construit l'échéancier « à rebours depuis la date cible (rentrée,
+   * prise de poste) », et le dépôt s'en déduit en retirant le délai
+   * d'instruction. Trois écrans l'affichaient comme une date de dépôt, et
+   * deux calculs s'en servaient comme telle — d'où `depot`, juste en
+   * dessous, qui est la vraie.
+   */
+  departVise?: string;
+  /**
+   * Date de dépôt, déduite de la cible en retirant le délai d'instruction
+   * de la règle **figée** (RG-09.1, INV-3). Absente sans date cible.
+   *
+   * Sans délai annoncé par la procédure, elle retombe sur la date cible :
+   * c'est l'approximation prudente que l'échéancier fait déjà, et elle ne
+   * prétend pas à une précision qu'on n'a pas.
+   *
+   * C'est **elle** qu'il faut pour toute question de la forme « cette
+   * pièce sera-t-elle encore valable ? » ou « quelle version de la règle
+   * s'appliquera ? » : ce qui compte est le jour du dépôt, pas celui du
+   * départ.
+   */
+  depot?: string;
   completude: CompletenessPublic;
   /**
    * Une seule action, celle qui débloque le plus. Un tableau de bord qui

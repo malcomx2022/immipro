@@ -90,10 +90,10 @@ export function ArchiveDuDossier({ archive }: { archive: Archive }) {
             <dt className="text-ink-500">Ouvert le</dt>
             <dd>{jourEnFrancais(dossier.ouvertLe.slice(0, 10))}</dd>
           </div>
-          {dossier.depotVise ? (
+          {dossier.departVise ? (
             <div className="flex gap-1.5">
               <dt className="text-ink-500">Départ visé</dt>
-              <dd>{jourEnFrancais(dossier.depotVise)}</dd>
+              <dd>{jourEnFrancais(dossier.departVise)}</dd>
             </div>
           ) : null}
           {dossier.purgePrevueLe ? (

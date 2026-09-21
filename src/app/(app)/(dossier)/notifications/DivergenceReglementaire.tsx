@@ -33,8 +33,12 @@ export interface DivergenceProps {
   pays: string;
   ancienne: VersionRegle;
   nouvelle: VersionRegle;
-  /** Date de dépôt visée du dossier concerné, si elle est fixée. */
-  depotVise?: string;
+  /**
+   * Date de **dépôt** du dossier concerné — la cible moins le délai
+   * d'instruction —, si elle est fixée. C'est elle qui décide de la
+   * version applicable, pas la date de départ.
+   */
+  depot?: string;
   detecteeLe: string;
   verifieeLe: string;
   source: string;
@@ -46,7 +50,7 @@ export function DivergenceReglementaire({
   pays,
   ancienne,
   nouvelle,
-  depotVise,
+  depot,
   detecteeLe,
   verifieeLe,
   source,
@@ -83,7 +87,7 @@ export function DivergenceReglementaire({
             ancienne,
             nouvelle,
             formatMontant(ecartMontant(ancienne, nouvelle), nouvelle.devise),
-            depotVise,
+            depot,
           )}
         </p>
       </section>

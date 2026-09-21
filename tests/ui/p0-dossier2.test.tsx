@@ -55,6 +55,36 @@ const rendrePiece = (props: Partial<Parameters<typeof PieceDuDossier>[0]> = {}) 
 
 describe("C-06 — Checklist", () => {
   /**
+   * La fausse alarme que le nom du champ produisait.
+   *
+   * Le dossier vise la rentrée du 15 avril ; le dépôt tombe au 15 janvier.
+   * Une pièce qui expire le 1er mars est valable le jour du dépôt — et la
+   * checklist annonçait « Expire le 1er mars 2027, avant le dépôt visé »,
+   * parce qu'on lui passait la rentrée. Trois mois de fenêtre, et un
+   * candidat qui refait une pièce pour rien.
+   */
+  it("n'alarme pas sur une pièce valable le jour du dépôt", () => {
+    const entreLesDeux = PIECES_NL.map((p) =>
+      p.id === "test-anglais" ? { ...p, perimeLe: "2027-03-01" } : p,
+    );
+    const { container } = render(
+      <Checklist dossier={DOSSIER} pieces={entreLesDeux} />,
+    );
+    expect(DOSSIER.depot).toBe("2027-01-15");
+    expect(DOSSIER.departVise).toBe("2027-04-15");
+    expect(container.textContent).not.toContain("avant le dépôt visé");
+    expect(container.textContent).toContain("Valable jusqu'au 1 mars 2027");
+  });
+
+  it("alarme bien sur une pièce périmée avant le dépôt", () => {
+    const tropTot = PIECES_NL.map((p) =>
+      p.id === "test-anglais" ? { ...p, perimeLe: "2026-12-01" } : p,
+    );
+    const { container } = render(<Checklist dossier={DOSSIER} pieces={tropTot} />);
+    expect(container.textContent).toContain("avant le dépôt visé");
+  });
+
+  /**
    * K.A, tranché le 20/09/2026 — l'espace dossier porte une aide, jamais
    * une offre.
    */
@@ -261,7 +291,7 @@ describe("C-10 — Échéancier", () => {
   */
   const CALENDRIER = {
     aujourdhui: AUJOURDHUI,
-    dateCible: DOSSIER.depotVise ?? null,
+    dateCible: DOSSIER.departVise ?? null,
     delaiInstructionJours: 60,
     aObtenir: [],
   };

@@ -316,9 +316,17 @@ describe("T-02 — divergence réglementaire", () => {
     expect(ecartMontant(REGLE_ANCIENNE, REGLE_NOUVELLE)).toBe(696);
   });
 
+  /**
+   * La date qui décide est celle du **dépôt**, pas celle du départ.
+   * L'écran recevait la date cible : sur la procédure néerlandaise, les
+   * quatre-vingt-dix jours d'instruction suffisent à enjamber une entrée
+   * en vigueur, et le candidat lisait qu'il lui fallait 696 € de plus
+   * alors que sa version restait la sienne.
+   */
   it("dit ce que le changement implique selon la date de dépôt", () => {
     const sansDate = libelleImpact(REGLE_ANCIENNE, REGLE_NOUVELLE, "696 €");
-    expect(sansDate).toContain("Ta date de dépôt n'est pas fixée");
+    expect(sansDate).toContain("Ta date de départ n'est pas fixée");
+    expect(sansDate).toContain("le dépôt s'en déduit");
     expect(sansDate).toContain("696 € de plus");
 
     const apres = libelleImpact(REGLE_ANCIENNE, REGLE_NOUVELLE, "696 €", "2027-03-01");
@@ -326,6 +334,16 @@ describe("T-02 — divergence réglementaire", () => {
 
     const avant = libelleImpact(REGLE_ANCIENNE, REGLE_NOUVELLE, "696 €", "2026-11-30");
     expect(avant).toContain("la version 4 reste celle de ton dossier");
+
+    /*
+      Le cas que l'ancien appelant produisait : entrée en vigueur au
+      1er janvier 2027, dépôt le 30 novembre 2026, rentrée le 28 février.
+      C'est l'ancienne version qui s'applique — et c'est la rentrée que
+      l'écran passait.
+    */
+    expect(libelleImpact(REGLE_ANCIENNE, REGLE_NOUVELLE, "696 €", "2026-11-30")).not.toContain(
+      "il te faut",
+    );
   });
 
   it("ne réintroduit aucune conversion de devise", () => {

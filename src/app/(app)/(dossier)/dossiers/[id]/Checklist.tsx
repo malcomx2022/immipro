@@ -58,9 +58,9 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
           Checklist
         </h1>
         <p className="text-14 text-ink-700">
-          {dossier.depotVise
-            ? `Départ visé : ${jourEnFrancais(dossier.depotVise)}`
-            : "Date de dépôt non fixée"}
+          {dossier.departVise
+            ? `Départ visé : ${jourEnFrancais(dossier.departVise)}`
+            : "Date de départ non fixée"}
         </p>
       </div>
 
@@ -128,14 +128,14 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
         famille="OBLIGATOIRE"
         pieces={pieces}
         dossierId={id}
-        depotVise={dossier.depotVise}
+        depot={dossier.depot}
         sousTitre={libelleAvancementFamille(pieces, "OBLIGATOIRE")}
       />
       <SectionPieces
         famille="COMPLEMENTAIRE"
         pieces={pieces}
         dossierId={id}
-        depotVise={dossier.depotVise}
+        depot={dossier.depot}
         sousTitre="Renforcent le dossier"
       />
 
@@ -180,13 +180,19 @@ function SectionPieces({
   famille,
   pieces,
   dossierId,
-  depotVise,
+  depot,
   sousTitre,
 }: {
   famille: FamillePiece;
   pieces: readonly Piece[];
   dossierId: string;
-  depotVise?: string;
+  /**
+   * Date de **dépôt**, pas date de départ : une pièce doit être valable le
+   * jour où le dossier est déposé. Comparée à la date de départ, elle
+   * alarmait sur des pièces qui passent — trois mois de marge, sur le
+   * dossier néerlandais.
+   */
+  depot?: string;
   sousTitre: string;
 }) {
   const lot = pieces.filter((p) => p.famille === famille);
@@ -209,7 +215,7 @@ function SectionPieces({
                 estDeposeeNonVerifiee(piece) ? LIBELLE_CONSERVEE_NON_VERIFIEE : undefined
               }
               message={piece.message}
-              mention={libelleAlertePeremption(piece, depotVise) ?? undefined}
+              mention={libelleAlertePeremption(piece, depot) ?? undefined}
               action={libelleAction(piece)}
               href={lienDePiece(dossierId, piece)}
             />

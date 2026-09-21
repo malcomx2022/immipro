@@ -214,7 +214,7 @@ describe("C-05 — Ouverture de dossier", () => {
     const creer = screen.getByRole("button", { name: "Créer mon dossier" });
     expect(creer).toBeDisabled();
     expect(creer).toHaveAccessibleDescription(
-      "Choisis une date de dépôt visée, même approximative.",
+      "Choisis une date de départ visée, même approximative.",
     );
   });
 
@@ -231,7 +231,33 @@ describe("C-05 — Ouverture de dossier", () => {
     ).toBeDefined();
   });
 
-  it("propose des dates de dépôt toujours à venir, jamais figées", () => {
+  /**
+   * La question demandait le dépôt, le champ stockait la rentrée : un
+   * candidat qui répondait « je dépose le 15 janvier » se voyait fixer un
+   * dépôt au 17 octobre, tout son échéancier avançant de quatre-vingt-dix
+   * jours. La question porte sur ce que le champ contient.
+   */
+  it("demande la date de départ, pas la date de dépôt", () => {
+    const { container } = render(ouverture());
+    expect(screen.getByText("Quand veux-tu être sur place ?")).toBeDefined();
+    expect(container.textContent).not.toContain("Quand veux-tu déposer");
+    expect(container.textContent).toContain("La date de dépôt s'en déduit");
+    // Et les options proposées sont bien des rentrées.
+    const dates = datesProposees(new Date("2026-09-21T00:00:00Z"));
+    for (const date of dates) {
+      if (!date.iso) continue;
+      expect(["09", "02"]).toContain(date.iso.slice(5, 7));
+    }
+    /*
+      Les rentrées tombent le premier du mois, et le français y met
+      l'ordinal. L'écran formatait les dates lui-même : tant que les
+      options étaient le 15 et le 2, la règle ne se voyait pas.
+    */
+    expect(dates.map((d) => d.libelle)).toContain("1er septembre 2027");
+    expect(dates.map((d) => d.libelle)).not.toContain("1 septembre 2027");
+  });
+
+  it("propose des dates de départ toujours à venir, jamais figées", () => {
     // Le défaut corrigé est celui des créneaux de consultant (écart H.2) :
     // des dates écrites en dur finissent toutes dans le passé.
     const aujourdhui = new Date("2029-06-01T00:00:00Z");

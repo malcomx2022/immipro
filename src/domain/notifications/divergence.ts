@@ -49,22 +49,31 @@ export function libelleImpact(
   ancienne: VersionRegle,
   nouvelle: VersionRegle,
   ecartFormate: string,
-  depotVise?: string,
+  /**
+   * Date de **dépôt**, jamais la date cible.
+   *
+   * C'est le jour du dépôt qui décide de la version applicable. Comparer
+   * la rentrée à l'entrée en vigueur annonçait la nouvelle version — et
+   * donc un montant plus élevé à réunir — sur un dossier qui déposera
+   * avant elle : quatre-vingt-dix jours d'écart sur la procédure
+   * néerlandaise, largement de quoi enjamber une date d'application.
+   */
+  depot?: string,
 ): string {
   const application = nouvelle.applicableDepuis
     ? `à partir du ${formaterJour(nouvelle.applicableDepuis)}`
     : "dès sa publication";
 
-  if (!depotVise) {
-    return `Ta date de dépôt n'est pas fixée. Si tu déposes ${application}, c'est la version ${nouvelle.numero} qui s'applique et il te faut ${ecartFormate} de plus.`;
+  if (!depot) {
+    return `Ta date de départ n'est pas fixée, et le dépôt s'en déduit. Si tu déposes ${application}, c'est la version ${nouvelle.numero} qui s'applique et il te faut ${ecartFormate} de plus.`;
   }
 
   const sousNouvelle =
-    nouvelle.applicableDepuis !== undefined && depotVise >= nouvelle.applicableDepuis;
+    nouvelle.applicableDepuis !== undefined && depot >= nouvelle.applicableDepuis;
 
   return sousNouvelle
-    ? `Ton dépôt est visé au ${formaterJour(depotVise)} : c'est la version ${nouvelle.numero} qui s'appliquera, et il te faut ${ecartFormate} de plus.`
-    : `Ton dépôt est visé au ${formaterJour(depotVise)}, avant l'entrée en vigueur : la version ${ancienne.numero} reste celle de ton dossier.`;
+    ? `Ton dépôt tombe au ${formaterJour(depot)} : c'est la version ${nouvelle.numero} qui s'appliquera, et il te faut ${ecartFormate} de plus.`
+    : `Ton dépôt tombe au ${formaterJour(depot)}, avant l'entrée en vigueur : la version ${ancienne.numero} reste celle de ton dossier.`;
 }
 
 export interface OptionArbitrage {

@@ -45,7 +45,7 @@ export async function tableauDeBord(userId: string): Promise<Dossier[]> {
 
   const vues = dossiers.flatMap((d) => {
     const fiche = d.visaRule ? versFiche(d.visaRule) : null;
-    return fiche ? [versDossier(d, d.documents, fiche)] : [];
+    return fiche ? [versDossier(d, d.documents, fiche, d.visaRule)] : [];
   });
   return trierDossiers(vues);
 }
@@ -84,7 +84,7 @@ export async function vueDuDossier(id: string, userId: string): Promise<VueDossi
 
   const pieces = brut.documents.map(versPiece);
   return {
-    dossier: versDossier(brut, brut.documents, fiche),
+    dossier: versDossier(brut, brut.documents, fiche, brut.visaRule),
     pieces,
     checklist: grouperPourCompletude(pieces),
     quota: await compteur(brut.id),
@@ -126,7 +126,8 @@ export async function quotaDuDossier(applicationId: string): Promise<Quota> {
  * trois mois six mois à l'avance le fait redemander deux fois.
  */
 export async function echeancierDuDossier(id: string, userId: string): Promise<{
-  depotVise: string | null;
+  /** Date cible — rentrée ou prise de poste. Le dépôt s'en déduit. */
+  departVise: string | null;
   echeances: Echeance[];
   calendrier: CalendrierAEvaluer;
 }> {
@@ -136,7 +137,7 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
     orderBy: { dueAt: "asc" },
   });
 
-  const depotVise = dossier.targetDate ? iso(dossier.targetDate) : null;
+  const departVise = dossier.targetDate ? iso(dossier.targetDate) : null;
 
   /**
    * La date de dépôt, et non la date cible.
@@ -150,7 +151,7 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
    * prudente.
    */
   const depot = enTable.find((e) => e.code === "depot");
-  const reference = depot ? iso(depot.dueAt) : depotVise;
+  const reference = depot ? iso(depot.dueAt) : departVise;
 
   const limites: Echeance[] = enTable.map((e) => ({
     id: e.code,
@@ -173,7 +174,7 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
     : [];
 
   return {
-    depotVise,
+    departVise,
     echeances: [...limites, ...perissables].sort((a, b) => a.date.localeCompare(b.date)),
     calendrier: calendrierAEvaluer(dossier),
   };
