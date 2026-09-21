@@ -23,6 +23,17 @@ import { PIECES_REDIGEABLES, pieceRedigeable } from "@/lib/contenu/redaction";
 export interface PieceARediger extends PieceRedigeable {
   /** Identifiant du `Document` correspondant dans ce dossier. */
   documentId: string;
+  /**
+   * Pays de destination, depuis la règle **figée** du dossier (INV-3).
+   * WF-08 étape 1 : les attendus d'une pièce rédigée diffèrent fortement
+   * d'un pays à l'autre, et ce sont ceux de la procédure sur laquelle le
+   * dossier a été ouvert, pas ceux de la règle publiée aujourd'hui.
+   *
+   * `null` quand le dossier n'a pas de règle figée. La mise en forme le
+   * refuse alors : écrire une pièce sans savoir pour quel pays produirait
+   * le modèle générique que WF-08 étape 3 écarte explicitement.
+   */
+  pays: string | null;
   /** Nombre de réponses déjà enregistrées : l'entretien se reprend. */
   reponsesEnregistrees: number;
   /** Version la plus récente, s'il y en a une. */
@@ -45,6 +56,7 @@ export async function piecesARediger(
     include: {
       _count: { select: { interview: true } },
       versions: { orderBy: { rank: "desc" }, take: 1, select: { rank: true } },
+      application: { select: { visaRule: { select: { countryCode: true } } } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -60,6 +72,7 @@ export async function piecesARediger(
         libelle: d.label,
         exigence: d.required ? "Exigée par la destination" : "Recommandée",
         documentId: d.id,
+        pays: d.application.visaRule?.countryCode ?? null,
         reponsesEnregistrees: d._count.interview,
         dernierRang: d.versions[0]?.rank ?? null,
       },

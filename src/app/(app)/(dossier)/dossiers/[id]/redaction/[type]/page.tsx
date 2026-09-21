@@ -8,6 +8,7 @@ import {
   versionsDeLaPiece,
 } from "@/server/lecture/redaction";
 import { exigerCandidat } from "@/server/securite/page";
+import { redactionConfiguree } from "@/server/redaction/redacteur";
 
 /**
  * R-02 entretien et R-03 éditeur — WF-08.
@@ -57,6 +58,10 @@ export default async function PagePieceRedigee({
       // repartait de zéro à chaque chargement.
       reponsesEnregistrees={await reponsesDeLEntretien(piece.documentId)}
       versions={await versionsDeLaPiece(piece.documentId)}
+      // L'écran dit ce qui manque plutôt que d'afficher une version vide :
+      // c'est la dégradation que le registre des dépendances décrit pour
+      // `redaction`, et qu'aucune ligne ne tenait.
+      redactionDisponible={redactionConfiguree()}
       maintenant={new Date().toISOString()}
     />
   );

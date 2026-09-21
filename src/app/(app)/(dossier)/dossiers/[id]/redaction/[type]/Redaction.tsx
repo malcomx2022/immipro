@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
@@ -21,12 +22,18 @@ import {
 } from "@/domain/redaction/entretien";
 import type { Suggestion, Version } from "@/domain/redaction/versions";
 import {
+  MENTION_AIDE_A_LA_REDACTION,
   MENTION_RETENTION_VERSIONS,
   estCourante,
+  etatDeLaPiece,
   libelleAnciennete,
   libelleVersion,
+  messageDEtat,
   motsDeLaVersion,
+  nombreDeReponsesTexte,
+  obstacleALEnregistrement,
   parOrdreDeLecture,
+  texteDeLaVersion,
   versionCourante,
 } from "@/domain/redaction/versions";
 import { appeler } from "@/lib/api";
@@ -65,6 +72,26 @@ import { EnteteDossier } from "../../EnteteDossier";
  * **Et une réponse identique ne se réenregistre pas.** Revenir sur une
  * question pour la relire, sans y toucher, n'écrit rien : c'est ce qui
  * distingue une navigation d'une modification.
+ *
+ * ── Et l'éditeur n'éditait rien ─────────────────────────────────────────
+ *
+ * L'onglet s'appelait « Éditeur » et rendait des paragraphes en lecture
+ * seule : pas de champ de saisie, pas d'enregistrement. Il ne montrait
+ * d'ailleurs jamais rien, puisqu'aucune route ne créait de version —
+ * `versionCourante` rendait toujours `undefined`, et « Restaurer » n'était
+ * relié à rien.
+ *
+ * Trois situations s'y confondaient dans un même écran vide : l'entretien
+ * pas assez avancé, la mise en forme à demander, et le service qui l'écrit
+ * non branché. La troisième est celle que le registre des dépendances
+ * décrit depuis S.3 — « aucun texte n'est produit, et aucun n'est inventé :
+ * l'écran dit ce qui manque plutôt que d'afficher une version vide ». Il ne
+ * le disait pas.
+ *
+ * Le texte, lui, appartient au candidat : il peut tout réécrire, et chaque
+ * enregistrement laisse une version restaurable. Sans retour en arrière,
+ * une suggestion acceptée puis regrettée est définitive, et la personne
+ * cesse d'accepter les suggestions.
  */
 export interface RedactionProps {
   dossier: Dossier;
@@ -73,6 +100,11 @@ export interface RedactionProps {
   reponsesEnregistrees: Reponses;
   versions: readonly Version[];
   suggestion?: Suggestion;
+  /**
+   * Le service de mise en forme est branché. Faux aujourd'hui : l'écran le
+   * dit au lieu de proposer un bouton qui ne rendrait rien (règle de Q.A).
+   */
+  redactionDisponible: boolean;
   /** Horodatage de rendu, passé par le serveur pour que « il y a 4 minutes » soit stable. */
   maintenant: string;
 }
@@ -85,8 +117,10 @@ export function Redaction({
   reponsesEnregistrees,
   versions,
   suggestion,
+  redactionDisponible,
   maintenant,
 }: RedactionProps) {
+  const router = useRouter();
   const [vue, setVue] = useState<Vue>(versions.length > 0 ? "EDITEUR" : "ENTRETIEN");
   const [index, setIndex] = useState(0);
   const [reponses, setReponses] = useState<Reponses>(reponsesEnregistrees);
@@ -103,6 +137,47 @@ export function Redaction({
   const question = piece.questions[index]!;
   const courante = versionCourante(versions);
   const date = new Date(maintenant);
+
+  const etat = etatDeLaPiece({
+    versions,
+    reponses: nombreDeReponsesTexte(reponses),
+    redactionDisponible,
+  });
+  const message = messageDEtat(etat, nombreDeReponsesTexte(reponses));
+
+  /** Le texte en cours de réécriture. Il part de la version courante. */
+  const [brouillon, setBrouillon] = useState(courante ? texteDeLaVersion(courante) : "");
+  const [envoi, setEnvoi] = useState("");
+  const manque = obstacleALEnregistrement(brouillon, courante);
+
+  /**
+   * Les trois gestes qui créent une version. Ils passent par la même route,
+   * discriminés sur le geste : aucun ne modifie une version existante, un
+   * état passé n'ayant pas à être réécrit.
+   */
+  async function ecrire(
+    cle: string,
+    corps: Record<string, unknown>,
+  ): Promise<void> {
+    setEnvoi(cle);
+    setEchec(null);
+    const resultat = await appeler<{ produite: boolean; disponible: boolean }>(
+      `/api/dossiers/${dossier.id}/redaction/${piece.type}/version`,
+      { methode: "POST", corps },
+    );
+    setEnvoi("");
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    /**
+     * `produite: false` n'est pas un échec du serveur : la demande a
+     * abouti, et aucun texte n'a été écrit parce que le service qui
+     * l'écrit n'est pas là. Le rechargement remet l'écran dans l'état que
+     * le serveur connaît, lequel dira lui-même ce qui manque.
+     */
+    router.refresh();
+  }
 
   /**
    * Enregistre la réponse courante, puis exécute la suite.
@@ -321,31 +396,104 @@ export function Redaction({
           )}
         >
           <h2 className="sr-only">Texte de la pièce</h2>
-          {courante?.paragraphes.map((paragraphe) => (
-            <div key={paragraphe.section} className="flex flex-col gap-1.5">
-              <h3 className="text-13 font-semibold uppercase tracking-wide text-ink-500">
-                {paragraphe.section}
+
+          {message ? (
+            <div className="flex flex-col items-start gap-2 rounded-lg border border-ink-300 bg-white p-5">
+              <h3 className="text-pretty text-19 font-semibold text-ink-900">
+                {message.titre}
               </h3>
-              {/* Au-delà de 68 caractères par ligne, l'œil perd la ligne. */}
-              <p className="max-w-[68ch] text-pretty text-16 leading-relaxed text-ink-900">
-                {paragraphe.texte}
+              <p className="max-w-[68ch] text-pretty text-14 text-ink-700">
+                {message.corps}
               </p>
-              {suggestion && suggestionVisible && suggestion.section === paragraphe.section ? (
-                <div className="flex flex-col items-start gap-2 rounded-md border-l-6 border-accent-500 bg-accent-50 p-3.5">
-                  <p className="text-13 font-semibold text-accent-700">Suggestion</p>
-                  <p className="text-pretty text-14 text-accent-700">{suggestion.texte}</p>
-                  <div className="flex gap-2">
-                    <Button variante="secondaire" onClick={() => setVue("ENTRETIEN")}>
-                      Répondre
-                    </Button>
-                    <Button variante="lien" onClick={() => setSuggestionVisible(false)}>
-                      Ignorer
-                    </Button>
-                  </div>
-                </div>
+              {message.action ? (
+                <Button
+                  className="mt-1"
+                  disabled={envoi !== ""}
+                  raisonDesactivation="Préparation du texte en cours."
+                  onClick={() =>
+                    etat === "A_METTRE_EN_FORME"
+                      ? ecrire("mise-en-forme", { geste: "mise-en-forme" })
+                      : setVue("ENTRETIEN")
+                  }
+                >
+                  {envoi === "mise-en-forme" ? "Préparation…" : message.action}
+                </Button>
               ) : null}
             </div>
-          ))}
+          ) : null}
+
+          {courante ? (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="texte" className="text-14 font-medium text-ink-900">
+                Ton texte
+              </label>
+              {/*
+                Un champ, et non des paragraphes en lecture seule. L'onglet
+                s'appelait « Éditeur » et n'éditait rien : le texte du
+                candidat lui appartient, et chaque enregistrement laisse une
+                version restaurable.
+
+                Le texte entier plutôt qu'un champ par paragraphe : on
+                réécrit une lettre, pas un tableau de morceaux, et déplacer
+                une phrase d'un paragraphe à l'autre est le geste le plus
+                courant d'une relecture.
+              */}
+              <textarea
+                id="texte"
+                rows={18}
+                value={brouillon}
+                onChange={(e) => setBrouillon(e.target.value)}
+                aria-describedby="texte-aide"
+                className={cn(CHAMP_CONTROLE, "h-auto max-w-[68ch] py-3 leading-relaxed")}
+              />
+              <p id="texte-aide" className="max-w-[68ch] text-pretty text-13 text-ink-500">
+                {MENTION_AIDE_A_LA_REDACTION}
+              </p>
+              <div className="flex flex-col items-start gap-2 pt-1 sm:flex-row sm:items-center">
+                <Button
+                  variante="secondaire"
+                  disabled={manque !== null || envoi !== ""}
+                  raisonDesactivation={manque ?? "Enregistrement en cours."}
+                  onClick={() => ecrire("reecriture", { geste: "reecriture", texte: brouillon })}
+                >
+                  {envoi === "reecriture" ? "Enregistrement…" : "Enregistrer une version"}
+                </Button>
+                <span className="text-13 text-ink-500">
+                  {`Version ${courante.rang} en cours · une nouvelle version est créée, l'ancienne reste`}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {/*
+            La suggestion se pose au-dessus du champ, et non sous le
+            paragraphe qu'elle visait.
+
+            Les paragraphes étaient rendus en lecture seule sous le champ de
+            saisie : la lettre s'affichait deux fois, et l'ancre de la
+            suggestion était le seul motif de cette répétition. La section
+            visée est nommée dans la suggestion — c'est ce qui la rattache au
+            bon passage, dans un texte que le candidat vient peut-être de
+            réorganiser.
+          */}
+          {suggestion && suggestionVisible && courante ? (
+            <div className="flex max-w-[68ch] flex-col items-start gap-2 rounded-md border-l-6 border-accent-500 bg-accent-50 p-3.5">
+              <p className="text-13 font-semibold text-accent-700">
+                {suggestion.section
+                  ? `Suggestion — paragraphe « ${suggestion.section} »`
+                  : "Suggestion"}
+              </p>
+              <p className="text-pretty text-14 text-accent-700">{suggestion.texte}</p>
+              <div className="flex gap-2">
+                <Button variante="secondaire" onClick={() => setVue("ENTRETIEN")}>
+                  Répondre
+                </Button>
+                <Button variante="lien" onClick={() => setSuggestionVisible(false)}>
+                  Ignorer
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section
@@ -370,7 +518,21 @@ export function Redaction({
                       Actuelle
                     </span>
                   ) : (
-                    <Button variante="lien">Restaurer</Button>
+                    <Button
+                      variante="lien"
+                      disabled={envoi !== ""}
+                      raisonDesactivation="Enregistrement en cours."
+                      onClick={() =>
+                        ecrire(`restauration-${version.rang}`, {
+                          geste: "restauration",
+                          rang: version.rang,
+                        })
+                      }
+                    >
+                      {envoi === `restauration-${version.rang}`
+                        ? "Restauration…"
+                        : "Restaurer"}
+                    </Button>
                   )}
                 </div>
                 <span className="text-13 text-ink-500">
@@ -390,13 +552,21 @@ export function Redaction({
           {suggestion && suggestionVisible ? "1 suggestion en attente" : "Aucune suggestion en attente"}
         </p>
         <div className="flex flex-col gap-2 md:flex-row">
-          <LienBouton
-            href={`/dossiers/${dossier.id}/redaction/${piece.type}/relecture`}
-            pleineLargeur
-            className="md:w-auto"
-          >
-            Lancer l&apos;analyse critique
-          </LienBouton>
+          {/*
+            « Lancer l'analyse critique » promettait un geste : le lien
+            ouvrait une page qui lit des remarques, sans qu'aucune analyse
+            soit déclenchée ni possible. Le libellé dit maintenant ce que le
+            lien fait — et il ne s'affiche que s'il y a un texte à ouvrir.
+          */}
+          {courante ? (
+            <LienBouton
+              href={`/dossiers/${dossier.id}/redaction/${piece.type}/relecture`}
+              pleineLargeur
+              className="md:w-auto"
+            >
+              Voir l&apos;analyse critique
+            </LienBouton>
+          ) : null}
           <Link
             href={`/dossiers/${dossier.id}`}
             className="flex min-h-touch items-center justify-center text-14 text-accent-700 underline"
