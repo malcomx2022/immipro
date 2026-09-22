@@ -5471,6 +5471,10 @@ motif parce qu'elles appellent une décision de produit, pas un correctif :
 | `AI_TOKENS_PACK_PRO` | idem |
 | `SMS_PROVIDER_KEY` | aucun envoi de SMS n'est modélisé, et aucune dépendance ne le déclare |
 
+> **Suite, le 22/09/2026.** Les trois `AI_TOKENS_PACK_*` sont retirées :
+> voir **S.36**. `SMS_PROVIDER_KEY` reste, et sa raison a changé — voir
+> aussi S.36.
+
 Les trois premières sont une seconde source pour un nombre qui en a déjà
 une — le genre de duplication qui diverge sans que rien ne le signale, et
 qui a déjà coûté une fois (S.14). Elles restent visibles dans la liste
@@ -6334,3 +6338,62 @@ Aucun message ne nomme la panne, le moteur, ni un code. RG-06.3 vaut ici
 comme pour un refus : ce qui n'est pas actionnable n'est pas dit, et ce
 qui l'est se dit en premier. Le message d'un fichier écarté au contrôle
 (`refusAuControle`) n'a pas bougé — il était déjà juste.
+
+---
+
+### S.36 — Deux sources pour un nombre, et une seule est lue
+
+S.28 avait relevé quatre variables déclarées dans `.env.example` que
+personne ne lit, et les avait laissées en exception datée « parce
+qu'elles appellent une décision de produit, pas un correctif ». Trois
+d'entre elles sont tranchées ; la quatrième ne l'est pas, et la raison
+de la garder a changé.
+
+#### Les trois quotas de pack sortent
+
+Leur motif disait : « le quota d'un pack vit dans `pricing.ts`
+(`tokensIA`), qui est la source lue. Deux sources pour le même nombre :
+à trancher, en retirant l'une des deux. »
+
+L'arbitrage est rendu **par l'usage**. `tokensIA` était déjà lue par la
+règle de cohérence de la grille (`pireTauxParPack`) ; depuis S.34, elle
+l'est aussi par l'alerte de quota de B-07, qui est la seule alerte
+disponible tant qu'aucun tarif de jeton n'est configuré. Les trois
+variables, elles, ne sont lues nulle part — ni par le code, ni par les
+scripts, ni par un `docker-compose`.
+
+Ce n'est pas seulement une redondance. Deux sources pour le même nombre
+divergent au premier changement de grille, et c'est **celle qui n'est pas
+lue qu'on aurait modifiée** : un exploitant qui veut relever le quota du
+pack Pro ouvre le fichier d'environnement, pas un module de domaine. Il
+aurait changé la valeur, redéployé, et rien ne se serait passé.
+
+#### `SMS_PROVIDER_KEY` reste, pour une autre raison
+
+Son motif disait « aucun envoi de SMS n'est modélisé, et aucune
+dépendance ne le déclare. À retirer, ou à brancher. » C'était incomplet :
+**DOC-11 §346 prévoit les SMS** — « rappels par email et, pour les
+échéances critiques, par SMS » (WF-09 étape 3) —, et le prototype les
+affiche dans deux écrans.
+
+La variable ne décore donc pas : elle marque la place d'une capacité
+spécifiée et non implémentée. La retirer effacerait la trace de l'écart,
+ce qui est l'inverse du travail. Son motif dit maintenant cela.
+
+L'écran de l'échéancier, lui, est déjà honnête : « Aucun rappel n'est
+envoyé pour l'instant, ni par email ni par SMS : reviens sur cet écran
+pour suivre tes échéances. » La promesse fausse a été retirée avant ce
+lot ; ce qui reste est un manque, pas un mensonge.
+
+#### Vérifié en mutant
+
+Deux mutations, deux rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| une variable dupliquée revient dans `.env.example` | la variable sans lecteur |
+| l'exception `SMS_PROVIDER_KEY` disparaît sans que la variable parte | la même |
+
+Le garde-fou de S.28 fonctionne dans les deux sens : il refuse une
+variable sans lecteur **et** une exception qui a cessé d'en être une. Le
+plafond de cinq entrées passe de quatre à une.
