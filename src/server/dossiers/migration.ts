@@ -2,8 +2,9 @@ import type { Application } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
-import { checklistDepuis, recalculerCompletude } from "@/server/acces/dossiers";
+import { recalculerCompletude } from "@/server/acces/dossiers";
 import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
+import { realignementDeLaChecklist } from "@/server/dossiers/checklist";
 import { filtrePourCandidat, payload, reglePubliee } from "@/server/acces/regles";
 
 /**
@@ -171,13 +172,14 @@ export async function arbitrerLaDivergence(
     });
   }
 
-  const nouvelles = checklistDepuis(payload(migration.toRule));
-  const existantes = await db.document.findMany({
-    where: { applicationId: dossier.id },
-    select: { code: true },
-  });
-  const connus = new Set(existantes.map((d) => d.code));
-  const ajoutees = nouvelles.filter((p) => !connus.has(p.code));
+  /*
+    La checklist se réaligne **en entier** sur la nouvelle version : une
+    pièce qui survit à la migration gardait sinon le libellé, le caractère
+    obligatoire, le remède et la durée de validité de l'ancienne. L'écran
+    annonçait « ajoutée » une pièce devenue obligatoire, et la migration
+    ne la rendait pas obligatoire.
+  */
+  const checklist = await realignementDeLaChecklist(dossier.id, payload(migration.toRule));
 
   /*
     L'échéancier se recalcule sur la **date cible du dossier**, qui ne
@@ -191,10 +193,8 @@ export async function arbitrerLaDivergence(
   );
 
   await db.$transaction([
-    // RG-11.1 — on ajoute, on ne retire pas.
-    db.document.createMany({
-      data: ajoutees.map((p) => ({ ...p, applicationId: dossier.id })),
-    }),
+    // RG-11.1 — on ajoute et on réaligne, on ne retire pas.
+    ...checklist.operations,
     ...echeancier,
     db.application.update({
       where: { id: dossier.id },
@@ -213,9 +213,15 @@ export async function arbitrerLaDivergence(
 
   await recalculerCompletude(dossier.id);
 
+  /*
+    Les pièces réalignées comptent parmi celles que le candidat doit
+    regarder : une pièce complémentaire devenue obligatoire n'est pas
+    « ajoutée » au sens de la base — sa ligne existait —, mais c'est bien
+    ce que l'écran lui a annoncé, et c'est ce qui change son travail.
+  */
   return {
     decision: "MIGRER",
-    piecesAjoutees: ajoutees.map((p) => p.label),
+    piecesAjoutees: [...checklist.ajoutees, ...checklist.realignees],
     mention: MENTION_MIGREE,
   };
 }

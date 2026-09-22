@@ -955,6 +955,145 @@ try {
       `et l'écran ouvre celle qui compte (v${ouverte.toRule.version})`,
     );
   }
+
+  console.log("\nWF-11 — migrer accepte la nouvelle version en entier, pas seulement ses pièces neuves");
+  {
+    /*
+      L'arbitrage n'ajoutait que les pièces dont le **code** était inconnu.
+      Une pièce qui survit gardait donc le libellé, le caractère
+      obligatoire, le remède et la durée de validité de l'ancienne version
+      — alors que l'écran de divergence l'annonce « ajoutée » dès qu'elle
+      devient obligatoire. L'écran promettait une ligne que la migration
+      ne posait pas.
+
+      Ce bloc ouvre son propre pays : les dossiers des blocs précédents
+      vivent sur les mêmes procédures, et une propagation vise toutes les
+      versions antérieures.
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "MA" as const, visaType: "etudes_mvv_vvr" as const,
+      category: "ETUDES" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2029-01-01"), publishedAt: new Date("2026-01-01"),
+    };
+    const PIECES = (brute.rules as never as {
+      pieces_requises: { code: string; libelle: string; obligatoire: boolean }[];
+    }).pieces_requises;
+    const avecDiplome = (diplome: Record<string, unknown>) => ({
+      ...(brute.rules as object),
+      pieces_requises: PIECES.map((x) => (x.code === "diplome" ? { ...x, ...diplome } : x)),
+    });
+
+    /*
+      v1 est en vigueur le temps que le dossier s'ouvre dessus :
+      `ouvrirDossier` est le seul créateur de dossiers, et il refuse une
+      version archivée. Une fixture qui poserait un dossier sur une v1
+      déjà retirée décrirait un état que le produit ne sait pas produire.
+    */
+    const v1 = await db.visaRule.create({
+      data: {
+        ...socle, version: 1, status: "PUBLISHED",
+        rules: avecDiplome({ obligatoire: false, libelle: "Diplôme" }) as never,
+      },
+    });
+
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-pub-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const dossier = await ouvrirDossier(candidat.id, v1.id, new Date("2027-09-01"));
+    await db.application.update({ where: { id: dossier.id }, data: { status: "ACTIF" } });
+
+    await db.visaRule.update({
+      where: { id: v1.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    const v2 = await db.visaRule.create({
+      data: {
+        ...socle, version: 2, status: "PUBLISHED",
+        rules: avecDiplome({
+          obligatoire: true,
+          libelle: "Diplôme le plus élevé, légalisé",
+          validite_mois: 6,
+          nature: "demarche",
+        }) as never,
+      },
+    });
+
+    const initiale = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "diplome" },
+    });
+    verifier(
+      !initiale.required && initiale.validityMonths === null,
+      `sur la v1, le diplôme est complémentaire et ne périme pas (obligatoire=${initiale.required})`,
+    );
+
+    /* Le candidat a déjà fourni sa pièce, et elle est conforme. */
+    await db.document.update({
+      where: { applicationId_code: { applicationId: dossier.id, code: "diplome" } },
+      data: { status: "CONFORME", feedback: "Lisible et complet.", expiresAt: new Date("2027-03-01") },
+    });
+
+    await propagerLaPublication(v2.id);
+    const migration = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: dossier.id, toRuleId: v2.id },
+    });
+    const vue = await divergenceAArbitrer(migration.id, candidat.id);
+    verifier(
+      vue.pieces.ajoutees.some((x) => x.code === "diplome"),
+      `l'écran annonce le diplôme parmi les pièces gagnées (${vue.pieces.ajoutees.map((x) => x.code).join(", ")})`,
+    );
+
+    const frais = await db.application.findUniqueOrThrow({ where: { id: dossier.id } });
+    const rendu = await arbitrerLaDivergence(frais, migration.id, "MIGRER");
+    verifier(
+      rendu.piecesAjoutees.includes("Diplôme le plus élevé, légalisé"),
+      `et l'arbitrage rend la même pièce (${JSON.stringify(rendu.piecesAjoutees)})`,
+    );
+    /*
+      Et elle seule : réaligner toute la checklist ferait nommer au
+      candidat des pièces qui n'ont pas bougé, et la mention de
+      confirmation n'apprendrait plus rien.
+    */
+    verifier(
+      rendu.piecesAjoutees.length === 1,
+      `et rien d'autre — les pièces inchangées ne sont pas nommées (${rendu.piecesAjoutees.length})`,
+    );
+
+    const apres = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "diplome" },
+    });
+    verifier(
+      apres.required && apres.family === "OBLIGATOIRE",
+      `la pièce devenue obligatoire l'est en base (obligatoire=${apres.required}, ${apres.family})`,
+    );
+    verifier(
+      apres.remedy === "DEMARCHE",
+      `le remède suit la nouvelle version (${apres.remedy})`,
+    );
+    verifier(
+      apres.validityMonths === 6,
+      `et sa durée de validité aussi (${apres.validityMonths})`,
+    );
+    verifier(
+      apres.label === "Diplôme le plus élevé, légalisé",
+      `le libellé décrit l'exigence du dossier (« ${apres.label} »)`,
+    );
+
+    /* RG-11.1 — on ajoute et on réaligne, on ne retire pas. */
+    verifier(
+      apres.status === "CONFORME" && apres.feedback === "Lisible et complet.",
+      `ce que le candidat a produit traverse intact (${apres.status})`,
+    );
+    verifier(
+      apres.expiresAt?.toISOString().slice(0, 10) === "2027-03-01",
+      `et la péremption calculée au dépôt n'est pas déplacée (${apres.expiresAt?.toISOString().slice(0, 10)})`,
+    );
+    const total = await db.document.count({ where: { applicationId: dossier.id } });
+    verifier(total === PIECES.length, `aucune pièce n'est retirée (${total})`);
+  }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

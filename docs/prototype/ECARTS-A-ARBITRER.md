@@ -8343,3 +8343,67 @@ ce qu'INV-8 interdit. C'est une lacune de **contenu**, à combler par la veille.
 l'arbitrage.** `comparaison.ts` compare les pièces par code et libellé. Une
 version qui ferait passer le relevé de trois à six mois déplacerait l'échéance
 du candidat sans le dire sur l'écran de divergence. C'est un lot à part.
+
+---
+
+## S.62 — L'écran promettait une ligne que la migration ne posait pas
+
+`arbitrerLaDivergence` n'ajoutait que les pièces dont le **code** était inconnu
+du dossier. Une pièce qui survit à la migration gardait donc toutes les
+propriétés de l'ancienne version.
+
+L'écran de divergence, lui, annonce « ajoutée » toute pièce devenue
+**obligatoire** — c'est ce qui compte pour le candidat, et c'est ce que
+`evolutionDesPieces` calcule. Les deux ne parlaient pas de la même chose.
+
+**Établi par exécution.** Un dossier ouvert sur une v1 où le diplôme est
+complémentaire, une v2 qui le rend obligatoire, périssable à six mois, et à
+obtenir par démarche :
+
+```
+l'écran annonce  : ajoutées = [« Diplôme le plus élevé, légalisé »]
+le candidat migre
+l'arbitrage rend : piècesAjoutées = []
+en base          : obligatoire=false  famille=COMPLEMENTAIRE
+                    remède=TELEVERSER  validité=null
+                    libellé=« Diplôme »
+```
+
+Quatre conséquences, et toutes vont dans le sens rassurant :
+
+1. la pièce que la nouvelle règle exige ne compte pas parmi les requises,
+   donc le dossier peut être déclaré **prêt sans elle** ;
+2. le bouton dit « Ajouter » pour un examen à passer ;
+3. la pièce ne périme jamais, et n'a pas d'échéance « à demander au plus tôt » ;
+4. le libellé décrit une exigence qui n'est plus celle du dossier.
+
+C'est le pendant exact de `remplacementDeLEcheancier` (S.53), qui a corrigé le
+même oubli sur les échéances et n'a pas regardé la checklist. Migrer accepte la
+nouvelle version **en entier**, pas seulement les pièces qu'elle invente.
+
+**Ce qui suit la règle, et ce qui appartient au candidat.** Seules se
+réalignent les cinq propriétés que `checklistDepuis` dérive du référentiel :
+libellé, famille, caractère obligatoire, remède, durée de validité. `status`,
+le fichier déposé, l'extraction, le retour d'analyse et `expiresAt` traversent
+intacts — RG-11.1, « on ajoute, on ne retire pas ». Une migration qui renverrait
+le candidat redéposer ce qu'il a fourni punirait l'acceptation de la règle.
+
+Deux mutations le confirment : débrancher les réécritures fait tomber les
+quatre assertions sur l'exigence et laisse vertes les deux qui veillent sur son
+travail ; ne rendre que les pièces créées fait tomber celle qui compare l'écran
+au résultat.
+
+### Ce qui reste à arbitrer
+
+**`expiresAt` n'est pas recalculé.** Une pièce déposée sous une validité de
+trois mois porte une péremption calculée sur trois mois ; si la nouvelle version
+en annonce six, la date ne bouge pas. La recalculer demanderait la date de dépôt
+— déductible de `expiresAt` moins l'ancienne durée, ou lisible sur
+`DocumentVersion` — et surtout de décider ce qu'on annonce au candidat : une
+date de péremption qu'il a déjà vue et qui recule est une information, pas une
+correction silencieuse. Lot à part.
+
+**Une durée de validité qui change n'apparaît pas dans l'arbitrage.**
+`comparaison.ts` compare les pièces par code et par caractère obligatoire. Le
+candidat voit désormais la bonne durée **après** avoir migré, pas avant de
+choisir. Même famille que le point ci-dessus, même lot à ouvrir.
