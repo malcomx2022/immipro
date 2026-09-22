@@ -415,6 +415,31 @@ describe("la traduction des échecs de nodemailer", () => {
   });
 
   /**
+   * **Un 4xx n'est pas un refus** — correctif du 22/09/2026.
+   *
+   * Le protocole distingue les deux depuis toujours : 5xx dit « non »,
+   * 4xx dit « pas maintenant ». Les trois codes nodemailer ci-dessous
+   * rendaient `refuse` quel que soit le code de réponse, si bien qu'un
+   * `451` — serveur momentanément indisponible, la réponse la plus
+   * banale d'un relais sous charge — se lisait « réessayer ne servirait
+   * à rien », et le renvoi d'un code de vérification était refusé au
+   * candidat.
+   *
+   * Trouvé par la fumée des rappels d'échéance, dont le serveur d'essai
+   * répond 451 : le rappel était marqué traité et n'arrivait jamais.
+   */
+  it("un code de réponse transitoire se reprend, quel que soit le code nodemailer", () => {
+    for (const code of ["EAUTH", "EENVELOPE", "EMESSAGE"]) {
+      expect(issueDeLErreur({ code, responseCode: 451 }).issue, code).toBe("injoignable");
+      expect(issueDeLErreur({ code, responseCode: 421 }).issue, code).toBe("injoignable");
+      expect(issueDeLErreur({ code, responseCode: 550 }).issue, code).toBe("refuse");
+    }
+    // Sans code de réponse, le serveur n'a rien dit : la règle d'avant
+    // s'applique, et ces trois-là restent des refus.
+    expect(issueDeLErreur({ code: "EENVELOPE" }).issue).toBe("refuse");
+  });
+
+  /**
    * Un code inconnu penche vers l'injoignable : entre laisser un
    * candidat sans code de vérification et lui en envoyer deux, le second
    * est le moindre mal.

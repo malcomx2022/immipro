@@ -148,6 +148,14 @@ jobs:
         run: npm run smoke:redaction
       - run: echo "- **Rédaction assistée** — aucun avis rendu sans lecture, relecture datée sur la version, jetons comptés même sans résultat" >> "$GITHUB_STEP_SUMMARY"
 
+      # Les rappels d'échéance, contre un vrai serveur SMTP. Ce qu'elle
+      # tient : un courrier part une fois, une urgence déjà rappelée ne
+      # repart pas le lendemain, et une coupure ne marque rien — la
+      # passe du lendemain reprend le rappel au lieu de le perdre.
+      - name: Rappels d'échéance
+        run: npm run smoke:rappels
+      - run: echo "- **Rappels d'échéance** — un envoi par échéance, cadence hebdomadaire tenue, coupure reprise sans perte" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention

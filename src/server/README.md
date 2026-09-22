@@ -398,7 +398,7 @@ traite son absence plutôt que de faire semblant :
 
 | Dépendance | Point de branchement | Sans elle |
 |---|---|---|
-| Messagerie | `courrier.ts`, `leTransport` / `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois |
+| Messagerie | `courrier.ts`, `leTransport` / `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois. Un échec transitoire (4xx) se reprend, un refus (5xx) non — la distinction décide si un candidat peut redemander son code |
 | Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D). Avec un moteur, une indisponibilité laisse la pièce en quarantaine et ouvre un incident — jamais une promotion |
 | Extraction IA | `dossiers/extracteur.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture. Avec une clé, une lecture qui n'aboutit pas nomme sa cause : une saturation se rejoue, un scan flou demande une photo, une clé refusée appelle un exploitant |
 | Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien. Avec une clé, une relecture qui n'aboutit pas ne date rien : R-04 continue de dire que le texte n'a pas été lu, et rien n'est débité |
@@ -526,6 +526,35 @@ satisfaire l'un suffit, et le verdict nomme ceux qui ne le sont pas —
 trente ans et plus, et le candidat est le seul à savoir lequel le
 concerne. En dessous de tous, l'échec cite le **moins exigeant** : c'est
 le seul constat vrai quel que soit le seuil applicable.
+
+### Les rappels d'échéance, et pourquoi ils se groupent
+
+Branchés le 22/09/2026. La file `echeancier.rappel` existait, déclarée
+sans écrivain avec ce motif : « l'envoi attend la messagerie ». Le
+transport SMTP avait été branché le matin même, et la phrase est devenue
+fausse sans que rien ne bouge — un candidat dont une échéance était
+dépassée depuis trois jours ne recevait ni courrier ni notification.
+
+RG-09.2 pose **deux règles distinctes**, et le lot porte donc deux
+marques : « un email hebdomadaire » est une cadence, qui porte sur le
+dossier (`Application.lastReminderAt`) ; « sauf urgence à moins de 7
+jours » est une exception, qui porte sur l'échéance
+(`Deadline.remindedAt`).
+
+La seconde décide de tout. Sans elle, une urgence repartirait chaque jour
+jusqu'à la date — la façon la plus sûre de se faire filtrer, et le filtre
+emporte le rappel qui comptait. Le groupement n'est pas une économie
+d'envois : c'est ce qui garde le canal lisible.
+
+Ce que le job ne décide pas : quoi envoyer. `domain/dossiers/rappels.ts`
+le dit sans base ni réseau — la cadence, l'urgence, l'horizon, le texte.
+Le job lit, appelle, envoie et marque.
+
+Un envoi qui se reprend (`injoignable`, dont les 4xx) ne marque rien : la
+passe du lendemain reprend le rappel. Marquer d'abord ferait d'une panne
+de messagerie un rappel définitivement perdu. Ce qui ne partira pas
+davantage demain — transport non branché, adresse refusée — est marqué :
+la notification reste, et elle attend le candidat à l'écran.
 
 ### Le balayage antivirus, et la seule issue qui promeut
 

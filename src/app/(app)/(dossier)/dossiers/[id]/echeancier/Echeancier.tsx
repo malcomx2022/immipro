@@ -125,19 +125,23 @@ export function Echeancier({
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row md:items-center md:justify-between">
         {/*
           La ligne disait « Rappels par email activés — les modifier ». Deux
-          affirmations, fausses toutes les deux : rien n'envoie de rappel —
-          la messagerie transactionnelle n'est pas branchée et aucun travail
-          de fond ne lit l'échéancier —, et le profil ne porte aucun réglage
-          de notification à modifier.
+          affirmations, fausses toutes les deux : rien n'envoyait de rappel,
+          et le profil ne porte aucun réglage à modifier.
 
-          C'est l'erreur du « rien à reprendre » de R-04 sur une autre
-          surface : un candidat qui croit ses rappels actifs cesse de venir
-          regarder, et rate la date. La phrase dit maintenant ce qui est, et
-          ce qu'il y a à faire en attendant (WF-09 étape 3).
+          Elle a ensuite dit qu'aucun rappel ne partait, ce qui était vrai
+          tant que rien ne lisait l'échéancier. Les rappels par email
+          partent depuis le 22/09/2026 (WF-09 étape 3) : la phrase dit donc
+          ce qui part, à quelle cadence, et ce qui ne part pas.
+
+          Le SMS reste annoncé nulle part comme actif. DOC-11 §346 le
+          prévoit pour les échéances critiques, aucun fournisseur n'est
+          branché, et un candidat qui croirait recevoir un SMS ne
+          regarderait pas ses emails.
         */}
         <p className="max-w-[60ch] text-pretty text-14 text-ink-700">
-          Aucun rappel n&apos;est envoyé pour l&apos;instant, ni par email ni par
-          SMS : reviens sur cet écran pour suivre tes échéances.
+          Un rappel par email te résume ces échéances chaque semaine, et tout
+          de suite si l&apos;une arrive à moins de sept jours. Rien n&apos;est
+          envoyé par SMS.
         </p>
         <LienBouton
           href={`/dossiers/${id}`}

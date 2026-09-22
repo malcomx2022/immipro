@@ -6860,3 +6860,113 @@ en ajoute d'autres du même genre.
 | le groupe échoué cite le seuil le plus exigeant | le seuil le moins exigeant, seul vrai quel que soit l'âge |
 | une pièce sans condition retrouve « correspondent à ce qui est exigé » | la phrase qui affirmait une comparaison |
 | une condition du référentiel livré perd son rattachement | le garde-fou sur la graine, en nommant la procédure |
+
+---
+
+### S.43 — Une file qui attendait une messagerie déjà branchée
+
+`JOBS.RAPPEL_ECHEANCIER` était déclarée avec ce motif :
+
+> Déclarée sans écrivain : la file existe, personne n'y poste encore,
+> **l'envoi attend la messagerie**. Une file vide ne promet rien ; c'est
+> l'écran qui doit rester honnête.
+
+Le transport SMTP a été branché le 22/09 au matin. La phrase est devenue
+fausse sans que rien ne bouge, et l'échéancier a continué de ne rien
+envoyer. Exécuté :
+
+```
+échéances en base       : 3
+  dont dépassée         : test_langue, il y a 3 jours
+  dont à moins de 7 j   : rdv_consulaire, dans 4 jours
+
+transport de courrier   : SMTP (branché)
+file déclarée           : echeancier.rappel
+un ouvrier la traite ?  : non
+quelqu'un y poste ?     : personne
+
+notifications d'échéance: 0
+```
+
+Un candidat dont une échéance est dépassée depuis trois jours ne reçoit
+rien, et l'écran lui dit de revenir regarder — ce qui est honnête, et ce
+qu'un échéancier existe précisément pour lui épargner.
+
+#### La cadence est une règle, pas un réglage
+
+RG-09.2 : « les rappels sont regroupés — un email hebdomadaire, sauf
+urgence à moins de 7 jours ». Deux règles distinctes, et donc deux
+marques : la cadence porte sur le **dossier** (`lastReminderAt`),
+l'exception sur l'**échéance** (`Deadline.remindedAt`).
+
+La seconde décide de tout. Sans elle, une urgence repartirait chaque jour
+jusqu'à la date — la façon la plus sûre de se faire filtrer, et le filtre
+emporte avec elle le rappel qui comptait. Le groupement n'est donc pas
+une économie d'envois : c'est ce qui garde le canal lisible.
+
+| Situation | Ce qui part |
+|---|---|
+| une échéance à moins de sept jours, jamais rappelée | tout de suite, avec les autres échéances proches |
+| la même, le lendemain | rien |
+| des échéances dans le mois, dernier envoi il y a une semaine | la passe hebdomadaire, urgences comprises |
+| la même, six jours après | rien |
+| une échéance faite, ou dépassée de plus de trente jours | rien — un rappel qui insiste sur une date passée depuis longtemps n'est plus un rappel, c'est un reproche |
+| un dossier déposé, suspendu, clôturé ou abandonné | rien, et **aucune marque** : il n'est pas « déjà rappelé », il est hors du périmètre |
+
+Le courrier ne dit rien de l'issue de la démarche (INV-1) ni de ce qu'une
+date manquée coûterait — c'est pourtant ce qu'un rappel est tenté de faire
+pour obtenir une réaction. Chaque ligne porte **le délai et la date** :
+« dans 4 jours » seul oblige à compter, « le 26 septembre » seul oblige à
+ouvrir un calendrier.
+
+#### Ce que l'écran disait, et ce qu'il dit
+
+La ligne avait déjà été corrigée une fois — elle affirmait « Rappels par
+email activés » devant un réglage qui n'existait pas. Elle disait ensuite
+qu'aucun rappel ne partait, ce qui était vrai. Elle dit maintenant ce qui
+part, à quelle cadence, **et ce qui ne part pas** : le SMS de DOC-11 §346
+n'a toujours aucun fournisseur branché, et un candidat qui croirait en
+recevoir un ne regarderait pas ses emails.
+
+---
+
+### S.44 — Un 451 n'est pas un refus
+
+Trouvé par la fumée du lot précédent, dont le serveur d'essai répond
+`451` : le rappel était marqué comme traité et n'arrivait jamais.
+
+`issueDeLErreur` traduit l'échec de nodemailer en issue d'envoi. Trois
+codes rendaient `refuse` **quel que soit le code de réponse** :
+
+```ts
+case "EAUTH":     return { issue: "refuse", … };
+case "EENVELOPE": return { issue: "refuse", … };
+case "EMESSAGE":  return { issue: "refuse", … };
+```
+
+Or `refuse` veut dire, dans le domaine qui l'arbitre, « réessayer à
+l'identique ne servirait à rien ». Le protocole SMTP distingue les deux
+depuis toujours : **5xx dit « non », 4xx dit « pas maintenant »**. Un
+`451` — serveur momentanément indisponible, la réponse la plus banale
+d'un relais sous charge — se lisait donc comme un refus définitif.
+
+La conséquence dépasse les rappels. `suiteDeLEnvoi` en déduit
+`renvoyable: false`, et c'est cette valeur qui décide si un candidat peut
+redemander son code de vérification. Un relais saturé pendant trente
+secondes lui refusait le renvoi.
+
+Le cas par défaut, lui, appliquait déjà la bonne règle — `reponse >= 500`
+pour un code inconnu. Elle vaut maintenant pour tous : le code nodemailer
+ne décide plus de l'issue, il donne le mot juste pour la dire. Sans code
+de réponse, le comportement d'avant est conservé : le serveur n'a rien
+dit, et ces trois-là restent des refus.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'urgence n'échappe plus à la cadence | trois tests, et deux assertions de la fumée |
+| une urgence repart chaque jour | deux tests, et trois assertions de la fumée |
+| une échéance faite se rappelle quand même | deux tests |
+| une coupure marque quand même | quatre assertions de la fumée, dont le rappel perdu |
+| un 451 redevient un refus définitif | le test du protocole, et cinq assertions de la fumée |

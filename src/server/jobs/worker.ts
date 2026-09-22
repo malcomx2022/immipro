@@ -13,6 +13,7 @@ import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
 import { declasserLesPiecesEchues } from "./peremption";
+import { envoyerLesRappels } from "./rappels";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
@@ -109,6 +110,10 @@ async function main() {
     console.info("[peremption]", await declasserLesPiecesEchues());
   });
 
+  await boss.work(JOBS.RAPPEL_ECHEANCIER, async () => {
+    console.info("[rappels]", await envoyerLesRappels());
+  });
+
   // Cadences de DOC-11 : quinze minutes pour la réconciliation (RG-05.4),
   // une fois par jour pour la veille (WF-14) et la purge (INV-5).
   //
@@ -121,6 +126,21 @@ async function main() {
   await boss.schedule(JOBS.VEILLE_ECHEANCE, "0 3 * * *");
   await boss.schedule(JOBS.PEREMPTION_PIECES, "15 3 * * *");
   await boss.schedule(JOBS.PURGE_RETENTION, "30 3 * * *");
+
+  /*
+    Les rappels d'échéance, une fois par jour — WF-09 étape 3.
+
+    À sept heures et non à trois : un courrier reçu la nuit est lu le
+    matin, mêlé à ceux de la nuit. La cadence hebdomadaire de RG-09.2
+    est tenue par le job, pas par le planificateur — une urgence à
+    quatre jours ne peut pas attendre lundi, et c'est la passe
+    quotidienne qui la voit.
+
+    Après la péremption : elle déclasse des pièces et refait des
+    barèmes, et un rappel envoyé avant elle citerait un état de la
+    veille.
+  */
+  await boss.schedule(JOBS.RAPPEL_ECHEANCIER, "0 7 * * *");
 
   /*
     La resonde, toutes les heures — I.C, 22/09/2026.
