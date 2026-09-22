@@ -193,6 +193,7 @@ const PIECES: EvolutionDesPieces = {
     { code: "casier_judiciaire", libelle: "Casier judiciaire", encoreDemandee: true },
     { code: "lettre_motivation", libelle: "Lettre de motivation", encoreDemandee: false },
   ],
+  validites: [],
 };
 
 describe("ce que la checklist gagne et perd", () => {
@@ -234,10 +235,10 @@ describe("ce que la checklist gagne et perd", () => {
   /** Le résumé ne répète pas « pièces » : la phrase composée les enchaîne. */
   it("le résumé se lit d'une traite", () => {
     expect(resumeDesPieces(PIECES)).toBe("1 pièce de plus à fournir, 2 de moins à réunir");
-    expect(resumeDesPieces({ ajoutees: PIECES.ajoutees, retirees: [] })).toBe(
+    expect(resumeDesPieces({ ajoutees: PIECES.ajoutees, retirees: [], validites: [] })).toBe(
       "1 pièce de plus à fournir",
     );
-    expect(resumeDesPieces({ ajoutees: [], retirees: PIECES.retirees })).toBe(
+    expect(resumeDesPieces({ ajoutees: [], retirees: PIECES.retirees, validites: [] })).toBe(
       "2 pièces de moins à réunir",
     );
   });

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { visaRulesSchema } from "@/domain/rules/schema";
+import { comparerLesVersions } from "@/domain/rules/comparaison";
+import { lignesDesPieces, texteDeLaValidite } from "@/domain/notifications/divergence";
 import { checklistDepuis } from "@/server/acces/dossiers";
 import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
 
@@ -111,5 +113,102 @@ describe("la durée de validité est une propriété de l'exigence", () => {
       "CH/etudes_permis_b": { preuve_fonds: 3 },
       "AE/etudes_residence_etudiante": { visite_medicale: 6 },
     });
+  });
+});
+
+/**
+ * RG-06.6 et WF-11 — une durée de validité qui change se voit avant qu'on
+ * tranche.
+ *
+ * ── Le défaut, tel qu'il s'est présenté ─────────────────────────────
+ *
+ * `comparerLesVersions` ne regardait pas la durée de validité. Une version
+ * qui ne changeait qu'elle rendait :
+ *
+ *     { impact: "MINEUR", diff: [], piecesTouchees: { ajoutees: [], retirees: [] } }
+ *
+ * `propagerLaPublication` passe son chemin sur `MINEUR` avec un diff vide.
+ * Donc aucune divergence, aucune notification, et un dossier qui gardait
+ * l'ancienne durée pour toujours — l'arbitrage étant le seul chemin qui
+ * réaligne sa checklist.
+ *
+ * Le sens n'est pas symétrique, et c'est ce qui fait mal. Une durée
+ * **raccourcie** rend périmée, le jour du dépôt, une pièce demandée à la
+ * date que l'échéancier annonçait : obtenue dans les temps, et refusée.
+ */
+describe("une durée de validité qui change est un changement", () => {
+  const nl = REGLES_DE_REFERENCE.find(
+    (r) => r.countryCode === "NL" && r.visaType === "etudes_mvv_vvr",
+  )!;
+
+  const avecValidite = (valeur: number | undefined) => {
+    const brut = structuredClone(nl.rules) as {
+      pieces_requises: { code: string; validite_mois?: number }[];
+    };
+    for (const p of brut.pieces_requises) {
+      if (p.code !== "preuve_fonds") continue;
+      if (valeur === undefined) delete p.validite_mois;
+      else p.validite_mois = valeur;
+    }
+    return visaRulesSchema.parse(brut);
+  };
+
+  it("entre au diff, et sort la version du silence", () => {
+    const c = comparerLesVersions(avecValidite(3), avecValidite(6));
+
+    expect(c.diff).toEqual([
+      { champ: "piece.preuve_fonds.validite_mois", avant: 3, apres: 6 },
+    ]);
+    // `propagerLaPublication` saute `MINEUR` avec un diff vide : c'est
+    // cette classification qui faisait taire la publication.
+    expect(c.impact).toBe("MAJEUR");
+  });
+
+  it("gêne sans rendre inéligible, donc jamais critique", () => {
+    expect(comparerLesVersions(avecValidite(6), avecValidite(3)).impact).toBe("MAJEUR");
+  });
+
+  it("nomme la pièce par son libellé et les deux durées", () => {
+    const { validites } = comparerLesVersions(avecValidite(3), avecValidite(6)).piecesTouchees;
+
+    expect(validites).toEqual([
+      {
+        code: "preuve_fonds",
+        libelle: "Justificatif de ressources (relevé, bourse ou garant)",
+        avant: 3,
+        apres: 6,
+      },
+    ]);
+  });
+
+  it("ne signale rien quand la durée ne bouge pas", () => {
+    const c = comparerLesVersions(avecValidite(3), avecValidite(3));
+    expect(c.piecesTouchees.validites).toEqual([]);
+    expect(c.impact).toBe("MINEUR");
+  });
+
+  it("dit dans quel sens, parce que le sens décide de la démarche", () => {
+    expect(texteDeLaValidite(6, 3)).toBe(
+      "valable 3 mois au lieu de 6 mois : à demander plus tard qu'annoncé",
+    );
+    expect(texteDeLaValidite(3, 6)).toBe(
+      "valable 6 mois au lieu de 3 mois : tu peux la demander plus tôt",
+    );
+    expect(texteDeLaValidite(null, 3)).toBe(
+      "valable 3 mois, à demander moins de 3 mois avant le dépôt",
+    );
+    expect(texteDeLaValidite(3, null)).toBe("ne périme plus");
+  });
+
+  it("l'écran d'arbitrage porte la ligne, nommée par son libellé", () => {
+    const { validites } = comparerLesVersions(avecValidite(6), avecValidite(3)).piecesTouchees;
+    const lignes = lignesDesPieces({ ajoutees: [], retirees: [], validites });
+
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0]!.texte).toBe(
+      "Justificatif de ressources (relevé, bourse ou garant) — valable 3 mois au lieu de 6 mois : à demander plus tard qu'annoncé",
+    );
+    // Un code de pièce ne sort jamais à l'écran.
+    expect(lignes[0]!.texte).not.toContain("preuve_fonds");
   });
 });

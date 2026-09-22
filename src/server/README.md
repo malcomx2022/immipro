@@ -1547,12 +1547,37 @@ l'exigence suit la règle, ce que le candidat a produit ne bouge pas.** Cinq
 propriétés se réalignent ; `status`, le fichier, l'extraction, le retour
 d'analyse et `expiresAt` traversent.
 
+La péremption a fini du côté de la règle, après coup : `expiresAt` se déduit de
+la date de dépôt et de la durée annoncée, donc une durée raccourcie la déplace.
+La laisser en place faisait déclarer conforme une pièce périmée depuis deux
+mois, sans que la passe de péremption trouve rien à déclasser. Elle se recalcule
+depuis `uploadedAt` de la dernière version — une date se lit, elle ne se déduit
+pas d'une autre date par soustraction — et `declasserLesPiecesEchues` fait le
+reste, avec le message actionnable qu'elle sait déjà écrire.
+
 Le symétrique vaut aussi : une pièce que la nouvelle version ne nomme plus du
 tout restait `OBLIGATOIRE`, donc comptée parmi les requises. Le candidat lisait
 « ta checklist perd : Diplôme », migrait, et son dossier restait bloqué dessus.
 Elle passe en complémentaire et cesse de compter — sa ligne et son fichier
 restent, car RG-11.1 protège le travail du candidat, pas une exigence disparue
 du référentiel.
+
+## Une version peut changer sans rien changer de comparable
+
+`comparerLesVersions` décide de l'impact, et `propagerLaPublication` saute les
+couples `MINEUR` + diff vide. Une version qui ne changeait qu'une durée de
+validité tombait exactement là : aucune divergence, aucune notification, et un
+dossier qui gardait l'ancienne durée pour toujours — puisque l'arbitrage est le
+seul chemin qui réaligne une checklist.
+
+La leçon vaut au-delà du cas : **tout ce qu'une version peut changer doit entrer
+dans la comparaison**, sans quoi le changement existe en base et n'existe pour
+personne. Le réalignement peut être parfait, il ne s'exécute jamais.
+
+Le classement se fait sur une question simple, celle que le fichier posait
+déjà : est-ce que cela rend **inéligible**, ou est-ce que cela **gêne** ? Un
+seuil relevé, un dispositif supprimé : critique. Un délai d'instruction, une
+durée de validité : majeur.
 
 ## Vérifier
 

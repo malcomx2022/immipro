@@ -126,6 +126,22 @@ export interface EvolutionDesPieces {
    * pouvait encore joindre.
    */
   retirees: readonly (PieceNommee & { encoreDemandee: boolean })[];
+  /**
+   * Présentes dans les deux versions, avec une **durée de validité**
+   * différente — RG-06.6.
+   *
+   * Elle ne figurait nulle part dans la comparaison, et la conséquence
+   * n'était pas seulement un écran muet : une version qui ne change que
+   * cela donnait `impact: MINEUR` et un diff vide, donc aucune divergence,
+   * aucune notification, et un dossier qui gardait l'ancienne durée pour
+   * toujours.
+   *
+   * Le sens n'est pas symétrique. Une durée **allongée** laisse demander
+   * la pièce plus tôt ; une durée **raccourcie** fait qu'une pièce
+   * obtenue à la date que l'échéancier annonçait est périmée le jour du
+   * dépôt — obtenue dans les temps, et refusée.
+   */
+  validites: readonly (PieceNommee & { avant: number | null; apres: number | null })[];
 }
 
 /** Fourchette de jours annoncée par l'autorité, ou son absence. */
@@ -152,7 +168,7 @@ const VIDE: Comparaison = {
   diff: [],
   bloquantesTouchees: [],
   delaiDInstruction: null,
-  piecesTouchees: { ajoutees: [], retirees: [] },
+  piecesTouchees: { ajoutees: [], retirees: [], validites: [] },
 };
 
 const parCode = (conditions: readonly Condition[]): Map<string, Condition> =>
@@ -322,6 +338,21 @@ export function comparerLesVersions(
   for (const piece of piecesTouchees.retirees) {
     diff.push({ champ: `piece.${piece.code}`, avant: "obligatoire", apres: null });
   }
+  /*
+    Une durée de validité qui bouge entre au diff comme le délai
+    d'instruction : elle gêne — elle déplace la date à laquelle demander
+    la pièce —, elle ne rend pas inéligible. Donc `MAJEUR`, jamais
+    `CRITIQUE`. Sans cette ligne, une version qui ne change que cela
+    sortait en `MINEUR` avec un diff vide, et la propagation passait son
+    chemin sans prévenir personne.
+  */
+  for (const piece of piecesTouchees.validites) {
+    diff.push({
+      champ: `piece.${piece.code}.validite_mois`,
+      avant: piece.avant,
+      apres: piece.apres,
+    });
+  }
 
   /*
     Le délai d'instruction — RG-09.3.
@@ -393,6 +424,16 @@ function evolutionDesPieces(
   const avantObl = obligatoires(avant);
   const apresObl = obligatoires(apres);
 
+  /*
+    La validité se compare sur les pièces des **deux** versions, sans
+    filtre d'obligation : une pièce complémentaire périssable porte elle
+    aussi une échéance « à demander au plus tôt », et l'obtenir trop tôt
+    la rend inutilisable de la même façon.
+  */
+  const validiteAvant = new Map(
+    avant.pieces_requises.map((x) => [x.code, x.validite_mois ?? null]),
+  );
+
   return {
     ajoutees: [...apresObl]
       .filter(([code]) => !avantObl.has(code))
@@ -400,6 +441,15 @@ function evolutionDesPieces(
     retirees: [...avantObl]
       .filter(([code]) => !apresObl.has(code))
       .map(([code, libelle]) => ({ code, libelle, encoreDemandee: codesApres.has(code) })),
+    validites: apres.pieces_requises
+      .filter((x) => validiteAvant.has(x.code))
+      .map((x) => ({
+        code: x.code,
+        libelle: x.libelle,
+        avant: validiteAvant.get(x.code) ?? null,
+        apres: x.validite_mois ?? null,
+      }))
+      .filter((x) => x.avant !== x.apres),
   };
 }
 
