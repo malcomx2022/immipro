@@ -181,10 +181,7 @@ export async function publierLaRegle(
     const file = await getQueue();
     // La réponse annonce `divergenceMiseEnFile` : elle ne doit pas
     // l'annoncer si rien n'a été mis en file.
-    await poster(file, JOBS.DIVERGENCE_REGLEMENTAIRE, {
-      ancienneId: veille.id,
-      nouvelleId: regle.id,
-    });
+    await poster(file, JOBS.DIVERGENCE_REGLEMENTAIRE, { nouvelleId: regle.id });
   }
 
   return {

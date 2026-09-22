@@ -147,11 +147,34 @@ const CONDITIONS = (brute.rules as never as {
 
 let rang = 0;
 
+/*
+  Chaque scénario a **sa** procédure. La propagation vise désormais toutes
+  les versions antérieures d'un même pays et type de visa : partager
+  `NL/etudes_mvv_vvr` entre les blocs les faisait se compter les uns les
+  autres, et c'est le nouveau comportement qui a raison — un dossier resté
+  sur v1 est bien concerné par la publication de v3.
+
+  Le code pays sert d'espace de noms. Il n'a pas à être réaliste : ce que
+  la fumée éprouve ici est la mécanique des états, pas la géographie.
+*/
+const PAYS = ["NL", "PT", "ES", "GR", "PL", "CZ", "HU", "RO", "SE", "FI", "DK", "AT"] as const;
+let scenario = -1;
+/** À appeler au début de chaque bloc : les versions qui suivent sont à lui. */
+const nouveauScenario = () => {
+  scenario += 1;
+  // `rang` ne repart pas à zéro : il numérote les versions **et** les
+  // adresses des candidats, qui doivent rester uniques d'un bout à
+  // l'autre. Les versions n'ont pas besoin de commencer à 1 — elles
+  // n'ont besoin d'être distinctes que pour un même pays.
+  return PAYS[scenario % PAYS.length]!;
+};
+let paysCourant: string = PAYS[0]!;
+
 async function regle(rules: unknown) {
   rang += 1;
   return db.visaRule.create({
     data: {
-      countryCode: "NL",
+      countryCode: paysCourant,
       visaType: "etudes_mvv_vvr",
       category: "ETUDES",
       version: rang,
@@ -198,6 +221,7 @@ const etat = async (id: string) => (await db.application.findUnique({ where: { i
 
 try {
   console.log("\nWF-10 étape 1 — la déclaration de dépôt, depuis le seul état qu'elle accepte");
+  paysCourant = nouveauScenario();
   {
     const r = await regle(brute.rules);
     const { application } = await dossierPret(r.id);
@@ -208,6 +232,7 @@ try {
   }
 
   console.log("\nWF-10 — la clôture d'un dossier prêt, par quelqu'un qui renonce avant de déposer");
+  paysCourant = nouveauScenario();
   {
     const r = await regle(brute.rules);
     const { application } = await dossierPret(r.id);
@@ -218,6 +243,7 @@ try {
   }
 
   console.log("\nWF-11 — une divergence critique prévient TOUS les dossiers prêts");
+  paysCourant = nouveauScenario();
   {
     const v1 = await regle(brute.rules);
     const perdue = CONDITIONS.find((c) => c.bloquant)!;
@@ -228,7 +254,7 @@ try {
 
     const trois = [await dossierPret(v1.id), await dossierPret(v1.id), await dossierPret(v1.id)];
 
-    const bilan = await propagerLaPublication(v1.id, v2.id);
+    const bilan = await propagerLaPublication(v2.id);
     verifier(
       bilan.alertes === 3 && bilan.critiques === 3,
       `les trois sont alertés et mis en pause (${JSON.stringify(bilan)})`,
@@ -293,7 +319,7 @@ try {
       `alertedAt` qui les écarte. Sans elle, arbitrer une divergence
       exposait à la recevoir une seconde fois.
     */
-    const reprise = await propagerLaPublication(v1.id, v2.id);
+    const reprise = await propagerLaPublication(v2.id);
     verifier(
       reprise.alertes === 0 && reprise.dejaAlertes === 1,
       `la reprise ne réalerte pas le dossier qui a arbitré (${JSON.stringify(reprise)})`,
@@ -305,6 +331,7 @@ try {
   }
 
   console.log("\nWF-11 — un relais saturé ne fait perdre l'alerte de personne");
+  paysCourant = nouveauScenario();
   {
     /*
       La panne attendue : le relais refuse temporairement **un** candidat.
@@ -328,7 +355,7 @@ try {
     const trois = [await dossierPret(v1.id), await dossierPret(v1.id), await dossierPret(v1.id)];
 
     differees.add(trois[1]!.user.email);
-    const coupure = await propagerLaPublication(v1.id, v2.id);
+    const coupure = await propagerLaPublication(v2.id);
     verifier(
       coupure.alertes === 2 && coupure.aReprendre === 1,
       `deux sont prévenus, un est repris (${JSON.stringify(coupure)})`,
@@ -354,7 +381,7 @@ try {
 
     // Le relais se dégage : la reprise le joint, et ne réalerte pas les autres.
     differees.clear();
-    const reprise = await propagerLaPublication(v1.id, v2.id);
+    const reprise = await propagerLaPublication(v2.id);
     verifier(
       reprise.alertes === 1 && reprise.aReprendre === 0,
       `la reprise prévient le dernier (${JSON.stringify(reprise)})`,
@@ -369,6 +396,7 @@ try {
   }
 
   console.log("\nWF-11 — un dossier qui échoue ne fait plus tomber les autres");
+  paysCourant = nouveauScenario();
   {
     /*
       L'échec imprévu, et non plus la coupure : le candidat du deuxième
@@ -391,7 +419,7 @@ try {
     auPremierMessage = async () => {
       await db.user.delete({ where: { id: trois[1]!.user.id } });
     };
-    const bilan = await propagerLaPublication(v1.id, v2.id);
+    const bilan = await propagerLaPublication(v2.id);
     verifier(
       bilan.alertes === 2 && bilan.aReprendre === 1,
       `le dossier disparu est compté à part (${JSON.stringify(bilan)})`,
@@ -405,6 +433,7 @@ try {
   }
 
   console.log("\nWF-11 — une divergence majeure ne se répète pas quand la file rejoue");
+  paysCourant = nouveauScenario();
   {
     /*
       Le cas où la reprise mord pour de bon : un impact **majeur** ne met
@@ -433,7 +462,7 @@ try {
     });
     const p = await dossierPret(v1.id);
 
-    const premiere = await propagerLaPublication(v1.id, v2.id);
+    const premiere = await propagerLaPublication(v2.id);
     verifier(
       premiere.alertes === 1 && premiere.critiques === 0,
       `le dossier est alerté sans être mis en pause (${JSON.stringify(premiere)})`,
@@ -441,7 +470,7 @@ try {
     const apres = await etat(p.application.id);
     verifier(apres.status === "PRET", `il reste prêt (${apres.status})`);
 
-    const reprise = await propagerLaPublication(v1.id, v2.id);
+    const reprise = await propagerLaPublication(v2.id);
     verifier(
       reprise.dossiers === 1 && reprise.alertes === 0 && reprise.dejaAlertes === 1,
       `la reprise le retrouve et ne le réalerte pas (${JSON.stringify(reprise)})`,
@@ -476,6 +505,7 @@ try {
   }
 
   console.log("\nWF-05 — un second pack acheté sur un dossier déjà prêt");
+  paysCourant = nouveauScenario();
   {
     /*
       Le quota d'analyses s'épuise avant le dossier : acheter un second
@@ -541,6 +571,7 @@ try {
   }
 
   console.log("\nRG-10.4 — la purge sur demande, sur un dossier prêt");
+  paysCourant = nouveauScenario();
   {
     const r = await regle(brute.rules);
     const { user, application } = await dossierPret(r.id);
@@ -570,6 +601,7 @@ try {
     verifier(reste.purgedAt !== null, "et il est purgé quand même (RG-10.4)");
   }
   console.log("\nRG-04.2 — le brouillon laissé de côté est relancé, puis clos");
+  paysCourant = nouveauScenario();
   {
     /*
       `ABANDONNE` vivait dans l'enum, dans `EtatStocke`, et l'écran savait

@@ -73,11 +73,15 @@ async function main() {
     },
   );
 
-  await boss.work<{ ancienneId: string; nouvelleId: string }>(
+  await boss.work<{ nouvelleId: string }>(
     JOBS.DIVERGENCE_REGLEMENTAIRE,
     async ([job]) => {
       if (!job) return;
-      const bilan = await propagerLaPublication(job.data.ancienneId, job.data.nouvelleId);
+      // `ancienneId` ne sert plus au ciblage : la passe vise toutes les
+      // versions antérieures, et compare chaque dossier depuis la sienne.
+      // Les jobs déjà en file le portent encore, et il est simplement
+      // ignoré.
+      const bilan = await propagerLaPublication(job.data.nouvelleId);
       console.info("[divergence]", bilan);
       /*
         Un dossier qui n'a pas pu être prévenu fait rejouer la passe —
