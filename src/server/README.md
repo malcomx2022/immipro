@@ -1419,6 +1419,28 @@ compte anonymisé la porte encore.
 La leçon est la même qu'ailleurs dans ce dépôt : une garde qui nomme la fin
 d'un processus ne protège pas pendant qu'il dure.
 
+## Deux chemins vers le même état, un seul filtré
+
+`ouvrirDossier` passe par `reglePubliee` : une règle dont la relecture est
+dépassée, ou qu'une version suivante a archivée, ne peut pas porter un
+nouveau dossier. C'est RG-14.1, et le filtre est au niveau de la requête
+comme INV-4 le demande.
+
+L'arbitrage d'une divergence menait au même état — un dossier figé sur une
+version — sans passer par ce filtre. La plateforme refusait donc d'y
+commencer et acceptait d'y aller : le candidat acceptait une migration, et
+son dossier se retrouvait adossé à une règle que la veille venait de
+retirer.
+
+Le même filtre garde désormais les deux chemins, et l'écran le dit avant le
+clic : l'option reste affichée, indisponible, avec sa raison. Proposer un
+bouton que le serveur refusera est la même faute qu'un bouton qui ne fait
+rien.
+
+« Conserver » reste ouvert dans tous les cas. C'est le choix sûr, et il met
+fin à la pause d'une divergence critique — fermer les deux punirait le
+candidat du retard de nos veilleurs.
+
 ## Vérifier
 
 ```

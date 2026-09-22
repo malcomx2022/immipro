@@ -70,6 +70,11 @@ export interface DivergenceProps {
    */
   pieces?: EvolutionDesPieces;
   /**
+   * RG-14.1. Faux quand la version visée n'est plus en vigueur : l'option
+   * « migrer » s'affiche alors indisponible, avec sa raison.
+   */
+  migrable?: boolean;
+  /**
    * Date de **dépôt** du dossier concerné — la cible moins le délai
    * d'instruction —, si elle est fixée. C'est elle qui décide de la
    * version applicable, pas la date de départ.
@@ -89,6 +94,7 @@ export function DivergenceReglementaire({
   ancienne,
   nouvelle,
   pieces = AUCUNE_PIECE,
+  migrable = true,
   depot,
   detecteeLe,
   verifieeLe,
@@ -106,6 +112,7 @@ export function DivergenceReglementaire({
     montant(ancienne),
     montant(nouvelle),
     pieces,
+    migrable,
   );
   const lignes = lignesDesPieces(pieces);
   const retenue = options.find((o) => o.cle === choix);
@@ -193,6 +200,7 @@ export function DivergenceReglementaire({
           valeur: o.cle,
           libelle: o.titre,
           description: o.detail,
+          ...(o.desactivee ? { desactivee: true } : {}),
         }))}
         valeur={choix}
         onChangement={(v) => setChoix(v as Arbitrage)}

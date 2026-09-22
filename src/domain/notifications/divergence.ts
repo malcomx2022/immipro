@@ -221,6 +221,12 @@ export interface OptionArbitrage {
   titre: string;
   /** Ce que le choix change concrètement, et dans quel cas il se défend. */
   detail: string;
+  /**
+   * Choix affiché mais indisponible, avec sa raison dans `detail`. Le
+   * retirer ferait chercher ce qu'on a mal fait, là où il n'y a rien à
+   * corriger de son côté.
+   */
+  desactivee?: boolean;
 }
 
 export function optionsArbitrage(
@@ -229,6 +235,13 @@ export function optionsArbitrage(
   montantAncien: string,
   montantNouveau: string,
   pieces: EvolutionDesPieces = AUCUNE_PIECE,
+  /**
+   * RG-14.1. Faux quand la version visée n'est plus en vigueur — relecture
+   * dépassée, ou archivée par une version suivante. L'option reste
+   * **affichée** et devient indisponible avec sa raison : la retirer
+   * ferait chercher ce qu'on a mal fait, là où il n'y a rien à corriger.
+   */
+  migrable = true,
 ): readonly OptionArbitrage[] {
   const limite = ancienne.applicableJusquau
     ? ` À ne garder que si tu déposes avant le ${formaterJour(ancienne.applicableJusquau)}.`
@@ -249,7 +262,10 @@ export function optionsArbitrage(
     {
       cle: "MIGRER",
       titre: `Migrer vers la version ${nouvelle.numero}`,
-      detail: `Ta checklist passe à la version ${nouvelle.numero}${etCeQuiChange(ecart, montantNouveau, nouvelle.delai, surLaChecklist)}.${entree}`,
+      detail: migrable
+        ? `Ta checklist passe à la version ${nouvelle.numero}${etCeQuiChange(ecart, montantNouveau, nouvelle.delai, surLaChecklist)}.${entree}`
+        : MENTION_VERSION_EN_RELECTURE,
+      ...(migrable ? {} : { desactivee: true }),
     },
     {
       cle: "CONSERVER",
@@ -287,6 +303,17 @@ export const mentionArbitrage = (choix: Arbitrage, pays: string): string =>
   choix === "MIGRER"
     ? `Ta checklist ${pays} sera mise à jour.`
     : `Ta checklist ${pays} restera en version antérieure.`;
+
+/**
+ * Ce que l'écran dit quand la version visée n'est plus en vigueur.
+ *
+ * Elle dit ce qui bloque, que rien n'est perdu, et le geste qui reste
+ * possible. Le candidat n'a rien à corriger : c'est la relecture de nos
+ * veilleurs qui est en retard, et le lui cacher le ferait chercher une
+ * faute de son côté.
+ */
+export const MENTION_VERSION_EN_RELECTURE =
+  "Cette version n'est plus celle en vigueur : nos veilleurs la revérifient. Elle te sera proposée de nouveau une fois vérifiée.";
 
 export const MENTION_SANS_ACCORD = "Nous ne modifions rien sans ton accord.";
 

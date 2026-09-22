@@ -921,6 +921,31 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
     expect(dialogue.textContent).not.toContain("assurance_maladie");
   });
 
+  /**
+   * RG-14.1 — la version visée n'est plus en vigueur. Proposer un bouton
+   * que le serveur refusera est la même faute qu'un bouton qui ne fait
+   * rien : l'écran le dit **avant** le clic.
+   */
+  it("une version retirée s'affiche indisponible, avec sa raison", () => {
+    render(
+      <Alertes
+        alertes={ALERTES}
+        maintenant="2026-09-18T13:05:00Z"
+        divergence={{ ...MEME_MONTANT, migrable: false }}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choisir la version à appliquer" }),
+    );
+    const migrer = screen.getByRole("radio", { name: /Migrer vers la version 5/ });
+    expect(migrer).toHaveProperty("disabled", true);
+    expect(screen.getByRole("dialog").textContent).toContain("nos veilleurs la revérifient");
+    // Conserver reste ouvert : c'est le choix sûr, et il met fin à la pause.
+    expect(
+      screen.getByRole("radio", { name: /Conserver la version 4/ }),
+    ).toHaveProperty("disabled", false);
+  });
+
   it("les deux options ne se lisent plus à l'identique", () => {
     ouvrir();
     const details = screen.getAllByRole("radio").map((r) => espaces(r.textContent ?? ""));

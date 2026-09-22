@@ -4,7 +4,7 @@ import { echec } from "@/server/http/echecs";
 import { miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
 import { checklistDepuis, recalculerCompletude } from "@/server/acces/dossiers";
 import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
-import { payload } from "@/server/acces/regles";
+import { payload, reglePubliee } from "@/server/acces/regles";
 
 /**
  * Arbitrage d'une divergence réglementaire — T-02, WF-11 étape 4.
@@ -42,6 +42,34 @@ import { payload } from "@/server/acces/regles";
  * implémentation, pas deux — et il est **dans la transaction** : un
  * dossier dont la version figée aurait changé sans son échéancier serait
  * exactement l'état qu'on vient de corriger.
+ *
+ * ── Migrer vers une version que la plateforme a retirée ─────────────
+ *
+ * RG-14.1 : « une fiche dont `nextReviewAt` est dépassée repasse
+ * automatiquement en DRAFT et disparaît de l'affichage utilisateur. Une
+ * donnée non relue ne peut pas continuer à se présenter comme fiable. »
+ *
+ * La veille dépubliait, et l'arbitrage proposait quand même. Exécuté avant
+ * correction :
+ *
+ *     fiches dépubliées : 1
+ *     v2 : relecture au 2027-01-01, statut DRAFT
+ *     version proposée  : 2
+ *     arbitrage : {"decision":"MIGRER",…}
+ *     son dossier est désormais figé sur la v2, statut DRAFT
+ *
+ * `ouvrirDossier` **refuse** d'ouvrir un dossier sur cette règle — elle
+ * passe par `reglePubliee`, qui porte le filtre candidat. La plateforme
+ * refusait donc d'y commencer et acceptait d'y aller. Le même filtre garde
+ * désormais les deux chemins.
+ *
+ * Il couvre plus que la relecture dépassée : une version archivée depuis
+ * qu'une v3 est parue en sort aussi, et migrer vers elle aurait figé le
+ * dossier sur une règle que la suivante a déjà remplacée.
+ *
+ * « Conserver » reste ouvert, toujours : c'est le choix sûr, et il met fin
+ * à la pause. Refuser les deux laisserait le dossier suspendu pour une
+ * relecture que le candidat ne peut pas faire avancer.
  */
 
 export type Decision = "MIGRER" | "CONSERVER";
@@ -56,6 +84,14 @@ export interface Arbitrage {
 const MENTION_CONSERVEE =
   "Ton dossier reste régi par la version que tu as figée à son ouverture. Rien ne change dans ta checklist, et il reprend son cours.";
 const MENTION_MIGREE = "Aucune pièce déjà validée n'a été retirée.";
+
+/**
+ * Le refus, et il est actionnable : il dit ce qui bloque, ce qui ne change
+ * pas, et le geste qui reste possible. « Migration impossible » seul
+ * laisserait chercher ce qu'on a mal fait.
+ */
+export const MENTION_VERSION_RETIREE =
+  "Cette version n'est plus celle en vigueur : nos veilleurs la revérifient. Ton dossier garde la sienne et rien n'est perdu. Tu peux conserver ta version dès maintenant ; si une nouvelle est mise en vigueur, elle te sera proposée.";
 
 export async function arbitrerLaDivergence(
   dossier: Application,
@@ -97,6 +133,18 @@ export async function arbitrerLaDivergence(
     // décide, la reprise ne fait que lui rendre la main.
     await recalculerCompletude(dossier.id);
     return { decision: "CONSERVER", piecesAjoutees: [], mention: MENTION_CONSERVEE };
+  }
+
+  /*
+    RG-14.1. La version visée doit être **en vigueur aujourd'hui**, et pas
+    seulement avoir existé le jour de l'alerte : entre les deux, la veille
+    a pu la retirer faute de relecture, ou une v3 a pu l'archiver. Le
+    filtre est celui de `reglePubliee`, donc le même qu'à l'ouverture d'un
+    dossier — refuser d'y commencer et accepter d'y migrer n'avait pas de
+    sens.
+  */
+  if ((await reglePubliee(migration.toRuleId, maintenant)) === null) {
+    throw echec("etat_incompatible", { corps: MENTION_VERSION_RETIREE });
   }
 
   const nouvelles = checklistDepuis(payload(migration.toRule));

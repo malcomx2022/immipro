@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUCUNE_PIECE,
+  MENTION_VERSION_EN_RELECTURE,
   ceQuiSepare,
   ecartMontant,
   libelleDelaiVersion,
@@ -267,5 +268,62 @@ describe("les options d'arbitrage citent les pièces", () => {
     expect(migrer).toContain("13 000 € à prouver");
     expect(migrer).toContain("60–150 jours");
     expect(migrer).toContain("1 pièce de plus");
+  });
+});
+
+
+/**
+ * Migrer vers une version que la plateforme a retirée — RG-14.1,
+ * correctif du 23/09/2026.
+ *
+ * « Une fiche dont `nextReviewAt` est dépassée repasse automatiquement en
+ * DRAFT et disparaît de l'affichage utilisateur. Une donnée non relue ne
+ * peut pas continuer à se présenter comme fiable. »
+ *
+ * La veille dépubliait, et l'arbitrage proposait quand même. Exécuté avant
+ * correction :
+ *
+ *     fiches dépubliées : 1
+ *     v2 : relecture au 2027-01-01, statut DRAFT
+ *     version proposée  : 2
+ *     arbitrage : {"decision":"MIGRER",…}
+ *     son dossier est désormais figé sur la v2, statut DRAFT
+ *
+ * `ouvrirDossier` refuse pourtant d'ouvrir un dossier sur cette règle : la
+ * plateforme refusait d'y commencer et acceptait d'y aller.
+ */
+describe("une version retirée ne se propose plus", () => {
+  const options = (migrable: boolean) =>
+    optionsArbitrage(V1, V2, "11 500 €", "13 000 €", AUCUNE_PIECE, migrable);
+
+  it("l'option « migrer » devient indisponible", () => {
+    expect(options(false)[0]!.desactivee).toBe(true);
+    expect(options(true)[0]!.desactivee).toBeUndefined();
+  });
+
+  /**
+   * Elle reste **affichée**. La retirer ferait chercher ce qu'on a mal
+   * fait, là où il n'y a rien à corriger de son côté.
+   */
+  it("mais elle reste affichée, avec sa raison", () => {
+    const [migrer] = options(false);
+    expect(migrer!.titre).toContain("Migrer vers la version 2");
+    expect(migrer!.detail).toBe(MENTION_VERSION_EN_RELECTURE);
+  });
+
+  /** Le motif dit qui est en retard, et que rien n'est perdu. */
+  it("la raison ne met pas la faute sur le candidat", () => {
+    expect(MENTION_VERSION_EN_RELECTURE).toContain("nos veilleurs");
+    expect(MENTION_VERSION_EN_RELECTURE).toContain("de nouveau une fois vérifiée");
+  });
+
+  /**
+   * « Conserver » reste ouvert, toujours : c'est le choix sûr, et il met
+   * fin à la pause. Fermer les deux laisserait le dossier suspendu pour
+   * une relecture que le candidat ne peut pas faire avancer.
+   */
+  it("conserver reste disponible", () => {
+    expect(options(false)[1]!.desactivee).toBeUndefined();
+    expect(options(false)[1]!.detail).toContain("Ta checklist reste");
   });
 });

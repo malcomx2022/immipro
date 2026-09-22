@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { payload } from "@/server/acces/regles";
+import { payload, reglePubliee } from "@/server/acces/regles";
 import { editorialDe } from "@/lib/contenu/destinations";
 import type { Alerte } from "@/domain/notifications/alerte";
 import type { VersionRegle } from "@/domain/notifications/divergence";
@@ -74,6 +74,14 @@ export interface VueDivergence {
    * code ne se montre pas à un candidat.
    */
   pieces: EvolutionDesPieces;
+  /**
+   * La version visée est-elle encore en vigueur ? RG-14.1 la retire de
+   * l'affichage dès que sa relecture est dépassée, et une v3 l'archive
+   * quand elle paraît. L'écran doit le dire **avant** le clic : proposer
+   * un bouton que le serveur refusera est la même faute qu'un bouton qui
+   * ne fait rien.
+   */
+  migrable: boolean;
 }
 
 /**
@@ -104,6 +112,9 @@ export async function divergenceAArbitrer(
     arbitree: migration.decision !== null,
     pieces: comparerLesVersions(payload(migration.fromRule), payload(migration.toRule))
       .piecesTouchees,
+    // Le même filtre qu'à l'ouverture d'un dossier, et que l'arbitrage
+    // applique côté écriture : une seule définition de « en vigueur ».
+    migrable: (await reglePubliee(migration.toRuleId)) !== null,
   };
 }
 

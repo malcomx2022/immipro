@@ -52,6 +52,7 @@ export default async function PageNotifications() {
         ancienne: vue.ancienne,
         nouvelle: vue.nouvelle,
         pieces: vue.pieces,
+        migrable: vue.migrable,
         /*
           Le dépôt, et non la date cible : c'est le jour du dépôt qui
           décide de la version applicable. L'écran annonçait la nouvelle
