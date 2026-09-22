@@ -5413,3 +5413,83 @@ Neuf mutations, neuf rouges. La plus utile est la dernière : en retirant
 le filtre sur le propriétaire de la lecture, la fumée rougit — un autre
 candidat lisait l'horaire et le nom du consultant d'un rendez-vous qui
 n'était pas le sien.
+
+### S.28 — Une dépendance qu'on n'utilise pas vote quand même
+
+`next-auth` était déclaré dans `package.json` et importé **nulle part**.
+Il est retiré.
+
+#### Ce qu'il coûtait
+
+Rien à l'exécution : aucun octet de son code n'entrait dans un paquet,
+puisque rien ne l'importait. Il coûtait ailleurs, et trois fois.
+
+**Il contraignait une version.** Son pair facultatif réclamait
+`nodemailer@^7`, qui porte dix avis de sécurité ouverts, dont deux de
+gravité haute — parmi eux une complexité quadratique de l'analyseur
+d'adresses, atteignable puisque nos destinataires sont des adresses
+saisies à l'inscription. Le lot du transport SMTP (S.26) a dû passer par
+un `overrides` pour prendre la version corrigée. L'`overrides` part avec
+lui : plus rien ne fige `nodemailer`, et une contrainte sans motif est
+exactement ce qui empêchera une mise à jour de sécurité dans six mois.
+
+**Il traînait quatre variables** dans `.env.example` — `NEXTAUTH_URL`,
+`NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — dont deux
+portent le mot « secret ». Aucune n'avait de lecteur. Qui déploie les
+remplit consciencieusement, produit un secret, le conserve quelque part,
+et rien ne le lit jamais.
+
+**Il contredisait un arbitrage déjà pris.** I.2 avait tranché : les
+sessions sont écrites en base par le dépôt, parce que NextAuth v4 force
+le jeton signé dès qu'on accepte un mot de passe, et qu'un jeton ne se
+révoque pas — une suspension (WF-15) n'aurait pris effet qu'à son
+expiration. La dépendance était un reste d'avant cette décision.
+
+#### Le garde-fou qui manquait
+
+`tests/secrets-paiement.test.ts` vérifiait déjà qu'une variable **exigée
+par une dépendance** figure dans `.env.example`. La réciproque n'était
+vérifiée que pour les bloquantes : une variable déclarée que personne
+n'exige lui échappait, et c'est exactement le cas des quatre ci-dessus.
+
+`tests/variables-denvironnement.test.ts` ferme cela : toute variable
+déclarée a un lecteur — le code, les scripts, ou un fichier
+`docker-compose`, qui en est un pour de bon. Le reste passe par une liste
+d'exceptions **nommées et datées**, sur le modèle de
+`copy-exceptions.json`, plafonnée à cinq : au-delà, ce n'est plus une
+exception, c'est que le fichier d'exemple a cessé de décrire le produit.
+
+#### Ce que le garde-fou a trouvé d'autre
+
+Quatre variables de plus sans lecteur, laissées en exception avec leur
+motif parce qu'elles appellent une décision de produit, pas un correctif :
+
+| Variable | Pourquoi elle n'est pas lue |
+|---|---|
+| `AI_TOKENS_PACK_ESSENTIEL` | le quota d'un pack vit dans `pricing.ts` (`tokensIA`), qui est la source lue |
+| `AI_TOKENS_PACK_DOSSIER` | idem |
+| `AI_TOKENS_PACK_PRO` | idem |
+| `SMS_PROVIDER_KEY` | aucun envoi de SMS n'est modélisé, et aucune dépendance ne le déclare |
+
+Les trois premières sont une seconde source pour un nombre qui en a déjà
+une — le genre de duplication qui diverge sans que rien ne le signale, et
+qui a déjà coûté une fois (S.14). Elles restent visibles dans la liste
+plutôt que retirées en silence.
+
+#### Ce qui reste ouvert
+
+**DOC-11 §147 spécifie « OAuth Google (NextAuth, sessions en base) ».**
+Les sessions en base existent ; l'OAuth Google n'est pas implémenté, et
+ne l'était pas davantage avec la dépendance présente. Le retrait ne
+supprime donc aucune capacité — mais l'écart entre la spécification et le
+produit, lui, reste entier, et il est maintenant le seul.
+
+#### Vérifié en exécutant
+
+`npm ci` reproduit un arbre sans `next-auth` et avec `nodemailer@10.0.10`
+sans `overrides`. L'audit de production ne cite plus ni `next-auth` ni
+`nodemailer`. Toute la porte passe, construction du worker comprise.
+
+Trois mutations, trois rouges : la dépendance qui revient, une variable
+sans lecteur qui reparaît dans le fichier d'exemple, et l'`overrides` qui
+se réinstalle sans motif.
