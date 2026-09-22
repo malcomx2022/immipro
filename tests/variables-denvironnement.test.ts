@@ -63,12 +63,17 @@ const declarees = EXEMPLE.split("\n")
  * c'est que le fichier d'exemple a cessé de décrire le produit.
  */
 const SANS_LECTEUR: Readonly<Record<string, string>> = {
-  AI_TOKENS_PACK_ESSENTIEL:
-    "22/09/2026 — le quota d'un pack vit dans `domain/payments/pricing.ts` (`tokensIA`), qui est la source lue. Deux sources pour le même nombre : à trancher, en retirant l'une des deux.",
-  AI_TOKENS_PACK_DOSSIER: "22/09/2026 — voir AI_TOKENS_PACK_ESSENTIEL.",
-  AI_TOKENS_PACK_PRO: "22/09/2026 — voir AI_TOKENS_PACK_ESSENTIEL.",
+  /*
+    Les trois `AI_TOKENS_PACK_*` sont sorties le 22/09/2026. Leur motif
+    disait « deux sources pour le même nombre : à trancher, en retirant
+    l'une des deux ». L'arbitrage est rendu par l'usage — `tokensIA` est
+    lue par la règle de cohérence de la grille, et désormais par l'alerte
+    de quota de B-07 —, et c'est le doublon dormant qui part. Le garder
+    aurait fait modifier un jour la valeur que personne ne lit, en
+    croyant agir.
+  */
   SMS_PROVIDER_KEY:
-    "22/09/2026 — aucun envoi de SMS n'est modélisé, et aucune dépendance ne le déclare. À retirer, ou à brancher.",
+    "22/09/2026 — DOC-11 §346 prévoit des rappels par SMS pour les échéances critiques (WF-09 étape 3) ; rien ne les envoie, et l'écran de l'échéancier le dit. La variable marque la place d'une capacité spécifiée, non implémentée : la retirer effacerait la trace de l'écart.",
 };
 
 describe("toute variable déclarée est lue quelque part", () => {

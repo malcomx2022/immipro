@@ -52,7 +52,19 @@ async function main() {
     JOBS.ANALYSE_DOCUMENT,
     async ([job]) => {
       if (!job) return;
-      await analyserUnePiece(job.data);
+      const suite = await analyserUnePiece(job.data);
+      /*
+        `A_REPRENDRE` : le service de lecture n'a pas répondu, et la cause
+        se dissipe seule. Rien n'a été écrit sur la pièce et le quota a
+        été rendu ; lever est la façon dont pg-boss rejoue, avec
+        l'attente croissante déclarée dans `REPRISES`. Au-delà de trois
+        tentatives, `analyserUnePiece` bascule de lui-même en revue
+        humaine et rend `TERMINEE` — le job ne se rejoue donc pas
+        indéfiniment.
+      */
+      if (suite === "A_REPRENDRE") {
+        throw new Error(`lecture à reprendre pour la version ${job.data.versionId}`);
+      }
     },
   );
 

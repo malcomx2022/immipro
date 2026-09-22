@@ -23,7 +23,7 @@ import {
 import { NON_BRANCHE as BALAYEUR_NON_BRANCHE, leBalayeur } from "@/server/securite/antivirus";
 import { remboursementBranche } from "@/server/paiement/remboursement";
 import { remboursementFedaPay } from "@/server/paiement/fedapay";
-import { lExtracteur } from "@/server/jobs/analyse";
+import { lExtracteur } from "@/server/dossiers/extracteur";
 import { laCritique, leRedacteur } from "@/server/redaction/service";
 import { FRAICHEUR_DU_CONSTAT_MS } from "@/domain/exploitation/constats";
 
@@ -192,7 +192,16 @@ describe("un `.env` complet devant des points de branchement vides", () => {
       */
       antivirus: "CONFIGUREE_NON_VERIFIEE",
       remboursement: "IMPLEMENTATION_ABSENTE",
-      extraction: "IMPLEMENTATION_ABSENTE",
+      /*
+        L'extraction est branchée depuis le 22/09/2026 : avec une clé,
+        l'adaptateur existe. Elle s'arrête à « configurée, non vérifiée »
+        et pas plus loin — le point ne déclare aucune sonde, parce que la
+        seule qui prouverait quelque chose serait un appel facturé sur une
+        pièce qu'il faudrait inventer. Une capacité facultative
+        non vérifiée ne rend pas l'instance inapte ; elle la laisse en
+        pilote, ce que la ligne suivante vérifie.
+      */
+      extraction: "CONFIGUREE_NON_VERIFIEE",
       redaction: "IMPLEMENTATION_ABSENTE",
     });
     /*
@@ -299,7 +308,23 @@ describe("un `.env` complet devant des points de branchement vides", () => {
         cle: "IMP-0001",
       }),
     ).toMatchObject({ issue: "non_configure" });
-    expect(await lExtracteur()("pieces/essai.pdf", "PASSEPORT")).toBeNull();
+    /*
+      L'extraction est branchée, mais sans clé elle ne rend pas une
+      lecture vide : elle nomme la cause. Un objet vide se serait
+      confondu avec « rien n'a été trouvé sur la pièce », qui est un
+      constat sur le fichier et non sur l'installation.
+    */
+    expect(
+      await lExtracteur({})(
+        { objectKey: "pieces/essai.pdf", mimeType: "application/pdf" },
+        {
+          codeAttendu: "passeport",
+          intituleAttendu: "Passeport",
+          codesDeLaChecklist: ["passeport"],
+          champs: [],
+        },
+      ),
+    ).toMatchObject({ etat: "NON_LUE", cause: "non_configure" });
     const matiere = {
       type: "LETTRE_MOTIVATION",
       objet: "Expliquer le projet d'études",

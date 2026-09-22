@@ -9,6 +9,12 @@ import {
   messageDeSurveillance,
 } from "@/domain/exploitation/dependances";
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
+import {
+  CAUSES_DE_NON_LECTURE,
+  MESSAGE_AU_CANDIDAT,
+  lireLaReponse,
+  quiPeutAgir,
+} from "@/domain/dossiers/extraction";
 
 /**
  * I.C, tranché le 20/09/2026 — trois dépendances, trois statuts ; puis I.D
@@ -169,15 +175,55 @@ describe("aucun service absent n'est simulé", () => {
   const lire = (f: string) => readFileSync(f, "utf8");
 
   /**
-   * Le point de branchement de l'extraction est unique, et son défaut ne
-   * rend pas un verdict : la pièce part en revue humaine et l'analyse est
-   * recréditée. Une valeur par défaut qui déclarerait « conforme » ferait
-   * exactement ce que la décision interdit.
+   * L'extraction est branchée depuis le 22/09/2026, et la règle qu'elle
+   * devait respecter absente est la même branchée : **une lecture qui
+   * n'aboutit pas ne produit jamais de champs**. Ce qui change, c'est le
+   * nombre de façons dont elle peut ne pas aboutir.
+   *
+   * Éprouvé sur la fonction, et non par une lecture du source : un
+   * `toContain("NON_BRANCHE")` passait le jour où la constante a changé
+   * de fichier sans que rien du comportement ait bougé, et il aurait
+   * passé aussi le jour où elle serait restée sans appelant.
    */
-  it("une pièce non lue part en revue, elle n'est pas déclarée conforme", () => {
-    const analyse = lire("src/server/jobs/analyse.ts");
-    expect(analyse).toContain("NON_BRANCHE");
-    expect(analyse).toContain("manualReview.create");
+  it("une réponse que le service n'a pas formée ne rend aucun champ", () => {
+    const champs = [
+      { code: "passeport_validite_min", nature: "date" as const, unite: "mois", exigence: "x" },
+    ];
+    for (const charge of [null, "", 42, {}, { champs: "pas un objet" }, { obstacle: "inventé" }]) {
+      const relue = lireLaReponse(charge, champs);
+      expect(relue).toMatchObject({ cause: "reponse_illisible" });
+    }
+    // Et un obstacle annoncé ne laisse passer aucune valeur, même si la
+    // charge en contient : c'est la garde contre une lecture partielle
+    // prise pour une lecture.
+    const avecObstacle = lireLaReponse(
+      { obstacle: "scan_illisible", champs: { passeport_validite_min: "2029-03-01" } },
+      champs,
+    );
+    expect(avecObstacle).toMatchObject({ obstacle: "scan_illisible", bruts: {} });
+  });
+
+  /**
+   * Un message d'échec est actionnable, et il ne demande un geste qu'à
+   * qui peut le faire. Une panne de la plateforme dont le message dit
+   * « reprends ta photo » envoie quelqu'un refaire un document qui n'a
+   * rien.
+   */
+  it("chaque cause dit qui agit, et ne demande un geste qu'à celui-là", () => {
+    const imperatif =
+      /\b(reprends|enregistre|joins|remplace|renseigne|dépose|refais|vérifie)\b/iu;
+    for (const cause of CAUSES_DE_NON_LECTURE) {
+      const message = MESSAGE_AU_CANDIDAT[cause];
+      expect(message.length, cause).toBeGreaterThan(40);
+      if (quiPeutAgir(cause) === "candidat") {
+        expect(message, cause).toMatch(imperatif);
+      } else {
+        expect(message, cause).not.toMatch(imperatif);
+        // Ce qui tient lieu de geste : dire qui s'en charge. Vérifiable —
+        // la revue manuelle est créée dans la même transaction.
+        expect(message, cause).toMatch(/opérateur/u);
+      }
+    }
   });
 
   it("un courrier manqué se journalise et remonte à l'appelant", () => {

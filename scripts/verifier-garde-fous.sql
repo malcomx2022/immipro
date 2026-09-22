@@ -155,6 +155,29 @@ SELECT refuse(
        "scanAttempts", "scanLastAttemptAt")
      VALUES ('v13','d1',13,'minio/ii','ii1', -1, now())$q$);
 
+-- L'attente de lecture, et son compte (22/09/2026). L'extraction parle
+-- maintenant à un service réel : une saturation se rejoue, et le nombre de
+-- reprises décide du basculement en revue humaine. Un compte faux le
+-- déclencherait trop tôt — une panne de tiers versée à la file de revue — ou
+-- jamais.
+SELECT refuse(
+  'WF-06 · une tentative de lecture comptée sans être datée',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "analysisAttempts")
+     VALUES ('v14','d1',14,'minio/jj','jj1', 2)$q$);
+
+SELECT refuse(
+  'WF-06 · une date de tentative de lecture sans tentative comptée',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "analysisLastAttemptAt")
+     VALUES ('v15','d1',15,'minio/kk','kk1', now())$q$);
+
+SELECT refuse(
+  'WF-06 · un compteur de tentatives de lecture négatif',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "analysisAttempts", "analysisLastAttemptAt")
+     VALUES ('v16','d1',16,'minio/ll','ll1', -1, now())$q$);
+
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
 

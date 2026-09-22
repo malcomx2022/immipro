@@ -67,6 +67,19 @@ export const FILES: readonly string[] = Object.values(JOBS);
  */
 export const REPRISES: Readonly<Record<string, PgBoss.RetryOptions>> = {
   [JOBS.BALAYAGE_PIECE]: { retryLimit: 6, retryDelay: 10, retryBackoff: true },
+  /*
+    L'extraction est branchée sur un service réel (22/09/2026), et DOC-11
+    demande pour WF-06 « backoff exponentiel ; au-delà de 3 échecs,
+    bascule en revue manuelle ». Le compte des trois est tenu par le job
+    lui-même, sur la version : lui seul distingue une saturation — qui se
+    rejoue — d'un scan flou, qui ne se rejouera jamais mieux.
+
+    La limite de la file est plus haute que ce compte, et volontairement :
+    elle borne les reprises de l'enveloppe — un worker tué en cours de
+    tâche, une base momentanément indisponible — qui ne sont pas des
+    tentatives de lecture et ne doivent pas consommer le compte.
+  */
+  [JOBS.ANALYSE_DOCUMENT]: { retryLimit: 6, retryDelay: 15, retryBackoff: true },
 };
 
 /**

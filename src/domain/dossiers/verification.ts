@@ -43,6 +43,23 @@ export interface Echec {
   action: string;
 }
 
+/**
+ * Une condition qu'on ne peut pas juger, et le geste qui le permettra.
+ *
+ * Distincte d'un échec, et la distinction est tout : un échec dit que la
+ * pièce ne satisfait pas l'exigence, une réserve dit qu'on ne le sait
+ * pas. Les confondre ferait envoyer refaire un document qui n'a rien —
+ * c'est le défaut établi le 22/09/2026, quand un passeport valable
+ * jusqu'en 2029 ressortait « aucune valeur lisible, 6 mois exigés ».
+ */
+export interface Reserve {
+  code: string;
+  /** Ce qui manque, nommé. */
+  manque: string;
+  /** Le geste attendu. Il porte sur le dossier, pas sur la pièce. */
+  action: string;
+}
+
 export interface Verdict {
   verdict: Extract<DocumentState, "CONFORME" | "A_CORRIGER" | "HORS_SUJET">;
   titre: string;
@@ -51,28 +68,51 @@ export interface Verdict {
   /** Le même constat en forme brève, pour la ligne de checklist. */
   constat?: string;
   echecs: Echec[];
+  /**
+   * Ce qui n'a pas pu être jugé. Vide dans le cas ordinaire.
+   *
+   * Une pièce sous réserve n'est pas conforme — on n'a pas vérifié — et
+   * elle n'est pas fautive non plus. `analyse.ts` s'en sert pour ne pas
+   * proposer de remplacer un fichier qui n'a rien à se reprocher.
+   */
+  reserves: readonly Reserve[];
 }
 
 export function evaluerConditions(
   conditions: readonly Condition[],
   champs: ChampsExtraits,
+  /**
+   * Les conditions mises en réserve, hors du jugement.
+   *
+   * Passées plutôt que déduites d'une valeur nulle : « non mesurable »
+   * et « non lu » se ressemblent dans les données et ne se ressemblent
+   * pas du tout pour le candidat. Le premier lui demande de renseigner
+   * son dossier, le second de redéposer sa pièce.
+   */
+  reserves: readonly Reserve[] = [],
 ): Verdict {
+  const enReserve = new Set(reserves.map((r) => r.code));
+  const jugeables = conditions.filter((c) => !enReserve.has(c.code));
   // Aucun champ lu alors que des conditions portent sur la pièce : le
   // document n'est pas celui qu'on attendait. C'est un constat, pas un
   // reproche — et il ouvre une action précise, le reclassement.
-  if (conditions.length > 0 && Object.values(champs).every((v) => v === null || v === undefined)) {
+  if (
+    jugeables.length > 0 &&
+    Object.values(champs).every((v) => v === null || v === undefined)
+  ) {
     return {
       verdict: "HORS_SUJET",
       titre: "Ce document ne correspond pas à la pièce attendue",
       corps:
         "Aucune des informations attendues n'a été trouvée dans ce fichier. Vérifie que tu as bien envoyé le bon document, ou reclasse-le dans la ligne qui lui correspond.",
       echecs: [],
+      reserves,
     };
   }
 
   const echecs: Echec[] = [];
 
-  for (const condition of conditions) {
+  for (const condition of jugeables) {
     const lu = champs[condition.code] ?? champs[racine(condition.code)] ?? null;
     if (!satisfaite(condition, lu)) {
       echecs.push({
@@ -89,11 +129,31 @@ export function evaluerConditions(
   }
 
   if (echecs.length === 0) {
+    /*
+      Rien à reprocher, mais tout n'a pas été vérifié : l'annoncer
+      conforme affirmerait un contrôle qui n'a pas eu lieu. La pièce
+      attend un renseignement du dossier, et le message le demande —
+      sans faire croire que le fichier est en cause.
+    */
+    if (reserves.length > 0) {
+      return {
+        verdict: "A_CORRIGER",
+        titre:
+          reserves.length > 1
+            ? `${reserves.length} renseignements manquent pour vérifier cette pièce`
+            : "Un renseignement manque pour vérifier cette pièce",
+        corps: reserves.map((r) => r.action).join(" "),
+        constat: `${reserves[0]!.manque} n'est pas renseignée.`,
+        echecs: [],
+        reserves,
+      };
+    }
     return {
       verdict: "CONFORME",
       titre: "Cette pièce est conforme",
       corps: "Les informations lues correspondent à ce qui est exigé.",
       echecs: [],
+      reserves: [],
     };
   }
 
@@ -103,9 +163,13 @@ export function evaluerConditions(
   return {
     verdict: "A_CORRIGER",
     titre: echecs.length > 1 ? `${echecs.length} points à corriger` : "Un point à corriger",
-    corps: echecs.map((e) => `${e.constate} constaté, ${e.exige} exigé. ${e.action}`).join(" "),
+    corps: [
+      ...echecs.map((e) => `${e.constate} constaté, ${e.exige} exigé. ${e.action}`),
+      ...reserves.map((r) => r.action),
+    ].join(" "),
     constat,
     echecs,
+    reserves,
   };
 }
 
