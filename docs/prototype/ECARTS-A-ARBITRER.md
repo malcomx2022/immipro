@@ -8407,3 +8407,47 @@ correction silencieuse. Lot à part.
 `comparaison.ts` compare les pièces par code et par caractère obligatoire. Le
 candidat voit désormais la bonne durée **après** avoir migré, pas avant de
 choisir. Même famille que le point ci-dessus, même lot à ouvrir.
+
+---
+
+## S.63 — La pièce que plus personne ne réclame bloquait toujours
+
+Le symétrique de S.62, trouvé en cherchant ce que le réalignement ne couvrait
+pas. Une pièce **absente** de `pieces_requises` n'était ni créée ni réalignée :
+elle restait `OBLIGATOIRE` et `required`, donc comptée parmi les requises par
+`computeCompleteness`.
+
+**Établi par exécution.** Un dossier dont tout est fourni sauf le diplôme, et
+une v2 qui cesse de l'exiger :
+
+```
+l'écran annonce  : retirées = [{ diplome, encoreDemandee: false }]
+le candidat migre
+en base          : obligatoire=true  famille=OBLIGATOIRE
+son dossier      : ACTIF — prêt=false
+```
+
+Le candidat lit « ta checklist perd : Diplôme », fait le geste, et son dossier
+reste bloqué sur une exigence que plus personne ne réclame. Après correction, le
+même scénario le rend `PRET`.
+
+**Ce que RG-11.1 protège, et ce qu'elle ne protège pas.** « On ajoute, on ne
+retire pas » protège le **travail du candidat** : la ligne reste, le fichier
+déposé avec elle, et le statut ne bouge pas. Elle ne protège pas une exigence
+qui a disparu du référentiel. La pièce passe donc en `COMPLEMENTAIRE`,
+`required: false`, et cesse de compter.
+
+Une pièce devenue simplement **complémentaire** figure encore dans la nouvelle
+checklist : elle se réaligne comme les autres, et ce chemin était déjà correct.
+Seule la disparition complète manquait.
+
+L'arbitrage rend désormais `piecesLiberees` à côté de `piecesAjoutees` : ce que
+la migration a cessé d'exiger est nommé, comme ce qu'elle exige en plus.
+
+### Ce qui reste à arbitrer
+
+**L'écran ne lit toujours pas la réponse de l'arbitrage.** `piecesAjoutees` et
+`piecesLiberees` traversent la route et sont jetées par `DivergenceReglementaire`,
+qui se contente de `router.refresh()`. Le candidat retrouve l'information sur sa
+checklist, mais pas au moment du geste, là où elle confirmerait ce qu'il vient
+de décider. Lot à part, et petit.

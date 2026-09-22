@@ -39,6 +39,25 @@ import type { VisaRulesPayload } from "@/domain/rules/schema";
  * oubli sur les échéances : migrer accepte la nouvelle version **en
  * entier**, pas seulement les pièces qu'elle invente.
  *
+ * ── La pièce que la nouvelle version ne demande plus ────────────────
+ *
+ * Symétrique du précédent, et aussi silencieux. Une pièce absente de
+ * `pieces_requises` n'était ni créée ni réalignée : elle restait
+ * `OBLIGATOIRE` et `required`, donc comptée parmi les requises par
+ * `computeCompleteness`. Le candidat lisait sur l'écran « ta checklist
+ * perd : Diplôme — elle ne se demande plus », migrait, et son dossier
+ * restait `ACTIF` pour une pièce que plus personne ne réclame :
+ *
+ *     l'écran annonce  : retirées = [{ diplome, encoreDemandee: false }]
+ *     le candidat migre
+ *     en base          : obligatoire=true  famille=OBLIGATOIRE
+ *     son dossier      : ACTIF — prêt=false
+ *
+ * Elle cesse donc de bloquer. La ligne reste, et le fichier déposé avec
+ * elle : RG-11.1 protège le travail du candidat, pas l'exigence qui a
+ * disparu. Une pièce devenue simplement complémentaire, elle, figure
+ * encore dans la nouvelle checklist et se réaligne comme les autres.
+ *
  * ── Ce qui suit la règle, et ce qui appartient au candidat ──────────
  *
  * Ne se réalignent que les propriétés qui **décrivent l'exigence**, celles
@@ -62,7 +81,12 @@ import type { VisaRulesPayload } from "@/domain/rules/schema";
 export async function realignementDeLaChecklist(
   applicationId: string,
   p: VisaRulesPayload,
-): Promise<{ operations: Prisma.PrismaPromise<unknown>[]; ajoutees: string[]; realignees: string[] }> {
+): Promise<{
+  operations: Prisma.PrismaPromise<unknown>[];
+  ajoutees: string[];
+  realignees: string[];
+  liberees: string[];
+}> {
   const attendues = checklistDepuis(p);
   const existantes = await db.document.findMany({
     where: { applicationId },
@@ -75,6 +99,16 @@ export async function realignementDeLaChecklist(
     const connue = connues.get(piece.code as string);
     return connue !== undefined && exigenceChangee(connue, piece);
   });
+
+  /*
+    Les pièces que la nouvelle version ne nomme plus du tout. Elles
+    gardent leur ligne, leur libellé et ce que le candidat y a déposé ;
+    elles cessent seulement d'être exigées.
+  */
+  const attenduesParCode = new Set(attendues.map((p) => p.code as string));
+  const aLiberer = existantes.filter(
+    (d) => !attenduesParCode.has(d.code) && (d.required || d.family === "OBLIGATOIRE"),
+  );
 
   const operations: Prisma.PrismaPromise<unknown>[] = [];
   if (aCreer.length > 0) {
@@ -95,10 +129,20 @@ export async function realignementDeLaChecklist(
     );
   }
 
+  if (aLiberer.length > 0) {
+    operations.push(
+      db.document.updateMany({
+        where: { applicationId, code: { in: aLiberer.map((d) => d.code) } },
+        data: { required: false, family: "COMPLEMENTAIRE" },
+      }),
+    );
+  }
+
   return {
     operations,
     ajoutees: aCreer.map((p) => p.label as string),
     realignees: aRealigner.map((p) => p.label as string),
+    liberees: aLiberer.map((d) => d.label),
   };
 }
 
