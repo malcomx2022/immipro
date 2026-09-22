@@ -85,6 +85,29 @@ const pieceRequise = z.object({
    * n'oblige pas à reprendre les fiches existantes.
    */
   nature: z.enum(["televerser", "rediger", "demarche"]).default("televerser"),
+  /**
+   * RG-06.6 — la durée de validité de la pièce, en mois.
+   *
+   * Elle est une donnée réglementaire, et elle varie d'un pays à l'autre :
+   * un relevé de trois mois ici peut en valoir six ailleurs. Le serveur la
+   * déduisait d'un motif sur l'identifiant — `/releve|bancaire|ressources|
+   * fonds/` valait trois mois —, c'est-à-dire de l'orthographe du code et
+   * non de l'exigence. Renommer `preuve_fonds` en `moyens_financiers`, ce
+   * que son propre libellé appelle déjà, faisait disparaître l'échéance
+   * « à demander au plus tôt » sans un mot :
+   *
+   *     référentiel tel quel          : preuve_fonds → 3 mois
+   *     la même exigence, renommée    : aucune pièce périssable
+   *
+   * Le référentiel tient ses renvois — le schéma refuse la règle si une
+   * condition nomme une pièce disparue. La durée était la seule propriété
+   * qui vivait dehors, et la seule qui se perdait en silence.
+   *
+   * Absente, la pièce ne périme pas. C'est le cas courant, et c'est la
+   * lecture prudente : la plateforme n'annonce pas une date de péremption
+   * qu'aucune source ne porte (INV-8).
+   */
+  validite_mois: z.number().int().positive().optional(),
 });
 
 export const visaRulesSchema = z.object({

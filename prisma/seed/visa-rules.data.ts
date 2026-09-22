@@ -89,7 +89,7 @@ export const REGLES_DE_REFERENCE = [
       pieces_requises: [
         { code: "passeport", libelle: "Passeport", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "admission", libelle: "Lettre d'admission inconditionnelle", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "preuve_fonds", libelle: "Justificatif de ressources (relevé, bourse ou garant)", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "preuve_fonds", libelle: "Justificatif de ressources (relevé, bourse ou garant)", obligatoire: true, validite_mois: 3, traduction_assermentee: false, legalisation: false },
         { code: "assurance_maladie", libelle: "Assurance maladie", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "diplome", libelle: "Diplôme le plus élevé", obligatoire: true, delai_obtention_jours: 30, traduction_assermentee: true, legalisation: true },
       ],
@@ -268,7 +268,7 @@ export const REGLES_DE_REFERENCE = [
       pieces_requises: [
         { code: "passeport", libelle: "Passeport", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "admission", libelle: "Attestation d'immatriculation de la haute école", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "preuve_fonds", libelle: "Justificatif de moyens financiers", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "preuve_fonds", libelle: "Justificatif de moyens financiers", obligatoire: true, validite_mois: 3, traduction_assermentee: false, legalisation: false },
         { code: "logement", libelle: "Justificatif de logement", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "assurance_maladie", libelle: "Assurance maladie", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "cv_plan_etudes", libelle: "CV et plan d'études motivé", nature: "rediger" as const, obligatoire: true, traduction_assermentee: false, legalisation: false },
@@ -352,7 +352,7 @@ export const REGLES_DE_REFERENCE = [
       pieces_requises: [
         { code: "passeport", libelle: "Passeport", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "admission", libelle: "Lettre d'admission d'un établissement accrédité", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "visite_medicale", libelle: "Examen médical sur place", nature: "demarche" as const, obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "visite_medicale", libelle: "Examen médical sur place", nature: "demarche" as const, obligatoire: true, validite_mois: 6, traduction_assermentee: false, legalisation: false },
         { code: "assurance_maladie", libelle: "Assurance santé", obligatoire: true, traduction_assermentee: false, legalisation: false },
         { code: "diplome", libelle: "Diplôme légalisé et attesté", obligatoire: true, delai_obtention_jours: 45, traduction_assermentee: true, legalisation: true },
       ],

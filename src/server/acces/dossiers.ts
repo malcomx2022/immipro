@@ -118,11 +118,15 @@ export async function ouvrirDossier(
 /**
  * Checklist dérivée de `pieces_requises`.
  *
- * Le remède vient du référentiel, où il est une propriété de l'exigence. Le
- * déduire du code par motif, comme une première version le faisait, se
- * trompait sur les cas qui comptent : « visite_medicale » devenait un
- * téléversement, et la ligne aurait proposé d'ajouter un fichier pour un
- * rendez-vous à prendre.
+ * Le remède **et la durée de validité** viennent du référentiel, où ils sont
+ * des propriétés de l'exigence. Les déduire du code par motif, comme deux
+ * versions successives le faisaient, se trompait sur les cas qui comptent :
+ * « visite_medicale » devenait un téléversement, et la ligne aurait proposé
+ * d'ajouter un fichier pour un rendez-vous à prendre ; renommer
+ * « preuve_fonds » faisait disparaître son échéance de péremption.
+ *
+ * Il ne reste ici aucune connaissance réglementaire : cette fonction met en
+ * forme ce que le référentiel dit, et rien d'autre.
  */
 export function checklistDepuis(p: VisaRulesPayload): Prisma.DocumentCreateWithoutApplicationInput[] {
   return p.pieces_requises.map((piece) => ({
@@ -132,7 +136,7 @@ export function checklistDepuis(p: VisaRulesPayload): Prisma.DocumentCreateWitho
     required: piece.obligatoire,
     remedy: remedeDe(piece.nature),
     status: "ATTENDUE" as const,
-    validityMonths: validiteDe(piece.code),
+    validityMonths: piece.validite_mois ?? null,
   }));
 }
 
@@ -144,24 +148,6 @@ const REMEDES = {
 
 export const remedeDe = (nature: keyof typeof REMEDES): (typeof REMEDES)[keyof typeof REMEDES] =>
   REMEDES[nature];
-
-/**
- * RG-06.6 : pièces à durée de validité limitée, en mois.
- *
- * Elle reste déduite du code, faute d'être dans le référentiel — et c'est un
- * pis-aller assumé. Une durée de validité est une donnée réglementaire : elle
- * varie d'un pays à l'autre, et un relevé de trois mois ici peut en valoir
- * six ailleurs. Elle a sa place dans `pieces_requises`, avec sa source, le
- * jour où les fiches seront reprises.
- */
-const PERISSABLES: readonly [RegExp, number][] = [
-  [/releve|bancaire|ressources|fonds/iu, 3],
-  [/casier|judiciaire/iu, 3],
-  [/medical|sante/iu, 6],
-];
-
-export const validiteDe = (code: string): number | null =>
-  PERISSABLES.find(([motif]) => motif.test(code))?.[1] ?? null;
 
 /**
  * Échéancier à rebours — WF-09, RG-09.1.

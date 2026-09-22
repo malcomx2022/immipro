@@ -1502,6 +1502,31 @@ Une leçon au passage : `as never` sur un appel fait taire le compilateur sur
 l'appel entier. `editorialDe("AE") as never` cachait un argument manquant
 depuis le début.
 
+## Une propriété de l'exigence appartient à l'exigence
+
+Deux fois le même défaut, à deux ans d'écart dans le même fichier : une
+propriété réglementaire déduite d'un motif sur l'identifiant de la pièce.
+
+`nature` d'abord — `visite_medicale` devenait un téléversement, et l'écran
+proposait d'ajouter un fichier pour un rendez-vous à prendre. `validite_mois`
+ensuite : `/releve|bancaire|ressources|fonds/` valait trois mois. Renommer
+`preuve_fonds` en `moyens_financiers`, ce que son libellé appelle déjà,
+supprimait l'échéance de péremption et la date d'expiration du dépôt, sans
+une trace.
+
+Le schéma du référentiel, lui, tient ses renvois : il refuse une règle dont
+une condition nomme une pièce disparue. Ce refus est ce qui a mis le doigt
+dessus — la sonde a dû renommer la condition pour être acceptée, et c'est en
+la renommant qu'on voit que la durée, elle, n'était rattachée à rien.
+
+La règle qui en sort : **si un veilleur peut la lire sur une fiche, elle va
+dans `pieces_requises`.** `checklistDepuis` ne porte plus aucune connaissance
+réglementaire ; elle met en forme ce que le référentiel dit.
+
+Absente, la durée vaut « ne périme pas ». C'est la lecture prudente : une date
+de péremption qu'aucune source ne porte serait une affirmation réglementaire
+inventée, et INV-8 l'interdit.
+
 ## Vérifier
 
 ```

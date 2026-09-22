@@ -8263,3 +8263,83 @@ taire ce qu'il avait à dire.
 **Ce que ce lot ne fait pas.** Il ne change aucun comportement du produit :
 quatre scripts de vérification et un fichier de configuration. C'est le
 garde-fou qu'il déplace, pas la règle.
+
+---
+
+## S.61 — La durée de validité dépendait de l'orthographe du code
+
+RG-06.6 veut que les pièces à durée de validité limitée portent une date de
+péremption et basculent en `EXPIREE`. Le mécanisme existe : `jobs/peremption.ts`
+écrit l'état, le dépôt inscrit `expiresAt`, et le calendrier ajoute une échéance
+« à demander au plus tôt ». Ce qui manquait, c'était la provenance de la durée.
+
+`checklistDepuis` la déduisait d'un motif sur l'identifiant :
+
+```ts
+const PERISSABLES: readonly [RegExp, number][] = [
+  [/releve|bancaire|ressources|fonds/iu, 3],
+  [/casier|judiciaire/iu, 3],
+  [/medical|sante/iu, 6],
+];
+```
+
+Une durée de validité est une donnée réglementaire. Celle-ci dépendait de la
+façon dont un code était épelé.
+
+**Établi par exécution.** Renommer `preuve_fonds` en `moyens_financiers` — ce
+que son propre libellé appelle déjà, « Justificatif de moyens financiers », et
+qu'un éditeur peut faire depuis B-02, qui reçoit le payload entier :
+
+```
+CH, référentiel tel quel      : preuve_fonds → 3 mois
+la même exigence, renommée    : aucune pièce périssable
+```
+
+Le candidat perdait l'échéance qui lui disait de ne pas demander son
+justificatif trop tôt, et sa pièce ne périmait plus jamais. Sans un mot.
+
+**Ce que la sonde a appris en chemin.** Le schéma a refusé le premier essai :
+une condition nommait une pièce disparue, et `visaRulesSchema` ne laisse pas
+passer un renvoi cassé. Le référentiel tient donc ses propres références. La
+durée de validité était la seule propriété de l'exigence qui vivait **hors**
+du référentiel — et la seule qui se perdait en silence. C'est le même défaut
+que `nature`, corrigé de la même façon : une propriété de l'exigence appartient
+à l'exigence.
+
+`pieces_requises` porte désormais `validite_mois`, facultatif. Absent, la pièce
+ne périme pas : la plateforme n'annonce pas une date de péremption qu'aucune
+source ne porte (INV-8).
+
+**Le transfert est neutre, et c'est vérifié.** Les trois durées que le motif
+produisait sur le référentiel de référence sont portées telles quelles, sur les
+mêmes pièces :
+
+| règle | pièce | durée |
+|---|---|---|
+| `NL/etudes_mvv_vvr` | `preuve_fonds` | 3 mois |
+| `NL/emploi_kennismigrant` | — | — |
+| `CH/etudes_permis_b` | `preuve_fonds` | 3 mois |
+| `AE/etudes_residence_etudiante` | `visite_medicale` | 6 mois |
+
+Un test relit cette table entière : il passait avant le lot comme après, c'est
+son rôle. Les quatre autres tombent si l'on remet le motif.
+
+### Ce qui reste à arbitrer
+
+**Trois durées identiques d'un pays à l'autre.** Les valeurs ci-dessus sont
+celles que le motif produisait ; elles ne viennent d'aucune source nommée. Elles
+sont désormais **lisibles et modifiables fiche par fiche** — un veilleur qui
+reprend la fiche IND voit `validite_mois: 3` et peut la corriger, là où elle
+était auparavant enfouie dans une expression régulière d'un module serveur.
+Leur vérification appartient à la veille, pas au code.
+
+**`assurance_maladie` n'en porte aucune.** Elle est obligatoire dans trois des
+quatre règles, et une attestation d'assurance a un terme. Le motif ne
+l'attrapait pas non plus — `/medical|sante/` ne reconnaît pas `maladie`. Je ne
+lui en invente pas : ce serait affirmer une durée réglementaire sans source,
+ce qu'INV-8 interdit. C'est une lacune de **contenu**, à combler par la veille.
+
+**Une durée qui change d'une version à l'autre n'apparaît pas dans
+l'arbitrage.** `comparaison.ts` compare les pièces par code et libellé. Une
+version qui ferait passer le relevé de trois à six mois déplacerait l'échéance
+du candidat sans le dire sur l'écran de divergence. C'est un lot à part.
