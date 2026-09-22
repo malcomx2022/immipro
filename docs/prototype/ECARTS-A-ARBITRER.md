@@ -7567,3 +7567,107 @@ Et deux vérifications que seul un chargement réel donne : la graine charge
 les quatre procédures sur une base neuve, et refuse le texte fautif sans
 rien insérer, avec le message que l'opérateur lit — l'extrait et le chemin
 du champ à reprendre.
+
+---
+
+### S.51 — Le délai que personne ne comparait, et le calendrier que migrer ne refaisait pas
+
+RG-09.3 est une phrase courte et elle demande deux choses : « un délai
+réglementaire modifié déclenche un recalcul intégral de l'échéancier **et**
+une notification explicite ».
+
+La question posée au code : **que se passe-t-il quand une autorité allonge
+son délai d'instruction ?** C'est le changement réglementaire le plus banal
+qui soit, et l'échéancier du produit se construit à rebours depuis la date
+cible en retirant ce délai — c'est lui qui décide de la date de dépôt, donc
+de toutes les autres.
+
+Exécuté avant correction, sur un dossier visant la rentrée du 1er septembre
+2027, avec `delai_traitement_jours.max` passant de 90 à 150 :
+
+```
+=== 1. La comparaison de versions ===
+  impact = MINEUR
+  diff   = []
+
+=== 3. La propagation de la publication ===
+  bilan = {"dossiers":0,"alertes":0,"critiques":0,…}
+  notifications reçues par le candidat : 0
+  lignes d'arbitrage créées            : 0
+
+=== 4. L'échéancier après publication ===
+  2027-06-03  depot   Dépôt de la demande
+  dépôt inchangé ? true
+  ce qu'il devrait être sur 150 jours : 2027-04-04
+```
+
+Ni l'un ni l'autre, donc. `comparerLesVersions` ne regardait pas le délai, et
+la propagation sort immédiatement dès que le diff est vide — le dossier n'est
+même pas compté.
+
+Et le second temps, celui qui étonne le plus :
+
+```
+=== 5. Et si le candidat migrait quand même ? ===
+  arbitrage : {"decision":"MIGRER",…}
+  version figée = v2
+  2027-06-03  depot   Dépôt de la demande
+  dépôt toujours inchangé ? true
+```
+
+Le candidat a fait le geste. Sa version figée pointe la nouvelle règle, sa
+checklist a reçu les pièces ajoutées, et son calendrier reste celui de
+l'ancienne. Deux mois de retard, invisibles, sur l'acte même par lequel il
+acceptait la mise à jour.
+
+**Ce qui n'est pas un défaut, et qu'il fallait ne pas casser.** Entre la
+publication et l'arbitrage, l'échéancier ne doit **pas** bouger : INV-3 fige
+la version d'un dossier, et un calendrier qui se décalerait sous les yeux du
+candidat avant qu'il ait tranché serait la migration d'office qu'INV-3
+interdit. La fumée le vérifie dans les deux sens — rien ne bouge avant, tout
+bouge après ; et le dossier qui conserve garde son calendrier.
+
+**L'arbitrage retenu sur l'impact.** Un délai allongé n'a jamais rendu
+personne inéligible : il reste `MAJEUR`. Le passer `CRITIQUE` mettrait le
+dossier en pause, c'est-à-dire retirerait au candidat la seule chose que ce
+changement lui a déjà prise — le temps. Il n'entre pas non plus dans
+`bloquantesTouchees` : WF-14 §4 vise « toute modification de condition
+bloquante », et exiger deux paires d'yeux pour une fourchette de jours
+banaliserait le contrôle qui compte.
+
+**Ce que « notification explicite » veut dire.** Le nouveau délai *et* ce
+qu'il fait à la date de dépôt. « Le délai passe à 150 jours » n'apprend rien
+à qui ne sait pas que son échéancier se calcule à rebours. Ce qui part
+désormais :
+
+> Le délai d'instruction annoncé passe de 60–90 jours à 60–150 jours. Si tu
+> appliques cette version, ta date de dépôt avance de 60 jours : il faut
+> déposer plus tôt pour la même date cible. Ta checklist actuelle ne change
+> pas. Tu peux comparer les deux versions et décider de migrer ou de
+> conserver la tienne.
+
+« Si tu appliques » et non « ta date avance » : rien n'a bougé tant qu'il n'a
+pas tranché, et une phrase au passé lui ferait chercher des dates qu'il ne
+verra pas.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la comparaison ne regarde plus le délai | les essais purs |
+| migrer ne recalcule plus l'échéancier | la fumée |
+| `doneAt` ne traverse plus le recalcul | la fumée |
+| l'alerte ne dit plus le délai | la fumée |
+| conserver recalcule quand même (INV-3) | la fumée |
+| le remplacement n'efface plus les anciennes lignes | la fumée, aux deux appelants |
+
+Et une découverte de méthode : la replanification de WF-09, second appelant
+du remplacement extrait, **n'était éprouvée par rien**. Extraire une décision
+sans éprouver ses deux appelants aurait déplacé le défaut d'un cran au lieu
+de le corriger ; la fumée conduit désormais le même couple que la route PUT,
+sans la couche HTTP, et vérifie qu'un dossier se replanifie sur sa version
+figée — 90 jours — et non sur la publiée du jour.
+
+**Ce qui reste ouvert.** L'écran T-02 pose toujours les deux versions côte à
+côte sur le seul montant : `DivergenceReglementaire` ne montre pas le délai,
+et son bouton « Appliquer mon choix » ferme la feuille sans appeler
+l'arbitrage. C'est un écart d'écran, pas de règle — la décision, elle, est
+branchée et éprouvée.

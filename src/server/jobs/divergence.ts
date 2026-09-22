@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { payload } from "@/server/acces/regles";
 import {
   comparerLesVersions,
+  mentionDuDelai,
   type Changement,
+  type EvolutionDuDelai,
   type Impact,
 } from "@/domain/rules/comparaison";
 import { envoyerAlerteCritique } from "@/server/courrier";
@@ -42,9 +44,12 @@ export type { Impact, Changement } from "@/domain/rules/comparaison";
 export function comparer(
   avant: VisaRule,
   apres: VisaRule,
-): { impact: Impact; diff: Changement[] } {
-  const { impact, diff } = comparerLesVersions(payload(avant), payload(apres));
-  return { impact, diff };
+): { impact: Impact; diff: Changement[]; delaiDInstruction: EvolutionDuDelai | null } {
+  const { impact, diff, delaiDInstruction } = comparerLesVersions(
+    payload(avant),
+    payload(apres),
+  );
+  return { impact, diff, delaiDInstruction };
 }
 
 export interface Bilan {
@@ -124,7 +129,7 @@ export async function propagerLaPublication(
   ]);
   if (!ancienne || !nouvelle) return { ...BILAN_VIDE };
 
-  const { impact, diff } = comparer(ancienne, nouvelle);
+  const { impact, diff, delaiDInstruction } = comparer(ancienne, nouvelle);
   if (impact === "MINEUR" && diff.length === 0) return { ...BILAN_VIDE };
 
   const dossiers = await db.application.findMany({
@@ -190,7 +195,7 @@ export async function propagerLaPublication(
             applicationId: dossier.id,
             kind: "REGLEMENTATION",
             title: titreDeLAlerte(impact, destination),
-            body: corpsDeLAlerte(impact),
+            body: corpsDeLAlerte(impact, delaiDInstruction),
             // INV-8 : l'alerte cite la source de la règle qui a changé.
             sourceUrl: nouvelle.sourceUrl,
             migrationId: migration.id,
@@ -237,14 +242,24 @@ const titreDeLAlerte = (impact: Impact, destination: string): string => {
   }
 };
 
-const corpsDeLAlerte = (impact: Impact): string => {
+/**
+ * Le corps de l'alerte, et ce que RG-09.3 y ajoute.
+ *
+ * « Une notification explicite » : quand le délai d'instruction a bougé,
+ * la phrase générique ne dit rien de ce qui compte. Le candidat ne perd
+ * aucune exigence, il perd — ou gagne — des semaines sur un calendrier
+ * qu'il a construit à rebours d'une rentrée. La mention est donc posée en
+ * tête, avant le rappel que rien ne bouge sans son accord.
+ */
+const corpsDeLAlerte = (impact: Impact, delai: EvolutionDuDelai | null): string => {
+  const calendrier = delai ? `${mentionDuDelai(delai)} ` : "";
   switch (impact) {
     case "CRITIQUE":
-      return "Ton dossier est mis en pause le temps que tu regardes. Rien n'est supprimé, et ta checklist reste celle de la version figée à l'ouverture.";
+      return `${calendrier}Ton dossier est mis en pause le temps que tu regardes. Rien n'est supprimé, et ta checklist reste celle de la version figée à l'ouverture.`;
     case "MAJEUR":
-      return "Ta checklist actuelle ne change pas. Tu peux comparer les deux versions et décider de migrer ou de conserver la tienne.";
+      return `${calendrier}Ta checklist actuelle ne change pas. Tu peux comparer les deux versions et décider de migrer ou de conserver la tienne.`;
     default:
-      return "Aucune condition bloquante n'est touchée. Ta checklist ne change pas.";
+      return `${calendrier}Aucune condition bloquante n'est touchée. Ta checklist ne change pas.`;
   }
 };
 
