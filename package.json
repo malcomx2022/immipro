@@ -28,6 +28,7 @@
     "smoke:balayage": "tsx scripts/fumee-balayage.mts",
     "smoke:extraction": "tsx scripts/fumee-extraction.mts",
     "smoke:redaction": "tsx scripts/fumee-redaction.mts",
+    "smoke:rappels": "tsx scripts/fumee-rappels.mts",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
     "sandbox:paiement": "tsx scripts/sandbox-paiement.mts",
     "db:migrate": "prisma migrate dev",

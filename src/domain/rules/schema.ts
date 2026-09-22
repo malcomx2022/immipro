@@ -28,6 +28,40 @@ const conditionDeterministe = z.object({
   unite: z.string().optional(),           // "mois", "EUR", "points"
   message_echec: z.string(),              // texte actionnable affiché à l'utilisateur
   bloquant: z.boolean(),                  // true = filtrage strict, false = pondéré
+
+  /**
+   * La pièce qui établit cette condition, par son code — 22/09/2026.
+   *
+   * Elle se **déclare**. Elle se déduisait du code par comparaison de
+   * préfixes, à deux endroits et selon deux règles différentes, et le
+   * rapprochement était faux dès que le référentiel nommait une condition
+   * autrement que sa pièce : `salaire_min_moins_30_ans` ne partage aucun
+   * préfixe avec `contrat_travail`. Sur la procédure kennismigrant, aucune
+   * des cinq conditions ne se rattachait à quoi que ce soit — l'extraction
+   * ne demandait aucun champ, chaque pièce ressortait « conforme » sans
+   * qu'une seule comparaison ait eu lieu, et le dossier ne pouvait jamais
+   * devenir prêt.
+   *
+   * Absente, la condition ne s'établit par aucune pièce déposée : une
+   * carence de travail, une progression de crédits constatée après
+   * l'arrivée. C'est un cas réel, et c'est pourquoi le champ est
+   * facultatif — mais il ne l'est pas pour une condition bloquante, voir
+   * `visaRulesSchema`.
+   */
+  piece: z.string().optional(),
+
+  /**
+   * Groupe d'alternatives : le seuil applicable dépend d'un fait que le
+   * dossier ne porte pas.
+   *
+   * Les quatre seuils de salaire kennismigrant sont le cas d'espèce :
+   * 4 357 € avant trente ans, 5 942 € à partir de trente ans, et deux
+   * variantes de procédure. Les évaluer séparément dit à un candidat de
+   * vingt-cinq ans qu'il lui manque mille cinq cents euros. Le groupe est
+   * satisfait dès qu'un de ses membres l'est ; il n'échoue que si aucun ne
+   * l'est, ce qui est alors vrai quel que soit le seuil applicable.
+   */
+  alternative: z.string().optional(),
 });
 
 const pieceRequise = z.object({
@@ -85,9 +119,61 @@ export const visaRulesSchema = z.object({
 
   /** Ce que la plateforme n'affirme pas. Alimente le disclaimer contextuel. */
   reserves: z.array(z.string()).default([]),
+}).superRefine((payload, ctx) => {
+  /*
+    Intégrité référentielle, et elle seule : une condition qui nomme une
+    pièce nomme une pièce qui existe.
+
+    Ce qu'elle ne fait **pas** : exiger qu'une condition bloquante nomme
+    une pièce. Ce schéma est repassé **à chaque lecture** — une règle
+    figée par un dossier ouvert avant cette évolution n'en porte aucune,
+    et la refuser ici rendrait illisibles des règles que des dossiers en
+    cours ont gelées (INV-3). Une exigence nouvelle sur la forme du
+    référentiel se pose à la publication, où elle arrête une règle avant
+    qu'un dossier soit ouvert dessus, et non au moment de relire ce qui
+    existe déjà.
+  */
+  const codes = new Set(payload.pieces_requises.map((p) => p.code));
+  for (const [rang, condition] of payload.conditions.entries()) {
+    if (condition.piece !== undefined && !codes.has(condition.piece)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["conditions", rang, "piece"],
+        message: `La condition « ${condition.code} » se rattache à « ${condition.piece} », qui ne figure pas dans les pièces requises.`,
+      });
+    }
+  }
 });
 
 export type VisaRulesPayload = z.infer<typeof visaRulesSchema>;
+
+/**
+ * Ce qui rend une règle impossible à terminer — 22/09/2026.
+ *
+ * Une condition bloquante qui ne nomme aucune pièce ne peut être
+ * satisfaite par aucun dépôt : le calcul de complétude cherche la pièce
+ * porteuse, n'en trouve pas, et conclut « non satisfaite », définitivement.
+ * Le dossier reste `ACTIF` avec une exigence que le candidat ne peut lever.
+ *
+ * Une procédure entière était dans cet état — les cinq conditions
+ * kennismigrant, dont trois bloquantes, ne se rattachaient à rien parce
+ * que le rapprochement se faisait par préfixe de code et que
+ * `salaire_min_moins_30_ans` n'en partage aucun avec `contrat_travail`.
+ * Rien ne le signalait : les pièces ressortaient « conformes » sans
+ * comparaison, et le dossier n'avançait pas.
+ *
+ * La vérification est **à la publication**, pas à la lecture : elle doit
+ * arrêter une règle avant qu'un dossier soit ouvert dessus, sans rendre
+ * illisibles celles qu'INV-3 a déjà figées.
+ */
+export function raisonsDIncompletabilite(payload: VisaRulesPayload): string[] {
+  return payload.conditions
+    .filter((c) => c.bloquant && c.piece === undefined)
+    .map(
+      (c) =>
+        `La condition bloquante « ${c.code} » ne nomme aucune pièce : aucun dépôt ne pourrait la satisfaire, et le dossier ne deviendrait jamais prêt.`,
+    );
+}
 
 /** Garde-fou : une règle ne passe PUBLISHED que sur source OFFICIEL ou INSTITUTIONNEL. */
 export function peutEtrePubliee(tier: "OFFICIEL" | "INSTITUTIONNEL" | "SECONDAIRE") {

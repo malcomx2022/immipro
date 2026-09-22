@@ -27,7 +27,40 @@ export interface Condition {
   unite?: string | undefined;
   message_echec: string;
   bloquant: boolean;
+  /**
+   * La pièce qui établit la condition. Déclarée par le référentiel, jamais
+   * devinée — voir `domain/rules/schema.ts` pour ce que la devinette
+   * coûtait.
+   */
+  piece?: string | undefined;
+  /** Groupe d'alternatives : satisfaire l'un satisfait le groupe. */
+  alternative?: string | undefined;
 }
+
+/**
+ * Les conditions qu'une pièce établit.
+ *
+ * **Une seule implémentation de cette relation**, et c'est le correctif.
+ * Il y en avait deux — l'une dans le job d'analyse, l'autre dans le calcul
+ * de complétude — écrites différemment, comparant des préfixes de codes.
+ * Deux réponses possibles à la même question, et aucune des deux juste.
+ */
+export const conditionsDeLaPiece = (
+  conditions: readonly Condition[],
+  codePiece: string,
+): readonly Condition[] => conditions.filter((c) => c.piece === codePiece);
+
+/**
+ * Les conditions qu'aucune pièce n'établit.
+ *
+ * Elles existent pour de bon : une carence de travail après l'arrivée, une
+ * progression de crédits que l'établissement signale en cours d'année. Le
+ * référentiel refuse qu'une **bloquante** soit dans ce cas — elle rendrait
+ * le dossier impossible à terminer.
+ */
+export const conditionsHorsPieces = (
+  conditions: readonly Condition[],
+): readonly Condition[] => conditions.filter((c) => c.piece === undefined);
 
 /** Champs lus dans la pièce. Les dates arrivent en ISO, les montants en nombre. */
 export type ChampsExtraits = Record<string, string | number | null>;
@@ -69,6 +102,17 @@ export interface Verdict {
   constat?: string;
   echecs: Echec[];
   /**
+   * Ce que le verdict suppose, quand il suppose quelque chose.
+   *
+   * Un groupe d'alternatives satisfait par certains de ses membres et pas
+   * par tous **est** satisfait — mais seulement si c'est bien le seuil
+   * atteint qui s'applique. Le dire n'est pas une précaution de style :
+   * un salaire de 4 400 € satisfait le seuil des moins de trente ans et
+   * pas celui des trente ans et plus, et « correspond à ce qui est
+   * exigé » tairait laquelle des deux situations a été supposée.
+   */
+  mentions: readonly string[];
+  /**
    * Ce qui n'a pas pu être jugé. Vide dans le cas ordinaire.
    *
    * Une pièce sous réserve n'est pas conforme — on n'a pas vérifié — et
@@ -106,26 +150,77 @@ export function evaluerConditions(
       corps:
         "Aucune des informations attendues n'a été trouvée dans ce fichier. Vérifie que tu as bien envoyé le bon document, ou reclasse-le dans la ligne qui lui correspond.",
       echecs: [],
+      mentions: [],
       reserves,
     };
   }
 
   const echecs: Echec[] = [];
+  const valeurLue = (condition: Condition) =>
+    champs[condition.code] ?? champs[racine(condition.code)] ?? null;
+  const echecDe = (condition: Condition): Echec => ({
+    code: condition.code,
+    constate: mettreEnForme(valeurLue(condition), condition.unite),
+    exige: mettreEnForme(
+      Array.isArray(condition.valeur) ? condition.valeur.join(", ") : condition.valeur,
+      condition.unite,
+    ),
+    bloquant: condition.bloquant,
+    action: condition.message_echec,
+  });
 
+  /*
+    Les alternatives d'abord, parce qu'elles ne se jugent pas une par une.
+
+    Quatre seuils de salaire kennismigrant, dont celui qui s'applique
+    dépend de l'âge du candidat — un fait que le dossier ne porte pas.
+    Les évaluer séparément dit à quelqu'un de vingt-cinq ans qu'il lui
+    manque les mille cinq cents euros qui séparent son seuil de celui
+    des trente ans et plus.
+
+    Le groupe est satisfait dès qu'un membre l'est. Il n'échoue que si
+    aucun ne l'est : le constat est alors vrai quel que soit le seuil
+    applicable, et c'est le plus bas qu'on cite — celui que le candidat
+    n'atteint même pas.
+  */
+  const groupes = new Map<string, Condition[]>();
+  const seules: Condition[] = [];
   for (const condition of jugeables) {
-    const lu = champs[condition.code] ?? champs[racine(condition.code)] ?? null;
-    if (!satisfaite(condition, lu)) {
-      echecs.push({
-        code: condition.code,
-        constate: mettreEnForme(lu, condition.unite),
-        exige: mettreEnForme(
-          Array.isArray(condition.valeur) ? condition.valeur.join(", ") : condition.valeur,
-          condition.unite,
-        ),
-        bloquant: condition.bloquant,
-        action: condition.message_echec,
-      });
+    if (condition.alternative === undefined) {
+      seules.push(condition);
+      continue;
     }
+    const groupe = groupes.get(condition.alternative);
+    if (groupe) groupe.push(condition);
+    else groupes.set(condition.alternative, [condition]);
+  }
+
+  for (const condition of seules) {
+    if (!satisfaite(condition, valeurLue(condition))) echecs.push(echecDe(condition));
+  }
+
+  const mentions: string[] = [];
+
+  for (const membres of groupes.values()) {
+    const tenus = membres.filter((c) => satisfaite(c, valeurLue(c)));
+    if (tenus.length > 0) {
+      // Satisfait — mais par certains seuils seulement. Nommer ceux qui
+      // ne le sont pas est la seule façon que le candidat vérifie si
+      // c'est bien le sien qui a été atteint.
+      const manques = membres.filter((c) => !tenus.includes(c));
+      if (manques.length > 0) {
+        mentions.push(
+          `Le seuil applicable dépend de ta situation. Ce qui est lu satisfait ${listeDeSeuils(tenus)}, et pas ${listeDeSeuils(manques)} : vérifie lequel te concerne.`,
+        );
+      }
+      continue;
+    }
+    // Le seuil le moins exigeant : ne pas l'atteindre, c'est n'atteindre
+    // aucun des autres, quel que soit celui qui s'applique.
+    const [premier] = [...membres].sort(
+      (a, b) => exigenceComparable(a) - exigenceComparable(b),
+    );
+    echecs.push(echecDe(premier!));
   }
 
   if (echecs.length === 0) {
@@ -145,14 +240,38 @@ export function evaluerConditions(
         corps: reserves.map((r) => r.action).join(" "),
         constat: `${reserves[0]!.manque} n'est pas renseignée.`,
         echecs: [],
+        mentions,
         reserves,
+      };
+    }
+    /*
+      Aucune condition ne porte sur cette pièce : il n'y avait rien à
+      comparer, et le dire « les informations lues correspondent à ce qui
+      est exigé » affirmerait une vérification qui n'a pas eu lieu.
+
+      Le cas est légitime — une lettre d'admission est exigée sans qu'un
+      seuil chiffré porte dessus — et il était aussi celui d'une
+      procédure entière dont aucune condition ne se rattachait à rien :
+      trois pièces déclarées conformes par cette phrase, sans qu'une
+      seule comparaison ait été faite.
+    */
+    if (conditions.length === 0) {
+      return {
+        verdict: "CONFORME",
+        titre: "Cette pièce est reçue",
+        corps:
+          "Le référentiel ne pose aucune condition chiffrée sur cette pièce : elle est reçue telle quelle. Son contenu n'a donc pas été comparé à un seuil.",
+        echecs: [],
+        mentions: [],
+        reserves: [],
       };
     }
     return {
       verdict: "CONFORME",
       titre: "Cette pièce est conforme",
-      corps: "Les informations lues correspondent à ce qui est exigé.",
+      corps: ["Les informations lues correspondent à ce qui est exigé.", ...mentions].join(" "),
       echecs: [],
+      mentions,
       reserves: [],
     };
   }
@@ -166,14 +285,39 @@ export function evaluerConditions(
     corps: [
       ...echecs.map((e) => `${e.constate} constaté, ${e.exige} exigé. ${e.action}`),
       ...reserves.map((r) => r.action),
+      ...mentions,
     ].join(" "),
     constat,
     echecs,
+    mentions,
     reserves,
   };
 }
 
 const racine = (code: string): string => code.split("_")[0] ?? code;
+
+/**
+ * De quoi ordonner les membres d'un groupe du moins exigeant au plus
+ * exigeant. Un seuil `lte` s'ordonne à l'envers d'un `gte` : cinq mois au
+ * plus est moins exigeant que trois. Ce qui n'est pas un seuil chiffré ne
+ * s'ordonne pas et passe en tête — il sera cité tel quel.
+ */
+/** « 4 357 EUR_brut_mensuel » ou « 4 357 EUR_brut_mensuel et 3 122 EUR_brut_mensuel ». */
+const listeDeSeuils = (conditions: readonly Condition[]): string =>
+  conditions
+    .map((c) =>
+      mettreEnForme(
+        Array.isArray(c.valeur) ? c.valeur.join(", ") : c.valeur,
+        c.unite,
+      ),
+    )
+    .join(" et ");
+
+function exigenceComparable(condition: Condition): number {
+  const seuil = Number(condition.valeur);
+  if (!Number.isFinite(seuil)) return -Infinity;
+  return condition.operateur === "lte" ? -seuil : seuil;
+}
 
 function satisfaite(condition: Condition, lu: string | number | null): boolean {
   if (condition.operateur === "exists") return lu !== null && lu !== "";

@@ -320,6 +320,30 @@ Ton dossier est mis en pause le temps que tu regardes : rien n'est supprimé, et
 Ouvre ton dossier pour voir ce qui change et décider.${SIGNATURE}`,
   });
 
+/**
+ * Rappel d'échéance — WF-09 étape 3, RG-09.2.
+ *
+ * L'objet et le corps sont **calculés dans le domaine**
+ * (`domain/dossiers/rappels.ts`) : ce qui part dépend de ce qui vient, et
+ * cette décision se teste sans serveur ni messagerie. Ce module ne fait
+ * que la remettre au transport.
+ *
+ * Comme l'alerte critique, le courrier renvoie à l'écran plutôt que de
+ * recopier l'état du dossier : lu trois semaines plus tard, un texte qui
+ * décrit des dates pourrait contredire l'échéancier.
+ */
+export const envoyerRappelDEcheance = (
+  destinataire: string,
+  objet: string,
+  corps: string,
+) =>
+  expedier({
+    destinataire,
+    genre: "rappel_echeance",
+    objet,
+    corps: `${corps}${SIGNATURE}`,
+  });
+
 export interface ConfirmationEntretien {
   destinataire: string;
   reference: string;

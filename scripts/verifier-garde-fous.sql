@@ -182,6 +182,17 @@ SELECT refuse(
 -- elle seule distingue « relu, rien à reprendre » de « jamais relu » : les
 -- deux rendent une liste de remarques vide. R-04 lisait la seconde comme la
 -- première, sur la foi d'une variable d'environnement.
+-- Les rappels d'échéance (22/09/2026). Une échéance faite ne se rappelle
+-- plus : porter la trace d'un rappel postérieur à son accomplissement
+-- décrirait un courrier envoyé pour une date déjà tenue.
+INSERT INTO "Deadline" (id, "applicationId", code, label, "dueAt", "doneAt")
+  VALUES ('dl1','a0','depot','Déposer la demande', now() + interval '10 days',
+          now() - interval '5 days');
+
+SELECT refuse(
+  'WF-09 · un rappel daté après l''accomplissement de l''échéance',
+  $q$UPDATE "Deadline" SET "remindedAt" = now() WHERE id = 'dl1'$q$);
+
 SELECT refuse(
   'WF-08 · une relecture datée sur une pièce téléversée, qui n''a pas de texte',
   $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,

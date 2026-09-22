@@ -356,12 +356,18 @@ describe("C-10 — Échéancier", () => {
   });
 
   /**
-   * La ligne affirmait « Rappels par email activés ». Rien n'envoie de
-   * rappel — la messagerie n'est pas branchée, aucun travail de fond ne lit
-   * l'échéancier — et le profil ne porte aucun réglage à modifier. Un
-   * candidat qui croit ses rappels actifs cesse de venir, et rate la date.
+   * La ligne affirmait « Rappels par email activés » alors que rien n'en
+   * envoyait, et le profil ne portait aucun réglage à modifier. Elle a
+   * ensuite dit qu'aucun rappel ne partait — vrai tant que rien ne lisait
+   * l'échéancier.
+   *
+   * Les rappels par email partent depuis le 22/09/2026 (WF-09 étape 3).
+   * Ce que l'écran doit dire est donc ce qui part **et** ce qui ne part
+   * pas : le SMS reste annoncé nulle part comme actif, DOC-11 §346 le
+   * prévoit sans qu'aucun fournisseur soit branché, et un candidat qui
+   * croirait en recevoir un ne regarderait pas ses emails.
    */
-  it("n'annonce pas des rappels que personne n'envoie", () => {
+  it("dit ce qui part, à quelle cadence, et ce qui ne part pas", () => {
     const { container } = render(
       <Echeancier
         dossier={DOSSIER}
@@ -371,8 +377,15 @@ describe("C-10 — Échéancier", () => {
         proposition={null}
       />,
     );
-    expect(container.textContent).not.toContain("Rappels par email activés");
-    expect(container.textContent).toContain("Aucun rappel n'est envoyé");
+    const texte = container.textContent ?? "";
+    // Jamais un réglage qui n'existe pas.
+    expect(texte).not.toContain("Rappels par email activés");
+    // Ce qui part, et sa cadence — RG-09.2.
+    expect(texte).toContain("rappel par email");
+    expect(texte).toMatch(/chaque semaine/u);
+    expect(texte).toMatch(/sept jours/u);
+    // Et ce qui ne part pas, dit sans détour.
+    expect(texte).toMatch(/Rien n'est\s+envoyé par SMS/u);
   });
 
   /** « Changer la date de dépôt » menait à un écran qui ne la change pas. */

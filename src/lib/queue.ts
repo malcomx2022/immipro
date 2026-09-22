@@ -11,9 +11,13 @@ export const JOBS = {
   PEREMPTION_PIECES: "document.peremption",
   DIVERGENCE_REGLEMENTAIRE: "regle.divergence",
   /**
-   * Rappels d'échéancier (WF-09 étape 3). Déclarée sans écrivain : la file
-   * existe, personne n'y poste encore, l'envoi attend la messagerie. Une
-   * file vide ne promet rien ; c'est l'écran qui doit rester honnête.
+   * Rappels d'échéancier (WF-09 étape 3), branchés le 22/09/2026.
+   *
+   * Elle était déclarée sans écrivain, avec ce motif : « l'envoi attend
+   * la messagerie ». Le transport SMTP a été branché le matin même, et
+   * la phrase est devenue fausse sans que rien ne bouge — un candidat
+   * dont une échéance était dépassée depuis trois jours ne recevait
+   * toujours rien. Le worker la planifie désormais chaque jour.
    */
   RAPPEL_ECHEANCIER: "echeancier.rappel",
   /**

@@ -6724,3 +6724,249 @@ revenu sous une forme plus difficile à lire.
 Le correctif ne touche que le script. Aucun code de production n'était en
 cause : c'est la fumée qui décrivait une chronologie que le produit
 refuse à raison.
+
+---
+
+### S.42 — Une procédure entière qu'aucun dépôt ne pouvait terminer
+
+Cherchant ce que le branchement des deux chaînes IA avait rendu faux
+ailleurs, la question posée au référentiel réel était : quelles conditions
+se rattachent à quelles pièces ? La réponse, pour une procédure sur
+quatre :
+
+```
+NL emploi_kennismigrant | passeport        | (aucune)
+NL emploi_kennismigrant | contrat_travail  | (aucune)
+NL emploi_kennismigrant | diplome          | (aucune)
+```
+
+Cinq conditions — dont trois bloquantes — et pas une seule rattachée.
+Exécuté :
+
+```
+Ce que l'extraction demandera, pièce par pièce :
+  passeport        champs demandés : []
+  contrat_travail  champs demandés : []
+  diplome          champs demandés : []
+                   verdict sur une lecture vide : CONFORME
+                   « Les informations lues correspondent à ce qui est exigé. »
+
+Et le dossier, toutes pièces conformes :
+  conditions tenues : toutes false
+  palier : INCOMPLET | prêt : false
+  ce qui manque : salaire_min_moins_30_ans, salaire_min_30_ans_et_plus,
+                  employeur_reconnu
+```
+
+Deux conséquences, opposées et toutes deux fausses. **Chaque pièce était
+déclarée conforme sans qu'une seule comparaison ait eu lieu** — un contrat
+à deux mille euros passait. Et **le dossier ne pouvait jamais devenir
+prêt** : les trois conditions bloquantes restaient insatisfaites quoi que
+le candidat dépose, et l'écran lui demandait de fournir
+`salaire_min_moins_30_ans`, qui n'est pas une pièce.
+
+#### Le préfixe n'est pas une relation
+
+Le rattachement se faisait par comparaison de préfixes de codes, **à deux
+endroits et selon deux règles différentes** :
+
+```ts
+// jobs/analyse.ts
+c.code.startsWith(codePiece) || codePiece.startsWith(c.code.split("_")[0])
+// acces/dossiers.ts
+code.startsWith(d.code) || d.code.startsWith(code)
+```
+
+Deux réponses possibles à une même question, et aucune des deux juste. La
+devinette tenait tant que le référentiel nommait ses conditions d'après
+leurs pièces — `passeport_validite_min` sur `passeport`, `preuve_fonds_annuelle`
+sur `preuve_fonds`. Elle s'écroulait dès qu'un rédacteur nommait une
+condition d'après ce qu'elle exige plutôt que d'après ce qui l'établit :
+`salaire_min_moins_30_ans` ne partage aucun préfixe avec
+`contrat_travail`, et rien ne le signalait.
+
+La pièce se **déclare** désormais (`condition.piece`), en un seul endroit
+lu par les deux appelants.
+
+#### Trois gardes, et où chacune se place
+
+| Garde | Où | Pourquoi là |
+|---|---|---|
+| une condition rattachée nomme une pièce **qui existe** | schéma, donc à chaque lecture | intégrité de forme ; vide de sens pour une règle ancienne, qui n'a pas de rattachement du tout |
+| une condition **bloquante** nomme une pièce | **publication** et insertion de la graine | le schéma est repassé à chaque lecture, et INV-3 fige des payloads écrits avant cette règle : les refuser à la lecture rendrait illisible ce que des dossiers en cours ont gelé |
+| le référentiel livré est terminable | test, sur les données de la graine | la forme d'une règle et sa terminabilité sont deux questions, et seule la première était posée |
+
+La deuxième est la correction structurelle : une règle qu'aucun dépôt ne
+pourrait terminer ne se publie plus. Sur une règle déjà figée, une
+bloquante sans pièce reste comptée non satisfaite — c'est la réponse
+prudente, et l'écarter reviendrait à déclarer prêt un dossier sur une
+exigence que personne n'a vérifiée.
+
+#### « Conforme » sans comparaison
+
+La phrase « Les informations lues correspondent à ce qui est exigé »
+couvrait le défaut : elle affirme une comparaison, et trois pièces la
+recevaient sans qu'aucune ait eu lieu. Une pièce sur laquelle le
+référentiel ne pose rien est maintenant **reçue**, et le message le dit :
+« Le référentiel ne pose aucune condition chiffrée sur cette pièce : elle
+est reçue telle quelle. Son contenu n'a donc pas été comparé à un seuil. »
+
+Le cas reste légitime — une lettre d'admission s'exige sans seuil chiffré.
+Ce qui ne l'était pas, c'est de le présenter comme un contrôle réussi.
+
+#### Un seuil dont l'applicabilité dépend du candidat
+
+Rattacher les quatre seuils de salaire à `contrat_travail` les rend enfin
+comparables — et découvre le problème que leur silence masquait. Ils sont
+**alternatifs** : 4 357 € avant trente ans, 5 942 € à partir de trente
+ans, plus deux variantes de procédure. Évalués séparément, ils disent à
+quelqu'un de vingt-cinq ans payé 4 400 € qu'il lui manque mille cinq cents
+euros.
+
+Le référentiel les groupe donc (`condition.alternative`), et le groupe se
+juge en bloc :
+
+| Ce qui est lu | Verdict | Pourquoi |
+|---|---|---|
+| au-dessus de tous les seuils | conforme, sans mention | rien à supposer |
+| au-dessus de certains | conforme, **avec la mention** de ceux qui ne le sont pas | c'est vrai si le seuil atteint est bien celui qui s'applique, et le candidat est le seul à le savoir |
+| en dessous de tous | à corriger, cité **au seuil le moins exigeant** | le constat est vrai quel que soit celui qui s'applique |
+
+#### Ce qui reste ouvert
+
+**Le dossier ne porte pas la date de naissance du candidat**, et c'est
+elle qui déciderait lequel des deux seuils kennismigrant s'applique. En
+son absence, la plateforme suppose et le dit. Deux suites possibles, et
+elles ne demandent pas le même travail :
+
+1. **poser la question au dossier** — un discriminant renseigné par le
+   candidat, que le référentiel nommerait sur le groupe. Une date de
+   naissance est une donnée personnelle de plus, avec ce qu'INV-5 impose
+   de rétention ; une tranche d'âge suffirait peut-être ;
+2. **laisser la mention** — la plateforme ne vérifie pas ce qu'elle ne
+   peut pas savoir, et le dit au candidat, qui vérifie.
+
+La seconde est ce qui est livré, parce qu'elle n'invente aucune donnée.
+La première est une décision de produit, à prendre avant qu'une procédure
+en ajoute d'autres du même genre.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le rattachement redevient une devinette de préfixe | la relation, sur la procédure kennismigrant |
+| une bloquante sans pièce se publie de nouveau | la garde de publication |
+| le groupe n'existe plus : chaque seuil se juge seul | deux tests, dont le faux « il te manque 1 500 € » |
+| le groupe échoué cite le seuil le plus exigeant | le seuil le moins exigeant, seul vrai quel que soit l'âge |
+| une pièce sans condition retrouve « correspondent à ce qui est exigé » | la phrase qui affirmait une comparaison |
+| une condition du référentiel livré perd son rattachement | le garde-fou sur la graine, en nommant la procédure |
+
+---
+
+### S.43 — Une file qui attendait une messagerie déjà branchée
+
+`JOBS.RAPPEL_ECHEANCIER` était déclarée avec ce motif :
+
+> Déclarée sans écrivain : la file existe, personne n'y poste encore,
+> **l'envoi attend la messagerie**. Une file vide ne promet rien ; c'est
+> l'écran qui doit rester honnête.
+
+Le transport SMTP a été branché le 22/09 au matin. La phrase est devenue
+fausse sans que rien ne bouge, et l'échéancier a continué de ne rien
+envoyer. Exécuté :
+
+```
+échéances en base       : 3
+  dont dépassée         : test_langue, il y a 3 jours
+  dont à moins de 7 j   : rdv_consulaire, dans 4 jours
+
+transport de courrier   : SMTP (branché)
+file déclarée           : echeancier.rappel
+un ouvrier la traite ?  : non
+quelqu'un y poste ?     : personne
+
+notifications d'échéance: 0
+```
+
+Un candidat dont une échéance est dépassée depuis trois jours ne reçoit
+rien, et l'écran lui dit de revenir regarder — ce qui est honnête, et ce
+qu'un échéancier existe précisément pour lui épargner.
+
+#### La cadence est une règle, pas un réglage
+
+RG-09.2 : « les rappels sont regroupés — un email hebdomadaire, sauf
+urgence à moins de 7 jours ». Deux règles distinctes, et donc deux
+marques : la cadence porte sur le **dossier** (`lastReminderAt`),
+l'exception sur l'**échéance** (`Deadline.remindedAt`).
+
+La seconde décide de tout. Sans elle, une urgence repartirait chaque jour
+jusqu'à la date — la façon la plus sûre de se faire filtrer, et le filtre
+emporte avec elle le rappel qui comptait. Le groupement n'est donc pas
+une économie d'envois : c'est ce qui garde le canal lisible.
+
+| Situation | Ce qui part |
+|---|---|
+| une échéance à moins de sept jours, jamais rappelée | tout de suite, avec les autres échéances proches |
+| la même, le lendemain | rien |
+| des échéances dans le mois, dernier envoi il y a une semaine | la passe hebdomadaire, urgences comprises |
+| la même, six jours après | rien |
+| une échéance faite, ou dépassée de plus de trente jours | rien — un rappel qui insiste sur une date passée depuis longtemps n'est plus un rappel, c'est un reproche |
+| un dossier déposé, suspendu, clôturé ou abandonné | rien, et **aucune marque** : il n'est pas « déjà rappelé », il est hors du périmètre |
+
+Le courrier ne dit rien de l'issue de la démarche (INV-1) ni de ce qu'une
+date manquée coûterait — c'est pourtant ce qu'un rappel est tenté de faire
+pour obtenir une réaction. Chaque ligne porte **le délai et la date** :
+« dans 4 jours » seul oblige à compter, « le 26 septembre » seul oblige à
+ouvrir un calendrier.
+
+#### Ce que l'écran disait, et ce qu'il dit
+
+La ligne avait déjà été corrigée une fois — elle affirmait « Rappels par
+email activés » devant un réglage qui n'existait pas. Elle disait ensuite
+qu'aucun rappel ne partait, ce qui était vrai. Elle dit maintenant ce qui
+part, à quelle cadence, **et ce qui ne part pas** : le SMS de DOC-11 §346
+n'a toujours aucun fournisseur branché, et un candidat qui croirait en
+recevoir un ne regarderait pas ses emails.
+
+---
+
+### S.44 — Un 451 n'est pas un refus
+
+Trouvé par la fumée du lot précédent, dont le serveur d'essai répond
+`451` : le rappel était marqué comme traité et n'arrivait jamais.
+
+`issueDeLErreur` traduit l'échec de nodemailer en issue d'envoi. Trois
+codes rendaient `refuse` **quel que soit le code de réponse** :
+
+```ts
+case "EAUTH":     return { issue: "refuse", … };
+case "EENVELOPE": return { issue: "refuse", … };
+case "EMESSAGE":  return { issue: "refuse", … };
+```
+
+Or `refuse` veut dire, dans le domaine qui l'arbitre, « réessayer à
+l'identique ne servirait à rien ». Le protocole SMTP distingue les deux
+depuis toujours : **5xx dit « non », 4xx dit « pas maintenant »**. Un
+`451` — serveur momentanément indisponible, la réponse la plus banale
+d'un relais sous charge — se lisait donc comme un refus définitif.
+
+La conséquence dépasse les rappels. `suiteDeLEnvoi` en déduit
+`renvoyable: false`, et c'est cette valeur qui décide si un candidat peut
+redemander son code de vérification. Un relais saturé pendant trente
+secondes lui refusait le renvoi.
+
+Le cas par défaut, lui, appliquait déjà la bonne règle — `reponse >= 500`
+pour un code inconnu. Elle vaut maintenant pour tous : le code nodemailer
+ne décide plus de l'issue, il donne le mot juste pour la dire. Sans code
+de réponse, le comportement d'avant est conservé : le serveur n'a rien
+dit, et ces trois-là restent des refus.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'urgence n'échappe plus à la cadence | trois tests, et deux assertions de la fumée |
+| une urgence repart chaque jour | deux tests, et trois assertions de la fumée |
+| une échéance faite se rappelle quand même | deux tests |
+| une coupure marque quand même | quatre assertions de la fumée, dont le rappel perdu |
+| un 451 redevient un refus définitif | le test du protocole, et cinq assertions de la fumée |

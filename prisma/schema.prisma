@@ -279,6 +279,10 @@ model Application {
   readyAt       DateTime?
 
   targetDate  DateTime? @db.Date
+  /// Dernier rappel groupé envoyé pour ce dossier — RG-09.2, « un email
+  /// hebdomadaire ». La cadence porte sur le dossier ; l'exception
+  /// d'urgence porte sur l'échéance (`Deadline.remindedAt`).
+  lastReminderAt DateTime?
   submittedAt DateTime?
   issue       Issue?
   issueReason String?
@@ -374,7 +378,15 @@ model Deadline {
   dueAt         DateTime    @db.Date
   doneAt        DateTime?
 
+  /// Dernier rappel qui portait cette échéance — WF-09 étape 3.
+  ///
+  /// Par échéance et non par dossier : une urgence échappe à la cadence
+  /// hebdomadaire (RG-09.2), et sans cette marque elle repartirait chaque
+  /// jour jusqu'à la date — la façon la plus sûre de se faire filtrer.
+  remindedAt    DateTime?
+
   @@index([applicationId, dueAt])
+  @@index([dueAt, doneAt])
 }
 
 // ═══════════════════════════════════════════════════════════

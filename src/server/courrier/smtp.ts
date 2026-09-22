@@ -167,24 +167,53 @@ export function issueDeLErreur(erreur: unknown): Envoi {
   const reponse = typeof lu?.responseCode === "number" ? lu.responseCode : null;
   const detail = reponse === null ? code || "erreur sans code" : `${code || "SMTP"} ${reponse}`;
 
+  /*
+    **Un 4xx n'est pas un refus** — correctif du 22/09/2026.
+
+    Le protocole distingue les deux depuis toujours : 5xx dit « non », 4xx
+    dit « pas maintenant, redemande ». Les trois codes nodemailer
+    ci-dessous rendaient `refuse` quel que soit le code de réponse, si
+    bien qu'un `451` — serveur momentanément indisponible, la réponse la
+    plus banale d'un relais sous charge — se lisait « réessayer à
+    l'identique ne servirait à rien ». Un candidat privé de son code de
+    vérification s'y voyait refuser le renvoi.
+
+    Le défaut a été trouvé par la fumée des rappels d'échéance : un
+    serveur d'essai répondant 451 faisait marquer le rappel comme traité,
+    et le candidat ne le recevait jamais.
+
+    La règle du cas par défaut était déjà juste ; elle vaut maintenant
+    pour tous. Le code nodemailer ne décide plus de l'issue — il donne le
+    mot juste pour la dire.
+  */
+  const transitoire = reponse !== null && reponse < 500;
+
   switch (code) {
     case "EAUTH":
-      return { issue: "refuse", detail: `authentification refusée (${detail})` };
+      return transitoire
+        ? { issue: "injoignable", detail: `authentification différée (${detail})` }
+        : { issue: "refuse", detail: `authentification refusée (${detail})` };
     case "EENVELOPE":
-      return { issue: "refuse", detail: `enveloppe refusée (${detail})` };
+      return transitoire
+        ? { issue: "injoignable", detail: `enveloppe différée (${detail})` }
+        : { issue: "refuse", detail: `enveloppe refusée (${detail})` };
     case "EMESSAGE":
-      return { issue: "refuse", detail: `message refusé (${detail})` };
+      return transitoire
+        ? { issue: "injoignable", detail: `message différé (${detail})` }
+        : { issue: "refuse", detail: `message refusé (${detail})` };
     case "ETIMEDOUT":
     case "ECONNECTION":
     case "ESOCKET":
     case "EDNS":
+      // Aucune réponse du tout : le serveur n'a rien dit, ni oui ni non.
       return { issue: "injoignable", detail };
     default:
       /*
-        Un code inconnu penche vers l'injoignable, et c'est délibéré :
-        entre laisser un candidat sans code de vérification et lui en
-        envoyer deux, le second est le moindre mal. Un 5xx qu'on aurait
-        mal rangé se verra au journal, qui porte le code.
+        Un code inconnu **sans** réponse penche vers l'injoignable, et
+        c'est délibéré : entre laisser un candidat sans code de
+        vérification et lui en envoyer deux, le second est le moindre
+        mal. Un 5xx qu'on aurait mal rangé se verra au journal, qui
+        porte le code.
       */
       return reponse !== null && reponse >= 500
         ? { issue: "refuse", detail }
