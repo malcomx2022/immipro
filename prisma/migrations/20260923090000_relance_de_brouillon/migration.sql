@@ -1,0 +1,14 @@
+-- RG-04.2 : « un dossier BROUILLON inactif depuis 90 jours déclenche une
+-- relance, puis passe en ABANDONNE à 12 mois. »
+--
+-- L'état `ABANDONNE` existait déjà dans l'enum ; rien ne l'écrivait. La
+-- relance, elle, n'avait pas de genre de notification où se ranger : les
+-- cinq existants portent une réglementation, une échéance, une analyse, un
+-- paiement ou une veille. Aucun ne dit « ton dossier va être clos ».
+--
+-- Le genre est ce qui rend la passe idempotente : elle relance un
+-- brouillon une seule fois par période d'inactivité, en cherchant si une
+-- notification de ce genre existe déjà depuis la dernière activité du
+-- candidat. Sans lui, la relance repartirait chaque nuit du
+-- quatre-vingt-dixième jour au trois-cent-soixante-cinquième.
+ALTER TYPE "NotificationKind" ADD VALUE IF NOT EXISTS 'INACTIVITE';

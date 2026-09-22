@@ -916,6 +916,9 @@ enum NotificationKind {
   ANALYSE
   PAIEMENT
   VEILLE
+  /// Brouillon laissé de côté — RG-04.2. Le genre rend la passe
+  /// idempotente : une relance par période d'inactivité, pas une par nuit.
+  INACTIVITE
 }
 
 /// Alerte adressée à un candidat (T-01, WF-11).

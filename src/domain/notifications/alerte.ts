@@ -13,7 +13,18 @@ import { libelleDelai } from "@/domain/dossiers/echeancier";
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-export type GenreAlerte = "REGLEMENTATION" | "ECHEANCE" | "ANALYSE" | "PAIEMENT" | "VEILLE";
+/**
+ * Les genres de `NotificationKind`, repris tels quels — un test les tient
+ * alignés. `INACTIVITE` est arrivée avec RG-04.2 : un brouillon qu'on
+ * laisse de côté est relancé, puis clos.
+ */
+export type GenreAlerte =
+  | "REGLEMENTATION"
+  | "ECHEANCE"
+  | "ANALYSE"
+  | "PAIEMENT"
+  | "VEILLE"
+  | "INACTIVITE";
 
 export interface Alerte {
   id: string;
@@ -38,7 +49,14 @@ export interface Alerte {
   echeanceLe?: string;
 }
 
-/** Onglets de T-01. « Toutes » n'est pas un genre : c'est l'absence de filtre. */
+/**
+ * Onglets de T-01. « Toutes » n'est pas un genre : c'est l'absence de filtre.
+ *
+ * Il n'y a pas d'onglet par genre, et c'est voulu : trois genres sur six
+ * n'en ont pas. Une relance de brouillon se lit sous « Toutes », là où
+ * elle est le plus visible — l'onglet qui compte pour elle est celui que
+ * le candidat ouvre en revenant, pas celui qu'il choisit.
+ */
 export type FiltreAlerte = "TOUTES" | "REGLEMENTATION" | "ECHEANCE";
 
 export const LIBELLE_FILTRE: Record<FiltreAlerte, string> = {

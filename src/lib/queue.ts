@@ -27,6 +27,15 @@ export const JOBS = {
    * de fonctionnement normal.
    */
   SONDE_SERVICES: "exploitation.sonde",
+
+  /**
+   * Brouillons laissés de côté — RG-04.2, branchée le 23/09/2026.
+   *
+   * `ABANDONNE` existait dans l'enum, l'écran savait l'afficher, et rien
+   * ne l'écrivait : un brouillon de vingt et un mois restait `BROUILLON`
+   * et n'avait reçu aucune relance.
+   */
+  BROUILLONS_INACTIFS: "dossier.inactivite",
 } as const;
 
 /**
