@@ -77,8 +77,16 @@ export type Decision = "MIGRER" | "CONSERVER";
 
 export interface Arbitrage {
   decision: Decision;
-  /** Libellés des pièces ajoutées par la nouvelle version. Vide si on conserve. */
+  /**
+   * Libellés des pièces que la nouvelle version ajoute **ou** durcit —
+   * une pièce complémentaire devenue obligatoire n'est pas « ajoutée » au
+   * sens de la base, sa ligne existait, mais c'est bien elle que l'écran
+   * a annoncée et c'est elle qui change le travail du candidat.
+   * Vide si on conserve.
+   */
   piecesAjoutees: readonly string[];
+  /** Libellés des pièces que la nouvelle version ne demande plus. */
+  piecesLiberees: readonly string[];
   mention: string;
 }
 
@@ -141,7 +149,12 @@ export async function arbitrerLaDivergence(
     // Le dossier peut être redevenu complet pendant la pause : le calcul
     // décide, la reprise ne fait que lui rendre la main.
     await recalculerCompletude(dossier.id);
-    return { decision: "CONSERVER", piecesAjoutees: [], mention: MENTION_CONSERVEE };
+    return {
+      decision: "CONSERVER",
+      piecesAjoutees: [],
+      piecesLiberees: [],
+      mention: MENTION_CONSERVEE,
+    };
   }
 
   /*
@@ -222,6 +235,7 @@ export async function arbitrerLaDivergence(
   return {
     decision: "MIGRER",
     piecesAjoutees: [...checklist.ajoutees, ...checklist.realignees],
+    piecesLiberees: checklist.liberees,
     mention: MENTION_MIGREE,
   };
 }

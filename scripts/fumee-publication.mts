@@ -1094,6 +1094,107 @@ try {
     const total = await db.document.count({ where: { applicationId: dossier.id } });
     verifier(total === PIECES.length, `aucune pièce n'est retirée (${total})`);
   }
+
+  console.log("\nWF-11 — la pièce que la nouvelle version ne demande plus cesse de bloquer");
+  {
+    /*
+      Le symétrique du bloc précédent, et aussi silencieux. Une pièce
+      absente de `pieces_requises` n'était ni créée ni réalignée : elle
+      restait obligatoire et requise, donc comptée parmi les requises par
+      `computeCompleteness`. L'écran disait « ta checklist perd : Diplôme
+      — elle ne se demande plus », le candidat migrait, et son dossier
+      restait ACTIF pour une pièce que plus personne ne réclame.
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "SN" as const, visaType: "emploi_kennismigrant" as const,
+      category: "EMPLOI" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2029-01-01"), publishedAt: new Date("2026-01-01"),
+    };
+    const PIECES_K = (brute.rules as never as {
+      pieces_requises: { code: string; libelle: string; obligatoire: boolean }[];
+    }).pieces_requises;
+
+    const v1 = await db.visaRule.create({
+      data: {
+        ...socle, version: 1, status: "PUBLISHED",
+        rules: {
+          ...(brute.rules as object),
+          pieces_requises: PIECES_K.map((x) =>
+            x.code === "diplome" ? { ...x, obligatoire: true } : x,
+          ),
+        } as never,
+      },
+    });
+
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-pub-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const dossier = await ouvrirDossier(candidat.id, v1.id, new Date("2027-09-01"));
+    await db.application.update({ where: { id: dossier.id }, data: { status: "ACTIF" } });
+
+    /* Tout est fourni, sauf le diplôme — que la v2 va cesser d'exiger. */
+    await db.document.updateMany({
+      where: { applicationId: dossier.id, code: { not: "diplome" } },
+      data: { status: "CONFORME" },
+    });
+    await recalculerCompletude(dossier.id);
+    const avant = await db.application.findUniqueOrThrow({ where: { id: dossier.id } });
+    verifier(
+      avant.status === "ACTIF",
+      `le diplôme manquant empêche le dossier d'être prêt (${avant.status})`,
+    );
+
+    await db.visaRule.update({
+      where: { id: v1.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    const v2 = await db.visaRule.create({
+      data: {
+        ...socle, version: 2, status: "PUBLISHED",
+        rules: {
+          ...(brute.rules as object),
+          pieces_requises: PIECES_K.filter((x) => x.code !== "diplome"),
+        } as never,
+      },
+    });
+    await propagerLaPublication(v2.id);
+
+    const migration = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: dossier.id, toRuleId: v2.id },
+    });
+    const vue = await divergenceAArbitrer(migration.id, candidat.id);
+    verifier(
+      vue.pieces.retirees.some((x) => x.code === "diplome" && !x.encoreDemandee),
+      `l'écran annonce le diplôme retiré et plus demandé (${JSON.stringify(vue.pieces.retirees)})`,
+    );
+
+    const frais = await db.application.findUniqueOrThrow({ where: { id: dossier.id } });
+    const rendu = await arbitrerLaDivergence(frais, migration.id, "MIGRER");
+    verifier(
+      rendu.piecesLiberees.includes("Diplôme"),
+      `et l'arbitrage la rend parmi les pièces libérées (${JSON.stringify(rendu.piecesLiberees)})`,
+    );
+
+    await recalculerCompletude(dossier.id);
+    const doc = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "diplome" },
+    });
+    verifier(
+      !doc.required && doc.family === "COMPLEMENTAIRE",
+      `la pièce ne bloque plus (obligatoire=${doc.required}, ${doc.family})`,
+    );
+    verifier(doc.status === "ATTENDUE", `et sa ligne reste — RG-11.1 (${doc.status})`);
+
+    const apres = await db.application.findUniqueOrThrow({ where: { id: dossier.id } });
+    verifier(
+      apres.status === "PRET" && apres.readyAt !== null,
+      `le dossier devient prêt sur une exigence que plus personne ne réclame (${apres.status})`,
+    );
+  }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

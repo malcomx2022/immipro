@@ -1547,6 +1547,13 @@ l'exigence suit la règle, ce que le candidat a produit ne bouge pas.** Cinq
 propriétés se réalignent ; `status`, le fichier, l'extraction, le retour
 d'analyse et `expiresAt` traversent.
 
+Le symétrique vaut aussi : une pièce que la nouvelle version ne nomme plus du
+tout restait `OBLIGATOIRE`, donc comptée parmi les requises. Le candidat lisait
+« ta checklist perd : Diplôme », migrait, et son dossier restait bloqué dessus.
+Elle passe en complémentaire et cesse de compter — sa ligne et son fichier
+restent, car RG-11.1 protège le travail du candidat, pas une exigence disparue
+du référentiel.
+
 ## Vérifier
 
 ```
