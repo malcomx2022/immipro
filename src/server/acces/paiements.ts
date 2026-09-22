@@ -1,5 +1,6 @@
 import type { Transaction, TransactionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
+import { miseEnEtat } from "@/domain/dossiers/etat";
 import { echec } from "@/server/http/echecs";
 import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
 import {
@@ -752,10 +753,25 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
     case "pack": {
       const pack = getPack(achat.code);
       if (!pack) return;
+      /*
+        Le dossier peut déjà être prêt : rien n'interdit d'acheter un
+        second pack une fois la checklist complète, et c'est même le cas
+        le plus banal — le quota d'analyses s'épuise avant le dossier.
+        `miseEnEtat` garde alors l'état et sa date ; écrire `ACTIF` seul
+        faisait refuser la transaction entière par la base, donc perdre
+        le crédit d'un pack payé.
+      */
+      const dossier = await db.application.findUnique({
+        where: { id: transaction.applicationId },
+        select: { status: true, readyAt: true },
+      });
       await db.$transaction([
         db.application.update({
           where: { id: transaction.applicationId },
-          data: { status: "ACTIF" },
+          data: miseEnEtat(
+            dossier?.status === "BROUILLON" || dossier === null ? "ACTIF" : dossier.status,
+            dossier?.readyAt ?? null,
+          ),
         }),
         db.analysisCredit.create({
           data: {

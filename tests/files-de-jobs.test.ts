@@ -64,18 +64,27 @@ describe("déclaration des files", () => {
   });
 
   /**
-   * Les deux files qui parlent à un service extérieur, et elles seules.
+   * Les trois files dont l'échec est attendu en exploitation ordinaire,
+   * et elles seules.
    *
    * L'analyse a rejoint le balayage le 22/09/2026, quand l'extraction a
    * été branchée : un service de lecture sature, et rejouer est ce qui
    * évite de verser une panne de tiers dans la file de revue humaine.
+   *
+   * La divergence réglementaire les a rejointes le soir même. Elle
+   * n'appelle pas un service de lecture, mais un relais de messagerie —
+   * RG-11.3 double l'alerte critique d'un email nominatif —, et surtout
+   * **elle n'a qu'une occasion** : postée à la publication d'une version,
+   * rien ne la replanifie. Un dossier qu'elle n'a pas prévenu ne le
+   * serait jamais.
+   *
    * Les autres files ne touchent que la base, et leur échec n'est pas
    * attendu — leur donner des reprises masquerait un vrai défaut derrière
    * six tentatives identiques.
    */
   it("la reprise ne s'étend pas aux files qu'elle ne concerne pas", () => {
     expect(Object.keys(REPRISES).sort()).toEqual(
-      [JOBS.BALAYAGE_PIECE, JOBS.ANALYSE_DOCUMENT].sort(),
+      [JOBS.BALAYAGE_PIECE, JOBS.ANALYSE_DOCUMENT, JOBS.DIVERGENCE_REGLEMENTAIRE].sort(),
     );
   });
 

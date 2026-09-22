@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { miseEnEtat } from "@/domain/dossiers/etat";
 import { removeObject } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
 import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
@@ -224,7 +225,19 @@ export async function purgerLesPiecesEchues(
         // aussi les brouillons (RG-10.4).
               data: {
                 purgedAt: maintenant,
-                ...(dossier.visaRuleId ? { status: "ARCHIVE" as const } : {}),
+                /*
+                  `miseEnEtat` et non `status` seul : RG-10.4 purge sur
+                  demande **sans attendre l'échéance**, donc sur des
+                  dossiers dans n'importe quel état — un dossier prêt
+                  compris. Écrire `ARCHIVE` sans retirer `readyAt` faisait
+                  refuser la transaction par la base, après que les objets
+                  eurent déjà quitté le stockage : les fichiers partis, la
+                  base les croyant présents, `purgedAt` jamais posée, et la
+                  passe du lendemain rejouant le même échec sans fin.
+                */
+                ...(dossier.visaRuleId
+                  ? miseEnEtat("ARCHIVE", dossier.readyAt, maintenant)
+                  : {}),
               },
             }),
           ]

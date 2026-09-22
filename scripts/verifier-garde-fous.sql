@@ -53,6 +53,11 @@ SELECT refuse(
   $q$INSERT INTO "Application" (id, "userId", status, "visaRuleId", "updatedAt")
      VALUES ('a2','u1','PRET', NULL, now())$q$);
 
+SELECT refuse(
+  'RG-07.2 · une date de passage sans l''état qui va avec',
+  $q$INSERT INTO "Application" (id, "userId", status, "visaRuleId", "readyAt", "updatedAt")
+     VALUES ('a3','u1','SOUMIS', NULL, now(), now())$q$);
+
 INSERT INTO "Application" (id, "userId", status, "updatedAt") VALUES ('a0','u1','BROUILLON', now());
 
 SELECT refuse(
@@ -192,6 +197,25 @@ INSERT INTO "Deadline" (id, "applicationId", code, label, "dueAt", "doneAt")
 SELECT refuse(
   'WF-09 · un rappel daté après l''accomplissement de l''échéance',
   $q$UPDATE "Deadline" SET "remindedAt" = now() WHERE id = 'dl1'$q$);
+
+-- La propagation d'une divergence (22/09/2026, au soir). La ligne
+-- d'arbitrage est créée **avant** l'alerte : c'est `alertedAt` qui dit que
+-- le candidat a été prévenu, et l'ordre des deux dates est ce qui rend
+-- lisible la question « a-t-il tranché après avoir été prévenu ? ».
+INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+    rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
+  VALUES ('vr1','NL','etudes','ETUDES',9,'2026-01-01','{}','https://x','OFFICIEL',
+    '2026-01-01','veilleur','2026-04-01','PUBLISHED', now());
+INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+    rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
+  VALUES ('vr2','NL','etudes','ETUDES',10,'2026-01-01','{}','https://x','OFFICIEL',
+    '2026-01-01','veilleur','2026-04-01','PUBLISHED', now());
+
+SELECT refuse(
+  'WF-11 · une divergence tranchée avant que le candidat en soit prévenu',
+  $q$INSERT INTO "RuleMigration" (id, "applicationId", "fromRuleId", "toRuleId", impact, diff,
+       "alertedAt", decision, "decidedAt")
+     VALUES ('rm1','a0','vr1','vr2','CRITIQUE','[]', now(), 'CONSERVER', now() - interval '1 day')$q$);
 
 SELECT refuse(
   'WF-08 · une relecture datée sur une pièce téléversée, qui n''a pas de texte',

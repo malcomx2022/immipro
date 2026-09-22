@@ -47,6 +47,23 @@ une pièce rédigée sont la même ligne de checklist ; les séparer obligerait
 chaque écran à savoir laquelle lire. `DocumentVersion` a donc `objectKey` ou
 `body`, et une contrainte interdit les deux nuls.
 
+**`Application.readyAt` ne s'écrit jamais sans `status`, ni l'inverse.** La
+garde le dit — `("status" = 'PRET') = ("readyAt" IS NOT NULL)` — et elle a
+raison : « prêt à déposer » est calculé, et la date où il l'est devenu en
+fait partie. La règle n'existait qu'en SQL, et six écritures sur sept la
+violaient : la déclaration de dépôt, dont `PRET` est le seul état accepté,
+était refusée à tous les coups. Elle vit désormais dans
+`domain/dossiers/etat.ts`, et toute écriture d'état passe par
+`miseEnEtat`.
+
+**`RuleMigration.alertedAt` dit que le candidat a été prévenu, pas que la
+ligne existe.** La ligne est créée avant l'alerte — la notification cite
+son identifiant —, elle ne peut donc pas porter cette réponse. Sans une
+seconde date, une reprise de la passe de propagation renvoyait une
+notification identique à qui l'avait déjà reçue. Une contrainte tient
+l'ordre des deux dates : on ne tranche pas une divergence avant d'en avoir
+été averti.
+
 **`Application.internalScore` porte son périmètre dans son nom.** Le barème
 de WF-07 reste calculé et stocké — le back-office en a besoin. Mais
 `completeness` se copiait dans une réponse d'API sans qu'on y pense ;

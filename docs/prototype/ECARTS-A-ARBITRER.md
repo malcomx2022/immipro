@@ -6970,3 +6970,147 @@ dit, et ces trois-là restent des refus.
 | une échéance faite se rappelle quand même | deux tests |
 | une coupure marque quand même | quatre assertions de la fumée, dont le rappel perdu |
 | un 451 redevient un refus définitif | le test du protocole, et cinq assertions de la fumée |
+
+---
+
+### S.45 — Le dépôt était impossible, et la règle n'existait qu'en SQL
+
+Cherchant ce que le branchement des chaînes IA avait rendu faux ailleurs,
+la question posée à la base était : **qui écrit `Application.status`, et
+pose-t-il la date qui va avec ?**
+
+Une garde de `20260918000100_garde_fous` tient depuis le premier jour :
+
+```sql
+CHECK (("status" = 'PRET') = ("readyAt" IS NOT NULL))
+```
+
+Elle est juste. « Prêt à déposer » est un état **calculé**, et la date où
+il a été atteint en fait partie : un dossier prêt sans date ne dit plus
+depuis quand, une date sans l'état prétend une mise en état qui n'a pas eu
+lieu.
+
+Sept écritures changeaient `status`. **Une seule** posait la date avec — et
+depuis le 22/09 au matin seulement, quand la même garde avait transformé
+l'analyse d'une pièce en panne (S.38). Le correctif était resté là où on
+l'avait trouvé.
+
+Exécuté, sur six dossiers réellement prêts :
+
+```
+Et la déclaration de dépôt — WF-10 étape 1, sur un dossier PRET :
+  dossier 6 : statut PRET, readyAt posée
+  ✗ le dépôt est refusé par la base : application_pret_date_coherente
+  dossier 6 : statut PRET, déposé non
+```
+
+`PRET` est le **seul** état que la route de dépôt accepte. La déclaration
+de dépôt — le dernier geste du parcours candidat, WF-10 étape 1 — était
+donc refusée à tous les coups, pour tout le monde, depuis le premier jour.
+Quelqu'un qui avait réuni toutes ses pièces recevait une erreur de service
+sur le seul geste qui clôt son travail.
+
+Cinq autres écritures tombaient de la même façon.
+
+| Écriture | État visé | Ce que le refus faisait |
+|---|---|---|
+| clôture avec issue déclarée (WF-10) | `ISSUE_DECLAREE` | renoncer avant de déposer échouait |
+| mise en pause d'une divergence (WF-11) | `SUSPENDU` | la passe mourait au premier dossier prêt |
+| arbitrage d'une divergence (T-02) | `ACTIF` | « je migre » ne faisait rien |
+| activation d'un pack payé | `ACTIF` | un second pack encaissé et non crédité |
+| archivage de fin de purge (RG-10.4) | `ARCHIVE` | les octets partis, la base les croyant présents |
+
+Le dernier est le plus grave après le dépôt. `removeObject` passe **avant**
+la transaction : les fichiers quittaient le stockage, l'écriture qui devait
+l'enregistrer était refusée, `purgedAt` restait nulle, et la passe du
+lendemain rejouait le même échec sans fin. INV-5 promet une purge ; elle
+avait lieu, et la base disait le contraire.
+
+#### La propagation s'arrêtait au premier dossier prêt
+
+Sur trois dossiers `PRET` rattachés à une version qui perd une condition
+bloquante :
+
+```
+Publication de la version 2 — propagation :
+  ✗ la propagation a levé : divergence.ts:145 db.application.update()
+Second passage (la file rejoue le job) :
+  ✗ la propagation a levé de nouveau
+Ce que les trois dossiers ont réellement reçu :
+  dossier 1 : statut PRET, 2 notification(s), 1 arbitrage(s)
+  dossier 2 : statut PRET, 0 notification(s), 0 arbitrage(s)
+  dossier 3 : statut PRET, 0 notification(s), 0 arbitrage(s)
+```
+
+Le dossier le plus exposé — celui qui allait déposer — faisait tomber tous
+les suivants. Personne n'était prévenu qu'une condition d'éligibilité avait
+disparu. Et le premier restait à moitié traité : une notification lui
+disant « ton dossier est mis en pause » devant un dossier toujours prêt,
+puis une seconde à chaque reprise de la file.
+
+#### « Je conserve ma version » ne levait jamais la pause
+
+```
+Et « je garde ma version », sur un dossier mis en pause :
+  dossier 5 : statut PRET, readyAt posée
+  dossier 5 : après « je conserve », statut SUSPENDU
+```
+
+Le courrier et la notification disent : « Ton dossier est mis en pause **le
+temps que tu regardes**. » La branche `CONSERVER` n'écrivait que
+l'arbitrage. Le dossier restait `SUSPENDU` — un état dont ni les rappels
+d'échéance (`ETATS_RAPPELABLES`) ni le passage en `PRET` ne sortent. Choisir
+de garder sa version gelait son dossier pour de bon.
+
+#### Ce que le correctif déplace
+
+**La règle descend dans le domaine.** `domain/dossiers/etat.ts` rend le
+couple, et les sept écritures y passent. La date est posée en entrant dans
+`PRET`, **conservée** si le dossier y était déjà — elle dit depuis quand —,
+retirée partout ailleurs.
+
+**Deux décisions descendent des routes.** Le dépôt, la clôture et
+l'arbitrage vivaient derrière `next/headers` : hors d'un serveur Next, rien
+ne pouvait les appeler, et c'est pourquoi aucune fumée ne pouvait voir que
+le dépôt ne passait pas. C'est la leçon de `vueDeLaRelecture` (S.39),
+reprise telle quelle.
+
+**La propagation devient reprenable plutôt que fragile.** Chaque dossier
+est traité pour lui-même ; ce qui échoue est compté et nommé ;
+`RuleMigration.alertedAt` marque le candidat **prévenu**, et une reprise le
+saute. L'email critique de RG-11.3 ne part plus dans un `catch` qui
+journalise : il suit la règle des rappels — envoyé avant la marque, et une
+coupure ne marque rien.
+
+#### L'angle mort, et ce qui le ferme
+
+Une règle pure ne peut pas éprouver une contrainte de base. C'est
+exactement ce qui a permis à six écritures d'être fausses pendant quatre
+jours : rien, dans la chaîne de vérification, n'écrivait réellement dans
+une base sur ces chemins-là. `scripts/fumee-transitions.mts` le fait,
+depuis un dossier réellement `PRET`, et la porte de qualité l'appelle.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le dépôt écrit l'état sans sa date | la fumée entière, au premier bloc |
+| la clôture, l'activation d'un pack, l'archivage de purge, idem | leur bloc respectif |
+| la mise en pause écrit l'état sans sa date | 21 assertions — la passe meurt de nouveau |
+| « je migre » écrit l'état sans sa date | le bloc majeur, sur un dossier prêt |
+| « je conserve » ne lève plus la pause | 2 assertions |
+| la marque d'alerte n'est plus posée | 4 assertions, dont la seconde notification |
+| un dossier fait de nouveau tomber les autres | le compte des alertés |
+| une coupure marque quand même | 6 assertions, dont l'alerte perdue |
+| l'email critique repasse dans un `catch` muet | 6 assertions |
+
+#### Relevé en passant, et laissé ouvert
+
+`prisma/README.md` dit que le barème de WF-07 « reste calculé et stocké —
+le back-office en a besoin ». Aucun écran ne le lit : `internalScore` est
+écrit par `recalculerCompletude` et par personne d'autre. Et les deux
+composantes confiées à l'IA lui sont passées à zéro, si bien qu'un dossier
+objectivement complet plafonne à 75 sur 100. Les deux points tiennent
+ensemble et demandent un arbitrage produit — donner au barème le lecteur
+que le document lui prête, ou constater qu'il n'en a pas — plutôt qu'un
+correctif.

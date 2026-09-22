@@ -105,12 +105,23 @@ describe("RG-10.4 — anonymisation à la suppression de compte", () => {
   });
 
   it("la purge d'un brouillon ne bute pas sur INV-3", () => {
-    // La suppression de compte purge aussi les brouillons, ce que la
-    // clôture ne faisait jamais. Un brouillon sans version de règle figée
-    // ne peut pas passer en ARCHIVE — la base le refuse, et elle a raison.
-    // Trouvé en purgeant un vrai compte, pas en relisant le code.
+    /*
+      La suppression de compte purge aussi les brouillons, ce que la
+      clôture ne faisait jamais. Un brouillon sans version de règle figée
+      ne peut pas passer en ARCHIVE — la base le refuse, et elle a raison.
+      Trouvé en purgeant un vrai compte, pas en relisant le code.
+
+      L'assertion visait le texte exact de l'expression, et elle est
+      devenue fausse le jour où l'état est passé par `miseEnEtat` — sans
+      que la garantie, elle, change. Elle ne retient donc plus que les
+      deux choses qui la portent : la condition sur la version figée, et
+      le fait que l'état ne s'écrive pas sans sa date. Le comportement,
+      lui, s'éprouve sur une vraie base dans `fumee-transitions`.
+    */
     const purge = lire("src/server/jobs/purge.ts");
-    expect(purge).toMatch(/dossier\.visaRuleId \? \{ status: "ARCHIVE" as const \} : \{\}/u);
+    expect(purge).toMatch(/dossier\.visaRuleId/u);
+    expect(purge).toMatch(/miseEnEtat\("ARCHIVE"/u);
+    expect(purge).not.toMatch(/status: "ARCHIVE"/u);
   });
 
   it("l'anonymisation ne supprime ni les reçus ni le grand livre", () => {

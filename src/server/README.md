@@ -556,6 +556,82 @@ de messagerie un rappel définitivement perdu. Ce qui ne partira pas
 davantage demain — transport non branché, adresse refusée — est marqué :
 la notification reste, et elle attend le candidat à l'écran.
 
+### L'état d'un dossier ne s'écrit pas sans sa date
+
+Correctif du 22/09/2026, au soir. Une garde de la base tient depuis le
+premier jour, et elle est juste :
+
+```sql
+CHECK (("status" = 'PRET') = ("readyAt" IS NOT NULL))
+```
+
+« Prêt à déposer » est un état **calculé**, et la date où il a été atteint
+en fait partie. Seulement, la règle ne vivait nulle part dans le code.
+Sept écritures changeaient `status` ; **une seule** posait la date avec —
+et depuis le 22/09 seulement, après que la même garde eut transformé
+l'analyse d'une pièce en panne. Les six autres étaient refusées dès que le
+dossier était prêt :
+
+| Écriture | État visé | Ce que le refus faisait |
+|---|---|---|
+| déclaration de dépôt (WF-10 §1) | `SOUMIS` | `PRET` en est le **seul** état accepté : le dépôt était impossible, toujours |
+| clôture avec issue (WF-10) | `ISSUE_DECLAREE` | renoncer avant de déposer échouait |
+| mise en pause d'une divergence (WF-11) | `SUSPENDU` | la passe entière mourait, et les dossiers suivants n'étaient pas prévenus |
+| arbitrage d'une divergence (T-02) | `ACTIF` | « je migre » ne faisait rien |
+| activation d'un pack payé | `ACTIF` | un second pack encaissé et non crédité |
+| archivage de fin de purge (RG-10.4) | `ARCHIVE` | les octets partis, la base les croyant présents, `purgedAt` jamais posée |
+
+La règle vit dans `domain/dossiers/etat.ts`, et les sept écritures y
+passent. `miseEnEtat(vise, readyAtActuelle)` rend le couple : la date est
+posée en entrant dans `PRET`, **conservée** si le dossier y était déjà —
+elle dit depuis quand, la repousser ferait vieillir le dossier à l'envers
+—, et retirée partout ailleurs.
+
+Ce qu'une règle pure ne peut pas faire, c'est éprouver une contrainte de
+base. C'est précisément l'angle mort qui a laissé six écritures fausses
+quatre jours : rien, dans la chaîne de vérification, n'écrivait réellement
+dans une base sur ces chemins-là. `scripts/fumee-transitions.mts` le fait,
+depuis un dossier réellement `PRET` — le seul état qui porte une date,
+donc le seul depuis lequel la garde peut mordre.
+
+Deux décisions sont descendues des routes vers `server/dossiers/` pour
+cela (`parcours.ts`, `migration.ts`) : une route ne s'appelle pas depuis
+une fumée, et une fumée qui réécrit la décision de la route n'éprouve pas
+la route.
+
+### Une divergence réglementaire prévient tout le monde, ou rejoue
+
+`propagerLaPublication` tenait dans une boucle sans filet : le premier
+dossier en échec emportait la liste. Trois choses la tiennent désormais, et
+elles vont ensemble.
+
+**Chaque dossier est traité pour lui-même.** Ce qui échoue est compté dans
+`aReprendre` et nommé dans `incidents` ; les autres reçoivent leur alerte.
+
+**La passe est reprenable.** `RuleMigration.alertedAt` dit que le candidat
+a été *prévenu* — la ligne d'arbitrage, elle, est créée avant l'alerte et
+ne peut pas le dire. Sans cette marque, chaque reprise ajoutait une
+seconde notification identique à ceux qui l'avaient déjà reçue.
+
+**Le courrier critique n'est plus avalé.** RG-11.3 demande un email
+nominatif ; il partait dans un `catch` qui journalisait. Il suit maintenant
+la règle des rappels d'échéance : envoyé **avant** la marque, et une
+coupure (`injoignable`, dont les 4xx) ne marque rien — la reprise le
+reprend au lieu de le perdre.
+
+Le bilan est rendu, et c'est l'ouvrier qui décide de rejouer
+(`doitRejouer`). Lever depuis la propagation enfouirait le compte dans un
+message d'erreur, et on ne pourrait plus vérifier que **les autres
+dossiers, eux, ont bien été prévenus** — ce qui est tout l'objet du
+correctif.
+
+Dernier point, du même ordre : la pause finit quand le candidat a regardé.
+Le courrier dit « ton dossier est mis en pause le temps que tu regardes ».
+La branche « je conserve » n'écrivait que l'arbitrage, et le dossier restait
+`SUSPENDU` — un état dont ni les rappels d'échéance ni le passage en `PRET`
+ne sortent. Les deux branches lèvent la pause désormais, et rendent la main
+au calcul de complétude plutôt que de décider à sa place.
+
 ### Le balayage antivirus, et la seule issue qui promeut
 
 Branché le 22/09/2026. `ANTIVIRUS_URL` ne désigne pas un fournisseur connu

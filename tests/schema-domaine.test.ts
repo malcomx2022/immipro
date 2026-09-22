@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { DocumentState } from "@/domain/completeness/score";
 import type { StatutDossier } from "@/domain/dossiers/dossier";
+import type { EtatStocke } from "@/domain/dossiers/etat";
 import type { FamillePiece, RemedePiece } from "@/domain/dossiers/piece";
 import type { GenreAlerte } from "@/domain/notifications/alerte";
 import type { Arbitrage } from "@/domain/notifications/divergence";
@@ -87,6 +88,24 @@ describe("le schéma et le domaine nomment les mêmes choses", () => {
       expect(base, statut).toContain(statut);
     }
     expect(trie(Object.keys(LIBELLE_STATUT))).toEqual(trie(candidat));
+
+    /*
+      Le vocabulaire **stocké**, lui, est complet dans le domaine depuis
+      que `miseEnEtat` arbitre le couple `status` / `readyAt` : un état
+      ajouté en base sans passer par là écrirait de nouveau l'un sans
+      l'autre, et la garde de la base le refuserait en production.
+    */
+    const stocke: EtatStocke[] = [
+      "BROUILLON",
+      "ACTIF",
+      "PRET",
+      "SOUMIS",
+      "SUSPENDU",
+      "ISSUE_DECLAREE",
+      "ABANDONNE",
+      "ARCHIVE",
+    ];
+    expect(base).toEqual(trie(stocke));
   });
 
   it("familles et remèdes de pièce — DocumentFamily / DocumentRemedy", () => {

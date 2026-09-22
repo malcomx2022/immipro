@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { db } from "@/lib/db";
-import { dossierDuCandidat, dateDePurge } from "@/server/acces/dossiers";
-import { PURGE_JOURS, mentionCloture, type IssueDemarche } from "@/domain/dossiers/cloture";
+import { dossierDuCandidat } from "@/server/acces/dossiers";
+import { mentionCloture } from "@/domain/dossiers/cloture";
+import { cloturerLeDossier, ISSUE_STOCKEE } from "@/server/dossiers/parcours";
 
 /**
  * Clôture et issue déclarée — C-11, WF-10.
@@ -16,13 +16,6 @@ import { PURGE_JOURS, mentionCloture, type IssueDemarche } from "@/domain/dossie
  * prédictif (RG-10.3) : il est stocké en texte, rattaché au dossier, et rien
  * ne l'agrège par taux.
  */
-const ISSUES: Record<IssueDemarche, "ACCEPTE" | "REFUSE" | "RENONCE" | "SANS_REPONSE"> = {
-  OBTENU: "ACCEPTE",
-  REFUS: "REFUSE",
-  ABANDON: "RENONCE",
-  AUTRE: "SANS_REPONSE",
-};
-
 export const POST = route({
   nom: "dossier.cloture",
   acces: "candidat_verifie",
@@ -33,23 +26,16 @@ export const POST = route({
   }),
   async traiter({ corps, params, acteur }) {
     const dossier = await dossierDuCandidat(params.id!, acteur!.id);
-    const maintenant = new Date();
-    const purgeLe = dateDePurge(maintenant);
-
-    const maj = await db.application.update({
-      where: { id: dossier.id },
-      data: {
-        status: "ISSUE_DECLAREE",
-        issue: ISSUES[corps.issue],
-        issueReason: corps.detail ?? null,
-        purgeDueAt: purgeLe,
-      },
-    });
+    const { dossier: maj, purgeLe, purgeDansJours } = await cloturerLeDossier(
+      dossier,
+      ISSUE_STOCKEE[corps.issue],
+      corps.detail ?? null,
+    );
 
     return {
       statut: maj.status,
       purgeLe: purgeLe.toISOString().slice(0, 10),
-      purgeDansJours: PURGE_JOURS,
+      purgeDansJours,
       mention: mentionCloture(corps.issue),
     };
   },
