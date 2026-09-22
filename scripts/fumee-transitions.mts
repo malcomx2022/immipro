@@ -628,6 +628,23 @@ try {
       data: { doneAt: ilYA(ABANDON_JOURS + 30) },
     });
 
+    /*
+      Et celui qui a demandé l'oubli. Entre la demande et l'anonymisation,
+      son compte existe encore et `deletedAt` est nul — l'état qu'ouvre une
+      panne du stockage objet. Le relancer reviendrait à inviter à revenir
+      quelqu'un qui vient de demander à partir.
+    */
+    rang += 1;
+    const partant = await db.user.create({
+      data: {
+        email: `fumee-inact-partant-${rang}-${process.pid}@exemple.test`,
+        role: "CANDIDAT",
+        deletionRequestedAt: ilYA(2),
+      },
+    });
+    const sonDossier = (await ouvrirDossier(partant.id, v.id, null)).id;
+    await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${ilYA(RELANCE_JOURS + 30)} WHERE id = ${sonDossier}`;
+
     const jeune = await ouvrir("jeune", RELANCE_JOURS - 5);
     const aRelancer = await ouvrir("relance", RELANCE_JOURS + 30);
     /*
@@ -706,6 +723,14 @@ try {
     verifier(
       (await etat(toutFait)).status === "ABANDONNE",
       `celui qui a tout coché puis disparu est clos (${(await etat(toutFait)).status})`,
+    );
+    verifier(
+      (await db.notification.count({ where: { applicationId: sonDossier } })) === 0,
+      "et celui qui a demandé l'oubli ne reçoit rien (RG-10.4)",
+    );
+    verifier(
+      (await etat(sonDossier)).status === "BROUILLON",
+      "ni ne voit son dossier clos par la plateforme",
     );
 
     const relance = await db.notification.findFirst({

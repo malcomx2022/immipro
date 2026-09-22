@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { envoyerRappelDEcheance } from "@/server/courrier";
 import { suiteDeLEnvoi } from "@/domain/courrier/transport";
+import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 import {
   HORIZON_HEBDOMADAIRE_JOURS,
   JOURS_APRES_ECHEANCE,
@@ -76,7 +77,12 @@ export async function envoyerLesRappels(
   const dossiers = await db.application.findMany({
     where: {
       status: { in: [...ETATS_RAPPELABLES] },
-      user: { deletedAt: null },
+      /*
+        La **demande** de suppression, et non son achèvement : entre les
+        deux, `deletedAt` est nul et le compte recevait ses rappels. Le
+        filtre couvre les deux états — rien n'efface `deletionRequestedAt`.
+      */
+      user: COMPTE_JOIGNABLE,
       deadlines: { some: { doneAt: null, dueAt: { gte: debut, lte: fin } } },
     },
     select: {

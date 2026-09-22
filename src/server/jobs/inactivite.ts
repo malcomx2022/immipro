@@ -12,6 +12,7 @@ import {
   RELANCE_JOURS,
 } from "@/domain/dossiers/inactivite";
 import { editorialDe } from "@/lib/contenu/destinations";
+import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 
 /**
  * Les brouillons laissés de côté — RG-04.2.
@@ -96,7 +97,18 @@ export async function traiterLesBrouillonsInactifs(
     les versions : il faut les charger pour le connaître.
   */
   const brouillons = await db.application.findMany({
-    where: { status: "BROUILLON", purgedAt: null, createdAt: { lte: seuil } },
+    where: {
+      status: "BROUILLON",
+      purgedAt: null,
+      createdAt: { lte: seuil },
+      /*
+        RG-10.4. Entre la demande de suppression et l'anonymisation, le
+        compte existe encore et `deletedAt` est nul — c'est l'état qu'ouvre
+        une panne du stockage. Le relancer reviendrait à inviter à revenir
+        quelqu'un qui vient de demander à partir.
+      */
+      user: COMPTE_JOIGNABLE,
+    },
     select: {
       id: true,
       userId: true,
