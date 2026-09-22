@@ -13,15 +13,46 @@ import type { MotifProposition } from "@/domain/consultants/proposition";
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-export type StatutDossier = "BROUILLON" | "ACTIF" | "PRET" | "SOUMIS" | "CLOTURE";
+/**
+ * Ce que le candidat lit sur son dossier.
+ *
+ * `EN_PAUSE` a été ajouté le 23/09/2026. Il manquait, et la conséquence
+ * n'était pas cosmétique : un dossier suspendu par une divergence critique
+ * s'affichait « Actif », annonçait « Rien ne bloque un dépôt », et refusait
+ * ensuite le dépôt en disant qu'il restait des pièces obligatoires à
+ * réunir — alors qu'il n'en manquait aucune. Le candidat relisait une
+ * checklist complète en cherchant ce qui n'y était pas.
+ *
+ * Le mot lui-même n'est pas nouveau : le courrier et la notification de
+ * WF-11 disent déjà « ton dossier est mis en pause le temps que tu
+ * regardes ». Il ne manquait qu'à l'écran du dossier.
+ */
+export type StatutDossier =
+  | "BROUILLON"
+  | "ACTIF"
+  | "PRET"
+  | "EN_PAUSE"
+  | "SOUMIS"
+  | "CLOTURE";
 
 export const LIBELLE_STATUT: Record<StatutDossier, string> = {
   BROUILLON: "Brouillon",
   ACTIF: "Actif",
   PRET: "Prêt à déposer",
+  EN_PAUSE: "En pause",
   SOUMIS: "Déposé",
   CLOTURE: "Clôturé",
 };
+
+/**
+ * Ce qu'un dossier en pause attend, et où cela se décide.
+ *
+ * La phrase nomme le geste et l'écran : « ton dossier est en pause » seul
+ * laisserait chercher. C'est la doctrine d'erreur du projet appliquée à un
+ * état plutôt qu'à un échec — le constat, puis le geste.
+ */
+export const MENTION_EN_PAUSE =
+  "Une exigence de ta destination a changé. Ton dossier est en pause le temps que tu regardes : rien n'est supprimé, et ta checklist reste celle de la version figée à l'ouverture. Ouvre tes alertes pour comparer les deux versions et décider.";
 
 export interface Dossier {
   id: string;
@@ -78,11 +109,14 @@ export const peutOuvrirUnDossier = (dossiers: readonly Dossier[]): boolean =>
  * demande une action passe avant ce qui attend.
  */
 const RANG: Record<StatutDossier, number> = {
-  ACTIF: 0,
-  PRET: 1,
-  BROUILLON: 2,
-  SOUMIS: 3,
-  CLOTURE: 4,
+  // Un dossier en pause passe devant tout : c'est le seul qui attend une
+  // décision du candidat et qu'aucune pièce ne fera avancer.
+  EN_PAUSE: 0,
+  ACTIF: 1,
+  PRET: 2,
+  BROUILLON: 3,
+  SOUMIS: 4,
+  CLOTURE: 5,
 };
 
 export const trierDossiers = (dossiers: readonly Dossier[]): Dossier[] =>

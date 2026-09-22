@@ -75,6 +75,10 @@ const { publierLaRegle } = await import("../src/server/regles/publication");
 const { propagerLaPublication } = await import("../src/server/jobs/divergence");
 const { depublierLesFichesEchues } = await import("../src/server/jobs/veille");
 const { recalculerCompletude } = await import("../src/server/acces/dossiers");
+const { versDossier } = await import("../src/server/vue/dossier");
+const { declarerLeDepot } = await import("../src/server/dossiers/parcours");
+const { MENTION_EN_PAUSE } = await import("../src/domain/dossiers/dossier");
+const { editorialDe } = await import("../src/lib/contenu/destinations");
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
 
 const brute = REGLES_DE_REFERENCE.find(
@@ -291,6 +295,46 @@ try {
       where: { id: p.application.id },
     });
     verifier(dossier.status === "SUSPENDU", `le dossier est suspendu (${dossier.status})`);
+
+    /*
+      Et ce que le candidat lit sur son dossier. L'état existait en base et
+      n'avait pas de mot à l'écran : le bandeau disait « Actif », la
+      prochaine action « Rien ne bloque un dépôt » — sur le seul dossier
+      dont le dépôt était bloqué —, et le refus du dépôt l'envoyait
+      chercher des pièces manquantes qu'il n'avait pas.
+    */
+    const avecPieces = await db.application.findUniqueOrThrow({
+      where: { id: p.application.id },
+      include: { documents: true, visaRule: true },
+    });
+    const vue = versDossier(
+      avecPieces,
+      avecPieces.documents,
+      editorialDe("AE") as never,
+      avecPieces.visaRule,
+      "2026-09-22",
+    );
+    verifier(vue.statut === "EN_PAUSE", `le bandeau dit la pause (${vue.statut})`);
+    verifier(
+      vue.completude.palier === "COMPLET",
+      `alors que rien ne manque à la checklist (${vue.completude.palier})`,
+    );
+    verifier(
+      vue.prochaineAction === MENTION_EN_PAUSE,
+      `et la prochaine action dit quoi faire (${vue.prochaineAction.slice(0, 40)}…)`,
+    );
+
+    let refus = "";
+    try {
+      await declarerLeDepot(avecPieces);
+    } catch (erreur) {
+      refus = corpsDe(erreur);
+    }
+    verifier(refus === MENTION_EN_PAUSE, `« Je dépose » dit la pause (${refus.slice(0, 40)}…)`);
+    verifier(
+      !refus.includes("pièces obligatoires"),
+      "et n'envoie pas chercher des pièces qui ne manquent pas",
+    );
 
     const migration = await db.ruleMigration.findFirstOrThrow({
       where: { applicationId: p.application.id },

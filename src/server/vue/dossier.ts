@@ -2,6 +2,7 @@ import type { Application, Document, VisaRule } from "@prisma/client";
 import type { Piece } from "@/domain/dossiers/piece";
 import { completudeDesPieces, premiereATraiter, libelleAction } from "@/domain/dossiers/piece";
 import type { Dossier, StatutDossier } from "@/domain/dossiers/dossier";
+import { MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDeDepot } from "@/domain/dossiers/faisabilite";
 import { estEchue } from "@/domain/dossiers/peremption";
 
@@ -79,8 +80,15 @@ export function versStatut(statut: Application["status"]): StatutDossier {
     case "BROUILLON":
       return "BROUILLON";
     case "ACTIF":
-    case "SUSPENDU":
       return "ACTIF";
+    /*
+      `SUSPENDU` s'affichait « Actif », et l'écran mentait deux fois : le
+      bandeau disait « en cours » sur un dossier en pause, et rien ne
+      disait au candidat ce qu'on attendait de lui. La notification, elle,
+      le disait déjà — mais elle vit sur l'écran des alertes.
+    */
+    case "SUSPENDU":
+      return "EN_PAUSE";
     case "PRET":
       return "PRET";
     case "SOUMIS":
@@ -143,7 +151,7 @@ export function versDossier(
         }
       : {}),
     completude: completudeDesPieces(pieces),
-    prochaineAction: prochaineAction(pieces),
+    prochaineAction: prochaineAction(pieces, versStatut(dossier.status)),
   };
 }
 
@@ -158,7 +166,18 @@ export function versDossier(
  * validité est trop courte. » Savoir *pourquoi* évite d'ouvrir l'écran pour
  * l'apprendre.
  */
-export function prochaineAction(pieces: readonly Piece[]): string {
+export function prochaineAction(
+  pieces: readonly Piece[],
+  statut: StatutDossier = "ACTIF",
+): string {
+  /*
+    La pause passe avant la checklist, et c'est tout le correctif : sur un
+    dossier suspendu par une divergence, toutes les pièces peuvent être
+    conformes — la phrase annonçait donc « Rien ne bloque un dépôt » sur le
+    seul dossier dont le dépôt était bloqué.
+  */
+  if (statut === "EN_PAUSE") return MENTION_EN_PAUSE;
+
   const suivante = premiereATraiter(pieces);
   if (!suivante) return "Rien ne bloque un dépôt.";
 
