@@ -11,18 +11,19 @@
  * composés à l'exécution.
  *
  * `nodemailer` est la bibliothèque de référence de l'écosystème Node
- * pour cela, encore publiée, et **déjà présente dans l'arbre** :
- * `next-auth` la déclare en pair facultatif. L'ajouter ne fait donc pas
- * entrer une nouvelle famille de code dans le dépôt — elle y était,
- * simplement personne ne s'en servait.
+ * pour cela, et encore publiée.
  *
- * Version 10, et pas la 7 que le pair facultatif de `next-auth`
- * réclamait : la 7 porte dix avis de sécurité ouverts, dont deux de
- * gravité haute — parmi eux une complexité quadratique de l'analyseur
- * d'adresses, atteignable puisque nos destinataires sont des adresses
- * saisies à l'inscription. Le conflit de pair est résolu par un
- * `overrides` dans `package.json`, et non par `--legacy-peer-deps` :
- * `npm ci` doit reproduire le même arbre que `npm install`.
+ * Version 10 : les versions antérieures à la 9.1 portent dix avis de
+ * sécurité ouverts, dont deux de gravité haute — parmi eux une
+ * complexité quadratique de l'analyseur d'adresses, atteignable
+ * puisque nos destinataires sont des adresses saisies à l'inscription.
+ *
+ * Elle est arrivée dans le dépôt contrainte à la 7 par un pair
+ * facultatif de `next-auth`, que la 10 violait ; le conflit était
+ * desserré par un `overrides`. `next-auth` a été retiré le 22/09/2026 —
+ * il n'était importé nulle part —, et l'`overrides` avec lui : plus
+ * rien ne contraint la version, et `npm ci` reproduit l'arbre de
+ * `npm install` sans détour.
  *
  * ── Ce que cet adaptateur ne fait pas ────────────────────────────────
  *
