@@ -1,5 +1,6 @@
 import type { Transaction, TransactionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
+import { appliquerLaCouverture } from "@/server/acces/couverture";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { echec } from "@/server/http/echecs";
 import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
@@ -765,24 +766,25 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
         where: { id: transaction.applicationId },
         select: { status: true, readyAt: true },
       });
-      await db.$transaction([
-        db.application.update({
-          where: { id: transaction.applicationId },
-          data: miseEnEtat(
-            dossier?.status === "BROUILLON" || dossier === null ? "ACTIF" : dossier.status,
-            dossier?.readyAt ?? null,
-          ),
-        }),
-        db.analysisCredit.create({
-          data: {
-            applicationId: transaction.applicationId,
-            delta: pack.analyses,
-            reason: "ACHAT_PACK",
-            transactionId: transaction.id,
-            note: `Pack ${pack.libelle}`,
-          },
-        }),
-      ]);
+      await db.application.update({
+        where: { id: transaction.applicationId },
+        data: miseEnEtat(
+          dossier?.status === "BROUILLON" || dossier === null ? "ACTIF" : dossier.status,
+          dossier?.readyAt ?? null,
+        ),
+      });
+      /*
+        Les analyses s'ouvrent par **destination couverte**, et non en bloc
+        sur le dossier visé : `Pack.destinations` était déclaré sur les trois
+        packs et lu par personne, si bien qu'un Pro à 45 000 XOF — « Trois
+        destinations comparées en parallèle » — servait un seul dossier.
+        `appliquerLaCouverture` sert d'abord celui-là, puis les dossiers
+        déjà ouverts que rien ne sert.
+      */
+      await appliquerLaCouverture(transaction.userId, {
+        applicationId: transaction.applicationId,
+        transactionId: transaction.id,
+      });
       return;
     }
 

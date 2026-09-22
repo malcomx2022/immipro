@@ -1,6 +1,7 @@
 import type { Application, Document, Prisma, VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
+import { appliquerLaCouverture } from "@/server/acces/couverture";
 import { DOSSIERS_MAX } from "@/domain/dossiers/dossier";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
 import { computeCompleteness } from "@/domain/completeness/score";
@@ -103,7 +104,7 @@ export async function ouvrirDossier(
   if (!regle) throw echec("regle_indisponible");
   const p = payload(regle);
 
-  return db.application.create({
+  const dossier = await db.application.create({
     data: {
       userId,
       visaRuleId: regle.id,
@@ -113,6 +114,18 @@ export async function ouvrirDossier(
       deadlines: dateCible ? { create: echeancesDepuis(p, dateCible) } : undefined,
     },
   });
+
+  /*
+    Un pack déjà payé peut couvrir plusieurs destinations — Pro en annonce
+    trois. Le dossier qu'on vient d'ouvrir en est peut-être une, et la
+    couverture s'applique ici plutôt qu'à l'achat : au moment du paiement,
+    ce dossier n'existait pas.
+
+    Hors de la création : un octroi de quota ne doit pas pouvoir faire
+    échouer l'ouverture d'un dossier, qui ne dépend d'aucun achat.
+  */
+  await appliquerLaCouverture(userId).catch(() => undefined);
+  return dossier;
 }
 
 /**

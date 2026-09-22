@@ -1579,6 +1579,29 @@ déjà : est-ce que cela rend **inéligible**, ou est-ce que cela **gêne** ? Un
 seuil relevé, un dispositif supprimé : critique. Un délai d'instruction, une
 durée de validité : majeur.
 
+## Un champ déclaré que personne ne lit est une promesse non tenue
+
+`Pack.destinations` vivait dans la grille — Essentiel 1, Dossier 1, Pro 3 —
+depuis le début, et aucun code ne le lisait. Un Pro à 45 000 XOF, dont le badge
+annonce « Trois destinations comparées en parallèle », ouvrait ses analyses sur
+un seul dossier.
+
+C'est le même angle mort que les pièces d'une migration ou la réponse d'un
+arbitrage : une donnée que personne ne lit est une donnée dont on ne sait pas si
+elle est juste. La différence ici, c'est qu'elle figurait sur une étiquette de
+prix.
+
+La couverture d'un achat **se déduit du grand livre** — les dossiers distincts
+que sa transaction a crédités — plutôt que de vivre dans une colonne. Même
+raison que le solde : une valeur stockée se désynchronise, une somme ne peut
+pas.
+
+Et elle s'applique aux **deux** moments où une destination peut apparaître : la
+confirmation du paiement et l'ouverture d'un dossier. N'en brancher qu'un seul
+ne se voit pas tout de suite — une mutation le montre : garder l'ouverture et
+débrancher la confirmation distribue cent cinquante analyses pour un pack qui en
+annonce quatre-vingt-dix.
+
 ## Vérifier
 
 ```

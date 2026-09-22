@@ -196,6 +196,39 @@ export const estDevise = (valeur: string): valeur is Devise =>
 
 export const getPack = (code: string) => PACKS.find((p) => p.code === code);
 
+/**
+ * Analyses ouvertes **par destination couverte** — arbitrage du 22/09/2026.
+ *
+ * `destinations` était déclaré sur les trois packs et lu par personne. Un
+ * achat de Pro ouvrait ses quatre-vingt-dix analyses sur **un seul**
+ * dossier, alors que son badge annonce « Trois destinations comparées en
+ * parallèle ». Exécuté avant correction, après l'achat d'un Pro :
+ *
+ *     dossier 1 : 90 analyses
+ *     dossier 2 : 0
+ *     dossier 3 : 0
+ *     destinations réellement couvertes : 1 sur 3
+ *
+ * La division n'est pas un choix arbitraire, c'est la grille elle-même :
+ * 90 = 3 × 30, et une destination de Pro ouvre donc exactement ce qu'ouvre
+ * un pack Dossier. Essentiel et Dossier, qui ne couvrent qu'une
+ * destination, gardent au passage exactement ce qu'ils ouvraient.
+ *
+ * Le prix, lui, n'est pas linéaire : 45 000 XOF font bien trois fois
+ * 15 000, mais 59 € n'en font pas trois fois 29. Pro est un lot remisé en
+ * euros, ce qui conforte la lecture « trois destinations » sans la
+ * démontrer — c'est le compte des analyses qui la démontre.
+ *
+ * Conséquence assumée : un acheteur de Pro qui n'ouvre qu'un dossier y
+ * reçoit trente analyses et non quatre-vingt-dix. Les deux destinations
+ * restantes ne sont pas perdues — elles s'ouvrent quand il ouvre les
+ * dossiers —, mais elles ne se reportent pas sur la première. Cumuler les
+ * trois sur un seul dossier, c'est acheter trois fois Dossier, ce que le
+ * produit permet déjà.
+ */
+export const analysesParDestination = (pack: Pack): number =>
+  Math.floor(pack.analyses / pack.destinations);
+
 export const packMisEnAvant = () => PACKS.find((p) => p.misEnAvant);
 
 /**

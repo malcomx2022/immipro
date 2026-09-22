@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  analysesParDestination,
   MARGE_MINIMALE_RECHARGE,
   PACKS,
   packMisEnAvant,
@@ -64,5 +65,64 @@ describe("règle de tarification de la recharge", () => {
 
   it("garde le plancher de collecte (RG-05.5)", () => {
     expect(RECHARGE_ANALYSES.prix.XOF).toBeGreaterThanOrEqual(3000);
+  });
+});
+
+/**
+ * RG-03.1 — un pack couvre le nombre de destinations qu'il annonce.
+ *
+ * ── Le défaut, tel qu'il s'est présenté ─────────────────────────────
+ *
+ * `Pack.destinations` était déclaré sur les trois packs et lu par aucun
+ * code. Un achat de Pro — 45 000 XOF, badge « Trois destinations comparées
+ * en parallèle » — ouvrait ses quatre-vingt-dix analyses sur un seul
+ * dossier. Exécuté avant correction, contre une vraie base :
+ *
+ *     dossier 1 : 90 analyses
+ *     dossier 2 : 0
+ *     dossier 3 : 0
+ *     destinations réellement couvertes : 1 sur 3
+ *
+ * Le candidat payait trois fois le prix de Dossier et recevait un seul
+ * dossier servi.
+ */
+describe("la part d'analyses par destination", () => {
+  it("se divise sans reste sur toute la grille", () => {
+    for (const pack of PACKS) {
+      expect(analysesParDestination(pack) * pack.destinations).toBe(pack.analyses);
+    }
+  });
+
+  /**
+   * Ce n'est pas une division choisie, c'est la grille : 90 = 3 × 30, et
+   * une destination de Pro vaut exactement un pack Dossier. Si les deux
+   * cessent de coïncider, c'est l'intention de la grille qui a changé, et
+   * ce test doit le dire avant le code.
+   *
+   * Le **prix**, lui, n'est pas linéaire, et c'est voulu : 45 000 XOF font
+   * bien trois fois 15 000, mais 59 € n'en font pas trois fois 29. Pro est
+   * un lot remisé en euros. L'assertion ne porte donc que sur ce que la
+   * couverture distribue — les analyses —, jamais sur le prix.
+   */
+  it("fait d'une destination de Pro exactement un pack Dossier", () => {
+    const dossier = PACKS.find((p) => p.code === "dossier")!;
+    const pro = PACKS.find((p) => p.code === "pro")!;
+
+    expect(analysesParDestination(pro)).toBe(analysesParDestination(dossier));
+    expect(pro.analyses).toBe(dossier.analyses * pro.destinations);
+  });
+
+  it("reste remisé en euros, et le lot n'est pas une simple multiplication", () => {
+    const dossier = PACKS.find((p) => p.code === "dossier")!;
+    const pro = PACKS.find((p) => p.code === "pro")!;
+
+    expect(pro.prix.XOF).toBe(dossier.prix.XOF * pro.destinations);
+    expect(pro.prix.EUR).toBeLessThan(dossier.prix.EUR * pro.destinations);
+  });
+
+  it("ne change rien aux packs qui n'ouvrent qu'une destination", () => {
+    for (const pack of PACKS.filter((p) => p.destinations === 1)) {
+      expect(analysesParDestination(pack)).toBe(pack.analyses);
+    }
   });
 });
