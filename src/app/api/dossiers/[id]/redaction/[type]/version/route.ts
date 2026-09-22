@@ -3,10 +3,12 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
-import { debiterUneAnalyse } from "@/server/acces/quota";
+import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { leRedacteur } from "@/server/redaction/service";
 import { compterMotsTexte } from "@/domain/redaction/versions";
+import { MOTIF_DAPPEL } from "@/domain/ia/appel";
+import { noterLesJetons } from "@/server/redaction/usage";
 import {
   MOTIF_PREMIERE_VERSION,
   MOTIF_REECRITURE,
@@ -40,10 +42,14 @@ import {
  *
  * ── Ce que l'absence du service produit ────────────────────────────────
  *
- * `REDACTEUR_NON_BRANCHE` rend `null`, et la route répond `produite: false`
- * sans créer de version ni débiter quoi que ce soit. C'est la règle d'I.C :
- * un texte fabriqué ici serait déposé en son nom par quelqu'un qui croirait
- * l'avoir relu.
+ * Sans clé, la route répond `produite: false, disponible: false` sans rien
+ * créer ni rien débiter. Avec une clé, l'appel peut encore ne pas aboutir,
+ * et alors `disponible: true` : la nuance porte le message à l'écran — « ce
+ * service n'existe pas ici » et « il n'a pas répondu cette fois » ne
+ * demandent pas la même chose au candidat.
+ *
+ * Dans les deux cas, aucun texte n'est fabriqué ici. C'est la règle d'I.C :
+ * il serait déposé en son nom par quelqu'un qui croirait l'avoir relu.
  */
 const GESTE = z.discriminatedUnion("geste", [
   z.object({ geste: z.literal("mise-en-forme") }),
@@ -146,34 +152,35 @@ export const POST = route({
       })),
     });
 
-    if (!produit) {
+    /*
+      Les jetons consommés sont enregistrés **quoi qu'il advienne** —
+      INV-6. Un appel interrompu au plafond a coûté ; ne pas l'écrire en
+      ferait un appel gratuit dans B-07, qui recalcule des coûts à partir
+      de ces nombres. C'est aussi la correction d'un `costMicros: 0` posé
+      en dur ici, quand l'analyse d'une pièce, elle, le calculait.
+    */
+    await noterLesJetons(
+      acteur!.id,
+      params.id!,
+      `redaction:${piece.type}`,
+      produit.jetonsEntree,
+      produit.jetonsSortie,
+    );
+
+    if (produit.etat === "SANS_TEXTE") {
       /**
        * Le service était branché et n'a rien rendu. La version n'est pas
        * créée et l'analyse est rendue — elle n'a rien rendu, exactement
        * comme une pièce illisible en WF-06. Sans ce retour, un candidat
        * paierait l'échec d'un appel.
        */
-      await db.analysisCredit.create({
-        data: {
-          applicationId: params.id!,
-          delta: 1,
-          reason: "ANALYSE_RENDUE",
-          note: "Mise en forme non aboutie : aucun texte rendu",
-        },
-      });
+      await rendreUneTentative(
+        params.id!,
+        `Mise en forme non aboutie (${produit.cause}) : aucun texte rendu`,
+      );
+      console.warn(`[redaction] ${MOTIF_DAPPEL[produit.cause]} — ${produit.detail}`);
       return { produite: false, disponible: true, rang: null };
     }
-
-    await db.aiUsage.create({
-      data: {
-        userId: acteur!.id,
-        applicationId: params.id!,
-        operation: `redaction:${piece.type}`,
-        inputTokens: produit.jetonsEntree,
-        outputTokens: produit.jetonsSortie,
-        costMicros: 0,
-      },
-    });
 
     return creer(piece.documentId, dernier + 1, produit.texte, MOTIF_PREMIERE_VERSION);
   },

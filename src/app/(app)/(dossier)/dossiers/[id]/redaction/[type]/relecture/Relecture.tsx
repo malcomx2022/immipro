@@ -17,6 +17,7 @@ import {
   type Recoupements,
 } from "@/domain/redaction/coherence";
 import { EnteteDossier } from "../../../EnteteDossier";
+import { LancerLAnalyse } from "./LancerLAnalyse";
 
 /**
  * R-04 — Analyse critique, présentation. WF-08.
@@ -69,6 +70,14 @@ export interface RelectureProps {
   recoupements: Recoupements;
   /** Une version existe : sans texte, il n'y a rien à analyser. */
   texteExistant: boolean;
+  /**
+   * Le service d'analyse est configuré sur cette instance.
+   *
+   * Il ne dit rien de ce qui a été fait — `remarques` s'en charge, et les
+   * confondre est le défaut que ce lot corrige. Il dit s'il y a un geste
+   * à proposer plutôt qu'une absence à expliquer.
+   */
+  analysePossible: boolean;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
   relectureLe: string;
 }
@@ -79,6 +88,7 @@ export function Relecture({
   remarques: brutes,
   recoupements,
   texteExistant,
+  analysePossible,
   relectureLe,
 }: RelectureProps) {
   const id = dossier.id;
@@ -93,6 +103,7 @@ export function Relecture({
     remarques: brutes === null ? null : toutes,
     texteExistant,
     recoupementsEffectues: recoupements.effectues.length > 0,
+    analysePossible,
   });
   const remarques = trierRemarques(toutes);
   const premiere = remarques[0];
@@ -178,13 +189,22 @@ export function Relecture({
       ) : null}
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row-reverse md:items-center md:justify-between">
-        <LienBouton
-          href={`/dossiers/${id}/redaction/${type}`}
-          pleineLargeur
-          className="min-h-action md:w-auto"
-        >
-          {premiere ? premiere.action : (ACTION_RELECTURE[etat] ?? "Revenir à l'éditeur")}
-        </LienBouton>
+        {/*
+          Un seul état porte un geste qui déclenche quelque chose, et c'est
+          celui-là. Partout ailleurs le bouton ramène à l'éditeur : un
+          « Relancer » qui ne relance rien vaut moins qu'une absence.
+        */}
+        {etat === "A_ANALYSER" ? (
+          <LancerLAnalyse dossierId={id} type={type} />
+        ) : (
+          <LienBouton
+            href={`/dossiers/${id}/redaction/${type}`}
+            pleineLargeur
+            className="min-h-action md:w-auto"
+          >
+            {premiere ? premiere.action : (ACTION_RELECTURE[etat] ?? "Revenir à l'éditeur")}
+          </LienBouton>
+        )}
         <LienBouton
           href={`/dossiers/${id}`}
           variante="secondaire"

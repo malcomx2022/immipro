@@ -663,9 +663,15 @@ try {
     const apres = await relireDocument(p.document.id);
     verifier(apres.status === "ILLISIBLE", `la pièce n'est pas déclarée conforme (${apres.status})`);
     const analyse = await analyseDe(p.version.id);
+    /*
+      Le motif est celui que tout appel partage ; le détail, lui, nomme la
+      variable à renseigner. C'est le détail qui rend la ligne
+      actionnable : « aucune clé » envoie chercher, `ANTHROPIC_API_KEY`
+      dit où.
+    */
     verifier(
-      (analyse?.engineLog ?? "").includes("aucune clé d'extraction"),
-      `le journal nomme la configuration manquante (${analyse?.engineLog})`,
+      (analyse?.engineLog ?? "").includes("ANTHROPIC_API_KEY"),
+      `le journal nomme la variable à renseigner (${analyse?.engineLog})`,
     );
     verifier(await solde(p.application.id) === 5, "et le candidat n'a rien payé");
   }

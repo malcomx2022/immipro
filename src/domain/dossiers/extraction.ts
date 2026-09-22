@@ -44,6 +44,12 @@
  * Module pur : aucune dépendance à Prisma, Next, au réseau ou au SDK.
  */
 import {
+  CAUSES_DAPPEL,
+  MOTIF_DAPPEL,
+  appelSeReprend,
+  type CauseDAppel,
+} from "@/domain/ia/appel";
+import {
   moisEntre,
   type ChampsExtraits,
   type Condition,
@@ -96,22 +102,27 @@ export const typeLisible = (mime: string | null | undefined): mime is TypeLisibl
  *   dans une langue qu'il ne traite pas. Le candidat a un geste à faire,
  *   et c'est le seul cas où le message lui en demande un.
  */
-export const CAUSES_DE_NON_LECTURE = [
-  "non_configure",
+/**
+ * Ce qui est propre à la lecture d'une pièce déposée : le fichier lui-même
+ * peut faire obstacle avant qu'un octet ne parte. Les six causes communes
+ * à tout appel vivent dans `domain/ia/appel.ts`, et ne sont pas recopiées
+ * ici — voir le module pour la raison.
+ */
+export const OBSTACLES_DE_LA_PIECE = [
   "type_non_lisible",
   "trop_volumineux",
   "objet_absent",
-  "injoignable",
-  "delai_depasse",
-  "service_sature",
-  "refus",
-  "reponse_illisible",
   "scan_illisible",
   "document_protege",
   "langue_non_geree",
 ] as const;
 
-export type CauseDeNonLecture = (typeof CAUSES_DE_NON_LECTURE)[number];
+export const CAUSES_DE_NON_LECTURE = [
+  ...CAUSES_DAPPEL,
+  ...OBSTACLES_DE_LA_PIECE,
+] as const;
+
+export type CauseDeNonLecture = CauseDAppel | (typeof OBSTACLES_DE_LA_PIECE)[number];
 
 /**
  * Les obstacles que le modèle peut signaler lui-même, et eux seuls.
@@ -137,7 +148,7 @@ export type ObstacleDuModele = (typeof OBSTACLES_DU_MODELE)[number];
  * consomme la file et retarde la revue humaine d'autant.
  */
 export const seReprendSeule = (cause: CauseDeNonLecture): boolean =>
-  cause === "injoignable" || cause === "delai_depasse" || cause === "service_sature";
+  (CAUSES_DAPPEL as readonly string[]).includes(cause) && appelSeReprend(cause as CauseDAppel);
 
 /** Qui peut agir. Commande le message : on ne demande un geste qu'à qui peut le faire. */
 export function quiPeutAgir(cause: CauseDeNonLecture): "candidat" | "plateforme" {
@@ -202,15 +213,10 @@ export const MESSAGE_AU_CANDIDAT: Record<CauseDeNonLecture, string> = {
  * URL, jamais un extrait de la pièce : ces lignes finissent en journal.
  */
 export const MOTIF_DE_NON_LECTURE: Record<CauseDeNonLecture, string> = {
-  non_configure: "aucune clé d'extraction n'est configurée",
+  ...MOTIF_DAPPEL,
   type_non_lisible: "le type MIME de la version n'est pas transmissible",
   trop_volumineux: "la pièce dépasse la limite de transmission",
   objet_absent: "l'objet est introuvable dans le stockage de confiance",
-  injoignable: "le service de lecture n'a pas répondu",
-  delai_depasse: `le service de lecture n'a rien rendu en ${DELAI_EXTRACTION_MS} ms`,
-  service_sature: "le service de lecture a refusé la demande faute de capacité",
-  refus: "le service de lecture a refusé de traiter la demande",
-  reponse_illisible: "la réponse du service n'a pas la forme attendue",
   scan_illisible: "le modèle ne déchiffre pas le texte de la pièce",
   document_protege: "le modèle signale un document protégé",
   langue_non_geree: "le modèle signale une langue qu'il ne traite pas",

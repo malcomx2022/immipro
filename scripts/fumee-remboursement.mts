@@ -99,11 +99,27 @@ function rembourseurSimule(
   };
 }
 
-const ACCEPTEE: Remboursement = {
+/**
+ * L'accusé du fournisseur, daté **au moment où il répond**.
+ *
+ * Il portait une date fixe, `2026-09-22T10:00:00Z`. La fumée passait le
+ * matin et échouait l'après-midi : `refundDueAt` est posée à l'ouverture
+ * de la dette, donc à l'heure du run, et la base refuse une demande
+ * antérieure à la décision qui l'ouvre
+ * (`transaction_demande_apres_la_decision`). Après dix heures UTC, la
+ * date figée passait avant l'ouverture, et la garde — qui fait son
+ * travail — arrêtait toute la fumée.
+ *
+ * Une fonction et non une constante : évaluée au chargement du module,
+ * même `new Date()` précéderait de quelques millisecondes l'ouverture
+ * de la dette, et le défaut reviendrait sous une forme plus difficile à
+ * lire.
+ */
+const acceptee = (): Remboursement => ({
   issue: "acceptee",
-  accepteLe: new Date("2026-09-22T10:00:00.000Z"),
+  accepteLe: new Date(),
   providerRefundId: "stripe:re_1",
-};
+});
 const TEMPORAIRE: Remboursement = { issue: "temporaire", detail: "réseau" };
 
 let rang = 0;
@@ -174,7 +190,7 @@ try {
   console.log("\nDeux reprises concurrentes");
   {
     const { application, transaction } = await candidatPaye({ analyses: 30 });
-    const rembourseur = rembourseurSimule([ACCEPTEE]);
+    const rembourseur = rembourseurSimule([acceptee()]);
 
     /*
       Le cœur du lot. Les deux appels partent ensemble : sans réservation
@@ -213,7 +229,7 @@ try {
   console.log("\nLa demande acceptée n'est pas un versement");
   {
     const { transaction } = await candidatPaye({ analyses: 10 });
-    const rembourseur = rembourseurSimule([ACCEPTEE]);
+    const rembourseur = rembourseurSimule([acceptee()]);
     const issue = await initierLeRemboursement(transaction.reference, rembourseur);
     verifier(issue.issue === "acceptee", `la demande est acceptée (${issue.issue})`);
 
@@ -244,7 +260,7 @@ try {
   console.log("\nReprise après un échec passager");
   {
     const { application, transaction } = await candidatPaye({ analyses: 30 });
-    const rembourseur = rembourseurSimule([TEMPORAIRE, ACCEPTEE]);
+    const rembourseur = rembourseurSimule([TEMPORAIRE, acceptee()]);
 
     const premier = await initierLeRemboursement(transaction.reference, rembourseur);
     verifier(premier.issue === "temporaire", `le premier envoi échoue (${premier.issue})`);
@@ -321,7 +337,7 @@ try {
   console.log("\nL'identifiant fournisseur est vérifié avant tout appel");
   {
     const { transaction } = await candidatPaye({ providerTxId: null });
-    const rembourseur = rembourseurSimule([ACCEPTEE]);
+    const rembourseur = rembourseurSimule([acceptee()]);
     const issue = await initierLeRemboursement(transaction.reference, rembourseur);
     verifier(
       issue.issue === "identifiant_inutilisable" && issue.detail === "absent",
@@ -334,7 +350,7 @@ try {
   }
   {
     const { transaction } = await candidatPaye({ providerTxId: `fedapay:${rang}_${process.pid}` });
-    const rembourseur = rembourseurSimule([ACCEPTEE]);
+    const rembourseur = rembourseurSimule([acceptee()]);
     const issue = await initierLeRemboursement(transaction.reference, rembourseur);
     verifier(
       issue.issue === "identifiant_inutilisable" && issue.detail === "autre_fournisseur",
@@ -348,7 +364,7 @@ try {
   {
     const { application, transaction } = await candidatPaye({ analyses: 30 });
     await debiterUneAnalyse(application.id);
-    const rembourseur = rembourseurSimule([ACCEPTEE]);
+    const rembourseur = rembourseurSimule([acceptee()]);
 
     const issue = await initierLeRemboursement(transaction.reference, rembourseur);
     verifier(issue.issue === "revue_manuelle", `la revue manuelle l'emporte (${issue.issue})`);
@@ -374,7 +390,7 @@ try {
   console.log("\nL'index ne parle que des remboursements");
   {
     const { application, transaction } = await candidatPaye({ analyses: 30 });
-    await initierLeRemboursement(transaction.reference, rembourseurSimule([ACCEPTEE]));
+    await initierLeRemboursement(transaction.reference, rembourseurSimule([acceptee()]));
     /*
       Un octroi et un retrait citent la même transaction : le pack l'a
       ouverte, le remboursement la referme. L'index ne doit pas les

@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Relecture } from "./Relecture";
-import { db } from "@/lib/db";
 import { vueDuDossier } from "@/server/lecture/dossiers";
-import { faitsDuDossier, pieceARediger, remarquesDeLaVersion } from "@/server/lecture/redaction";
-import { AUCUN_RECOUPEMENT, recoupements } from "@/domain/redaction/coherence";
+import { faitsDuDossier, pieceARediger, vueDeLaRelecture } from "@/server/lecture/redaction";
 import { exigerCandidat } from "@/server/securite/page";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 
@@ -57,39 +55,16 @@ export default async function PageRelecture({
   ]);
   if (!vue || !piece) notFound();
 
-  const derniere = await db.documentVersion.findFirst({
-    where: { documentId: piece.documentId },
-    orderBy: { rank: "desc" },
-    select: { id: true, uploadedAt: true, body: true },
-  });
-
-  /**
-   * Tant que le service d'analyse n'est pas branché, aucune remarque n'a pu
-   * être produite : la liste vide de la base ne veut pas dire « rien à
-   * reprendre ». Le jour où il l'est, une version analysée sans remarque
-   * rendra bien `[]`, et l'écran dira enfin la vérité en le disant.
-   */
-  const remarques =
-    derniere && redactionConfiguree() ? await remarquesDeLaVersion(derniere.id) : null;
-
   /*
-    Les recoupements déterministes ne dépendent ni du service d'analyse ni
-    du quota : la règle d'architecture 2 veut que ce qui est vérifiable
-    sans IA le soit sans IA. Ils tournent donc même quand la rédaction
-    n'est pas branchée — c'est tout l'objet de ce lot.
+    La décision — « cette version a-t-elle été relue ? » — vit dans
+    `vueDeLaRelecture`, et non ici. La fumée du lot appelle cette
+    fonction-là : recopier la décision dans un script aurait vérifié un
+    chemin que personne n'emprunte, et une mutation l'a prouvé en
+    laissant la fumée verte alors que la page redevenait fautive.
   */
-  const croisements = derniere?.body
-    ? recoupements(derniere.body, faits)
-    : AUCUN_RECOUPEMENT;
+  const vueRelecture = await vueDeLaRelecture(piece.documentId, faits, redactionConfiguree());
 
   return (
-    <Relecture
-      dossier={vue.dossier}
-      type={type}
-      remarques={remarques}
-      recoupements={croisements}
-      texteExistant={derniere !== null}
-      relectureLe={(derniere?.uploadedAt ?? new Date()).toISOString().slice(0, 10)}
-    />
+    <Relecture dossier={vue.dossier} type={type} {...vueRelecture} />
   );
 }
