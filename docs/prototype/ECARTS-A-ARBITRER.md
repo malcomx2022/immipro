@@ -5892,3 +5892,130 @@ Cinq mutations, cinq rouges :
 | le résolveur relit `process.env` | trois cas, dont l'adresse du moteur |
 | « aucune sonde sûre » se confond avec « aucune sonde » | la lecture d'ensemble |
 | une exception de plus, non justifiée | cinq cas, dont le plafond |
+
+---
+
+### S.32 — La sonde ne traversait pas la frontière des processus
+
+S.31 a rendu le 503 de `/api/health` extinguible. Il ne s'éteignait
+toujours pas, pour une seconde raison, cachée derrière la première.
+
+Deux sondes concluent sur un **fait** plutôt que sur la forme d'une
+variable : la messagerie a-t-elle parlé à un serveur, le moteur de
+balayage a-t-il reconnu le fichier d'essai. C'est la bonne règle, posée
+exprès le 21/09. Le fait était rangé dans une variable de module — et
+il est **établi par le worker**, qui est un service séparé
+(`docker-compose.prod.yml`), tandis que `/api/health` vit dans le
+processus web.
+
+Établi en exécutant les deux sondes dans un processus qui n'a rien
+sondé, c'est-à-dire dans la situation du serveur web :
+
+```
+messagerie : ABSENTE | fait : null
+antivirus  : ABSENTE | fait : null
+```
+
+Les deux dépendances sont bloquantes. L'instance restait donc inapte,
+indéfiniment, et aucun déploiement n'y aurait rien changé.
+
+#### Trois défauts, une seule cause
+
+**Le constat ne franchissait pas la frontière.** Il passe par la base
+(`ServiceProbe`), qui est le seul état que les deux processus partagent.
+Écrit par qui sonde, lu en une requête par `/api/health`, qui le passe
+aux sondes — celles-ci restent pures, aucune ne va chercher quoi que ce
+soit.
+
+**Il n'avait pas de date de péremption.** `DernierFait` portait sa date
+et personne ne la lisait : un envoi réussi il y a trois semaines aurait
+déclaré la messagerie opérationnelle devant un serveur éteint depuis.
+Trois heures de validité, soit le triple de la cadence de resonde — un
+retard de passe ne fait pas clignoter l'état, une panne installée se
+voit. Au-delà, le constat redevient « aucune nouvelle » : **ni succès,
+ni échec**, parce que le service n'a pas été pris en défaut.
+
+**Personne ne resondait.** Le worker sondait au démarrage et plus
+jamais : sans repasse, le constat se serait périmé après une matinée de
+fonctionnement normal. Une file horaire s'en charge, et une passe part
+aussi tout de suite — attendre l'heure ronde laisserait l'instance sans
+constat jusqu'à soixante minutes après un déploiement, c'est-à-dire
+exactement quand on la regarde.
+
+#### La sonde ne commandait rien
+
+C'est le point le plus important, et il n'était pas dans le périmètre
+annoncé.
+
+Le lot du balayage (S.30) a ajouté une sonde EICAR pour détecter « la
+seule panne de cette chaîne qui ne se remarquerait pas » — un moteur qui
+répond `clean` à tout. Elle la détectait, et le disait à l'état de
+service. **Rien n'en tirait de conséquence** : le dépôt d'une pièce ne
+consultait qu'`antivirusConfigure`, si bien que les fichiers
+continuaient d'être acceptés et promus par un moteur qui ne lit rien.
+
+Une sonde dont rien ne dépend est un affichage. Le dépôt lit maintenant
+le constat et refuse devant un moteur pris en défaut. L'ignorance, elle,
+ne ferme rien : une pièce déposée sans constat reste en quarantaine et
+n'est promue que sur un verdict « saine ». Fermer sur l'ignorance
+bloquerait chaque démarrage à froid sans rien protéger de plus. Un échec
+périmé ne ferme plus non plus — le moteur a pu être remplacé, et laisser
+un vieux constat fermer indéfiniment ferait d'une panne réparée une
+panne permanente.
+
+#### Le commentaire qui l'annonçait déjà
+
+Le lot du balayage avait écrit, dans le worker :
+
+> Son échec n'empêche pas le worker de démarrer. Il n'ouvre rien non
+> plus : `antivirusConfigure` commande le dépôt, et une sonde muette
+> laisse la capacité non vérifiée, donc l'instance inapte au
+> téléversement.
+
+Deux faits vrais, juxtaposés de façon à suggérer un mécanisme qui
+n'existait pas : l'inaptitude de l'instance ne ferme aucun dépôt, et la
+route ne consulte pas la capacité. C'est le troisième commentaire de
+cette série à décrire un garde-fou que le code ne tient pas — après
+l'avertissement de l'adaptateur FedaPay (S.29) et le test qui lisait un
+commentaire pour vérifier un commentaire.
+
+#### Ce que la mise à l'épreuve a trouvé
+
+Deux choses qu'aucune relecture n'aurait données, parce qu'elles
+n'apparaissent qu'en exécutant :
+
+- **`expedier` ne persistait pas son constat.** Le commentaire du module
+  disait « écrit par le worker et par le processus web à chaque courrier
+  réellement expédié » ; seule la première moitié existait. La fumée du
+  courrier l'a montrée : un envoi réel, puis aucune ligne en base.
+- **La fumée n'empruntait pas le chemin du worker.** Elle appelait
+  `verifierLeMoteur` directement, c'est-à-dire un enchaînement que la
+  production n'exécute pas — et ne voyait donc aucun constat écrit. Les
+  sondes ont été sorties dans `server/exploitation/sondes.ts`, appelé
+  par le worker **et** par la fumée.
+
+#### Vérifié en exécutant, et en mutant
+
+Six mutations, six rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la fraîcheur n'est plus lue | cinq cas, dont la capacité périmée |
+| un constat périmé bascule en échec | cinq cas |
+| l'absence de constat ferme le dépôt | le démarrage à froid |
+| un échec périmé ferme encore | la panne réparée qui resterait permanente |
+| le dépôt ne consulte plus le constat | le branchement de la route |
+| `expedier` ne persiste plus son constat | deux cas de la fumée du courrier |
+
+Deux garde-fous SQL de plus : un service que le code ne connaît pas est
+refusé, et un constat daté du futur aussi — une horloge déréglée rendrait
+un constat éternellement frais.
+
+#### Un bruit écarté, plutôt que toléré
+
+Persister depuis `expedier` a fait cracher à Prisma une erreur de
+configuration à chaque courrier journalisé en test, où aucune base
+n'existe. `noterLeConstat` sort maintenant sans rien tenter quand
+`DATABASE_URL` est absente : il n'y a pas de constat à écrire, et rien à
+signaler. Le bruit d'un journal finit par cacher les vraies erreurs —
+c'est la même leçon que la violation d'unicité du lot des remboursements.

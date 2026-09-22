@@ -32,11 +32,11 @@ import {
   EICAR,
   TAILLE_MAXI_BALAYAGE_OCTETS,
   lireLaReponse,
-  sondeDuBalayage,
   urlDuMoteurValide,
   type DernierBalayageDEssai,
   type Verdict,
 } from "@/domain/securite/balayage";
+import { sondeDuConstat, type Constat } from "@/domain/exploitation/constats";
 import { lireEnQuarantaine, tailleEnQuarantaine } from "@/lib/storage";
 
 export type { Verdict } from "@/domain/securite/balayage";
@@ -255,11 +255,26 @@ export const oublierLesEssais = (): void => {
   dernierEssai = null;
 };
 
-/** La sonde de l'état de service. Locale, sans réseau, sans effet de bord. */
+/**
+ * La sonde de l'état de service. Locale, sans réseau, sans effet de bord.
+ *
+ * Le constat lui est **passé** : il vient de la base, parce que l'essai
+ * est fait par le worker et lu par le processus web. À défaut — un
+ * test, une commande hors ligne —, elle retombe sur l'essai du
+ * processus courant.
+ */
 export const sonderLeBalayage = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,
-): ReturnType<typeof sondeDuBalayage> =>
-  sondeDuBalayage(urlDuMoteurValide((environnement.ANTIVIRUS_URL ?? "").trim()), dernierEssai);
+  constat: Constat | undefined = dernierEssai
+    ? { reussi: dernierEssai.reconnu, quand: dernierEssai.quand }
+    : undefined,
+  maintenant = new Date(),
+): ReturnType<typeof sondeDuConstat> =>
+  sondeDuConstat(
+    urlDuMoteurValide((environnement.ANTIVIRUS_URL ?? "").trim()),
+    constat,
+    maintenant,
+  );
 
 /**
  * Présente EICAR au moteur, et note ce qu'il en a dit.

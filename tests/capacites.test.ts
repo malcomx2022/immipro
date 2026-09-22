@@ -25,6 +25,7 @@ import { remboursementBranche } from "@/server/paiement/remboursement";
 import { remboursementFedaPay } from "@/server/paiement/fedapay";
 import { lExtracteur } from "@/server/jobs/analyse";
 import { laCritique, leRedacteur } from "@/server/redaction/service";
+import { FRAICHEUR_DU_CONSTAT_MS } from "@/domain/exploitation/constats";
 
 /**
  * « Une variable renseignée ne vaut pas un service. »
@@ -576,5 +577,104 @@ describe("le résolveur lit l'environnement observé, pas celui du processus", (
     // La normalisation a eu lieu une fois, et les trois en profitent.
     for (const vu of vus) expect(vu.FEDAPAY_API_KEY).toBe("ancienne");
     expect(new Set(vus).size).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Le constat franchit la frontière des processus, ou il ne sert à rien.
+ * ------------------------------------------------------------------ */
+
+/**
+ * **Le second 503 permanent, caché derrière le premier.**
+ *
+ * Deux sondes concluent sur un fait — la messagerie a-t-elle parlé à un
+ * serveur, le moteur a-t-il reconnu EICAR. Ce fait était établi par le
+ * **worker**, qui est un service séparé en production, et lu par
+ * `/api/health`, qui vit dans le processus web. Une variable de module
+ * ne traverse pas cette frontière : l'adresse lisait « aucune sonde n'a
+ * tourné » indéfiniment, pour deux dépendances bloquantes.
+ *
+ * Les constats sont donc passés depuis la base, et ces tests les
+ * fournissent comme `/api/health` le fait.
+ */
+describe("les capacités concluent sur les constats qu'on leur donne", () => {
+  const TOUT = { ...TOUT_RENSEIGNE };
+  const frais = (reussi: boolean) => ({ reussi, quand: new Date() });
+
+  afterEach(() => {
+    brancherTransport(TRANSPORT_JOURNAL);
+    oublierLesFaits();
+  });
+
+  /** Sans constat : ce que le processus web voyait, toujours. */
+  it("sans constat, les deux sondes restent sans conclusion", () => {
+    const par = Object.fromEntries(
+      constaterLesDependances(TOUT, {}).map((c) => [c.cle, c.observation.sonde]),
+    );
+    expect(par.messagerie).toBe("ABSENTE");
+    expect(par.antivirus).toBe("ABSENTE");
+  });
+
+  /**
+   * Avec les constats du worker, les deux deviennent opérationnelles —
+   * ce qui était **impossible** avant ce lot, quelle que soit la
+   * configuration et quoi qu'ait fait le worker.
+   */
+  it("avec les constats du worker, elles concluent", () => {
+    const constats = constaterLesDependances(TOUT, {
+      messagerie: frais(true),
+      antivirus: frais(true),
+    });
+    const par = Object.fromEntries(constats.map((c) => [c.cle, c.capacite]));
+    expect(par.messagerie).toBe("OPERATIONNELLE");
+    expect(par.antivirus).toBe("OPERATIONNELLE");
+  });
+
+  /**
+   * Et un moteur qui a déclaré sain le fichier d'essai se lit **en
+   * panne**, pas « non vérifié » : c'est un fait établi, et le plus
+   * grave de tous, puisque tout continuerait de passer.
+   */
+  it("un moteur qui ne détecte rien se lit en panne", () => {
+    const constats = constaterLesDependances(TOUT, { antivirus: frais(false) });
+    const antivirus = constats.find((c) => c.cle === "antivirus")!;
+    expect(antivirus.observation.sonde).toBe("ECHOUEE");
+    // Bloquante et attendue : « en panne », pas « dégradée ».
+    expect(antivirus.capacite).toBe("EN_PANNE");
+  });
+
+  /** Un constat périmé ne conclut plus — l'instance retombe à l'ignorance. */
+  it("un constat périmé cesse de porter la capacité", () => {
+    const vieux = { reussi: true, quand: new Date(Date.now() - FRAICHEUR_DU_CONSTAT_MS - 1) };
+    const constats = constaterLesDependances(TOUT, { messagerie: vieux, antivirus: vieux });
+    const par = Object.fromEntries(constats.map((c) => [c.cle, c.capacite]));
+    expect(par.messagerie).toBe("CONFIGUREE_NON_VERIFIEE");
+    expect(par.antivirus).toBe("CONFIGUREE_NON_VERIFIEE");
+  });
+
+  /**
+   * Le constat des signatures n'existe pas, et c'est normal : cette
+   * sonde-là est entièrement locale — elle signe un corps connu et
+   * vérifie la fonction qu'appellent les routes de webhook. Rien à
+   * partager entre processus.
+   */
+  it("la sonde locale conclut sans qu'aucun constat lui soit donné", () => {
+    const paiements = constaterLesDependances(TOUT, {}).find((c) => c.cle === "paiements")!;
+    expect(paiements.capacite).toBe("OPERATIONNELLE");
+  });
+
+  /**
+   * L'instant de référence est **passé**, jamais lu en douce : une
+   * capacité ne doit pas dépendre de l'horloge au milieu d'un calcul.
+   */
+  it("la fraîcheur se mesure contre l'instant fourni", () => {
+    const constat = { reussi: true, quand: new Date("2026-09-22T06:00:00Z") };
+    const lire = (maintenant: Date) =>
+      constaterLesDependances(TOUT, { antivirus: constat }, DEPENDANCES, POINTS, maintenant).find(
+        (c) => c.cle === "antivirus",
+      )!.capacite;
+
+    expect(lire(new Date("2026-09-22T08:00:00Z"))).toBe("OPERATIONNELLE");
+    expect(lire(new Date("2026-09-22T10:00:00Z"))).toBe("CONFIGUREE_NON_VERIFIEE");
   });
 });

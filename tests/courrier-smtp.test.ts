@@ -8,7 +8,6 @@ import {
   DELAI_ENVOI_MS,
   analyserUrlSmtp,
   domaineDe,
-  sondeDuTransport,
   suiteDeLEnvoi,
   traceDEnvoi,
   type IssueDEnvoi,
@@ -20,6 +19,10 @@ import {
   oublierLeTransporteur,
   verifierLaConnexion,
 } from "@/server/courrier/smtp";
+import {
+  FRAICHEUR_DU_CONSTAT_MS,
+  sondeDuConstat,
+} from "@/domain/exploitation/constats";
 import {
   TRANSPORT_JOURNAL,
   brancherTransport,
@@ -227,11 +230,29 @@ describe("les issues, et ce qu'elles autorisent", () => {
   });
 
   it("la sonde ne conclut que sur un fait", () => {
-    expect(sondeDuTransport(true, null)).toBe("ABSENTE");
-    expect(sondeDuTransport(true, { reussi: true, quand: new Date() })).toBe("CONCLUANTE");
-    expect(sondeDuTransport(true, { reussi: false, quand: new Date() })).toBe("ECHOUEE");
+    expect(sondeDuConstat(true, undefined)).toBe("ABSENTE");
+    expect(sondeDuConstat(true, { reussi: true, quand: new Date() })).toBe("CONCLUANTE");
+    expect(sondeDuConstat(true, { reussi: false, quand: new Date() })).toBe("ECHOUEE");
     // Une URL illisible est un fait, elle : inutile d'attendre un envoi.
-    expect(sondeDuTransport(false, { reussi: true, quand: new Date() })).toBe("ECHOUEE");
+    expect(sondeDuConstat(false, { reussi: true, quand: new Date() })).toBe("ECHOUEE");
+  });
+
+  /**
+   * Un constat a une durée de validité. `DernierFait` portait sa date et
+   * personne ne la lisait : un envoi réussi il y a trois semaines aurait
+   * déclaré la messagerie opérationnelle aujourd'hui, devant un serveur
+   * éteint depuis.
+   */
+  it("un constat périmé ne conclut plus rien — ni succès, ni échec", () => {
+    const vieux = { reussi: true, quand: new Date(Date.now() - FRAICHEUR_DU_CONSTAT_MS - 1) };
+    expect(sondeDuConstat(true, vieux)).toBe("ABSENTE");
+
+    // Et il ne bascule pas non plus en échec : le service n'a pas été
+    // pris en défaut, on n'a simplement plus de nouvelles.
+    expect(sondeDuConstat(true, vieux)).not.toBe("ECHOUEE");
+
+    const juste = { reussi: true, quand: new Date(Date.now() - FRAICHEUR_DU_CONSTAT_MS + 60_000) };
+    expect(sondeDuConstat(true, juste)).toBe("CONCLUANTE");
   });
 });
 

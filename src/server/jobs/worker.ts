@@ -8,9 +8,7 @@
  * d'incident, sans file de jobs.
  */
 import { getQueue, JOBS, poster } from "@/lib/queue";
-import { noterLeFait } from "@/server/courrier";
-import { verifierLaConnexion } from "@/server/courrier/smtp";
-import { verifierLeMoteur } from "@/server/securite/antivirus";
+import { sonderLesServices } from "@/server/exploitation/sondes";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
@@ -91,6 +89,10 @@ async function main() {
     console.info("[veille]", { depubliees });
   });
 
+  await boss.work(JOBS.SONDE_SERVICES, async () => {
+    console.info("[sondes]", await sonderLesServices());
+  });
+
   await boss.work(JOBS.PEREMPTION_PIECES, async () => {
     console.info("[peremption]", await declasserLesPiecesEchues());
   });
@@ -109,52 +111,21 @@ async function main() {
   await boss.schedule(JOBS.PURGE_RETENTION, "30 3 * * *");
 
   /*
-    La sonde du transport de courrier, une fois au démarrage.
+    La resonde, toutes les heures — I.C, 22/09/2026.
 
-    `verify()` ouvre la connexion, dit bonjour, s'authentifie si besoin,
-    et raccroche : **aucun message n'est remis**. C'est ce qui permet de
-    l'appeler ici sans écrire à personne.
-
-    Elle est ici et non dans `/api/health`, parce que cette adresse-là
-    est interrogée par un répartiteur de charge et que la décision de
-    n'en rien faire partir est prise (21/09/2026). Sans ce passage, la
-    messagerie resterait « configurée, non vérifiée » jusqu'au premier
-    courrier réel — c'est-à-dire jusqu'au premier candidat, qui est
-    exactement la personne sur qui on ne veut pas découvrir la panne.
-
-    Son échec n'empêche pas le worker de démarrer : les jobs de paiement
-    et de purge n'ont rien à voir avec le courrier, et les bloquer sur
-    un serveur de messagerie muet ferait d'une panne un arrêt.
+    Sans repasse, le constat du démarrage se périmerait
+    (`FRAICHEUR_DU_CONSTAT_MS` vaut trois heures) et l'état de service
+    retomberait à « aucune nouvelle » après une matinée de
+    fonctionnement normal. La cadence est le tiers de la fraîcheur : un
+    retard ou un redémarrage ne fait pas clignoter l'état, une panne
+    installée se voit au bout de trois heures au plus.
   */
-  const courrier = await verifierLaConnexion().catch(() => null);
-  if (courrier) {
-    noterLeFait(courrier.issue === "envoye");
-    console.info(`[courrier] vérification de la connexion · ${courrier.issue}`);
-  }
+  await boss.schedule(JOBS.SONDE_SERVICES, "0 * * * *");
 
-  /*
-    La sonde du moteur de balayage, une fois au démarrage, et pour la même
-    raison que celle du courrier : `/api/health` est interrogée par un
-    répartiteur de charge et ne déclenche rien.
-
-    Ce qui part est le fichier d'essai **EICAR** — une chaîne normalisée,
-    sans charge, que les moteurs se sont accordés à signaler précisément
-    pour qu'on puisse les vérifier. Aucun fichier de candidat n'est
-    transmis, aucune version n'est touchée, rien n'est promu.
-
-    Le seul résultat qui vaut preuve est « infectée ». Un moteur qui
-    répond `clean` à EICAR répond sans détecter, et c'est la panne qu'il
-    faut lire ici plutôt que sur le premier fichier réellement infecté :
-    elle ne se remarquerait jamais autrement, puisque tout continuerait
-    de passer.
-
-    Son échec n'empêche pas le worker de démarrer. Il n'ouvre rien non
-    plus : `antivirusConfigure` commande le dépôt, et une sonde muette
-    laisse la capacité non vérifiée, donc l'instance inapte au
-    téléversement.
-  */
-  const moteur = await verifierLeMoteur().catch(() => null);
-  if (moteur) console.info(`[balayage] vérification du moteur · ${moteur.issue} — ${moteur.detail}`);
+  // Et une fois tout de suite : attendre l'heure ronde laisserait
+  // l'instance sans constat pendant jusqu'à soixante minutes après un
+  // déploiement, c'est-à-dire exactement quand on la regarde.
+  console.info("[sondes]", await sonderLesServices());
 
   console.log("worker démarré");
 }

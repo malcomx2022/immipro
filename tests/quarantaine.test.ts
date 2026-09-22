@@ -110,6 +110,39 @@ describe("l'absence de balayeur ne se traduit jamais en acceptation", () => {
   });
 });
 
+/* ------------------------------------------------------------------ *
+ * Ce que la sonde a fini par commander.
+ * ------------------------------------------------------------------ */
+
+describe("un moteur pris en défaut ferme le dépôt, et pas seulement l'état", () => {
+  /**
+   * La sonde EICAR voyait déjà un moteur qui répond sans détecter, et le
+   * disait à l'état de service. Personne n'en tirait de conséquence : le
+   * dépôt ne consultait qu'`antivirusConfigure`, si bien que les
+   * fichiers continuaient d'être acceptés **et promus** par un moteur
+   * qui ne lit rien. Une sonde dont rien ne dépend est un affichage.
+   *
+   * La route lit maintenant le constat. Ce test tient le branchement —
+   * la règle elle-même est éprouvée dans
+   * `tests/constats-de-service.test.ts`, et la chaîne complète dans
+   * `scripts/fumee-balayage.mts`.
+   */
+  it("la route de dépôt consulte le constat, pas seulement la configuration", () => {
+    const route = lire("src/app/api/dossiers/[id]/pieces/[pieceId]/depot/route.ts");
+    expect(route).toMatch(/moteurPrisEnDefaut\(\(await lireLesConstats\(\)\)\.antivirus\)/u);
+    // Et les deux refus mènent au même message, qui dit ce qui manque.
+    expect(route.match(/televersement_indisponible/gu)?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  /** Le message reste actionnable, et ne nomme aucune menace. */
+  it("le refus dit ce qui est conservé et quoi faire", () => {
+    const refus = ECHECS.televersement_indisponible;
+    expect(refus.statut).toBe(503);
+    expect(refus.conserve).toMatch(/déjà déposées ne changent pas/u);
+    expect(refus.action).toBeTruthy();
+  });
+});
+
 describe("les messages disent l'état réel, et le geste attendu", () => {
   it("une quarantaine se dit sans le mot qui inquiète, et sans rien demander", () => {
     expect(mentionApercu("EN_QUARANTAINE")).toBe(MENTION_EN_QUARANTAINE);

@@ -7,6 +7,7 @@ import {
   messageDeSurveillance,
 } from "@/domain/exploitation/dependances";
 import { constaterLesDependances } from "@/server/exploitation/capacites";
+import { lireLesConstats } from "@/server/exploitation/constats";
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
 
 /**
@@ -119,13 +120,27 @@ async function sonderLaQuarantaine(): Promise<EtatDeLaQuarantaine> {
 }
 
 export async function GET() {
-  const [base, file, quarantaine] = await Promise.all([
+  const [base, file, quarantaine, faits] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
+    /*
+      Les constats de service, lus en base — 22/09/2026.
+
+      Deux sondes concluent sur un fait établi par le **worker**, qui
+      est un service séparé en production. Tant que ce fait vivait dans
+      une variable de module, cette adresse-ci lisait toujours « aucune
+      sonde n'a tourné » : la messagerie et le balayage, tous deux
+      bloquants, ne pouvaient jamais être opérationnels, et l'instance
+      restait inapte indéfiniment.
+
+      Les lire ici ne déclenche rien : c'est une requête, pas une sonde.
+      Les sondes restent pures et reçoivent ce qu'on a trouvé.
+    */
+    lireLesConstats(),
   ]);
 
-  const constats = constaterLesDependances();
+  const constats = constaterLesDependances(process.env, faits);
   const etat = etatDesCapacites(constats);
   const intitules = new Map(DEPENDANCES.map((d) => [d.cle, d.intitule]));
 

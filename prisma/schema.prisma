@@ -599,6 +599,27 @@ model AiUsage {
   @@index([applicationId, createdAt])
 }
 
+/// Le dernier constat d'un service extérieur — I.C, 22/09/2026.
+///
+/// Il était tenu dans une variable de module. Le worker le posait, le
+/// processus web le lisait, et les deux ne partagent aucune mémoire : la
+/// lecture rendait « aucune sonde n'a tourné » indéfiniment. La base est
+/// le seul état que les deux processus ont en commun.
+///
+/// Une ligne par service, écrasée : c'est l'état courant qui décide, et
+/// un historique de sondes n'apprendrait rien que le journal ne dise.
+model ServiceProbe {
+  /// La clé de la dépendance : « messagerie », « antivirus ».
+  service    String   @id
+  /// Le service a répondu **comme il devait**, pas seulement répondu.
+  succeeded  Boolean
+  observedAt DateTime
+  /// La forme de ce qui s'est passé. Jamais un secret, jamais un corps.
+  detail     String?
+
+  @@index([observedAt])
+}
+
 model AuditLog {
   id        String   @id @default(uuid())
   actorId   String

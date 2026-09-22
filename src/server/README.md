@@ -702,6 +702,38 @@ aujourd'hui lisent un **fait déjà établi** — une signature vérifiée, un
 courrier réellement parti, EICAR réellement signalé —, jamais la forme d'une
 variable.
 
+#### Le fait doit franchir la frontière des processus
+
+Il ne la franchissait pas. Deux sondes concluent sur un fait établi par le
+**worker**, qui est un service séparé (`docker-compose.prod.yml`), et lu par
+`/api/health`, qui vit dans le processus web. Le fait tenait dans une
+variable de module : l'adresse lisait « aucune sonde n'a tourné »
+indéfiniment, pour la messagerie et pour le balayage — deux bloquantes. Le
+503 qu'on venait de rendre extinguible ne s'éteignait toujours pas, pour une
+autre raison, invisible.
+
+Le constat passe donc par la base (`ServiceProbe`), qui est le seul état
+partagé. Il est écrit par qui sonde — le worker au démarrage et à chaque
+passe horaire, le processus web à chaque courrier réellement expédié — et lu
+en une requête par `/api/health`, qui le passe aux sondes. Celles-ci restent
+pures : aucune ne va chercher quoi que ce soit.
+
+**Un constat a une durée de validité**, ce qui manquait aussi :
+`DernierFait` portait sa date et personne ne la lisait, si bien qu'un envoi
+réussi trois semaines plus tôt aurait déclaré la messagerie opérationnelle
+devant un serveur éteint depuis. Trois heures, soit le triple de la cadence
+de resonde — un retard ne fait pas clignoter l'état, une panne installée se
+voit. Au-delà, le constat redevient « aucune nouvelle » : ni succès, ni
+échec, parce que le service n'a pas été pris en défaut.
+
+**Et la sonde commande enfin quelque chose.** Un moteur qui a déclaré sain le
+fichier d'essai répond sans détecter ; le dépôt d'une pièce le lit et refuse.
+Auparavant il ne consultait que la configuration : les fichiers continuaient
+d'être acceptés et promus par un moteur qui ne lit rien, pendant que l'état
+de service le disait à qui voulait l'entendre. Une sonde dont rien ne dépend
+est un affichage. L'ignorance, elle, ne ferme rien — une pièce déposée sans
+constat reste en quarantaine, et n'est promue que sur un verdict « saine ».
+
 #### Le 503 qui ne pouvait pas s'éteindre
 
 Une bloquante n'est acquittée que par `OPERATIONNELLE`, et c'est la bonne

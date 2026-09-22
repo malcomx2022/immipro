@@ -10,11 +10,11 @@ import {
   TENTATIVES_AVANT_INCIDENT,
   lireLaReponse,
   seReprendSeule,
-  sondeDuBalayage,
   suiteDeLIndisponibilite,
   urlDuMoteurValide,
   type CauseDIndisponibilite,
 } from "@/domain/securite/balayage";
+import { FRAICHEUR_DU_CONSTAT_MS, sondeDuConstat } from "@/domain/exploitation/constats";
 
 /**
  * Le moteur de balayage — arbitrage du 22/09/2026.
@@ -553,10 +553,35 @@ describe("la sonde ne conclut que sur un fait", () => {
 
   /** Avant tout essai, la sonde s'abstient — elle ne suppose pas le succès. */
   it("une adresse qui n'a jamais été essayée reste sans conclusion", () => {
-    expect(sondeDuBalayage(true, null)).toBe("ABSENTE");
-    expect(sondeDuBalayage(false, null)).toBe("ECHOUEE");
-    expect(sondeDuBalayage(false, { reconnu: true, quand: new Date() })).toBe("ECHOUEE");
-    expect(sondeDuBalayage(true, { reconnu: true, quand: new Date() })).toBe("CONCLUANTE");
+    expect(sondeDuConstat(true, undefined)).toBe("ABSENTE");
+    expect(sondeDuConstat(false, undefined)).toBe("ECHOUEE");
+    expect(sondeDuConstat(false, { reussi: true, quand: new Date() })).toBe("ECHOUEE");
+    expect(sondeDuConstat(true, { reussi: true, quand: new Date() })).toBe("CONCLUANTE");
+  });
+
+  /**
+   * **Le constat traverse la frontière des processus, ou il ne sert à
+   * rien.** L'essai est fait par le worker ; `/api/health` vit dans le
+   * processus web. Le constat lui est donc passé, et la sonde conclut
+   * dessus — c'est ce que l'ancienne variable de module rendait
+   * impossible.
+   */
+  it("conclut sur un constat venu d'ailleurs, sans avoir rien essayé elle-même", () => {
+    const avec = { ANTIVIRUS_URL: "http://av.interne/scan" };
+    // Rien n'a été essayé dans ce processus-ci.
+    expect(leDernierEssai()).toBeNull();
+    expect(sonderLeBalayage(avec)).toBe("ABSENTE");
+
+    // Le worker, lui, a présenté EICAR et l'a noté en base.
+    expect(sonderLeBalayage(avec, { reussi: true, quand: new Date() })).toBe("CONCLUANTE");
+    expect(sonderLeBalayage(avec, { reussi: false, quand: new Date() })).toBe("ECHOUEE");
+  });
+
+  /** Et un constat périmé cesse de parler pour aujourd'hui. */
+  it("un constat trop vieux ne déclare plus rien d'opérationnel", () => {
+    const avec = { ANTIVIRUS_URL: "http://av.interne/scan" };
+    const vieux = { reussi: true, quand: new Date(Date.now() - FRAICHEUR_DU_CONSTAT_MS - 1) };
+    expect(sonderLeBalayage(avec, vieux)).toBe("ABSENTE");
   });
 
   /** La sonde et le balayage empruntent le même chemin réseau. */

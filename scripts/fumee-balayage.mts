@@ -215,6 +215,12 @@ const { leBalayeur, verifierLeMoteur, sonderLeBalayage, oublierLesEssais } = awa
   "../src/server/securite/antivirus"
 );
 const { TENTATIVES_AVANT_INCIDENT, EICAR } = await import("../src/domain/securite/balayage");
+const { noterLeConstat, lireLesConstats } = await import("../src/server/exploitation/constats");
+const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
+  "../src/domain/exploitation/constats"
+);
+const { constaterLesDependances } = await import("../src/server/exploitation/capacites");
+const { sonderLesServices } = await import("../src/server/exploitation/sondes");
 
 let rang = 0;
 
@@ -612,6 +618,116 @@ try {
       version.scanState === "EN_QUARANTAINE" && version.scanIncidentCause === "objet_absent",
       `elle attend une main, sans être déclarée saine (${version.scanIncidentCause})`,
     );
+  }
+
+  console.log("\nLe constat franchit la frontière des processus");
+  {
+    /*
+      Le worker sonde, le processus web lit. Ici, un seul processus joue
+      les deux rôles — mais l'écriture et la lecture passent par la
+      base, qui est précisément ce qui manquait : `oublierLesEssais`
+      vide la mémoire du module, comme un autre processus l'aurait
+      toujours eue vide.
+    */
+    reponseDuMoteur = {
+      statut: 200,
+      corps: '{"status":"infected","signature":"Eicar-Test-Signature"}',
+    };
+    /*
+      Le chemin du worker, pas une recopie : `sonderLesServices` est la
+      fonction que le service de production exécute au démarrage et à
+      chaque passe horaire. Une recopie aurait éprouvé un enchaînement
+      que personne n'emprunte.
+    */
+    await sonderLesServices();
+    oublierLesEssais();
+
+    verifier(
+      sonderLeBalayage() === "ABSENTE",
+      "la mémoire du processus vidée, la sonde locale ne sait plus rien",
+    );
+
+    const relus = await lireLesConstats();
+    verifier(relus.antivirus?.reussi === true, "mais le constat est en base, et il est lu");
+    verifier(
+      sonderLeBalayage(process.env, relus.antivirus) === "CONCLUANTE",
+      "et la sonde conclut dessus — ce qu'une variable de module ne permettait pas",
+    );
+
+    const capacite = constaterLesDependances(process.env, relus).find(
+      (c) => c.cle === "antivirus",
+    );
+    verifier(
+      capacite?.capacite === "OPERATIONNELLE",
+      `la capacité devient opérationnelle (${capacite?.capacite})`,
+    );
+  }
+
+  console.log("\nUn moteur qui ne détecte rien ferme le dépôt");
+  {
+    // Le moteur répond « sain » à tout, EICAR compris : il répond sans
+    // détecter, et c'est la seule panne qui ne se remarquerait pas.
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    await sonderLesServices();
+
+    const relus = await lireLesConstats();
+    verifier(relus.antivirus?.reussi === false, "le constat enregistre la défaillance");
+    verifier(
+      moteurPrisEnDefaut(relus.antivirus),
+      "et le dépôt la lit comme une fermeture, pas comme un avertissement",
+    );
+
+    const capacite = constaterLesDependances(process.env, relus).find(
+      (c) => c.cle === "antivirus",
+    );
+    verifier(
+      capacite?.capacite === "EN_PANNE",
+      `la capacité se lit en panne, pas « non vérifiée » (${capacite?.capacite})`,
+    );
+
+    // Un constat périmé rouvre : le moteur a pu être remplacé depuis.
+    await noterLeConstat(
+      "antivirus",
+      false,
+      "constat volontairement ancien",
+      new Date(Date.now() - FRAICHEUR_DU_CONSTAT_MS - 60_000),
+    );
+    verifier(
+      !moteurPrisEnDefaut((await lireLesConstats()).antivirus),
+      "un échec périmé ne ferme plus : une panne réparée n'est pas permanente",
+    );
+  }
+
+  console.log("\nLa base refuse un constat qu'aucun code ne doit écrire");
+  {
+    const client = new Client({ connectionString: cible.toString() });
+    await client.connect();
+    try {
+      let refuse = false;
+      try {
+        await client.query(
+          `INSERT INTO "ServiceProbe" (service, succeeded, "observedAt")
+             VALUES ('inventé', true, now())`,
+        );
+      } catch {
+        refuse = true;
+      }
+      verifier(refuse, "un service que le code ne connaît pas est refusé");
+
+      refuse = false;
+      try {
+        // Une horloge déréglée rendrait un constat éternellement frais.
+        await client.query(
+          `UPDATE "ServiceProbe" SET "observedAt" = now() + interval '2 days'
+             WHERE service = 'antivirus'`,
+        );
+      } catch {
+        refuse = true;
+      }
+      verifier(refuse, "et un constat daté du futur aussi");
+    } finally {
+      await client.end();
+    }
   }
 
   console.log("\nLes garde-fous de la base refusent ce qu'aucun code ne doit écrire");
