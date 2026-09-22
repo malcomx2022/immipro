@@ -26,6 +26,8 @@
  */
 
 import type { Rail } from "../payments/rail";
+import type { Achat } from "../payments/achat";
+import { ceQuiSOuvre } from "./contrepartie";
 
 export const DUREE_ATTENTE_SECONDES = 5 * 60;
 export const PERIODE_RELEVE_SECONDES = 3;
@@ -104,7 +106,7 @@ export const RIEN_RECU: Record<Rail, string> = {
  */
 export const LIBELLES_ETAPES: Record<
   EtapeAttente,
-  (numero: string | null, rail: Rail) => string
+  (numero: string | null, rail: Rail, achat: Achat) => string
 > = {
   notification: (numero, rail) => {
     if (rail === "CARTE") return "Demande de confirmation transmise à ta banque";
@@ -114,10 +116,26 @@ export const LIBELLES_ETAPES: Record<
     rail === "CARTE"
       ? "Tu valides la demande auprès de ta banque"
       : "Tu saisis ton code PIN sur ton téléphone",
-  // La dernière étape ne nomme personne : elle parle de nous, et elle est
-  // vraie des deux côtés.
-  confirmation: () => "Nous recevons la confirmation, ton pack s'ouvre",
+  /*
+    La dernière étape ne nomme aucun émetteur : elle parle de nous, et elle
+    est vraie des deux rails. Ce qu'elle nomme, en revanche, c'est la
+    contrepartie — et celle-là dépend de l'achat, pas du rail.
+  */
+  confirmation: (_numero, _rail, achat) =>
+    `Nous recevons la confirmation, ${ceQuiSOuvre(achat)}`,
 };
+
+/**
+ * La phrase de patience, en bas de l'écran.
+ *
+ * Elle disait « Garde cette page ouverte » aux trois achats. Pour une
+ * consultation, il faut dire de plus **ce qui est en jeu** : le créneau
+ * est tenu pendant que le paiement se confirme, et fermer l'onglet ne le
+ * garde pas. Le texte de la tenue vient de son propre domaine
+ * (`domain/consultants/tenue.ts`), qui est l'endroit où la règle vit.
+ */
+export const GARDER_LA_PAGE =
+  "Garde cette page ouverte. La confirmation arrive en général en moins d'une minute.";
 
 export const secondesRestantes = (ecoulees: number): number =>
   Math.max(0, DUREE_ATTENTE_SECONDES - Math.max(0, Math.trunc(ecoulees)));

@@ -3,9 +3,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { LienBouton } from "@/components/ui/LienBouton";
-import { recuDuPaiement } from "@/server/lecture/paiements";
+import { consultationDuPaiement, recuDuPaiement } from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
 import { momentEnFrancais } from "@/domain/format/moment";
+import { libelleLimiteAnnulation, libelleRendezVous } from "@/domain/consultants/rendez-vous";
+import { MENTION_REVOCATION } from "@/domain/consultants/access";
+import { achatDepuisLeCode } from "@/domain/payments/achat";
+import { actionApresLAchat, phraseDeConfirmation } from "@/domain/paiement/contrepartie";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -25,12 +29,28 @@ import { formatMontant } from "@/lib/utils";
  * Une transaction qui n'est pas confirmée n'a rien à faire ici : l'écran du
  * reçu dit déjà, et dit seul, ce qu'il en est d'un paiement en attente ou
  * sans suite.
+ *
+ * ── La consultation, coordonnée le 22/09/2026 ───────────────────────
+ *
+ * C'est $-03 qui amène ici, et $-03 est traversé par trois achats. Après
+ * une consultation payée, cet écran annonçait « Ton dossier est ouvert »
+ * et proposait trois étapes de démarrage de pack — téléverser un
+ * passeport, fixer une date de dépôt, rédiger une lettre. Rien de tout
+ * cela n'est ce que le candidat vient d'acheter, et le rendez-vous qu'il
+ * vient de réserver n'était nommé nulle part.
+ *
+ * Corriger $-03 sans corriger cet écran-ci aurait réparé l'attente pour
+ * la rendre à une confirmation qui se trompe d'achat.
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * La description ne nomme pas de contrepartie : trois achats aboutissent
+ * ici, et une métadonnée statique ne sait pas lequel.
+ */
 export const metadata: Metadata = {
   title: "Paiement confirmé",
-  description: "Ton dossier est ouvert.",
+  description: "Le paiement est confirmé.",
 };
 
 const ETAPES_SUIVANTES = [
@@ -55,6 +75,18 @@ export default async function PageConfirme({
   if (recu.etat !== "paye") redirect(`/paiement/recu/${encodeURIComponent(tx)}`);
 
   const montant = formatMontant(recu.montant, recu.devise);
+  const consultation = await consultationDuPaiement(tx, acteur.id).catch(() => null);
+  /*
+    La contrepartie vient du domaine, exhaustive par catégorie, et non
+    d'un ternaire ici : les deux écrans du bout du tunnel avaient déjà
+    divergé sur le même achat — $-03 disait « pack », $-04 « dossier ».
+  */
+  const achat = achatDepuisLeCode(recu.achatCode) ?? { type: "pack" as const, code: recu.achatCode };
+  /*
+    Après une consultation, la suite utile est le rendez-vous, pas la
+    checklist : le candidat vient de payer un horaire, et c'est lui qu'il
+    voudra retrouver, ajouter à son agenda et préparer.
+  */
   const suite = recu.dossier ? `/dossiers/${recu.dossier.id}` : "/tableau-de-bord";
 
   return (
@@ -76,7 +108,7 @@ export default async function PageConfirme({
             Paiement confirmé
           </h1>
           <p className="text-pretty text-16 text-ink-700">
-            Ton dossier est ouvert. {montant} débités par {recu.moyen}.
+            {phraseDeConfirmation(achat)} {montant} débités par {recu.moyen}.
           </p>
         </div>
       </div>
@@ -100,22 +132,49 @@ export default async function PageConfirme({
         ))}
       </dl>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-19 font-semibold text-ink-900">Tes trois prochaines étapes</h2>
-        <ol className="flex flex-col gap-3">
-          {ETAPES_SUIVANTES.map((etape, i) => (
-            <li key={etape} className="flex items-start gap-3">
-              <span
-                aria-hidden="true"
-                className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent-50 font-mono text-13 font-medium text-accent-700"
-              >
-                {i + 1}
-              </span>
-              <span className="text-pretty text-16 text-ink-700">{etape}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
+      {/* Le rendez-vous réservé, quand c'en est un. L'heure et la limite
+          d'annulation viennent de ce que la base a écrit, comme dans le
+          courrier de confirmation : deux sources pour une pièce
+          opposable finissent par diverger. */}
+      {consultation ? (
+        <section className="flex flex-col gap-2 rounded-lg bg-ink-100 p-5">
+          <h2 className="text-16 font-semibold text-ink-900">Ton rendez-vous</h2>
+          <p className="text-14 font-medium text-ink-900">
+            {libelleRendezVous({ debut: consultation.debut, disponible: false })} ·{" "}
+            {consultation.consultant}
+          </p>
+          <p className="text-pretty text-14 text-ink-700">
+            Référence {consultation.reference}. Annulation ou report sans frais
+            jusqu&apos;au{" "}
+            {libelleLimiteAnnulation({ debut: consultation.debut, disponible: false })}.
+            Passé ce délai, la consultation est due.
+          </p>
+          <p className="text-pretty text-13 text-ink-500">{MENTION_REVOCATION}</p>
+        </section>
+      ) : null}
+
+      {/* Les trois étapes de démarrage ne s'affichent que pour ce qui
+          ouvre un dossier. Téléverser un passeport et fixer une date de
+          dépôt ne sont pas la suite d'un rendez-vous payé — et une
+          section masquée par une classe resterait dans le balisage. */}
+      {achat.type === "consultation" ? null : (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-19 font-semibold text-ink-900">Tes trois prochaines étapes</h2>
+          <ol className="flex flex-col gap-3">
+            {ETAPES_SUIVANTES.map((etape, i) => (
+              <li key={etape} className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent-50 font-mono text-13 font-medium text-accent-700"
+                >
+                  {i + 1}
+                </span>
+                <span className="text-pretty text-16 text-ink-700">{etape}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <p className="text-pretty text-13 text-ink-500">
         Un reçu a été envoyé à ton adresse email. Il reste disponible dans ton
@@ -128,7 +187,7 @@ export default async function PageConfirme({
             renvoyait donc en 404 juste après un paiement — le pire moment
             du parcours pour une page introuvable. */}
         <LienBouton href={suite} pleineLargeur className="min-h-action">
-          Ouvrir ma checklist
+          {actionApresLAchat(achat)}
         </LienBouton>
         <Link
           href={`/paiement/recu/${encodeURIComponent(recu.reference)}`}

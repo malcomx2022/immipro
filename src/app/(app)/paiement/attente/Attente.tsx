@@ -7,7 +7,7 @@ import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
-import type { PaiementEnCours } from "@/server/lecture/paiements";
+import type { ConsultationPayee, PaiementEnCours } from "@/server/lecture/paiements";
 import {
   AUPRES_DE,
   CONSIGNE_ATTENTE,
@@ -16,6 +16,7 @@ import {
   LIBELLES_ETAPES,
   PERIODE_RELEVE_SECONDES,
   RIEN_RECU,
+  GARDER_LA_PAGE,
   TITRE_ATTENTE,
   attenteExpiree,
   rebours,
@@ -24,6 +25,9 @@ import {
   suiteDeLAttente,
 } from "@/domain/paiement/attente";
 import { railDe } from "@/domain/payments/rail";
+import { achatDepuisLeCode } from "@/domain/payments/achat";
+import { corpsDeLEtat, TITRE_ETAT } from "@/domain/consultants/tenue";
+import { libelleLimite, libelleRendezVous } from "@/domain/consultants/rendez-vous";
 import { cn, formatMontant } from "@/lib/utils";
 
 /**
@@ -49,6 +53,22 @@ import { cn, formatMontant } from "@/lib/utils";
  * « paiement confirmé » sur autre chose qu'un `CONFIRMEE` annoncerait un
  * débit que l'opérateur n'a pas fait, et c'est la seule erreur de cet écran
  * qui coûte de l'argent.
+ *
+ * ── Trois achats passent ici, et l'écran n'en connaissait qu'un ──────
+ *
+ * La dernière étape du fil annonçait « ton pack s'ouvre » à qui venait de
+ * payer quarante-cinq minutes d'entretien. La contrepartie vient
+ * maintenant du domaine (`ceQuiSOuvre`), exhaustive par catégorie.
+ *
+ * Et pour une consultation, l'écran dit de plus **ce qui est en jeu** :
+ * le créneau, l'heure jusqu'à laquelle il est tenu, et le nom du
+ * consultant. C'était l'information la plus utile de l'écran, et elle n'y
+ * était pas — le candidat attendait sans savoir ce qu'il attendait.
+ *
+ * Le décompte de cinq minutes est celui de la confirmation, pas celui de
+ * la tenue, qui dure vingt minutes. Les deux sont montrés séparément :
+ * confondre l'un avec l'autre ferait croire qu'un délai dépassé a rendu
+ * le créneau, alors qu'il est encore tenu un quart d'heure.
  */
 const TEINTES: Record<ReturnType<typeof etatDeLEtape>, string> = {
   faite: "bg-success",
@@ -56,7 +76,16 @@ const TEINTES: Record<ReturnType<typeof etatDeLEtape>, string> = {
   a_venir: "bg-ink-300",
 };
 
-export function Attente({ attente }: { attente: PaiementEnCours }) {
+export interface AttenteProps {
+  attente: PaiementEnCours;
+  /**
+   * Le rendez-vous que ce paiement paie, quand c'en est un. La page le
+   * lit ; le composant ne va rien chercher lui-même.
+   */
+  consultation?: ConsultationPayee | null;
+}
+
+export function Attente({ attente, consultation = null }: AttenteProps) {
   const router = useRouter();
   const [ecoulees, setEcoulees] = useState(0);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -121,6 +150,14 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
   }, [attente.reference, expiree, router]);
 
   const montant = formatMontant(attente.montant, attente.devise);
+  /*
+    La catégorie de l'achat vient du code enregistré, relu par le domaine
+    (`achatDepuisLeCode`) et non comparé à des chaînes ici. Un code que la
+    grille ne reconnaît plus retombe sur le pack : c'est le cas de tous
+    les paiements antérieurs à la recharge, et l'étape reste juste.
+  */
+  const achat = achatDepuisLeCode(attente.achatCode) ?? { type: "pack" as const, code: attente.achatCode };
+  const estUneConsultation = achat.type === "consultation";
   // La devise décide du rail, et le rail de la voix de l'écran : le même
   // fil d'étapes se lit différemment selon qu'un opérateur ou une banque
   // est au bout.
@@ -176,17 +213,41 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
                   etat === "a_venir" && "text-ink-500",
                 )}
               >
-                {LIBELLES_ETAPES[etape](attente.telephone, rail)}
+                {LIBELLES_ETAPES[etape](attente.telephone, rail, achat)}
               </span>
             </li>
           );
         })}
       </ol>
 
-      <p className="text-pretty text-14 text-ink-700">
-        Garde cette page ouverte. La confirmation arrive en général en moins
-        d&apos;une minute.
-      </p>
+      {/* Ce qui est en jeu, quand c'est un créneau. La phrase de l'état
+          vient du domaine de la tenue : elle dit que le créneau reste
+          tenu, et que le retour de la page de paiement ne confirme rien —
+          ce qui est la règle de WF-12 et non une formule d'attente. */}
+      {estUneConsultation && consultation ? (
+        <section className="flex flex-col gap-2 rounded-lg border border-ink-300 p-5">
+          <h2 className="text-16 font-semibold text-ink-900">
+            {TITRE_ETAT.EN_ATTENTE}
+          </h2>
+          <p className="text-14 font-medium text-ink-900">
+            {libelleRendezVous({ debut: consultation.debut, disponible: false })} ·{" "}
+            {consultation.consultant}
+          </p>
+          <p className="text-pretty text-14 text-ink-700">
+            {corpsDeLEtat("EN_ATTENTE")}
+          </p>
+          {consultation.tenuJusqua ? (
+            <p className="text-pretty text-13 text-ink-500">
+              Ce créneau t&apos;est gardé jusqu&apos;à{" "}
+              {libelleLimite(consultation.tenuJusqua)}, ce qui laisse plus de
+              temps que le décompte ci-dessus : celui-ci porte sur la
+              confirmation du paiement, pas sur le créneau.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      <p className="text-pretty text-14 text-ink-700">{GARDER_LA_PAGE}</p>
 
       <div className="flex flex-col gap-2">
         {reessaiPropose(ecoulees) ? (
@@ -206,11 +267,20 @@ export function Attente({ attente }: { attente: PaiementEnCours }) {
         >
           {RIEN_RECU[rail]}
         </Link>
+        {/* Abandonner un paiement de consultation n'a pas la même suite
+            qu'abandonner un pack : le créneau redevient libre, et le dire
+            évite de revenir une heure plus tard en le croyant gardé. Le
+            lien ramène là où un créneau se reprend, et non au tableau de
+            bord, qui n'en montre aucun. */}
         <Link
-          href="/tableau-de-bord"
+          href={
+            estUneConsultation && attente.dossierId
+              ? `/consultants?dossier=${attente.dossierId}`
+              : "/tableau-de-bord"
+          }
           className="flex min-h-touch items-center justify-center text-14 text-ink-700"
         >
-          Annuler le paiement
+          {estUneConsultation ? "Abandonner et libérer le créneau" : "Annuler le paiement"}
         </Link>
       </div>
 

@@ -7,6 +7,7 @@ import {
   suiteDeLAttente,
 } from "@/domain/paiement/attente";
 import { echecPourMotif, motifParDefaut } from "@/domain/paiement/echec";
+import type { Achat } from "@/domain/payments/achat";
 import { REGLES } from "@/server/http/limites";
 import { suiteDictable } from "@/server/securite/secret";
 
@@ -27,6 +28,9 @@ const sansCommentaires = (source: string): string =>
  * n'était appelée par personne. Ce qui se vérifie ici, c'est surtout ce que
  * la relève **n'a pas le droit** de conclure.
  */
+/** Un achat de pack, quand l'étape testée ne dépend pas de la catégorie. */
+const PACK: Achat = { type: "pack", code: "dossier" };
+
 describe("ce que l'écran fait de la relève", () => {
   it("ne confirme que sur un CONFIRMEE", () => {
     // Naviguer vers « paiement confirmé » sur autre chose annoncerait un
@@ -77,13 +81,13 @@ describe("ce que l'écran fait de la relève", () => {
 
 describe("ce que les écrans nomment quand la base ne sait pas", () => {
   it("le fil d'étapes se passe d'un numéro qui n'existe pas", () => {
-    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "MOBILE_MONEY")).toBe(
+    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "MOBILE_MONEY", PACK)).toBe(
       "Notification envoyée au 97 •• •• 42",
     );
-    expect(LIBELLES_ETAPES.notification(null, "MOBILE_MONEY")).toBe(
+    expect(LIBELLES_ETAPES.notification(null, "MOBILE_MONEY", PACK)).toBe(
       "Notification envoyée sur ton téléphone",
     );
-    expect(LIBELLES_ETAPES.notification(null, "MOBILE_MONEY")).not.toMatch(/null|undefined/u);
+    expect(LIBELLES_ETAPES.notification(null, "MOBILE_MONEY", PACK)).not.toMatch(/null|undefined/u);
   });
 
   it("l'échec renvoie au profil plutôt que de citer un vide", () => {

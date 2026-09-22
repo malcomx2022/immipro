@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Attente } from "./Attente";
-import { paiementDuTunnel } from "@/server/lecture/paiements";
+import { consultationDuPaiement, paiementDuTunnel } from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
 
 /**
- * $-03 — Attente de confirmation Mobile Money. WF-05.
+ * $-03 — Attente de confirmation. WF-05.
  *
  * Variante retenue : le fil d'étapes. Un anneau qui tourne est le signal
  * exact d'une page bloquée — il tourne aussi bien quand rien n'arrive.
@@ -17,12 +17,24 @@ import { exigerCandidat } from "@/server/securite/page";
  * Un paiement déjà abouti ne repasse pas par l'attente : le rejoindre par
  * un retour arrière ou un signet conduirait à attendre cinq minutes une
  * confirmation déjà reçue.
+ *
+ * Le rendez-vous est lu ici quand le paiement en paie un : c'est la page
+ * qui lit, le composant ne va rien chercher. La lecture est distincte du
+ * reçu — voir `consultationDuPaiement`.
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Le titre et la description ne nomment aucune contrepartie.
+ *
+ * Ils disaient « pour ouvrir ton pack », et trois achats passent par cet
+ * écran : une recharge n'ouvre pas de pack, une consultation n'en ouvre
+ * pas non plus. Une métadonnée statique ne peut pas savoir lequel des
+ * trois — elle ne le prétend donc plus, et la page, elle, le dit.
+ */
 export const metadata: Metadata = {
   title: "Confirmation en cours",
-  description: "Confirme le paiement pour ouvrir ton pack.",
+  description: "Confirme le paiement pour que ton achat soit pris en compte.",
 };
 
 export default async function PageAttente({
@@ -41,5 +53,7 @@ export default async function PageAttente({
   if (attente.etat === "paye") redirect(`/paiement/confirme?tx=${encodeURIComponent(tx)}`);
   if (attente.etat !== "en_cours") redirect(`/paiement/echec?tx=${encodeURIComponent(tx)}`);
 
-  return <Attente attente={attente} />;
+  const consultation = await consultationDuPaiement(tx, acteur.id).catch(() => null);
+
+  return <Attente attente={attente} consultation={consultation} />;
 }

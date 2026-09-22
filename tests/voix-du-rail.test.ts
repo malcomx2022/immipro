@@ -11,6 +11,7 @@ import {
 } from "@/domain/paiement/attente";
 import { sansCommentaires } from "@/domain/copy/source";
 import type { Rail } from "@/domain/payments/rail";
+import type { Achat } from "@/domain/payments/achat";
 
 const lire = (f: string) => readFileSync(f, "utf8");
 
@@ -156,23 +157,37 @@ describe("$-05 — chaque motif parle la langue de son rail", () => {
  * téléphone » pour tout le monde.
  */
 describe("$-03 — l'écran d'attente tient le même interdit", () => {
-  const textesDAttente = (rail: Rail, numero: string | null): string[] => [
+  /*
+    Les trois achats traversent cet écran, et depuis le 22/09/2026 la
+    dernière étape dit ce que chacun ouvre. L'interdit de vocabulaire
+    doit donc tenir sur les six combinaisons, et non sur deux : c'est
+    exactement là qu'une phrase nouvelle échappe à une liste ancienne.
+  */
+  const ACHATS: readonly Achat[] = [
+    { type: "pack", code: "dossier" },
+    { type: "recharge" },
+    { type: "consultation" },
+  ];
+
+  const textesDAttente = (rail: Rail, numero: string | null, achat: Achat): string[] => [
     TITRE_ATTENTE[rail],
     CONSIGNE_ATTENTE[rail],
     AUPRES_DE[rail],
     RIEN_RECU[rail],
-    ...ETAPES_ATTENTE.map((e) => LIBELLES_ETAPES[e](numero, rail)),
+    ...ETAPES_ATTENTE.map((e) => LIBELLES_ETAPES[e](numero, rail, achat)),
   ];
 
   it("chaque rail n'entend que son propre vocabulaire", () => {
     for (const rail of ["MOBILE_MONEY", "CARTE"] as const) {
       for (const numero of NUMEROS) {
-        for (const texte of textesDAttente(rail, numero)) {
+        for (const achat of ACHATS) {
+        for (const texte of textesDAttente(rail, numero, achat)) {
           for (const interdit of INTERDITS[rail]) {
             expect(interdit.motif.test(texte), `${rail} · ${interdit.mot} · ${texte}`).toBe(
               false,
             );
           }
+        }
         }
       }
     }
@@ -185,8 +200,13 @@ describe("$-03 — l'écran d'attente tient le même interdit", () => {
    * eu lieu.
    */
   it("le numéro ne s'affiche que sur le rail qui en a un", () => {
-    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "MOBILE_MONEY")).toContain("97 •• •• 42");
-    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "CARTE")).not.toContain("97 •• •• 42");
+    const pack: Achat = { type: "pack", code: "dossier" };
+    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "MOBILE_MONEY", pack)).toContain(
+      "97 •• •• 42",
+    );
+    expect(LIBELLES_ETAPES.notification("97 •• •• 42", "CARTE", pack)).not.toContain(
+      "97 •• •• 42",
+    );
   });
 
   /**
@@ -205,8 +225,9 @@ describe("$-03 — l'écran d'attente tient le même interdit", () => {
   });
 
   it("les deux rails donnent deux fils d'étapes distincts", () => {
-    const mm = ETAPES_ATTENTE.map((e) => LIBELLES_ETAPES[e](null, "MOBILE_MONEY"));
-    const carte = ETAPES_ATTENTE.map((e) => LIBELLES_ETAPES[e](null, "CARTE"));
+    const pack: Achat = { type: "pack", code: "dossier" };
+    const mm = ETAPES_ATTENTE.map((e) => LIBELLES_ETAPES[e](null, "MOBILE_MONEY", pack));
+    const carte = ETAPES_ATTENTE.map((e) => LIBELLES_ETAPES[e](null, "CARTE", pack));
     expect(mm).not.toEqual(carte);
     // La dernière étape parle de nous, et vaut des deux côtés.
     expect(mm[2]).toBe(carte[2]);

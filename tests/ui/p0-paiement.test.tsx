@@ -7,11 +7,16 @@ import { Echec } from "@/app/(app)/paiement/echec/Echec";
 import { CONSULTATION, PACKS, RECHARGE_ANALYSES } from "@/domain/payments/pricing";
 import { corpsDAchat, tarifDe, type Achat } from "@/domain/payments/achat";
 import { corpsDeLEtat } from "@/domain/consultants/tenue";
+import { libelleLimite, libelleRendezVous } from "@/domain/consultants/rendez-vous";
 import { DELAI_REESSAI_SECONDES } from "@/domain/paiement/attente";
 import { formatMontant } from "@/lib/utils";
 import { readFileSync } from "node:fs";
 import { LIBELLE_ETAT } from "@/domain/paiement/recu";
-import type { PaiementEnCours, Tunnel } from "@/server/lecture/paiements";
+import type {
+  ConsultationPayee,
+  PaiementEnCours,
+  Tunnel,
+} from "@/server/lecture/paiements";
 
 const parametres = new URLSearchParams();
 const pousse = vi.fn();
@@ -386,6 +391,102 @@ describe("$-03 — Attente Mobile Money", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Le délai de confirmation est dépassé",
     );
+  });
+
+  /**
+   * L'écran d'attente pour une consultation — arbitrage du 22/09/2026.
+   *
+   * Signalé depuis trois lots : « l'écran d'attente de paiement est celui
+   * des packs ». Un candidat qui venait de payer quarante-cinq minutes
+   * d'entretien lisait « Nous recevons la confirmation, ton pack
+   * s'ouvre », et rien ne nommait le créneau qu'il attendait.
+   */
+  const CONSULTATION_EN_COURS: PaiementEnCours = {
+    ...EN_COURS,
+    achat: CONSULTATION.libelle,
+    achatCode: "consultation",
+    montant: CONSULTATION.prix.XOF,
+  };
+
+  const RENDEZ_VOUS: ConsultationPayee = {
+    reference: "RV-260922-AB12",
+    debut: "2026-09-24T15:30:00.000Z",
+    dureeMinutes: 45,
+    consultant: "Marieke Vermeulen",
+    tenuJusqua: "2026-09-22T10:20:00.000Z",
+    confirme: false,
+  };
+
+  it("annonce le créneau réservé, et non un pack qui s'ouvre", () => {
+    const { container } = render(
+      <Attente attente={CONSULTATION_EN_COURS} consultation={RENDEZ_VOUS} />,
+    );
+    expect(container.textContent).toContain("ton créneau est réservé");
+    expect(container.textContent).not.toContain("ton pack s'ouvre");
+  });
+
+  /** Ce qui manquait le plus : savoir ce qu'on attend. */
+  it("nomme le créneau et le consultant", () => {
+    const { container } = render(
+      <Attente attente={CONSULTATION_EN_COURS} consultation={RENDEZ_VOUS} />,
+    );
+    expect(container.textContent).toContain("Marieke Vermeulen");
+    expect(container.textContent).toContain(
+      libelleRendezVous({ debut: RENDEZ_VOUS.debut, disponible: false }),
+    );
+    expect(container.textContent).toContain(corpsDeLEtat("EN_ATTENTE"));
+  });
+
+  /**
+   * Les deux décomptes ne se confondent pas : l'attente dure cinq
+   * minutes, la tenue vingt. Voir le premier s'épuiser ne veut pas dire
+   * que le créneau est perdu.
+   */
+  it("distingue le délai de confirmation de la tenue du créneau", () => {
+    const { container } = render(
+      <Attente attente={CONSULTATION_EN_COURS} consultation={RENDEZ_VOUS} />,
+    );
+    expect(container.textContent).toContain(libelleLimite(RENDEZ_VOUS.tenuJusqua!));
+    expect(container.textContent).toMatch(
+      /porte sur la confirmation du paiement, pas sur le créneau/u,
+    );
+  });
+
+  it("dit ce qu'abandonner fait au créneau, et où en reprendre un", () => {
+    render(<Attente attente={CONSULTATION_EN_COURS} consultation={RENDEZ_VOUS} />);
+    const abandon = screen.getByRole("link", { name: "Abandonner et libérer le créneau" });
+    expect(abandon.getAttribute("href")).toBe("/consultants?dossier=nl-1");
+    expect(screen.queryByRole("link", { name: "Annuler le paiement" })).toBeNull();
+  });
+
+  /** Et le cas du pack ne bouge pas d'un mot. */
+  it("un pack garde son fil, sa contrepartie et son lien d'annulation", () => {
+    const { container } = render(<Attente attente={EN_COURS} />);
+    expect(container.textContent).toContain("ton pack s'ouvre");
+    expect(container.textContent).not.toContain("créneau");
+    expect(
+      screen.getByRole("link", { name: "Annuler le paiement" }).getAttribute("href"),
+    ).toBe("/tableau-de-bord");
+  });
+
+  it("une recharge annonce ses analyses, pas un pack", () => {
+    const { container } = render(
+      <Attente attente={{ ...EN_COURS, achatCode: "recharge" }} />,
+    );
+    expect(container.textContent).toContain("tes analyses sont créditées");
+    expect(container.textContent).not.toContain("ton pack s'ouvre");
+  });
+
+  /**
+   * Le bloc du créneau ne s'affiche que s'il y a un créneau à montrer.
+   * Une consultation dont le rendez-vous a disparu ne doit pas faire
+   * planter l'écran d'un paiement peut-être déjà encaissé.
+   */
+  it("une consultation sans rendez-vous lu reste un écran lisible", () => {
+    const { container } = render(<Attente attente={CONSULTATION_EN_COURS} />);
+    expect(container.textContent).toContain("ton créneau est réservé");
+    expect(container.textContent).not.toContain(corpsDeLEtat("EN_ATTENTE"));
+    expect(screen.getByRole("heading", { level: 1 })).toBeDefined();
   });
 });
 

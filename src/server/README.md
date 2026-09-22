@@ -237,6 +237,23 @@ confirmer. Elle se paie depuis T-05, où l'horaire existe — et l'écran
 d'échec renvoie une consultation à l'annuaire plutôt qu'au
 récapitulatif, parce que sa tenue a été libérée avec l'échec.
 
+**La contrepartie vient du domaine, pas de l'écran.** Trois achats
+traversent $-03 et $-04, qui n'en connaissaient qu'un : ils annonçaient
+« ton pack s'ouvre » et « ton dossier est ouvert » à qui venait de payer
+quarante-cinq minutes d'entretien. `domain/paiement/contrepartie.ts`
+répond par catégorie et par `switch` exhaustif — ce qui s'ouvre, la
+phrase de confirmation, la suite proposée. Il est à part parce que la
+question se pose sur deux écrans, et qu'écrite dans chacun elle avait
+déjà divergé.
+
+**Le rendez-vous payé se lit à part du reçu.** `consultationDuPaiement`
+joint `Appointment` par `transactionId` pour que $-03 nomme le créneau,
+le consultant et l'échéance de tenue — et pour que $-04 montre la limite
+d'annulation opposable. Ce n'est pas un champ de `Recu` : un reçu est une
+pièce comptable, qui nomme le moyen de paiement et jamais le
+portefeuille. Les deux décomptes y sont distincts : cinq minutes pour la
+confirmation, vingt pour la tenue du créneau.
+
 **La relève ne conclut rien.** `$-03` interroge `paiements.statut` toutes
 les trois secondes ; la route lit le statut que le webhook signé fait
 avancer et ne confirme rien elle-même (RG-05.1). Ce que vaut la réponse est

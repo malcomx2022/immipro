@@ -5305,3 +5305,111 @@ refusé » passait par la levée d'exception, pas par cette branche. Et
 faire répondre de nouveau `{ envoye: true }` sans vérifier ne faisait
 rougir personne non plus — la correction la plus visible du lot n'avait
 aucun garde-fou. Un test a été ajouté pour chacune.
+
+### S.27 — « Ton pack s'ouvre », dit à qui achetait un rendez-vous
+
+L'écart était ouvert depuis trois lots, signalé à chaque livraison et
+jamais tranché : l'écran d'attente de paiement était celui des packs. Le
+voici traité.
+
+#### Ce que les deux derniers écrans du tunnel disaient
+
+Trois achats traversent `/paiement/attente` — un pack, une recharge
+d'analyses, une consultation. Les deux écrans du bout n'en connaissaient
+qu'un :
+
+| Écran | Ce qui s'affichait | Pour une consultation |
+|---|---|---|
+| $-03, dernière étape du fil | « Nous recevons la confirmation, ton pack s'ouvre » | aucun pack ne s'ouvre : un créneau se réserve |
+| $-03, métadonnée | « Confirme le paiement pour ouvrir ton pack » | idem |
+| $-04, première phrase | « Ton dossier est ouvert. » | le dossier était déjà ouvert ; le rendez-vous, non |
+| $-04, trois étapes | téléverser un passeport, fixer une date de dépôt, rédiger une lettre | rien de cela n'est la suite d'un entretien payé |
+| $-04, bouton | « Ouvrir ma checklist » | la checklist n'a pas changé du fait de prendre rendez-vous |
+
+Ces deux phrases sont les seules de tout le parcours qui nomment la
+**contrepartie** — ce que la somme achète. Les lire fausses à la seconde
+où l'on vient de payer, c'est douter d'avoir acheté la bonne chose. Et
+pour une consultation, le doute était fondé.
+
+#### Ce qui manquait, et qui manquait plus encore
+
+Le créneau n'était nommé nulle part. Le candidat attendait cinq minutes
+devant un décompte, sans voir l'heure qu'il venait de retenir, ni le nom
+du consultant, ni jusqu'à quand le créneau lui était gardé. C'était
+l'information la plus utile de l'écran, et c'est celle qui n'y était pas.
+
+**Et les deux décomptes se confondaient.** L'attente dure cinq minutes,
+la tenue du créneau vingt (S.23). Voir le premier s'épuiser laissait
+croire le créneau perdu — alors qu'il restait un quart d'heure pour
+reprendre le paiement. L'écran montre maintenant les deux séparément, et
+dit lequel porte sur quoi.
+
+#### Un module pour la contrepartie
+
+`domain/paiement/contrepartie.ts` répond trois fois à la même question,
+par catégorie et par `switch` exhaustif : ce qui s'ouvre (au futur, pour
+le fil de $-03), la phrase de confirmation (au passé, pour $-04), et la
+suite proposée.
+
+Il est à part parce que la question se pose **deux fois**, sur deux
+écrans — et qu'écrite dans chacun, elle avait déjà divergé : $-03 disait
+« pack » là où $-04 disait « dossier », pour le même achat. Une
+quatrième catégorie ne compilera pas tant que les trois réponses ne sont
+pas écrites.
+
+#### La lecture du rendez-vous, séparée du reçu
+
+`consultationDuPaiement` joint `Appointment` par `transactionId` et rend
+l'horaire, la durée, le consultant, l'échéance de tenue et l'état.
+
+**Lecture distincte, et non un champ de plus sur `Recu`.** Le reçu est
+une pièce comptable : il nomme le moyen de paiement et jamais le
+portefeuille, par minimisation. Y faire entrer le nom d'un consultant et
+un horaire aurait contredit la règle que ce module tient ailleurs — et
+les deux écrans du tunnel qui en ont besoin peuvent le demander
+eux-mêmes.
+
+Trois absences rendent `null` plutôt que de supposer : un paiement qui
+n'est pas une consultation, une référence inconnue, et une consultation
+sans rendez-vous. Le dernier cas ne devrait plus se produire depuis que
+$-02 refuse d'ouvrir une consultation (S.24), mais le supposer ferait
+planter l'écran d'un paiement déjà encaissé.
+
+#### Abandonner, aussi, se dit autrement
+
+« Annuler le paiement » ramenait au tableau de bord. Pour une
+consultation, le créneau redevient libre — et le tableau de bord n'en
+montre aucun, donc ne permet pas d'en reprendre un. Le lien dit
+maintenant ce qui arrive au créneau et mène à l'annuaire.
+
+#### Deux phrases enfin lues
+
+`corpsDeLEtat("EN_ATTENTE")` et `TITRE_ETAT.EN_ATTENTE` ont été écrits au
+lot de la tenue et n'avaient aucun appelant — comme les deux phrases que
+S.24 avait trouvées fausses pour cette raison même. Celles-ci étaient
+justes, et disaient exactement ce que cet écran devait dire : le créneau
+reste tenu, et le retour de la page de paiement ne confirme rien. Elles
+s'affichent.
+
+#### Vérifié en exécutant
+
+L'écran est rendu pour les trois achats : la consultation annonce son
+créneau réservé et nomme l'horaire, le consultant et l'échéance de
+tenue ; la recharge annonce ses analyses ; le pack ne bouge pas d'un mot,
+lien d'annulation compris. Et une consultation dont le rendez-vous ne se
+lit pas reste un écran lisible.
+
+L'interdit de vocabulaire de rail (S.21) tourne désormais sur **six**
+combinaisons au lieu de deux — trois achats × deux rails —, parce que
+c'est exactement là qu'une phrase nouvelle échappe à une liste ancienne.
+
+Sur PostgreSQL réel (`npm run smoke:consultation`) : la jointure rend le
+consultant, l'heure écrite en base et l'échéance de tenue ; après la
+notification signée, plus rien n'est tenu et tout est réservé ; un
+paiement de pack, une référence inconnue et la transaction d'un autre
+candidat rendent l'absence.
+
+Neuf mutations, neuf rouges. La plus utile est la dernière : en retirant
+le filtre sur le propriétaire de la lecture, la fumée rougit — un autre
+candidat lisait l'horaire et le nom du consultant d'un rendez-vous qui
+n'était pas le sien.
