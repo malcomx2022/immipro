@@ -11,14 +11,17 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import type { Arbitrage, VersionRegle } from "@/domain/notifications/divergence";
 import {
+  AUCUNE_PIECE,
   MENTION_HISTORIQUE,
   MENTION_SANS_ACCORD,
   ecartMontant,
   libelleDelaiVersion,
   libelleImpact,
+  lignesDesPieces,
   mentionArbitrage,
   optionsArbitrage,
 } from "@/domain/notifications/divergence";
+import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -59,6 +62,14 @@ export interface DivergenceProps {
   ancienne: VersionRegle;
   nouvelle: VersionRegle;
   /**
+   * Les pièces obligatoires que la nouvelle version ajoute ou retire.
+   *
+   * L'écran nommait la checklist — « ta checklist passe à la version 5 »
+   * — sans nommer une seule de ses lignes. Le candidat tranchait sans
+   * savoir ce qu'il devrait fournir en plus, et le découvrait après coup.
+   */
+  pieces?: EvolutionDesPieces;
+  /**
    * Date de **dépôt** du dossier concerné — la cible moins le délai
    * d'instruction —, si elle est fixée. C'est elle qui décide de la
    * version applicable, pas la date de départ.
@@ -77,6 +88,7 @@ export function DivergenceReglementaire({
   pays,
   ancienne,
   nouvelle,
+  pieces = AUCUNE_PIECE,
   depot,
   detecteeLe,
   verifieeLe,
@@ -88,7 +100,14 @@ export function DivergenceReglementaire({
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
   const montant = (v: VersionRegle) => formatMontant(v.montant, v.devise);
-  const options = optionsArbitrage(ancienne, nouvelle, montant(ancienne), montant(nouvelle));
+  const options = optionsArbitrage(
+    ancienne,
+    nouvelle,
+    montant(ancienne),
+    montant(nouvelle),
+    pieces,
+  );
+  const lignes = lignesDesPieces(pieces);
   const retenue = options.find((o) => o.cle === choix);
 
   /**
@@ -147,6 +166,26 @@ export function DivergenceReglementaire({
           )}
         </p>
       </section>
+
+      {lignes.length > 0 ? (
+        <section className="flex flex-col gap-1.5 rounded-md border border-ink-300 p-3.5">
+          <h3 className="text-14 font-semibold text-ink-900">
+            Ce que ta checklist gagne et perd
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {lignes.map((ligne) => (
+              <li key={ligne.cle} className="flex items-start gap-2">
+                {/* Le signe ne porte pas l'information seul : chaque ligne
+                    dit en toutes lettres ce qu'elle devient. */}
+                <span aria-hidden="true" className="pt-1.5 text-ink-500">
+                  •
+                </span>
+                <span className="text-pretty text-14 text-ink-700">{ligne.texte}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <RadioGroup
         libelle="Ton arbitrage"

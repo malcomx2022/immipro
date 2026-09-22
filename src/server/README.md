@@ -1363,6 +1363,23 @@ horloge injectée et marquait sur celle du serveur. Les deux coïncident en
 production et divergent dès qu'une passe est rejouée en retard. La
 notification porte donc `createdAt: maintenant`.
 
+## Un code de référentiel ne se montre jamais à un candidat
+
+`comparerLesVersions` calculait depuis toujours le delta des pièces
+obligatoires — mais sous forme de `piece.<code>` dans le diff. C'est une clé
+de référentiel : `assurance_maladie`, `casier_judiciaire`. L'écran
+d'arbitrage T-02 n'avait donc rien à montrer, et disait « ta checklist passe
+à la version 5 » sans nommer une seule de ses lignes.
+
+Le delta ressort désormais **nommé** — code *et* libellé —, et le diff en
+dérive. Le libellé ne peut pas se reconstruire depuis le code : il vient du
+référentiel, et c'est la seule raison pour laquelle cette structure existe à
+côté du diff.
+
+Même forme que `delaiDInstruction` en S.51 : ce que l'écran doit dire ne se
+recalcule pas depuis une liste de `{ champ, avant, apres }` de texte. Un
+champ de plus sur `Comparaison`, et l'écran cesse de paraphraser.
+
 ## Vérifier
 
 ```

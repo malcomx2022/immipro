@@ -51,6 +51,7 @@ export default async function PageNotifications() {
         pays: vue.destination,
         ancienne: vue.ancienne,
         nouvelle: vue.nouvelle,
+        pieces: vue.pieces,
         /*
           Le dépôt, et non la date cible : c'est le jour du dépôt qui
           décide de la version applicable. L'écran annonçait la nouvelle

@@ -7850,3 +7850,57 @@ toujours la version —, mais si une ligne d'un autre âge en portait une, elle
 ressortirait en incident à chaque passe. Aucune branche défensive n'a été
 écrite pour un état que l'application ne produit pas : l'incident est
 précisément l'endroit où une telle ligne doit se voir.
+
+---
+
+### S.54 — La checklist qu'on nommait sans en nommer une ligne
+
+L'écart laissé ouvert par S.52. L'écran T-02 montrait les deux versions par
+leur montant, puis par leur délai — jamais par leurs **pièces**.
+
+```
+  une nouvelle version qui exige une pièce de plus :
+  le mot « pièce » apparaît-il ?      false
+  une checklist est-elle nommée ?    false
+  option : « Ta checklist passe à la version 5, avec 11 904 € à prouver. »
+```
+
+« Ta checklist passe à la version 5 » nomme la checklist sans nommer une
+seule de ses lignes. Le candidat tranchait sans savoir ce qu'il devrait
+fournir, et le découvrait sur sa checklist après coup — ce qui est
+exactement ce qu'un écran d'arbitrage doit éviter.
+
+La donnée existait pourtant. `comparerLesVersions` calculait déjà le delta
+des pièces obligatoires, mais sous forme de `piece.<code>` dans le diff : un
+code de référentiel, que rien ne peut montrer à un candidat. Le delta ressort
+désormais nommé, et le diff en dérive — une implémentation, pas deux.
+
+**Une pièce sort de deux façons, et le mot n'est pas le même.** Devenue
+complémentaire, elle reste joignable ; disparue, elle ne se demande plus.
+`encoreDemandee` porte la distinction, et les confondre ferait jeter un
+document qu'on pouvait encore envoyer.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'écran ne liste plus les pièces | l'essai d'écran |
+| une pièce devenue complémentaire est dite disparue | les essais purs et d'écran |
+| conserver cite les mêmes pièces que migrer | les essais purs |
+| les pièces ne remontent plus du référentiel | la fumée |
+| le libellé est remplacé par le code | la fumée |
+| l'énumération rebégaie | les essais purs |
+
+Six mutations, six rouges. La cinquième ne mord **que** dans la fumée : les
+essais purs travaillent sur une fixture nommée à la main, et seul un
+chargement réel du référentiel montre qu'un libellé remonte bien jusqu'à
+l'écran.
+
+Une note de rédaction, trouvée en exécutant : trois changements à la fois
+donnaient « avec 11 904 € à prouver **et** 1 pièce de plus à fournir **et** 2
+pièces de moins à réunir ». L'énumération se fait désormais par virgules avec
+un « et » final, et le second membre ne répète pas « pièces ».
+
+**Ce qui reste ouvert.** `arbitrerLaDivergence` rend toujours `piecesAjoutees`
+et aucun écran ne le lit — mais ce n'est plus le même manque : le candidat
+voit désormais les pièces **avant** de trancher, et sa checklist les porte
+après. Le champ sert la fumée, qui vérifie que la migration ajoute bien les
+lignes annoncées.

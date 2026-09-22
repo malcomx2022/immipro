@@ -550,6 +550,23 @@ try {
     */
     rang += 10;
     const DELAI = (max: number) => ({ ...(brute.rules as object), delai_traitement_jours: { min: 60, max } });
+    /*
+      Et une pièce obligatoire de plus, pour éprouver la seconde moitié de
+      ce que l'écran d'arbitrage montre. Le libellé compte autant que le
+      code : c'est lui que le candidat lit, et le diff stocké ne le porte
+      pas.
+    */
+    const PIECE_EN_PLUS = {
+      code: "assurance_maladie",
+      libelle: "Assurance maladie",
+      obligatoire: true,
+      traduction_assermentee: false,
+      legalisation: false,
+    };
+    const AVEC_PIECE = (max: number) => ({
+      ...DELAI(max),
+      pieces_requises: [...RULES.pieces_requises, PIECE_EN_PLUS],
+    });
     const v1 = await db.visaRule.create({
       data: {
         countryCode: "BE", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 1,
@@ -604,7 +621,7 @@ try {
     const v2 = await db.visaRule.create({
       data: {
         countryCode: "BE", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 2,
-        effectiveFrom: new Date("2026-01-01"), rules: DELAI(150) as never,
+        effectiveFrom: new Date("2026-01-01"), rules: AVEC_PIECE(150) as never,
         sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
         verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
         nextReviewAt: new Date("2027-01-01"), status: "DRAFT",
@@ -646,6 +663,11 @@ try {
     verifier(
       vue.ancienne.delai?.max === 90 && vue.nouvelle.delai?.max === 150,
       `l'arbitrage reçoit les deux délais (${JSON.stringify([vue.ancienne.delai, vue.nouvelle.delai])})`,
+    );
+    verifier(
+      vue.pieces.ajoutees.length === 1 &&
+        vue.pieces.ajoutees[0]?.libelle === "Assurance maladie",
+      `et la pièce exigée en plus, avec son libellé (${JSON.stringify(vue.pieces.ajoutees)})`,
     );
 
     const dossier = await db.application.findUniqueOrThrow({ where: { id: ouvert.id } });

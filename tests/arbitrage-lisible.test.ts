@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  AUCUNE_PIECE,
   ceQuiSepare,
   ecartMontant,
   libelleDelaiVersion,
   libelleImpact,
+  lignesDesPieces,
   optionsArbitrage,
+  resumeDesPieces,
   type VersionRegle,
 } from "@/domain/notifications/divergence";
+import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
 
 /**
  * Ce qu'un arbitrage doit montrer — T-02, correctif du 22/09/2026.
@@ -53,10 +57,17 @@ const impact = (a: VersionRegle, b: VersionRegle, depot?: string) =>
 
 describe("ce qui sépare deux versions", () => {
   it("le montant seul, le délai seul, ou les deux", () => {
-    expect(ceQuiSepare(V1, V2)).toEqual({ montant: true, delai: true });
-    expect(ceQuiSepare(V1, sansLeMontant)).toEqual({ montant: false, delai: true });
-    expect(ceQuiSepare(V1, sansLeDelai)).toEqual({ montant: true, delai: false });
-    expect(ceQuiSepare(V1, { ...V1, numero: 9 })).toEqual({ montant: false, delai: false });
+    // Les pièces se passent à part : elles ne se lisent pas sur une
+    // `VersionRegle`, qui porte le montant et le délai et rien d'autre.
+    const sansPiece = { pieces: false };
+    expect(ceQuiSepare(V1, V2)).toEqual({ montant: true, delai: true, ...sansPiece });
+    expect(ceQuiSepare(V1, sansLeMontant)).toEqual({ montant: false, delai: true, ...sansPiece });
+    expect(ceQuiSepare(V1, sansLeDelai)).toEqual({ montant: true, delai: false, ...sansPiece });
+    expect(ceQuiSepare(V1, { ...V1, numero: 9 })).toEqual({
+      montant: false,
+      delai: false,
+      ...sansPiece,
+    });
   });
 
   /** Changer de devise change le montant exigé, même à valeur égale. */
@@ -155,5 +166,106 @@ describe("les deux options d'arbitrage", () => {
     const [migrer, conserver] = options(V2);
     expect(migrer).toContain("si tu déposes à partir du");
     expect(conserver).toContain("si tu déposes avant le");
+  });
+});
+
+
+/**
+ * Ce que l'arbitrage montre des **pièces** — correctif du 23/09/2026.
+ *
+ * L'écart laissé ouvert par S.52. L'écran disait « ta checklist passe à la
+ * version 5 » : il nommait la checklist sans nommer une seule de ses
+ * lignes. Exécuté avant correction, sur une version qui exige une pièce de
+ * plus :
+ *
+ *     le mot « pièce » apparaît-il ?      false
+ *     une checklist est-elle nommée ?    false
+ *     option : « Ta checklist passe à la version 5, avec 11 904 € à prouver. »
+ *
+ * Le candidat tranchait sans savoir ce qu'il devrait fournir, et le
+ * découvrait sur sa checklist après coup.
+ */
+const PIECES: EvolutionDesPieces = {
+  ajoutees: [{ code: "assurance_maladie", libelle: "Assurance maladie" }],
+  retirees: [
+    { code: "casier_judiciaire", libelle: "Casier judiciaire", encoreDemandee: true },
+    { code: "lettre_motivation", libelle: "Lettre de motivation", encoreDemandee: false },
+  ],
+};
+
+describe("ce que la checklist gagne et perd", () => {
+  it("chaque pièce est nommée par son libellé, jamais par son code", () => {
+    const lignes = lignesDesPieces(PIECES);
+    expect(lignes).toHaveLength(3);
+    for (const ligne of lignes) {
+      expect(ligne.texte).not.toMatch(/_/u);
+    }
+    expect(lignes[0]!.texte).toContain("Assurance maladie");
+  });
+
+  it("une pièce ajoutée dit qu'elle est à fournir en plus", () => {
+    expect(lignesDesPieces(PIECES)[0]!.texte).toContain("à fournir en plus");
+  });
+
+  /**
+   * Une pièce sort de deux façons, et le mot n'est pas le même. Les
+   * confondre ferait jeter un document qu'on pouvait encore joindre.
+   */
+  it("devenue complémentaire, elle reste joignable — disparue, non", () => {
+    const [, complementaire, disparue] = lignesDesPieces(PIECES);
+    expect(complementaire!.texte).toContain("n'est plus obligatoire");
+    expect(complementaire!.texte).toContain("tu peux toujours la joindre");
+    expect(disparue!.texte).toContain("n'est plus demandée");
+    expect(disparue!.texte).not.toContain("joindre");
+  });
+
+  it("aucune pièce touchée : rien à montrer", () => {
+    expect(lignesDesPieces(AUCUNE_PIECE)).toEqual([]);
+    expect(resumeDesPieces(AUCUNE_PIECE)).toBeNull();
+    expect(ceQuiSepare(V1, V1, AUCUNE_PIECE).pieces).toBe(false);
+  });
+
+  it("une seule pièce touchée suffit à séparer les deux versions", () => {
+    expect(ceQuiSepare(V1, V1, PIECES).pieces).toBe(true);
+  });
+
+  /** Le résumé ne répète pas « pièces » : la phrase composée les enchaîne. */
+  it("le résumé se lit d'une traite", () => {
+    expect(resumeDesPieces(PIECES)).toBe("1 pièce de plus à fournir, 2 de moins à réunir");
+    expect(resumeDesPieces({ ajoutees: PIECES.ajoutees, retirees: [] })).toBe(
+      "1 pièce de plus à fournir",
+    );
+    expect(resumeDesPieces({ ajoutees: [], retirees: PIECES.retirees })).toBe(
+      "2 pièces de moins à réunir",
+    );
+  });
+});
+
+describe("les options d'arbitrage citent les pièces", () => {
+  const options = (pieces: EvolutionDesPieces) =>
+    optionsArbitrage(V1, sansLeDelai, "11 500 €", "13 000 €", pieces).map((o) => o.detail);
+
+  it("migrer dit ce que la checklist gagne et perd", () => {
+    expect(options(PIECES)[0]).toContain("1 pièce de plus à fournir, 2 de moins à réunir");
+  });
+
+  /**
+   * Conserver ne change rien à la checklist : reprendre le même décompte
+   * des deux côtés présenterait le choix comme identique. C'est le défaut
+   * corrigé pour le montant, et il vaut ici mot pour mot.
+   */
+  it("conserver n'en cite aucune : ce choix ne change pas la checklist", () => {
+    expect(options(PIECES)[1]).not.toContain("pièce");
+  });
+
+  /** Trois changements à la fois se lisent encore : « A, B et C ». */
+  it("montant, délai et pièces s'énumèrent sans bégayer", () => {
+    const [migrer] = optionsArbitrage(V1, V2, "11 500 €", "13 000 €", PIECES).map(
+      (o) => o.detail,
+    );
+    expect(migrer).not.toMatch(/ et .* et /u);
+    expect(migrer).toContain("13 000 € à prouver");
+    expect(migrer).toContain("60–150 jours");
+    expect(migrer).toContain("1 pièce de plus");
   });
 });
