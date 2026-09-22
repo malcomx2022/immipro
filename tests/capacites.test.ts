@@ -8,6 +8,7 @@ import {
   type Observation,
 } from "@/domain/exploitation/dependances";
 import {
+  POINTS,
   constaterLesDependances,
   observer,
   sonderLesSignatures,
@@ -171,23 +172,97 @@ describe("un `.env` complet devant des points de branchement vides", () => {
       // sa sonde conclut avec ces secrets-là.
       paiements: "OPERATIONNELLE",
       /*
-        Le second adaptateur écrit, et le premier dont la capacité
-        plafonne : les clés sont là, l'ouvreur existe, et aucune sonde ne
-        peut l'éprouver sans ouvrir une vraie session chez le
-        fournisseur. « Configurée, non vérifiée » — donc pas prête.
+        Les clés sont là, l'ouvreur existe, et aucune sonde ne peut
+        l'éprouver sans ouvrir une vraie session chez le fournisseur.
+        Ce n'est pas « pas encore vérifiée » : c'est **non vérifiable**,
+        et la distinction est la correction du 22/09/2026 — la première
+        se répare, la seconde jamais.
       */
-      ouverture_paiement: "CONFIGUREE_NON_VERIFIEE",
-      antivirus: "IMPLEMENTATION_ABSENTE",
+      ouverture_paiement: "NON_VERIFIABLE",
+      /*
+        L'antivirus se lisait ici `IMPLEMENTATION_ABSENTE` avec une
+        `ANTIVIRUS_URL` valide, et c'était faux : le résolveur était
+        appelé sans argument, donc il lisait `process.env` pendant que
+        le reste de l'observation lisait l'environnement passé. Il reçoit
+        maintenant le même environnement que les deux autres mesures.
+
+        L'adaptateur est donc vu, et la capacité dit ce qu'il en est —
+        configurée, et personne n'a encore présenté EICAR au moteur.
+      */
+      antivirus: "CONFIGUREE_NON_VERIFIEE",
       remboursement: "IMPLEMENTATION_ABSENTE",
       extraction: "IMPLEMENTATION_ABSENTE",
       redaction: "IMPLEMENTATION_ABSENTE",
     });
-    expect(etat.bloquantes).toEqual([
-      "messagerie",
-      "ouverture_paiement",
-      "antivirus",
-      "remboursement",
+    /*
+      Trois bloquantes réparables, et une réserve. La distinction est
+      neuve : l'ouverture de paiement ne deviendra jamais opérationnelle,
+      puisqu'aucune sonde ne peut l'éprouver sans ouvrir une session
+      facturée. La ranger parmi les bloquantes rendait l'instance inapte
+      pour toujours.
+    */
+    expect(etat.bloquantes).toEqual(["messagerie", "antivirus", "remboursement"]);
+    expect(etat.reserves).toEqual(["ouverture_paiement"]);
+  });
+
+  /**
+   * **Le 503 qui ne pouvait pas s'éteindre.**
+   *
+   * Avant cette correction, `ouverture_paiement` plafonnait par
+   * construction et comptait parmi les bloquantes : aucune configuration,
+   * aucun adaptateur, aucune sonde n'aurait pu sortir l'instance
+   * d'`INAPTE`. `/api/health` répondait 503 en permanence.
+   *
+   * Ce test le tient par l'autre bout : une installation dont **tout ce
+   * qui est réparable** est opérationnel n'est plus inapte, alors même
+   * qu'une réserve subsiste. Sans la distinction, il serait rouge.
+   */
+  it("une réserve seule n'inapte pas l'instance, et ne la déclare pas prête", () => {
+    const reserve = par("ouverture_paiement");
+    const constats = [
+      constater(reserve, { adaptateur: true, configuree: true, sonde: "IMPOSSIBLE" }),
+      constater(par("paiements"), { adaptateur: true, configuree: true, sonde: "CONCLUANTE" }),
+    ];
+    const etat = etatDesCapacites(constats);
+
+    expect(etat.aptitude).not.toBe("INAPTE");
+    expect(etat.bloquantes).toEqual([]);
+    expect(etat.reserves).toEqual(["ouverture_paiement"]);
+    // Elle n'est pas prête pour autant : une preuve manque, et cela se lit.
+    expect(etat.aptitude).toBe("PILOTE");
+    expect(etat.manquantes).toContain("ouverture_paiement");
+  });
+
+  /**
+   * L'inverse, qui est la raison d'être de la prudence d'origine : une
+   * bloquante réparable inapte toujours, et la réserve n'y change rien.
+   */
+  it("une bloquante réparable inapte, réserve ou pas", () => {
+    const etat = etatDesCapacites([
+      constater(par("ouverture_paiement"), {
+        adaptateur: true,
+        configuree: true,
+        sonde: "IMPOSSIBLE",
+      }),
+      constater(par("messagerie"), { adaptateur: true, configuree: false, sonde: "ABSENTE" }),
     ]);
+    expect(etat.aptitude).toBe("INAPTE");
+    expect(etat.bloquantes).toEqual(["messagerie"]);
+    expect(etat.reserves).toEqual(["ouverture_paiement"]);
+  });
+
+  /**
+   * « Aucune sonde n'a tourné » et « aucune sonde ne peut exister » ne se
+   * confondent plus. La première se répare — la messagerie conclut dès
+   * qu'un courrier part —, la seconde jamais.
+   */
+  it("une sonde qui n'a pas encore tourné n'est pas une réserve", () => {
+    const etat = etatDesCapacites([
+      constater(par("messagerie"), { adaptateur: true, configuree: true, sonde: "ABSENTE" }),
+    ]);
+    expect(etat.aptitude).toBe("INAPTE");
+    expect(etat.bloquantes).toEqual(["messagerie"]);
+    expect(etat.reserves).toEqual([]);
   });
 
   /**
@@ -382,5 +457,124 @@ describe("la sonde des signatures éprouve ce que la route exécute", () => {
     // Les deux réunis : elle tourne.
     observer(par("remboursement"), TOUT_RENSEIGNE, compte);
     expect(appels).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * La réserve est une exception, et une exception se plafonne.
+ * ------------------------------------------------------------------ */
+
+/**
+ * `sansSondeSure` acquitte une bloquante sans preuve. C'est justifiable
+ * une fois — ouvrir une session chez un fournisseur est un appel facturé
+ * au temps —, et c'est une échappatoire dès qu'on s'y habitue : il
+ * suffirait de l'écrire pour qu'une dépendance cesse d'inapter.
+ *
+ * Elle est donc plafonnée, sur le modèle de `copy-exceptions.json` : au
+ * delà de deux, ce n'est plus une exception, c'est la façon dont on
+ * arrête de sonder. Le plafond est bas exprès — une sonde sûre est
+ * presque toujours écrivable, et le lot du balayage l'a montré : on la
+ * croyait impossible, EICAR la rend triviale.
+ */
+describe("aucune sonde sûre : une exception, nommée et plafonnée", () => {
+  const sansSonde = Object.entries(POINTS).filter(([, p]) => "sansSondeSure" in p);
+
+  it("chaque exception dit pourquoi, en une phrase qui tient", () => {
+    for (const [cle, point] of sansSonde) {
+      const raison = (point as { sansSondeSure: string }).sansSondeSure;
+      expect(raison, cle).toBeTruthy();
+      // Une raison générique — « pas possible », « trop compliqué » — ne
+      // se relit pas dans six mois. Celle-ci doit dire ce que la sonde
+      // coûterait ou déclencherait.
+      expect(raison.length, cle).toBeGreaterThan(30);
+      expect(raison, cle).not.toMatch(/^(impossible|non|pas de sonde)\.?$/iu);
+    }
+  });
+
+  it("elles restent deux au plus", () => {
+    expect(sansSonde.map(([cle]) => cle)).toEqual(["ouverture_paiement"]);
+    expect(sansSonde.length).toBeLessThanOrEqual(2);
+  });
+
+  /**
+   * Et elle ne s'étend pas aux facultatives : une facultative non
+   * opérationnelle laisse déjà tourner un pilote, elle n'a aucun besoin
+   * d'être acquittée. L'y autoriser ne servirait qu'à masquer.
+   */
+  it("elles ne concernent que des bloquantes", () => {
+    for (const [cle] of sansSonde) {
+      expect(par(cle).statut, cle).not.toBe("FACULTATIVE_PILOTE");
+    }
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Les trois mesures d'une observation portent sur le même environnement.
+ * ------------------------------------------------------------------ */
+
+describe("le résolveur lit l'environnement observé, pas celui du processus", () => {
+  /**
+   * Le défaut corrigé le 22/09/2026 : `brancheEcrit` appelait le
+   * résolveur **sans argument**, donc il lisait `process.env` pendant
+   * que `configuree` et la sonde lisaient l'environnement passé. Les
+   * trois mesures d'une même observation ne portaient pas sur la même
+   * chose.
+   *
+   * Tant qu'aucun résolveur ne lisait l'environnement, cela ne se voyait
+   * pas. Le balayeur branché l'a rendu visible : une `ANTIVIRUS_URL`
+   * valide se lisait « aucun adaptateur ».
+   */
+  it("une adresse de moteur passée en argument est vue par la mesure d'adaptateur", () => {
+    const avec = observer(par("antivirus"), { ANTIVIRUS_URL: "http://antivirus.interne/scan" });
+    expect(avec.adaptateur).toBe(true);
+    expect(avec.configuree).toBe(true);
+
+    const sans = observer(par("antivirus"), {});
+    expect(sans.adaptateur).toBe(false);
+  });
+
+  /**
+   * Et la mesure suit le même critère que le module : une variable
+   * renseignée qui ne désigne aucun moteur ne vaut pas un adaptateur.
+   */
+  it("une adresse illisible ne vaut ni adaptateur ni configuration", () => {
+    const vu = observer(par("antivirus"), { ANTIVIRUS_URL: "à définir" });
+    expect(vu.adaptateur).toBe(false);
+    expect(vu.configuree).toBe(false);
+  });
+
+  /**
+   * Le résolveur lit l'environnement **normalisé**, comme les deux
+   * autres mesures. Sans cela, un déploiement resté sur une graphie
+   * dépréciée se lirait « configuré » — la normalisation fait son
+   * travail — et « sans adaptateur » — le résolveur lisant le nom brut.
+   * L'exploitant chercherait du code absent là où il fallait renommer
+   * une variable.
+   */
+  it("les trois mesures lisent le même environnement normalisé", () => {
+    const vus: Array<Record<string, string | undefined>> = [];
+    const points: Record<string, PointDeBranchement> = {
+      antivirus: {
+        resolveur: (environnement) => {
+          vus.push(environnement);
+          return "branché";
+        },
+        nonBranche: "absent",
+        configure: (environnement) => {
+          vus.push(environnement);
+          return true;
+        },
+        sonde: (environnement) => {
+          vus.push(environnement);
+          return "CONCLUANTE";
+        },
+      },
+    };
+    observer(par("antivirus"), { FEDAPAY_SECRET_KEY: "ancienne" }, points);
+
+    expect(vus).toHaveLength(3);
+    // La normalisation a eu lieu une fois, et les trois en profitent.
+    for (const vu of vus) expect(vu.FEDAPAY_API_KEY).toBe("ancienne");
+    expect(new Set(vus).size).toBe(1);
   });
 });
