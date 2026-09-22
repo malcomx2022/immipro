@@ -5493,3 +5493,117 @@ sans `overrides`. L'audit de production ne cite plus ni `next-auth` ni
 Trois mutations, trois rouges : la dépendance qui revient, une variable
 sans lecteur qui reparaît dans le fichier d'exemple, et l'`overrides` qui
 se réinstalle sans motif.
+
+---
+
+### S.29 — Le rail des francs CFA ne pouvait ouvrir aucun paiement
+
+L'adaptateur FedaPay attendait une enveloppe `{"v1/transaction": …}`
+autour de chaque réponse. La documentation publique du fournisseur, lue
+le 22/09/2026, décrit des réponses **plates**. Si elle dit vrai — et
+c'est la seule source disponible —, chaque réponse réelle tombait en
+`reponse_inattendue`, donc en `ouverture_refusee` : **aucun paiement en
+francs CFA ne pouvait s'ouvrir**, sur le rail de la clientèle visée.
+
+#### D'où venait la forme
+
+De nulle part. Elle avait été écrite sans clé de bac à sable et sans
+source, puis **éprouvée contre elle-même** : les tests construisaient
+leurs fixtures dans la forme supposée, et passaient. C'est la raison
+pour laquelle le défaut a survécu à une porte de qualité complète —
+mille sept cents tests verts n'attrapent pas une supposition que les
+tests partagent.
+
+L'avertissement en tête du fichier annonçait le risque en toutes
+lettres : « non éprouvé, à confronter au bac à sable ». Il n'a servi à
+rien, et c'est instructif. Un commentaire qui dit « ceci est peut-être
+faux » ne met personne en garde contre *quoi* ; il autorise à déployer
+en conscience. Ce qui a trouvé le défaut, c'est d'aller lire la
+documentation du fournisseur.
+
+#### Quatre corrections, et ce qu'elles reposent sur
+
+| # | Ce qui était écrit | Ce que la documentation dit |
+|---|---|---|
+| 1 | réponse enveloppée, exigée | réponse **plate** sur les trois points d'appel utilisés |
+| 2 | `currency: { iso }` partout | la **lecture** rend `currency_id`, un entier, sans code ISO |
+| 3 | « `Idempotency-Key` protège d'un second débit » | l'en-tête **n'est pas documenté** chez ce fournisseur |
+| 4 | consultation « non opérationnelle, états inconnus » | la liste des états **est** documentée, et coïncide avec la nôtre |
+
+Les deux formes coexistent maintenant dans le schéma : la plate, que la
+documentation décrit, et l'enveloppée, au cas où elle existerait sur un
+point d'appel non documenté. Refuser celle qu'on connaissait déjà
+n'aurait rien gagné.
+
+#### La reprise, qui refusait tout le monde
+
+Le point n° 2 a une conséquence que la seule lecture du schéma ne montre
+pas. `currency_id` est rendu par **la lecture**, c'est-à-dire par l'appel
+que fait toute reprise. `retrouver` n'avait pas la devise sous la main et
+passait une chaîne vide ; `ouvertureConcorde` ne pouvait pas concorder ;
+`ouvrirLeTunnel` écrivait une divergence et refusait le candidat.
+
+Autrement dit : un paiement en francs CFA dont la première réponse s'était
+perdue devenait **définitivement** irrécupérable, et l'exploitation lisait
+un écart de montant là où rien ne divergeait. Le contrat `Ouvreur` reçoit
+donc la devise sur `retrouver`, en repli. Ce n'est pas une vérification
+contournée : dès que le fournisseur dit la devise, c'est la sienne qui est
+comparée, et le montant l'est toujours — c'est par lui qu'une divergence
+réelle se manifeste.
+
+#### Ce qui n'a pas de solution, et pourquoi
+
+**FedaPay n'expose aucune API de remboursement.** Ce n'était pas la
+lecture qu'on en faisait : on croyait qu'il manquait « le chemin, l'en-tête
+d'idempotence, la forme de la réponse et la liste des états, à vérifier
+contre leur bac à sable ». Ces choses n'existent pas. Le remboursement est
+un geste manuel dans leur tableau de bord — un formulaire, six étapes, un
+courriel au client — et il n'est possible **que par MTN Mobile Money**.
+
+`PUT /transactions/{id}` accepte bien un champ `status`, et `refunded`
+figure parmi les états. Rien ne documente qu'écrire cet état *déclenche*
+un remboursement ; cela pourrait n'étiqueter que la ligne. Le tenter
+serait deviner un mouvement d'argent.
+
+L'adaptateur reste donc non opérationnel, mais pour une raison qui a
+changé de nature : elle n'attend plus une documentation, elle constate une
+absence. **Ce qui manque est un parcours d'exploitation** — une dette
+`refundDueAt` qui reste visible, et un opérateur qui la solde au tableau
+de bord du fournisseur avant qu'une notification signée la clôture. C'est
+une décision de produit, pas un correctif, et elle n'est pas prise.
+
+#### Documenté n'est pas vérifié
+
+Aucune clé de bac à sable n'est disponible. Rien de ce qui précède n'a
+rencontré un serveur : c'est conforme à une **documentation**, ce qui vaut
+mieux qu'une supposition et moins qu'une exécution. `npm run sandbox:paiement`
+existe et le dit lui-même quand il tourne sans clés — il ne se déclare pas
+vert. Le jour où des clés existent, c'est cette exécution qui fera foi, pas
+le commentaire en tête du fichier.
+
+#### Vérifié en mutant
+
+Huit mutations, huit rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'enveloppe redevient exigée | cinq cas de la forme plate |
+| la devise de repli redevient une chaîne vide, à la création | l'entité qui ne porte que `currency_id` |
+| la même, sur la reprise | la reprise sans code ISO |
+| la comparaison de référence disparaît, à la création | deux cas, plate et enveloppée |
+| la même, à la consultation | la référence étrangère |
+| un état hors table se traduit « au plus proche » | l'état inconnu |
+| le code de retour cesse d'être lu, chez FedaPay | les 500, 502 et 429 |
+| le même, chez Stripe | les 503 et 429 |
+
+Les deux dernières ont demandé de **réparer d'abord le test**. Il envoyait
+un corps vide avec son code d'erreur : la lecture au schéma échouait, et le
+garde-fou paraissait tenu sans jamais avoir été exercé. Le corps envoyé est
+maintenant celui d'un paiement **approuvé** — seul le code de retour dit la
+panne. Sans cela, un 500 dont le corps aurait porté une transaction
+approuvée se serait lu « confirmé ».
+
+Un neuvième garde-fou a été **retiré** plutôt que réparé : un test lisait
+le source de l'adaptateur pour y vérifier la présence d'un commentaire.
+C'est une prose qui garde une prose. L'assertion de comportement — l'en-tête
+part, et il porte la clé de la tentative — reste seule.

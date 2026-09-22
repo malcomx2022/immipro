@@ -277,6 +277,7 @@ describe("adaptateur Stripe", () => {
     const vu = await adaptateurStripe("sk_essai", RETOUR).retrouver(
       "stripe:cs_test_123",
       DEMANDE.reference,
+      "EUR",
     );
     expect(vu).toMatchObject({ issue: "ouverte" });
     expect(appels[0]!.url).toBe("https://api.stripe.com/v1/checkout/sessions/cs_test_123");
@@ -382,6 +383,130 @@ describe("adaptateur FedaPay", () => {
       issue: "creee_sans_url",
       detail: "url domaine_inattendu",
     });
+  });
+
+  /**
+   * La forme que la documentation décrit — correctif du 22/09/2026.
+   *
+   * **Tous les cas ci-dessus emploient une enveloppe `v1/transaction`,
+   * et c'est ainsi que le défaut a survécu** : les tests confrontaient
+   * l'adaptateur à la forme qu'il avait lui-même supposée. La
+   * documentation publique de FedaPay décrit des réponses plates, sur la
+   * création comme sur la lecture. Si elle dit vrai, le rail en francs
+   * CFA n'ouvrait aucun paiement.
+   *
+   * Les deux formes sont désormais acceptées : la plate parce qu'elle
+   * est documentée, l'enveloppée parce qu'une documentation peut
+   * retarder sur une API et que refuser la bonne est le seul des deux
+   * risques qui bloque le rail.
+   */
+  describe("la forme plate, telle que la documentation la décrit", () => {
+    const plate = {
+      id: 42,
+      reference: XOF.reference,
+      amount: 5000,
+      currency: { iso: "XOF" },
+    };
+
+    it("ouvre le paiement, là où l'enveloppe était exigée", async () => {
+      simuler(reponse(200, plate), reponse(200, jeton));
+      expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
+        issue: "ouverte",
+        session: {
+          providerTxId: "fedapay:42",
+          url: "https://process.fedapay.com/abc",
+          montant: 5000,
+          devise: "XOF",
+        },
+      });
+    });
+
+    /**
+     * La lecture rend `currency_id`, un entier, là où la création
+     * accepte `currency: { iso }`. Sans code ISO, il n'y a pas de devise
+     * à comparer — ce qui n'est pas une raison de refuser l'ouverture.
+     * L'ancien code rendait une chaîne vide, et la comparaison de
+     * `ouvertureConcorde` échouait à tous les coups.
+     */
+    it("accepte une entité qui ne porte que `currency_id`", async () => {
+      simuler(
+        reponse(200, { id: 42, reference: XOF.reference, amount: 5000, currency_id: 1 }),
+        reponse(200, jeton),
+      );
+      const vu = await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF);
+      expect(vu).toMatchObject({
+        issue: "ouverte",
+        session: { montant: 5000, devise: "XOF" },
+      });
+    });
+
+    it("refuse toujours une référence qui n'est pas la nôtre", async () => {
+      simuler(reponse(200, { ...plate, reference: "leur-reference" }));
+      expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
+        issue: "reponse_inattendue",
+        detail: "la référence interne n'est pas revenue telle quelle",
+      });
+    });
+
+    it("refuse toujours une entité sans montant", async () => {
+      simuler(reponse(200, { id: 42, reference: XOF.reference, currency: { iso: "XOF" } }));
+      expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
+        issue: "reponse_inattendue",
+        detail: "montant absent de la transaction",
+      });
+    });
+
+    /**
+     * **La reprise, et l'écart qu'elle ouvrait à chaque fois.**
+     *
+     * La documentation décrit `currency_id` sur la lecture — c'est-à-dire
+     * précisément sur l'appel que fait une reprise. La devise rendue
+     * était une chaîne vide, `ouvertureConcorde` ne pouvait pas
+     * concorder, et `ouvrirLeTunnel` écrivait une divergence puis
+     * refusait le candidat. Un paiement dont la première réponse s'est
+     * perdue était donc **définitivement** irrécupérable.
+     *
+     * La devise locale est maintenant passée en repli : la reprise rend
+     * ce que la plateforme a décidé, et le montant reste comparé.
+     */
+    it("une reprise sur une entité sans code ISO rend la devise locale", async () => {
+      simuler(
+        reponse(200, { id: 42, reference: XOF.reference, amount: 5000, currency_id: 1 }),
+        reponse(200, jeton),
+      );
+      const vu = await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).retrouver(
+        "fedapay:42",
+        XOF.reference,
+        "XOF",
+      );
+      expect(vu).toMatchObject({ issue: "ouverte", session: { montant: 5000, devise: "XOF" } });
+      // Ce que la reprise doit permettre : la concordance passe.
+      expect(
+        vu.issue === "ouverte" && ouvertureConcorde({ montant: 5000, devise: "XOF" }, vu.session),
+      ).toBe(true);
+    });
+
+    /** Et l'enveloppe continue de passer : les deux formes coexistent. */
+    it("l'enveloppe reste acceptée", async () => {
+      simuler(reponse(200, transaction), reponse(200, jeton));
+      expect(
+        (await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).issue,
+      ).toBe("ouverte");
+    });
+  });
+
+  /**
+   * `Idempotency-Key` n'est pas documenté chez FedaPay. L'en-tête part
+   * quand même — il ne coûte rien, et s'il est un jour honoré il fera
+   * son office. Ce qu'on n'affirme plus, c'est qu'il protège : la
+   * protection contre un second débit est `creerOuReprendre`, du côté
+   * local, et elle est éprouvée par les cas de reprise ci-dessus.
+   */
+  it("l'en-tête d'idempotence part, et il porte la clé de la tentative", async () => {
+    const appels = simuler(reponse(200, transaction), reponse(200, jeton));
+    await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF);
+    const entetes = (appels[0]!.options.headers ?? {}) as Record<string, string>;
+    expect(entetes["Idempotency-Key"]).toBe(XOF.cle);
   });
 });
 

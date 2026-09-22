@@ -410,6 +410,17 @@ Trois refus avant d'envoyer qui que ce soit payer :
 | la référence interne | une session qui ne renvoie pas notre référence — le webhook ne saurait pas quoi confirmer |
 | le montant et la devise | ce que le fournisseur a enregistré doit être ce que la plateforme a décidé |
 
+**La devise comparée n'existe pas toujours.** FedaPay documente
+`currency_id`, un entier, là où sa création accepte `currency: { iso }` :
+sur une lecture — donc sur toute reprise — il n'y a pas de code ISO à
+comparer. `retrouver` reçoit la devise de la transaction locale et la rend
+en repli ; sans elle, la comparaison échouait à tous les coups et **chaque
+reprise d'un paiement en francs CFA ouvrait un écart** puis refusait le
+candidat, alors que rien ne divergeait. Le repli ne contourne pas la
+vérification : dès que le fournisseur dit la devise, c'est la sienne qui
+est comparée, et le montant l'est toujours — c'est par lui qu'une
+divergence réelle se manifeste.
+
 Le client ne choisit jamais son fournisseur : il suit la devise (N.A), et
 ni le fournisseur ni le montant ne sont reçus du navigateur. Les clés
 sortantes ne sont lues que par `paiement/ouvreurs.ts`, et n'atteignent
@@ -459,13 +470,18 @@ Cinq issues, et leurs frontières sont la règle :
 Aucune de ces issues n'expire quoi que ce soit : l'expiration suit
 `aExpirer` et elle seule. Ni Stripe ni FedaPay ne la prononcent.
 
-**FedaPay est explicitement non opérationnel.** Faute de documentation
-vérifiée, il n'y a pas de traduction honnête : deviner quels états valent
-confirmation ou refus déciderait si un candidat est crédité et si un échec
-lui est imputé. L'adaptateur rend `indisponible` avec sa raison — le
-comportement d'avant, sans invention. Ce qu'il faut pour le brancher : la
-liste des états du fournisseur et la forme de la réponse, vérifiées contre
-le bac à sable.
+**FedaPay est branché depuis le 22/09/2026.** Il ne l'était pas : deviner
+quels états valent confirmation ou refus déciderait si un candidat est
+crédité et si un échec lui est imputé, et la liste manquait. La
+documentation publique la donne — `pending`, `approved`, `canceled`,
+`refunded`, `declined`, `transferred` — et elle **coïncide** avec
+`ETATS_FEDAPAY`, écrite d'après des notifications observées. Deux sources
+indépendantes qui concordent, et la table n'est pas recopiée : la
+consultation lit **la même**, importée, sans quoi les deux chemins
+traduiraient un jour le même mot différemment.
+
+Un état hors table rend toujours `indisponible` : la frontière n'a pas
+bougé, seule la table s'est remplie.
 
 ### Les secrets de paiement, une seule nomenclature
 
@@ -490,10 +506,10 @@ Ce que chaque usage consomme aujourd'hui :
 
 | Usage | Module | Variables | Branché ? |
 |---|---|---|---|
-| Création de paiement | `paiement/ouvreurs.ts` | `*_API_KEY` | **oui**, les deux rails — la forme des échanges FedaPay reste non éprouvée faute de clés de bac à sable |
+| Création de paiement | `paiement/ouvreurs.ts` | `*_API_KEY` | **oui**, les deux rails — FedaPay conforme à sa documentation depuis le 22/09/2026, toujours non éprouvé contre un serveur |
 | Webhooks | `paiement/signature.ts` | `*_WEBHOOK_SECRET` | **oui** |
-| Consultation fournisseur | `paiement/consultation.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay non — ses états de transaction n'ont pas pu être vérifiés |
-| Remboursement sortant | `paiement/remboursement.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay non — chemin, idempotence et états non vérifiés |
+| Consultation fournisseur | `paiement/consultation.ts` | `*_API_KEY` | **oui**, les deux rails — la table d'états FedaPay est confirmée par sa documentation |
+| Remboursement sortant | `paiement/remboursement.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay **n'expose aucune API de remboursement** — geste manuel au tableau de bord, MTN Mobile Money seulement |
 | Espace FedaPay | `paiement/fedapay.ts` | `FEDAPAY_ENVIRONMENT` | **oui** — `baseDe` choisit le bac à sable ou la production |
 
 Ce tableau avait dérivé : il annonçait « non » sur trois lignes que les

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleDEvenementDeReconciliation } from "@/domain/paiement/ouverture";
 import { consultantStripe, ETAT_DE_LINTENTION } from "@/server/paiement/stripe";
-import { consultantFedaPay, CONSULTATION_NON_OPERATIONNELLE } from "@/server/paiement/fedapay";
+import { consultantFedaPay } from "@/server/paiement/fedapay";
+import { ETATS_FEDAPAY } from "@/server/paiement/notifications";
 import { leConsultant } from "@/server/paiement/consultation";
 
 /**
@@ -166,8 +167,16 @@ describe("la consultation Stripe retrouve ce que le webhook a perdu", () => {
    * La frontière qui compte : pas de réponse ≠ refus.
    * ---------------------------------------------------------------- */
 
-  it("un échec temporaire ne conclut rien", async () => {
-    for (const cas of [new Error("ECONNRESET"), reponse(503, {}), reponse(429, {})]) {
+  /**
+   * Le corps de la réponse est **celui d'une session payée**, et le code
+   * de retour est une panne. C'est ce qui distingue le garde-fou de son
+   * apparence : avec un corps vide, la lecture au schéma échouerait de
+   * toute façon et le code de retour ne serait jamais consulté. Ici, s'il
+   * cessait de l'être, un 503 se lirait « payé ».
+   */
+  it("un échec temporaire ne conclut rien, même quand le corps dit « payé »", async () => {
+    const paye = session({ payment_status: "paid" });
+    for (const cas of [new Error("ECONNRESET"), reponse(503, paye), reponse(429, paye)]) {
       simuler(cas);
       const vu = await consultant.consulter(ID, REFERENCE);
       expect(vu.issue).toBe("indisponible");
@@ -219,22 +228,121 @@ describe("la consultation Stripe retrouve ce que le webhook a perdu", () => {
   });
 });
 
-describe("la consultation FedaPay est non opérationnelle, et le dit", () => {
-  /**
-   * Faute de documentation vérifiée, il n'y a pas de traduction honnête :
-   * deviner quels états valent confirmation ou refus déciderait si un
-   * candidat est crédité, et si un échec lui est imputé.
-   */
-  it("rend `indisponible` avec sa raison, jamais un état", async () => {
-    const vu = await consultantFedaPay().consulter("fedapay:42", REFERENCE);
-    expect(vu).toEqual({ issue: "indisponible", detail: CONSULTATION_NON_OPERATIONNELLE });
-    expect(CONSULTATION_NON_OPERATIONNELLE).toMatch(/non branchée|non vérifi/u);
+describe("la consultation FedaPay, branchée le 22/09/2026", () => {
+  const consultant = consultantFedaPay("sk_essai", "sandbox");
+  const ID_FEDAPAY = "fedapay:42";
+  const entite = (reste: Record<string, unknown>) => ({
+    id: 42,
+    reference: REFERENCE,
+    amount: 5000,
+    ...reste,
   });
 
-  it("ne prononce ni confirmation, ni refus, ni expiration", async () => {
-    const vu = await consultantFedaPay().consulter("fedapay:42", REFERENCE);
-    expect(vu.issue).not.toBe("connu");
-    expect(vu.issue).not.toBe("sans_paiement");
+  /**
+   * Elle était non opérationnelle faute de savoir quels états le
+   * fournisseur prononce : deviner cette table-là décide si un candidat
+   * est crédité, et si un échec lui est imputé.
+   *
+   * La documentation publique donne la liste, et elle **coïncide** avec
+   * `ETATS_FEDAPAY`, écrite d'après des notifications observées. La
+   * table n'est pas recopiée : c'est la même, importée — deux tables
+   * divergeraient au premier correctif.
+   */
+  it("traduit les six états documentés, et la table est partagée", async () => {
+    const attendus: Array<[string, string]> = [
+      ["approved", "CONFIRMEE"],
+      ["transferred", "CONFIRMEE"],
+      ["pending", "EN_ATTENTE"],
+      ["declined", "ECHOUEE"],
+      ["canceled", "ECHOUEE"],
+      ["refunded", "REMBOURSEE"],
+    ];
+    for (const [brut, statut] of attendus) {
+      simuler(reponse(200, entite({ status: brut })));
+      expect(await consultant.consulter(ID_FEDAPAY, REFERENCE), brut).toMatchObject({
+        issue: "connu",
+        statut,
+        providerTxId: "fedapay:42",
+      });
+    }
+    // Les six de la documentation sont couverts par la table partagée.
+    for (const [brut] of attendus) expect(ETATS_FEDAPAY[brut], brut).toBeTruthy();
+  });
+
+  /** La cause n'accompagne que ce que le fournisseur a dit (N.B). */
+  it("ne prononce une cause que sur les états qui en portent une", async () => {
+    simuler(reponse(200, entite({ status: "declined" })));
+    expect(await consultant.consulter(ID_FEDAPAY, REFERENCE)).toMatchObject({
+      cause: "REFUS_EMETTEUR",
+    });
+
+    simuler(reponse(200, entite({ status: "approved" })));
+    expect(await consultant.consulter(ID_FEDAPAY, REFERENCE)).not.toHaveProperty("cause");
+  });
+
+  /**
+   * **La frontière du module.** Un état hors table ne se traduit pas au
+   * plus proche : le job ne conclut rien, et l'écart s'ouvre au délai
+   * prévu. C'est ce qui se passait quand rien n'était branché.
+   */
+  it("un état inconnu rend l'indisponibilité, jamais un refus", async () => {
+    simuler(reponse(200, entite({ status: "quelque_chose_de_nouveau" })));
+    const vu = await consultant.consulter(ID_FEDAPAY, REFERENCE);
+    expect(vu).toEqual({ issue: "indisponible", detail: "état non reconnu" });
+  });
+
+  /**
+   * Même exigence que côté Stripe, et pour la même raison : le corps
+   * envoyé ici est **approuvé**, seul le code de retour dit la panne. Un
+   * corps vide aurait buté sur le schéma, et le garde-fou aurait paru
+   * tenu sans jamais être exercé.
+   */
+  it("une absence de réponse n'est pas un refus bancaire, ni une confirmation", async () => {
+    simuler(new Error("ECONNRESET"));
+    expect((await consultant.consulter(ID_FEDAPAY, REFERENCE)).issue).toBe("indisponible");
+
+    for (const statut of [500, 502, 429]) {
+      simuler(reponse(statut, entite({ status: "approved" })));
+      const vu = await consultant.consulter(ID_FEDAPAY, REFERENCE);
+      expect(vu, String(statut)).toEqual({ issue: "indisponible", detail: `réponse ${statut}` });
+    }
+  });
+
+  it("un 404 dit que la transaction est inconnue, et rien de plus", async () => {
+    simuler(reponse(404, {}));
+    expect(await consultant.consulter(ID_FEDAPAY, REFERENCE)).toEqual({ issue: "introuvable" });
+  });
+
+  /** Une transaction qui n'est pas la nôtre n'est pas une panne. */
+  it("une référence étrangère rend l'incohérence", async () => {
+    simuler(reponse(200, entite({ status: "approved", reference: "IMP-AUTRUI" })));
+    expect(await consultant.consulter(ID_FEDAPAY, REFERENCE)).toMatchObject({
+      issue: "incoherent",
+    });
+  });
+
+  it("sans identifiant, elle n'appelle personne", async () => {
+    const appels = simuler(reponse(200, entite({ status: "approved" })));
+    expect((await consultant.consulter(null, REFERENCE)).issue).toBe("indisponible");
+    expect(appels).toHaveLength(0);
+  });
+
+  /** La forme plate documentée, celle qui bloquait l'ouverture. */
+  it("lit l'entité plate comme l'entité enveloppée", async () => {
+    simuler(reponse(200, { "v1/transaction": entite({ status: "approved" }) }));
+    expect((await consultant.consulter(ID_FEDAPAY, REFERENCE)).issue).toBe("connu");
+
+    simuler(reponse(200, entite({ status: "approved" })));
+    expect((await consultant.consulter(ID_FEDAPAY, REFERENCE)).issue).toBe("connu");
+  });
+
+  it("la clé secrète ne paraît jamais dans ce qui est rendu", async () => {
+    simuler(reponse(500, {}));
+    const vu = await consultantFedaPay("sk_tres_secrete", "sandbox").consulter(
+      ID_FEDAPAY,
+      REFERENCE,
+    );
+    expect(JSON.stringify(vu)).not.toContain("sk_tres_secrete");
   });
 });
 

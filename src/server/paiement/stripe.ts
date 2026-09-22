@@ -153,6 +153,8 @@ export const adaptateurStripe = (cle: string, retourAbsolu: (chemin: string) => 
   },
 
   async retrouver(providerTxId: string, reference: string): Promise<Ouverture> {
+    // La devise n'est pas reprise : Stripe rend toujours `currency` sur
+    // une session, et le repli du contrat n'a donc jamais à servir ici.
     const identifiant = providerTxId.replace(/^stripe:/u, "");
     const reponse = await appeler(cle, `/checkout/sessions/${encodeURIComponent(identifiant)}`, {});
     if (!reponse) return { issue: "injoignable" };
