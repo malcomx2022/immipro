@@ -6397,3 +6397,153 @@ Deux mutations, deux rouges :
 Le garde-fou de S.28 fonctionne dans les deux sens : il refuse une
 variable sans lecteur **et** une exception qui a cessé d'en être une. Le
 plafond de cinq entrées passe de quatre à une.
+
+---
+
+### S.37 — Un passeport valable jusqu'en 2029, prié d'être renouvelé
+
+Le lot demandait de brancher l'extraction documentaire. La méthode du
+dépôt veut qu'on établisse le défaut par l'exécution avant d'écrire la
+correction : la chaîne a donc été exécutée d'abord, avec un extracteur
+rendant ce qu'un modèle rend quand on ne lui dit que « passeport » — un
+numéro, un nom, une date d'expiration.
+
+Le dossier en est ressorti :
+
+```
+verdict  : A_CORRIGER
+message  : aucune valeur lisible constaté, 6 mois exigé.
+           Ton passeport doit rester valable 6 mois après le départ.
+           Fais-le renouveler puis redépose-le.
+champs   : {"nom":"SEGLA","numero":"AB1234567","date_expiration":"2029-03-01"}
+```
+
+Le passeport est valable trois ans de plus que nécessaire. Le message
+envoie son titulaire chez l'autorité de délivrance, dans un pays où cela
+prend des semaines et coûte un mois de budget.
+
+#### Deux causes, aucune dans l'adaptateur
+
+**L'extracteur n'apprenait jamais ce qu'on cherchait.** Sa signature
+était `(objectKey, codePiece)`, et il devait rendre des champs nommés
+d'après les **conditions** du référentiel — c'est ainsi que
+`evaluerConditions` les retrouve. Or le code de la pièce ne nomme pas ses
+conditions. Aucun adaptateur, écrit par qui que ce soit, ne pouvait
+produire la clé `passeport_validite_min`. Le contrat était infaisable, et
+son défaut se lisait « aucune valeur lisible » — la formule exacte qu'on
+emploie pour une pièce illisible.
+
+**Personne ne transformait la date lue en la durée comparée.** « Six mois
+de validité » ne s'imprime sur aucun passeport ; ce qui y figure est une
+date. `moisEntre` existait dans le domaine depuis le premier jour, avec
+le commentaire « c'est la mesure de RG-06.3 », et **aucun appelant** :
+la chaîne qui en avait besoin n'existait pas. Elle en a un maintenant.
+
+#### Le repère manquant, qui est le cas ordinaire
+
+En branchant la mesure, une troisième question s'est posée : six mois
+après quoi ? Le référentiel dit « après la date de début du programme »,
+et le dossier la porte — `targetDate`, la rentrée ou la prise de poste.
+
+Un dossier neuf ne l'a pas. Le candidat dépose son passeport avant
+d'avoir arrêté son départ : c'est l'ordre naturel, donc le cas fréquent.
+Les deux réponses faciles sont fausses toutes les deux.
+
+| Réponse | Ce qu'elle produit |
+|---|---|
+| « conforme » | un contrôle annoncé qui n'a pas eu lieu |
+| mesurer depuis aujourd'hui | un passeport expirant dans sept mois déclaré conforme pour un départ à huit |
+
+La condition passe donc **en réserve** : nommée, non jugée, avec le geste
+qui la lève — « Renseigne ta date de départ visée dans l'échéancier ».
+`Verdict` porte désormais `reserves` à côté de `echecs`, et la
+distinction commande deux choses à l'écran : la pièce n'est pas déclarée
+conforme, **et le bouton ne propose pas de la remplacer**. Le fichier n'a
+rien ; c'est le dossier qui attend un renseignement.
+
+La date lue est conservée telle qu'elle figure sur la pièce — ce sont les
+faits bruts qui sont persistés, pas la durée calculée. Le jour où la date
+de départ est renseignée, la mesure se refait sans redemander le fichier
+ni redébiter une analyse.
+
+#### Ce que le branchement a corrigé en plus
+
+| Ce qui était écrit | Ce qui se passait |
+|---|---|
+| `engineLog: "extracteur non branché"`, en dur | Vrai tant que rien n'appelait ; faux au premier appel, pour un délai, un refus ou un PDF protégé |
+| aucun `AiUsage` quand l'extraction rend `null` | Une réponse tronquée a consommé des jetons. Ne pas les écrire en fait un appel gratuit dans B-07 — un dépassement silencieux, qu'INV-6 interdit |
+| une lecture manquée verse aussitôt en revue humaine | DOC-11 WF-06 demande trois reprises avec attente croissante. La première saturation d'un tiers partait en file de revue avec un message accusant le fichier |
+| le type détecté se déduisait de « tous les champs sont nuls » | « Ce n'est pas le bon document » se constate sans aide ; savoir **où** le reclasser est ce qui fait avancer. Le modèle choisit dans la checklist du dossier |
+
+#### Le modèle par défaut
+
+`AI_MODEL` valait `claude-sonnet-5`. Le défaut est maintenant le modèle
+le plus capable, et la variable reste pour qu'une installation en décide
+autrement. La raison est asymétrique : une pièce mal lue envoie quelqu'un
+refaire un document qui n'a rien, ou laisse passer un document qui
+manque. Les deux se paient au guichet, pas sur la facture.
+
+Le paquet `@anthropic-ai/sdk` était figé en `^0.30.0` — une version qui
+ne connaît ni les sorties structurées, ni les blocs `document`, ni les
+modèles courants. Le client y était construit **au chargement du
+module**, et n'était appelé par personne. Il est maintenant construit à
+l'usage, comme celui du stockage, et pour la même raison.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| sans repère, mesurer depuis aujourd'hui | la réserve, et le faux « conforme » qu'elle empêche |
+| la date lue n'est pas convertie en durée | la conformité d'un passeport valable, et le message d'un passeport trop court |
+| une réserve laisse passer `CONFORME` | l'assertion qu'une pièce non vérifiée n'est pas déclarée conforme |
+| un obstacle inconnu du schéma est accepté | la relecture qui ne fait pas confiance à la réponse |
+| pas d'`AiUsage` quand la lecture échoue | deux assertions de jetons (INV-6) |
+| une saturation part directement en revue | six assertions de la reprise |
+| le compteur de tentatives n'est pas soldé | le solde du compteur |
+| la consigne précède la pièce dans le corps | l'ordre des blocs, lu sur ce qui est réellement sérialisé |
+| le remède bascule sur « remplacer » sous simple réserve | le bouton qui n'envoie pas refaire un fichier correct |
+| la taille n'est plus demandée avant le flux | quatre assertions, dont le refus sans transfert |
+| tous les `APIError` se rangent sous « injoignable » | trois assertions, dont la clé refusée qui ne se rejoue pas |
+| le hors-sujet annoncé par le modèle est ignoré | la ligne de reclassement nommée |
+
+---
+
+### S.38 — Une garde de cohérence transformée en panne
+
+Trouvé en exécutant la fumée d'extraction, sur une fixture qui n'était
+pas encore `ACTIF`.
+
+`recalculerCompletude` posait `readyAt` **dès que le calcul rendait
+« prêt »**, sans regarder si la transition avait lieu :
+
+```ts
+readyAt: resultat.ready ? (dossier.readyAt ?? new Date()) : null,
+...(passeEnPret ? { status: "PRET" } : {}),
+```
+
+Or `passeEnPret` exige `status === "ACTIF"` — c'est la règle de DOC-11,
+et elle est juste. Sur un dossier qui n'est pas `ACTIF`, la ligne
+recevait donc une date de « prêt » en gardant son état. La base refuse
+cette ligne : la garde `application_pret_date_coherente` dit
+`("status" = 'PRET') = ("readyAt" IS NOT NULL)`.
+
+Ce n'est pas la garde qui est en cause — elle fait exactement son
+travail. C'est qu'elle rejette **toute la mise à jour**, donc
+`recalculerCompletude`, donc `analyserUnePiece` qui l'appelle en dernier.
+Le verdict était écrit, le quota débité, la notification envoyée, et le
+job mourait ensuite. La file le rejouait alors sur une pièce déjà
+analysée — un second débit, une seconde notification, à chaque reprise.
+
+Le cas se produit pour de bon. `SUSPENDU` — ce qu'une divergence
+réglementaire produit (WF-11) — n'est pas dans les états figés, et un
+dossier suspendu continue de recevoir des pièces. `BROUILLON` non plus.
+
+`readyAt` suit maintenant l'état résultant, et non le score : la garde
+est structurellement satisfaite au lieu d'être éprouvée à chaque
+écriture. La fumée pose une pièce conforme sur un dossier suspendu et
+vérifie que l'analyse aboutit, que le dossier garde son état, et qu'il ne
+reçoit pas une date que son état contredirait.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| `readyAt` suit de nouveau le score | la fumée entière, sur l'erreur d'origine |

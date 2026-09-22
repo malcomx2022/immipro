@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type PgBoss from "pg-boss";
 import { declarerLesFiles, FILES, JOBS, poster, REPRISES } from "@/lib/queue";
 import { TENTATIVES_AVANT_INCIDENT } from "@/domain/securite/balayage";
+import { TENTATIVES_AVANT_REVUE } from "@/server/jobs/analyse";
 
 /**
  * pg-boss 10 ne crée plus une file au premier `send`. Deux conséquences se
@@ -62,9 +63,36 @@ describe("déclaration des files", () => {
     expect(misesAJour.get(JOBS.BALAYAGE_PIECE)?.retryLimit).toBe(balayage?.retryLimit);
   });
 
-  /** Les autres files n'en portent pas : leur échec n'est pas attendu. */
+  /**
+   * Les deux files qui parlent à un service extérieur, et elles seules.
+   *
+   * L'analyse a rejoint le balayage le 22/09/2026, quand l'extraction a
+   * été branchée : un service de lecture sature, et rejouer est ce qui
+   * évite de verser une panne de tiers dans la file de revue humaine.
+   * Les autres files ne touchent que la base, et leur échec n'est pas
+   * attendu — leur donner des reprises masquerait un vrai défaut derrière
+   * six tentatives identiques.
+   */
   it("la reprise ne s'étend pas aux files qu'elle ne concerne pas", () => {
-    expect(Object.keys(REPRISES)).toEqual([JOBS.BALAYAGE_PIECE]);
+    expect(Object.keys(REPRISES).sort()).toEqual(
+      [JOBS.BALAYAGE_PIECE, JOBS.ANALYSE_DOCUMENT].sort(),
+    );
+  });
+
+  /**
+   * La limite de la file est **plus haute** que le compte tenu par le job.
+   *
+   * Les deux comptent des choses différentes : le job compte les lectures
+   * qui n'ont pas abouti, la file compte les reprises de l'enveloppe — un
+   * worker tué, une base momentanément indisponible. Si la file
+   * s'épuisait la première, une pièce resterait « en analyse » sans que
+   * personne la reprenne et sans qu'aucune revue soit ouverte.
+   */
+  it("la file laisse au job le temps d'atteindre son propre seuil", () => {
+    expect(REPRISES[JOBS.ANALYSE_DOCUMENT]!.retryLimit!).toBeGreaterThan(
+      TENTATIVES_AVANT_REVUE,
+    );
+    expect(REPRISES[JOBS.ANALYSE_DOCUMENT]!.retryBackoff).toBe(true);
   });
 });
 

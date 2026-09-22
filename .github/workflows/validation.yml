@@ -130,6 +130,15 @@ jobs:
         run: npm run smoke:balayage
       - run: echo "- **Balayage antivirus** — chaîne complète, promotion sur le seul verdict « saine », incident visible sans acceptation" >> "$GITHUB_STEP_SUMMARY"
 
+      # La lecture d'une pièce, contre le vrai SDK parlant à un service
+      # d'essai. Ce qu'elle tient : ce sont les octets qui partent et
+      # jamais une URL, une lecture qui n'aboutit pas ne déclare rien
+      # conforme et ne débite personne, et une saturation se rejoue au
+      # lieu d'accuser le fichier.
+      - name: Chaîne d'extraction
+        run: npm run smoke:extraction
+      - run: echo "- **Extraction documentaire** — octets transmis sans URL, mesure déterministe des durées, saturation rejouée sans débit" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention

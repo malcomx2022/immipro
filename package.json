@@ -26,6 +26,7 @@
     "smoke:remboursement": "tsx scripts/fumee-remboursement.mts",
     "smoke:courrier": "tsx scripts/fumee-courrier.mts",
     "smoke:balayage": "tsx scripts/fumee-balayage.mts",
+    "smoke:extraction": "tsx scripts/fumee-extraction.mts",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
     "sandbox:paiement": "tsx scripts/sandbox-paiement.mts",
     "db:migrate": "prisma migrate dev",
@@ -36,7 +37,7 @@
     "seed:editorial": "tsx prisma/seed/editorial.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.30.0",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@prisma/client": "^6.0.0",
     "clsx": "^2.1.0",
     "minio": "^8.0.0",

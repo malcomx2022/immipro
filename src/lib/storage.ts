@@ -58,6 +58,34 @@ export const presignedPut = (key: string) =>
 export const lireEnQuarantaine = (key: string) => connexion().getObject(quarantaine(), key);
 
 /**
+ * Le flux d'une pièce promue. Seul appelant légitime : l'extraction.
+ *
+ * Lire le seau de confiance depuis le serveur n'ouvre rien — c'est déjà
+ * ce que fait une URL présignée, en moins durable. Ce qui compte est ce
+ * qui **ne se fait pas** : aucune URL, présignée ou non, n'est transmise
+ * au service de lecture. Ce sont les octets qui partent, une fois, dans
+ * le corps de l'appel. Confier une adresse à un tiers, c'est lui laisser
+ * la possibilité de la rappeler demain, et la rétention (INV-5) ne
+ * saurait rien en effacer.
+ */
+export const lireUnePiece = (key: string) => connexion().getObject(confiance(), key);
+
+/**
+ * La taille d'une pièce promue, sans la lire.
+ *
+ * Rend `null` quand l'objet n'existe pas — ce qui arrive pour de bon,
+ * quand une reprise de file suit une purge de rétention.
+ */
+export async function tailleDUnePiece(key: string): Promise<number | null> {
+  try {
+    const etat = await connexion().statObject(confiance(), key);
+    return etat.size;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * La taille d'un objet en quarantaine, sans le lire.
  *
  * Demandée avant le flux : un objet trop volumineux se refuse sans qu'un

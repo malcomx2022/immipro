@@ -241,13 +241,31 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
   const passeEnPret = resultat.ready && dossier.status === "ACTIF";
   const redescend = !resultat.ready && dossier.status === "PRET";
 
+  /*
+    `readyAt` suit **l'état**, pas le score — correctif du 22/09/2026,
+    trouvé en exécutant la chaîne d'extraction.
+
+    Elle se posait dès que le calcul rendait `ready`, y compris quand la
+    transition n'avait pas lieu : seul un dossier `ACTIF` passe à `PRET`,
+    et un dossier `BROUILLON` ou `SUSPENDU` gardait donc son état en
+    recevant une date. La base refuse cette ligne — la garde dit
+    `("status" = 'PRET') = ("readyAt" IS NOT NULL)` —, et c'est toute la
+    mise à jour qui échouait, donc l'analyse qui l'appelle : un verdict
+    écrit, un quota débité, et le job rejoué par la file sur une pièce
+    déjà analysée. Une garde de cohérence transformée en panne, sur le
+    chemin le plus fréquenté du produit.
+
+    Le cas se produit pour de bon : un dossier suspendu pour divergence
+    réglementaire n'est pas figé, et sa dernière pièce s'analyse.
+  */
+  const statutApres = passeEnPret ? "PRET" : redescend ? "ACTIF" : dossier.status;
+
   await db.application.update({
     where: { id: applicationId },
     data: {
       internalScore: resultat.interne.score,
-      readyAt: resultat.ready ? (dossier.readyAt ?? new Date()) : null,
-      ...(passeEnPret ? { status: "PRET" as const } : {}),
-      ...(redescend ? { status: "ACTIF" as const } : {}),
+      readyAt: statutApres === "PRET" ? (dossier.readyAt ?? new Date()) : null,
+      ...(statutApres === dossier.status ? {} : { status: statutApres }),
     },
   });
 }

@@ -124,6 +124,27 @@ export async function rendreUneAnalyse(
 }
 
 /**
+ * Rend l'analyse débitée pour une tentative qui n'a rien rendu et sera
+ * rejouée — branchement de l'extraction, 22/09/2026.
+ *
+ * Distincte de `rendreUneAnalyse`, et la distinction porte l'idempotence.
+ * Celle-là est idempotente **par analyse**, parce qu'une revue rejouée ne
+ * doit pas recréditer deux fois. Ici il n'y a pas d'analyse : le job a
+ * débité, le service de lecture n'a pas répondu, rien n'est écrit sur la
+ * pièce et la file rejouera. Chaque tentative est donc son propre couple
+ * débit/rendu, et les compter par analyse ne rendrait qu'une fois sur
+ * trois — le candidat paierait les indisponibilités d'un tiers.
+ *
+ * `note` dit laquelle : sans elle, le grand livre montrerait des rendus
+ * sans cause, et INV-6 demande que le quota se relise.
+ */
+export async function rendreUneTentative(applicationId: string, note: string): Promise<void> {
+  await db.analysisCredit.create({
+    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", note },
+  });
+}
+
+/**
  * Analyses ouvertes par un pack. La valeur vient de la grille tarifaire et
  * non d'une constante recopiée ici : deux chiffres pour la même chose
  * divergent au premier changement de grille.

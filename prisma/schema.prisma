@@ -701,6 +701,13 @@ model DocumentVersion {
   /// l'exploitant s'il doit attendre ou intervenir.
   scanIncidentCause String?
 
+  /// Tentatives de lecture automatique restées sans résultat. Remises à zéro
+  /// dès qu'un verdict tombe : le compteur mesure une attente en cours, pas
+  /// un passé. Au-delà de trois, la pièce part en revue humaine — DOC-11,
+  /// WF-06, cas limites.
+  analysisAttempts      Int       @default(0)
+  analysisLastAttemptAt DateTime?
+
   analyses DocumentAnalysis[]
   findings CritiqueFinding[]
 

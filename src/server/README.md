@@ -30,6 +30,8 @@ src/server/
   securite/
     secret.ts        Empreintes scrypt, codes à usage unique, clés d'objet.
     session.ts       Sessions en base, révocables.
+  dossiers/
+    extracteur.ts    WF-06 étape 5. Les octets partent, jamais une URL.
   acces/
     regles.ts        Référentiel. INV-4 et RG-14.1 dans la requête.
     dossiers.ts      Appartenance dans la requête, INV-3 à l'ouverture.
@@ -396,10 +398,52 @@ traite son absence plutôt que de faire semblant :
 |---|---|---|
 | Messagerie | `courrier.ts`, `leTransport` / `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois |
 | Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D). Avec un moteur, une indisponibilité laisse la pièce en quarantaine et ouvre un incident — jamais une promotion |
-| Extraction IA | `jobs/analyse.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture |
+| Extraction IA | `dossiers/extracteur.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture. Avec une clé, une lecture qui n'aboutit pas nomme sa cause : une saturation se rejoue, un scan flou demande une photo, une clé refusée appelle un exploitant |
 | Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien |
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
+
+### La lecture d'une pièce, et ce qu'elle ne décide pas
+
+Branchée le 22/09/2026, sur `ANTHROPIC_API_KEY`. Trois choses la tiennent.
+
+**Ce qui part, ce sont les octets.** Jamais une URL, ni présignée ni
+permanente — même règle que le balayage, et pour la même raison : une
+adresse confiée à un tiers se rappelle demain, et la purge de rétention
+n'en effacerait rien. Le seul lecteur du seau de confiance hors du
+navigateur est cet adaptateur-là.
+
+**Le modèle lit, il ne juge pas.** Il rend ce qui est écrit sur la pièce —
+une date telle qu'elle y figure, un montant tel qu'il y est imprimé. La
+mesure se calcule en TypeScript : « six mois de validité » n'est pas une
+mention du passeport, c'est une soustraction entre sa date de fin et la
+date de départ visée. C'est RG-06.1, et ce n'est pas une élégance — le
+défaut qui a motivé ce lot était exactement là.
+
+Avant le branchement, l'extracteur recevait la clé de l'objet et le code
+de la pièce, et devait rendre des champs nommés d'après les **conditions**
+du référentiel. Le code de la pièce ne les nomme pas. En exécutant la
+chaîne avec un extracteur rendant ce qu'un modèle rend dans ces
+conditions — un numéro, un nom, une date d'expiration —, un passeport
+valable jusqu'en 2029 ressortait :
+
+> aucune valeur lisible constaté, 6 mois exigé. Ton passeport doit rester
+> valable 6 mois après le départ. Fais-le renouveler puis redépose-le.
+
+La demande porte donc les conditions, et `domain/dossiers/extraction.ts`
+construit le schéma de réponse à partir d'elles.
+
+**Sans repère, rien n'est jugé.** Un dossier neuf n'a pas de date cible :
+le candidat dépose son passeport avant d'avoir arrêté son départ. La
+condition passe alors **en réserve** — ni conforme, on n'a pas vérifié, ni
+fautive, la pièce n'a rien — et le message demande le renseignement qui
+manque, sans proposer de remplacer le fichier.
+
+Le reste suit les mêmes règles que le balayage : une cause qui se dissipe
+seule se rejoue (trois fois, DOC-11 WF-06), les autres partent en revue
+humaine avec le motif qui convient, et **les jetons consommés sont
+enregistrés même quand rien n'a été rendu** — un appel raté a coûté, et
+INV-6 ne connaît pas de dépassement silencieux.
 
 ### Le balayage antivirus, et la seule issue qui promeut
 
