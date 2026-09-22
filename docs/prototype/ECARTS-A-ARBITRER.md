@@ -6019,3 +6019,107 @@ n'existe. `noterLeConstat` sort maintenant sans rien tenter quand
 `DATABASE_URL` est absente : il n'y a pas de constat à écrire, et rien à
 signaler. Le bruit d'un journal finit par cacher les vraies erreurs —
 c'est la même leçon que la violation d'unicité du lot des remboursements.
+
+---
+
+### S.33 — Une pièce d'identité survivait à sa propre purge
+
+INV-5 : « Les pièces d'identité sont purgées automatiquement selon la
+politique de rétention. » Quand le stockage refusait une suppression, la
+version était tout de même marquée purgée, **sa clé effacée**, et le
+dossier déclaré purgé. Le fichier restait donc dans le stockage, la base
+affirmait qu'il était parti, et plus rien ne permettait de le retrouver.
+
+Établi en exécutant la purge sur une base réelle, devant un stockage
+d'essai qui répond 500 :
+
+```
+bilan : {"dossiers":1,"versions":1,"objetsSupprimes":0,"objetsManquants":1}
+dossier purgedAt : DATÉ — le dossier se déclare purgé
+version  purgedAt : DATÉ | objectKey : EFFACÉE
+restant pour acheverLaSuppression : 0
+```
+
+#### Deux erreurs dans une phrase de six mots
+
+Le `catch` portait : « Objet déjà absent : c'est l'état visé, pas un
+incident. »
+
+**Un objet absent ne lève pas.** `DELETE` sur une clé inconnue rend 204,
+chez S3 comme chez MinIO — vérifié contre le vrai client. Le cas que ce
+`catch` prétendait couvrir n'y passait jamais, et le compteur
+`objetsManquants` n'a jamais compté un objet manquant.
+
+**Ce qui y passait était l'inverse.** Une panne réelle — un 500, une
+coupure, un refus d'authentification — était rangée sous « déjà absent »,
+c'est-à-dire sous « tout va bien ». La purge continuait, effaçait la clé,
+et l'incident devenait invisible : rien dans le bilan, rien dans le
+journal, rien à l'écran.
+
+C'est la forme la plus coûteuse du motif que cette série accumule : non
+pas une promesse fausse, mais **une erreur rangée dans la case des
+succès**.
+
+#### Le garde-fou qui existait, et qui était mort
+
+`acheverLaSuppression` (RG-10.4) prévoyait exactement ce cas :
+
+> Une pièce n'a pas pu partir. On n'anonymise pas : le compte reste
+> « suppression demandée », visible en B-03, et la reprise réessaiera.
+> Anonymiser ici rendrait le fichier orphelin et introuvable.
+
+Le test était `restant > 0`, sur le nombre de dossiers non purgés. Comme
+la purge marquait le dossier purgé quoi qu'il arrive, ce compte valait
+**toujours zéro**. Le chemin n'était pas seulement inatteignable : il
+décrivait précisément le mal qu'il laissait faire — le compte anonymisé
+par-dessus un fichier survivant, devenu orphelin et introuvable.
+
+Un garde-fou dont la condition ne peut pas être vraie est le troisième
+de cette série, après le 503 qui ne pouvait pas s'éteindre (S.31) et la
+sonde dont rien ne dépendait (S.32). Les trois se ressemblent : le
+raisonnement était juste, et rien ne le reliait à l'exécution.
+
+#### Ce qui change
+
+Une version dont l'objet résiste n'est plus purgée : sa clé reste, son
+contenu aussi, et les copies dérivées avec — une purge à moitié faite ne
+doit pas se lire comme une purge entière. Le document n'est purgé que si
+plus rien de lui ne reste ; le dossier, que si tout est parti. Sinon il
+demeure échu, et la passe du lendemain réessaie : la purge est
+idempotente par construction, c'est ce que `purgeDueAt` permet.
+
+Le bilan dit maintenant ce qu'il compte : `objetsEnEchec` au lieu
+d'`objetsManquants`, et `dossiersIncomplets` à côté de `dossiers`.
+
+**Et le retard se voit.** Ne plus purger sur échec est la bonne conduite,
+mais elle a un revers : un stockage durablement fâché laisserait des
+pièces d'identité en place pendant que la purge repart en silence chaque
+nuit. `/api/health` compte les dossiers au-delà de leur échéance et
+l'ancienneté du plus ancien — la même mesure que pour les pièces bloquées
+au contrôle, et pour la même raison : un écran de back-office ne
+surveille que ceux qui l'ouvrent.
+
+#### Vérifié en exécutant, et en mutant
+
+`scripts/fumee-purge.mts` fait tourner la purge sur une base réelle
+devant un stockage objet de deux seaux auquel le vrai client MinIO parle,
+et qu'on fait refuser à volonté. Il couvre la purge ordinaire et ses
+copies, l'objet déjà absent, le refus, la reprise, le dossier à
+plusieurs pièces qui ne se purge pas à moitié, le dossier vivant qu'on ne
+touche pas, la contrainte SQL, et le bout de la chaîne : une suppression
+de compte qui **n'anonymise pas** par-dessus un fichier survivant, puis
+s'achève quand le stockage revient.
+
+Trois mutations, trois rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| les versions en échec sont purgées quand même | cinq vérifications, dont la clé effacée |
+| le dossier se déclare purgé malgré un échec | six, dont la suppression de compte |
+| un document à moitié purgé se déclare purgé | l'état des documents |
+
+C'est aussi le premier lot de la série où la mise à l'épreuve n'a rien
+appris de plus que ce que le diagnostic annonçait : le défaut avait été
+établi par exécution **avant** d'écrire une ligne de correction, et les
+fixtures ont seulement demandé quatre allers-retours pour trouver les
+champs obligatoires d'un entretien.

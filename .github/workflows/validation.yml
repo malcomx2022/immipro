@@ -130,6 +130,12 @@ jobs:
         run: npm run smoke:balayage
       - run: echo "- **Balayage antivirus** — chaîne complète, promotion sur le seul verdict « saine », incident visible sans acceptation" >> "$GITHUB_STEP_SUMMARY"
 
+      # La purge de rétention devant un stockage qui refuse : ce qui se
+      # déclare purgé doit avoir réellement quitté le stockage (INV-5).
+      - name: Purge de rétention
+        run: npm run smoke:purge
+      - run: echo "- **Purge de rétention** — rien ne se déclare purgé tant que les octets n'ont pas quitté le stockage" >> "$GITHUB_STEP_SUMMARY"
+
       # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
       # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.
       - name: Bac à sable des fournisseurs

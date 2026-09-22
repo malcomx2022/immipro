@@ -1,0 +1,462 @@
+/**
+ * La purge de rétention, de bout en bout — INV-5, RG-10.1, RG-10.4.
+ *
+ * Ce qui s'éprouve ici et nulle part ailleurs : **ce que devient un
+ * dossier quand le stockage refuse de supprimer un objet**. La réponse
+ * était mauvaise et silencieuse — la version était marquée purgée, sa
+ * clé effacée, le dossier déclaré purgé, et le fichier restait dans le
+ * stockage sans que rien ne permette plus de le retrouver.
+ *
+ * Deux serveurs d'essai, sur la boucle locale :
+ *
+ * - **le stockage objet**, deux seaux en mémoire devant lesquels le vrai
+ *   client MinIO parle pour de bon, et qu'on peut faire refuser à
+ *   volonté. Un faux objet n'aurait pas appris que `DELETE` sur une clé
+ *   absente rend 204 : c'est ce détail qui rendait le `catch` d'origine
+ *   trompeur ;
+ * - aucun autre : la purge ne parle à personne d'autre.
+ *
+ * Rien ne sort de la machine, et aucune pièce réelle n'est lue.
+ *
+ *     DATABASE_URL=postgresql://…/postgres npm run smoke:purge
+ */
+import { spawnSync } from "node:child_process";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
+import { Client } from "pg";
+
+const source = process.env.DATABASE_URL;
+if (!source) {
+  console.error("DATABASE_URL absente — le script a besoin d'un serveur, pas d'une base précise.");
+  process.exit(1);
+}
+
+const nomBase = `immipro_purge_${process.pid}`;
+const administration = new URL(source);
+administration.pathname = "/postgres";
+administration.searchParams.delete("schema");
+const cible = new URL(source);
+cible.pathname = `/${nomBase}`;
+cible.searchParams.set("schema", "public");
+
+const echecs: string[] = [];
+const verifier = (condition: boolean, message: string): void => {
+  console.log(condition ? `  ✓ ${message}` : `  ✗ ${message}`);
+  if (!condition) echecs.push(message);
+};
+
+async function surLAdministration(texte: string): Promise<void> {
+  const client = new Client({ connectionString: administration.toString() });
+  await client.connect();
+  try {
+    await client.query(texte);
+  } finally {
+    await client.end();
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Le stockage objet d'essai — deux seaux, en mémoire.
+ * ------------------------------------------------------------------ */
+
+const SEAU_CONFIANCE = "immipro-documents";
+const SEAU_QUARANTAINE = "immipro-quarantaine";
+const seaux = new Map<string, Map<string, Buffer>>([
+  [SEAU_CONFIANCE, new Map()],
+  [SEAU_QUARANTAINE, new Map()],
+]);
+const seau = (nom: string) => seaux.get(nom) ?? new Map<string, Buffer>();
+
+/** Le stockage refuse toute suppression tant que ceci est vrai. */
+let refuserLesSuppressions = false;
+
+const stockage = createServer((requete: IncomingMessage, reponse: ServerResponse) => {
+  const morceaux: Buffer[] = [];
+  requete.on("data", (bloc: Buffer) => morceaux.push(bloc));
+  requete.on("end", () => {
+    const [brut, requeteDUrl] = (requete.url ?? "/").split("?");
+    if (requeteDUrl === "location") {
+      reponse.writeHead(200, { "Content-Type": "application/xml" });
+      return reponse.end(
+        '<?xml version="1.0" encoding="UTF-8"?><LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>',
+      );
+    }
+
+    const chemin = decodeURIComponent(brut!).replace(/^\//u, "");
+    const separation = chemin.indexOf("/");
+    const objets = seau(separation === -1 ? chemin : chemin.slice(0, separation));
+    const cle = separation === -1 ? "" : chemin.slice(separation + 1);
+
+    switch (requete.method) {
+      case "PUT": {
+        objets.set(cle, Buffer.concat(morceaux));
+        reponse.writeHead(200, { ETag: '"essai"' });
+        return reponse.end();
+      }
+      case "DELETE": {
+        if (refuserLesSuppressions) {
+          reponse.writeHead(500, { "Content-Type": "application/xml" });
+          return reponse.end("<Error><Code>InternalError</Code></Error>");
+        }
+        /*
+          Une clé absente rend 204, comme S3 et MinIO. C'est ce fait-là
+          qui rendait le `catch` d'origine trompeur : il annonçait
+          couvrir l'objet déjà supprimé, et ne voyait passer que des
+          pannes.
+        */
+        objets.delete(cle);
+        reponse.writeHead(204);
+        return reponse.end();
+      }
+      default: {
+        reponse.writeHead(405);
+        return reponse.end();
+      }
+    }
+  });
+});
+await new Promise<void>((ok) => stockage.listen(0, "127.0.0.1", ok));
+const portStockage = (stockage.address() as AddressInfo).port;
+
+console.log(`Purge de rétention sur une base jetable (${nomBase}), stockage :${portStockage}`);
+await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
+await surLAdministration(`CREATE DATABASE ${nomBase}`);
+process.env.DATABASE_URL = cible.toString();
+
+const migration = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+  encoding: "utf8",
+  env: { ...process.env, DATABASE_URL: cible.toString() },
+});
+if (migration.status !== 0) {
+  console.error(`${migration.stdout ?? ""}${migration.stderr ?? ""}`);
+  await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
+  process.exit(1);
+}
+
+process.env.MINIO_ENDPOINT = "127.0.0.1";
+process.env.MINIO_PORT = String(portStockage);
+process.env.MINIO_USE_SSL = "false";
+process.env.MINIO_ROOT_USER = "essai";
+process.env.MINIO_ROOT_PASSWORD = "essai-mot-de-passe";
+process.env.MINIO_BUCKET_DOCUMENTS = SEAU_CONFIANCE;
+process.env.MINIO_BUCKET_QUARANTAINE = SEAU_QUARANTAINE;
+
+const { db } = await import("../src/lib/db");
+const { purgerLesPiecesEchues, ANALYSE_PURGEE_CORPS } = await import("../src/server/jobs/purge");
+const { demanderLaSuppression, acheverLesSuppressionsEnAttente } = await import(
+  "../src/server/acces/suppression"
+);
+
+const HIER = new Date(Date.now() - 24 * 3_600_000);
+let rang = 0;
+
+/** Un dossier échu, avec une pièce déposée, son analyse et son entretien. */
+async function dossierEchu(nombreDePieces = 1) {
+  rang += 1;
+  const user = await db.user.create({
+    data: { email: `fumee-p-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+  });
+  const application = await db.application.create({
+    data: { userId: user.id, purgeDueAt: HIER },
+  });
+
+  const cles: string[] = [];
+  for (let n = 0; n < nombreDePieces; n += 1) {
+    const document = await db.document.create({
+      data: {
+        applicationId: application.id,
+        code: `PIECE_${n}`,
+        label: "Passeport",
+        status: "CONFORME",
+        required: true,
+      },
+    });
+    const cle = `dossiers/${application.id}/piece-${n}.pdf`;
+    seau(SEAU_CONFIANCE).set(cle, Buffer.from(`%PDF pièce ${n} du dossier ${rang}`));
+    cles.push(cle);
+
+    const version = await db.documentVersion.create({
+      data: {
+        documentId: document.id,
+        rank: 1,
+        objectKey: cle,
+        checksum: `somme-${rang}-${n}-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 42,
+        scanState: "SAINE",
+        scannedAt: new Date(),
+      },
+    });
+    await db.documentAnalysis.create({
+      data: {
+        versionId: version.id,
+        verdict: "CONFORME",
+        title: "Passeport lisible",
+        body: "Ton passeport expire le 12 avril 2031.",
+        fields: { numero: "A1234567", naissance: "1998-03-04" },
+      },
+    });
+    await db.interviewAnswer.create({
+      data: {
+        documentId: document.id,
+        rank: 1,
+        section: "motivation",
+        question: "Pourquoi ce pays ?",
+        answer: "Je souhaite étudier à Montréal, près de ma sœur.",
+      },
+    });
+  }
+
+  return { user, application, cles };
+}
+
+const enStockage = (cle: string) => seau(SEAU_CONFIANCE).has(cle);
+
+try {
+  console.log("\nUne purge ordinaire emporte le fichier et ses copies");
+  {
+    refuserLesSuppressions = false;
+    const d = await dossierEchu();
+    verifier(enStockage(d.cles[0]!), "avant : le fichier est dans le stockage de confiance");
+
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.dossiers === 1, `un dossier purgé (${bilan.dossiers})`);
+    verifier(bilan.objetsSupprimes === 1, `un objet supprimé (${bilan.objetsSupprimes})`);
+    verifier(bilan.objetsEnEchec === 0, `aucun échec (${bilan.objetsEnEchec})`);
+    verifier(!enStockage(d.cles[0]!), "le fichier a quitté le stockage");
+
+    const version = await db.documentVersion.findFirstOrThrow({
+      where: { document: { applicationId: d.application.id } },
+    });
+    verifier(version.purgedAt !== null, "la version est datée purgée");
+    verifier(version.objectKey === null, "et ne garde aucune clé");
+
+    // INV-5 ne distingue pas l'original de la copie.
+    const analyse = await db.documentAnalysis.findFirstOrThrow({
+      where: { versionId: version.id },
+    });
+    verifier(analyse.fields === null, "les champs lus dans la pièce sont effacés");
+    verifier(
+      analyse.body === ANALYSE_PURGEE_CORPS,
+      "le message qui les citait aussi",
+    );
+    verifier(
+      (await db.interviewAnswer.count({ where: { document: { applicationId: d.application.id } } })) ===
+        0,
+      "et les réponses d'entretien ne survivent pas à la pièce",
+    );
+  }
+
+  console.log("\nUn objet déjà absent n'est pas un incident");
+  {
+    refuserLesSuppressions = false;
+    const d = await dossierEchu();
+    // Le fichier a disparu du stockage entre deux passes : c'est l'état visé.
+    seau(SEAU_CONFIANCE).delete(d.cles[0]!);
+
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.dossiers === 1, `le dossier est purgé quand même (${bilan.dossiers})`);
+    verifier(
+      bilan.objetsEnEchec === 0,
+      `et aucun échec n'est compté (${bilan.objetsEnEchec})`,
+    );
+  }
+
+  console.log("\nUn stockage qui refuse ne fait pas disparaître la clé");
+  {
+    const d = await dossierEchu();
+    refuserLesSuppressions = true;
+
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.objetsEnEchec === 1, `l'échec est compté comme tel (${bilan.objetsEnEchec})`);
+    verifier(bilan.dossiers === 0, `et aucun dossier n'est déclaré purgé (${bilan.dossiers})`);
+    verifier(
+      bilan.dossiersIncomplets === 1,
+      `le dossier est compté incomplet (${bilan.dossiersIncomplets})`,
+    );
+
+    const version = await db.documentVersion.findFirstOrThrow({
+      where: { document: { applicationId: d.application.id } },
+    });
+    verifier(
+      version.objectKey === d.cles[0],
+      "la clé est conservée : sans elle, le fichier serait introuvable",
+    );
+    verifier(version.purgedAt === null, "et la version ne se déclare pas purgée");
+    verifier(enStockage(d.cles[0]!), "le fichier est toujours là, et on sait où");
+
+    const application = await db.application.findUniqueOrThrow({
+      where: { id: d.application.id },
+    });
+    verifier(application.purgedAt === null, "le dossier reste échu, donc repris demain");
+
+    /*
+      Le garde-fou de RG-10.4, qui était un chemin mort :
+      `acheverLaSuppression` n'anonymise que si plus rien ne reste. Tant
+      que le dossier se déclarait purgé quoi qu'il arrive, ce compte
+      valait toujours zéro — et le compte était anonymisé par-dessus un
+      fichier survivant, devenu orphelin et introuvable.
+    */
+    verifier(
+      (await db.application.count({ where: { userId: d.user.id, purgedAt: null } })) === 1,
+      "et la suppression de compte voit qu'une pièce n'a pas pu partir",
+    );
+
+    // Les copies ne partent pas non plus : une purge à moitié faite ne
+    // doit pas se lire comme une purge entière.
+    const analyse = await db.documentAnalysis.findFirstOrThrow({
+      where: { versionId: version.id },
+    });
+    verifier(analyse.fields !== null, "les champs lus restent, comme le fichier");
+  }
+
+  console.log("\nLa passe suivante rattrape ce que le stockage avait refusé");
+  {
+    refuserLesSuppressions = false;
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.dossiers === 1, `le dossier passe enfin (${bilan.dossiers})`);
+    verifier(bilan.objetsEnEchec === 0, "sans échec cette fois");
+    verifier(
+      (await db.documentVersion.count({ where: { objectKey: { not: null }, purgedAt: null } })) === 0,
+      "et plus aucune version n'attend sa purge",
+    );
+  }
+
+  console.log("\nUn dossier à plusieurs pièces ne se purge pas à moitié");
+  {
+    const d = await dossierEchu(2);
+    // Le stockage refuse tout : les deux pièces résistent.
+    refuserLesSuppressions = true;
+    await purgerLesPiecesEchues();
+
+    const restantes = await db.documentVersion.count({
+      where: { document: { applicationId: d.application.id }, purgedAt: null },
+    });
+    verifier(restantes === 2, `les deux versions restent à purger (${restantes})`);
+    const documentsPurges = await db.document.count({
+      where: { applicationId: d.application.id, status: "PURGEE" },
+    });
+    verifier(
+      documentsPurges === 0,
+      `et aucun document ne se déclare purgé (${documentsPurges})`,
+    );
+
+    refuserLesSuppressions = false;
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.versions === 2, `la reprise emporte les deux (${bilan.versions})`);
+    verifier(
+      (await db.document.count({
+        where: { applicationId: d.application.id, status: "PURGEE" },
+      })) === 2,
+      "et les deux documents sont enfin purgés",
+    );
+  }
+
+  console.log("\nCe qui n'est pas échu n'est pas touché");
+  {
+    refuserLesSuppressions = false;
+    const user = await db.user.create({
+      data: { email: `fumee-p-vif-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const application = await db.application.create({
+      data: { userId: user.id, purgeDueAt: new Date(Date.now() + 30 * 24 * 3_600_000) },
+    });
+    const document = await db.document.create({
+      data: { applicationId: application.id, code: "P", label: "Passeport", required: true },
+    });
+    const cle = `dossiers/${application.id}/vivant.pdf`;
+    seau(SEAU_CONFIANCE).set(cle, Buffer.from("%PDF vivant"));
+    await db.documentVersion.create({
+      data: {
+        documentId: document.id,
+        rank: 1,
+        objectKey: cle,
+        checksum: `vif-${process.pid}`,
+        scanState: "SAINE",
+        scannedAt: new Date(),
+      },
+    });
+
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.dossiers === 0, `aucun dossier purgé (${bilan.dossiers})`);
+    verifier(enStockage(cle), "et le fichier d'un dossier vivant ne bouge pas");
+  }
+
+  console.log("\nUne suppression de compte n'anonymise pas par-dessus un fichier survivant");
+  {
+    /*
+      RG-10.4, et le garde-fou qui était un chemin mort.
+
+      `acheverLaSuppression` n'anonymise que si plus aucun dossier ne
+      reste à purger — « anonymiser ici rendrait le fichier orphelin et
+      introuvable », disait son commentaire. Tant que la purge se
+      déclarait complète quoi qu'il arrive, ce compte valait toujours
+      zéro : le compte était anonymisé, le fichier restait, et sa clé
+      partait avec la version.
+    */
+    const d = await dossierEchu();
+    refuserLesSuppressions = true;
+
+    const bilan = await demanderLaSuppression(d.user.id);
+    verifier(bilan.anonymise === false, "le compte n'est pas anonymisé");
+    verifier(enStockage(d.cles[0]!), "parce que le fichier n'a pas pu partir");
+
+    const compte = await db.user.findUniqueOrThrow({ where: { id: d.user.id } });
+    verifier(compte.deletedAt === null, "le compte reste « suppression demandée »");
+    verifier(
+      compte.deletionRequestedAt !== null,
+      "et la demande est datée : elle sera reprise",
+    );
+
+    // L'accès, lui, est fermé tout de suite : la reprise ne rouvre rien.
+    verifier(
+      (await db.session.count({ where: { userId: d.user.id } })) === 0,
+      "les sessions sont fermées sans attendre l'issue de la purge",
+    );
+
+    console.log("  — le stockage revient, la reprise s'achève —");
+    refuserLesSuppressions = false;
+    const reprises = await acheverLesSuppressionsEnAttente();
+    verifier(reprises.reprises === 1, `la reprise trouve le compte (${reprises.reprises})`);
+    verifier(!enStockage(d.cles[0]!), "le fichier part enfin");
+
+    const apres = await db.user.findUniqueOrThrow({ where: { id: d.user.id } });
+    verifier(apres.deletedAt !== null, "et le compte est anonymisé, une fois seulement");
+  }
+
+  console.log("\nLa base refuse ce qu'aucun code ne doit écrire");
+  {
+    const d = await dossierEchu();
+    const client = new Client({ connectionString: cible.toString() });
+    await client.connect();
+    try {
+      let refuse = false;
+      try {
+        // Une version purgée qui garderait sa clé est une URL présignable.
+        await client.query(
+          `UPDATE "DocumentVersion" SET "purgedAt" = now()
+             WHERE "documentId" IN (SELECT id FROM "Document" WHERE "applicationId" = $1)`,
+          [d.application.id],
+        );
+      } catch {
+        refuse = true;
+      }
+      verifier(refuse, "une version datée purgée qui garde sa clé d'objet est refusée");
+    } finally {
+      await client.end();
+    }
+  }
+} finally {
+  await new Promise<void>((ok) => {
+    stockage.closeAllConnections();
+    stockage.close(() => ok());
+  });
+  await db.$disconnect();
+  await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
+}
+
+if (echecs.length > 0) {
+  console.error(`\n${echecs.length} vérification(s) en échec.`);
+  process.exit(1);
+}
+console.log("\nRien ne se déclare purgé tant que les octets n'ont pas quitté le stockage.");

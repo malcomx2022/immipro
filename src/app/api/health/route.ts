@@ -119,11 +119,58 @@ async function sonderLaQuarantaine(): Promise<EtatDeLaQuarantaine> {
   }
 }
 
+interface EtatDeLaPurge {
+  lisible: boolean;
+  /** Dossiers dont l'échéance de rétention est passée et qui restent entiers. */
+  enRetard: number;
+  /** L'ancienneté du plus ancien retard, en heures. */
+  depuisHeures: number;
+}
+
+/**
+ * Les purges qui n'aboutissent pas — INV-5, ajouté le 22/09/2026.
+ *
+ * Un objet que le stockage refuse de supprimer ne fait plus effacer sa
+ * version : la clé reste, le dossier reste échu, et la passe du
+ * lendemain réessaie. C'est la bonne conduite, et elle a un revers —
+ * un stockage durablement fâché laisserait des pièces d'identité en
+ * place **sans que rien ne le dise**, puisque la purge repart en
+ * silence chaque nuit.
+ *
+ * Ce compte est ce qui manque pour que la reprise ne devienne pas une
+ * attente indéfinie. Il ne supprime rien et n'accélère rien : il rend
+ * une échéance dépassée visible depuis l'extérieur du back-office.
+ */
+async function sonderLaPurge(): Promise<EtatDeLaPurge> {
+  const maintenant = new Date();
+  try {
+    const [enRetard, plusAncien] = await Promise.all([
+      db.application.count({ where: { purgedAt: null, purgeDueAt: { lte: maintenant } } }),
+      db.application.findFirst({
+        where: { purgedAt: null, purgeDueAt: { lte: maintenant } },
+        orderBy: { purgeDueAt: "asc" },
+        select: { purgeDueAt: true },
+      }),
+    ]);
+    const depuis = plusAncien?.purgeDueAt;
+    return {
+      lisible: true,
+      enRetard,
+      depuisHeures: depuis
+        ? Math.floor((maintenant.getTime() - depuis.getTime()) / 3_600_000)
+        : 0,
+    };
+  } catch {
+    return { lisible: false, enRetard: 0, depuisHeures: 0 };
+  }
+}
+
 export async function GET() {
-  const [base, file, quarantaine, faits] = await Promise.all([
+  const [base, file, quarantaine, purge, faits] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
+    sonderLaPurge(),
     /*
       Les constats de service, lus en base — 22/09/2026.
 
@@ -200,6 +247,16 @@ export async function GET() {
           : quarantaine.incidents === 0
             ? "Aucune pièce bloquée au contrôle."
             : `${quarantaine.incidents} pièce(s) bloquée(s) au contrôle, la plus ancienne depuis ${quarantaine.depuisHeures} h. Elles restent en quarantaine.`,
+      },
+      purge: {
+        lisible: purge.lisible,
+        enRetard: purge.enRetard,
+        depuisHeures: purge.depuisHeures,
+        message: !purge.lisible
+          ? "Les échéances de rétention n'ont pas pu être lues."
+          : purge.enRetard === 0
+            ? "Aucune purge en retard."
+            : `${purge.enRetard} dossier(s) au-delà de leur échéance de rétention, le plus ancien depuis ${purge.depuisHeures} h.`,
       },
       revue: {
         lisible: file.lisible,
