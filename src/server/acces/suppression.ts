@@ -28,6 +28,35 @@ import { initierLeRemboursement, ouvrirUnRemboursement } from "@/server/acces/pa
  * affiche déjà et que `acheverLesSuppressionsEnAttente` reprend.
  */
 
+/**
+ * Les comptes auxquels la plateforme n'écrit plus — RG-10.4.
+ *
+ * ── Ce que les passes de nuit faisaient ─────────────────────────────
+ *
+ * Entre la demande et l'anonymisation, le compte est « suppression
+ * demandée » : c'est l'état qu'ouvre une panne du stockage objet, et il
+ * peut durer jusqu'à la reprise du lendemain. Pendant ce temps,
+ * `deletedAt` est nul.
+ *
+ * Les deux passes de nuit ne regardaient que lui. Un candidat qui avait
+ * demandé l'oubli deux jours plus tôt recevait donc :
+ *
+ *     [ECHEANCE]   NL — une échéance est dépassée
+ *     [INACTIVITE] Ton dossier Pays-Bas est en attente
+ *                  « … il sera clos le 12 mai 2027. Déposer une pièce
+ *                    suffit à le garder ouvert. »
+ *
+ * On invite à revenir quelqu'un qui vient de demander à partir.
+ *
+ * Le filtre porte donc sur la **demande** et non sur son achèvement. Il
+ * couvre les deux états : rien n'efface `deletionRequestedAt`, un compte
+ * anonymisé le porte encore.
+ */
+export const COMPTE_A_NE_PAS_RELANCER = { deletionRequestedAt: { not: null } } as const;
+
+/** Sa négation, telle qu'une requête de job l'écrit. */
+export const COMPTE_JOIGNABLE = { deletionRequestedAt: null } as const;
+
 export interface BilanSuppression {
   /** Dossiers purgés à cette occasion. */
   dossiers: number;

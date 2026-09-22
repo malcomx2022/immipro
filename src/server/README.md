@@ -1398,6 +1398,27 @@ contredisent. La première avait perdu la succession des versions entre la
 veille et la propagation. Le motif est le même : une passe qui décide sur son
 propre critère sans lire ce que l'autre a écrit.
 
+## Le filtre qui visait l'achèvement au lieu de la demande
+
+La suppression d'un compte se fait en deux temps, et le module le dit : la
+demande ferme l'accès tout de suite, l'anonymisation attend que les pièces
+soient parties. Entre les deux, le compte est « suppression demandée » —
+l'état qu'ouvre une panne du stockage objet.
+
+Les passes de nuit écrivaient dedans. Celle des rappels filtrait
+`deletedAt: null` : juste, et insuffisant, puisque c'est l'achèvement et non
+la demande. Celle de l'inactivité ne filtrait rien. Un candidat qui avait
+demandé l'oubli deux jours plus tôt recevait une invitation à revenir déposer
+une pièce.
+
+Le filtre porte désormais sur `deletionRequestedAt`, et il vit à un seul
+endroit — `COMPTE_JOIGNABLE`, dans le module qui sait ce que « suppression en
+cours » veut dire. Il couvre les deux états : rien n'efface cette date, un
+compte anonymisé la porte encore.
+
+La leçon est la même qu'ailleurs dans ce dépôt : une garde qui nomme la fin
+d'un processus ne protège pas pendant qu'il dure.
+
 ## Vérifier
 
 ```

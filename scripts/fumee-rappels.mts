@@ -108,11 +108,20 @@ const jour = (n: number, depuis = new Date()) => {
 /** Un candidat, son dossier, et les échéances qu'on lui donne. */
 async function dossierAvec(
   echeances: { code: string; jours: number; faite?: boolean }[],
-  options: { statut?: "ACTIF" | "SOUMIS" | "ARCHIVE"; dernierRappel?: Date | null } = {},
+  options: {
+    statut?: "ACTIF" | "SOUMIS" | "ARCHIVE";
+    dernierRappel?: Date | null;
+    /** Compte dont la suppression est demandée mais pas encore achevée. */
+    suppressionDemandee?: boolean;
+  } = {},
 ) {
   rang += 1;
   const user = await db.user.create({
-    data: { email: `fumee-rap-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    data: {
+      email: `fumee-rap-${rang}-${process.pid}@exemple.test`,
+      role: "CANDIDAT",
+      ...(options.suppressionDemandee ? { deletionRequestedAt: jour(-2) } : {}),
+    },
   });
   const regle = await db.visaRule.create({
     data: {
@@ -276,6 +285,32 @@ try {
       .then(() => false)
       .catch(() => true);
     verifier(refusee, "rappeler une échéance déjà faite est refusé par la base");
+  }
+  console.log("\nRG-10.4 — on n'écrit pas à qui a demandé l'oubli");
+  {
+    /*
+      Entre la demande de suppression et l'anonymisation, le compte existe
+      encore et `deletedAt` est nul — c'est l'état qu'ouvre une panne du
+      stockage objet, et il dure jusqu'à la reprise du lendemain. La passe
+      ne regardait que `deletedAt` : elle relançait donc quelqu'un qui
+      venait de demander à partir.
+    */
+    const partant = await dossierAvec([{ code: "depot", jours: -5 }], {
+      suppressionDemandee: true,
+    });
+    const bilan = await envoyerLesRappels();
+    verifier(
+      bilan.urgences === 0,
+      `aucun rappel ne part pour lui (${JSON.stringify(bilan)})`,
+    );
+    verifier(
+      courriersVers(partant.user.email).length === 0,
+      "aucun courrier ne l'atteint",
+    );
+    verifier(
+      (await notifications(partant.user.id)) === 0,
+      "et aucune alerte ne l'attend à l'écran",
+    );
   }
 } finally {
   await db.$disconnect().catch(() => undefined);

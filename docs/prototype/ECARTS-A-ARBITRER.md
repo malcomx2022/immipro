@@ -7971,3 +7971,58 @@ fermerait jamais.
 permet de cocher une échéance. Le filtre est donc correct et pour l'instant
 inerte en production — la fumée l'éprouve en posant la date directement, ce
 que fera l'écran le jour où il existera.
+
+---
+
+### S.56 — On invitait à revenir quelqu'un qui venait de demander à partir
+
+RG-10.4 : « une demande de suppression de compte purge immédiatement les
+pièces et anonymise les métadonnées, sans attendre l'échéance. »
+
+Le code la tient en **deux temps**, et il le dit : la demande ferme l'accès
+tout de suite, l'anonymisation vient après la purge des pièces. Entre les
+deux, le compte est « suppression demandée » — l'état qu'ouvre une panne du
+stockage objet, et qui dure jusqu'à la reprise du lendemain. `deletedAt` y est
+nul.
+
+La question posée aux passes de nuit : **qu'envoient-elles à un compte dans cet
+état ?**
+
+```
+=== Le compte ===
+  suppression demandée  : il y a 2 jours
+  anonymisé (deletedAt) : non — le stockage a résisté
+  dossier purgé         : non
+
+=== Ce qu'il reçoit, après avoir demandé l'oubli ===
+  [ECHEANCE]   NL — etudes_mvv_vvr — une échéance est dépassée
+  [INACTIVITE] Ton dossier Pays-Bas est en attente
+               « … il sera clos le 12 mai 2027. Déposer une pièce suffit
+                 à le garder ouvert. »
+```
+
+Les deux. Un candidat qui a demandé l'oubli deux jours plus tôt reçoit une
+invitation à revenir déposer une pièce, et un rappel d'échéance dépassée.
+
+La passe des rappels filtrait `deletedAt: null` — juste, et insuffisant :
+c'est l'**achèvement** de la suppression, pas sa demande. La passe
+d'inactivité, arrivée deux lots plus tôt, ne filtrait ni l'un ni l'autre.
+
+**Le filtre porte donc sur la demande**, et il couvre les deux états : rien
+n'efface `deletionRequestedAt`, un compte anonymisé le porte encore. Il vit à
+un seul endroit — `COMPTE_JOIGNABLE`, dans le module qui sait ce que
+« suppression en cours » veut dire.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la passe d'inactivité oublie le filtre | la fumée des transitions |
+| les rappels reviennent à `deletedAt` seul | la fumée des rappels |
+
+Deux mutations, deux rouges — et la seconde est la plus instructive : elle
+montre que le filtre d'origine, qui semblait juste, laissait passer
+exactement le cas qu'il devait couvrir.
+
+**Ce que ce lot ne change pas.** L'état « suppression demandée » reste un
+état d'incident : il n'apparaît que si le stockage objet était indisponible,
+et `acheverLesSuppressionsEnAttente` le reprend chaque nuit. Le filtre ne le
+raccourcit pas — il empêche seulement d'écrire à quelqu'un pendant qu'il dure.
