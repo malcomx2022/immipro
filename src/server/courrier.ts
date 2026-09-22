@@ -7,53 +7,83 @@ import {
   type Creneau,
 } from "@/domain/consultants/rendez-vous";
 import { verifierTexte, INTERDITS_PARTOUT } from "@/domain/copy/vocabulaire-interdit";
+import {
+  sondeDuTransport,
+  traceDEnvoi,
+  type DernierFait,
+  type Envoi,
+} from "@/domain/courrier/transport";
+import type { Sonde } from "@/domain/exploitation/dependances";
+import { configurationLisible, envoyerParSmtp } from "@/server/courrier/smtp";
 
 /**
- * Courriers transactionnels — A-03, $-04, T-05.
+ * Courriers transactionnels — A-03, $-04, T-05 ; transport branché le
+ * 22/09/2026.
  *
- * Le prototype ne les couvre pas (guide de démarrage, §5). Deux conséquences
- * assumées, plutôt qu'une implémentation qui ferait semblant :
+ * **Le transport part maintenant pour de bon.** `SMTP_URL` lue et
+ * valide, les codes de vérification, les réinitialisations, les reçus,
+ * les confirmations d'entretien et de remboursement sont remis à un
+ * serveur SMTP (`courrier/smtp.ts`). Absente, la dégradation ne change
+ * pas : rien ne part, l'appelant le sait, et la messagerie reste
+ * bloquante pour l'ouverture au public.
  *
- * **Le transport n'est pas branché.** `SMTP_URL` est vide dans
- * `.env.example` et rien ici ne parle à un serveur de messagerie. Ce module
- * met en forme, journalise, et rend la main. Le jour où un transport arrive,
- * c'est `expedier` qui change, pas les appelants.
+ * ── Ce qui a changé pour les appelants ──────────────────────────────
  *
- * **Un envoi manqué ne se tait pas.** Une adresse non vérifiée bloque le
- * dépôt de pièces, un code non reçu bloque l'inscription : avaler l'échec
- * ferait passer un défaut d'infrastructure pour une erreur de l'utilisateur.
- * Le journal du serveur porte l'échec, et l'appelant décide.
+ * `expedier` **rend une issue** au lieu de ne rien rendre. Tant que rien
+ * ne partait, ne rien rendre était tolérable ; maintenant qu'un envoi
+ * peut échouer pour cinq raisons distinctes, un appelant qui n'apprend
+ * rien affirme des choses fausses. La route de renvoi de code répondait
+ * `{ envoye: true }` devant un transport muet, et l'écran affichait « un
+ * nouveau code est parti » — il n'en partait aucun.
+ *
+ * ── Ce qui ne se journalise pas ─────────────────────────────────────
+ *
+ * Ni l'objet, ni le corps. L'objet paraissait anodin : il **est** le
+ * code de vérification (`481920 — ton code de vérification ImmiPro`).
+ * Le transport de repli l'écrivait à chaque envoi, ce qui mettait le
+ * code d'ouverture de chaque compte dans le journal du serveur — donc
+ * dans un agrégateur conservé des semaines, hors de toute purge. La
+ * règle et sa raison vivent dans `domain/courrier/transport.ts`.
  *
  * **Le vocabulaire interdit s'applique ici aussi.** INV-2 dit « aucune
- * promesse de résultat, nulle part : interface, emails, documents générés ».
- * L'email est le seul de ces trois supports que `npm run check:copy` ne
- * relit pas au même titre qu'un écran, puisque son texte peut être composé
- * à l'exécution — d'où la vérification au moment de l'envoi.
+ * promesse de résultat, nulle part : interface, emails, documents
+ * générés ». La vérification a lieu avant le transport, quel qu'il
+ * soit : un courrier fautif ne part pas.
  */
 
 export interface Courrier {
   destinataire: string;
   objet: string;
   corps: string;
+  /**
+   * De quel courrier il s'agit, pour le journal. Donné, jamais déduit de
+   * l'objet : déduire du texte reviendrait à en journaliser un morceau,
+   * et un jour ce morceau porterait un code.
+   */
+  genre: string;
 }
 
-export type Transport = (courrier: Courrier) => Promise<void>;
+export type Transport = (courrier: Courrier) => Promise<Envoi>;
 
 /**
- * Transport par défaut. Il écrit dans le journal du serveur et signale
- * l'absence de configuration une fois par démarrage, pas à chaque envoi :
- * un avertissement répété mille fois ne se lit plus.
+ * Transport par défaut. Il écrit une trace au journal — genre, domaine,
+ * issue — et signale l'absence de configuration une fois par démarrage,
+ * pas à chaque envoi : un avertissement répété mille fois ne se lit plus.
+ *
+ * Il rend `journalise`, jamais `envoye` : c'est toute la différence
+ * entre une dégradation honnête et un service qui ment.
  */
 let signale = false;
 
 const journaliser: Transport = async (courrier) => {
-  if (!process.env.SMTP_URL && !signale) {
+  if (!signale) {
     signale = true;
     console.warn(
-      "[courrier] SMTP_URL absent : les courriers sont journalisés, pas expédiés.",
+      "[courrier] transport non branché : les courriers sont tracés, pas expédiés.",
     );
   }
-  console.info(`[courrier] → ${courrier.destinataire} · ${courrier.objet}`);
+  console.info(traceDEnvoi(courrier.genre, courrier.destinataire, "journalise"));
+  return { issue: "journalise" };
 };
 
 /**
@@ -64,17 +94,85 @@ const journaliser: Transport = async (courrier) => {
  */
 export const TRANSPORT_JOURNAL: Transport = journaliser;
 
-let transport: Transport = TRANSPORT_JOURNAL;
-
-/** Point d'entrée du branchement, et des tests. */
-export const brancherTransport = (nouveau: Transport): void => {
-  transport = nouveau;
+/**
+ * Le transport SMTP, qui remet réellement le message.
+ *
+ * Il est construit paresseusement par `courrier/smtp.ts` : ce module-ci
+ * n'ouvre aucune connexion, et une commande hors ligne qui l'importe
+ * n'en ouvre pas davantage.
+ */
+export const TRANSPORT_SMTP: Transport = async (courrier) => {
+  const issue = await envoyerParSmtp(courrier);
+  console.info(traceDEnvoi(courrier.genre, courrier.destinataire, issue.issue));
+  return issue;
 };
 
-/** Le transport que `expedier` utilisera, demandé au moment de l'envoi. */
-export const leTransport = (): Transport => transport;
+let remplacant: Transport | null = null;
 
-export async function expedier(courrier: Courrier): Promise<void> {
+/** Point d'entrée des tests et d'un branchement explicite. */
+export const brancherTransport = (nouveau: Transport | null): void => {
+  remplacant = nouveau;
+};
+
+/**
+ * Le transport que `expedier` utilisera, demandé au moment de l'envoi.
+ *
+ * Il suit la configuration : une `SMTP_URL` lisible donne le transport
+ * SMTP, son absence donne le journal. L'état de service interroge ce
+ * même résolveur, si bien qu'il rend compte de ce que l'appelant
+ * exécutera — et non de ce que le `.env` laisse espérer.
+ */
+export const leTransport = (
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): Transport => {
+  if (remplacant) return remplacant;
+  return configurationLisible(environnement).lisible ? TRANSPORT_SMTP : TRANSPORT_JOURNAL;
+};
+
+/**
+ * Le dernier fait établi — un envoi réel, ou une vérification de
+ * connexion réelle. C'est la seule chose sur laquelle la sonde conclut.
+ *
+ * **Une URL qui s'analyse ne prouve rien** : c'est la leçon de
+ * l'arbitrage du 21/09 sur les capacités, et la retenir ici veut dire
+ * que la messagerie ne se déclare opérationnelle qu'après avoir
+ * réellement parlé à un serveur. Le worker s'en charge au démarrage
+ * (`verifierLaConnexion`), et chaque envoi rafraîchit le constat.
+ *
+ * Ce que cette lecture **ne** dit **pas** : que le transport marche en
+ * ce moment. Elle dit ce qui s'est passé la dernière fois qu'on a
+ * essayé. Le savoir en continu demanderait d'interroger le serveur
+ * depuis `/api/health`, et cette adresse ne déclenche rien (décision du
+ * 21/09).
+ */
+let dernier: DernierFait | null = null;
+
+export const noterLeFait = (reussi: boolean, quand = new Date()): void => {
+  dernier = { reussi, quand };
+};
+
+export const leDernierFait = (): DernierFait | null => dernier;
+
+export const oublierLesFaits = (): void => {
+  dernier = null;
+  signale = false;
+};
+
+/** La sonde de l'état de service. Locale, sans effet de bord, sans réseau. */
+export const sonderLeCourrier = (
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): Sonde =>
+  sondeDuTransport(configurationLisible(environnement).lisible, dernier);
+
+/**
+ * Expédie, et rend ce qui s'est passé.
+ *
+ * Le refus pour vocabulaire interdit **lève** plutôt que de rendre une
+ * issue : ce n'est pas un incident d'exploitation, c'est un défaut de
+ * notre propre texte, et il doit réveiller un développeur plutôt que
+ * d'être compté comme un envoi manqué de plus.
+ */
+export async function expedier(courrier: Courrier): Promise<Envoi> {
   const fautes = [
     ...verifierTexte(courrier.objet, INTERDITS_PARTOUT),
     ...verifierTexte(courrier.corps, INTERDITS_PARTOUT),
@@ -86,7 +184,12 @@ export async function expedier(courrier: Courrier): Promise<void> {
       `INV-2 : courrier refusé, formulation interdite — ${fautes.map((f) => f.extrait).join(", ")}`,
     );
   }
-  await leTransport()(courrier);
+  const issue = await leTransport()(courrier);
+  // Un envoi réel est la meilleure preuve qu'il y ait que le transport
+  // fonctionne — et un échec réel, la meilleure qu'il ne fonctionne pas.
+  // Le journal, lui, n'établit rien : il n'a parlé à personne.
+  if (issue.issue !== "journalise") noterLeFait(issue.issue === "envoye");
+  return issue;
 }
 
 const SIGNATURE = `
@@ -96,6 +199,7 @@ ImmiPro prépare et informe. La décision appartient à l'autorité consulaire, 
 export const envoyerCodeDeVerification = (destinataire: string, code: string) =>
   expedier({
     destinataire,
+    genre: "code_verification",
     objet: `${code} — ton code de vérification ImmiPro`,
     corps: `Ton code de vérification est ${code}.
 
@@ -105,6 +209,7 @@ Il est valable ${VALIDITE_MINUTES} minutes. Si tu n'as pas créé de compte, ign
 export const envoyerCodeDeReinitialisation = (destinataire: string, code: string) =>
   expedier({
     destinataire,
+    genre: "code_reinitialisation",
     objet: `${code} — code de réinitialisation ImmiPro`,
     corps: `Ton code de réinitialisation est ${code}.
 
@@ -118,6 +223,7 @@ Il est valable ${VALIDITE_MINUTES} minutes. Si tu n'as rien demandé, ignore ce 
 export const envoyerCompteDejaOuvert = (destinataire: string) =>
   expedier({
     destinataire,
+    genre: "compte_deja_ouvert",
     objet: "Tu as déjà un compte ImmiPro",
     corps: `Quelqu'un vient de demander la création d'un compte avec cette adresse, et un compte existe déjà.
 
@@ -130,6 +236,7 @@ Si ce n'était pas toi : il n'y a rien à faire, aucun compte n'a été créé e
 export const envoyerRecu = (destinataire: string, reference: string, montant: string) =>
   expedier({
     destinataire,
+    genre: "recu",
     objet: `Reçu ImmiPro ${reference}`,
     corps: `Ton paiement de ${montant} est enregistré sous la référence ${reference}.
 
@@ -155,6 +262,7 @@ export const envoyerRemboursementConfirme = (
 ) =>
   expedier({
     destinataire,
+    genre: "remboursement_confirme",
     objet: `Remboursement ImmiPro ${reference}`,
     corps: `${CONFIRMATION_AU_CANDIDAT}
 
@@ -173,6 +281,7 @@ Montant : ${montant}, sous la référence ${reference}, qui ne change pas.${SIGN
 export const envoyerAlerteCritique = (destinataire: string, destination: string) =>
   expedier({
     destinataire,
+    genre: "alerte_critique",
     objet: `Changement de règle pour ton dossier ${destination}`,
     corps: `Une condition d'éligibilité de ton dossier ${destination} a changé.
 
@@ -226,6 +335,7 @@ export const envoyerConfirmationEntretien = ({
 }: ConfirmationEntretien) =>
   expedier({
     destinataire,
+    genre: "entretien_confirme",
     objet: `Entretien confirmé — ${libelleRendezVous(creneau)}`,
     corps: `Ton entretien avec ${consultant} est réservé.
 

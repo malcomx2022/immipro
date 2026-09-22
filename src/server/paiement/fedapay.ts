@@ -37,6 +37,7 @@ import { z } from "zod";
 import { verifierLUrlHebergee } from "@/domain/paiement/ouverture";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
 import type { Consultant } from "./consultation";
+import type { Rembourseur } from "./rembourseur";
 
 /** Le domaine, pas l'hôte : l'hôte exact n'a pas pu être vérifié. */
 export const DOMAINES = ["fedapay.com"] as const;
@@ -249,5 +250,51 @@ export const consultantFedaPay = (): Consultant => ({
   consulter: async () => ({
     issue: "indisponible",
     detail: CONSULTATION_NON_OPERATIONNELLE,
+  }),
+});
+
+/* ------------------------------------------------------------------ *
+ * Remboursement sortant — non opérationnel, et c'est délibéré.
+ * ------------------------------------------------------------------ */
+
+/**
+ * L'adaptateur de remboursement FedaPay existe, et ne rembourse rien.
+ *
+ * Même raison que pour la consultation, et elle pèse plus lourd ici :
+ * **aucune documentation vérifiée du remboursement FedaPay n'était
+ * disponible au moment d'écrire ce fichier.** Deviner un chemin
+ * d'API — `/transactions/{id}/refund`, un objet `refund`, un champ
+ * `status` et ses valeurs — ne coûterait pas un défaut d'affichage.
+ * Deux issues, également graves :
+ *
+ * - la requête inventée part et **envoie de l'argent** d'une manière
+ *   qu'on n'a pas éprouvée, par exemple deux fois si la clé
+ *   d'idempotence ne s'appelle pas ainsi chez eux ;
+ * - la réponse inventée est mal lue, la demande est comptée « acceptée »,
+ *   et une dette sort de la file sans que personne n'ait rien rendu.
+ *
+ * La seconde est la pire, parce qu'elle est silencieuse : le tableau de
+ * B-04 se vide, et le candidat attend un virement que rien n'a déclenché.
+ *
+ * L'issue rendue est donc `non_configure`, avec un détail qui dit
+ * laquelle des deux causes s'applique — pas de clé, ou pas d'adaptateur.
+ * L'opérateur lit la vraie raison, la dette reste due et visible, et
+ * `remboursementBranche()` refuse de déclarer la capacité opérationnelle
+ * tant que ce fichier rend ceci.
+ *
+ * Ce qu'il faut pour le brancher : le chemin de création d'un
+ * remboursement, le nom de l'en-tête d'idempotence, la forme de la
+ * réponse et la liste des états, tous vérifiés contre le bac à sable
+ * (`npm run sandbox:paiement`).
+ */
+export const REMBOURSEMENT_NON_OPERATIONNEL =
+  "remboursement FedaPay non branché : chemin, idempotence et états du fournisseur non vérifiés";
+
+export const remboursementFedaPay = (): Rembourseur => ({
+  fournisseur: "FEDAPAY",
+  operationnel: false,
+  demander: async () => ({
+    issue: "non_configure",
+    detail: REMBOURSEMENT_NON_OPERATIONNEL,
   }),
 });

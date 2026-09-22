@@ -25,6 +25,7 @@ import {
 } from "@/domain/paiement/ouverture";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
 import type { Consultant } from "./consultation";
+import type { DemandeDeRemboursement, Remboursement, Rembourseur } from "./rembourseur";
 import { CAUSES_STRIPE } from "./notifications";
 import type { TransactionStatus } from "@prisma/client";
 
@@ -295,5 +296,155 @@ export const consultantStripe = (cle: string): Consultant => ({
     // plateforme, pas la sienne.
     if (lu.data.status === "expired") return { issue: "sans_paiement" };
     return { issue: "sans_paiement" };
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Remboursement sortant — la demande part, l'argent non.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Ce que Stripe rend sur un remboursement.
+ *
+ * Le `status` est lu, jamais supposé : c'est lui qui sépare une demande
+ * prise en charge d'un refus. Et même `succeeded` ne fait pas écrire
+ * `refundedAt` chez nous — seule la notification signée `charge.refunded`
+ * l'écrit (INV-7). Ce que l'adaptateur rend s'arrête à « il a pris la
+ * demande ».
+ */
+const schemaRemboursement = z.object({
+  id: z.string().min(1),
+  status: z.string().nullish(),
+});
+
+/**
+ * Les états d'un remboursement Stripe, et ce qu'ils valent ici.
+ *
+ * Table fermée : un état inconnu n'est pas rangé par défaut du côté
+ * rassurant. Il rend `reponse_illisible`, qui appelle un humain — un
+ * état qu'on ne connaît pas est exactement le cas où deviner coûte cher.
+ */
+export const ETAT_DU_REMBOURSEMENT: Readonly<Record<string, "acceptee" | "refusee">> = {
+  succeeded: "acceptee",
+  pending: "acceptee",
+  requires_action: "acceptee",
+  failed: "refusee",
+  canceled: "refusee",
+};
+
+/**
+ * Les types d'erreur qui ne se relancent pas.
+ *
+ * `invalid_request_error` couvre le remboursement déjà fait, la charge
+ * trop ancienne, l'intention inexistante : relancer n'y changera rien.
+ * Tout le reste — `api_error`, `rate_limit_error`, un type inconnu — est
+ * tenu pour passager, ce qui est le côté sûr : on réessaie une dette
+ * plutôt que de la classer.
+ */
+const REFUS_DEFINITIF = new Set(["invalid_request_error", "card_error"]);
+
+export const remboursementStripe = (cle: string): Rembourseur => ({
+  fournisseur: "STRIPE",
+  operationnel: true,
+
+  async demander(demande: DemandeDeRemboursement): Promise<Remboursement> {
+    /*
+      Notre `providerTxId` est celui d'une **session** de paiement, et
+      Stripe ne rembourse pas une session : il rembourse une intention ou
+      une charge. Le premier appel va donc chercher l'intention que la
+      session a produite.
+
+      C'est aussi la seule vérification qui vaille que la session est bien
+      la nôtre : on relit `metadata[reference]` avant de rembourser quoi
+      que ce soit. Rembourser la session d'un autre candidat parce qu'un
+      identifiant a été mal recopié est le genre d'erreur qu'on ne répare
+      pas avec un correctif.
+    */
+    const identifiant = demande.providerTxId.replace(/^stripe:/u, "");
+    const session = await appeler(
+      cle,
+      `/checkout/sessions/${encodeURIComponent(identifiant)}`,
+      {},
+    );
+    if (!session) return { issue: "temporaire", detail: "session injoignable" };
+    if (session.statut >= 500) return { issue: "temporaire", detail: `session ${session.statut}` };
+    if (session.statut >= 400) {
+      return { issue: "refusee_definitivement", detail: "session inconnue chez Stripe" };
+    }
+
+    const lue = schemaConsultation.safeParse(session.charge);
+    if (!lue.success) return { issue: "reponse_illisible", detail: "session illisible au schéma" };
+    if (lue.data.metadata?.reference !== demande.reference) {
+      return {
+        issue: "refusee_definitivement",
+        detail: "la session ne porte pas notre référence",
+      };
+    }
+
+    const intention =
+      typeof lue.data.payment_intent === "string"
+        ? lue.data.payment_intent
+        : (lue.data.payment_intent?.id ?? null);
+    if (!intention) {
+      /*
+        Une session sans intention n'a jamais été payée. Ce n'est pas une
+        panne : il n'y a rien à rendre, et relancer ne fera rien
+        apparaître. L'opérateur doit le savoir plutôt que de voir la
+        tentative se répéter.
+      */
+      return {
+        issue: "refusee_definitivement",
+        detail: "la session ne porte aucune intention de paiement : rien n'a été encaissé",
+      };
+    }
+
+    const reponse = await appeler(cle, "/refunds", {
+      // La même clé à chaque tentative : Stripe y reconnaît un rejeu et
+      // rend le remboursement déjà créé, au lieu d'en créer un second.
+      idempotence: demande.cle,
+      corps: formulaire({
+        payment_intent: intention,
+        amount: versSousUnite(demande.montant, demande.devise),
+        // Notre référence voyage aussi ici : elle revient dans la
+        // notification signée, qui doit savoir quoi confirmer.
+        "metadata[reference]": demande.reference,
+      }),
+    });
+
+    if (!reponse) return { issue: "temporaire", detail: "remboursement injoignable" };
+    if (reponse.statut === 429) return { issue: "temporaire", detail: "cadence limitée" };
+    if (reponse.statut >= 500) return { issue: "temporaire", detail: `réponse ${reponse.statut}` };
+    if (reponse.statut >= 400) {
+      const erreur = schemaErreur.safeParse(reponse.charge);
+      const type = erreur.success ? (erreur.data.error?.type ?? "") : "";
+      return REFUS_DEFINITIF.has(type)
+        ? { issue: "refusee_definitivement", detail: type }
+        : { issue: "temporaire", detail: type === "" ? `réponse ${reponse.statut}` : type };
+    }
+
+    const lu = schemaRemboursement.safeParse(reponse.charge);
+    if (!lu.success) {
+      return { issue: "reponse_illisible", detail: "remboursement illisible au schéma" };
+    }
+    const etat = ETAT_DU_REMBOURSEMENT[(lu.data.status ?? "").toLowerCase()];
+    if (etat === undefined) {
+      return { issue: "reponse_illisible", detail: "état de remboursement non reconnu" };
+    }
+    if (etat === "refusee") {
+      return { issue: "refusee_definitivement", detail: `état ${lu.data.status}` };
+    }
+
+    /*
+      Accepté, et rien de plus. `succeeded` arrive ici comme `pending` :
+      Stripe dit que le remboursement est passé de son côté, nous
+      attendons quand même sa notification signée pour l'écrire. C'est
+      INV-7, et c'est aussi la seule lecture qui reste vraie quand il
+      annule un remboursement `succeeded` — cela arrive.
+    */
+    return {
+      issue: "acceptee",
+      accepteLe: new Date(),
+      providerRefundId: `stripe:${lu.data.id}`,
+    };
   },
 });

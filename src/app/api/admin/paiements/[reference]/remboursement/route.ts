@@ -19,9 +19,16 @@ import { initierLeRemboursement, ouvrirUnRemboursement } from "@/server/acces/pa
  * sans écrire, et la traçabilité que la décision demande se réduirait à une
  * date.
  *
- * La route **ouvre** un remboursement, elle ne verse rien. Le fournisseur
- * de paiement n'est pas branché (I.C) ; se déclarer quitte sans avoir rien
- * versé serait précisément la simulation qu'il interdit.
+ * La route **ouvre** un remboursement, et envoie la demande. Elle ne
+ * verse rien : seule la notification signée du fournisseur écrit le
+ * versement (INV-7). Une réponse 200 du fournisseur ressemble à de
+ * l'argent rendu — c'est précisément pourquoi elle ne suffit pas, et la
+ * dette reste visible en B-04 jusqu'à la notification.
+ *
+ * L'issue de l'envoi est rendue telle quelle à l'opérateur : il a besoin
+ * de savoir si la demande est partie, si elle a été refusée pour de bon,
+ * ou si le rail de ce fournisseur n'est pas branché — les trois
+ * n'appellent pas la même suite.
  */
 export const POST = route({
   nom: "admin.paiement.remboursement",
@@ -48,13 +55,17 @@ export const POST = route({
     }
 
     /**
-     * L'obligation ouverte, la demande part — arbitrage du 21/09/2026.
+     * L'obligation ouverte, la demande part — arbitrages du 21 et du
+     * 22/09/2026.
      *
-     * L'initiation retire les droits non consommés et tente l'envoi. Elle
-     * ne verse rien : le rail n'est pas branché, l'appel rend `null`, et
-     * la dette reste visible en B-04. Un pack partiellement consommé ne
-     * part pas du tout — il ouvre un écart, parce que ce que vaut une
-     * analyse déjà rendue est une question commerciale.
+     * L'initiation réserve la tentative, retire les droits non
+     * consommés une seule fois, et envoie. Un second clic de
+     * l'opérateur pendant que le premier appel est en cours repart avec
+     * `deja_en_cours` : aucune seconde demande ne part.
+     *
+     * Un pack partiellement consommé ne part pas du tout — il ouvre un
+     * écart, parce que ce que vaut une analyse déjà rendue est une
+     * question commerciale.
      */
     const envoi = await initierLeRemboursement(ouverture.reference);
 

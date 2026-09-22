@@ -97,8 +97,12 @@ describe("les six dépendances n'ont pas le même statut", () => {
 describe("une variable dit l'intention, pas la capacité", () => {
   it("une variable vide ne vaut pas une variable renseignée", () => {
     const messagerie = DEPENDANCES[0]!;
-    expect(configuree(messagerie, { SMTP_URL: "smtp://x" })).toBe(true);
-    expect(configuree(messagerie, { SMTP_URL: "   " })).toBe(false);
+    const complet = { SMTP_URL: "smtp://x", SMTP_FROM: "ne-pas-repondre@exemple.test" };
+    expect(configuree(messagerie, complet)).toBe(true);
+    expect(configuree(messagerie, { ...complet, SMTP_URL: "   " })).toBe(false);
+    // L'expéditeur compte autant que l'URL : sans lui, le serveur de
+    // soumission refuse l'enveloppe et rien ne part.
+    expect(configuree(messagerie, { SMTP_URL: "smtp://x" })).toBe(false);
     expect(configuree(messagerie, {})).toBe(false);
   });
 

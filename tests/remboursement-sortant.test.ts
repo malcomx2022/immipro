@@ -1,27 +1,90 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   CONFIRMATION_AU_CANDIDAT,
   LIBELLE_ETAPE,
+  MOTIF_IDENTIFIANT,
   MOTIF_REVUE_PARTIELLE,
   RESTE_A_FAIRE,
   cleDIdempotence,
+  defautDIdentifiant,
   etapeDe,
+  suiteDeLaTentative,
   suiteDuQuota,
+  type IssueDeDemande,
 } from "@/domain/paiement/remboursement";
-import { NON_BRANCHE, VARIABLES, leRembourseur } from "@/server/paiement/remboursement";
+import {
+  VARIABLES,
+  leRembourseur,
+  remboursementBranche,
+  remboursementConfigure,
+} from "@/server/paiement/remboursement";
+import { ETAT_DU_REMBOURSEMENT, remboursementStripe } from "@/server/paiement/stripe";
+import {
+  REMBOURSEMENT_NON_OPERATIONNEL,
+  remboursementFedaPay,
+} from "@/server/paiement/fedapay";
 
 /**
- * Le rail de remboursement sortant — arbitrage du 21/09/2026.
+ * Le rail de remboursement sortant — arbitrages du 21 et du 22/09/2026.
  *
  * Trois faits, et le produit n'en écrivait que deux : la décision (K.C)
- * et la confirmation (M.B). La demande envoyée au fournisseur manquait,
- * si bien qu'une obligation ouverte et une demande partie se lisaient
- * pareil, et qu'une tentative échouée ne laissait aucune trace.
+ * et la confirmation (M.B). La demande envoyée au fournisseur manquait.
+ * Elle existe maintenant pour Stripe ; ce qui compte le plus est ce qui
+ * n'a pas bougé — **une demande acceptée n'est pas un versement**, et
+ * seule la notification signée écrit `refundedAt` (INV-7).
+ *
+ * Ce qui demande une base — deux reprises concurrentes, le retrait de
+ * droits unique, la dette qui survit à l'acceptation — vit dans
+ * `scripts/fumee-remboursement.mts`, sur PostgreSQL.
  */
 
 const lire = (f: string) => readFileSync(f, "utf8");
 const ACCES = "src/server/acces/paiements.ts";
+
+const DEMANDE = {
+  reference: "IMP-260922-ABCDEF",
+  providerTxId: "stripe:cs_essai",
+  montant: 29,
+  devise: "EUR",
+  cle: cleDIdempotence("IMP-260922-ABCDEF"),
+};
+
+const reponse = (statut: number, charge: unknown) => ({
+  status: statut,
+  json: async () => charge,
+});
+
+/** Chaque appel rend la réponse suivante ; la dernière se répète. */
+function simuler(...reponses: Array<{ status: number; json: () => Promise<unknown> } | Error>) {
+  const appels: Array<{ url: string; corps: string; idempotence: string | undefined }> = [];
+  let rang = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, options?: RequestInit) => {
+      const entetes = (options?.headers ?? {}) as Record<string, string>;
+      appels.push({
+        url,
+        corps: String(options?.body ?? ""),
+        idempotence: entetes["Idempotency-Key"],
+      });
+      const suivante = reponses[Math.min(rang++, reponses.length - 1)];
+      if (suivante instanceof Error) throw suivante;
+      return suivante as unknown as Response;
+    }),
+  );
+  return appels;
+}
+
+/** La session que Stripe rend, portant notre référence et son intention. */
+const session = (reste: Record<string, unknown> = {}) => ({
+  id: "cs_essai",
+  metadata: { reference: DEMANDE.reference },
+  payment_intent: "pi_essai",
+  ...reste,
+});
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("les trois faits ne se confondent pas", () => {
   const d = (x: Partial<Record<"dueAt" | "requestedAt" | "refundedAt", Date>>) => ({
@@ -42,88 +105,314 @@ describe("les trois faits ne se confondent pas", () => {
     }
   });
 
-  /**
-   * Une demande partie et non confirmée est le cas le plus facile à
-   * oublier, parce qu'il ressemble à un succès. Le texte doit dire que la
-   * somme n'est pas rendue.
-   */
   it("une demande acceptée n'est pas un versement", () => {
     expect(LIBELLE_ETAPE.DEMANDE).toMatch(/en attente de confirmation/u);
     expect(RESTE_A_FAIRE.DEMANDE).toMatch(/la somme n'est pas rendue/u);
   });
 });
 
-describe("le rail n'est pas branché, et rien ne le simule", () => {
-  it("l'envoi non branché rend null, jamais un accusé", async () => {
-    expect(
-      await NON_BRANCHE({ reference: "IMP-1", providerTxId: null, montant: 1, devise: "XOF", cle: "k" }),
-    ).toBeNull();
-    expect(VARIABLES).toEqual(["FEDAPAY_API_KEY", "STRIPE_API_KEY"]);
+describe("les cinq issues d'une demande", () => {
+  const TOUTES: readonly IssueDeDemande[] = [
+    "acceptee",
+    "refusee_definitivement",
+    "temporaire",
+    "reponse_illisible",
+    "non_configure",
+  ];
+
+  /**
+   * **Aucune issue ne solde la dette.** C'est la propriété centrale du
+   * module : le seul champ qui éteint une obligation est `refundedAt`,
+   * et il n'est écrit que par la notification signée.
+   */
+  it("une seule accepte, et aucune ne verse", () => {
+    const acceptantes = TOUTES.filter((i) => suiteDeLaTentative(i).acceptee);
+    expect(acceptantes).toEqual(["acceptee"]);
+    for (const issue of TOUTES) {
+      expect(suiteDeLaTentative(issue).message.length, issue).toBeGreaterThan(20);
+      expect(suiteDeLaTentative(issue).message, issue).not.toMatch(/remboursé|versé|rendu à/u);
+    }
   });
 
   /**
-   * Un seul point de branchement, comme pour l'antivirus et l'interrogation
-   * — et l'initiation le demande au résolveur plutôt que de nommer la
-   * fonction non branchée. C'est ce qui permet à l'état de service de
-   * rendre compte de **ce que l'appelant exécutera** : il interroge le même
-   * résolveur.
+   * Ce qui se reprend tout seul n'appelle personne ; ce qui ne se
+   * reprendra jamais, si. Confondre les deux noie la file d'écarts sous
+   * des coupures réseau, ou laisse une demande morte s'y relancer.
    */
-  it("un seul point de branchement, demandé au résolveur", async () => {
-    expect(leRembourseur()).toBe(NON_BRANCHE);
-    expect(
-      await leRembourseur()({
-        reference: "IMP-1",
-        providerTxId: null,
-        montant: 1,
-        devise: "XOF",
-        cle: "k",
-      }),
-    ).toBeNull();
-    expect(lire(ACCES)).toMatch(/envoyer: Rembourseur = leRembourseur\(\)/u);
+  it("seuls le refus définitif et l'illisible appellent un humain", () => {
+    expect(TOUTES.filter((i) => suiteDeLaTentative(i).exigeUnHumain)).toEqual([
+      "refusee_definitivement",
+      "reponse_illisible",
+    ]);
   });
 
-  /** Et il est déclaré au registre des dépendances, avec ce qu'il bloque. */
-  it("l'absence du rail bloque l'encaissement", () => {
+  it("une issue inconnue ne passe pas en silence", () => {
+    expect(() => suiteDeLaTentative("inventee" as IssueDeDemande)).toThrow(/non arbitrée/u);
+  });
+});
+
+describe("l'identifiant du fournisseur est vérifié avant l'appel", () => {
+  it("absent, il n'y a rien à rembourser chez lui", () => {
+    expect(defautDIdentifiant(null, "STRIPE")).toBe("absent");
+    expect(defautDIdentifiant("  ", "STRIPE")).toBe("absent");
+  });
+
+  /** Les deux rails écrivent la même colonne : le préfixe les sépare. */
+  it("le préfixe de l'autre rail est refusé", () => {
+    expect(defautDIdentifiant("fedapay:42", "STRIPE")).toBe("autre_fournisseur");
+    expect(defautDIdentifiant("stripe:cs_1", "FEDAPAY")).toBe("autre_fournisseur");
+    expect(defautDIdentifiant("stripe:cs_1", "STRIPE")).toBeNull();
+    expect(defautDIdentifiant("fedapay:42", "FEDAPAY")).toBeNull();
+  });
+
+  it("chaque défaut dit à l'opérateur ce qu'il doit faire", () => {
+    expect(MOTIF_IDENTIFIANT.absent).toMatch(/à la main/u);
+    expect(MOTIF_IDENTIFIANT.autre_fournisseur).toMatch(/Aucune demande n'est partie/u);
+  });
+});
+
+describe("l'adaptateur Stripe, contre les réponses du fournisseur", () => {
+  const adaptateur = remboursementStripe("sk_essai");
+
+  it("une demande acceptée rend l'accusé, et rien de plus", async () => {
+    const appels = simuler(
+      reponse(200, session()),
+      reponse(200, { id: "re_1", status: "pending" }),
+    );
+    const issue = await adaptateur.demander(DEMANDE);
+    expect(issue).toMatchObject({ issue: "acceptee", providerRefundId: "stripe:re_1" });
+
+    // Le remboursement vise l'intention, pas la session : Stripe ne
+    // rembourse pas une session de paiement.
+    expect(appels[1]?.url).toBe("https://api.stripe.com/v1/refunds");
+    expect(appels[1]?.corps).toContain("payment_intent=pi_essai");
+    // Le montant part en plus petite unité : 29 € valent 2900.
+    expect(appels[1]?.corps).toContain("amount=2900");
+    // Et la clé dérivée voyage, pour que le rejeu soit reconnu chez lui.
+    expect(appels[1]?.idempotence).toBe(cleDIdempotence(DEMANDE.reference));
+  });
+
+  /**
+   * `succeeded` chez Stripe ne vaut pas `refundedAt` chez nous. C'est la
+   * frontière d'INV-7, et l'adaptateur n'a aucun moyen de la franchir :
+   * il ne sait rendre qu'« il a pris la demande ».
+   */
+  it("« succeeded » reste une demande acceptée, jamais un versement", async () => {
+    simuler(reponse(200, session()), reponse(200, { id: "re_2", status: "succeeded" }));
+    const issue = await adaptateur.demander(DEMANDE);
+    expect(issue.issue).toBe("acceptee");
+    expect(JSON.stringify(issue)).not.toMatch(/refundedAt|REMBOURSEE|verse/u);
+    expect(ETAT_DU_REMBOURSEMENT.succeeded).toBe("acceptee");
+  });
+
+  it("un remboursement refusé par Stripe est définitif", async () => {
+    simuler(reponse(200, session()), reponse(200, { id: "re_3", status: "failed" }));
+    expect(await adaptateur.demander(DEMANDE)).toMatchObject({
+      issue: "refusee_definitivement",
+    });
+  });
+
+  /** Une somme déjà rendue de son côté : relancer n'y changera rien. */
+  it("une requête invalide est définitive, une panne ne l'est pas", async () => {
+    simuler(
+      reponse(200, session()),
+      reponse(400, { error: { type: "invalid_request_error" } }),
+    );
+    expect(await adaptateur.demander(DEMANDE)).toMatchObject({
+      issue: "refusee_definitivement",
+      detail: "invalid_request_error",
+    });
+
+    simuler(reponse(200, session()), reponse(500, {}));
+    expect((await adaptateur.demander(DEMANDE)).issue).toBe("temporaire");
+
+    simuler(reponse(200, session()), reponse(429, {}));
+    expect((await adaptateur.demander(DEMANDE)).issue).toBe("temporaire");
+
+    // Un type d'erreur qu'on ne connaît pas penche du côté sûr : on
+    // réessaie une dette plutôt que de la classer.
+    simuler(reponse(200, session()), reponse(400, { error: { type: "inconnue" } }));
+    expect((await adaptateur.demander(DEMANDE)).issue).toBe("temporaire");
+  });
+
+  it("une coupure réseau est passagère, pas un refus", async () => {
+    simuler(new Error("ECONNRESET"));
+    expect((await adaptateur.demander(DEMANDE)).issue).toBe("temporaire");
+
+    simuler(reponse(200, session()), new Error("ECONNRESET"));
+    expect((await adaptateur.demander(DEMANDE)).issue).toBe("temporaire");
+  });
+
+  /** Un état hors table appelle un humain : deviner coûterait cher. */
+  it("un état inconnu n'est ni accepté ni refusé", async () => {
+    simuler(reponse(200, session()), reponse(200, { id: "re_4", status: "en_cours_peut_etre" }));
+    expect(await adaptateur.demander(DEMANDE)).toMatchObject({ issue: "reponse_illisible" });
+
+    simuler(reponse(200, session()), reponse(200, { statut: "ok" }));
+    expect((await adaptateur.demander(DEMANDE)).issue).toBe("reponse_illisible");
+  });
+
+  /**
+   * **La vérification qui compte.** Rembourser la session d'un autre
+   * candidat parce qu'un identifiant a été mal recopié ne se répare pas
+   * avec un correctif.
+   */
+  it("une session qui ne porte pas notre référence n'est pas remboursée", async () => {
+    const appels = simuler(
+      reponse(200, session({ metadata: { reference: "IMP-000000-AUTRUI" } })),
+    );
+    expect(await adaptateur.demander(DEMANDE)).toMatchObject({
+      issue: "refusee_definitivement",
+      detail: "la session ne porte pas notre référence",
+    });
+    // Et surtout : aucun appel de remboursement n'a été fait.
+    expect(appels.filter((a) => a.url.endsWith("/refunds"))).toHaveLength(0);
+  });
+
+  it("une session jamais payée n'a rien à rendre", async () => {
+    const appels = simuler(reponse(200, session({ payment_intent: null })));
+    expect(await adaptateur.demander(DEMANDE)).toMatchObject({
+      issue: "refusee_definitivement",
+    });
+    expect(appels.filter((a) => a.url.endsWith("/refunds"))).toHaveLength(0);
+  });
+
+  it("la clé secrète ne paraît jamais dans ce qui est rendu", async () => {
+    simuler(reponse(200, session()), reponse(400, { error: { type: "invalid_request_error" } }));
+    const issue = await remboursementStripe("sk_tres_secrete").demander(DEMANDE);
+    expect(JSON.stringify(issue)).not.toContain("sk_tres_secrete");
+  });
+});
+
+describe("FedaPay ne devine pas ce qu'il ne sait pas", () => {
+  /**
+   * Aucune documentation vérifiée du remboursement FedaPay n'était
+   * disponible. Deviner un chemin et un format enverrait de l'argent
+   * d'une manière non éprouvée, ou — pire, parce que silencieux —
+   * compterait une demande « acceptée » et sortirait une dette de la
+   * file sans que personne n'ait rien rendu.
+   */
+  it("l'adaptateur existe, ne rembourse rien, et le dit", async () => {
+    const appels = simuler(reponse(200, {}));
+    const issue = await remboursementFedaPay().demander({
+      ...DEMANDE,
+      providerTxId: "fedapay:42",
+    });
+    expect(issue).toEqual({ issue: "non_configure", detail: REMBOURSEMENT_NON_OPERATIONNEL });
+    // Et il n'appelle personne : pas de format inventé sur le réseau.
+    expect(appels).toHaveLength(0);
+  });
+
+  /**
+   * `operationnel` est une déclaration, et une déclaration se dément.
+   * Celle-ci est éprouvée contre le comportement des deux adaptateurs :
+   * un `true` posé sur un adaptateur qui n'appelle rien est exactement
+   * l'affirmation rassurante que ce produit s'est déjà faite.
+   */
+  it("« opérationnel » dit la vérité sur les deux rails", async () => {
+    expect(remboursementFedaPay().operationnel).toBe(false);
+    expect(remboursementStripe("sk_essai").operationnel).toBe(true);
+
+    // Non opérationnel ⇒ il refuse sans réseau.
+    const sans = simuler(reponse(200, {}));
+    expect((await remboursementFedaPay().demander(DEMANDE)).issue).toBe("non_configure");
+    expect(sans).toHaveLength(0);
+
+    // Opérationnel ⇒ il appelle, et ne rend jamais `non_configure`.
+    const avec = simuler(reponse(200, session()), reponse(200, { id: "re_5", status: "pending" }));
+    const issue = await remboursementStripe("sk_essai").demander(DEMANDE);
+    expect(avec.length).toBeGreaterThan(0);
+    expect(issue.issue).not.toBe("non_configure");
+  });
+
+  /** Et la capacité se lit non branchée tant qu'un rail manque. */
+  it("la capacité exige les deux rails", () => {
+    expect(remboursementBranche()).toBe(false);
     const registre = lire("src/domain/exploitation/dependances.ts");
     expect(registre).toMatch(/cle: "remboursement"/u);
     expect(registre).toMatch(/statut: "BLOQUANTE_ENCAISSEMENT"/u);
   });
 });
 
-describe("un échec d'envoi conserve la dette", () => {
-  const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(lire(ACCES))![0];
+describe("le point de branchement suit le fournisseur de la transaction", () => {
+  it("chaque rail a le sien, et une clé absente n'en rend aucun", () => {
+    const avec = { FEDAPAY_API_KEY: "fk", STRIPE_API_KEY: "sk" };
+    expect(leRembourseur("STRIPE", avec)?.fournisseur).toBe("STRIPE");
+    expect(leRembourseur("FEDAPAY", avec)?.fournisseur).toBe("FEDAPAY");
+    expect(leRembourseur("STRIPE", { FEDAPAY_API_KEY: "fk" })).toBeNull();
+    expect(leRembourseur("FEDAPAY", { STRIPE_API_KEY: "sk" })).toBeNull();
+    expect(leRembourseur("STRIPE", { STRIPE_API_KEY: "   " })).toBeNull();
+  });
+
+  it("les clés sortantes sont celles de la nomenclature unique", () => {
+    expect(VARIABLES).toEqual(["FEDAPAY_API_KEY", "STRIPE_API_KEY"]);
+    expect(remboursementConfigure({ FEDAPAY_API_KEY: "fk", STRIPE_API_KEY: "sk" })).toBe(true);
+    expect(remboursementConfigure({ STRIPE_API_KEY: "sk" })).toBe(false);
+    // L'ancienne graphie est comprise jusqu'à sa date de retrait.
+    expect(remboursementConfigure({ FEDAPAY_SECRET_KEY: "fk", STRIPE_SECRET_KEY: "sk" })).toBe(
+      true,
+    );
+  });
+
+  /** L'initiation ne nomme aucun rail : elle le lit sur la transaction. */
+  it("l'initiation résout le rail d'après la transaction", () => {
+    expect(lire(ACCES)).toMatch(/leRembourseur\(transaction\.provider\)/u);
+  });
+});
+
+describe("l'initiation ne déclare jamais la somme rendue", () => {
+  const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(
+    lire(ACCES),
+  )![0];
 
   /**
-   * **Le test central.** L'initiation n'écrit ni `status` ni `refundedAt` :
-   * seule la notification signée du fournisseur les écrit (INV-7). Une
-   * demande partie n'est pas de l'argent rendu.
+   * **Le test central, et il vaut plus qu'avant.** Le rail existe
+   * désormais : une réponse 200 du fournisseur ressemble à de l'argent
+   * rendu, et c'est exactement le moment où l'on serait tenté d'écrire
+   * `refundedAt`.
    */
-  it("l'initiation ne déclare jamais la somme rendue", () => {
-    // La **dernière** écriture sur la transaction : la première appartient
-    // à la branche de revue manuelle, qui n'écrit qu'un écart.
-    const ecriture = /data: \{[\s\S]*?\n {4}\},/u.exec(
-      fonction.slice(fonction.lastIndexOf("db.transaction.update")),
-    )![0];
-    for (const interdit of ["status", "refundedAt", "refundBasis", "amount"]) {
-      expect(ecriture, interdit).not.toContain(interdit);
+  it("aucune écriture de l'initiation ne touche l'état ni le versement", () => {
+    /*
+      Toutes les écritures sur la transaction, prises une par une : ce
+      qui suit chaque `db.transaction.update…` jusqu'à la fermeture de
+      son `data`. La condition `where` peut lire `refundedAt` — c'est
+      même ce qui protège la réservation —, seules les données écrites
+      sont en cause.
+    */
+    const ecritures = [...fonction.matchAll(/db\.transaction\.update\w*\(\{/gu)].map((m) => {
+      const reste = fonction.slice(m.index!);
+      const debut = reste.indexOf("data: {");
+      return reste.slice(debut, reste.indexOf("});", debut));
+    });
+    expect(ecritures.length).toBeGreaterThan(0);
+    for (const ecriture of ecritures) {
+      for (const interdit of ["status:", "refundedAt", "refundBasis", "amount:"]) {
+        expect(ecriture, `${interdit} dans ${ecriture}`).not.toContain(interdit);
+      }
     }
-    expect(ecriture).toContain("refundAttemptedAt");
-    expect(ecriture).toContain("refundAttempts");
-  });
-
-  /** La tentative est comptée même quand l'envoi échoue : c'est sa fonction. */
-  it("la tentative est datée et comptée dans les deux cas", () => {
-    expect(fonction).toMatch(/refundAttempts: \{ increment: 1 \}/u);
-    // `refundRequestedAt` n'est posé que si le fournisseur a accusé
-    // réception, et une seule fois.
-    expect(fonction).toMatch(/accuse && !transaction\.refundRequestedAt/u);
+    expect(fonction).toContain("refundAttemptedAt");
+    expect(fonction).toContain("refundAttempts");
   });
 
   /**
-   * La clé est dérivée, pas tirée au sort : deux tentatives portent la
-   * même, et le fournisseur reconnaît un rejeu plutôt que d'envoyer
-   * l'argent deux fois.
+   * La tentative est **réservée** avant l'appel, par une mise à jour
+   * conditionnée à ce qu'on vient de lire. Deux reprises concurrentes
+   * lisent la même valeur ; une seule voit sa condition tenir. La
+   * preuve à l'exécution est dans `scripts/fumee-remboursement.mts`.
    */
+  it("la tentative est réservée avant que rien ne parte", () => {
+    const reservation = fonction.indexOf("refundAttemptedAt: transaction.refundAttemptedAt");
+    const appel = fonction.indexOf("adaptateur.demander(");
+    expect(reservation).toBeGreaterThan(-1);
+    expect(reservation).toBeLessThan(appel);
+    expect(fonction).toMatch(/refundedAt: null,\s*\n\s*refundRequestedAt: null,/u);
+    expect(fonction).toMatch(/if \(count !== 1\) return \{ issue: "deja_en_cours" \}/u);
+  });
+
+  it("la date d'acceptation n'est posée qu'une fois", () => {
+    expect(fonction).toMatch(/where: \{ id: transaction\.id, refundRequestedAt: null \}/u);
+  });
+
   it("la clé d'idempotence est dérivée de la référence", () => {
     expect(cleDIdempotence("IMP-260921-ABCDEF")).toBe("remboursement:IMP-260921-ABCDEF");
     expect(cleDIdempotence("IMP-1")).toBe(cleDIdempotence("IMP-1"));
@@ -150,39 +439,42 @@ describe("le quota d'un pack remboursé", () => {
     expect(MOTIF_REVUE_PARTIELLE).toMatch(/à trancher à la main/u);
   });
 
-  /**
-   * Les droits partent à l'initiation, pas à la confirmation : entre les
-   * deux il peut s'écouler des jours, et laisser un pack utilisable
-   * pendant qu'on en rend le prix revient à l'offrir.
-   */
   it("le retrait est une écriture du grand livre, jamais une suppression", () => {
-    const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(lire(ACCES))![0];
-    expect(fonction).toMatch(/analysisCredit\.create/u);
+    const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(
+      lire(ACCES),
+    )![0];
+    expect(fonction).toMatch(/analysisCredit\s*\n?\s*\.create/u);
     expect(fonction).toMatch(/delta: -suite\.retire/u);
     expect(fonction).toMatch(/reason: "REMBOURSEMENT"/u);
     expect(fonction).not.toMatch(/analysisCredit\.delete|deleteMany/u);
   });
 
   /**
-   * **Le retrait n'a lieu qu'une fois.** Vu en exécutant : deux
-   * tentatives d'envoi retiraient deux fois les mêmes droits, et le solde
-   * passait de trente à moins trente. La clé d'idempotence protège
-   * l'appel au fournisseur, pas le grand livre — et un échec d'envoi est
-   * le cas ordinaire tant que le rail n'est pas branché, donc la seconde
-   * tentative n'est pas une hypothèse.
+   * **Le retrait n'a lieu qu'une fois, et c'est la base qui le tient.**
+   * La lecture préalable ne protégeait pas deux reprises simultanées :
+   * entre la lecture et l'écriture, l'autre était passé. L'index unique
+   * partiel est la garantie ; la lecture évite seulement de provoquer
+   * une violation à chaque relance ordinaire.
    */
-  it("une seconde tentative ne retire pas les droits deux fois", () => {
-    const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(lire(ACCES))![0];
-    expect(fonction).toMatch(/analysisCredit\.findFirst/u);
-    expect(fonction).toMatch(/reason: "REMBOURSEMENT"[\s\S]*?select: \{ id: true \}/u);
-    expect(fonction).toMatch(/suite\.retire > 0 && !dejaRetire/u);
+  it("l'unicité du retrait est portée par une migration", () => {
+    const migration = lire(
+      "prisma/migrations/20260922000000_retrait_unique_du_remboursement/migration.sql",
+    );
+    expect(migration).toMatch(/CREATE UNIQUE INDEX/u);
+    expect(migration).toMatch(/WHERE "reason" = 'REMBOURSEMENT'/u);
+    // Le garde-fou l'éprouve, et le compte passe de 64 à 65.
+    expect(lire("scripts/verifier-garde-fous.sql")).toMatch(
+      /un second retrait de droits sur le même remboursement/u,
+    );
   });
 
   /** Un pack partiellement consommé n'envoie aucune demande. */
   it("la revue manuelle ouvre un écart et n'envoie rien", () => {
-    const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(lire(ACCES))![0];
+    const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(
+      lire(ACCES),
+    )![0];
     const avant = fonction.indexOf('return { issue: "revue_manuelle"');
-    const envoi = fonction.indexOf("await envoyer(");
+    const envoi = fonction.indexOf("adaptateur.demander(");
     expect(avant).toBeGreaterThan(-1);
     expect(avant).toBeLessThan(envoi);
   });
@@ -191,11 +483,24 @@ describe("le quota d'un pack remboursé", () => {
 describe("le candidat est prévenu à la confirmation, et pas avant", () => {
   const reception = lire("src/server/paiement/reception.ts");
 
-  it("le courrier part sur la notification signée, pas sur la décision", () => {
+  /**
+   * Le rail branché ne change rien ici, et c'est le point : un courrier
+   * envoyé sur l'acceptation ferait chercher sur un relevé une somme
+   * qui n'y est pas encore.
+   */
+  it("le courrier part sur la notification signée, pas sur la demande", () => {
     expect(reception).toContain("envoyerRemboursementConfirme");
     expect(reception).toMatch(/transaction\.status === "REMBOURSEE" && transaction\.refundedAt/u);
-    // Ni l'initiation ni l'ouverture n'écrivent au candidat.
-    expect(lire(ACCES)).not.toContain("envoyerRemboursementConfirme");
+    // Ni l'initiation, ni l'ouverture, ni les adaptateurs n'écrivent au
+    // candidat.
+    for (const module of [
+      ACCES,
+      "src/server/paiement/remboursement.ts",
+      "src/server/paiement/stripe.ts",
+      "src/server/paiement/fedapay.ts",
+    ]) {
+      expect(lire(module), module).not.toContain("envoyerRemboursementConfirme");
+    }
   });
 
   /** Un courrier qui échoue ne défait pas un remboursement confirmé. */
@@ -207,7 +512,6 @@ describe("le candidat est prévenu à la confirmation, et pas avant", () => {
   it("le texte n'annonce aucun délai de notre part", () => {
     expect(CONFIRMATION_AU_CANDIDAT).toMatch(/quelques jours/u);
     expect(CONFIRMATION_AU_CANDIDAT).not.toMatch(/sous \d|dans \d|\d+ jours ouvr/u);
-    // Et la référence ne change pas : c'est la même pièce comptable.
     expect(lire("src/server/courrier.ts")).toMatch(/qui ne change pas/u);
   });
 });

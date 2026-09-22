@@ -109,6 +109,20 @@ jobs:
         run: npm run smoke:consultation
       - run: echo "- **Parcours consultant** — tenue, concurrence sur un créneau et confirmation payée" >> "$GITHUB_STEP_SUMMARY"
 
+      # La demande de remboursement : deux reprises à la même
+      # milliseconde, le retrait de droits qui n'a lieu qu'une fois, et la
+      # dette qui survit à une réponse 200 du fournisseur.
+      - name: Remboursement sortant
+        run: npm run smoke:remboursement
+      - run: echo "- **Remboursement sortant** — reprises concurrentes, retrait unique et dette conservée jusqu'à la notification" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le transport SMTP contre un vrai serveur local : le message part,
+      # le rejeu d'une notification n'en produit pas un second, et le
+      # journal ne porte ni l'objet ni le code qu'il contient.
+      - name: Transport SMTP
+        run: npm run smoke:courrier
+      - run: echo "- **Transport SMTP** — envoi réel sur serveur local, rejeu sans doublon, journal sans code" >> "$GITHUB_STEP_SUMMARY"
+
       # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
       # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.
       - name: Bac à sable des fournisseurs

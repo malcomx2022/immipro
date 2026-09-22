@@ -92,6 +92,7 @@ describe("le courriel de confirmation — il n'existait pas", () => {
     parti = null;
     brancherTransport(async (courrier) => {
       parti = courrier;
+      return { issue: "envoye" };
     });
   });
 

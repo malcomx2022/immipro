@@ -473,11 +473,17 @@ Ce que chaque usage consomme aujourd'hui :
 
 | Usage | Module | Variables | Branché ? |
 |---|---|---|---|
-| Création de paiement | `acces/paiements.ts` | aucune | non — la transaction est locale, aucune page hébergée n'est encore créée |
+| Création de paiement | `paiement/ouvreurs.ts` | `*_API_KEY` | **oui**, les deux rails — la forme des échanges FedaPay reste non éprouvée faute de clés de bac à sable |
 | Webhooks | `paiement/signature.ts` | `*_WEBHOOK_SECRET` | **oui** |
-| Consultation fournisseur | `jobs/reconciliation.ts` | aucune | non — `Interrogation` n'est pas branchée |
-| Remboursement | `paiement/remboursement.ts` | `*_API_KEY` | non — `leRembourseur` rend `null` |
-| Espace FedaPay | — | `FEDAPAY_ENVIRONMENT` | non — l'adaptateur qui le lira n'existe pas |
+| Consultation fournisseur | `paiement/consultation.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay non — ses états de transaction n'ont pas pu être vérifiés |
+| Remboursement sortant | `paiement/remboursement.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay non — chemin, idempotence et états non vérifiés |
+| Espace FedaPay | `paiement/fedapay.ts` | `FEDAPAY_ENVIRONMENT` | **oui** — `baseDe` choisit le bac à sable ou la production |
+
+Ce tableau avait dérivé : il annonçait « non » sur trois lignes que les
+lots suivants avaient branchées. Une ligne fausse dans le sens rassurant
+se remarque ; dans l'autre sens, elle fait refaire un travail déjà fait.
+Les deux se corrigent en le relisant à chaque lot qui branche quelque
+chose.
 
 Les anciens noms sont repliés sur les nouveaux par
 `environnementNormalise`, **seul** endroit qui les connaisse, avec un
@@ -490,6 +496,81 @@ Trois vérifications tiennent l'ensemble : toute variable exigée par une
 dépendance figure dans `.env.example` ; vider une variable bloquante
 change ce que `/api/health` observe, ce qui prouve qu'elle a un lecteur
 réel ; et aucun appel à `console` n'interpole la lecture d'un secret.
+
+### Le courrier part, et le journal se tait
+
+`SMTP_URL` lue et valide, les codes de vérification, les
+réinitialisations, les reçus, les confirmations d'entretien et de
+remboursement sont remis à un serveur SMTP (`courrier/smtp.ts`, sur
+`nodemailer`). Absente, la dégradation ne change pas : rien ne part,
+l'appelant l'apprend, et la messagerie reste bloquante pour l'ouverture
+au public.
+
+**Ni l'objet ni le corps n'atteignent le journal.** Pour la moitié des
+courriers, l'objet **est** le secret — `481920 — ton code de
+vérification ImmiPro` — et le transport de repli le recopiait à chaque
+envoi, mettant le code d'ouverture de chaque compte dans un agrégateur
+conservé des semaines. La trace porte le genre du courrier, le domaine
+du destinataire et l'issue : de quoi exploiter un incident sans nommer
+personne. Le genre est donné par l'appelant, jamais déduit du texte.
+
+**`expedier` rend une issue** parmi cinq (`Envoi`, domaine) : envoyé,
+journalisé, non configuré, refusé, injoignable. Seule la coupure est
+renvoyable — on ne sait pas si le message est passé, et un second code
+vaut mieux qu'aucun. Deux routes taisent délibérément l'issue, la
+demande de réinitialisation et la création de compte : elles répondent
+la même chose avec ou sans compte existant, et remonter l'échec dirait
+« cette adresse est cliente ».
+
+**La sonde ne conclut que sur un fait** — un envoi réel, ou un
+`verify()` réel, qui ouvre la connexion et raccroche sans rien remettre.
+Le worker l'appelle au démarrage. `/api/health` ne parle à aucun serveur
+SMTP : cette adresse ne déclenche rien (décision du 21/09), et une
+`SMTP_URL` qui s'analyse ne prouve rien.
+
+### Rembourser, sans qu'une réponse 200 solde une dette
+
+Trois faits, et un seul écrit le versement : `refundDueAt` dit qu'on
+doit (K.C), `refundRequestedAt` dit que le fournisseur a **accepté la
+demande**, `refundedAt` et `REMBOURSEE` disent que l'argent est reparti
+— et ceux-là ne s'écrivent que dans `appliquerLaNotification`, sur
+notification signée (INV-7, M.B).
+
+La frontière ne risquait rien tant que rien ne partait. Elle commence à
+risquer quelque chose le jour où un appel rend 200, parce qu'une réponse
+200 ressemble à de l'argent rendu. L'adaptateur ne sait donc rendre
+qu'« il a pris la demande » : `succeeded` chez Stripe arrive ici comme
+`pending`, ce qui est la seule lecture qui reste vraie le jour où il
+annule un remboursement `succeeded`.
+
+**Cinq issues** (`IssueDeDemande`, domaine), parce qu'elles n'appellent
+pas la même suite : acceptée, refus définitif, erreur passagère, réponse
+illisible, rail non configuré. Le refus définitif et la réponse
+illisible ouvrent un écart — relancer n'y changerait rien ; la panne
+n'en ouvre pas, sans quoi la file se noierait sous des coupures réseau.
+Aucune ne solde la dette.
+
+**Deux reprises concurrentes ne produisent qu'une demande.** La clé
+d'idempotence protège le fournisseur, pas le grand livre, et elle
+suppose qu'il l'honore. La tentative est donc réservée avant tout appel,
+par une mise à jour conditionnée à la valeur lue — l'arbitrage de la
+base, comme pour la tenue d'un créneau. Le retrait des droits non
+consommés, lui, est porté par un **index unique partiel** :
+`analysiscredit_un_seul_retrait_par_remboursement`.
+
+**L'identifiant est vérifié avant l'appel** (`defautDIdentifiant`) :
+absent, aucune session n'a jamais été ouverte ; portant l'autre préfixe,
+la demande viserait un paiement étranger. Côté Stripe s'ajoute la
+relecture de `metadata[reference]` sur la session, parce que notre
+`providerTxId` désigne une session — que Stripe ne rembourse pas — et
+qu'il faut de toute façon aller chercher son intention de paiement.
+
+**FedaPay n'est pas branché, et son adaptateur le dit.** Le format de
+remboursement n'a pas pu être vérifié ; le deviner enverrait de l'argent
+d'une manière non éprouvée, ou — pire, parce que silencieux — compterait
+une demande acceptée et sortirait une dette de la file sans que personne
+n'ait rien rendu. Tant que les deux rails n'y sont pas, la capacité
+d'exploitation se lit non branchée.
 
 ### Configuré n'est pas branché
 

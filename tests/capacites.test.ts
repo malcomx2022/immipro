@@ -13,9 +13,15 @@ import {
   sonderLesSignatures,
   type PointDeBranchement,
 } from "@/server/exploitation/capacites";
-import { TRANSPORT_JOURNAL, brancherTransport, envoyerCodeDeVerification } from "@/server/courrier";
+import {
+  TRANSPORT_JOURNAL,
+  brancherTransport,
+  envoyerCodeDeVerification,
+  oublierLesFaits,
+} from "@/server/courrier";
 import { NON_BRANCHE as BALAYEUR_NON_BRANCHE, leBalayeur } from "@/server/securite/antivirus";
-import { leRembourseur } from "@/server/paiement/remboursement";
+import { remboursementBranche } from "@/server/paiement/remboursement";
+import { remboursementFedaPay } from "@/server/paiement/fedapay";
 import { lExtracteur } from "@/server/jobs/analyse";
 import { laCritique, leRedacteur } from "@/server/redaction/service";
 
@@ -32,6 +38,7 @@ import { laCritique, leRedacteur } from "@/server/redaction/service";
 const TOUT_RENSEIGNE = {
   APP_URL: "https://exemple.test",
   SMTP_URL: "smtp://exemple",
+  SMTP_FROM: "ne-pas-repondre@exemple.test",
   FEDAPAY_WEBHOOK_SECRET: "secret-fedapay",
   STRIPE_WEBHOOK_SECRET: "secret-stripe",
   ANTIVIRUS_URL: "http://exemple",
@@ -152,7 +159,14 @@ describe("un `.env` complet devant des points de branchement vides", () => {
 
     expect(etat.aptitude).toBe("INAPTE");
     expect(Object.fromEntries(constats.map((c) => [c.cle, c.capacite]))).toEqual({
-      messagerie: "IMPLEMENTATION_ABSENTE",
+      /*
+        Depuis le 22/09/2026, l'adaptateur SMTP est écrit : la messagerie
+        n'est plus une implémentation absente. Elle n'est pas
+        opérationnelle pour autant — personne n'a encore parlé à un
+        serveur —, et l'instance reste inapte. C'est la même règle,
+        appliquée à un module qui a commencé à se brancher.
+      */
+      messagerie: "CONFIGUREE_NON_VERIFIEE",
       // Le seul adaptateur écrit : la vérification de signature existe, et
       // sa sonde conclut avec ces secrets-là.
       paiements: "OPERATIONNELLE",
@@ -184,15 +198,23 @@ describe("un `.env` complet devant des points de branchement vides", () => {
    */
   it("et les fonctions que l'appelant obtient ne rendent rien", async () => {
     expect(await leBalayeur()("pieces/essai.pdf")).toBeNull();
+    /*
+      Le remboursement a désormais un adaptateur écrit pour Stripe, et
+      aucun pour FedaPay : la capacité se lit non branchée tant que les
+      deux rails n'y sont pas. Ce que l'appelant obtient sur le rail
+      manquant ne rembourse rien, et le dit — c'est la même mesure, sur
+      un module qui a commencé à se brancher.
+    */
+    expect(remboursementBranche()).toBe(false);
     expect(
-      await leRembourseur()({
+      await remboursementFedaPay().demander({
         reference: "IMP-0001",
-        providerTxId: null,
+        providerTxId: "fedapay:1",
         montant: 1000,
         devise: "XOF",
         cle: "IMP-0001",
       }),
-    ).toBeNull();
+    ).toMatchObject({ issue: "non_configure" });
     expect(await lExtracteur()("pieces/essai.pdf", "PASSEPORT")).toBeNull();
     const matiere = {
       type: "LETTRE_MOTIVATION",
@@ -207,30 +229,62 @@ describe("un `.env` complet devant des points de branchement vides", () => {
 
   /**
    * Et la réciproque, qui est la garantie réelle : ce que l'état annonce
-   * suit **la fonction que l'appelant exécutera**, pas une déclaration.
-   * On branche un transport pour de bon, et l'état change d'avis — puis on
-   * le débranche, et il revient.
+   * suit **ce qui s'est réellement passé**, pas une déclaration.
+   *
+   * L'adaptateur SMTP est écrit depuis le 22/09/2026 : la question n'est
+   * plus « existe-t-il ? » mais « a-t-il déjà parlé à un serveur ? ».
+   * Une `SMTP_URL` qui s'analyse ne suffit pas — c'est précisément le
+   * raccourci que cet arbitrage interdit.
    */
-  it("brancher un vrai transport suffit à changer ce que l'état annonce", async () => {
+  it("la messagerie ne devient opérationnelle que sur un fait, pas sur une URL", async () => {
     const messagerie = par("messagerie");
-    expect(observer(messagerie, TOUT_RENSEIGNE).adaptateur).toBe(false);
+    oublierLesFaits();
 
+    // Adaptateur écrit et configuration présente : l'état s'arrête là,
+    // parce que personne n'a encore parlé à un serveur.
+    const lu = observer(messagerie, TOUT_RENSEIGNE);
+    expect(lu.adaptateur).toBe(true);
+    expect(lu.configuree).toBe(true);
+    expect(lu.sonde).toBe("ABSENTE");
+    expect(capacite(messagerie, lu)).toBe("CONFIGUREE_NON_VERIFIEE");
+
+    // Un envoi réel qui aboutit établit le fait, et l'état suit.
     const partis: string[] = [];
-    brancherTransport(async (courrier) => void partis.push(courrier.destinataire));
-
-    expect(observer(messagerie, TOUT_RENSEIGNE).adaptateur).toBe(true);
-    expect(capacite(messagerie, observer(messagerie, TOUT_RENSEIGNE))).toBe(
-      // Branché et configuré, mais aucune sonde ne sait encore éprouver un
-      // envoi sans en envoyer un : l'honnêteté s'arrête là.
-      "CONFIGUREE_NON_VERIFIEE",
-    );
-
-    // Et c'est bien ce transport-là que les courriers empruntent.
+    brancherTransport(async (courrier) => {
+      partis.push(courrier.destinataire);
+      return { issue: "envoye" };
+    });
     await envoyerCodeDeVerification("candidate@exemple.test", "123456");
     expect(partis).toEqual(["candidate@exemple.test"]);
+    expect(capacite(messagerie, observer(messagerie, TOUT_RENSEIGNE))).toBe("OPERATIONNELLE");
 
+    // Un envoi réel qui échoue l'établit tout autant, dans l'autre sens.
+    brancherTransport(async () => ({ issue: "injoignable", detail: "ETIMEDOUT" }));
+    await envoyerCodeDeVerification("candidate@exemple.test", "123456");
+    expect(capacite(messagerie, observer(messagerie, TOUT_RENSEIGNE))).toBe("EN_PANNE");
+
+    /*
+      Le repli au journal, lui, n'établit rien : il n'a parlé à personne.
+      Le compter comme un succès ferait déclarer opérationnelle une
+      installation muette — le défaut que tout ce module corrige.
+    */
+    oublierLesFaits();
     brancherTransport(TRANSPORT_JOURNAL);
-    expect(observer(messagerie, TOUT_RENSEIGNE).adaptateur).toBe(false);
+    await envoyerCodeDeVerification("candidate@exemple.test", "123456");
+    expect(observer(messagerie, TOUT_RENSEIGNE).sonde).toBe("ABSENTE");
+
+    brancherTransport(null);
+    oublierLesFaits();
+  });
+
+  /** Une URL renseignée mais illisible est un fait, elle aussi. */
+  it("une SMTP_URL illisible se voit tout de suite, sans attendre un candidat", () => {
+    oublierLesFaits();
+    brancherTransport(null);
+    const messagerie = par("messagerie");
+    const casse = { ...TOUT_RENSEIGNE, SMTP_URL: "pigeon voyageur" };
+    expect(observer(messagerie, casse).sonde).toBe("ECHOUEE");
+    expect(capacite(messagerie, observer(messagerie, casse))).toBe("EN_PANNE");
   });
 
   it("sans variables, l'adaptateur reste absent — ce n'est pas la configuration qui manque", () => {

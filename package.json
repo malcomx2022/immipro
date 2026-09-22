@@ -23,6 +23,8 @@
     "smoke:tunnel": "tsx scripts/fumee-tunnel.mts",
     "smoke:reconciliation": "tsx scripts/fumee-reconciliation.mts",
     "smoke:consultation": "tsx scripts/fumee-consultation.mts",
+    "smoke:remboursement": "tsx scripts/fumee-remboursement.mts",
+    "smoke:courrier": "tsx scripts/fumee-courrier.mts",
     "sandbox:paiement": "tsx scripts/sandbox-paiement.mts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -38,6 +40,7 @@
     "minio": "^8.0.0",
     "next": "^15.0.0",
     "next-auth": "^4.24.0",
+    "nodemailer": "^10.0.10",
     "pg-boss": "^10.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -50,7 +53,9 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.0.0",
+    "@types/smtp-server": "^3.5.13",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.0",
     "esbuild": "^0.28.2",
@@ -60,9 +65,13 @@
     "postcss": "^8.4.0",
     "prettier": "^3.3.0",
     "prisma": "^6.0.0",
+    "smtp-server": "^3.19.13",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "overrides": {
+    "nodemailer": "^10.0.10"
   }
 }
