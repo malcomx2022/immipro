@@ -1380,6 +1380,24 @@ Même forme que `delaiDInstruction` en S.51 : ce que l'écran doit dire ne se
 recalcule pas depuis une liste de `{ champ, avant, apres }` de texte. Un
 champ de plus sur `Comparaison`, et l'écran cesse de paraphraser.
 
+## Deux moitiés justes, fausses ensemble
+
+L'horloge d'inactivité de RG-04.2 ignorait l'échéancier. Les deux sont justes
+séparément : le premier ferme les brouillons morts, le second planifie à
+rebours d'une date cible. Ensemble, ils fermaient le dossier d'un candidat
+visant 2029 deux ans avant sa première tâche — après lui avoir fait le plan
+qui disait de ne rien faire.
+
+L'horloge part désormais du plus tard entre ce que le candidat a produit et sa
+**première échéance non faite**. Une échéance à venir la suspend : on ne
+reproche pas à quelqu'un de n'avoir rien fait quand on lui a dit qu'il n'y
+avait rien à faire. Elle repart le jour où l'échéance arrive.
+
+C'est la deuxième fois que deux passes de nuit, chacune correcte, se
+contredisent. La première avait perdu la succession des versions entre la
+veille et la propagation. Le motif est le même : une passe qui décide sur son
+propre critère sans lire ce que l'autre a écrit.
+
 ## Vérifier
 
 ```

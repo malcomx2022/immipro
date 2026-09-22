@@ -5,6 +5,7 @@ import { miseEnEtat } from "@/domain/dossiers/etat";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
 import {
   abandonDeBrouillon,
+  debutDeLInactivite,
   joursDInactivite,
   relanceDeBrouillon,
   suiteDInactivite,
@@ -112,6 +113,18 @@ export async function traiterLesBrouillonsInactifs(
           },
         },
       },
+      /*
+        La première échéance qu'il lui reste à tenir. Elle suspend
+        l'horloge tant qu'elle est à venir : l'échéancier est le plan que
+        la plateforme lui a fait, et fermer son dossier avant ce plan
+        reviendrait à lui reprocher de l'avoir suivi.
+      */
+      deadlines: {
+        where: { doneAt: null },
+        select: { dueAt: true },
+        orderBy: { dueAt: "asc" },
+        take: 1,
+      },
     },
   });
 
@@ -127,7 +140,11 @@ export async function traiterLesBrouillonsInactifs(
         (tard, date) => (date > tard ? date : tard),
         dossier.createdAt,
       );
-      const inactifDepuis = joursDInactivite(derniereActivite, maintenant);
+      const debut = debutDeLInactivite(
+        derniereActivite,
+        dossier.deadlines[0]?.dueAt ?? null,
+      );
+      const inactifDepuis = joursDInactivite(debut, maintenant);
 
       /*
         La relance déjà envoyée se lit sur la notification, et non sur un
@@ -144,7 +161,7 @@ export async function traiterLesBrouillonsInactifs(
           where: {
             applicationId: dossier.id,
             kind: "INACTIVITE",
-            createdAt: { gte: derniereActivite },
+            createdAt: { gte: debut },
           },
         })) > 0;
 
@@ -189,7 +206,7 @@ export async function traiterLesBrouillonsInactifs(
         continue;
       }
 
-      const texte = relanceDeBrouillon(destination, derniereActivite, depots.length);
+      const texte = relanceDeBrouillon(destination, debut, depots.length);
 
       /*
         Le courrier part **avant** la notification, comme pour les rappels
