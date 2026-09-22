@@ -217,6 +217,11 @@ let rang = 0;
 
 const CONDITION_PASSEPORT = {
   code: "passeport_validite_min",
+  // La pièce qui établit la condition se déclare (22/09/2026). Elle se
+  // devinait par préfixe de code, et cette fixture-ci passait par chance :
+  // « passeport_validite_min » commence par « passeport ». Une fixture qui
+  // tient par chance n'éprouve pas la relation, elle la contourne.
+  piece: "passeport",
   operateur: "gte",
   valeur: 6,
   unite: "mois",

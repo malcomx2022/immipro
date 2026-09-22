@@ -1,5 +1,4 @@
 import type { ReviewReason } from "@prisma/client";
-import type { VisaRulesPayload } from "@/domain/rules/schema";
 import { db } from "@/lib/db";
 import { payload } from "@/server/acces/regles";
 import {
@@ -8,7 +7,7 @@ import {
   rendreUneTentative,
 } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
-import { evaluerConditions } from "@/domain/dossiers/verification";
+import { conditionsDeLaPiece, evaluerConditions } from "@/domain/dossiers/verification";
 import { transmissibleALAnalyse } from "@/domain/dossiers/quarantaine";
 import {
   MESSAGE_AU_CANDIDAT,
@@ -166,7 +165,7 @@ export async function analyserUnePiece(
   const application = document.application;
   const regle = application.visaRule;
   const regles = regle ? payload(regle) : null;
-  const conditions = regles ? conditionsDeLaPiece(regles, document.code) : [];
+  const conditions = regles ? conditionsDeLaPiece(regles.conditions, document.code) : [];
 
   const demande: DemandeDeLecture = {
     codeAttendu: document.code,
@@ -383,15 +382,3 @@ async function acheverHorsSujet(
   return "TERMINEE";
 }
 
-/**
- * Conditions qui portent sur cette pièce. Le rapprochement se fait par
- * préfixe de code — `passeport_validite_min` porte sur `passeport` — parce
- * que le référentiel nomme ses conditions d'après la pièce qu'elles
- * contraignent. Une condition qui ne se rattache à aucune pièce reste
- * évaluée au niveau du dossier, par le calcul de complétude.
- */
-function conditionsDeLaPiece(p: VisaRulesPayload, codePiece: string) {
-  return p.conditions.filter(
-    (c) => c.code.startsWith(codePiece) || codePiece.startsWith(c.code.split("_")[0] ?? ""),
-  );
-}

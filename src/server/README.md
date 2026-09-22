@@ -487,6 +487,46 @@ service muet — vivent dans `domain/ia/appel.ts` et sont partagées avec la
 lecture des pièces. Deux listes pour une même règle divergent, et c'est
 celle qu'on n'a pas sous les yeux qu'on oublie de corriger.
 
+### Quelle pièce établit quelle condition
+
+Elle se **déclare** dans le référentiel (`condition.piece`), depuis le
+22/09/2026. Elle se devinait par comparaison de préfixes de codes, à deux
+endroits et selon deux règles différentes — deux réponses possibles à la
+même question.
+
+La devinette tenait tant qu'une condition portait le nom de sa pièce.
+Elle s'écroulait dès qu'un rédacteur nommait une condition d'après ce
+qu'elle exige : `salaire_min_moins_30_ans` ne partage aucun préfixe avec
+`contrat_travail`. Sur la procédure kennismigrant, **aucune des cinq
+conditions ne se rattachait à rien** : l'extraction ne demandait aucun
+champ, les trois pièces ressortaient « conformes » sans qu'une seule
+comparaison ait eu lieu, et le dossier ne devenait jamais prêt — les
+conditions bloquantes restaient insatisfaites quoi que le candidat
+dépose.
+
+Trois gardes, et chacune à sa place :
+
+- **le schéma** vérifie qu'une condition rattachée nomme une pièce qui
+  existe. À chaque lecture, donc — et rien de plus, parce qu'INV-3 fige
+  des payloads écrits avant cette évolution : les refuser rendrait
+  illisible ce que des dossiers en cours ont gelé.
+- **la publication** refuse une condition bloquante sans pièce
+  (`raisonsDIncompletabilite`). C'est le dernier moment où personne n'a
+  encore ouvert de dossier dessus.
+- **un test** relit les données de la graine : la forme d'une règle et sa
+  terminabilité sont deux questions, et seule la première était posée.
+
+Une pièce sur laquelle rien ne porte est **reçue**, et le message le dit.
+« Les informations lues correspondent à ce qui est exigé » affirme une
+comparaison, et c'est cette phrase qui couvrait le défaut.
+
+Les seuils **alternatifs** (`condition.alternative`) se jugent en bloc :
+satisfaire l'un suffit, et le verdict nomme ceux qui ne le sont pas —
+4 400 € satisfont le seuil des moins de trente ans et pas celui des
+trente ans et plus, et le candidat est le seul à savoir lequel le
+concerne. En dessous de tous, l'échec cite le **moins exigeant** : c'est
+le seul constat vrai quel que soit le seuil applicable.
+
 ### Le balayage antivirus, et la seule issue qui promeut
 
 Branché le 22/09/2026. `ANTIVIRUS_URL` ne désigne pas un fournisseur connu

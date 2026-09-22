@@ -9,6 +9,7 @@ import {
   visaRulesSchema,
   SCHEMA_VERSION,
   peutEtrePubliee,
+  raisonsDIncompletabilite,
   textesCandidat,
 } from "@/domain/rules/schema";
 import { verifierPayloadCandidat, messageDeRefusPayload } from "@/domain/backoffice/regle";
@@ -164,6 +165,18 @@ export const POST = route({
     const fautes = verifierPayloadCandidat(textesCandidat(lu.data));
     if (fautes.length > 0) {
       throw echec("etat_incompatible", { corps: messageDeRefusPayload(fautes[0]!) });
+    }
+
+    /*
+      Et la règle doit pouvoir être terminée. Une condition bloquante qui
+      ne nomme aucune pièce n'est satisfaite par aucun dépôt : le dossier
+      resterait `ACTIF` avec une exigence que le candidat ne peut lever.
+      Le refus est ici parce que c'est le dernier moment où personne n'a
+      encore ouvert de dossier dessus.
+    */
+    const impossibles = raisonsDIncompletabilite(lu.data);
+    if (impossibles.length > 0) {
+      throw echec("etat_incompatible", { corps: impossibles[0]! });
     }
 
     const veille = await db.visaRule.findFirst({

@@ -214,16 +214,39 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
   });
   if (!dossier || FIGES.includes(dossier.status)) return;
 
+  /*
+    Les conditions déterministes sont évaluées par l'analyse de pièce et
+    reportées sur le document correspondant : ici, une condition est tenue
+    dès que **la pièce qui la porte** est conforme.
+
+    Laquelle, c'est le référentiel qui le dit (`condition.piece`). Ce
+    fichier la cherchait par comparaison de préfixes de codes, selon une
+    règle différente de celle du job d'analyse — deux réponses possibles à
+    la même question. Sur la procédure kennismigrant, les deux se
+    trompaient : aucune des cinq conditions ne trouvait de pièce, toutes
+    se lisaient « non satisfaites », et le dossier ne pouvait jamais
+    devenir prêt quoi que le candidat dépose.
+
+    Une condition facultative **sans pièce** ne se juge pas ici : elle ne
+    s'établit par aucun dépôt — une carence de travail après l'arrivée,
+    une progression de crédits signalée en cours d'année — et ne pèse pas
+    sur ce que le candidat peut faire aujourd'hui.
+
+    Une **bloquante** sans pièce, elle, reste comptée non satisfaite.
+    C'est la réponse prudente, et elle ne devrait plus se produire : la
+    publication d'une règle la refuse désormais. Elle ne subsiste que sur
+    une règle figée avant cette garde, et l'écarter reviendrait à
+    déclarer un dossier prêt sur une exigence que personne n'a vérifiée.
+  */
   const conditions = dossier.visaRule
-    ? payload(dossier.visaRule).conditions.map((c) => ({
-        code: c.code,
-        bloquant: c.bloquant,
-        // Les conditions déterministes sont évaluées par l'analyse de pièce
-        // et reportées sur le document correspondant : ici, une condition
-        // est tenue dès que la pièce qui la porte est conforme.
-        satisfaite: conditionTenue(c.code, dossier.documents),
-        messageEchec: c.message_echec,
-      }))
+    ? payload(dossier.visaRule)
+        .conditions.filter((c) => c.piece !== undefined || c.bloquant)
+        .map((c) => ({
+          code: c.code,
+          bloquant: c.bloquant,
+          satisfaite: conditionTenue(c, dossier.documents),
+          messageEchec: c.message_echec,
+        }))
     : [];
 
   const resultat = computeCompleteness({
@@ -270,8 +293,11 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
   });
 }
 
-const conditionTenue = (code: string, documents: readonly Document[]): boolean => {
-  const porteuse = documents.find((d) => code.startsWith(d.code) || d.code.startsWith(code));
+const conditionTenue = (
+  condition: { piece?: string | undefined },
+  documents: readonly Document[],
+): boolean => {
+  const porteuse = documents.find((d) => d.code === condition.piece);
   return porteuse ? porteuse.status === "CONFORME" : false;
 };
 
