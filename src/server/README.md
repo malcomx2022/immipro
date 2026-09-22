@@ -1318,6 +1318,51 @@ L'écriture suit le patron de la clôture C-11 : `appeler`, `envoi`, `echec`,
 écrit** — fermer d'abord ferait disparaître le seul endroit où l'échec peut
 se lire, sur une décision qui remplace un échéancier entier.
 
+## Une horloge que la plateforme remettait à zéro
+
+RG-04.2 — « un dossier `BROUILLON` inactif depuis 90 jours déclenche une
+relance, puis passe en `ABANDONNE` à 12 mois » — n'existait nulle part.
+`ABANDONNE` vivait dans l'enum Prisma, dans `EtatStocke`, et l'écran savait
+l'afficher : `versStatut("ABANDONNE")` rend « CLOTURE ». Aucune écriture ne le
+produisait. Un brouillon de vingt et un mois restait `BROUILLON`, sans la
+moindre relance. Même forme que le `readyAt` de S.47 et que l'`EXPIREE` de la
+péremption : un état que le produit décrit et que personne n'écrit.
+
+Le piège n'était pas là. Il était dans **l'horloge**.
+
+Mesurer l'inactivité sur `Application.updatedAt` est le réflexe, et il est
+faux : `@updatedAt` se déplace à **toute** écriture, y compris celles de la
+plateforme. Le job de rappels d'échéance réveille aussi les brouillons
+(`ETATS_RAPPELABLES`) et pose `lastReminderAt` — il aurait remis l'horloge à
+zéro chaque semaine, et les douze mois ne seraient jamais arrivés. Un dossier
+mort serait resté vivant parce que la plateforme lui écrivait. La mutation le
+montre : avec `updatedAt`, le dossier de treize mois n'est pas clos, il est
+relancé.
+
+L'horloge est donc ce que **le candidat** a produit : l'ouverture du dossier
+et le dernier dépôt de pièce. Aucune passe de nuit n'écrit de
+`DocumentVersion` — l'analyse note un verdict, la péremption déclasse, la
+purge efface un contenu, aucune n'en crée.
+
+Trois conséquences tiennent ensemble :
+
+- **La relance ne touche pas le dossier.** Elle écrit une `Notification` de
+  genre `INACTIVITE` et rien d'autre : poser un champ sur `Application`
+  déplacerait `updatedAt`, et le brouillon passerait pour actif.
+- **Le marquage suit le courrier.** Marqué d'abord, un candidat dont la boîte
+  refuse ne serait plus jamais relancé — et serait clos neuf mois plus tard
+  sans avoir rien reçu. C'est la règle des rappels et des divergences, et elle
+  vaut ici plus qu'ailleurs.
+- **L'abandon programme la purge.** `ABANDONNE` est terminal —
+  `exigerModifiable` le refuse, plus rien ne vient derrière. Clore sans poser
+  `purgeDueAt` aurait laissé des pièces d'identité dans le stockage pour
+  toujours, un trou d'INV-5 ouvert à l'endroit même où l'on ferme un dossier.
+
+Une dernière chose, que seule une base a montrée : la passe décide sur une
+horloge injectée et marquait sur celle du serveur. Les deux coïncident en
+production et divergent dès qu'une passe est rejouée en retard. La
+notification porte donc `createdAt: maintenant`.
+
 ## Vérifier
 
 ```

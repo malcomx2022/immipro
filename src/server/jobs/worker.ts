@@ -18,6 +18,10 @@ import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
 import { propagerLaPublication, doitRejouer } from "./divergence";
+import {
+  traiterLesBrouillonsInactifs,
+  doitRejouer as doitRejouerLInactivite,
+} from "./inactivite";
 
 async function main() {
   // `getQueue` déclare les files avant de rendre la main (voir
@@ -126,6 +130,20 @@ async function main() {
     console.info("[rappels]", await envoyerLesRappels());
   });
 
+  await boss.work(JOBS.BROUILLONS_INACTIFS, async () => {
+    const bilan = await traiterLesBrouillonsInactifs();
+    console.info("[inactivite]", bilan);
+    /*
+      Comme la propagation d'une divergence : la passe rend son bilan, et
+      c'est ici qu'on décide de rejouer. Un dossier qui échoue n'emporte
+      pas les autres, et la relance non envoyée repart à la passe
+      suivante — rien n'est marqué tant que le courrier n'est pas parti.
+    */
+    if (doitRejouerLInactivite(bilan)) {
+      throw new Error(`Brouillons inactifs non traités : ${bilan.incidents.join(" | ")}`);
+    }
+  });
+
   // Cadences de DOC-11 : quinze minutes pour la réconciliation (RG-05.4),
   // une fois par jour pour la veille (WF-14) et la purge (INV-5).
   //
@@ -153,6 +171,21 @@ async function main() {
     veille.
   */
   await boss.schedule(JOBS.RAPPEL_ECHEANCIER, "0 7 * * *");
+
+  /*
+    Les brouillons laissés de côté, une fois par jour — RG-04.2.
+
+    À huit heures, après les rappels d'échéance : un candidat dont le
+    brouillon porte aussi une échéance reçoit d'abord ce qu'il peut faire
+    aujourd'hui, ensuite ce qui arrivera dans neuf mois. L'inverse ferait
+    lire une clôture avant une date à tenir.
+
+    Quotidienne et non hebdomadaire : le seuil est un jour précis, et la
+    relance annonce une date de clôture calculée depuis la dernière
+    activité. Une passe hebdomadaire la ferait partir jusqu'à six jours
+    en retard, sur une échéance que le courrier donne au jour près.
+  */
+  await boss.schedule(JOBS.BROUILLONS_INACTIFS, "0 8 * * *");
 
   /*
     La resonde, toutes les heures — I.C, 22/09/2026.

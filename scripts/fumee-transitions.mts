@@ -124,8 +124,10 @@ const { db } = await import("../src/lib/db");
 const { declarerLeDepot, cloturerLeDossier } = await import("../src/server/dossiers/parcours");
 const { arbitrerLaDivergence } = await import("../src/server/dossiers/migration");
 const { propagerLaPublication, doitRejouer } = await import("../src/server/jobs/divergence");
-const { purgerSurDemande } = await import("../src/server/jobs/purge");
-const { recalculerCompletude } = await import("../src/server/acces/dossiers");
+const { purgerSurDemande, purgerLesPiecesEchues } = await import("../src/server/jobs/purge");
+const { traiterLesBrouillonsInactifs } = await import("../src/server/jobs/inactivite");
+const { RELANCE_JOURS, ABANDON_JOURS } = await import("../src/domain/dossiers/inactivite");
+const { recalculerCompletude, ouvrirDossier } = await import("../src/server/acces/dossiers");
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
 type Ouvreur = Parameters<typeof ouvrirLeTunnel>[3];
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
@@ -566,6 +568,140 @@ try {
     const reste = await etat(sansRegle.id);
     verifier(reste.status === "BROUILLON", `le brouillon n'est pas archivé (${reste.status})`);
     verifier(reste.purgedAt !== null, "et il est purgé quand même (RG-10.4)");
+  }
+  console.log("\nRG-04.2 — le brouillon laissé de côté est relancé, puis clos");
+  {
+    /*
+      `ABANDONNE` vivait dans l'enum, dans `EtatStocke`, et l'écran savait
+      l'afficher. Rien ne l'écrivait : un brouillon de vingt et un mois
+      restait `BROUILLON`, sans la moindre relance.
+
+      Ce qui ne s'éprouve qu'ici : l'horloge. Elle ne peut pas être
+      `updatedAt` — c'est `@updatedAt`, déplacé par **toute** écriture, y
+      compris celles de la plateforme. La passe de rappels d'échéance
+      réveille aussi les brouillons et pose `lastReminderAt`.
+    */
+    const MAINTENANT = new Date("2027-06-01T08:00:00Z");
+    const ilYA = (jours: number) => new Date(MAINTENANT.getTime() - jours * 86400000);
+    const v = await regle(brute.rules);
+
+    const ouvrir = async (nom: string, ouvertIlYA: number) => {
+      rang += 1;
+      const user = await db.user.create({
+        data: { email: `fumee-inact-${nom}-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+      });
+      const a = await ouvrirDossier(user.id, v.id, null);
+      await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${ilYA(ouvertIlYA)} WHERE id = ${a.id}`;
+      return a.id;
+    };
+
+    const jeune = await ouvrir("jeune", RELANCE_JOURS - 5);
+    const aRelancer = await ouvrir("relance", RELANCE_JOURS + 30);
+    /*
+      Un candidat dont la boîte refuse temporairement. Le marquage doit
+      suivre le courrier et jamais le précéder : marqué sans avoir été
+      prévenu, il ne le serait plus jamais — et serait clos neuf mois plus
+      tard sans avoir rien reçu.
+    */
+    const injoignable = await ouvrir("injoignable", RELANCE_JOURS + 30);
+    const adresse = (
+      await db.application.findUniqueOrThrow({
+        where: { id: injoignable },
+        select: { user: { select: { email: true } } },
+      })
+    ).user.email;
+    differees.add(adresse);
+    const aClore = await ouvrir("abandon", ABANDON_JOURS + 35);
+    const actif = await ouvrir("actif", ABANDON_JOURS + 35);
+
+    /* Un dépôt récent sur un dossier ouvert il y a longtemps : le candidat
+       est là, et c'est lui l'horloge. */
+    const piece = await db.document.findFirstOrThrow({ where: { applicationId: actif } });
+    const version = await db.documentVersion.create({
+      data: { documentId: piece.id, rank: 1, objectKey: `inact-${process.pid}` },
+    });
+    await db.$executeRaw`UPDATE "DocumentVersion" SET "uploadedAt" = ${ilYA(10)} WHERE id = ${version.id}`;
+
+    /* Et ce que la plateforme écrit d'elle-même sur un brouillon oublié :
+       exactement ce que pose le job de rappels d'échéance. */
+    await db.application.update({
+      where: { id: aClore },
+      data: { lastReminderAt: MAINTENANT },
+    });
+
+    const bilan = await traiterLesBrouillonsInactifs(MAINTENANT);
+    verifier(
+      bilan.relances === 1 && bilan.abandons === 1 && bilan.incidents.length === 0,
+      `un relancé, un clos, rien d'autre (${JSON.stringify(bilan)})`,
+    );
+    verifier(
+      bilan.courriersRetenus === 1,
+      `et un courrier retenu, compté à part (${bilan.courriersRetenus})`,
+    );
+
+    /* Rien n'est marqué tant que le courrier n'est pas parti. */
+    verifier(
+      (await db.notification.count({
+        where: { applicationId: injoignable, kind: "INACTIVITE" },
+      })) === 0,
+      "le candidat injoignable n'est pas marqué prévenu",
+    );
+    differees.delete(adresse);
+    const reprise = await traiterLesBrouillonsInactifs(
+      new Date(MAINTENANT.getTime() + 86400000),
+    );
+    verifier(
+      reprise.relances === 1,
+      `et la passe suivante le relance pour de bon (${JSON.stringify(reprise)})`,
+    );
+
+    verifier((await etat(jeune)).status === "BROUILLON", "le brouillon récent n'est pas touché");
+    verifier(
+      (await etat(actif)).status === "BROUILLON",
+      "ni celui dont le candidat a déposé une pièce il y a dix jours",
+    );
+
+    const relance = await db.notification.findFirst({
+      where: { applicationId: aRelancer, kind: "INACTIVITE" },
+    });
+    verifier((await etat(aRelancer)).status === "BROUILLON", "le relancé reste un brouillon");
+    verifier(
+      relance?.body.includes("sera clos le") === true,
+      `et sa relance annonce la date de clôture (${relance?.body.slice(0, 48)}…)`,
+    );
+
+    const clos = await etat(aClore);
+    verifier(
+      clos.status === "ABANDONNE",
+      `le brouillon de treize mois est clos (${clos.status}) — l'écriture système ne l'a pas sauvé`,
+    );
+    verifier(clos.readyAt === null, "et son état passe par miseEnEtat");
+
+    /*
+      INV-5. `ABANDONNE` est terminal : sans purge programmée ici, les
+      pièces d'identité d'un dossier clos resteraient en stockage pour
+      toujours — plus rien ne vient derrière.
+    */
+    verifier(clos.purgeDueAt !== null, "la purge de ses pièces est programmée (INV-5)");
+    const purge = await purgerLesPiecesEchues(new Date("2027-08-01T00:00:00Z"));
+    verifier(
+      purge.dossiers >= 1,
+      `et la purge le reprend le moment venu (${JSON.stringify(purge.dossiers)})`,
+    );
+
+    /* La passe du lendemain ne renvoie rien : sans quoi la même relance
+       repartirait chaque nuit pendant neuf mois. */
+    const lendemain = await traiterLesBrouillonsInactifs(
+      new Date(MAINTENANT.getTime() + 2 * 86400000),
+    );
+    verifier(
+      lendemain.relances === 0 && lendemain.abandons === 0,
+      `la passe du lendemain ne renvoie rien (${JSON.stringify(lendemain)})`,
+    );
+    verifier(
+      (await db.notification.count({ where: { applicationId: aRelancer } })) === 1,
+      "et le candidat n'a reçu qu'une alerte",
+    );
   }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);

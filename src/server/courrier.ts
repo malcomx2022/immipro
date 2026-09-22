@@ -344,6 +344,32 @@ export const envoyerRappelDEcheance = (
     corps: `${corps}${SIGNATURE}`,
   });
 
+/**
+ * Relance d'un brouillon laissé de côté — RG-04.2.
+ *
+ * Par courrier et pas seulement par notification, et c'est le cœur de la
+ * règle : elle vise quelqu'un qui n'a pas ouvert l'application depuis
+ * trois mois. Une alerte dans l'application n'est pas lue par quelqu'un
+ * qui n'ouvre pas l'application — c'est l'argument de RG-11.3, et il vaut
+ * ici encore plus fort, puisque l'inactivité est la condition même de
+ * l'envoi.
+ *
+ * Le texte est calculé dans le domaine (`domain/dossiers/inactivite.ts`),
+ * comme pour les rappels d'échéance : ce qui part dépend de ce qui reste,
+ * et cette décision s'éprouve sans serveur ni messagerie.
+ */
+export const envoyerRelanceDeBrouillon = (
+  destinataire: string,
+  objet: string,
+  corps: string,
+) =>
+  expedier({
+    destinataire,
+    genre: "relance_brouillon",
+    objet,
+    corps: `${corps}${SIGNATURE}`,
+  });
+
 export interface ConfirmationEntretien {
   destinataire: string;
   reference: string;

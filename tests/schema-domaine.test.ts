@@ -154,6 +154,11 @@ describe("le schéma et le domaine nomment les mêmes choses", () => {
       "ANALYSE",
       "PAIEMENT",
       "VEILLE",
+      // RG-04.2, 23/09/2026 : le brouillon laissé de côté. Le genre n'est
+      // pas décoratif — c'est lui qui rend la passe de nuit idempotente,
+      // en disant si ce dossier a déjà été relancé depuis sa dernière
+      // activité.
+      "INACTIVITE",
     ];
     expect(valeursDeLEnum("NotificationKind")).toEqual(trie(genres));
   });

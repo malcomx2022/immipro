@@ -7756,3 +7756,97 @@ réelles et vérifie que les deux délais arrivent.
 ajoutées ou retirées par la nouvelle version — `arbitrerLaDivergence` les
 rend pourtant dans `piecesAjoutees`, et personne ne les lit. Un candidat qui
 migre découvre les nouvelles lignes sur sa checklist après coup.
+
+---
+
+### S.53 — L'horloge que la plateforme remettait à zéro
+
+RG-04.2 : « un dossier `BROUILLON` inactif depuis 90 jours déclenche une
+relance, puis passe en `ABANDONNE` à 12 mois. »
+
+La question posée au code : **qu'arrive-t-il à un brouillon qu'on laisse de
+côté ?** Exécuté avant correction :
+
+```
+=== 1. Ce que le code affirme d'ABANDONNE ===
+  l'enum Prisma le porte      : oui
+  l'écran a un cas pour lui   : versStatut("ABANDONNE") = CLOTURE
+  une file de jobs le produit : NON
+
+=== 2. Un brouillon laissé de côté ===
+  inactif depuis              : 630 jours (21 mois)
+  statut                      : BROUILLON
+  relance envoyée             : 0
+
+=== 4. Y a-t-il seulement un écrivain d'ABANDONNE ? ===
+  dossiers ABANDONNE en base  : 0
+```
+
+Vingt et un mois, aucune relance, aucun changement. C'est la troisième fois
+que ce projet rencontre cette forme exacte — un état que l'enum porte, que
+l'écran sait afficher, et qu'aucune écriture ne produit : `readyAt` en S.47,
+`EXPIREE` avant la péremption, `ABANDONNE` ici.
+
+**Le vrai piège n'était pas là.** Il était dans l'horloge, et la sonde l'a
+posé avant qu'une ligne soit écrite :
+
+```
+=== 3. `updatedAt` peut-il servir d'horloge d'inactivité ? ===
+  updatedAt avant                     : 2025-01-01
+  updatedAt après un rappel système   : 2026-09-22
+  l'horloge a-t-elle été remise à zéro par le système ? true
+```
+
+`Application.updatedAt` est `@updatedAt` : **toute** écriture le déplace, y
+compris celles de la plateforme. Le job de rappels d'échéance réveille aussi
+les brouillons et pose `lastReminderAt`. L'horloge aurait été remise à zéro
+chaque semaine par la plateforme elle-même, et les douze mois ne seraient
+jamais arrivés — un dossier mort resté vivant parce qu'on lui écrivait.
+
+L'horloge retenue est ce que **le candidat** a produit : l'ouverture du
+dossier, et le dernier dépôt de pièce. Aucune passe de nuit n'écrit de
+`DocumentVersion`.
+
+**Ce qu'elle ne compte pas**, et c'est assumé : un candidat qui ne ferait que
+déplacer sa date cible, sans jamais rien déposer, pendant douze mois. La
+relance du quatre-vingt-dixième jour part neuf mois avant l'abandon et dit ce
+qui arrivera — c'est le filet, et il est large.
+
+**Trois décisions qui tiennent ensemble.** La relance n'écrit rien sur le
+dossier, sans quoi elle réactiverait l'horloge qu'elle observe. Le marquage
+suit le courrier : marqué d'abord, un candidat injoignable ne serait plus
+jamais relancé et serait clos sans avoir rien reçu. Et l'abandon programme la
+purge — `ABANDONNE` est terminal, et clore sans `purgeDueAt` aurait laissé des
+pièces d'identité en stockage pour toujours, un trou d'INV-5 ouvert à
+l'endroit même où l'on ferme un dossier.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'horloge redevient `updatedAt` | la fumée — le dossier de 13 mois est relancé, pas clos |
+| l'abandon ne programme plus la purge | la fumée (INV-5) |
+| la relance repart chaque nuit | les essais purs et la fumée |
+| la notification porte l'horloge du serveur | la fumée |
+| l'abandon avertit au lieu de clore | les essais purs et la fumée |
+| la marque précède le courrier | la fumée — **après renforcement** |
+| le dépôt du candidat ne compte plus | la fumée |
+
+Sept mutations, sept rouges. La sixième n'a d'abord pas mordu : le relais SMTP
+de la fumée acceptait tout, et la garde « courrier avant marque » n'était donc
+éprouvée par rien. Le harnais savait déjà différer une adresse — il servait à
+la propagation des divergences — et la fumée relance désormais un candidat
+dont la boîte refuse, vérifie qu'il n'est **pas** marqué, puis que la passe
+suivante le relance pour de bon.
+
+**Et une chose que seule une base a montrée.** La passe décide sur une horloge
+injectée et marquait sur celle du serveur : deux dates qui coïncident en
+production et divergent dès qu'une passe est rejouée en retard. La fumée l'a
+vu — la passe du lendemain renvoyait la même relance — et la notification
+porte désormais `createdAt: maintenant`.
+
+**Ce qui reste ouvert.** Un brouillon sans version figée ne peut pas passer
+`ABANDONNE` : `application_version_figee` l'interdit, et elle a raison. Le cas
+n'existe pas — `ouvrirDossier` est le seul créateur d'`Application` et pose
+toujours la version —, mais si une ligne d'un autre âge en portait une, elle
+ressortirait en incident à chaque passe. Aucune branche défensive n'a été
+écrite pour un état que l'application ne produit pas : l'incident est
+précisément l'endroit où une telle ligne doit se voir.
