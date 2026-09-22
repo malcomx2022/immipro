@@ -73,6 +73,7 @@ const { db } = await import("../src/lib/db");
 const { getQueue } = await import("../src/lib/queue");
 const { publierLaRegle } = await import("../src/server/regles/publication");
 const { propagerLaPublication } = await import("../src/server/jobs/divergence");
+const { depublierLesFichesEchues } = await import("../src/server/jobs/veille");
 const { recalculerCompletude } = await import("../src/server/acces/dossiers");
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
 
@@ -112,6 +113,10 @@ async function version(payload: unknown, statut: "PUBLISHED" | "DRAFT", ecritePa
       verifiedBy: ecritePar,
       nextReviewAt: new Date("2027-01-01"),
       status: statut,
+      // Ce qu'écrit une vraie mise en vigueur. Sans elle, la fixture décrit
+      // une version publiée que personne n'a jamais mise en vigueur, et la
+      // succession ne la trouve pas — à juste titre.
+      publishedAt: statut === "PUBLISHED" ? new Date("2026-01-01") : null,
     },
   });
 }
@@ -209,6 +214,7 @@ try {
         sourceUrl: "https://exemple.test/ch", sourceTier: "INSTITUTIONNEL",
         verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
         nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
       },
     });
     const ch = REGLES_DE_REFERENCE.find((r) => r.countryCode === "CH")!.rules as never as {
@@ -261,6 +267,7 @@ try {
         sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
         verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
         nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
       },
     });
     const p = await dossierPret(v1.id);
@@ -295,6 +302,116 @@ try {
     );
   }
 
+  console.log("\nRG-14.1 — une fiche dépubliée pour retard reste la version en vigueur");
+  {
+    /*
+      Deux passes justes, prises séparément, et un défaut à leur rencontre.
+
+      La veille de 3 h repasse en `DRAFT` une fiche dont la relecture est
+      dépassée : elle cesse de s'afficher, mais elle reste la version que
+      des dossiers ont figée. La publication de la suivante cherchait son
+      prédécesseur par `status = 'PUBLISHED'` et n'en trouvait plus : elle
+      se croyait première, n'archivait rien, ne mettait aucune divergence
+      en file. Le candidat dont le seuil montait n'apprenait rien.
+
+      La relecture par défaut étant de quatre-vingt-dix jours, tout retard
+      du veilleur ouvre la fenêtre — et une version se publie précisément
+      quand il vient de relire.
+    */
+    rang += 10;
+    const v1 = await db.visaRule.create({
+      data: {
+        countryCode: "CA", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 1,
+        effectiveFrom: new Date("2026-01-01"), rules: brute.rules as never,
+        sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+        // Relecture dépassée : c'est ce que la veille cherche.
+        nextReviewAt: new Date("2026-09-01"), status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const p = await dossierPret(v1.id);
+    const v2 = await db.visaRule.create({
+      data: {
+        countryCode: "CA", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 2,
+        effectiveFrom: new Date("2026-01-01"), rules: avecSeuil(ACTUEL + 1500) as never,
+        sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+        nextReviewAt: new Date("2027-01-01"), status: "DRAFT",
+      },
+    });
+
+    const depubliees = await depublierLesFichesEchues(new Date("2026-09-22"));
+    verifier(depubliees >= 1, `la veille dépublie la fiche en retard (${depubliees})`);
+    const demotee = await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } });
+    verifier(demotee.status === "DRAFT", `elle repasse en brouillon (${demotee.status})`);
+    verifier(
+      demotee.publishedAt !== null && demotee.effectiveTo === null,
+      "mais elle reste en vigueur : sa mise en vigueur tient, sa fin n'est pas posée",
+    );
+
+    const publiee = await publierLaRegle(v2.id, AUTRE, "Montants IND au 1er janvier");
+    verifier(publiee.archivee === v1.id, `la version dépubliée est bien archivée (${publiee.archivee})`);
+    verifier(publiee.divergenceMiseEnFile, "et la divergence part en file");
+
+    const bilan = await propagerLaPublication(v1.id, v2.id);
+    verifier(bilan.critiques === 1, `le dossier est prévenu (${JSON.stringify(bilan)})`);
+    const dossier = await db.application.findUniqueOrThrow({
+      where: { id: p.application.id },
+    });
+    verifier(dossier.status === "SUSPENDU", `et mis en pause (${dossier.status})`);
+
+    const close = await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } });
+    verifier(
+      close.effectiveTo !== null,
+      "la version remplacée porte enfin sa date de fin — la diligence de RG-14.4",
+    );
+
+    /*
+      Et la chaîne continue : une v3 doit trouver la v2 comme
+      prédécesseur. C'est la publication qui a posé la mise en vigueur de
+      la v2 — si elle ne l'écrivait pas, la succession s'arrêterait à la
+      première version publiée par le produit lui-même.
+    */
+    const v2EnVigueur = await db.visaRule.findUniqueOrThrow({ where: { id: v2.id } });
+    verifier(
+      v2EnVigueur.publishedAt !== null,
+      "la publication pose la mise en vigueur de la version qu'elle publie",
+    );
+
+    const v3 = await db.visaRule.create({
+      data: {
+        countryCode: "CA", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 3,
+        effectiveFrom: new Date("2026-01-01"), rules: avecSeuil(ACTUEL + 2000) as never,
+        sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+        nextReviewAt: new Date("2027-01-01"), status: "DRAFT",
+      },
+    });
+    const troisieme = await publierLaRegle(v3.id, AUTRE, "Second relèvement");
+    verifier(
+      troisieme.archivee === v2.id,
+      `la v3 trouve la v2 comme prédécesseur (${troisieme.archivee === v2.id ? "oui" : troisieme.archivee})`,
+    );
+
+    /*
+      Enfin, une republication de la même version ne réécrit pas sa date
+      d'entrée en vigueur : c'est elle qui ordonne la succession, et la
+      déplacer à chaque remise en ligne ferait passer une vieille version
+      devant une plus récente.
+    */
+    const dateDOrigine = (
+      await db.visaRule.findUniqueOrThrow({ where: { id: v3.id } })
+    ).publishedAt!;
+    await db.visaRule.update({ where: { id: v3.id }, data: { status: "DRAFT" } });
+    await publierLaRegle(v3.id, AUTRE, "Remise en ligne après relecture");
+    const rechargee = await db.visaRule.findUniqueOrThrow({ where: { id: v3.id } });
+    verifier(
+      rechargee.publishedAt?.getTime() === dateDOrigine.getTime(),
+      `la republication garde la date d'origine (${rechargee.publishedAt?.toISOString()})`,
+    );
+  }
+
   console.log("\nWF-11 — un seuil abaissé prévient sans mettre en pause");
   {
     rang += 10;
@@ -305,6 +422,7 @@ try {
         sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
         verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
         nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
       },
     });
     const p = await dossierPret(v1.id);

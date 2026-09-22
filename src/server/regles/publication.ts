@@ -94,13 +94,28 @@ export async function publierLaRegle(
     throw echec("etat_incompatible", { corps: impossibles[0]! });
   }
 
+  /*
+    Le prédécesseur est la version **mise en vigueur et jamais remplacée**,
+    et non « celle qui est PUBLISHED ». La distinction n'est pas
+    théorique : RG-14.1 repasse en `DRAFT` une fiche dont la relecture est
+    dépassée, et la relecture par défaut est de quatre-vingt-dix jours.
+    Tout retard du veilleur ouvre donc la fenêtre — précisément au moment
+    où il vient de relire et où la version suivante va paraître.
+
+    Cherché par `status`, le prédécesseur disparaissait alors : la
+    publication se croyait première, n'archivait rien, et ne mettait
+    aucune divergence en file. Le candidat dont le seuil montait de
+    1 500 € n'apprenait rien.
+  */
   const veille = await db.visaRule.findFirst({
     where: {
       countryCode: regle.countryCode,
       visaType: regle.visaType,
-      status: "PUBLISHED",
       id: { not: regle.id },
+      publishedAt: { not: null },
+      effectiveTo: null,
     },
+    orderBy: { publishedAt: "desc" },
   });
 
   /*
@@ -138,7 +153,14 @@ export async function publierLaRegle(
       : []),
     db.visaRule.update({
       where: { id: regle.id },
-      data: { status: "PUBLISHED" as const, effectiveFrom: aujourdhui },
+      data: {
+        status: "PUBLISHED" as const,
+        effectiveFrom: aujourdhui,
+        // Posée une fois. Une fiche republiée après une échéance de
+        // relecture garde la date où elle est entrée en vigueur : c'est
+        // elle qui ordonne la succession, pas la dernière remise en ligne.
+        publishedAt: regle.publishedAt ?? aujourdhui,
+      },
     }),
   ]);
 

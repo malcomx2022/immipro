@@ -49,6 +49,16 @@ model VisaRule {
   /// Alimente la file de veille (WF-14).
   nextReviewAt  DateTime     @db.Date
   status        RuleStatus   @default(DRAFT)
+  /// Date de **mise en vigueur** de cette version, posée une fois (WF-14 §5).
+  ///
+  /// Distincte de `status`, qui dit ce qui s'affiche aujourd'hui. RG-14.1
+  /// repasse en `DRAFT` une fiche dont la relecture est dépassée : elle
+  /// cesse alors d'être montrée, mais elle reste la version que des dossiers
+  /// ont figée (INV-3) — elle est toujours en vigueur pour eux. Confondre
+  /// les deux faisait perdre la succession : la publication de la version
+  /// suivante ne trouvait plus de prédécesseur, n'archivait rien, et ne
+  /// prévenait aucun dossier.
+  publishedAt   DateTime?
   notes         String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -60,6 +70,8 @@ model VisaRule {
   @@unique([countryCode, visaType, version])
   @@index([countryCode, category, status])
   @@index([status, nextReviewAt])
+  /// La publication cherche le prédécesseur : mis en vigueur, jamais remplacé.
+  @@index([countryCode, visaType, publishedAt])
 }
 
 // ═══════════════════════════════════════════════════════════

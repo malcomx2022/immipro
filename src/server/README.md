@@ -688,6 +688,52 @@ Le dernier point compte autant : réécrire une phrase ne change aucune
 exigence, et faire partir une alerte à tous les dossiers ouverts parce
 qu'un texte a été clarifié apprend à ignorer les suivantes.
 
+### Ce qui s'affiche, et ce qui est en vigueur
+
+Correctif du 23/09/2026, né de la rencontre de deux passes justes.
+
+RG-14.1 repasse en `DRAFT` une fiche dont la relecture est dépassée : « une
+donnée non relue ne peut pas continuer à se présenter comme fiable ». La
+passe est juste, et elle ne fait que de la tenue de livre — le filtre de
+lecture candidat écarte déjà ces fiches, requête par requête.
+
+La publication de la version suivante, elle, cherchait son prédécesseur par
+`status = 'PUBLISHED'`. Après une passe de veille, elle n'en trouvait plus :
+
+```
+La passe de veille de 3 h du matin (RG-14.1) :
+  1 fiche(s) dépubliée(s) — la v1 passe à DRAFT
+
+Puis le veilleur finit sa relecture, et un administrateur publie la v2 :
+  version archivée   : AUCUNE
+  divergence en file : false
+
+  le candidat est-il prévenu que son seuil passe de 4357 € à 5857 € ? NON
+```
+
+La v1 restait `DRAFT` pour toujours, sans date de fin ; la v2 se croyait
+première ; et le dossier figé sur la v1 n'apprenait rien. La relecture par
+défaut étant de quatre-vingt-dix jours, tout retard du veilleur ouvre cette
+fenêtre — et une nouvelle version paraît précisément quand il vient de
+relire.
+
+**`status` dit ce qui s'affiche ; `publishedAt` dit ce qui a été mis en
+vigueur.** Les deux étaient confondus. Une fiche dépubliée pour retard cesse
+d'être montrée, mais elle reste la version que des dossiers ont figée
+(INV-3) : elle est toujours en vigueur pour eux. La succession se lit donc
+sur la mise en vigueur — « mise en vigueur, jamais remplacée » —, que la
+dépublication ne touche pas.
+
+La date est posée **une fois**. Une fiche republiée après une échéance de
+relecture garde celle de son entrée en vigueur : la déplacer à chaque remise
+en ligne ferait passer une vieille version devant une plus récente.
+
+Deux gardes en base tiennent la cohérence : on n'archive pas ce qui n'a
+jamais été mis en vigueur, et on ne termine pas ce qui n'a pas commencé. La
+seconde répare au passage un silence de RG-14.4 — la version remplacée porte
+enfin sa date de fin, même lorsqu'elle était en brouillon au moment d'être
+remplacée.
+
 ### La relecture par un second opérateur, et ce qu'elle n'était pas
 
 WF-14 §4 : « Relecture par un second opérateur pour toute modification de

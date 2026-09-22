@@ -211,6 +211,33 @@ INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effec
   VALUES ('vr2','NL','etudes','ETUDES',10,'2026-01-01','{}','https://x','OFFICIEL',
     '2026-01-01','veilleur','2026-04-01','PUBLISHED', now());
 
+-- La succession des versions (23/09/2026). `status` dit ce qui s'affiche,
+-- `publishedAt` dit ce qui a été mis en vigueur — et c'est la seconde qui
+-- ordonne la succession, parce que la veille repasse en DRAFT une fiche dont
+-- la relecture est dépassée sans pour autant mettre fin à la version.
+SELECT refuse(
+  'WF-14 · une version archivée qui n''aurait jamais été mise en vigueur',
+  $q$INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+       rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
+     VALUES ('vr9','NL','etudes','ETUDES',97,'2026-01-01','{}','https://x','OFFICIEL',
+       '2026-01-01','veilleur','2026-04-01','ARCHIVED', now())$q$);
+
+SELECT refuse(
+  'WF-14 · une fin de validité sans mise en vigueur',
+  $q$INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+       "effectiveTo", rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy",
+       "nextReviewAt", status, "updatedAt")
+     VALUES ('vr10','NL','etudes','ETUDES',98,'2026-01-01','2026-06-01','{}','https://x','OFFICIEL',
+       '2026-01-01','veilleur','2026-04-01','DRAFT', now())$q$);
+
+SELECT refuse(
+  'WF-14 · une version qui finit avant d''entrer en vigueur',
+  $q$INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+       "effectiveTo", "publishedAt", rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy",
+       "nextReviewAt", status, "updatedAt")
+     VALUES ('vr11','NL','etudes','ETUDES',99,'2026-01-01','2026-06-01','2026-09-01','{}','https://x','OFFICIEL',
+       '2026-01-01','veilleur','2026-04-01','ARCHIVED', now())$q$);
+
 SELECT refuse(
   'WF-11 · une divergence tranchée avant que le candidat en soit prévenu',
   $q$INSERT INTO "RuleMigration" (id, "applicationId", "fromRuleId", "toRuleId", impact, diff,

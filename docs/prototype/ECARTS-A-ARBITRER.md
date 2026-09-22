@@ -7334,3 +7334,83 @@ un arbitrage déjà pris, et `domain/backoffice/couts.ts` l'écrit : « le
 candidat compte en analyses, pas en jetons ». Il reste que `verifierQuota`,
 dans `lib/ai.ts`, calcule un refus que personne ne demande — une fonction
 sans appelant qui donne à l'invariant l'air d'être tenu.
+
+---
+
+### S.48 — Deux passes justes, et un défaut à leur rencontre
+
+Le lot précédent avait appris à la publication à voir la valeur d'un seuil.
+Restait à vérifier qu'elle trouve toujours la version qu'elle remplace.
+
+RG-14.1 repasse en `DRAFT` une fiche dont la relecture est dépassée : « une
+donnée non relue ne peut pas continuer à se présenter comme fiable ». La
+passe est juste, et elle est modeste — le filtre de lecture candidat écarte
+déjà ces fiches, requête par requête ; la passe ne fait que rendre l'état de
+la base conforme à ce qui s'affiche.
+
+La publication, elle, cherchait son prédécesseur par `status = 'PUBLISHED'`.
+Exécuté, sur un dossier prêt figé sur la version en vigueur :
+
+```
+La passe de veille de 3 h du matin (RG-14.1) :
+  1 fiche(s) dépubliée(s) — la v1 passe à DRAFT
+
+Puis le veilleur finit sa relecture, et un administrateur publie la v2 :
+  version archivée   : AUCUNE
+  divergence en file : false
+
+Ce qu'il reste :
+  v1 : DRAFT, effectiveTo nulle
+  versions en vigueur : v2
+  le dossier suit toujours v1
+  le candidat est-il prévenu que son seuil passe de 4357 € à 5857 € ? NON
+```
+
+Aucune des deux passes n'a tort séparément. Ensemble, elles perdent la
+succession : la v1 reste `DRAFT` pour toujours sans date de fin, la v2 se
+croit première, et le candidat dont le seuil vient de monter de mille cinq
+cents euros n'apprend rien.
+
+Et la fenêtre n'est pas étroite. RG-14.3 fixe la relecture par défaut à
+quatre-vingt-dix jours : tout retard du veilleur l'ouvre — précisément au
+moment où il vient de relire et où la version suivante va paraître.
+
+#### `status` n'est pas « en vigueur »
+
+Les deux étaient confondus dans une seule colonne. Une fiche dépubliée pour
+retard cesse d'être **montrée** ; elle reste la version que des dossiers ont
+figée (INV-3), donc en vigueur pour eux.
+
+`VisaRule.publishedAt` porte la mise en vigueur, posée une fois et jamais
+effacée. La succession se lit dessus — « mise en vigueur, jamais
+remplacée » —, et la dépublication ne la touche pas. Une republication après
+échéance garde la date d'origine : la déplacer à chaque remise en ligne
+ferait passer une vieille version devant une plus récente.
+
+Deux gardes en base : on n'archive pas ce qui n'a jamais été mis en vigueur,
+et on ne termine pas ce qui n'a pas commencé — la seconde tenant aussi
+l'ordre des deux dates. Elles réparent au passage un silence de RG-14.4 : la
+version remplacée porte enfin sa date de fin, même lorsqu'elle était en
+brouillon au moment d'être remplacée.
+
+#### Ce que les fixtures disaient sans le vouloir
+
+Une fixture qui crée une règle `PUBLISHED` sans date de mise en vigueur
+décrit une version publiée que personne n'a jamais mise en vigueur. La sonde
+l'a montré d'abord sur elle-même : le correctif écrit, elle rendait toujours
+« aucun prédécesseur » — et elle avait raison, puisque sa v1 n'avait jamais
+été mise en vigueur. C'est le même constat que la veille au soir sur les
+autorisations de la fumée de balayage, et il vaut d'être noté comme tel :
+une fixture décrit un état, et un état qu'aucun chemin du produit ne peut
+produire n'éprouve rien.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le prédécesseur se cherche de nouveau par statut | trois assertions : rien n'est archivé, rien n'est mis en file |
+| la mise en vigueur n'est plus posée à la publication | la chaîne s'arrête à la deuxième version |
+| une republication réécrit la date d'origine | l'ordre de la succession |
+
+Les trois ne mordent que dans la fumée : ce sont des décisions de base, et
+une règle pure ne peut pas éprouver la rencontre de deux passes nocturnes.
