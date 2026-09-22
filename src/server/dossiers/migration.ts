@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
 import { checklistDepuis, recalculerCompletude } from "@/server/acces/dossiers";
+import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
 import { payload } from "@/server/acces/regles";
 
 /**
@@ -27,6 +28,20 @@ import { payload } from "@/server/acces/regles";
  * Et « je migre » écrivait `ACTIF` sans poser `readyAt` : sur un dossier
  * prêt — celui qui a le plus à perdre à changer de version — la base
  * refusait la transaction entière, et le bouton ne faisait rien.
+ *
+ * ── Ce que « migrer » laissait derrière ─────────────────────────────
+ *
+ * La checklist de la nouvelle version, oui. L'échéancier, non — RG-09.3
+ * demande pourtant « un recalcul intégral » dès qu'un délai réglementaire
+ * change, et c'est exactement ce qu'une migration fait changer. Le dossier
+ * repartait donc sur une version annonçant 150 jours d'instruction, avec
+ * des dates calculées sur 90 : deux mois de retard, invisibles, sur le
+ * geste même par lequel le candidat venait d'accepter la nouvelle règle.
+ *
+ * Le remplacement est partagé avec la replanification de WF-09 — une
+ * implémentation, pas deux — et il est **dans la transaction** : un
+ * dossier dont la version figée aurait changé sans son échéancier serait
+ * exactement l'état qu'on vient de corriger.
  */
 
 export type Decision = "MIGRER" | "CONSERVER";
@@ -92,11 +107,23 @@ export async function arbitrerLaDivergence(
   const connus = new Set(existantes.map((d) => d.code));
   const ajoutees = nouvelles.filter((p) => !connus.has(p.code));
 
+  /*
+    L'échéancier se recalcule sur la **date cible du dossier**, qui ne
+    change pas : migrer accepte une autre règle, pas une autre rentrée. Ce
+    sont les délais qui bougent sous elle.
+  */
+  const echeancier = await remplacementDeLEcheancier(
+    dossier.id,
+    payload(migration.toRule),
+    dossier.targetDate,
+  );
+
   await db.$transaction([
     // RG-11.1 — on ajoute, on ne retire pas.
     db.document.createMany({
       data: ajoutees.map((p) => ({ ...p, applicationId: dossier.id })),
     }),
+    ...echeancier,
     db.application.update({
       where: { id: dossier.id },
       data: {

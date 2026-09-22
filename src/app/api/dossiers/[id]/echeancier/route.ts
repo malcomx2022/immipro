@@ -3,11 +3,8 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { echeancierDuDossier } from "@/server/lecture/dossiers";
-import {
-  dossierAvecSaRegle,
-  echeancesDepuis,
-  exigerModifiable,
-} from "@/server/acces/dossiers";
+import { dossierAvecSaRegle, exigerModifiable } from "@/server/acces/dossiers";
+import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
 import { payload } from "@/server/acces/regles";
 import { joursEntre } from "@/domain/dossiers/echeancier";
 
@@ -42,10 +39,9 @@ export const GET = route({
  * en annonce 90 depuis. Une divergence de version s'arbitre par
  * `RuleMigration`, elle ne se glisse pas dans un changement de date.
  *
- * `doneAt` est reporté ligne à ligne : une échéance déjà faite le reste
- * après replanification. Rien ne l'écrit encore, mais l'export de
- * portabilité la lit, et une donnée détruite par un recalcul ne se
- * retrouve pas.
+ * Le remplacement lui-même vit dans `server/dossiers/echeancier.ts` : la
+ * migration d'une divergence le fait aussi, et ne le faisait pas. Une
+ * implémentation, pas deux.
  *
  * Régime `sensible` comme la clôture : ce n'est pas un appel qui coûte de
  * l'argent, c'est une écriture qui remplace des lignes, et dix par minute
@@ -86,30 +82,11 @@ export const PUT = route({
     const regle = dossier.visaRule;
     if (!regle) throw echec("regle_indisponible");
 
-    const faites = new Map(
-      (
-        await db.deadline.findMany({
-          where: { applicationId: dossier.id, doneAt: { not: null } },
-          select: { code: true, doneAt: true },
-        })
-      ).map((e) => [e.code, e.doneAt]),
-    );
-
     const cible = new Date(`${corps.dateCible}T00:00:00Z`);
-    const nouvelles = echeancesDepuis(payload(regle), cible).map((e) => ({
-      ...e,
-      ...(faites.get(e.code) ? { doneAt: faites.get(e.code)! } : {}),
-    }));
 
     await db.$transaction([
-      db.deadline.deleteMany({ where: { applicationId: dossier.id } }),
-      db.application.update({
-        where: { id: dossier.id },
-        data: {
-          targetDate: cible,
-          deadlines: { create: nouvelles },
-        },
-      }),
+      ...(await remplacementDeLEcheancier(dossier.id, payload(regle), cible)),
+      db.application.update({ where: { id: dossier.id }, data: { targetDate: cible } }),
     ]);
 
     return echeancierDuDossier(dossier.id, acteur!.id);

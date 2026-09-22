@@ -38,6 +38,34 @@ import type { VisaRulesPayload } from "./schema";
  * alerte à tous les dossiers ouverts parce qu'une phrase a été clarifiée
  * apprendrait à ignorer les suivantes.
  *
+ * ── Le délai d'instruction, qui ne décide pas de l'éligibilité ──────
+ *
+ * Il n'entrait pas non plus dans la comparaison, et pour une raison qui
+ * se tenait : un délai qui s'allonge ne rend personne inéligible. Mais il
+ * déplace **toutes** les dates du dossier. L'échéancier se calcule à
+ * rebours depuis la date cible, en retirant le délai d'instruction : de 90
+ * à 150 jours, la date de dépôt avance de deux mois. Exécuté avant
+ * correction, sur un dossier visant la rentrée du 1er septembre 2027 :
+ *
+ *     v1 delai_traitement_jours.max = 90
+ *     v2 delai_traitement_jours.max = 150
+ *     impact = MINEUR      diff = []
+ *     bilan  = {"dossiers":0,"alertes":0,…}
+ *     notifications reçues par le candidat : 0
+ *     dépôt : 2027-06-03 — inchangé
+ *     ce qu'il devrait être sur 150 jours : 2027-04-04
+ *
+ * Soixante jours de retard que personne ne signale, sur ce que RG-09.3
+ * nomme : « un délai réglementaire modifié déclenche un recalcul intégral
+ * de l'échéancier et une notification explicite. »
+ *
+ * Il entre donc au diff, et il n'entre pas dans `bloquantesTouchees` : ce
+ * n'est pas une condition, WF-14 §4 ne le vise pas. L'impact reste
+ * `MAJEUR` — notification et proposition de migration —, jamais
+ * `CRITIQUE` : mettre un dossier en pause parce que l'autorité annonce
+ * deux mois de plus retirerait au candidat la seule chose qui lui reste,
+ * le temps de s'organiser.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
@@ -61,10 +89,40 @@ export interface Comparaison {
    * §4 la demande pour **toute** modification, durcissante ou non.
    */
   bloquantesTouchees: readonly string[];
+  /**
+   * Le délai d'instruction, quand il a bougé. C'est ce champ — et non
+   * l'impact — qui fait dire à l'alerte ce que le calendrier devient :
+   * RG-09.3 demande une notification « explicite », et « une exigence a
+   * changé » ne dit pas qu'il faut déposer deux mois plus tôt.
+   */
+  delaiDInstruction: EvolutionDuDelai | null;
+}
+
+/** Fourchette de jours annoncée par l'autorité, ou son absence. */
+export type Delai = { min: number; max: number } | null;
+
+export interface EvolutionDuDelai {
+  avant: Delai;
+  apres: Delai;
+  /**
+   * Jours dont la date de dépôt de l'échéancier **avance**. Positif quand
+   * le délai s'allonge, négatif quand il raccourcit.
+   *
+   * C'est le maximum qui compte, et non la moyenne de la fourchette :
+   * `echeancesDepuis` calcule à rebours depuis le pire des deux, parce
+   * qu'un échéancier construit sur le meilleur fait arriver en retard une
+   * fois sur deux.
+   */
+  joursDAvance: number;
 }
 
 /** Aucune des deux versions ne pose ce qui suit. */
-const VIDE: Comparaison = { impact: "MINEUR", diff: [], bloquantesTouchees: [] };
+const VIDE: Comparaison = {
+  impact: "MINEUR",
+  diff: [],
+  bloquantesTouchees: [],
+  delaiDInstruction: null,
+};
 
 const parCode = (conditions: readonly Condition[]): Map<string, Condition> =>
   new Map(conditions.map((c) => [c.code, c]));
@@ -238,6 +296,26 @@ export function comparerLesVersions(
     }
   }
 
+  /*
+    Le délai d'instruction — RG-09.3.
+
+    Il entre au diff comme les autres, mais il ressort en plus tel quel :
+    l'alerte doit pouvoir dire « de 90 à 150 jours » et « ta date de dépôt
+    avance de 60 jours », ce qu'un `{ champ, avant, apres }` de texte ne
+    permet pas de recalculer sans le reparser.
+  */
+  const delaiDInstruction = evolutionDuDelai(
+    avant.delai_traitement_jours,
+    apres.delai_traitement_jours,
+  );
+  if (delaiDInstruction) {
+    diff.push({
+      champ: "delai_traitement_jours",
+      avant: delaiLisible(delaiDInstruction.avant),
+      apres: delaiLisible(delaiDInstruction.apres),
+    });
+  }
+
   const fondsAvant = avant.preuve_fonds?.valeur ?? null;
   const fondsApres = apres.preuve_fonds?.valeur ?? null;
   if (fondsAvant !== fondsApres) {
@@ -258,7 +336,69 @@ export function comparerLesVersions(
   const impact: Impact =
     dispositifPerdu || durcissement ? "CRITIQUE" : diff.length > 0 ? "MAJEUR" : "MINEUR";
 
-  return { impact, diff, bloquantesTouchees: [...bloquantesTouchees] };
+  return { impact, diff, bloquantesTouchees: [...bloquantesTouchees], delaiDInstruction };
+}
+
+/**
+ * Le délai a-t-il bougé, et de combien la date de dépôt avance-t-elle ?
+ *
+ * `null` quand il n'a pas bougé. Une fourchette qui apparaît ou disparaît
+ * en est une évolution : `echeancesDepuis` ne pose pas d'échéance de dépôt
+ * quand le référentiel n'annonce aucun délai, et le calendrier du candidat
+ * change donc du tout au tout.
+ */
+function evolutionDuDelai(avant: Delai, apres: Delai): EvolutionDuDelai | null {
+  if (avant === null && apres === null) return null;
+  if (avant?.min === apres?.min && avant?.max === apres?.max) return null;
+  return { avant, apres, joursDAvance: (apres?.max ?? 0) - (avant?.max ?? 0) };
+}
+
+/**
+ * « 60–90 jours », ou l'absence, pour que le diff se lise sans le schéma.
+ *
+ * Le tiret plutôt que « à » : la mention compose « passe de … à … », et
+ * « passe de 60 à 90 jours à 60 à 150 jours » ne se lit pas.
+ */
+const delaiLisible = (delai: Delai): string =>
+  delai === null
+    ? "non annoncé"
+    : delai.min === delai.max
+      ? `${delai.max} jours`
+      : `${delai.min}–${delai.max} jours`;
+
+/**
+ * Ce que l'alerte ajoute quand le délai a bougé — RG-09.3, « notification
+ * explicite ».
+ *
+ * Elle nomme le nouveau délai **et** ce qu'il fait à la date de dépôt.
+ * L'un sans l'autre laisse le calcul au candidat : « le délai passe à 150
+ * jours » n'apprend rien à qui ne sait pas que son échéancier se construit
+ * à rebours.
+ *
+ * Elle dit aussi que rien n'a encore bougé chez lui. INV-3 fige sa version
+ * tant qu'il n'a pas tranché, et une phrase qui annonce un calendrier déjà
+ * décalé lui ferait chercher des dates qu'il ne verra pas.
+ */
+export function mentionDuDelai(evolution: EvolutionDuDelai): string {
+  const { avant, apres, joursDAvance } = evolution;
+
+  if (apres === null) {
+    return "L'autorité n'annonce plus de délai d'instruction. Si tu appliques cette version, l'échéancier ne place plus de date de dépôt : c'est à toi de la fixer.";
+  }
+  if (avant === null) {
+    return `L'autorité annonce désormais un délai d'instruction de ${delaiLisible(apres)}. Si tu appliques cette version, ton échéancier place une date de dépôt à rebours de ta date cible.`;
+  }
+
+  const socle = `Le délai d'instruction annoncé passe de ${delaiLisible(avant)} à ${delaiLisible(apres)}.`;
+  if (joursDAvance === 0) {
+    // Seul le plancher a bougé : l'échéancier se construit sur le plafond.
+    return `${socle} Ta date de dépôt ne change pas : elle se calcule sur le délai le plus long.`;
+  }
+  const jours = Math.abs(joursDAvance);
+  const pluriel = jours > 1 ? "jours" : "jour";
+  return joursDAvance > 0
+    ? `${socle} Si tu appliques cette version, ta date de dépôt avance de ${jours} ${pluriel} : il faut déposer plus tôt pour la même date cible.`
+    : `${socle} Si tu appliques cette version, ta date de dépôt recule de ${jours} ${pluriel} : tu disposes d'autant de temps en plus pour réunir tes pièces.`;
 }
 
 export const comparaisonVide = (): Comparaison => ({ ...VIDE });

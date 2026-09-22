@@ -77,6 +77,10 @@ const { depublierLesFichesEchues } = await import("../src/server/jobs/veille");
 const { recalculerCompletude } = await import("../src/server/acces/dossiers");
 const { versDossier } = await import("../src/server/vue/dossier");
 const { declarerLeDepot } = await import("../src/server/dossiers/parcours");
+const { arbitrerLaDivergence } = await import("../src/server/dossiers/migration");
+const { ouvrirDossier } = await import("../src/server/acces/dossiers");
+const { remplacementDeLEcheancier } = await import("../src/server/dossiers/echeancier");
+const { payload } = await import("../src/server/acces/regles");
 const { MENTION_EN_PAUSE } = await import("../src/domain/dossiers/dossier");
 const { editorialDe } = await import("../src/lib/contenu/destinations");
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
@@ -534,6 +538,157 @@ try {
       where: { id: p.application.id },
     });
     verifier(dossier.status === "PRET", `et il reste prêt à déposer (${dossier.status})`);
+  }
+  console.log("\nRG-09.3 — un délai modifié prévient, et le recalcul suit l'arbitrage");
+  {
+    /*
+      Le second défaut de ce lot, et celui qu'aucun test pur n'atteint :
+      migrer changeait la version figée et la checklist, jamais
+      l'échéancier. Le dossier repartait sur une règle annonçant 150 jours
+      d'instruction avec des dates calculées sur 90.
+    */
+    rang += 10;
+    const DELAI = (max: number) => ({ ...(brute.rules as object), delai_traitement_jours: { min: 60, max } });
+    const v1 = await db.visaRule.create({
+      data: {
+        countryCode: "BE", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 1,
+        effectiveFrom: new Date("2026-01-01"), rules: DELAI(90) as never,
+        sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+        nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+
+    const user = await db.user.create({
+      data: { email: `fumee-delai-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const CIBLE = new Date("2027-09-01T00:00:00Z");
+    const ouvert = await ouvrirDossier(user.id, v1.id, CIBLE);
+    await db.application.update({ where: { id: ouvert.id }, data: { status: "ACTIF" } });
+
+    const jour = (d: Date) => d.toISOString().slice(0, 10);
+    const depotDe = async () =>
+      jour(
+        (await db.deadline.findFirstOrThrow({
+          where: { applicationId: ouvert.id, code: "depot" },
+        })).dueAt,
+      );
+
+    const avant = await depotDe();
+    verifier(avant === "2027-06-03", `le dépôt est calculé sur 90 jours (${avant})`);
+
+    /*
+      Une échéance déjà faite : elle doit traverser le recalcul. Une
+      donnée détruite par un recalcul ne se retrouve pas.
+    */
+    await db.deadline.updateMany({
+      where: { applicationId: ouvert.id, code: "depot" },
+      data: { doneAt: new Date("2026-10-01") },
+    });
+
+    /*
+      Le second candidat s'ouvre **avant** la publication : elle archive
+      v1, et `ouvrirDossier` ne sert que les versions en vigueur. Une
+      fixture qui l'ouvrirait après décrirait un dossier que personne ne
+      peut ouvrir.
+    */
+    rang += 1;
+    const autre = await db.user.create({
+      data: { email: `fumee-delai-b-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const conserve = await ouvrirDossier(autre.id, v1.id, CIBLE);
+    await db.application.update({ where: { id: conserve.id }, data: { status: "ACTIF" } });
+
+    const v2 = await db.visaRule.create({
+      data: {
+        countryCode: "BE", visaType: "emploi_kennismigrant", category: "EMPLOI", version: 2,
+        effectiveFrom: new Date("2026-01-01"), rules: DELAI(150) as never,
+        sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+        nextReviewAt: new Date("2027-01-01"), status: "DRAFT",
+      },
+    });
+    await publierLaRegle(v2.id, AUTRE, "Délai d'instruction allongé par l'autorité");
+
+    const bilan = await propagerLaPublication(v1.id, v2.id);
+    verifier(
+      bilan.dossiers === 2 && bilan.alertes === 2,
+      `les deux candidats sont prévenus (${JSON.stringify(bilan)})`,
+    );
+    verifier(bilan.critiques === 0, "et aucun dossier n'est mis en pause pour autant");
+
+    const alerte = await db.notification.findFirstOrThrow({
+      where: { applicationId: ouvert.id, kind: "REGLEMENTATION" },
+    });
+    verifier(
+      alerte.body.includes("60–150 jours") && alerte.body.includes("avance de 60 jours"),
+      "et l'alerte dit le nouveau délai et l'avance qu'il impose",
+    );
+
+    // INV-3 : rien n'a bougé tant qu'il n'a pas tranché.
+    verifier(
+      (await depotDe()) === avant,
+      "tant qu'il n'a pas tranché, son échéancier ne bouge pas (INV-3)",
+    );
+
+    const migration = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: ouvert.id, toRuleId: v2.id },
+    });
+    const dossier = await db.application.findUniqueOrThrow({ where: { id: ouvert.id } });
+    await arbitrerLaDivergence(dossier, migration.id, "MIGRER");
+
+    const apres = await depotDe();
+    verifier(apres === "2027-04-04", `migrer recalcule l'échéancier (${apres})`);
+
+    const ligne = await db.deadline.findFirstOrThrow({
+      where: { applicationId: ouvert.id, code: "depot" },
+    });
+    verifier(
+      ligne.doneAt !== null,
+      "et une échéance déjà faite le reste après recalcul",
+    );
+
+    // Et le dossier qui conserve garde sa version, donc son calendrier.
+    const m2 = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: conserve.id, toRuleId: v2.id },
+    });
+    await arbitrerLaDivergence(
+      await db.application.findUniqueOrThrow({ where: { id: conserve.id } }),
+      m2.id,
+      "CONSERVER",
+    );
+    const depotConserve = jour(
+      (await db.deadline.findFirstOrThrow({
+        where: { applicationId: conserve.id, code: "depot" },
+      })).dueAt,
+    );
+    verifier(
+      depotConserve === "2027-06-03",
+      `conserver sa version garde son calendrier (${depotConserve})`,
+    );
+
+    /*
+      WF-09 étape 4 — l'autre appelant du remplacement, jusqu'ici couvert
+      par rien du tout. Ce que la route PUT exécute, sans la couche HTTP :
+      le même couple, dans la même transaction. Extraire une décision sans
+      éprouver ses deux appelants n'aurait déplacé le défaut que d'un cran.
+    */
+    const regleConservee = await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } });
+    const REPORTEE = new Date("2027-11-01T00:00:00Z");
+    await db.$transaction([
+      ...(await remplacementDeLEcheancier(conserve.id, payload(regleConservee), REPORTEE)),
+      db.application.update({ where: { id: conserve.id }, data: { targetDate: REPORTEE } }),
+    ]);
+    const replanifie = jour(
+      (await db.deadline.findFirstOrThrow({
+        where: { applicationId: conserve.id, code: "depot" },
+      })).dueAt,
+    );
+    verifier(
+      replanifie === "2027-08-03",
+      `replanifier recalcule sur la version figée, pas sur la publiée (${replanifie})`,
+    );
   }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);

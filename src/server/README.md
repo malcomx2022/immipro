@@ -1255,6 +1255,43 @@ deux, sur le modèle de `copy-exceptions.json`. Le plafond est bas exprès :
 une sonde sûre est presque toujours écrivable, et le balayage vient de le
 montrer — on la croyait impossible, EICAR la rend triviale.
 
+## Un dossier dérive trois choses de sa règle, et la migration n'en refaisait que deux
+
+L'ouverture d'un dossier construit sa checklist **et** son échéancier depuis
+le même payload, au même instant, « pour que les trois soient cohérents entre
+eux ». La phrase est dans `ouvrirDossier`, et c'est la bonne. La migration
+d'une divergence, elle, ajoutait les pièces de la nouvelle version et gardait
+l'échéancier de l'ancienne.
+
+Le dossier se retrouvait donc rattaché à une règle annonçant 150 jours
+d'instruction, avec des dates calculées sur 90 — et le candidat venait
+précisément d'accepter cette règle. Il déposerait deux mois trop tard, sur le
+geste par lequel il croyait se mettre à jour.
+
+En amont, rien ne l'avait prévenu : `comparerLesVersions` ne regardait pas
+`delai_traitement_jours`, pour une raison qui se tenait — un délai ne rend
+personne inéligible — et la propagation sort sans rien faire dès que le diff
+est vide. RG-09.3 demande pourtant les deux : « un recalcul intégral de
+l'échéancier **et** une notification explicite ».
+
+Trois choses en découlent :
+
+- le délai entre au diff, l'impact est `MAJEUR`, jamais `CRITIQUE` — mettre un
+  dossier en pause parce que l'autorité annonce deux mois de plus retirerait
+  au candidat la seule chose qui lui reste, le temps de s'organiser ;
+- il n'entre pas dans `bloquantesTouchees` : ce n'est pas une condition, et
+  WF-14 §4 ne le vise pas. Exiger deux paires d'yeux pour une fourchette de
+  jours banaliserait le contrôle qui compte ;
+- le remplacement de l'échéancier descend dans `dossiers/echeancier.ts`, appelé
+  par la migration **et** par la replanification de WF-09, dans la transaction
+  de chacune. Une implémentation, pas deux — et la replanification n'était
+  éprouvée par rien, ce qui aurait fait de l'extraction un déplacement du
+  défaut plutôt qu'une correction.
+
+`doneAt` traverse le recalcul, `remindedAt` non : la date a bougé, le rappel
+qui portait l'ancienne ne vaut plus, et le garder ferait taire le seul rappel
+qui compte.
+
 ## Vérifier
 
 ```
