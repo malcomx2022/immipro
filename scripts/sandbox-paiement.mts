@@ -70,7 +70,7 @@ async function eprouver(nom: string, ouvreur: Ouvreur, montant: number, devise: 
 
   // La reprise, sur la session qui vient d'être créée : c'est ce chemin
   // qui protège d'un second débit après une réponse perdue.
-  const repris = await ouvreur.retrouver(vu.session.providerTxId, reference);
+  const repris = await ouvreur.retrouver(vu.session.providerTxId, reference, devise);
   verifier(repris.issue === "ouverte", `${nom} : la session se retrouve par son identifiant`);
 
   // Le second appel de création, avec la même clé : le fournisseur doit

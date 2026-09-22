@@ -359,7 +359,16 @@ try {
     const vue = versDossier(
       avecPieces,
       avecPieces.documents,
-      editorialDe("AE") as never,
+      /*
+        La fiche éditoriale vient de la règle **du dossier** : recopier un
+        couple pays/type en dur, c'est ce qui avait laissé passer un
+        `editorialDe("AE")` à un seul argument, masqué par le `as never` —
+        la fiche rendue était `undefined`, et le nom de destination avec.
+      */
+      editorialDe(
+        avecPieces.visaRule!.countryCode,
+        avecPieces.visaRule!.visaType,
+      ) as never,
       avecPieces.visaRule,
       "2026-09-22",
     );

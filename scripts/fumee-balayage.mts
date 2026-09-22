@@ -346,7 +346,6 @@ async function piece(options: { avecQuota?: boolean; sansAutorisation?: boolean 
     user,
     application,
     document,
-    user,
   };
 }
 

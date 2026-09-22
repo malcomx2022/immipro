@@ -1485,6 +1485,23 @@ depuis que la propagation rattrape les retardataires ; la plus ancienne est
 alors une comparaison sans objet qu'il fallait écarter avant de voir celle
 qui compte.
 
+## Le garde-fou ne regardait pas la couche qui attrape le reste
+
+`tsconfig.json` incluait `**/*.ts`. Les fumées sont des `.mts` : elles
+n'étaient pas typées. Un champ renommé dans un module serveur les cassait en
+silence, `npm run typecheck` restait vert, et seul un passage complet sur une
+base réelle le disait — c'est-à-dire l'étape la plus lente de la porte.
+
+Elles le sont depuis. Ce que la portée étendue a trouvé du premier coup : une
+clé d'objet écrite deux fois, deux appels à un argument près, et un
+`${loin.id}` sur une chaîne — ce dernier rendait `undefined` dans un
+`UPDATE`, donc une fixture inerte et une assertion qui passait pour la
+mauvaise raison.
+
+Une leçon au passage : `as never` sur un appel fait taire le compilateur sur
+l'appel entier. `editorialDe("AE") as never` cachait un argument manquant
+depuis le début.
+
 ## Vérifier
 
 ```
