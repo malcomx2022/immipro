@@ -82,7 +82,7 @@ export const REGLES_DE_REFERENCE = [
           valeur: 50,
           unite: "pourcent_credits",
           message_echec:
-            "L'établissement signale à l'IND tout étudiant validant moins de 50 % de ses crédits annuels, ce qui peut entraîner le retrait du titre de séjour.",
+            "L'établissement signale à l'IND tout étudiant validant moins de la moitié de ses crédits annuels, ce qui peut entraîner le retrait du titre de séjour.",
           bloquant: false,
         },
       ],

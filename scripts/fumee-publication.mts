@@ -261,6 +261,50 @@ try {
     verifier(publiee?.archivee === socle.id, "et la version précédente est archivée");
   }
 
+  console.log("\nINV-1 — une formulation refusée n'entre pas en base, par aucun chemin");
+  {
+    /*
+      Une règle entre en base par deux chemins : cette publication, et la
+      graine qui charge le référentiel livré. Ils appliquaient des
+      contrôles différents — la graine ignorait le vocabulaire —, et le
+      référentiel portait donc « moins de 50 % de ses crédits annuels »
+      dans un `message_echec`, c'est-à-dire une phrase que le candidat lit
+      sur sa pièce et que cette route refuse.
+
+      Les deux appellent `refusDuReferentiel` désormais. Ce bloc éprouve
+      le chemin de la publication, sur le texte exact qui était en base.
+    */
+    rang += 10;
+    const v1 = await version(brute.rules, "PUBLISHED", REDACTEUR.email);
+    const fautif = {
+      ...(brute.rules as object),
+      conditions: RULES.conditions.map((c) =>
+        c.code === SEUIL
+          ? { ...c, message_echec: "Moins de 50 % du salaire de référence." }
+          : c,
+      ),
+    };
+    const v2 = await version(fautif, "DRAFT", REDACTEUR.email);
+
+    let refus = "";
+    try {
+      await publierLaRegle(v2.id, AUTRE, "Tentative avec un pourcentage");
+    } catch (erreur) {
+      refus = corpsDe(erreur);
+    }
+    verifier(refus !== "", `la publication est refusée (${refus.slice(0, 50)}…)`);
+    verifier(refus.includes("50 %"), "et le refus cite l'extrait fautif");
+    verifier(
+      /message_echec/u.test(refus),
+      "et le chemin où il se trouve, pour que l'auteur sache quoi reprendre",
+    );
+
+    const relu = await db.visaRule.findUniqueOrThrow({ where: { id: v2.id } });
+    verifier(relu.status === "DRAFT", `la version reste en brouillon (${relu.status})`);
+    const enVigueur = await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } });
+    verifier(enVigueur.status === "PUBLISHED", "et la version en vigueur n'est pas archivée");
+  }
+
   console.log("\nWF-11 — un seuil relevé met les dossiers en pause et écrit à chacun");
   {
     rang += 10;
