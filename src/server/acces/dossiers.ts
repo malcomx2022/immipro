@@ -4,6 +4,7 @@ import { echec } from "@/server/http/echecs";
 import { DOSSIERS_MAX } from "@/domain/dossiers/dossier";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
 import { computeCompleteness } from "@/domain/completeness/score";
+import { miseEnEtat } from "@/domain/dossiers/etat";
 import { payload, reglePubliee } from "./regles";
 import type { VisaRulesPayload } from "@/domain/rules/schema";
 
@@ -280,6 +281,10 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
 
     Le cas se produit pour de bon : un dossier suspendu pour divergence
     réglementaire n'est pas figé, et sa dernière pièce s'analyse.
+
+    Le correctif vivait ici, et ici seulement : six autres écritures
+    changeaient `status` sans poser la date. La règle est passée dans
+    `domain/dossiers/etat.ts`, et elles y passent toutes.
   */
   const statutApres = passeEnPret ? "PRET" : redescend ? "ACTIF" : dossier.status;
 
@@ -287,8 +292,7 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
     where: { id: applicationId },
     data: {
       internalScore: resultat.interne.score,
-      readyAt: statutApres === "PRET" ? (dossier.readyAt ?? new Date()) : null,
-      ...(statutApres === dossier.status ? {} : { status: statutApres }),
+      ...miseEnEtat(statutApres, dossier.readyAt),
     },
   });
 }

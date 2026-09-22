@@ -964,12 +964,21 @@ model RuleMigration {
   impact        RuleImpact
   /// Diff calculé à la publication, affiché côte à côte (T-02).
   diff          Json
+  /// Date où le candidat a été **effectivement** prévenu (WF-11).
+  ///
+  /// Sans elle, la passe de propagation n'était pas reprenable : la file
+  /// rejouait le job et le candidat recevait une seconde notification
+  /// identique. La ligne d'arbitrage, elle, existait déjà — elle est
+  /// créée avant l'alerte et ne dit donc pas que l'alerte est partie.
+  alertedAt     DateTime?
   decision      MigrationDecision?
   decidedAt     DateTime?
   createdAt     DateTime           @default(now())
 
   @@unique([applicationId, toRuleId])
   @@index([decision, createdAt])
+  /// La reprise cherche les dossiers concernés et pas encore prévenus.
+  @@index([toRuleId, alertedAt])
 }
 
 /// Relevé d'une source de veille (B-01, WF-14).

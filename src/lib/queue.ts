@@ -65,6 +65,9 @@ export const FILES: readonly string[] = Object.values(JOBS);
  * soient épuisées, ce qui est l'intérêt d'un seuil — être prévenu pendant
  * qu'on peut encore agir, et non après.
  *
+ * Trois files en portent une désormais, et le commentaire disait « la
+ * seule » bien après qu'elles furent deux.
+ *
  * Une cause qui ne se reprend pas seule ne consomme aucune de ces
  * reprises : `balayerUnePiece` ne lève pas dans ce cas et la tâche
  * s'achève sur `BLOQUEE`, incident ouvert.
@@ -84,6 +87,20 @@ export const REPRISES: Readonly<Record<string, PgBoss.RetryOptions>> = {
     tentatives de lecture et ne doivent pas consommer le compte.
   */
   [JOBS.ANALYSE_DOCUMENT]: { retryLimit: 6, retryDelay: 15, retryBackoff: true },
+  /*
+    La propagation d'une divergence n'a qu'une occasion : elle est postée
+    à la publication d'une version, et rien ne la replanifie. Un dossier
+    qu'elle n'a pas prévenu ne le sera donc jamais — et « une condition
+    d'éligibilité a disparu » est précisément ce qu'on ne peut pas ne pas
+    dire (RG-11.3).
+
+    Elle lève quand un dossier lui a échappé, et la reprise saute ceux
+    qui sont déjà prévenus : rejouer ne coûte qu'une requête par dossier
+    traité. Le délai part de trente secondes parce que la cause attendue
+    est un relais de messagerie sous charge, qui se dégage en minutes et
+    non en secondes.
+  */
+  [JOBS.DIVERGENCE_REGLEMENTAIRE]: { retryLimit: 8, retryDelay: 30, retryBackoff: true },
 };
 
 /**

@@ -17,7 +17,7 @@ import { envoyerLesRappels } from "./rappels";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
-import { propagerLaPublication } from "./divergence";
+import { propagerLaPublication, doitRejouer } from "./divergence";
 
 async function main() {
   // `getQueue` déclare les files avant de rendre la main (voir
@@ -75,6 +75,18 @@ async function main() {
       if (!job) return;
       const bilan = await propagerLaPublication(job.data.ancienneId, job.data.nouvelleId);
       console.info("[divergence]", bilan);
+      /*
+        Un dossier qui n'a pas pu être prévenu fait rejouer la passe —
+        elle est reprenable, et ceux qui l'ont été sont sautés. C'est ici
+        que la décision se prend et non dans la propagation : celle-ci
+        doit pouvoir rendre son compte pour qu'on vérifie que les autres
+        dossiers, eux, ont bien reçu leur alerte.
+      */
+      if (doitRejouer(bilan)) {
+        throw new Error(
+          `Divergence : ${bilan.aReprendre} dossier(s) non alerté(s) sur ${bilan.dossiers}. ${bilan.incidents.join(" · ")}`,
+        );
+      }
     },
   );
 

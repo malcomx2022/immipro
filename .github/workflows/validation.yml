@@ -156,6 +156,15 @@ jobs:
         run: npm run smoke:rappels
       - run: echo "- **Rappels d'échéance** — un envoi par échéance, cadence hebdomadaire tenue, coupure reprise sans perte" >> "$GITHUB_STEP_SUMMARY"
 
+      # Les transitions d'état d'un dossier, depuis PRET — le seul état qui
+      # porte une `readyAt`, donc le seul depuis lequel la garde SQL peut
+      # mordre. Six écritures sur sept la violaient, et la déclaration de
+      # dépôt était refusée à tous les coups : rien, dans cette chaîne,
+      # n'écrivait réellement dans une base avant elle.
+      - name: Transitions d'état d'un dossier
+        run: npm run smoke:transitions
+      - run: echo "- **Transitions d'état** — dépôt, clôture, divergence, arbitrage, pack et purge passent depuis un dossier prêt ; une alerte perdue par personne" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention
