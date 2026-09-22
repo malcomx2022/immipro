@@ -96,6 +96,36 @@ export interface Comparaison {
    * changé » ne dit pas qu'il faut déposer deux mois plus tôt.
    */
   delaiDInstruction: EvolutionDuDelai | null;
+  /**
+   * Les pièces obligatoires qu'une version exige et pas l'autre, avec leur
+   * libellé.
+   *
+   * Le diff les portait déjà, mais sous forme de `piece.<code>` : un code
+   * de référentiel, que l'écran d'arbitrage ne peut pas montrer à un
+   * candidat. Il ne montrait donc rien — « ta checklist passe à la version
+   * 5 » nommait la checklist sans nommer une seule de ses lignes, et le
+   * candidat découvrait ce qu'il devait fournir **après** avoir tranché.
+   */
+  piecesTouchees: EvolutionDesPieces;
+}
+
+/** Une pièce, telle qu'elle se montre — son code ne sort jamais à l'écran. */
+export interface PieceNommee {
+  code: string;
+  libelle: string;
+}
+
+export interface EvolutionDesPieces {
+  /** Obligatoires dans la nouvelle version et pas dans l'ancienne. */
+  ajoutees: readonly PieceNommee[];
+  /**
+   * Obligatoires dans l'ancienne et plus dans la nouvelle. `encoreDemandee`
+   * distingue les deux façons de sortir : une pièce qui devient
+   * complémentaire reste à fournir si on veut, une pièce disparue ne se
+   * demande plus du tout. Les confondre ferait jeter un document qu'on
+   * pouvait encore joindre.
+   */
+  retirees: readonly (PieceNommee & { encoreDemandee: boolean })[];
 }
 
 /** Fourchette de jours annoncée par l'autorité, ou son absence. */
@@ -122,6 +152,7 @@ const VIDE: Comparaison = {
   diff: [],
   bloquantesTouchees: [],
   delaiDInstruction: null,
+  piecesTouchees: { ajoutees: [], retirees: [] },
 };
 
 const parCode = (conditions: readonly Condition[]): Map<string, Condition> =>
@@ -279,21 +310,17 @@ export function comparerLesVersions(
     durcissement = true;
   }
 
-  const obligatoiresAvant = new Set(
-    avant.pieces_requises.filter((p) => p.obligatoire).map((p) => p.code),
-  );
-  const obligatoiresApres = new Set(
-    apres.pieces_requises.filter((p) => p.obligatoire).map((p) => p.code),
-  );
-  for (const code of obligatoiresApres) {
-    if (!obligatoiresAvant.has(code)) {
-      diff.push({ champ: `piece.${code}`, avant: null, apres: "obligatoire" });
-    }
+  /*
+    Les pièces obligatoires. Le delta se calcule une fois, avec les
+    libellés, et le diff en dérive — l'écran d'arbitrage a besoin des deux
+    et ne peut pas reconstruire un libellé depuis `piece.<code>`.
+  */
+  const piecesTouchees = evolutionDesPieces(avant, apres);
+  for (const piece of piecesTouchees.ajoutees) {
+    diff.push({ champ: `piece.${piece.code}`, avant: null, apres: "obligatoire" });
   }
-  for (const code of obligatoiresAvant) {
-    if (!obligatoiresApres.has(code)) {
-      diff.push({ champ: `piece.${code}`, avant: "obligatoire", apres: null });
-    }
+  for (const piece of piecesTouchees.retirees) {
+    diff.push({ champ: `piece.${piece.code}`, avant: "obligatoire", apres: null });
   }
 
   /*
@@ -336,7 +363,44 @@ export function comparerLesVersions(
   const impact: Impact =
     dispositifPerdu || durcissement ? "CRITIQUE" : diff.length > 0 ? "MAJEUR" : "MINEUR";
 
-  return { impact, diff, bloquantesTouchees: [...bloquantesTouchees], delaiDInstruction };
+  return {
+    impact,
+    diff,
+    bloquantesTouchees: [...bloquantesTouchees],
+    delaiDInstruction,
+    piecesTouchees,
+  };
+}
+
+/**
+ * Ce que les deux versions exigent et que l'autre n'exige pas.
+ *
+ * Seules les **obligatoires** comptent : une pièce complémentaire qui
+ * apparaît n'oblige à rien, et l'annoncer comme un changement apprendrait
+ * à ignorer les annonces suivantes.
+ *
+ * Une pièce peut sortir de deux façons, et le mot n'est pas le même :
+ * devenue complémentaire, elle reste joignable ; disparue, elle ne se
+ * demande plus. `encoreDemandee` porte la distinction.
+ */
+function evolutionDesPieces(
+  avant: VisaRulesPayload,
+  apres: VisaRulesPayload,
+): EvolutionDesPieces {
+  const obligatoires = (p: VisaRulesPayload) =>
+    new Map(p.pieces_requises.filter((x) => x.obligatoire).map((x) => [x.code, x.libelle]));
+  const codesApres = new Set(apres.pieces_requises.map((p) => p.code));
+  const avantObl = obligatoires(avant);
+  const apresObl = obligatoires(apres);
+
+  return {
+    ajoutees: [...apresObl]
+      .filter(([code]) => !avantObl.has(code))
+      .map(([code, libelle]) => ({ code, libelle })),
+    retirees: [...avantObl]
+      .filter(([code]) => !apresObl.has(code))
+      .map(([code, libelle]) => ({ code, libelle, encoreDemandee: codesApres.has(code) })),
+  };
 }
 
 /**

@@ -13,7 +13,11 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 import { jourEnFrancais as formaterJour } from "@/domain/format/moment";
-import { delaiLisible, type Delai } from "@/domain/rules/comparaison";
+import {
+  delaiLisible,
+  type Delai,
+  type EvolutionDesPieces,
+} from "@/domain/rules/comparaison";
 
 /**
  * ── Un arbitrage entre deux versions qu'on montrait identiques ──────
@@ -66,14 +70,84 @@ export interface VersionRegle {
 export interface Ecart {
   montant: boolean;
   delai: boolean;
+  pieces: boolean;
 }
 
-export const ceQuiSepare = (ancienne: VersionRegle, nouvelle: VersionRegle): Ecart => ({
+export const ceQuiSepare = (
+  ancienne: VersionRegle,
+  nouvelle: VersionRegle,
+  pieces: EvolutionDesPieces = AUCUNE_PIECE,
+): Ecart => ({
   montant: ancienne.montant !== nouvelle.montant || ancienne.devise !== nouvelle.devise,
   delai:
     (ancienne.delai?.min ?? null) !== (nouvelle.delai?.min ?? null) ||
     (ancienne.delai?.max ?? null) !== (nouvelle.delai?.max ?? null),
+  pieces: pieces.ajoutees.length > 0 || pieces.retirees.length > 0,
 });
+
+export const AUCUNE_PIECE: EvolutionDesPieces = { ajoutees: [], retirees: [] };
+
+/**
+ * Ce que la checklist gagne et perd, en toutes lettres — T-02.
+ *
+ * L'écran disait « ta checklist passe à la version 5 » sans nommer une
+ * seule de ses lignes. Le candidat tranchait sans savoir ce qu'il devrait
+ * fournir en plus, et le découvrait après coup.
+ *
+ * Une pièce sort de deux façons, et le mot n'est pas le même : devenue
+ * complémentaire, elle reste joignable ; disparue, elle ne se demande
+ * plus. Les confondre ferait jeter un document qu'on pouvait encore
+ * envoyer.
+ */
+export interface LignePiece {
+  cle: string;
+  texte: string;
+}
+
+export function lignesDesPieces(pieces: EvolutionDesPieces): readonly LignePiece[] {
+  return [
+    ...pieces.ajoutees.map((p) => ({
+      cle: `+${p.code}`,
+      texte: `${p.libelle} — à fournir en plus`,
+    })),
+    ...pieces.retirees.map((p) => ({
+      cle: `-${p.code}`,
+      texte: p.encoreDemandee
+        ? `${p.libelle} — n'est plus obligatoire, tu peux toujours la joindre`
+        : `${p.libelle} — n'est plus demandée`,
+    })),
+  ];
+}
+
+/**
+ * « 2 pièces de plus à fournir, 1 de moins à réunir » — pour le détail
+ * d'une option, qui énumère déjà d'autres changements.
+ *
+ * Le second membre ne répète pas « pièces » : la phrase composée les
+ * enchaîne, et « 2 pièces de plus à fournir et 1 pièce de moins à réunir »
+ * se lit deux fois plus lentement pour la même information.
+ */
+export function resumeDesPieces(pieces: EvolutionDesPieces): string | null {
+  const { ajoutees, retirees } = pieces;
+  const parts: string[] = [];
+  if (ajoutees.length > 0) {
+    parts.push(`${ajoutees.length} pièce${ajoutees.length > 1 ? "s" : ""} de plus à fournir`);
+  }
+  if (retirees.length > 0) {
+    parts.push(
+      ajoutees.length > 0
+        ? `${retirees.length} de moins à réunir`
+        : `${retirees.length} pièce${retirees.length > 1 ? "s" : ""} de moins à réunir`,
+    );
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+/** « A, B et C ». Trois « et » à la suite ne se lisent pas. */
+const enumerer = (parts: readonly string[]): string =>
+  parts.length <= 1
+    ? (parts[0] ?? "")
+    : `${parts.slice(0, -1).join(", ")} et ${parts.at(-1)}`;
 
 /** « 60–90 jours », ou l'absence, sur la carte d'une version. */
 export const libelleDelaiVersion = (version: VersionRegle): string =>
@@ -154,6 +228,7 @@ export function optionsArbitrage(
   nouvelle: VersionRegle,
   montantAncien: string,
   montantNouveau: string,
+  pieces: EvolutionDesPieces = AUCUNE_PIECE,
 ): readonly OptionArbitrage[] {
   const limite = ancienne.applicableJusquau
     ? ` À ne garder que si tu déposes avant le ${formaterJour(ancienne.applicableJusquau)}.`
@@ -168,17 +243,24 @@ export function optionsArbitrage(
     options comme la même, et c'est précisément l'arbitrage qu'on demande
     de trancher.
   */
-  const ecart = ceQuiSepare(ancienne, nouvelle);
+  const ecart = ceQuiSepare(ancienne, nouvelle, pieces);
+  const surLaChecklist = resumeDesPieces(pieces);
   return [
     {
       cle: "MIGRER",
       titre: `Migrer vers la version ${nouvelle.numero}`,
-      detail: `Ta checklist passe à la version ${nouvelle.numero}${etCeQuiChange(ecart, montantNouveau, nouvelle.delai)}.${entree}`,
+      detail: `Ta checklist passe à la version ${nouvelle.numero}${etCeQuiChange(ecart, montantNouveau, nouvelle.delai, surLaChecklist)}.${entree}`,
     },
     {
       cle: "CONSERVER",
       titre: `Conserver la version ${ancienne.numero}`,
-      detail: `Ta checklist reste à la version ${ancienne.numero}${etCeQuiChange(ecart, montantAncien, ancienne.delai)}.${limite}`,
+      /*
+        Conserver ne change rien à la checklist : le détail ne cite donc
+        aucune pièce. Reprendre « 2 pièces de plus » des deux côtés
+        présenterait le choix comme identique — c'est le défaut corrigé
+        pour le montant, et il vaut ici mot pour mot.
+      */
+      detail: `Ta checklist reste à la version ${ancienne.numero}${etCeQuiChange(ecart, montantAncien, ancienne.delai, null)}.${limite}`,
     },
   ];
 }
@@ -187,12 +269,18 @@ export function optionsArbitrage(
  * « , avec 13 000 € à prouver et un délai de 60–150 jours » — et rien pour
  * ce qui n'a pas bougé.
  */
-function etCeQuiChange(ecart: Ecart, montant: string, delai: Delai | undefined): string {
+function etCeQuiChange(
+  ecart: Ecart,
+  montant: string,
+  delai: Delai | undefined,
+  surLaChecklist: string | null,
+): string {
   const parts: string[] = [];
   if (ecart.montant) parts.push(`${montant} à prouver`);
   if (ecart.delai) parts.push(`un délai d'instruction de ${delaiLisible(delai ?? null)}`);
+  if (ecart.pieces && surLaChecklist) parts.push(surLaChecklist);
   if (parts.length === 0) return "";
-  return `, avec ${parts.join(" et ")}`;
+  return `, avec ${enumerer(parts)}`;
 }
 
 export const mentionArbitrage = (choix: Arbitrage, pays: string): string =>

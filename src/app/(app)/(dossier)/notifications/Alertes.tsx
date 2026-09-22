@@ -15,6 +15,7 @@ import {
   toutMarquerLu,
 } from "@/domain/notifications/alerte";
 import type { VersionRegle } from "@/domain/notifications/divergence";
+import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
 import { cn } from "@/lib/utils";
 import { DivergenceReglementaire } from "./DivergenceReglementaire";
 
@@ -41,6 +42,8 @@ export interface AlertesProps {
     pays: string;
     ancienne: VersionRegle;
     nouvelle: VersionRegle;
+    /** Ce que la checklist gagne et perd — nommé, jamais par son code. */
+    pieces?: EvolutionDesPieces;
     depot?: string;
     detecteeLe: string;
     verifieeLe: string;

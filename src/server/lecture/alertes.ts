@@ -4,6 +4,10 @@ import { payload } from "@/server/acces/regles";
 import { editorialDe } from "@/lib/contenu/destinations";
 import type { Alerte } from "@/domain/notifications/alerte";
 import type { VersionRegle } from "@/domain/notifications/divergence";
+import {
+  comparerLesVersions,
+  type EvolutionDesPieces,
+} from "@/domain/rules/comparaison";
 
 /**
  * Lecture des alertes — T-01 et T-02, WF-11.
@@ -63,6 +67,13 @@ export interface VueDivergence {
   impact: "MINEUR" | "MAJEUR" | "CRITIQUE";
   destination: string;
   arbitree: boolean;
+  /**
+   * Les pièces obligatoires que la nouvelle version ajoute ou retire,
+   * nommées. Elles viennent de la comparaison des deux payloads et non du
+   * `diff` stocké : celui-ci ne porte que des codes de référentiel, et un
+   * code ne se montre pas à un candidat.
+   */
+  pieces: EvolutionDesPieces;
 }
 
 /**
@@ -91,6 +102,8 @@ export async function divergenceAArbitrer(
     impact: migration.impact,
     destination: edito?.pays ?? migration.toRule.countryCode,
     arbitree: migration.decision !== null,
+    pieces: comparerLesVersions(payload(migration.fromRule), payload(migration.toRule))
+      .piecesTouchees,
   };
 }
 

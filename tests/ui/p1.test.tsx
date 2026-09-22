@@ -885,6 +885,42 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
   });
 
   /** Deux options identiques ne sont pas un arbitrage. */
+  /**
+   * L'écart laissé ouvert par S.52 : l'écran nommait la checklist sans
+   * nommer une seule de ses lignes. Exécuté avant correction, sur une
+   * version qui exige une pièce de plus :
+   *
+   *     le mot « pièce » apparaît-il ?   false
+   *     une checklist est-elle nommée ?  false
+   *
+   * Le candidat tranchait sans savoir ce qu'il devrait fournir.
+   */
+  it("nomme les pièces que la nouvelle version ajoute et retire", () => {
+    render(
+      <Alertes
+        alertes={ALERTES}
+        maintenant="2026-09-18T13:05:00Z"
+        divergence={{
+          ...MEME_MONTANT,
+          pieces: {
+            ajoutees: [{ code: "assurance_maladie", libelle: "Assurance maladie" }],
+            retirees: [
+              { code: "casier_judiciaire", libelle: "Casier judiciaire", encoreDemandee: true },
+            ],
+          },
+        }}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choisir la version à appliquer" }),
+    );
+    const dialogue = screen.getByRole("dialog");
+    expect(dialogue.textContent).toContain("Assurance maladie — à fournir en plus");
+    expect(dialogue.textContent).toContain("Casier judiciaire — n'est plus obligatoire");
+    // Un code de référentiel ne se montre jamais au candidat.
+    expect(dialogue.textContent).not.toContain("assurance_maladie");
+  });
+
   it("les deux options ne se lisent plus à l'identique", () => {
     ouvrir();
     const details = screen.getAllByRole("radio").map((r) => espaces(r.textContent ?? ""));
