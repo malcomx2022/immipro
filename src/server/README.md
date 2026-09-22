@@ -1527,6 +1527,26 @@ Absente, la durée vaut « ne périme pas ». C'est la lecture prudente : une da
 de péremption qu'aucune source ne porte serait une affirmation réglementaire
 inventée, et INV-8 l'interdit.
 
+## Migrer accepte la nouvelle version en entier
+
+`remplacementDeLEcheancier` a corrigé la moitié du geste : l'échéancier suivait
+la version figée, la checklist non. L'arbitrage n'ajoutait que les pièces dont
+le **code** était inconnu, et une pièce qui survit gardait le libellé, la
+famille, le caractère obligatoire, le remède et la durée de validité de
+l'ancienne.
+
+L'écran, lui, annonce « ajoutée » toute pièce devenue obligatoire. Il promettait
+donc une ligne que la migration ne posait pas — et la pièce que la nouvelle
+règle exige ne bloquait pas la complétude, donc le dossier pouvait être déclaré
+prêt sans elle.
+
+`realignementDeLaChecklist` complète le geste, sur le même modèle que
+l'échéancier : elle rend des opérations, l'arbitrage les exécute dans la
+transaction qui fige la version. La frontière est explicite — **ce qui décrit
+l'exigence suit la règle, ce que le candidat a produit ne bouge pas.** Cinq
+propriétés se réalignent ; `status`, le fichier, l'extraction, le retour
+d'analyse et `expiresAt` traversent.
+
 ## Vérifier
 
 ```

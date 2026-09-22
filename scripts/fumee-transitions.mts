@@ -127,7 +127,9 @@ const { propagerLaPublication, doitRejouer } = await import("../src/server/jobs/
 const { purgerSurDemande, purgerLesPiecesEchues } = await import("../src/server/jobs/purge");
 const { traiterLesBrouillonsInactifs } = await import("../src/server/jobs/inactivite");
 const { RELANCE_JOURS, ABANDON_JOURS } = await import("../src/domain/dossiers/inactivite");
-const { recalculerCompletude, ouvrirDossier } = await import("../src/server/acces/dossiers");
+const { recalculerCompletude, ouvrirDossier, checklistDepuis } = await import(
+  "../src/server/acces/dossiers"
+);
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
 type Ouvreur = Parameters<typeof ouvrirLeTunnel>[3];
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
@@ -199,13 +201,17 @@ async function dossierPret(regleId: string) {
   const application = await db.application.create({
     data: { userId: user.id, visaRuleId: regleId, status: "ACTIF" },
   });
+  /*
+    La checklist vient de `checklistDepuis`, comme celle qu'écrit une vraie
+    ouverture. La construire à la main omettait `remedy` et
+    `validityMonths` : la fixture décrivait un dossier que le produit ne
+    sait pas produire, et le réalignement de la migration voyait donc
+    changer des pièces qui n'avaient pas changé de version.
+  */
   await db.document.createMany({
-    data: PIECES.map((p) => ({
+    data: checklistDepuis(brute.rules as never).map((p) => ({
+      ...p,
       applicationId: application.id,
-      code: p.code,
-      label: p.libelle,
-      family: p.obligatoire ? ("OBLIGATOIRE" as const) : ("COMPLEMENTAIRE" as const),
-      required: p.obligatoire,
       status: "CONFORME" as const,
     })),
   });
