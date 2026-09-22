@@ -599,6 +599,52 @@ cela (`parcours.ts`, `migration.ts`) : une route ne s'appelle pas depuis
 une fumée, et une fumée qui réécrit la décision de la route n'éprouve pas
 la route.
 
+### L'autorisation d'analyse, et ce que son retrait arrête
+
+Correctif du 23/09/2026. RG-02.1 annonce le consentement au traitement des
+pièces d'identité **révocable**. Il ne l'était que pour l'avenir : le retrait
+écrivait une ligne, refusait les dépôts suivants, et n'arrêtait rien de ce
+qui était déjà en file.
+
+Exécuté — le candidat autorise, dépose, se ravise, et le job reprend :
+
+```
+  autorisation accordée ?    false
+  un nouveau dépôt est refusé ? oui
+  appels au modèle           : 1
+  jetons débités             : 4500
+  analyses consommées        : 1
+  état de la pièce           : A_CORRIGER
+```
+
+Le fichier partait au service de lecture, une analyse était débitée, un
+verdict s'écrivait — après le retrait de l'accord.
+
+L'autorisation se relit désormais à deux endroits, et les deux sont
+nécessaires. À la **promotion** (`balayage`), parce que le candidat a pu se
+raviser entre le dépôt et le balayage. À l'**analyse**, parce qu'il peut se
+raviser pendant que le job attend dans la file — c'est même l'intervalle le
+plus probable. La lecture précède le débit et la lecture du fichier : ni
+jeton dépensé, ni octet transmis.
+
+Une lecture, pas deux. `exigerConsentementPieces` refaisait la requête que
+`autorisationAccordee` faisait déjà, avec sa propre version de « la dernière
+ligne l'emporte ». Deux lectures d'un même registre de preuve finissent par
+répondre différemment ; sur un registre de consentement, c'est la pire des
+divergences. Elle délègue.
+
+**La pièce dit pourquoi elle n'a pas été analysée.** Il y a deux motifs
+désormais, et une mention unique en démentirait un : envoyer recharger des
+analyses quelqu'un qui vient de retirer son accord lui ferait payer pour un
+geste qu'il a lui-même fait. Le motif est écrit sur la pièce
+(`MENTION_NON_ANALYSEE`), et la pastille reste « Conservée, non vérifiée » —
+ce qu'on veut savoir d'abord est que le fichier est arrivé.
+
+**Et l'écran des autorisations disait l'inverse de la règle.** « Sans cette
+autorisation, tu téléverses tes pièces sans analyse automatique » décrivait
+un parcours qui n'existe pas : RG-02.2 refuse le dépôt lui-même. Le candidat
+lisait l'inverse de ce qui allait se passer, au moment précis où il décidait.
+
 ### Ce qui sépare deux versions d'une règle
 
 Correctif du 23/09/2026. La comparaison qui décide de l'impact d'une

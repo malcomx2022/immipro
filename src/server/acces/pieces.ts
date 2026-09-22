@@ -1,6 +1,7 @@
 import type { Document, DocumentVersion } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
+import { autorisationAccordee } from "@/server/acces/consentements";
 import { presignedGet, presignedPut } from "@/lib/storage";
 import { cleObjet } from "@/server/securite/secret";
 import { refusDuFichier, TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
@@ -44,17 +45,17 @@ export async function pieceDuDossier(
  * RG-02.2 : aucune pièce ne peut être téléversée avant le consentement au
  * traitement des pièces d'identité, et ce consentement est révocable.
  *
- * La vérification lit le dernier état enregistré plutôt qu'un `granted:
- * true` quelconque : un consentement accordé puis retiré laisse deux lignes,
- * et ne regarder que l'existence de la première rendrait le retrait sans
- * effet.
+ * La lecture ne se refait pas ici. Elle vivait en double — `autorisationAccordee`
+ * répondait déjà à la même question pour la proposition de partenaire —, et deux
+ * lectures d'un même registre de preuve finissent par répondre différemment le
+ * jour où l'une apprend quelque chose que l'autre ignore. C'est le défaut
+ * qu'avait le rattachement d'une condition à sa pièce (S.42), sur un objet
+ * autrement plus sensible.
  */
 export async function exigerConsentementPieces(userId: string): Promise<void> {
-  const dernier = await db.consent.findFirst({
-    where: { userId, kind: "PIECES_IDENTITE" },
-    orderBy: { grantedAt: "desc" },
-  });
-  if (!dernier || !dernier.granted || dernier.revokedAt) throw echec("consentement_manquant");
+  if (!(await autorisationAccordee(userId, "pieces_identite"))) {
+    throw echec("consentement_manquant");
+  }
 }
 
 export interface DemandeDeDepot {

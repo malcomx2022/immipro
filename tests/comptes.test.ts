@@ -83,7 +83,22 @@ describe("consentements — RG-02.1", () => {
   });
 
   it("dit la conséquence du refus là où elle existe, sans la présenter en sanction", () => {
-    expect(CONSENTEMENT_SENSIBLE?.siRefuse).toContain("sans analyse automatique");
+    /*
+      La phrase promettait « tu téléverses tes pièces sans analyse
+      automatique », c'est-à-dire un parcours qui n'existe pas : RG-02.2
+      refuse le dépôt lui-même tant que l'autorisation manque. Le candidat
+      lisait l'inverse de ce qui allait se passer, au moment précis où il
+      décidait.
+
+      Ce que la phrase doit dire désormais : ce que le refus empêche, et ce
+      que le retrait arrête — puisqu'il arrête quelque chose.
+    */
+    expect(CONSENTEMENT_SENSIBLE?.siRefuse).not.toContain("sans analyse automatique");
+    expect(CONSENTEMENT_SENSIBLE?.siRefuse).toMatch(/aucune pièce ne peut être déposée/u);
+    expect(CONSENTEMENT_SENSIBLE?.siRefuse).toMatch(/retirer à tout moment/u);
+    expect(CONSENTEMENT_SENSIBLE?.siRefuse).toMatch(/déjà déposées/u);
+
+    // Le refus reste une décision, pas une faute.
     for (const c of CONSENTEMENTS) {
       expect(c.siRefuse ?? "").not.toMatch(/oblig|bloqu|interdit/i);
     }

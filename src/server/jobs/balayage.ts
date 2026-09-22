@@ -9,6 +9,8 @@ import {
 import { refusAuControle } from "@/domain/dossiers/quarantaine";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { solde } from "@/server/acces/quota";
+import { autorisationAccordee } from "@/server/acces/consentements";
+import { MENTION_NON_ANALYSEE, type MotifDeNonAnalyse } from "@/domain/dossiers/piece";
 
 /**
  * Balayage d'une pièce déposée — WF-06 étape 2, I.D.
@@ -161,14 +163,47 @@ async function admettre(version: Version, tache: Tache): Promise<Suite> {
     },
   });
 
+  /*
+    RG-02.1 — l'autorisation d'analyse est révocable, et un retrait arrête
+    la lecture à venir, pas seulement les dépôts suivants. Elle se relit
+    ici comme le quota, et pour la même raison : entre le dépôt et le
+    balayage, le candidat a pu se raviser.
+
+    Avant le quota, parce qu'un retrait n'est pas un manque à recharger :
+    proposer des analyses à quelqu'un qui vient de retirer son accord lui
+    ferait payer pour un geste qu'il a lui-même fait.
+  */
+  const autorise = await autorisationAccordee(
+    (await db.document.findUniqueOrThrow({
+      where: { id: version.documentId },
+      select: { application: { select: { userId: true } } },
+    })).application.userId,
+    "pieces_identite",
+  );
+  if (!autorise) return conserver(version.documentId, tache, "autorisation_retiree");
+
   // RG-06.5 — le quota n'interdit pas le dépôt, il n'interdit que l'analyse.
   // Il se relit ici et non au dépôt : entre les deux, une autre pièce a pu
   // consommer la dernière analyse.
   if ((await solde(tache.applicationId)) > 0) return "ANALYSE";
 
+  return conserver(version.documentId, tache, "quota");
+}
+
+/**
+ * La pièce est là, elle ne sera pas analysée, et l'écran dit pourquoi.
+ *
+ * Le motif est écrit sur la pièce et non déduit d'une constante : il y en a
+ * deux désormais, et une mention unique en démentirait une.
+ */
+async function conserver(
+  documentId: string,
+  tache: Tache,
+  motif: MotifDeNonAnalyse,
+): Promise<Suite> {
   await db.document.update({
-    where: { id: version.documentId },
-    data: { status: "ATTENDUE" },
+    where: { id: documentId },
+    data: { status: "ATTENDUE", feedback: MENTION_NON_ANALYSEE[motif] },
   });
   await recalculerCompletude(tache.applicationId);
   return "CONSERVEE";

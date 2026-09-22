@@ -9,7 +9,7 @@ import {
 } from "@/domain/dossiers/televersement";
 import {
   LIBELLE_CONSERVEE_NON_VERIFIEE,
-  MENTION_CONSERVEE_NON_VERIFIEE,
+  MENTION_NON_ANALYSEE,
   estDeposeeNonVerifiee,
   libelleAction,
   type Piece,
@@ -119,10 +119,26 @@ describe("une pièce déposée ne se dit plus « attendue »", () => {
 
   it("dit le fichier arrivé avant de dire la vérification manquante", () => {
     expect(LIBELLE_CONSERVEE_NON_VERIFIEE).toBe("Conservée, non vérifiée");
-    expect(MENTION_CONSERVEE_NON_VERIFIEE).toMatch(/^Ton fichier est bien arrivé/u);
-    expect(MENTION_CONSERVEE_NON_VERIFIEE).toContain("recharger des analyses");
-    // Jamais une promesse, jamais un pronostic.
-    expect(MENTION_CONSERVEE_NON_VERIFIEE).not.toMatch(/garanti|chances|score/iu);
+    for (const mention of Object.values(MENTION_NON_ANALYSEE)) {
+      expect(mention).toMatch(/^Ton fichier est bien arrivé/u);
+      // Jamais une promesse, jamais un pronostic.
+      expect(mention).not.toMatch(/garanti|chances|score/iu);
+    }
+  });
+
+  /**
+   * Deux motifs, deux gestes. Envoyer recharger des analyses quelqu'un qui
+   * vient de retirer son accord lui ferait payer pour un geste qu'il a
+   * lui-même fait, et ne réparerait rien.
+   */
+  it("nomme le geste qui correspond au motif, et pas l'autre", () => {
+    expect(MENTION_NON_ANALYSEE.quota).toContain("recharger des analyses");
+    expect(MENTION_NON_ANALYSEE.quota).not.toMatch(/autorisation/iu);
+
+    expect(MENTION_NON_ANALYSEE.autorisation_retiree).toMatch(/autorisation/u);
+    expect(MENTION_NON_ANALYSEE.autorisation_retiree).not.toMatch(/recharger|pack/iu);
+    // Ce que le candidat veut savoir d'abord : le fichier n'est pas perdu.
+    expect(MENTION_NON_ANALYSEE.autorisation_retiree).toMatch(/conservé/u);
   });
 
   /** L'action reste « Remplacer » : le fichier est là, il peut être changé. */

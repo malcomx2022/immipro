@@ -210,6 +210,9 @@ process.env.MINIO_BUCKET_DOCUMENTS = SEAU_CONFIANCE;
 process.env.MINIO_BUCKET_QUARANTAINE = SEAU_QUARANTAINE;
 
 const { db } = await import("../src/lib/db");
+const { enregistrerLAutorisation } = await import("../src/server/acces/consentements");
+const { estDeposeeNonVerifiee, LIBELLE_CONSERVEE_NON_VERIFIEE } =
+  await import("../src/domain/dossiers/piece");
 const { balayerUnePiece, BalayageIndisponible } = await import("../src/server/jobs/balayage");
 const { leBalayeur, verifierLeMoteur, sonderLeBalayage, oublierLesEssais } = await import(
   "../src/server/securite/antivirus"
@@ -266,7 +269,7 @@ const REGLE_MINIMALE = {
 };
 
 /** Un candidat, son dossier, une pièce attendue et sa version en quarantaine. */
-async function piece(options: { avecQuota?: boolean } = {}) {
+async function piece(options: { avecQuota?: boolean; sansAutorisation?: boolean } = {}) {
   rang += 1;
   const user = await db.user.create({
     data: { email: `fumee-b-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
@@ -297,6 +300,10 @@ async function piece(options: { avecQuota?: boolean } = {}) {
       label: "Passeport",
       status: "EN_ANALYSE",
       required: true,
+      // Ce que la route de dépôt écrit : le fichier est là, il se remplace.
+      // Sans cela, une pièce conservée sans analyse se relit « Attendue ·
+      // Ajouter » et le candidat renvoie ce qu'il vient d'envoyer.
+      remedy: "REMPLACER",
     },
   });
 
@@ -322,10 +329,21 @@ async function piece(options: { avecQuota?: boolean } = {}) {
     });
   }
 
+  /*
+    L'autorisation d'analyse est accordée, parce qu'en production elle l'est
+    forcément : RG-02.2 refuse le dépôt sans elle, et une pièce à balayer a
+    donc été déposée sous accord. La fixture ne la posait pas, et le jour où
+    la promotion a commencé à la lire, c'est cette fumée qui l'a dit — un
+    fichier promu que rien n'analysait, faute d'un accord que personne
+    n'avait jamais donné.
+  */
+  await enregistrerLAutorisation(user.id, "pieces_identite", !options.sansAutorisation);
+
   return {
     tache: { applicationId: application.id, documentId: document.id, versionId: version.id },
     cle,
     octets,
+    user,
     application,
     document,
     user,
@@ -417,6 +435,40 @@ try {
     verifier(enConfiance(p.cle), "le fichier est bien entré dans le stockage de confiance");
     const document = await db.document.findUniqueOrThrow({ where: { id: p.document.id } });
     verifier(document.status === "ATTENDUE", `et la pièce attend son analyse (${document.status})`);
+  }
+
+  console.log("\nRG-02.1 — l'autorisation retirée arrête l'analyse, et le dit autrement");
+  {
+    /*
+      Le quota est plein : ce qui retient l'analyse est le retrait, et le
+      message doit le dire. Envoyer recharger des analyses quelqu'un qui
+      vient de retirer son accord lui ferait payer pour son propre geste.
+    */
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    const p = await piece({ avecQuota: true, sansAutorisation: true });
+    const suite = await balayerUnePiece(p.tache, leBalayeur());
+    verifier(suite === "CONSERVEE", `la pièce est promue sans être analysée (${suite})`);
+    verifier(enConfiance(p.cle), "le fichier entre quand même dans le stockage de confiance");
+    const document = await db.document.findUniqueOrThrow({ where: { id: p.document.id } });
+    verifier(
+      (document.feedback ?? "").includes("autorisation"),
+      `et l'écran nomme le motif (${(document.feedback ?? "").slice(0, 45)}…)`,
+    );
+    verifier(
+      !(document.feedback ?? "").includes("recharger"),
+      "sans proposer de recharger des analyses, qui ne répareraient rien",
+    );
+    verifier(
+      estDeposeeNonVerifiee({
+        id: document.id,
+        code: document.code,
+        libelle: document.label,
+        famille: document.family,
+        etat: document.status,
+        remede: document.remedy,
+      }),
+      `et la pastille se lit « ${LIBELLE_CONSERVEE_NON_VERIFIEE} » (${document.status} / ${document.remedy})`,
+    );
   }
 
   console.log("\nUne pièce infectée est détruite, et le candidat lit quoi faire");

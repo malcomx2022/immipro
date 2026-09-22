@@ -212,6 +212,7 @@ const { analyserUnePiece, TENTATIVES_AVANT_REVUE } = await import("../src/server
 const { lExtracteur, EXTRACTEUR_NON_BRANCHE } = await import("../src/server/dossiers/extracteur");
 const { GESTE_SANS_DATE_CIBLE } = await import("../src/domain/dossiers/extraction");
 const { solde } = await import("../src/server/acces/quota");
+const { enregistrerLAutorisation } = await import("../src/server/acces/consentements");
 
 let rang = 0;
 
@@ -274,6 +275,7 @@ async function piece(
     dateCible?: string | null;
     sansObjet?: boolean;
     statut?: "BROUILLON" | "ACTIF" | "SUSPENDU";
+    sansAutorisation?: boolean;
   } = {},
 ) {
   rang += 1;
@@ -337,10 +339,20 @@ async function piece(
     data: { applicationId: application.id, delta: 5, reason: "ACHAT_PACK" },
   });
 
+  /*
+    L'autorisation d'analyse est accordée, comme elle l'est forcément en
+    production : RG-02.2 refuse le dépôt sans elle. La fixture ne la posait
+    pas, et le jour où l'analyse a commencé à la relire, cette fumée l'a dit
+    — rien ne partait plus au service, faute d'un accord que personne
+    n'avait donné.
+  */
+  await enregistrerLAutorisation(user.id, "pieces_identite", !options.sansAutorisation);
+
   return {
     tache: { applicationId: application.id, documentId: document.id, versionId: version.id },
     cle,
     octets,
+    user,
     application,
     document,
     version,
@@ -424,6 +436,64 @@ try {
     verifier(
       (await solde(premiere.application.id)) === 4,
       "une analyse, et une seule, a été débitée",
+    );
+  }
+
+  console.log("\nRG-02.1 — l'autorisation retirée arrête la lecture, pas seulement les dépôts");
+  {
+    /*
+      Le cas est banal et il ne se voit qu'ici : le candidat autorise,
+      dépose, puis se ravise pendant que le job attend dans la file. Le
+      retrait n'arrêtait rien — le fichier partait au service, une analyse
+      était débitée, un verdict s'écrivait sur la pièce.
+
+      Ce que la fumée tient, et qu'aucun essai pur ne peut tenir : **rien
+      n'est parti**. Le service d'essai compte ce qu'il reçoit.
+    */
+    recusParLeService.length = 0;
+    const p = await piece({ dateCible: "2027-09-01", sansAutorisation: true });
+
+    const avant = await solde(p.application.id);
+    const suite = await analyserUnePiece(p.tache, lExtracteur());
+    verifier(suite === "TERMINEE", `le job s'achève sans reprise (${suite})`);
+    verifier(
+      recusParLeService.length === 0,
+      `aucun octet ne part au service de lecture (${recusParLeService.length} appel(s))`,
+    );
+    verifier(
+      (await solde(p.application.id)) === avant,
+      "aucune analyse n'est débitée : le candidat ne paie pas son propre retrait",
+    );
+    verifier(
+      (await db.aiUsage.count({ where: { applicationId: p.application.id } })) === 0,
+      "et aucun jeton n'est enregistré",
+    );
+
+    const apres = await relireDocument(p.document.id);
+    verifier(
+      apres.status === "ATTENDUE" && apres.remedy === "REMPLACER",
+      `la pièce est conservée, non vérifiée (${apres.status} / ${apres.remedy})`,
+    );
+    verifier(
+      (apres.feedback ?? "").includes("autorisation"),
+      `et l'écran dit pourquoi (${(apres.feedback ?? "").slice(0, 50)}…)`,
+    );
+    verifier(
+      !(apres.feedback ?? "").includes("recharger"),
+      "sans l'envoyer recharger des analyses, qui ne répareraient rien",
+    );
+
+    // Il redonne son accord : la reprise du job analyse pour de bon.
+    await enregistrerLAutorisation(p.user.id, "pieces_identite", true);
+    const reprise = await analyserUnePiece(p.tache, lExtracteur());
+    verifier(reprise === "TERMINEE", `la reprise aboutit (${reprise})`);
+    verifier(
+      recusParLeService.length === 1,
+      `et le service reçoit enfin la pièce (${recusParLeService.length})`,
+    );
+    verifier(
+      (await solde(p.application.id)) === avant - 1,
+      "une analyse est débitée cette fois",
     );
   }
 

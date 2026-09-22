@@ -7224,3 +7224,113 @@ Le partage est celui qu'on attend : ce qui se décide sans base est rouge
 dans les essais, ce qui demande une base et deux comptes l'est dans la
 fumée. Une mutation rouge des deux côtés dit que la règle est éprouvée
 deux fois ; une mutation rouge d'un seul côté dit où elle vit.
+
+---
+
+### S.47 — « Révocable » ne l'était que pour l'avenir
+
+RG-02.1 annonce le consentement au traitement des pièces d'identité
+**séparé et révocable**. La séparation était tenue. La révocation, non.
+
+Le candidat autorise, dépose une pièce, puis se ravise pendant que le job
+d'analyse attend dans la file :
+
+```
+  autorisation accordée ?       false
+  un nouveau dépôt est refusé ? oui
+
+Et la pièce déjà déposée, dont l'analyse est en file :
+  appels au modèle           : 1
+  jetons débités             : 4500
+  analyses consommées        : 1
+  état de la pièce           : A_CORRIGER
+```
+
+Le retrait écrivait une ligne et refusait les dépôts suivants. Le fichier
+déjà déposé partait au service de lecture, une analyse était débitée, un
+verdict s'écrivait sur la pièce — après le retrait de l'accord.
+
+L'autorisation se relit désormais à deux endroits : à la promotion, parce
+que le candidat a pu se raviser entre le dépôt et le balayage, et à
+l'analyse, parce qu'il peut se raviser pendant que le job attend — c'est
+même l'intervalle le plus probable. La lecture précède le débit et la
+lecture du fichier : ni jeton dépensé, ni octet transmis.
+
+#### Deux lectures d'un même registre de preuve
+
+`exigerConsentementPieces` refaisait la requête que `autorisationAccordee`
+faisait déjà, avec sa propre version de « la dernière ligne l'emporte ».
+C'est le défaut de S.42 — une relation écrite deux fois — sur un objet
+autrement plus sensible : deux lectures d'un registre de consentement qui
+finiraient par répondre différemment. Une seule reste.
+
+#### Ce que la pièce ne disait pas
+
+`MENTION_CONSERVEE_NON_VERIFIEE` était exportée, éprouvée par un test, et
+**affichée par aucun écran** : la pastille disait « Conservée, non
+vérifiée » et rien n'expliquait pourquoi.
+
+Avec un second motif, une mention unique en démentirait un — envoyer
+recharger des analyses quelqu'un qui vient de retirer son accord lui ferait
+payer pour un geste qu'il a lui-même fait. Le motif est donc porté par la
+pièce, et il atteint l'écran par le chemin ordinaire du message de pièce.
+
+#### L'écran des autorisations disait l'inverse de la règle
+
+« Sans cette autorisation, tu téléverses tes pièces sans analyse
+automatique. » RG-02.2 dit le contraire — « aucune pièce ne peut être
+téléversée avant ce consentement » — et c'est la règle que le code applique.
+Le candidat lisait l'inverse de ce qui allait se passer, au moment précis où
+il décidait.
+
+La phrase dit maintenant les deux moitiés : ce que le refus empêche, et ce
+que le retrait arrête.
+
+#### La fumée a dit ce qu'une fixture taisait
+
+La fumée du balayage ne posait aucune autorisation sur ses candidats. Le
+jour où la promotion a commencé à la lire, elle a viré au rouge — et elle
+avait raison deux fois : la lecture nouvelle mordait, et la fixture
+décrivait un dépôt impossible, puisqu'en production RG-02.2 refuse de
+déposer sans accord. Elle pose l'autorisation désormais, comme le ferait un
+vrai dépôt, et son remède aussi : sans lui, une pièce conservée sans analyse
+se relisait « Attendue · Ajouter » et le candidat renvoyait ce qu'il venait
+d'envoyer.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'analyse ne relit plus l'autorisation | sept assertions de la fumée d'extraction |
+| la promotion ne la lit plus | deux assertions de la fumée de balayage |
+| le retrait est lu comme un accord | les deux fumées |
+| un accord ancien suffit de nouveau (`asc` au lieu de `desc`) | dix-sept assertions |
+| les deux motifs redonnent le même message | les essais purs, et les deux fumées |
+| la pièce non analysée ne dit plus pourquoi | la fumée de balayage |
+
+Cinq des six ne virent au rouge que dans les fumées : ce sont des décisions
+de serveur, qui demandent une base et un registre de consentement. La
+sixième est une décision d'écriture, et elle est rouge des deux côtés.
+
+#### Relevé en passant, et laissé ouvert
+
+**Quelle autorisation couvre quelle pièce ?** Aucune ne le déclare.
+`exigerConsentementPieces` applique l'autorisation *sensible* à toutes les
+pièces, si bien qu'un candidat qui refuse l'analyse de ses pièces
+d'identité ne peut pas non plus déposer son relevé bancaire — et que
+l'autorisation « pièces financières », présentée séparément, ne commande
+rien du tout. Déclarer la relation dans le référentiel serait la réponse
+(c'est ce que S.42 a fait pour les conditions), mais elle butte sur une
+question qui n'est pas d'ingénierie : l'examen médical et l'assurance
+santé sont des **données de santé**, et aucune autorisation ne les couvre
+aujourd'hui. Inventer ce consentement serait décider à la place du produit
+et de son conseil juridique.
+
+**Le quota de jetons n'est pas un plafond.** INV-6 dit « débité d'un quota
+de tokens rattaché au pack ». Exécuté, un dossier atteint 225 % du quota de
+son pack sans que rien ne s'y oppose : ce qui est débité, ce sont des
+analyses, et les jetons sont seulement comptés. Ce n'est pas un défaut mais
+un arbitrage déjà pris, et `domain/backoffice/couts.ts` l'écrit : « le
+candidat compte en analyses, pas en jetons ». Il reste que `verifierQuota`,
+dans `lib/ai.ts`, calcule un refus que personne ne demande — une fonction
+sans appelant qui donne à l'invariant l'air d'être tenu.

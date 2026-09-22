@@ -7,6 +7,8 @@ import {
   rendreUneTentative,
 } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
+import { autorisationAccordee } from "@/server/acces/consentements";
+import { MENTION_NON_ANALYSEE } from "@/domain/dossiers/piece";
 import { conditionsDeLaPiece, evaluerConditions } from "@/domain/dossiers/verification";
 import { transmissibleALAnalyse } from "@/domain/dossiers/quarantaine";
 import {
@@ -179,6 +181,33 @@ export async function analyserUnePiece(
     codesDeLaChecklist: regles?.pieces_requises.map((p) => p.code) ?? [document.code],
     champs: champsDemandes(conditions),
   };
+
+  /*
+    RG-02.1 — l'autorisation d'analyse est révocable.
+
+    Le balayage l'a déjà lue, et elle se relit ici : entre la promotion et
+    la reprise d'un job par la file, il peut s'écouler des minutes, et
+    c'est précisément dans cet intervalle qu'un candidat qui se ravise
+    clique. Sans cette seconde lecture, le retrait n'arrêtait rien — le
+    fichier était relu, envoyé au modèle, une analyse débitée et un
+    verdict écrit, après que l'accord eut été retiré.
+
+    Avant le débit et avant la lecture du fichier : ni jeton dépensé, ni
+    octet transmis.
+  */
+  if (!(await autorisationAccordee(application.userId, "pieces_identite"))) {
+    await db.document.update({
+      where: { id: document.id },
+      data: {
+        status: "ATTENDUE",
+        remedy: "REMPLACER",
+        feedback: MENTION_NON_ANALYSEE.autorisation_retiree,
+        finding: null,
+      },
+    });
+    await recalculerCompletude(tache.applicationId);
+    return "TERMINEE";
+  }
 
   // INV-6 — le débit précède l'appel. Débiter après laisserait une analyse
   // gratuite à chaque interruption, et l'invariant dit « jamais de

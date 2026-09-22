@@ -87,8 +87,27 @@ export const estDeposeeNonVerifiee = (piece: Piece): boolean =>
  */
 export const LIBELLE_CONSERVEE_NON_VERIFIEE = "Conservée, non vérifiée";
 
-export const MENTION_CONSERVEE_NON_VERIFIEE =
-  "Ton fichier est bien arrivé. Il n'a pas été analysé : tes analyses du pack sont utilisées. Tu peux le relire toi-même, ou recharger des analyses.";
+/**
+ * Pourquoi la vérification n'a pas eu lieu — et pourquoi il en faut deux.
+ *
+ * La mention était une constante unique, qui disait « tes analyses du pack
+ * sont utilisées ». Elle était exacte tant que c'était le seul motif. Elle
+ * ne l'est plus depuis que le retrait de l'autorisation d'analyse arrête
+ * la lecture : envoyer quelqu'un recharger des analyses alors qu'il vient
+ * de retirer son accord lui ferait payer pour un geste qu'il a lui-même
+ * fait, et ne réparerait rien.
+ *
+ * Le motif est donc porté par la pièce, et la pastille reste la même : ce
+ * qu'on veut savoir d'abord est que le fichier est arrivé.
+ */
+export type MotifDeNonAnalyse = "quota" | "autorisation_retiree";
+
+export const MENTION_NON_ANALYSEE: Record<MotifDeNonAnalyse, string> = {
+  quota:
+    "Ton fichier est bien arrivé. Il n'a pas été analysé : tes analyses du pack sont utilisées. Tu peux le relire toi-même, ou recharger des analyses.",
+  autorisation_retiree:
+    "Ton fichier est bien arrivé et il est conservé. Il n'a pas été analysé : tu as retiré l'autorisation d'analyse de tes pièces. Tu peux la redonner depuis tes autorisations, ou relire la pièce toi-même.",
+};
 
 /**
  * Pièce qu'on photographie ou qu'on scanne, par opposition à une pièce qu'on
