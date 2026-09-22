@@ -4,6 +4,7 @@ import {
   MENTION_VERSION_EN_RELECTURE,
   MENTION_VERSION_REMPLACEE,
   ceQuiSepare,
+  confirmationDArbitrage,
   ecartMontant,
   libelleDelaiVersion,
   libelleImpact,
@@ -346,6 +347,98 @@ describe("une version retirée ne se propose plus", () => {
     for (const blocage of ["REMPLACEE", "EN_RELECTURE"] as const) {
       expect(options(blocage)[1]!.desactivee).toBeUndefined();
       expect(options(blocage)[1]!.detail).toContain("Ta checklist reste");
+    }
+  });
+});
+
+/**
+ * T-02 — la confirmation rend au passé ce que l'écran promettait au futur.
+ *
+ * ── Le défaut, tel qu'il s'est présenté ─────────────────────────────
+ *
+ * Avant le clic, l'écran disait « Ta checklist Pays-Bas sera mise à
+ * jour ». Après, la feuille se fermait et la page se rafraîchissait. Le
+ * serveur rendait pourtant la liste des pièces ajoutées et libérées, et
+ * l'écran la jetait :
+ *
+ *     appeler(…) → { ok: true, donnees: { piecesAjoutees: […],
+ *                                          piecesLiberees: […] } }
+ *     l'écran     : onFermer(); router.refresh();
+ *     le candidat : rien
+ *
+ * Trois lots ont enrichi cette réponse sans que rien ne la regarde. Une
+ * donnée que personne ne lit est une donnée dont on ne sait pas si elle
+ * est juste.
+ */
+describe("la confirmation d'arbitrage", () => {
+  const MENTION_MIGREE = "Aucune pièce déjà validée n'a été retirée.";
+  const MENTION_CONSERVEE =
+    "Ton dossier reste régi par la version que tu as figée à son ouverture.";
+
+  it("nomme ce qu'il faut fournir en plus, avant tout le reste", () => {
+    const { titre, lignes } = confirmationDArbitrage(
+      "MIGRER",
+      "Pays-Bas",
+      MENTION_MIGREE,
+      ["Diplôme le plus élevé, légalisé", "Assurance maladie"],
+      [],
+    );
+
+    expect(titre).toBe("Ta checklist Pays-Bas suit la nouvelle version.");
+    expect(lignes[0]).toBe(
+      "À fournir en plus : Diplôme le plus élevé, légalisé et Assurance maladie.",
+    );
+  });
+
+  it("dit d'une pièce libérée que sa ligne et son dépôt restent", () => {
+    const { lignes } = confirmationDArbitrage("MIGRER", "Suisse", MENTION_MIGREE, [], [
+      "Casier judiciaire",
+    ]);
+
+    // « N'est plus demandée » seul se lit comme « jette-la ».
+    expect(lignes[0]).toBe(
+      "Plus demandé : Casier judiciaire. La ligne reste dans ta checklist, et ce que tu as déjà déposé est conservé.",
+    );
+  });
+
+  it("place le geste à faire avant ce qui est libéré", () => {
+    const { lignes } = confirmationDArbitrage(
+      "MIGRER",
+      "Suisse",
+      MENTION_MIGREE,
+      ["Contrat de travail"],
+      ["Casier judiciaire"],
+    );
+
+    expect(lignes[0]).toContain("À fournir en plus");
+    expect(lignes[1]).toContain("Plus demandé");
+    expect(lignes.at(-1)).toBe(MENTION_MIGREE);
+  });
+
+  it("ne nomme aucune liste quand la migration n'en change aucune", () => {
+    expect(confirmationDArbitrage("MIGRER", "Pays-Bas", MENTION_MIGREE).lignes).toEqual([
+      MENTION_MIGREE,
+    ]);
+  });
+
+  it("reprend la phrase du serveur, elle ne la réécrit pas", () => {
+    const { titre, lignes } = confirmationDArbitrage("CONSERVER", "Pays-Bas", MENTION_CONSERVEE);
+
+    expect(titre).toBe("Ta checklist Pays-Bas reste en version antérieure.");
+    expect(lignes).toEqual([MENTION_CONSERVEE]);
+  });
+
+  it("parle au passé, jamais au futur : le geste a eu lieu", () => {
+    const rendus = [
+      confirmationDArbitrage("MIGRER", "Pays-Bas", MENTION_MIGREE, ["Diplôme"], ["Casier"]),
+      confirmationDArbitrage("CONSERVER", "Pays-Bas", MENTION_CONSERVEE),
+    ];
+
+    for (const { titre, lignes } of rendus) {
+      for (const texte of [titre, ...lignes]) {
+        expect(texte).not.toContain("sera ");
+        expect(texte).not.toContain("restera ");
+      }
     }
   });
 });

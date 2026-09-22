@@ -8564,3 +8564,53 @@ parce que la règle tenait. Elle porte désormais une version déposée et véri
 la date recalculée. La frontière de S.62 s'affine : `status`, le fichier,
 l'extraction et le retour d'analyse appartiennent au candidat ; la **péremption**
 se déduit de son dépôt et de la règle, et suit donc la règle.
+
+---
+
+## S.66 — La réponse du serveur que l'écran jetait
+
+Le dernier point ouvert de la famille des migrations, consigné en S.63.
+
+Avant le clic, l'écran promettait au futur : « Ta checklist Pays-Bas **sera**
+mise à jour. » Après le clic, la feuille se fermait et la page se
+rafraîchissait. Le serveur, lui, rendait la liste des pièces ajoutées et des
+pièces libérées :
+
+```
+appeler(…) → { ok: true, donnees: { piecesAjoutees: [« Diplôme… »],
+                                     piecesLiberees: [« Casier… »] } }
+l'écran     : onFermer(); router.refresh();
+le candidat : rien
+```
+
+La promesse au futur n'était jamais rendue au passé. Le candidat retrouvait
+l'information sur sa checklist s'il pensait à la relire, mais pas au moment du
+geste, là où il venait de décider — et sur une décision que le serveur refuse
+de rejouer.
+
+**Trois lots ont enrichi cette réponse sans que rien ne la regarde.** S.62 y a
+mis les pièces durcies, S.63 les pièces libérées. Une donnée que personne ne
+lit est une donnée dont on ne sait pas si elle est juste : c'est le même angle
+mort que S.52, où `piecesAjoutees` existait déjà sans lecteur.
+
+**L'ordre des lignes porte l'information.** Ce qui demande un geste vient en
+premier : une pièce à fournir en plus change le travail du candidat
+aujourd'hui. Ce qui est libéré vient ensuite, avec la précision qui compte —
+la ligne reste, le document déposé aussi —, parce que « n'est plus demandée »
+se lit facilement comme « jette-la ».
+
+**La phrase de clôture vient du serveur.** `confirmationDArbitrage` reçoit la
+`mention` que l'arbitrage a rendue au lieu de la réécrire : deux copies de la
+même phrase finiraient par diverger, et c'est celle qui accompagne l'écriture
+qui fait foi. C'est la leçon de S.42 appliquée à un texte plutôt qu'à une
+fonction.
+
+**Une fois l'arbitrage écrit, la feuille ne montre plus les options.** Elles
+décrivent un choix qui n'est plus à faire, et le bouton ne mènerait qu'à un
+refus : `arbitrerLaDivergence` rejette un second arbitrage. C'est le candidat
+qui ferme, une fois la confirmation lue.
+
+**Un test a changé de sens, et c'est voulu.** « Ne se ferme qu'une fois écrit »
+vérifiait que la feuille disparaissait après succès. Elle reste désormais
+ouverte pour porter la confirmation ; l'assertion sur le rafraîchissement, elle,
+tient toujours et garde son nom propre.

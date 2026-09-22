@@ -38,3 +38,23 @@ Références : `docs/prototype/ImmiPro Fondations.dc.html`,
   au travers de cette frontière, un composant serveur ne reçoit qu'une
   référence au module, pas ses valeurs. `tests/frontiere-client.test.ts`
   refuse qu'une constante la retraverse.
+
+## Une action qui aboutit se dit, comme une action qui échoue
+
+`BlocEchec` existe parce qu'un échec doit se lire là où le geste a été fait.
+La réussite obéit à la même règle, et on l'a découvert en la manquant : l'écran
+d'arbitrage d'une divergence fermait sa feuille sur un succès et jetait la
+réponse du serveur, qui nommait pourtant les pièces ajoutées et celles qui ne
+sont plus demandées.
+
+Trois lots avaient enrichi cette réponse sans que rien ne la regarde.
+
+La règle qui en sort : **un écran qui promet au futur rend au passé.** « Ta
+checklist sera mise à jour » appelle une confirmation qui dit ce qui a
+effectivement changé — surtout quand le geste n'est pas rejouable, et que le
+serveur a déjà écrit la liste. La fermeture appartient alors à la personne, pas
+au code.
+
+Et la phrase de clôture vient du serveur, jamais d'une seconde copie côté
+écran : deux rédactions de la même phrase finissent par diverger, et c'est
+celle qui accompagne l'écriture qui fait foi.
