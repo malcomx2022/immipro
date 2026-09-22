@@ -1195,6 +1195,91 @@ try {
       `le dossier devient prêt sur une exigence que plus personne ne réclame (${apres.status})`,
     );
   }
+
+  console.log("\nRG-06.6 — une durée de validité qui change ne passe plus en silence");
+  {
+    /*
+      `comparerLesVersions` ne regardait pas la durée de validité. Une
+      version qui ne changeait qu'elle rendait `MINEUR` avec un diff vide,
+      et la propagation passe son chemin sur ce couple : aucune
+      divergence, aucune notification, et un dossier qui gardait
+      l'ancienne durée pour toujours — l'arbitrage étant le seul chemin
+      qui réaligne sa checklist.
+
+      Le sens compte : raccourcie, elle rend périmée le jour du dépôt une
+      pièce demandée à la date que l'échéancier annonçait.
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "CI" as const, visaType: "etudes_mvv_vvr" as const,
+      category: "ETUDES" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2029-01-01"), publishedAt: new Date("2026-01-01"),
+    };
+    const PIECES_V = (brute.rules as never as {
+      pieces_requises: { code: string; libelle: string; obligatoire: boolean }[];
+    }).pieces_requises;
+    const avecValidite = (valeur: number) => ({
+      ...(brute.rules as object),
+      pieces_requises: PIECES_V.map((x) =>
+        x.code === "diplome" ? { ...x, obligatoire: true, validite_mois: valeur } : x,
+      ),
+    });
+
+    const v1 = await db.visaRule.create({
+      data: { ...socle, version: 1, status: "PUBLISHED", rules: avecValidite(6) as never },
+    });
+
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-pub-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const dossier = await ouvrirDossier(candidat.id, v1.id, new Date("2027-09-01"));
+    await db.application.update({ where: { id: dossier.id }, data: { status: "ACTIF" } });
+
+    const initiale = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "diplome" },
+    });
+    verifier(initiale.validityMonths === 6, `la pièce vaut six mois (${initiale.validityMonths})`);
+
+    await db.visaRule.update({
+      where: { id: v1.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    const v2 = await db.visaRule.create({
+      data: { ...socle, version: 2, status: "PUBLISHED", rules: avecValidite(3) as never },
+    });
+
+    /* La seule différence entre les deux versions est cette durée. */
+    const bilan = await propagerLaPublication(v2.id);
+    verifier(
+      bilan.alertes === 1,
+      `la publication prévient, alors qu'elle ne change qu'une durée (${JSON.stringify(bilan)})`,
+    );
+
+    const migration = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: dossier.id, toRuleId: v2.id },
+    });
+    verifier(migration.impact === "MAJEUR", `elle gêne sans rendre inéligible (${migration.impact})`);
+
+    const vue = await divergenceAArbitrer(migration.id, candidat.id);
+    const ligne = vue.pieces.validites.find((x) => x.code === "diplome");
+    verifier(
+      ligne?.avant === 6 && ligne.apres === 3,
+      `l'écran porte les deux durées avant qu'il tranche (${JSON.stringify(ligne)})`,
+    );
+
+    const frais = await db.application.findUniqueOrThrow({ where: { id: dossier.id } });
+    await arbitrerLaDivergence(frais, migration.id, "MIGRER");
+    const apres = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "diplome" },
+    });
+    verifier(
+      apres.validityMonths === 3,
+      `et la checklist porte la nouvelle durée après migration (${apres.validityMonths})`,
+    );
+  }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

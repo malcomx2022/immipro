@@ -8451,3 +8451,58 @@ la migration a cessé d'exiger est nommé, comme ce qu'elle exige en plus.
 qui se contente de `router.refresh()`. Le candidat retrouve l'information sur sa
 checklist, mais pas au moment du geste, là où elle confirmerait ce qu'il vient
 de décider. Lot à part, et petit.
+
+---
+
+## S.64 — La durée de validité qui changeait sans que rien ne bouge
+
+Consigné deux fois comme « lot à part » en S.61 puis en S.62. En l'ouvrant, il
+s'est révélé plus large que ce que j'avais écrit : ce n'était pas seulement un
+écran muet.
+
+**Établi par exécution.** Deux versions NL identiques, sauf que `preuve_fonds`
+passe de trois à six mois :
+
+```json
+{ "impact": "MINEUR", "diff": [], "piecesTouchees": { "ajoutees": [], "retirees": [] } }
+```
+
+`propagerLaPublication` fait `continue` sur `MINEUR` avec un diff vide. Donc
+**aucune divergence, aucune notification**, et le dossier garde l'ancienne durée
+pour toujours — l'arbitrage étant le seul chemin qui réaligne sa checklist. Le
+lot S.62 rendait le réalignement correct ; encore fallait-il qu'il ait lieu.
+
+**Le sens n'est pas symétrique, et c'est ce qui fait mal.** Une durée
+**allongée** laisse demander la pièce plus tôt : rien n'est perdu. Une durée
+**raccourcie** rend périmée, le jour du dépôt, une pièce demandée à la date que
+l'échéancier annonçait — obtenue dans les temps, et refusée. C'est exactement ce
+que le calendrier candidat promet d'éviter : « Cette pièce vaut 3 mois, et doit
+être valable le jour du dépôt. »
+
+`EvolutionDesPieces` porte donc une troisième liste, `validites`, et l'écart
+entre au diff. L'impact devient `MAJEUR`, jamais `CRITIQUE` : comme le délai
+d'instruction, une durée qui bouge gêne, elle ne rend pas inéligible.
+
+**La ligne d'écran nomme le sens**, parce que c'est le sens qui décide s'il faut
+refaire une démarche :
+
+```
+valable 3 mois au lieu de 6 mois : à demander plus tard qu'annoncé
+valable 6 mois au lieu de 3 mois : tu peux la demander plus tôt
+valable 3 mois, à demander moins de 3 mois avant le dépôt
+ne périme plus
+```
+
+« Sa durée de validité change » aurait été vrai et inutile.
+
+**La comparaison ne filtre pas sur l'obligation**, contrairement aux pièces
+ajoutées et retirées. Une pièce complémentaire périssable porte elle aussi une
+échéance « à demander au plus tôt », et l'obtenir trop tôt la rend inutilisable
+de la même façon.
+
+### Ce qui reste à arbitrer
+
+**`expiresAt` n'est toujours pas recalculé** — le point ouvert en S.62 tient. Le
+candidat qui a déjà déposé sa pièce sous six mois garde une péremption calculée
+sur six, alors que sa checklist en annonce trois. C'est désormais visible : la
+divergence le prévient avant qu'il tranche, et la date, elle, ne suit pas.

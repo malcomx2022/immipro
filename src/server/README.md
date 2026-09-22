@@ -1554,6 +1554,23 @@ Elle passe en complémentaire et cesse de compter — sa ligne et son fichier
 restent, car RG-11.1 protège le travail du candidat, pas une exigence disparue
 du référentiel.
 
+## Une version peut changer sans rien changer de comparable
+
+`comparerLesVersions` décide de l'impact, et `propagerLaPublication` saute les
+couples `MINEUR` + diff vide. Une version qui ne changeait qu'une durée de
+validité tombait exactement là : aucune divergence, aucune notification, et un
+dossier qui gardait l'ancienne durée pour toujours — puisque l'arbitrage est le
+seul chemin qui réaligne une checklist.
+
+La leçon vaut au-delà du cas : **tout ce qu'une version peut changer doit entrer
+dans la comparaison**, sans quoi le changement existe en base et n'existe pour
+personne. Le réalignement peut être parfait, il ne s'exécute jamais.
+
+Le classement se fait sur une question simple, celle que le fichier posait
+déjà : est-ce que cela rend **inéligible**, ou est-ce que cela **gêne** ? Un
+seuil relevé, un dispositif supprimé : critique. Un délai d'instruction, une
+durée de validité : majeur.
+
 ## Vérifier
 
 ```

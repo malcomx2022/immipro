@@ -82,10 +82,13 @@ export const ceQuiSepare = (
   delai:
     (ancienne.delai?.min ?? null) !== (nouvelle.delai?.min ?? null) ||
     (ancienne.delai?.max ?? null) !== (nouvelle.delai?.max ?? null),
-  pieces: pieces.ajoutees.length > 0 || pieces.retirees.length > 0,
+  pieces:
+    pieces.ajoutees.length > 0 ||
+    pieces.retirees.length > 0 ||
+    pieces.validites.length > 0,
 });
 
-export const AUCUNE_PIECE: EvolutionDesPieces = { ajoutees: [], retirees: [] };
+export const AUCUNE_PIECE: EvolutionDesPieces = { ajoutees: [], retirees: [], validites: [] };
 
 /**
  * Ce que la checklist gagne et perd, en toutes lettres — T-02.
@@ -116,7 +119,37 @@ export function lignesDesPieces(pieces: EvolutionDesPieces): readonly LignePiece
         ? `${p.libelle} — n'est plus obligatoire, tu peux toujours la joindre`
         : `${p.libelle} — n'est plus demandée`,
     })),
+    ...pieces.validites.map((p) => ({
+      cle: `~${p.code}`,
+      texte: `${p.libelle} — ${texteDeLaValidite(p.avant, p.apres)}`,
+    })),
   ];
+}
+
+/**
+ * Ce qu'une durée de validité qui change veut dire pour le candidat —
+ * RG-06.6.
+ *
+ * Le sens n'est pas symétrique, et la phrase le dit. **Raccourcie** : une
+ * pièce demandée à la date qu'annonçait l'échéancier sera périmée le jour
+ * du dépôt, donc à demander plus tard. **Allongée** : rien n'est perdu,
+ * la marge est simplement plus large.
+ *
+ * Le nombre de mois est toujours nommé. « Sa durée de validité change »
+ * ne dit pas dans quel sens, et c'est précisément le sens qui décide s'il
+ * faut refaire une démarche.
+ */
+const mois = (n: number): string => `${n} mois`;
+
+export function texteDeLaValidite(avant: number | null, apres: number | null): string {
+  if (avant === null && apres !== null) {
+    return `valable ${mois(apres)}, à demander moins de ${mois(apres)} avant le dépôt`;
+  }
+  if (apres === null) return "ne périme plus";
+  if (avant !== null && apres < avant) {
+    return `valable ${mois(apres)} au lieu de ${mois(avant)} : à demander plus tard qu'annoncé`;
+  }
+  return `valable ${mois(apres)} au lieu de ${mois(avant ?? 0)} : tu peux la demander plus tôt`;
 }
 
 /**
@@ -139,6 +172,10 @@ export function resumeDesPieces(pieces: EvolutionDesPieces): string | null {
         ? `${retirees.length} de moins à réunir`
         : `${retirees.length} pièce${retirees.length > 1 ? "s" : ""} de moins à réunir`,
     );
+  }
+  if (pieces.validites.length > 0) {
+    const n = pieces.validites.length;
+    parts.push(`${n} dont la durée de validité change`);
   }
   return parts.length > 0 ? parts.join(", ") : null;
 }

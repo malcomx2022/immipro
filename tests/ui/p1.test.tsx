@@ -907,6 +907,7 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
             retirees: [
               { code: "casier_judiciaire", libelle: "Casier judiciaire", encoreDemandee: true },
             ],
+            validites: [],
           },
         }}
       />,
