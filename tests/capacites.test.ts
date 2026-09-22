@@ -332,8 +332,21 @@ describe("un `.env` complet devant des points de branchement vides", () => {
       reponses: {},
       questions: [],
     };
-    expect(await leRedacteur()(matiere)).toBeNull();
-    expect(await laCritique()("un texte déjà écrit", matiere)).toBeNull();
+    /*
+      La rédaction est branchée depuis le 22/09/2026, et sans clé elle ne
+      rend pas un texte vide ni une liste de remarques vide : elle nomme
+      la cause. Le second point vaut d'être dit — `remarques: []` se lit
+      « relu, rien à reprendre », et c'est exactement l'avis rassurant
+      qu'un service absent ne doit jamais produire.
+    */
+    expect(await leRedacteur({})(matiere)).toMatchObject({
+      etat: "SANS_TEXTE",
+      cause: "non_configure",
+    });
+    expect(await laCritique({})("un texte déjà écrit", matiere)).toMatchObject({
+      etat: "SANS_AVIS",
+      cause: "non_configure",
+    });
   });
 
   /**

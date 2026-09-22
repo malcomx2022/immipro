@@ -470,6 +470,8 @@ describe("R-04 — un vide ne vaut pas un avis", () => {
     remarques: readonly Remarque[] | null;
     texteExistant?: boolean;
     recoupements?: Recoupements;
+    /** Par défaut absent : ces cas éprouvent ce que l'écran dit sans service. */
+    analysePossible?: boolean;
   }) =>
     render(
       <Relecture
@@ -478,6 +480,7 @@ describe("R-04 — un vide ne vaut pas un avis", () => {
         remarques={props.remarques}
         recoupements={props.recoupements ?? AUCUN_RECOUPEMENT}
         texteExistant={props.texteExistant ?? true}
+        analysePossible={props.analysePossible ?? false}
         relectureLe="2026-09-11"
       />,
     );
@@ -573,6 +576,7 @@ describe("R-04 — Analyse critique", () => {
       remarques={REMARQUES_MOTIVATION}
       recoupements={AUCUN_RECOUPEMENT}
       texteExistant
+      analysePossible
       relectureLe="2026-09-11"
     />
   );

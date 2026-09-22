@@ -139,6 +139,15 @@ jobs:
         run: npm run smoke:extraction
       - run: echo "- **Extraction documentaire** — octets transmis sans URL, mesure déterministe des durées, saturation rejouée sans débit" >> "$GITHUB_STEP_SUMMARY"
 
+      # La mise en forme et la relecture d'une pièce rédigée, contre le
+      # vrai SDK parlant à un service d'essai. Ce qu'elle tient : une
+      # version non relue ne se lit jamais « rien à reprendre », une
+      # relecture qui n'aboutit pas ne date rien et ne débite rien, et une
+      # relecture réelle sans remarque reste un résultat.
+      - name: Chaîne de rédaction
+        run: npm run smoke:redaction
+      - run: echo "- **Rédaction assistée** — aucun avis rendu sans lecture, relecture datée sur la version, jetons comptés même sans résultat" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention

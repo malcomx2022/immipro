@@ -6547,3 +6547,180 @@ reçoit pas une date que son état contredirait.
 | Mutation | Ce qui vire au rouge |
 |---|---|
 | `readyAt` suit de nouveau le score | la fumée entière, sur l'erreur d'origine |
+
+---
+
+### S.39 — « Rien à reprendre » sur une lettre que personne n'avait lue
+
+Le lot précédent a branché la lecture des pièces, et posé
+`ANTHROPIC_API_KEY` dans toute installation qui la veut. Ce lot-ci devait
+brancher la seconde moitié de WF-08 — la mise en forme et l'analyse
+critique. La chaîne a d'abord été exécutée, clé posée, sur une version
+enregistrée par le candidat :
+
+```
+redactionConfiguree()        : true
+remarques rendues à l'écran  : []
+état                         : RELUE_SANS_REMARQUE
+ce que le candidat lit       : Rien à reprendre sur cette version.
+
+CritiqueFinding en base      : 0
+laCritique() est branchée ?  : non
+```
+
+Un avis favorable sur un texte que rien n'avait lu, rendu sur la foi
+d'une variable d'environnement.
+
+#### La condition ne tenait pas le raisonnement écrit au-dessus d'elle
+
+Le commentaire de la page disait la règle juste :
+
+> Tant que le service d'analyse n'est pas branché, aucune remarque n'a pu
+> être produite : **la liste vide de la base ne veut pas dire « rien à
+> reprendre »**.
+
+Et la ligne suivante écrivait :
+
+```ts
+const remarques =
+  derniere && redactionConfiguree() ? await remarquesDeLaVersion(derniere.id) : null;
+```
+
+`redactionConfiguree()` ne teste que la présence de la clé. C'est
+exactement le raccourci qu'I.C interdit et que `capacites.ts` énonce en
+titre : **une variable renseignée ne vaut pas un service**. Il dormait
+tant que personne ne posait la clé ; le branchement de la lecture des
+pièces l'a réveillé le matin même.
+
+Une liste vide **est** un résultat légitime — « relu, rien à reprendre ».
+Ce qui manquait est la trace de la relecture, seule capable de la
+distinguer d'une absence. Elle se porte sur la version (`critiquedAt`),
+parce que c'est la version qui est relue : une version suivante n'hérite
+de rien.
+
+#### `laCritique` n'avait aucun appelant
+
+Elle existait, l'état de service la comparait à sa variante non branchée,
+et **aucune route ne l'appelait**. Le jour où elle aurait été branchée,
+rien n'aurait produit la moindre remarque : la capacité serait passée à
+« branchée » sans qu'un seul texte soit relu.
+
+C'est la troisième occurrence de la même forme en trois lots — la sonde
+de balayage qui ne commandait rien (S.32), `moisEntre` sans appelant
+(S.37), et celle-ci. Une fonction juste, dont le branchement ne change
+rien, parce que le chemin qui y mène n'existe pas.
+
+R-04 porte donc un geste, et c'est le seul de l'écran : `A_ANALYSER`,
+« Lancer l'analyse ». Il annonce ce qu'il coûte avant le clic — RG-08.4
+fait payer chaque itération, et un geste qui débite se propose, il ne se
+découvre pas au compteur.
+
+#### Ce que le branchement a corrigé en plus
+
+| Ce qui était écrit | Ce qui se passait |
+|---|---|
+| `costMicros: 0` en dur dans la route de mise en forme | L'analyse d'une pièce, elle, calculait. Le jour du premier tarif, cette ligne-là n'aurait pas suivi |
+| aucun `AiUsage` quand la mise en forme échoue | Une réponse coupée au plafond a coûté ses jetons. INV-6 ne connaît pas d'appel gratuit |
+| un recrédit écrit à la main (`analysisCredit.create`) | Le grand livre a une API depuis S.37 ; deux façons d'écrire la même ligne divergent |
+| six causes d'échec d'appel, prêtes à être recopiées | Elles vivent maintenant dans `domain/ia/appel.ts`, lues par la lecture des pièces **et** par la rédaction. Deux listes pour une règle divergent, et c'est celle qu'on n'a pas sous les yeux qu'on oublie |
+
+#### Ce que le modèle reçoit, et ce qu'il ne reçoit pas
+
+Les réponses de l'entretien et le texte de la version. **Aucune pièce
+jointe** : le recoupement inter-pièces reste en TypeScript
+(`domain/redaction/coherence.ts`), sur ce que le dossier sait déjà de
+lui-même. La règle d'architecture 2 tient, et elle évite en plus
+d'envoyer le contenu d'un passeport pour relire une lettre.
+
+Une question sans réponse n'est pas transmise vide : présenter
+« FINANCEMENT : » suivi de rien invite à combler le vide, ce que l'étape 3
+de WF-08 écarte — « à partir de ses réponses, jamais d'un modèle
+pré-rempli générique ».
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la décision redevient « la clé est posée » | quatre assertions de la fumée, dont le message d'origine mot pour mot |
+| l'état `A_ANALYSER` disparaît | le test d'état, et trois assertions de la fumée |
+| une réponse illisible retombe sur une liste vide | la relecture qui ne fait pas confiance, et deux assertions de la fumée |
+| une incohérence sans ses deux valeurs passe | RG-08.3 sur la relecture |
+| un texte tronqué devient une version | deux assertions de la fumée |
+| une réponse d'entretien vide est transmise | la question passée qui doit le rester |
+| toutes les causes d'appel se rejouent | deux tests, et quatre assertions de la fumée d'extraction |
+| le domaine importe le serveur | la garde de pureté ci-dessous |
+
+---
+
+### S.40 — La première règle d'architecture n'était tenue par personne
+
+`CLAUDE.md` ouvre ses règles d'architecture par celle-ci :
+
+> `src/domain/` ne connaît ni Prisma, ni Next, ni le réseau. Logique pure,
+> testée sans infrastructure.
+
+Rien ne la vérifiait. Elle s'est respectée jusqu'ici parce qu'on la
+relisait — c'est-à-dire de la façon que ce dépôt remplace lot après lot.
+
+Elle a failli céder **dans ce lot même**. `domain/redaction/commande.ts` a
+d'abord importé ses types depuis `server/redaction/redacteur.ts` : des
+formes de données, sans rien de serveur, et pourtant l'inversion exacte
+que la règle interdit. Le domaine aurait dépendu de la couche qui
+l'appelle, et l'aurait entraînée dans ses tests. Les types ont été
+déplacés dans le domaine, et le module serveur les réexporte.
+
+Ce que la règle protège n'est pas une élégance. Un domaine qui n'importe
+ni Prisma ni Next se teste sans base, sans serveur et sans réseau — c'est
+ce qui rend les mille neuf cents tests de ce dépôt assez rapides pour
+qu'on les lance à chaque édition. Un seul `@prisma/client` dans un module
+de domaine y fait entrer le client généré, donc une variable
+d'environnement et une connexion, dans des fichiers que le simulateur
+public charge.
+
+`tests/domaine-pur.test.ts` lit les imports de tout `src/domain/` et
+refuse quatre choses : Prisma, Next et React, une remontée vers
+`@/server`, `@/app`, `@/lib` ou `@/components`, et tout appel réseau. Il
+vérifie d'abord qu'il a bien lu des fichiers — une garde qui n'en lirait
+aucun passerait toujours.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| un module du domaine importe `@/server/http/echecs` | la remontée vers le serveur, en nommant le fichier fautif |
+
+---
+
+### S.41 — Une fumée qui passait le matin et échouait l'après-midi
+
+Trouvée en faisant tourner les neuf fumées avant de livrer le lot de
+rédaction. `smoke:remboursement` avait passé à 08:20 UTC ; à 10:56 elle
+s'arrêtait sur une garde de base, **sans qu'une ligne du produit ait
+changé** entre les deux — vérifié en la rejouant sur le commit précédent.
+
+Le rembourseur simulé rendait un accusé daté en dur :
+
+```ts
+const ACCEPTEE: Remboursement = {
+  issue: "acceptee",
+  accepteLe: new Date("2026-09-22T10:00:00.000Z"),
+  …
+};
+```
+
+Or `refundDueAt` — la date à laquelle la dette est ouverte — est posée à
+l'heure du run, et la base exige `refundRequestedAt >= refundDueAt` : une
+demande antérieure à la décision qui l'ouvre décrit une histoire
+impossible. La garde est juste et faisait exactement son travail. Passé
+dix heures UTC, la date figée du fournisseur passait avant l'ouverture, et
+toute la fumée s'arrêtait là.
+
+Une date de fixture figée devant une donnée qui suit l'horloge : la fumée
+n'éprouvait pas la même chose selon l'heure à laquelle on la lançait. Le
+fournisseur accuse une demande **au moment où il répond** ; l'accusé est
+donc construit à ce moment-là, par une fonction et non par une constante
+— évaluée au chargement du module, même `new Date()` précéderait de
+quelques millisecondes l'ouverture de la dette, et le défaut serait
+revenu sous une forme plus difficile à lire.
+
+Le correctif ne touche que le script. Aucun code de production n'était en
+cause : c'est la fumée qui décrivait une chronologie que le produit
+refuse à raison.

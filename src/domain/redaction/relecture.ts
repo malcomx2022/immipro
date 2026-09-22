@@ -169,6 +169,16 @@ export type EtatRelecture =
    * n'avait jugé le fond.
    */
   | "RECOUPEE_SEULEMENT"
+  /**
+   * Le service est là, et cette version-ci n'a pas encore été relue.
+   *
+   * L'état manquait, et son absence est le défaut que ce lot corrige :
+   * faute de lui, une version jamais relue devant un service disponible
+   * retombait sur `RELUE_SANS_REMARQUE` — « rien à reprendre » sur un
+   * texte que personne n'avait lu. C'est aussi le seul état qui porte un
+   * geste que le candidat peut faire.
+   */
+  | "A_ANALYSER"
   /** Ni analysée ni recoupable : rien n'a été lu, et rien n'était comparable. */
   | "ANALYSE_INDISPONIBLE"
   /** Il n'y a pas encore de texte à analyser. */
@@ -185,9 +195,18 @@ export function etatDeLaRelecture(options: {
    * ne dit pas « rien ne diverge », il dit qu'on n'a rien regardé.
    */
   recoupementsEffectues?: boolean;
+  /**
+   * Le service d'analyse peut être appelé sur cette instance.
+   *
+   * Il ne dit **pas** qu'une analyse a eu lieu — c'est exactement la
+   * confusion que ce lot corrige. Il dit seulement qu'il y a un geste à
+   * proposer plutôt qu'une absence à expliquer.
+   */
+  analysePossible?: boolean;
 }): EtatRelecture {
   if (!options.texteExistant) return "SANS_TEXTE";
   if (options.remarques === null) {
+    if (options.analysePossible) return "A_ANALYSER";
     return options.recoupementsEffectues ? "RECOUPEE_SEULEMENT" : "ANALYSE_INDISPONIBLE";
   }
   return options.remarques.length === 0 ? "RELUE_SANS_REMARQUE" : "RELUE";
@@ -195,6 +214,16 @@ export function etatDeLaRelecture(options: {
 
 export const RESUME_ANALYSE_INDISPONIBLE =
   "Cette version n'a pas été analysée. Le service qui relève les incohérences n'est pas branché, et nous ne te disons pas que ton texte est bon sans l'avoir lu.";
+
+/**
+ * Le service est disponible, et cette version n'a pas encore été relue.
+ *
+ * La phrase ne dit rien du texte, et c'est le point : il n'a pas été lu.
+ * Elle annonce ce que l'analyse coûte, parce que RG-08.4 la fait payer et
+ * qu'un geste qui débite se propose avant de débiter, jamais après.
+ */
+export const RESUME_A_ANALYSER =
+  "Cette version n'a pas encore été analysée. L'analyse relève les incohérences et les points laissés sans appui ; elle décompte une analyse de ton quota.";
 
 export const RESUME_SANS_TEXTE =
   "Il n'y a pas encore de texte à analyser sur cette pièce.";
@@ -235,6 +264,7 @@ export function resumeSelonLEtat(
   remarques: readonly Remarque[] | null,
 ): string {
   if (etat === "SANS_TEXTE") return RESUME_SANS_TEXTE;
+  if (etat === "A_ANALYSER") return RESUME_A_ANALYSER;
   if (etat === "ANALYSE_INDISPONIBLE") return RESUME_ANALYSE_INDISPONIBLE;
   if (etat === "RECOUPEE_SEULEMENT") return resumeRecoupement(remarques ?? []);
   return resumeRelecture(remarques ?? []);
@@ -251,6 +281,8 @@ export const ACTION_RELECTURE: Record<EtatRelecture, string | null> = {
   RELUE: "Revenir au texte",
   RELUE_SANS_REMARQUE: "Revenir au texte",
   RECOUPEE_SEULEMENT: "Revenir au texte",
+  /** Le seul état où le bouton déclenche quelque chose. */
+  A_ANALYSER: "Lancer l'analyse",
   ANALYSE_INDISPONIBLE: null,
   SANS_TEXTE: null,
 };

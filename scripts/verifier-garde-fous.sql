@@ -178,6 +178,16 @@ SELECT refuse(
        "analysisAttempts", "analysisLastAttemptAt")
      VALUES ('v16','d1',16,'minio/ll','ll1', -1, now())$q$);
 
+-- La relecture d'une pièce rédigée (22/09/2026). Elle porte sur un texte, et
+-- elle seule distingue « relu, rien à reprendre » de « jamais relu » : les
+-- deux rendent une liste de remarques vide. R-04 lisait la seconde comme la
+-- première, sur la foi d'une variable d'environnement.
+SELECT refuse(
+  'WF-08 · une relecture datée sur une pièce téléversée, qui n''a pas de texte',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "critiquedAt")
+     VALUES ('v17','d1',17,'minio/mm','mm1', now())$q$);
+
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
 

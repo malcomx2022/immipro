@@ -708,6 +708,14 @@ model DocumentVersion {
   analysisAttempts      Int       @default(0)
   analysisLastAttemptAt DateTime?
 
+  /// Date de l'analyse critique de ce texte — WF-08 étape 4.
+  ///
+  /// Nulle tant que la relecture n'a pas eu lieu, et c'est la seule chose
+  /// qui distingue « relu, rien à reprendre » de « jamais relu » : les deux
+  /// rendent une liste de remarques vide. R-04 lisait la seconde comme la
+  /// première, sur la foi d'une variable d'environnement.
+  critiquedAt DateTime?
+
   analyses DocumentAnalysis[]
   findings CritiqueFinding[]
 

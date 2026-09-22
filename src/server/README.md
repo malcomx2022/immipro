@@ -32,6 +32,8 @@ src/server/
     session.ts       Sessions en base, révocables.
   dossiers/
     extracteur.ts    WF-06 étape 5. Les octets partent, jamais une URL.
+  redaction/
+    adaptateur.ts    WF-08 étapes 3 et 4. Mise en forme diffusée, relecture fermée.
   acces/
     regles.ts        Référentiel. INV-4 et RG-14.1 dans la requête.
     dossiers.ts      Appartenance dans la requête, INV-3 à l'ouverture.
@@ -399,7 +401,7 @@ traite son absence plutôt que de faire semblant :
 | Messagerie | `courrier.ts`, `leTransport` / `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois |
 | Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D). Avec un moteur, une indisponibilité laisse la pièce en quarantaine et ouvre un incident — jamais une promotion |
 | Extraction IA | `dossiers/extracteur.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture. Avec une clé, une lecture qui n'aboutit pas nomme sa cause : une saturation se rejoue, un scan flou demande une photo, une clé refusée appelle un exploitant |
-| Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien |
+| Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien. Avec une clé, une relecture qui n'aboutit pas ne date rien : R-04 continue de dire que le texte n'a pas été lu, et rien n'est débité |
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
 
@@ -444,6 +446,46 @@ seule se rejoue (trois fois, DOC-11 WF-06), les autres partent en revue
 humaine avec le motif qui convient, et **les jetons consommés sont
 enregistrés même quand rien n'a été rendu** — un appel raté a coûté, et
 INV-6 ne connaît pas de dépassement silencieux.
+
+### La relecture d'une pièce rédigée, et ce qui la distingue d'un silence
+
+Branchée le 22/09/2026, sur la même clé que la lecture des pièces.
+
+**Une liste de remarques vide est un résultat** — « relu, rien à
+reprendre ». Une absence de relecture n'en est pas un. Les deux se
+ressemblent dans les données, et l'écran les confondait : il décidait
+d'afficher un avis sur `redactionConfiguree()`, c'est-à-dire sur la
+présence d'`ANTHROPIC_API_KEY`. Aucune analyse n'ayant jamais tourné, la
+base rendait `[]`, et le candidat lisait « Rien à reprendre sur cette
+version » sur une lettre que personne n'avait lue. Le branchement de la
+lecture des pièces, le matin même, avait rendu ce chemin ordinaire.
+
+La relecture se constate donc **sur la version** : `critiquedAt` n'est
+posée que par une analyse qui a abouti, dans la même transaction que ses
+remarques. Séparées, une interruption entre les deux écritures laisserait
+soit des remarques qu'aucune date ne rend visibles, soit une date sans
+remarques — qui se lirait « rien à reprendre ».
+
+`laCritique` n'avait par ailleurs **aucun appelant**. La route
+`POST /api/dossiers/[id]/redaction/[type]/relecture` lui en donne un, et
+R-04 porte le geste qui l'appelle : le seul de l'écran, et il annonce ce
+qu'il coûte avant le clic (RG-08.4).
+
+**Ce que le modèle reçoit** : les réponses de l'entretien et le texte de
+la version. Aucune pièce jointe — le recoupement inter-pièces reste en
+TypeScript (`domain/redaction/coherence.ts`), sur ce que le dossier sait
+déjà de lui-même. La règle d'architecture 2 tient, et elle évite en plus
+d'envoyer le contenu d'un passeport pour relire une lettre.
+
+La mise en forme est **diffusée** : une lettre fait quelques milliers de
+jetons de sortie, et une demande qui les attend en bloc atteint le délai
+de la passerelle avant d'avoir fini. La relecture, qui rend une liste
+courte sous schéma fermé, ne l'est pas.
+
+Les six causes d'échec d'un appel — clé refusée, cadence dépassée,
+service muet — vivent dans `domain/ia/appel.ts` et sont partagées avec la
+lecture des pièces. Deux listes pour une même règle divergent, et c'est
+celle qu'on n'a pas sous les yeux qu'on oublie de corriger.
 
 ### Le balayage antivirus, et la seule issue qui promeut
 

@@ -3,7 +3,13 @@ import { echec } from "@/server/http/echecs";
 import type { PieceRedigeable } from "@/domain/redaction/entretien";
 import type { Version, Paragraphe } from "@/domain/redaction/versions";
 import type { Remarque, GenreRemarque, Ecart } from "@/domain/redaction/relecture";
-import { destinationNommee, type FaitsDuDossier } from "@/domain/redaction/coherence";
+import {
+  AUCUN_RECOUPEMENT,
+  destinationNommee,
+  recoupements,
+  type FaitsDuDossier,
+  type Recoupements,
+} from "@/domain/redaction/coherence";
 import { PIECES_REDIGEABLES, pieceRedigeable } from "@/lib/contenu/redaction";
 
 /**
@@ -136,6 +142,73 @@ export function enParagraphes(texte: string): Paragraphe[] {
         ? { section: premiere.trim(), texte: reste.join("\n").trim() }
         : { section: "", texte: bloc };
     });
+}
+
+/**
+ * Ce que R-04 affiche — la décision, et non sa mise en forme.
+ *
+ * ── Pourquoi elle vit ici, et pas dans la page ──────────────────────
+ *
+ * Elle y vivait, et la fumée du lot la **recopiait** pour l'éprouver.
+ * Une mutation l'a montré : remettre dans la page la condition fautive
+ * — décider sur la présence de la clé plutôt que sur la version —
+ * laissait la fumée entièrement verte. Elle vérifiait un chemin que
+ * personne n'emprunte, ce qui est la façon la plus tranquille de tenir
+ * un garde-fou qui ne garde rien. C'est la règle déjà appliquée aux
+ * sondes de service : **ce qu'une fumée éprouve doit être ce que la
+ * production exécute**.
+ *
+ * ── La décision elle-même ───────────────────────────────────────────
+ *
+ * `critiquedAt` n'est posée que par une analyse qui a abouti. Une liste
+ * de remarques vide **sous une date** est donc un résultat — « relu,
+ * rien à reprendre » — et une absence de date reste une absence.
+ *
+ * La ligne lisait `redactionConfiguree()`, c'est-à-dire la présence
+ * d'`ANTHROPIC_API_KEY`. Aucune analyse n'ayant jamais tourné, la base
+ * rendait `[]` et l'écran l'affichait comme un avis favorable sur une
+ * lettre que personne n'avait lue. Le branchement de la lecture des
+ * pièces a rendu ce chemin ordinaire : toute installation qui veut lire
+ * les pièces pose cette clé.
+ */
+export interface VueDeLaRelecture {
+  /** `null` quand aucune analyse n'a tourné — jamais `[]`. */
+  remarques: readonly Remarque[] | null;
+  /** Recoupements déterministes (RG-08.3), toujours calculés. */
+  recoupements: Recoupements;
+  texteExistant: boolean;
+  /** Le service peut être appelé — jamais « il l'a été ». */
+  analysePossible: boolean;
+  /** Date de la version relue, ISO `AAAA-MM-JJ`. */
+  relectureLe: string;
+}
+
+export async function vueDeLaRelecture(
+  documentId: string,
+  faits: FaitsDuDossier,
+  /** Passée plutôt que lue : la fumée éprouve les deux réponses. */
+  analysePossible: boolean,
+): Promise<VueDeLaRelecture> {
+  const derniere = await db.documentVersion.findFirst({
+    where: { documentId },
+    orderBy: { rank: "desc" },
+    select: { id: true, uploadedAt: true, body: true, critiquedAt: true },
+  });
+
+  const remarques = derniere?.critiquedAt ? await remarquesDeLaVersion(derniere.id) : null;
+
+  /*
+    Les recoupements ne dépendent ni du service ni du quota : la règle
+    d'architecture 2 veut que ce qui est vérifiable sans IA le soit sans
+    IA. Ils tournent donc même quand la rédaction n'est pas branchée.
+  */
+  return {
+    remarques,
+    recoupements: derniere?.body ? recoupements(derniere.body, faits) : AUCUN_RECOUPEMENT,
+    texteExistant: derniere !== null,
+    analysePossible,
+    relectureLe: (derniere?.uploadedAt ?? new Date()).toISOString().slice(0, 10),
+  };
 }
 
 export async function remarquesDeLaVersion(versionId: string): Promise<Remarque[]> {

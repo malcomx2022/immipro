@@ -199,29 +199,70 @@ describe("R-04 rendait un avis favorable sans avoir lu", () => {
     expect(ACTION_RELECTURE.SANS_TEXTE).toBeNull();
     expect(ACTION_RELECTURE.RELUE).not.toBeNull();
   });
+
+  /**
+   * Le défaut que ce lot corrige, pris à la racine : une version jamais
+   * relue devant un service disponible retombait sur « relu, rien à
+   * reprendre ». Elle porte maintenant le seul geste de l'écran.
+   */
+  it("un service disponible sur une version non relue propose l'analyse, il ne conclut pas", () => {
+    const etat = etatDeLaRelecture({
+      remarques: null,
+      texteExistant: true,
+      analysePossible: true,
+    });
+    expect(etat).toBe("A_ANALYSER");
+    expect(resumeSelonLEtat(etat, null)).not.toContain("Rien à reprendre");
+    // RG-08.4 : le geste coûte, et il le dit avant le clic.
+    expect(resumeSelonLEtat(etat, null)).toContain("quota");
+    expect(ACTION_RELECTURE.A_ANALYSER).not.toBeNull();
+  });
+
+  /**
+   * Et la réciproque : une liste vide **sous une relecture réelle** reste
+   * un résultat. Sans elle, la correction aurait supprimé l'état qu'elle
+   * existe pour rendre enfin vrai.
+   */
+  it("une version réellement relue sans remarque dit qu'il n'y a rien à reprendre", () => {
+    const etat = etatDeLaRelecture({
+      remarques: [],
+      texteExistant: true,
+      analysePossible: true,
+    });
+    expect(etat).toBe("RELUE_SANS_REMARQUE");
+    expect(resumeSelonLEtat(etat, [])).toContain("Rien à reprendre");
+  });
 });
 
 describe("aucun service absent n'est simulé", () => {
-  it("la mise en forme et la critique rendent null, jamais un texte", async () => {
-    await expect(
-      REDACTEUR_NON_BRANCHE({
-        type: "lettre-motivation",
-        objet: "Motiver la candidature",
-        pays: "NL",
-        reponses: { 0: "Une réponse." },
-        questions: [{ rang: 0, section: "PARCOURS", intitule: "Ton parcours ?" }],
-      }),
-    ).resolves.toBeNull();
+  /**
+   * Depuis le branchement du 22/09/2026, l'absence ne rend plus `null`
+   * mais **nomme sa cause** : la route en tire le message, et le journal
+   * la ligne que l'exploitant suit. Ce qui n'a pas changé, et qui est
+   * tout, c'est qu'aucun texte n'est fabriqué.
+   */
+  it("la mise en forme et la critique ne rendent aucun texte, et disent pourquoi", async () => {
+    const matiere = {
+      type: "lettre-motivation",
+      objet: "Motiver la candidature",
+      pays: "NL",
+      reponses: { 0: "Une réponse." },
+      questions: [{ rang: 0, section: "PARCOURS", intitule: "Ton parcours ?" }],
+    };
 
-    await expect(
-      CRITIQUE_NON_BRANCHEE("Un texte.", {
-        type: "lettre-motivation",
-        objet: "Motiver la candidature",
-        pays: "NL",
-        reponses: {},
-        questions: [],
-      }),
-    ).resolves.toBeNull();
+    const sansTexte = await REDACTEUR_NON_BRANCHE(matiere);
+    expect(sansTexte.etat).toBe("SANS_TEXTE");
+    expect("texte" in sansTexte).toBe(false);
+    expect(sansTexte).toMatchObject({ cause: "non_configure" });
+
+    const sansAvis = await CRITIQUE_NON_BRANCHEE("Un texte.", matiere);
+    expect(sansAvis.etat).toBe("SANS_AVIS");
+    /*
+      Et surtout pas `remarques: []`, qui se lirait « relu, rien à
+      reprendre » — le défaut que ce lot corrige, à sa source.
+    */
+    expect("remarques" in sansAvis).toBe(false);
+    expect(sansAvis).toMatchObject({ cause: "non_configure" });
   });
 
   it("la clé décide, et l'environnement est passé plutôt que lu", () => {
