@@ -81,6 +81,8 @@ const { arbitrerLaDivergence } = await import("../src/server/dossiers/migration"
 const { ouvrirDossier } = await import("../src/server/acces/dossiers");
 const { remplacementDeLEcheancier } = await import("../src/server/dossiers/echeancier");
 const { divergenceAArbitrer } = await import("../src/server/lecture/alertes");
+const { dateDePeremption } = await import("../src/server/acces/pieces");
+const { declasserLesPiecesEchues } = await import("../src/server/jobs/peremption");
 const { payload } = await import("../src/server/acces/regles");
 const { MENTION_EN_PAUSE } = await import("../src/domain/dossiers/dossier");
 const { editorialDe } = await import("../src/lib/contenu/destinations");
@@ -1030,10 +1032,17 @@ try {
       `sur la v1, le diplôme est complémentaire et ne périme pas (obligatoire=${initiale.required})`,
     );
 
-    /* Le candidat a déjà fourni sa pièce, et elle est conforme. */
+    /* Le candidat a déjà fourni sa pièce, déposée le 1er mai, et elle est conforme. */
+    const DEPOSE = new Date("2026-05-01T09:00:00Z");
+    await db.documentVersion.create({
+      data: {
+        documentId: initiale.id, rank: 1, objectKey: "cle-diplome",
+        uploadedAt: DEPOSE, scanState: "SAINE", scannedAt: DEPOSE,
+      },
+    });
     await db.document.update({
       where: { applicationId_code: { applicationId: dossier.id, code: "diplome" } },
-      data: { status: "CONFORME", feedback: "Lisible et complet.", expiresAt: new Date("2027-03-01") },
+      data: { status: "CONFORME", feedback: "Lisible et complet." },
     });
 
     await propagerLaPublication(v2.id);
@@ -1087,9 +1096,16 @@ try {
       apres.status === "CONFORME" && apres.feedback === "Lisible et complet.",
       `ce que le candidat a produit traverse intact (${apres.status})`,
     );
+    /*
+      La péremption, elle, n'appartient pas au candidat : elle se déduit de
+      sa date de dépôt et de la durée que la règle annonce. La pièce ne
+      périmait pas, la v2 lui donne six mois, et six mois après le 1er mai
+      font le 1er novembre. La laisser nulle aurait dit « ne périme
+      jamais » sous une règle qui la borne.
+    */
     verifier(
-      apres.expiresAt?.toISOString().slice(0, 10) === "2027-03-01",
-      `et la péremption calculée au dépôt n'est pas déplacée (${apres.expiresAt?.toISOString().slice(0, 10)})`,
+      apres.expiresAt?.toISOString().slice(0, 10) === "2026-11-01",
+      `et sa péremption se recalcule depuis son dépôt (${apres.expiresAt?.toISOString().slice(0, 10)})`,
     );
     const total = await db.document.count({ where: { applicationId: dossier.id } });
     verifier(total === PIECES.length, `aucune pièce n'est retirée (${total})`);
@@ -1278,6 +1294,100 @@ try {
     verifier(
       apres.validityMonths === 3,
       `et la checklist porte la nouvelle durée après migration (${apres.validityMonths})`,
+    );
+  }
+
+  console.log("\nRG-06.6 — une pièce déposée ne reste pas conforme sous une durée raccourcie");
+  {
+    /*
+      `expiresAt` est calculée **au dépôt**. Migrer vers une version qui
+      raccourcit la durée la laissait telle quelle, et les deux se
+      contredisaient sur le même écran : « valable 3 mois » d'un côté, une
+      péremption de 2027 de l'autre, statut conforme. La pièce était
+      périmée depuis deux mois, la passe de péremption ne trouvait rien, et
+      le dossier pouvait être déclaré prêt dessus.
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "CM" as const, visaType: "etudes_mvv_vvr" as const,
+      category: "ETUDES" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2029-01-01"), publishedAt: new Date("2026-01-01"),
+    };
+    const PIECES_P = (brute.rules as never as {
+      pieces_requises: { code: string; libelle: string; obligatoire: boolean }[];
+    }).pieces_requises;
+    const avecValidite = (valeur: number) => ({
+      ...(brute.rules as object),
+      pieces_requises: PIECES_P.map((x) =>
+        x.code === "diplome" ? { ...x, obligatoire: true, validite_mois: valeur } : x,
+      ),
+    });
+
+    /* Déposé il y a cinq mois, sous une règle qui donnait douze mois. */
+    const DEPOSE = new Date("2026-04-22T10:00:00Z");
+    const MAINTENANT = new Date("2026-09-22T10:00:00Z");
+
+    const v1 = await db.visaRule.create({
+      data: { ...socle, version: 1, status: "PUBLISHED", rules: avecValidite(12) as never },
+    });
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-pub-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const dossier = await ouvrirDossier(candidat.id, v1.id, new Date("2027-09-01"));
+    await db.application.update({ where: { id: dossier.id }, data: { status: "ACTIF" } });
+
+    const piece = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "diplome" },
+    });
+    await db.documentVersion.create({
+      data: {
+        documentId: piece.id, rank: 1, objectKey: "cle",
+        uploadedAt: DEPOSE, scanState: "SAINE", scannedAt: DEPOSE,
+      },
+    });
+    await db.document.update({
+      where: { id: piece.id },
+      data: { status: "CONFORME", expiresAt: dateDePeremption(12, DEPOSE) },
+    });
+    const initiale = await db.document.findUniqueOrThrow({ where: { id: piece.id } });
+    verifier(
+      initiale.expiresAt?.toISOString().slice(0, 10) === "2027-04-22",
+      `la pièce déposée périme dans un an (${initiale.expiresAt?.toISOString().slice(0, 10)})`,
+    );
+
+    await db.visaRule.update({
+      where: { id: v1.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    const v2 = await db.visaRule.create({
+      data: { ...socle, version: 2, status: "PUBLISHED", rules: avecValidite(3) as never },
+    });
+    await propagerLaPublication(v2.id, MAINTENANT);
+
+    const migration = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: dossier.id, toRuleId: v2.id },
+    });
+    const frais = await db.application.findUniqueOrThrow({ where: { id: dossier.id } });
+    await arbitrerLaDivergence(frais, migration.id, "MIGRER", MAINTENANT);
+
+    const apres = await db.document.findUniqueOrThrow({ where: { id: piece.id } });
+    verifier(
+      apres.expiresAt?.toISOString().slice(0, 10) === "2026-07-22",
+      `la péremption se recalcule depuis le dépôt, pas depuis l'ancienne date (${apres.expiresAt?.toISOString().slice(0, 10)})`,
+    );
+
+    /*
+      Et la suite ne s'invente pas ici : la passe de péremption reprend la
+      pièce avec le message actionnable qu'elle sait déjà écrire.
+    */
+    const bilan = await declasserLesPiecesEchues(MAINTENANT);
+    const final = await db.document.findUniqueOrThrow({ where: { id: piece.id } });
+    verifier(
+      bilan.pieces === 1 && final.status === "EXPIREE" && final.remedy === "REMPLACER",
+      `la passe du jour la déclasse et dit quoi faire (${final.status}/${final.remedy}, ${JSON.stringify(bilan)})`,
     );
   }
 } catch (erreur) {

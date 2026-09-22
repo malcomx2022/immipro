@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { checklistDepuis } from "@/server/acces/dossiers";
+import { dateDePeremption } from "@/server/acces/pieces";
 import type { VisaRulesPayload } from "@/domain/rules/schema";
 
 /**
@@ -58,6 +59,30 @@ import type { VisaRulesPayload } from "@/domain/rules/schema";
  * disparu. Une pièce devenue simplement complémentaire, elle, figure
  * encore dans la nouvelle checklist et se réaligne comme les autres.
  *
+ * ── La date de péremption suit la durée, pas l'inverse ──────────────
+ *
+ * `expiresAt` est calculée **au dépôt**, à partir de la durée de validité
+ * d'alors. Migrer vers une version qui raccourcit cette durée la laissait
+ * telle quelle, et les deux se contredisaient sur le même écran :
+ *
+ *     déposé le 2026-04-22, validité 12 mois → péremption 2027-04-22
+ *     la v2 ramène la validité à 3 mois
+ *     après migration : validité annoncée 3 mois
+ *                       péremption        2027-04-22   statut CONFORME
+ *                       ce qu'elle vaut   2026-07-22
+ *
+ * La pièce était périmée depuis deux mois, la plateforme la déclarait
+ * conforme, et la passe de péremption ne trouvait rien à déclasser : le
+ * dossier pouvait être déclaré prêt sur une pièce que l'autorité
+ * refuserait.
+ *
+ * Elle se recalcule donc depuis la date de dépôt réelle — `uploadedAt` de
+ * la dernière version, et non `expiresAt` moins l'ancienne durée : une
+ * date se lit, elle ne se déduit pas d'une autre date par soustraction.
+ * Si la nouvelle échéance est déjà passée, `declasserLesPiecesEchues` la
+ * reprend à sa passe suivante, avec le message actionnable qu'elle sait
+ * déjà écrire. Rien à inventer ici.
+ *
  * ── Ce qui suit la règle, et ce qui appartient au candidat ──────────
  *
  * Ne se réalignent que les propriétés qui **décrivent l'exigence**, celles
@@ -90,7 +115,12 @@ export async function realignementDeLaChecklist(
   const attendues = checklistDepuis(p);
   const existantes = await db.document.findMany({
     where: { applicationId },
-    select: { code: true, label: true, family: true, required: true, remedy: true, validityMonths: true },
+    select: {
+      code: true, label: true, family: true, required: true, remedy: true,
+      validityMonths: true,
+      // La date de dépôt réelle, d'où la péremption se recalcule.
+      versions: { orderBy: { uploadedAt: "desc" }, take: 1, select: { uploadedAt: true } },
+    },
   });
   const connues = new Map(existantes.map((d) => [d.code, d]));
 
@@ -115,6 +145,9 @@ export async function realignementDeLaChecklist(
     operations.push(db.document.createMany({ data: aCreer.map((p) => ({ ...p, applicationId })) }));
   }
   for (const piece of aRealigner) {
+    const connue = connues.get(piece.code as string)!;
+    const validite = (piece.validityMonths as number | null) ?? null;
+    const depose = connue.versions[0]?.uploadedAt ?? null;
     operations.push(
       db.document.update({
         where: { applicationId_code: { applicationId, code: piece.code as string } },
@@ -123,7 +156,15 @@ export async function realignementDeLaChecklist(
           family: piece.family,
           required: piece.required,
           remedy: piece.remedy,
-          validityMonths: piece.validityMonths ?? null,
+          validityMonths: validite,
+          /*
+            Seulement si la durée a bougé, et seulement sur une pièce
+            réellement déposée : sans version, il n'y a pas de date de
+            départ, et une péremption sans dépôt ne veut rien dire.
+          */
+          ...(validite !== (connue.validityMonths ?? null) && depose !== null
+            ? { expiresAt: dateDePeremption(validite, depose) }
+            : {}),
         },
       }),
     );

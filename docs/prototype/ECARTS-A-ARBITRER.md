@@ -8506,3 +8506,61 @@ de la même façon.
 candidat qui a déjà déposé sa pièce sous six mois garde une péremption calculée
 sur six, alors que sa checklist en annonce trois. C'est désormais visible : la
 divergence le prévient avant qu'il tranche, et la date, elle, ne suit pas.
+
+---
+
+## S.65 — La pièce périmée que la plateforme déclarait conforme
+
+Le point ouvert en S.62 puis en S.64. Je l'avais écrit comme demandant un
+arbitrage produit : « une date de péremption qu'il a déjà vue et qui recule est
+une information, pas une correction silencieuse ». En l'ouvrant, l'arbitrage
+s'est dissous — parce que la plateforme sait déjà dire cette information, et
+parce que ne rien faire n'était pas la position neutre.
+
+`expiresAt` est calculée **au dépôt**, à partir de la durée d'alors. Migrer vers
+une version qui raccourcit cette durée la laissait telle quelle.
+
+**Établi par exécution.** Une pièce déposée le 22 avril sous une validité de
+douze mois, une v2 qui la ramène à trois :
+
+```
+après migration : validité annoncée 3 mois
+                  péremption        2027-04-22   statut CONFORME
+                  ce qu'elle vaut   2026-07-22
+
+la passe de péremption du jour : {"pieces":0,"dossiers":0,"redescendus":0}
+```
+
+La pièce était périmée depuis deux mois. La checklist annonçait trois mois, la
+pièce en portait douze, et les deux se contredisaient sur le même écran. La
+passe de péremption ne trouvait rien à déclasser, et le dossier pouvait être
+déclaré prêt sur une pièce que l'autorité refuserait.
+
+**Pourquoi il n'y avait pas d'arbitrage à rendre.** Ne pas recalculer, ce
+n'était pas s'abstenir : c'était affirmer une validité que la règle du dossier
+dément. Et la suite ne demande rien d'inventé —
+`declasserLesPiecesEchues` reprend la pièce à sa passe suivante, la passe en
+`EXPIREE`, pose `remedy: REMPLACER` et écrit le message actionnable qu'elle sait
+déjà écrire. Vérifié de bout en bout :
+
+```
+la péremption se recalcule depuis le dépôt      : 2026-07-22
+la passe du jour la déclasse et dit quoi faire  : EXPIREE/REMPLACER
+```
+
+**La date se lit, elle ne se déduit pas.** Le recalcul part de `uploadedAt` de
+la dernière version — la date de dépôt réelle —, et non de `expiresAt` moins
+l'ancienne durée. Les deux donneraient le même résultat aujourd'hui ; la
+soustraction cesserait d'être vraie le jour où une péremption serait écrite par
+un autre chemin.
+
+Une pièce **sans version déposée** n'est pas touchée : sans dépôt, il n'y a pas
+de date de départ, et une péremption sans dépôt ne veut rien dire.
+
+**Une assertion qui passait pour la mauvaise raison.** Celle de S.62, « la
+péremption calculée au dépôt n'est pas déplacée », passait encore après ce
+correctif — mais parce que sa fixture n'avait aucune `DocumentVersion`, pas
+parce que la règle tenait. Elle porte désormais une version déposée et vérifie
+la date recalculée. La frontière de S.62 s'affine : `status`, le fichier,
+l'extraction et le retour d'analyse appartiennent au candidat ; la **péremption**
+se déduit de son dépôt et de la règle, et suit donc la règle.
