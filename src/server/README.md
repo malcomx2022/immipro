@@ -688,6 +688,44 @@ Le dernier point compte autant : réécrire une phrase ne change aucune
 exigence, et faire partir une alerte à tous les dossiers ouverts parce
 qu'un texte a été clarifié apprend à ignorer les suivantes.
 
+### Un dossier en pause, et les trois phrases qui disaient le contraire
+
+Correctif du 23/09/2026. WF-11 met en pause le dossier d'un candidat dont
+une condition d'éligibilité vient de changer — c'est le lot de la veille.
+Restait à savoir ce que ce candidat lit en ouvrant son dossier.
+
+```
+── Le même dossier, mis en pause par une divergence critique ──
+  en base            : SUSPENDU
+  bandeau du dossier : « Actif »
+  palier             : COMPLET
+  prochaine action   : « Rien ne bloque un dépôt. »
+  « Je dépose »      : refusé — « Ton dossier n'est pas encore complet :
+                       il reste des pièces obligatoires à réunir.
+                       La checklist dit lesquelles. »
+```
+
+Trois phrases sur le même écran, fausses toutes les trois. `SUSPENDU`
+n'avait pas de mot dans le vocabulaire candidat : `versStatut` le rendait
+`ACTIF`. Toutes les pièces étant conformes, la prochaine action annonçait
+que rien ne bloquait un dépôt — sur le seul dossier dont le dépôt était
+bloqué. Et le refus envoyait relire une checklist complète en cherchant des
+pièces qui ne manquaient pas.
+
+La notification, elle, disait juste : « Ton dossier est mis en pause le
+temps que tu regardes. » Mais elle vit sur l'écran des alertes, et le
+candidat qui ouvre son dossier ne la voit pas.
+
+`StatutDossier` porte donc `EN_PAUSE`. Le mot n'est pas nouveau — le
+courrier et la notification de WF-11 l'employaient déjà —, il manquait à
+l'écran du dossier. `MENTION_EN_PAUSE` dit le constat, ce qui est conservé,
+et **où se prend la décision** : une pause qu'on ne sait pas lever n'est
+pas actionnable, et la décision ne se prend pas sur l'écran du dossier.
+
+Trois conséquences, et une quatrième qui se déduit : dans la liste des
+dossiers, celui qui est en pause passe devant. C'est le seul qu'aucune
+pièce ne fera avancer.
+
 ### Ce qui s'affiche, et ce qui est en vigueur
 
 Correctif du 23/09/2026, né de la rencontre de deux passes justes.

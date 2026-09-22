@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { PURGE_JOURS, type IssueDemarche } from "@/domain/dossiers/cloture";
+import { MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDePurge } from "@/server/acces/dossiers";
 
 /**
@@ -49,6 +50,15 @@ export async function declarerLeDepot(
   dossier: Application,
   maintenant: Date = new Date(),
 ): Promise<Application> {
+  /*
+    Deux refus, parce qu'il y a deux raisons et qu'elles n'appellent pas le
+    même geste. Le message unique envoyait chercher des pièces manquantes
+    un candidat dont le dossier était complet et seulement mis en pause :
+    il relisait une checklist entière sans y trouver quoi que ce soit.
+  */
+  if (dossier.status === "SUSPENDU") {
+    throw echec("etat_incompatible", { corps: MENTION_EN_PAUSE });
+  }
   if (dossier.status !== "PRET") {
     throw echec("etat_incompatible", {
       corps:

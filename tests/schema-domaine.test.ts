@@ -78,13 +78,27 @@ describe("le schéma et le domaine nomment les mêmes choses", () => {
   });
 
   it("statuts de dossier — ApplicationStatus / StatutDossier", () => {
-    // Le domaine candidat n'expose pas les états internes SUSPENDU,
-    // ISSUE_DECLAREE, ABANDONNE et ARCHIVE : ils existent en base et dans le
-    // back-office, pas dans les écrans du candidat.
-    const candidat: StatutDossier[] = ["BROUILLON", "ACTIF", "PRET", "SOUMIS", "CLOTURE"];
+    /*
+      Le domaine candidat n'expose pas `ISSUE_DECLAREE`, `ABANDONNE` ni
+      `ARCHIVE` : trois fins de vie que l'écran réunit sous « Clôturé ».
+
+      `SUSPENDU` y était aussi, et c'était une erreur : il s'affichait
+      « Actif » sur un dossier que WF-11 venait de mettre en pause, et
+      l'écran annonçait alors « Rien ne bloque un dépôt » sur le seul
+      dossier dont le dépôt était bloqué. Il a son mot depuis le
+      23/09/2026 — `EN_PAUSE`, que le courrier de WF-11 employait déjà.
+    */
+    const candidat: StatutDossier[] = [
+      "BROUILLON",
+      "ACTIF",
+      "PRET",
+      "EN_PAUSE",
+      "SOUMIS",
+      "CLOTURE",
+    ];
     const base = valeursDeLEnum("ApplicationStatus");
     for (const statut of candidat) {
-      if (statut === "CLOTURE") continue;
+      if (statut === "CLOTURE" || statut === "EN_PAUSE") continue;
       expect(base, statut).toContain(statut);
     }
     expect(trie(Object.keys(LIBELLE_STATUT))).toEqual(trie(candidat));

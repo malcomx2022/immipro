@@ -7414,3 +7414,78 @@ produire n'éprouve rien.
 
 Les trois ne mordent que dans la fumée : ce sont des décisions de base, et
 une règle pure ne peut pas éprouver la rencontre de deux passes nocturnes.
+
+---
+
+### S.49 — Trois phrases sur le même écran, fausses toutes les trois
+
+Le lot précédent avait rendu la mise en pause fiable : WF-11 suspend le
+dossier d'un candidat dont une condition d'éligibilité vient de changer, lui
+écrit, et lui laisse l'arbitrage. Restait à savoir ce que ce candidat lit en
+ouvrant son dossier.
+
+```
+── Dossier complet, avant la divergence ──
+  en base            : PRET
+  bandeau du dossier : « Prêt à déposer »
+  prochaine action   : « Rien ne bloque un dépôt. »
+
+── Le même dossier, mis en pause par une divergence critique ──
+  en base            : SUSPENDU
+  bandeau du dossier : « Actif »
+  palier             : COMPLET
+  prochaine action   : « Rien ne bloque un dépôt. »
+  « Je dépose »      : refusé — « Ton dossier n'est pas encore complet :
+                       il reste des pièces obligatoires à réunir.
+                       La checklist dit lesquelles. »
+```
+
+`SUSPENDU` n'avait pas de mot dans le vocabulaire candidat : `versStatut` le
+rendait `ACTIF`, et le bandeau disait « en cours » sur un dossier en pause.
+
+Toutes les pièces étant conformes — c'est le cas ordinaire, puisque la
+divergence frappe les dossiers avancés —, la prochaine action annonçait
+« Rien ne bloque un dépôt » sur le seul dossier dont le dépôt était bloqué.
+
+Et le refus du dépôt donnait la seule raison qu'il connaissait : des pièces
+obligatoires manquantes. Il n'en manquait aucune. Le candidat relisait une
+checklist entière en cherchant ce qui n'y était pas — c'est exactement ce
+que la doctrine d'erreur du projet interdit, un message qui ne se corrige
+pas.
+
+La notification, elle, disait juste : « Ton dossier est mis en pause le
+temps que tu regardes. » Mais elle vit sur l'écran des alertes ; celui qui
+ouvre son dossier ne la voit pas.
+
+#### Le mot existait déjà dans le produit
+
+`EN_PAUSE` entre dans `StatutDossier`. Il n'est pas inventé : le courrier de
+RG-11.3 et le corps de la notification emploient « mis en pause » depuis que
+WF-11 existe. Il manquait à un seul endroit — l'écran du dossier — et c'est
+là que le candidat regarde.
+
+`MENTION_EN_PAUSE` dit le constat, ce qui est conservé, et **où la décision
+se prend**. Une pause qu'on ne sait pas lever n'est pas actionnable, et elle
+ne se lève pas sur l'écran du dossier : l'arbitrage vit dans les alertes.
+
+La même phrase sert aux trois endroits — bandeau, prochaine action, refus du
+dépôt — parce que c'est la même chose qui est vraie aux trois.
+
+Et une quatrième conséquence s'en déduit : dans la liste des dossiers, celui
+qui est en pause passe devant. C'est le seul qu'aucune pièce ne fera
+avancer.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| un dossier en pause se relit « Actif » | les essais purs, et deux assertions de la fumée |
+| la prochaine action ignore la pause | les essais, et la fumée |
+| la vue ne passe plus l'état à la prochaine action | la fumée seule — c'est un câblage |
+| le refus du dépôt redevient unique | la fumée seule |
+| la pause ne passe plus devant dans la liste | les essais seuls |
+| la mention ne dit plus où décider | les essais seuls |
+
+Le partage est net : ce que le domaine décide est rouge dans les essais, ce
+que la vue câble l'est dans la fumée. Deux mutations rouges des deux côtés :
+ce sont celles qui portent la règle elle-même.
