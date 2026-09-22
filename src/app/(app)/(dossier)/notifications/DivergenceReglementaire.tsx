@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { SourceNote } from "@/components/ui/SourceNote";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import type { Arbitrage, VersionRegle } from "@/domain/notifications/divergence";
 import {
   MENTION_HISTORIQUE,
   MENTION_SANS_ACCORD,
   ecartMontant,
+  libelleDelaiVersion,
   libelleImpact,
   mentionArbitrage,
   optionsArbitrage,
@@ -26,10 +31,30 @@ import { formatMontant } from "@/lib/utils";
  *
  * Aucune option n'est présélectionnée : un arbitrage pré-coché n'est pas un
  * arbitrage.
+ *
+ * ── Un arbitrage qu'on ne recueillait pas ───────────────────────────
+ *
+ * Le bouton fermait la feuille. Rien ne partait, rien n'était écrit, et
+ * l'écran annonçait pourtant « Ta checklist Pays-Bas **sera** mise à
+ * jour » — au futur, pour un geste qui n'aurait jamais lieu. Exécuté avant
+ * correction, après un choix « Migrer » et un clic :
+ *
+ *     appels réseau partis    : 0
+ *     la feuille s'est fermée : true
+ *     ce que l'écran lui dit  : « Ta checklist Pays-Bas sera mise à jour. »
+ *     et plus haut            : « Nous ne modifions rien sans ton accord. »
+ *
+ * La promesse du haut d'écran n'était tenue que parce que rien n'était
+ * jamais modifié. `arbitrerLaDivergence` existait, éprouvée par une fumée,
+ * et n'avait aucun appelant : les props ne portaient même pas de quoi
+ * nommer le dossier ni la divergence.
  */
 export interface DivergenceProps {
   ouverte: boolean;
   onFermer: () => void;
+  /** Le dossier et la divergence, pour que le choix puisse être écrit. */
+  dossierId: string;
+  migrationId: string;
   pays: string;
   ancienne: VersionRegle;
   nouvelle: VersionRegle;
@@ -47,6 +72,8 @@ export interface DivergenceProps {
 export function DivergenceReglementaire({
   ouverte,
   onFermer,
+  dossierId,
+  migrationId,
   pays,
   ancienne,
   nouvelle,
@@ -55,11 +82,40 @@ export function DivergenceReglementaire({
   verifieeLe,
   source,
 }: DivergenceProps) {
+  const router = useRouter();
   const [choix, setChoix] = useState<Arbitrage | null>(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
   const montant = (v: VersionRegle) => formatMontant(v.montant, v.devise);
   const options = optionsArbitrage(ancienne, nouvelle, montant(ancienne), montant(nouvelle));
   const retenue = options.find((o) => o.cle === choix);
+
+  /**
+   * L'arbitrage part, et la feuille ne se ferme qu'une fois écrit.
+   *
+   * Fermer d'abord ferait disparaître le seul endroit où l'échec peut se
+   * lire — et sur une décision qui déplace un échéancier entier, « ça n'a
+   * pas marché » doit se voir là où le geste a été fait. `router.refresh()`
+   * parce que la page est rendue côté serveur : sans lui, la liste
+   * garderait l'alerte que l'on vient de trancher.
+   */
+  async function appliquer() {
+    if (!choix) return;
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler(
+      `/api/dossiers/${dossierId}/migrations/${migrationId}`,
+      { corps: { decision: choix } },
+    );
+    if (resultat.ok) {
+      onFermer();
+      router.refresh();
+      return;
+    }
+    setEnvoi(false);
+    setEchec(resultat.echec);
+  }
 
   return (
     <BottomSheet
@@ -112,12 +168,14 @@ export function DivergenceReglementaire({
       </SourceNote>
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-3">
+        {echec ? <BlocEchec echec={echec} /> : null}
         <Button
           pleineLargeur
           className="min-h-action"
           disabled={!retenue}
+          chargement={envoi}
           raisonDesactivation="Choisis d'abord la version à appliquer : nous ne modifions rien sans ton accord."
-          onClick={onFermer}
+          onClick={() => void appliquer()}
         >
           {retenue ? retenue.titre : "Appliquer mon choix"}
         </Button>
@@ -144,6 +202,10 @@ function CarteVersion({ version, statut }: { version: VersionRegle; statut: stri
         {formatMontant(version.montant, version.devise)}
       </span>
       <span className="text-14 text-ink-700">{version.intitule}</span>
+      {/* Le délai décide de la date de dépôt : une carte de version qui
+          ne le porte pas laisse croire que seul le montant sépare les
+          deux. */}
+      <span className="text-14 text-ink-700">{libelleDelaiVersion(version)}</span>
       <span className="text-pretty text-13 text-ink-500">
         Publiée le {jour(version.publieeLe)}
         {version.applicableJusquau

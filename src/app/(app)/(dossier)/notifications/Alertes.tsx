@@ -35,6 +35,9 @@ export interface AlertesProps {
    * changement critique, personne ne l'ouvre.
    */
   divergence?: {
+    /** De quoi écrire l'arbitrage : sans eux, l'écran ne peut que se fermer. */
+    dossierId: string;
+    migrationId: string;
     pays: string;
     ancienne: VersionRegle;
     nouvelle: VersionRegle;

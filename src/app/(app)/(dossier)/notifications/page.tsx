@@ -46,6 +46,8 @@ export default async function PageNotifications() {
 
   const divergence = migration
     ? await divergenceAArbitrer(migration.id, acteur.id).then((vue) => ({
+        dossierId: migration.applicationId,
+        migrationId: migration.id,
         pays: vue.destination,
         ancienne: vue.ancienne,
         nouvelle: vue.nouvelle,
