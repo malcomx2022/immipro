@@ -772,6 +772,39 @@ seconde répare au passage un silence de RG-14.4 — la version remplacée porte
 enfin sa date de fin, même lorsqu'elle était en brouillon au moment d'être
 remplacée.
 
+### Une règle entre en base par deux chemins, et un seul contrôlait
+
+Correctif du 23/09/2026. CLAUDE.md annonce « une seule liste, quatre points
+d'application » pour le vocabulaire interdit, et nomme B-02 pour les textes
+d'une règle. B-02 le fait. Mais B-02 n'est qu'un des **deux** chemins par
+lesquels une règle entre en base : l'autre est la graine, qui charge le
+référentiel livré — et elle ne contrôlait que la forme et la terminabilité.
+
+Le référentiel portait donc, en base et à l'écran :
+
+```
+NL etudes_mvv_vvr  1 faute(s)
+  conditions.2.message_echec · « 50 % »
+  → arbitrage C-09 — aucune part affichée sur le dossier
+```
+
+C'est un `message_echec`, c'est-à-dire la phrase que le candidat lit sur sa
+pièce quand la condition échoue. La publication l'aurait refusée ; la graine
+l'a chargée.
+
+`refusDuReferentiel` réunit les deux refus de contenu — terminabilité et
+vocabulaire — et les **deux chemins l'appellent**. Deux listes de mots
+refusés finiraient par diverger, et c'est celle de la graine qui gagnerait,
+puisque c'est elle qui charge la production.
+
+**Le texte a été réécrit, pas excepté.** `copy-exceptions.json` était
+l'autre issue, et le projet la prévoit. Elle n'a pas été prise : le budget
+est de cinq dérogations, et « moins de la moitié de ses crédits annuels »
+dit exactement « moins de 50 % » en toutes lettres. Une dérogation se
+dépense pour ce qui n'a pas d'équivalent — ici, le seuil réglementaire reste
+dit, et `valeur: 50` reste dans la condition, où il sert à comparer et n'est
+jamais affiché.
+
 ### La relecture par un second opérateur, et ce qu'elle n'était pas
 
 WF-14 §4 : « Relecture par un second opérateur pour toute modification de

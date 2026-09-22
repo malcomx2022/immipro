@@ -7489,3 +7489,81 @@ avancer.
 Le partage est net : ce que le domaine décide est rouge dans les essais, ce
 que la vue câble l'est dans la fumée. Deux mutations rouges des deux côtés :
 ce sont celles qui portent la règle elle-même.
+
+---
+
+### S.50 — Le seul texte candidat que la liste ne voyait pas
+
+CLAUDE.md énonce la règle du vocabulaire interdit et son périmètre : « Une
+seule liste, quatre points d'application : un administrateur qui saisit une
+promesse dans un guide pays bute sur la même règle qu'un développeur. »
+B-02 y figure, pour les textes d'une règle.
+
+La question posée au référentiel réel : **cette liste passe-t-elle sur le
+référentiel livré ?**
+
+```
+Le vocabulaire interdit, passé sur le référentiel livré :
+
+  NL etudes_mvv_vvr              1 faute(s)
+      conditions.2.message_echec · « 50 % »
+      → arbitrage C-09 — aucune part affichée sur le dossier
+  NL emploi_kennismigrant        0 faute(s)
+  CH etudes_permis_b             0 faute(s)
+  AE etudes_residence_etudiante  0 faute(s)
+```
+
+Le texte : « L'établissement signale à l'IND tout étudiant validant moins de
+**50 %** de ses crédits annuels, ce qui peut entraîner le retrait du titre de
+séjour. » C'est un `message_echec`, donc la phrase que le candidat lit sur sa
+pièce quand la condition échoue.
+
+Une règle entre en base par **deux** chemins : la publication de B-02, et la
+graine. B-02 refuse ce texte. La graine l'a chargé — elle ne contrôlait que
+la forme (Zod) et la terminabilité (S.42). C'était le seul chemin d'écriture
+d'un texte candidat qui n'appliquait pas la liste.
+
+Le contrôle du dépôt ne le voyait pas non plus, et à juste titre :
+`check:copy` applique `INTERDITS_PARTOUT` — les promesses de résultat — à
+tout le dépôt, mais la seconde portée, celle de la note de dossier, ne vaut
+que pour ce que le candidat lit. Le fichier de données n'est pas un écran ;
+son contenu, lui, en est un.
+
+#### Une fonction, deux appelants
+
+`refusDuReferentiel` réunit les deux refus de contenu — terminabilité et
+vocabulaire — et les deux chemins l'appellent. C'est la leçon de S.42, une
+fois de plus : deux listes de mots refusés finiraient par diverger, et c'est
+celle de la graine qui gagnerait, puisque c'est elle qui charge la
+production.
+
+#### Réécrit plutôt qu'excepté
+
+`copy-exceptions.json` était l'autre issue, et CLAUDE.md la prévoit
+explicitement : « chaîne exacte, chemin, motif, date ». Elle n'a pas été
+prise.
+
+Le budget est de cinq dérogations — « au-delà, ce n'est plus une exception,
+c'est une dérive » —, et « moins de la moitié de ses crédits annuels » dit
+exactement « moins de 50 % » en toutes lettres, sans perdre un mot de
+l'information réglementaire. Une dérogation se dépense pour ce qui n'a pas
+d'équivalent.
+
+Le seuil lui-même n'a pas bougé : `valeur: 50` reste dans la condition, où
+il sert à comparer et n'est jamais affiché. C'est précisément la distinction
+que l'arbitrage C-09 pose — le barème vit, il ne s'affiche pas.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le pourcentage revient dans le référentiel | les essais purs |
+| le refus partagé oublie le vocabulaire | les essais |
+| le refus partagé oublie la terminabilité | les essais — la fumée reste verte, ses règles sont terminables |
+| le motif « pourcentage » quitte la liste | les essais, dont celui qui éprouve le motif lui-même |
+| la publication ne refuse plus rien | la fumée |
+
+Et deux vérifications que seul un chargement réel donne : la graine charge
+les quatre procédures sur une base neuve, et refuse le texte fautif sans
+rien insérer, avec le message que l'opérateur lit — l'extrait et le chemin
+du champ à reprendre.

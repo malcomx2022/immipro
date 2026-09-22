@@ -3,6 +3,11 @@ import {
   verifierTexte,
   type Faute,
 } from "@/domain/copy/vocabulaire-interdit";
+import {
+  raisonsDIncompletabilite,
+  textesCandidat,
+  type VisaRulesPayload,
+} from "@/domain/rules/schema";
 
 /**
  * Édition d'une règle versionnée — B-02, WF-14, INV-3 et INV-8.
@@ -230,3 +235,29 @@ export interface FauteDePayload {
 /** Même forme de message que B-02 : la formulation exacte, puis où la corriger. */
 export const messageDeRefusPayload = (faute: FauteDePayload): string =>
   `« ${faute.extrait} » ne peut pas s'afficher chez le candidat — ${faute.raison}. Reformule le champ « ${faute.chemin} ».`;
+
+/**
+ * Ce qui interdit à une règle d'entrer en base — les trois refus réunis.
+ *
+ * Une règle entre en base par **deux** chemins : la publication de B-02, et
+ * la graine qui charge le référentiel livré. Ils appliquaient des contrôles
+ * différents — la graine ignorait le vocabulaire —, et le référentiel a
+ * donc embarqué « moins de 50 % de ses crédits annuels » dans un
+ * `message_echec`, c'est-à-dire une phrase que le candidat lit sur sa pièce
+ * et que la publication refuse.
+ *
+ * Les deux chemins appellent cette fonction. Elle rend le premier motif de
+ * refus, déjà rédigé pour l'opérateur, ou `null`.
+ *
+ * Le contrôle de forme (Zod) n'y figure pas : il rend un payload typé, et
+ * c'est lui qui donne l'argument de cette fonction.
+ */
+export function refusDuReferentiel(payload: VisaRulesPayload): string | null {
+  const impossibles = raisonsDIncompletabilite(payload);
+  if (impossibles.length > 0) return impossibles[0]!;
+
+  const fautes = verifierPayloadCandidat(textesCandidat(payload));
+  if (fautes.length > 0) return messageDeRefusPayload(fautes[0]!);
+
+  return null;
+}

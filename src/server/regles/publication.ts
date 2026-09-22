@@ -2,13 +2,8 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { getQueue, JOBS, poster } from "@/lib/queue";
-import {
-  visaRulesSchema,
-  peutEtrePubliee,
-  raisonsDIncompletabilite,
-  textesCandidat,
-} from "@/domain/rules/schema";
-import { verifierPayloadCandidat, messageDeRefusPayload } from "@/domain/backoffice/regle";
+import { visaRulesSchema, peutEtrePubliee } from "@/domain/rules/schema";
+import { refusDuReferentiel } from "@/domain/backoffice/regle";
 import {
   comparerLesVersions,
   relectureExigee,
@@ -77,21 +72,20 @@ export async function publierLaRegle(
     });
   }
 
-  const fautes = verifierPayloadCandidat(textesCandidat(lu.data));
-  if (fautes.length > 0) {
-    throw echec("etat_incompatible", { corps: messageDeRefusPayload(fautes[0]!) });
-  }
-
   /*
-    Et la règle doit pouvoir être terminée. Une condition bloquante qui ne
-    nomme aucune pièce n'est satisfaite par aucun dépôt : le dossier
-    resterait `ACTIF` avec une exigence que le candidat ne peut lever. Le
-    refus est ici parce que c'est le dernier moment où personne n'a encore
-    ouvert de dossier dessus.
+    Les deux refus de contenu, réunis dans une fonction que la **graine**
+    appelle aussi : une règle entre en base par deux chemins, et ils
+    appliquaient des contrôles différents. Le vocabulaire manquait du côté
+    de la graine, et le référentiel livré portait donc une formulation que
+    cette route refuse.
+
+    Le second refus — une règle qu'aucun dépôt ne pourrait terminer — est
+    ici parce que c'est le dernier moment où personne n'a encore ouvert de
+    dossier dessus.
   */
-  const impossibles = raisonsDIncompletabilite(lu.data);
-  if (impossibles.length > 0) {
-    throw echec("etat_incompatible", { corps: impossibles[0]! });
+  const refus = refusDuReferentiel(lu.data);
+  if (refus !== null) {
+    throw echec("etat_incompatible", { corps: refus });
   }
 
   /*

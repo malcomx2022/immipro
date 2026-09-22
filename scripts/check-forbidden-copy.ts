@@ -8,7 +8,19 @@
  *
  * La liste vit dans `src/domain/copy/vocabulaire-interdit.ts`, partagée avec
  * le test de l'interface candidat et avec la validation à l'enregistrement
- * côté back-office. Une seule liste, trois points d'application.
+ * côté back-office.
+ *
+ * Ce script applique `INTERDITS_PARTOUT` — les promesses de résultat — à
+ * tout le dépôt. La seconde portée, celle de la note de dossier, ne vaut
+ * que pour ce que le candidat lit : le test de l'interface candidat la
+ * passe sur les écrans, la validation de B-02 sur les textes d'une règle
+ * saisie, et — depuis le 23/09/2026 — la graine sur le référentiel livré.
+ *
+ * Cette dernière manquait, et ce n'était pas théorique : le référentiel
+ * portait « moins de 50 % de ses crédits annuels » dans un `message_echec`,
+ * c'est-à-dire une phrase que le candidat lit sur sa pièce et que la
+ * publication refuse. La graine était le seul chemin d'écriture d'un texte
+ * candidat qui ne contrôlait rien.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname } from "node:path";

@@ -3,8 +3,8 @@ import {
   visaRulesSchema,
   SCHEMA_VERSION,
   peutEtrePubliee,
-  raisonsDIncompletabilite,
 } from "../../src/domain/rules/schema";
+import { refusDuReferentiel } from "../../src/domain/backoffice/regle";
 import { REGLES_DE_REFERENCE } from "./visa-rules.data";
 
 const prisma = new PrismaClient();
@@ -14,13 +14,19 @@ async function main() {
     // 1. Validation du payload
     const payload = visaRulesSchema.parse(r.rules);
 
-    // 2. Garde-fou : une règle qu'aucun dépôt ne pourrait terminer ne
-    //    s'insère pas. Elle passerait la validation de forme — la pièce
-    //    porteuse d'une condition est facultative — et laisserait chaque
-    //    dossier ouvert dessus bloqué pour toujours.
-    const impossibles = raisonsDIncompletabilite(payload);
-    if (impossibles.length > 0) {
-      throw new Error(`${r.countryCode}/${r.visaType} : ${impossibles.join(" ")}`);
+    // 2. Garde-fous de contenu, les mêmes que ceux de la publication.
+    //
+    //    Une règle entre en base par deux chemins : B-02, et cette graine.
+    //    Ils appliquaient des contrôles différents — la graine ignorait le
+    //    vocabulaire —, et le référentiel livré portait donc « moins de
+    //    50 % de ses crédits annuels » dans un `message_echec`, c'est-à-dire
+    //    une phrase que le candidat lit sur sa pièce et que la publication
+    //    refuse. Une règle qu'aucun dépôt ne pourrait terminer était déjà
+    //    refusée ici ; le vocabulaire l'est depuis le 23/09/2026, et par la
+    //    même fonction que B-02.
+    const refus = refusDuReferentiel(payload);
+    if (refus !== null) {
+      throw new Error(`${r.countryCode}/${r.visaType} : ${refus}`);
     }
 
     // 3. Garde-fou : pas de publication sur source secondaire
@@ -29,7 +35,7 @@ async function main() {
       console.warn(`[${r.countryCode}/${r.visaType}] forcé en DRAFT : source ${r.sourceTier}`);
     }
 
-    // 3. Archivage de la version précédente s'il y en a une.
+    // 4. Archivage de la version précédente s'il y en a une.
     //
     // `version: { not: r.version }` n'est pas un détail : sans cette clause,
     // un second passage du seed archive la ligne qu'il s'apprête à réécrire.
