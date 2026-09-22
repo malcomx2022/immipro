@@ -237,20 +237,14 @@ export function analyserUrlSmtp(
  * service qui répond. La sonde ne conclut donc que sur un **fait** — un
  * envoi réel, ou une vérification de connexion réelle — et jamais sur la
  * forme d'une chaîne de caractères.
+ *
+ * La règle de lecture, elle, n'est plus ici : elle est commune à toutes
+ * les sondes qui concluent sur un fait, et vit dans
+ * `domain/exploitation/constats.ts` avec sa fraîcheur. Ce type-ci reste
+ * la forme du fait tel que le module de courrier le tient pour son
+ * propre processus.
  */
 export interface DernierFait {
   reussi: boolean;
   quand: Date;
-}
-
-export function sondeDuTransport(
-  urlValide: boolean,
-  dernier: DernierFait | null,
-): "CONCLUANTE" | "ECHOUEE" | "ABSENTE" {
-  // Une URL illisible est un fait, lui : la configuration est là et ne
-  // peut pas servir. Le dire tout de suite épargne d'attendre le premier
-  // candidat pour l'apprendre.
-  if (!urlValide) return "ECHOUEE";
-  if (!dernier) return "ABSENTE";
-  return dernier.reussi ? "CONCLUANTE" : "ECHOUEE";
 }

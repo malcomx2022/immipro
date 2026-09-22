@@ -55,6 +55,7 @@ import {
   hauteurRelative,
   libelleDepassement,
   candidatsAuDepassement,
+  partDuQuotaIA,
   mesureDepuisLesLignes,
   metriquesMesurees,
   serieQuotidienne,
@@ -644,24 +645,111 @@ describe("B-07 — coûts IA, livré vide", () => {
 
   // ── Les dépassements individuels, RG-16.2 ────────────────────────────
 
+  const marge = (dossierId: string, pack: string, part: number, appels: number) =>
+    ({ dossierId, pack, part, appels, nature: "marge" }) as const;
+
   it("nomme les dossiers au-delà du seuil, du pire au moindre", () => {
     const releves = depassements([
-      { dossierId: "a", pack: "ESSENTIEL", part: 0.04, appels: 2 },
-      { dossierId: "b", pack: "DOSSIER", part: 0.22, appels: 9 },
-      { dossierId: "c", pack: "PRO", part: 0.17, appels: 5 },
+      marge("a", "ESSENTIEL", 0.04, 2),
+      marge("b", "DOSSIER", 0.22, 9),
+      marge("c", "PRO", 0.17, 5),
       // Exactement au seuil : la règle dit « au-delà ».
-      { dossierId: "d", pack: "PRO", part: 0.15, appels: 4 },
+      marge("d", "PRO", 0.15, 4),
     ]);
     expect(releves.map((d) => d.dossierId)).toEqual(["b", "c"]);
   });
 
   it("accorde le singulier du nombre d'appels", () => {
+    expect(libelleDepassement(marge("a", "PRO", 0.22, 1))).toMatch(/sur 1 appel$/);
+    expect(libelleDepassement(marge("a", "PRO", 0.22, 2))).toMatch(/sur 2 appels$/);
+  });
+
+  /* ── Le quota de jetons, la mesure qui tient sans tarif ───────────── */
+
+  /**
+   * `candidatsAuDepassement` écartait toute ligne dont `partDuPrix`
+   * valait `null`, c'est-à-dire **toutes** tant qu'aucun tarif de jeton
+   * n'est configuré. La liste d'alerte ne pouvait donc pas être non
+   * vide, et un dossier à dix fois son quota n'apparaissait nulle part.
+   */
+  it("un dossier hors quota se voit sans qu'aucun tarif soit configuré", () => {
+    const sansTarif = {
+      dossierId: "a",
+      appels: 3,
+      jetonsEntree: 800_000,
+      jetonsSortie: 400_000,
+      coutMicros: null,
+      pack: "essentiel",
+      partDuPrix: null,
+      partDuQuota: partDuQuotaIA(1_200_000, 120_000),
+    };
+    const releves = depassements(candidatsAuDepassement([sansTarif]));
+    expect(releves).toHaveLength(1);
+    expect(releves[0]!.nature).toBe("quota");
+    expect(libelleDepassement(releves[0]!)).toContain("du quota de jetons");
+  });
+
+  /** Sous le quota, rien ne remonte : le seuil est le quota lui-même. */
+  it("un dossier dans son quota ne remonte pas", () => {
+    const dansLeQuota = {
+      dossierId: "a",
+      appels: 1,
+      jetonsEntree: 40_000,
+      jetonsSortie: 20_000,
+      coutMicros: null,
+      pack: "essentiel",
+      partDuPrix: null,
+      partDuQuota: partDuQuotaIA(60_000, 120_000),
+    };
+    expect(depassements(candidatsAuDepassement([dansLeQuota]))).toEqual([]);
+  });
+
+  /**
+   * Les deux mesures sont deux constats, pas un seul : un dossier peut
+   * figurer pour sa marge **et** pour son quota, et les confondre ferait
+   * disparaître celui qui tient sans tarif.
+   */
+  it("les deux mesures se lisent côte à côte quand les deux existent", () => {
+    const releves = depassements(
+      candidatsAuDepassement([
+        {
+          dossierId: "a",
+          appels: 3,
+          jetonsEntree: 800_000,
+          jetonsSortie: 400_000,
+          coutMicros: 9_000_000,
+          pack: "essentiel",
+          partDuPrix: 0.75,
+          partDuQuota: partDuQuotaIA(1_200_000, 120_000),
+        },
+      ]),
+    );
+    expect(releves.map((d) => d.nature)).toEqual(["quota", "marge"]);
+  });
+
+  /** Sans pack payé, il n'y a pas de quota : rien à dépasser. */
+  it("un dossier sans pack n'a ni marge ni quota", () => {
+    expect(partDuQuotaIA(500_000, null)).toBeNull();
     expect(
-      libelleDepassement({ dossierId: "a", pack: "PRO", part: 0.22, appels: 1 }),
-    ).toMatch(/sur 1 appel$/);
-    expect(
-      libelleDepassement({ dossierId: "a", pack: "PRO", part: 0.22, appels: 2 }),
-    ).toMatch(/sur 2 appels$/);
+      candidatsAuDepassement([
+        {
+          dossierId: "a",
+          appels: 1,
+          jetonsEntree: 500_000,
+          jetonsSortie: 0,
+          coutMicros: null,
+          pack: null,
+          partDuPrix: null,
+          partDuQuota: null,
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  /** Un quota nul ou négatif ne se divise pas : la grille serait fautive. */
+  it("un quota nul ne produit pas d'infini", () => {
+    expect(partDuQuotaIA(500_000, 0)).toBeNull();
+    expect(partDuQuotaIA(500_000, -1)).toBeNull();
   });
 
   // ── L'agrégat, sorti de la page ──────────────────────────────────────
@@ -681,6 +769,8 @@ describe("B-07 — coûts IA, livré vide", () => {
       coutMicros: 900_000,
       pack: "DOSSIER",
       partDuPrix: 0.22,
+      // Loin sous le quota : ces lignes éprouvent la marge, pas les jetons.
+      partDuQuota: 0.01,
     },
     {
       dossierId: "b",
@@ -690,6 +780,7 @@ describe("B-07 — coûts IA, livré vide", () => {
       coutMicros: 200_000,
       pack: "ESSENTIEL",
       partDuPrix: 0.03,
+      partDuQuota: 0.01,
     },
   ];
 
@@ -713,13 +804,15 @@ describe("B-07 — coûts IA, livré vide", () => {
     expect(mesure.jetons).toBe(5600);
   });
 
-  it("ne retient comme dépassables que les dossiers dont la part est connue", () => {
+  it("ne retient comme dépassables que les dossiers dont une part est connue", () => {
     const candidats = candidatsAuDepassement([
       ...LIGNES,
+      // Sans tarif, la marge est inconnue — mais le quota, lui, se lit.
       { ...LIGNES[0]!, dossierId: "c", partDuPrix: null },
-      { ...LIGNES[0]!, dossierId: "d", pack: null },
+      // Sans pack, il n'y a aucune référence : ni marge, ni quota.
+      { ...LIGNES[0]!, dossierId: "d", pack: null, partDuQuota: null },
     ]);
-    expect(candidats.map((c) => c.dossierId)).toEqual(["a", "b"]);
+    expect([...new Set(candidats.map((c) => c.dossierId))]).toEqual(["a", "b", "c"]);
     expect(depassements(candidats).map((c) => c.dossierId)).toEqual(["a"]);
   });
 

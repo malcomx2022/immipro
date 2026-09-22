@@ -6,6 +6,7 @@ import {
   GARDE_FOUS,
   MENTION_AUCUN_DEPASSEMENT,
   MENTION_DEPASSEMENTS_NON_CALCULABLES,
+  MENTION_QUOTA_SANS_TARIF,
   MENTION_ETAT_VIDE,
   MENTION_HISTOGRAMME_EN_JETONS,
   MENTION_SANS_DONNEE_CANDIDAT,
@@ -60,7 +61,14 @@ export interface CoutsIaProps {
 export function CoutsIa({ metriques, serie, candidats, tarife }: CoutsIaProps) {
   const vide = aucuneMesure(metriques);
   const sansAppel = serieVide(serie);
-  const audela = depassements(candidats);
+  /*
+    Sans tarif, la marge n'existe pas : `partDuPrix` vaut `null`, et une
+    ligne « marge » ne peut pas en sortir. Le filtre est là quand même —
+    l'écran ne doit pas tenir sur une garantie que seule la lecture
+    fournit, sous peine d'afficher un rapport entre un coût absent et un
+    prix le jour où un appelant changera d'avis.
+  */
+  const audela = depassements(candidats).filter((d) => tarife || d.nature === "quota");
 
   return (
     <div className="flex flex-col">
@@ -126,18 +134,25 @@ export function CoutsIa({ metriques, serie, candidats, tarife }: CoutsIaProps) {
 
         <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-5">
           <h2 className="text-16 font-semibold text-ink-900">Dépassements individuels</h2>
+          {/*
+            Sans tarif, la marge n'est pas calculable — et elle n'est plus
+            la seule mesure : le quota de jetons du pack se compare sans
+            connaître le prix de rien. La section disait donc « rien à
+            relever » là où un dossier à dix fois son quota attendait.
+          */}
           {!tarife ? (
             <p className="max-w-[80ch] text-pretty text-14 text-ink-700">
-              {MENTION_DEPASSEMENTS_NON_CALCULABLES}
+              {MENTION_DEPASSEMENTS_NON_CALCULABLES} {MENTION_QUOTA_SANS_TARIF}
             </p>
-          ) : audela.length === 0 ? (
+          ) : null}
+          {audela.length === 0 ? (
             <p className="text-14 text-ink-700">{MENTION_AUCUN_DEPASSEMENT}</p>
           ) : (
             <>
               <ul className="flex flex-col">
                 {audela.map((d) => (
                   <li
-                    key={d.dossierId}
+                    key={`${d.dossierId}-${d.nature}`}
                     className="flex items-baseline justify-between gap-6 border-t border-ink-300 py-2.5"
                   >
                     <span className="font-mono text-13 text-ink-700">{d.dossierId}</span>

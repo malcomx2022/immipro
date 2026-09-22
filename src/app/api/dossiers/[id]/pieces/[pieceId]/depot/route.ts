@@ -15,6 +15,8 @@ import {
 import { compteur, solde } from "@/server/acces/quota";
 import { getQueue, JOBS, poster } from "@/lib/queue";
 import { antivirusConfigure } from "@/server/securite/antivirus";
+import { lireLesConstats } from "@/server/exploitation/constats";
+import { moteurPrisEnDefaut } from "@/domain/exploitation/constats";
 import { MENTION_EN_QUARANTAINE } from "@/domain/dossiers/quarantaine";
 
 /**
@@ -54,6 +56,25 @@ export const POST = route({
     // Refuser ici coûte un aller-retour ; l'accepter coûterait un fichier
     // que rien ne pourra promouvoir.
     if (!antivirusConfigure()) throw echec("televersement_indisponible");
+
+    /*
+      Et un moteur **pris en défaut** ferme le dépôt aussi — 22/09/2026.
+
+      Un moteur qui a déclaré sain le fichier d'essai répond sans
+      détecter : tout ce qu'il examine passera, et c'est la seule panne
+      de cette chaîne qui ne se remarquerait pas. La sonde le voyait
+      déjà et le disait à l'état de service ; personne n'en tirait de
+      conséquence, si bien que les dépôts continuaient d'être acceptés
+      et promus par un moteur qui ne lit rien.
+
+      L'absence de constat, elle, ne ferme rien : une pièce déposée sans
+      constat reste en quarantaine et n'est promue que sur un verdict
+      « saine ». Fermer sur l'ignorance bloquerait chaque démarrage à
+      froid sans rien protéger de plus.
+    */
+    if (moteurPrisEnDefaut((await lireLesConstats()).antivirus)) {
+      throw echec("televersement_indisponible");
+    }
 
     const dossier = await dossierDuCandidat(params.id!, acteur!.id);
     exigerModifiable(dossier);

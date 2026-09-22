@@ -16,6 +16,13 @@ export const JOBS = {
    * file vide ne promet rien ; c'est l'écran qui doit rester honnête.
    */
   RAPPEL_ECHEANCIER: "echeancier.rappel",
+  /**
+   * Resonde des services extérieurs (I.C). Un constat a une durée de
+   * validité : sans repasse, celui du démarrage se périmerait et l'état
+   * de service retomberait à « aucune nouvelle » après quelques heures
+   * de fonctionnement normal.
+   */
+  SONDE_SERVICES: "exploitation.sonde",
 } as const;
 
 /**

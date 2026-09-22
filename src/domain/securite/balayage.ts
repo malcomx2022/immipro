@@ -257,25 +257,19 @@ export const EICAR =
 /**
  * Ce que l'état de service peut dire du balayeur.
  *
- * Même règle que pour le transport de courrier (`domain/courrier/
- * transport.ts`) : **une URL qui s'analyse ne prouve rien**. La sonde ne
- * conclut que sur un fait — le moteur a reconnu EICAR —, jamais sur la
- * forme d'une variable. Un moteur qui répondrait `clean` à EICAR est un
- * moteur en panne, et il vaut mieux le lire ici que sur le premier
- * fichier réellement infecté.
+ * Même règle que pour le transport de courrier : **une URL qui
+ * s'analyse ne prouve rien**. La sonde ne conclut que sur un fait — le
+ * moteur a reconnu EICAR —, jamais sur la forme d'une variable. Un
+ * moteur qui répondrait `clean` à EICAR est un moteur en panne, et il
+ * vaut mieux le lire au démarrage que sur le premier fichier réellement
+ * infecté.
+ *
+ * La règle de lecture est commune aux deux sondes et vit dans
+ * `domain/exploitation/constats.ts`, avec la fraîcheur qui manquait ici
+ * comme là-bas. Ce type-ci reste la forme de l'essai tel que le module
+ * le tient pour son propre processus.
  */
 export interface DernierBalayageDEssai {
   reconnu: boolean;
   quand: Date;
-}
-
-export function sondeDuBalayage(
-  urlValide: boolean,
-  dernier: DernierBalayageDEssai | null,
-): "CONCLUANTE" | "ECHOUEE" | "ABSENTE" {
-  // Une URL illisible est un fait : la configuration est là et ne peut
-  // pas servir. Le dire tout de suite épargne d'attendre le premier dépôt.
-  if (!urlValide) return "ECHOUEE";
-  if (!dernier) return "ABSENTE";
-  return dernier.reconnu ? "CONCLUANTE" : "ECHOUEE";
 }

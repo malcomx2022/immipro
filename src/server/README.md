@@ -114,8 +114,33 @@ de passeport qu'on y avait lu n'est pas une purge. Restent le verdict, le
 genre de remarque et les horodatages : ils prouvent que la vérification a eu
 lieu sans nommer personne.
 
+#### Rien ne se déclare purgé tant que les octets sont là
+
+Une suppression que le stockage refuse n'efface plus la version. Elle
+l'effaçait : le `catch` autour de `removeObject` portait « objet déjà
+absent, c'est l'état visé », et deux choses y étaient fausses.
+
+D'abord, **un objet absent ne lève pas** : `DELETE` sur une clé inconnue
+rend 204, chez S3 comme chez MinIO. Le cas annoncé ne passait jamais par
+là. Ensuite, ce qui y passait était l'inverse — une panne réelle, comptée
+« manquant », la version marquée purgée et sa **clé effacée**. Le fichier
+restait dans le stockage, la base affirmait qu'il était parti, et plus
+rien ne permettait de le retrouver.
+
+Une version dont l'objet résiste garde donc sa clé et son état. Le
+document n'est purgé que si plus rien de lui ne reste, le dossier que si
+tout est parti ; sinon il demeure échu et la passe du lendemain réessaie.
+`/api/health` compte les échéances dépassées, pour qu'une reprise ne
+devienne pas une attente indéfinie.
+
 `acces/suppression.ts` est la **suppression de compte** (RG-10.4). Elle
-purge tous les dossiers sans attendre l'échéance, puis anonymise. Elle
+purge tous les dossiers sans attendre l'échéance, puis anonymise —
+**seulement si la purge a tout emporté**. Ce garde-fou existait, avec son
+commentaire (« anonymiser ici rendrait le fichier orphelin et
+introuvable »), et c'était un chemin mort : la purge se déclarant
+complète quoi qu'il arrive, le compte se retrouvait anonymisé par-dessus
+un fichier survivant. Il est vivant depuis le 22/09/2026, et
+`scripts/fumee-purge.mts` l'éprouve devant un stockage qui refuse. Elle
 n'efface pas la ligne du compte : un reçu de paiement pointe dessus, et C-11
 l'annonce au candidat avant même qu'il clôture. Ce qui part est tout ce qui
 nomme quelqu'un ; ce qui reste est un compte sans personne.
@@ -701,6 +726,38 @@ de fournisseur, aucun jeton d'IA, aucune écriture. Celles qui concluent
 aujourd'hui lisent un **fait déjà établi** — une signature vérifiée, un
 courrier réellement parti, EICAR réellement signalé —, jamais la forme d'une
 variable.
+
+#### Le fait doit franchir la frontière des processus
+
+Il ne la franchissait pas. Deux sondes concluent sur un fait établi par le
+**worker**, qui est un service séparé (`docker-compose.prod.yml`), et lu par
+`/api/health`, qui vit dans le processus web. Le fait tenait dans une
+variable de module : l'adresse lisait « aucune sonde n'a tourné »
+indéfiniment, pour la messagerie et pour le balayage — deux bloquantes. Le
+503 qu'on venait de rendre extinguible ne s'éteignait toujours pas, pour une
+autre raison, invisible.
+
+Le constat passe donc par la base (`ServiceProbe`), qui est le seul état
+partagé. Il est écrit par qui sonde — le worker au démarrage et à chaque
+passe horaire, le processus web à chaque courrier réellement expédié — et lu
+en une requête par `/api/health`, qui le passe aux sondes. Celles-ci restent
+pures : aucune ne va chercher quoi que ce soit.
+
+**Un constat a une durée de validité**, ce qui manquait aussi :
+`DernierFait` portait sa date et personne ne la lisait, si bien qu'un envoi
+réussi trois semaines plus tôt aurait déclaré la messagerie opérationnelle
+devant un serveur éteint depuis. Trois heures, soit le triple de la cadence
+de resonde — un retard ne fait pas clignoter l'état, une panne installée se
+voit. Au-delà, le constat redevient « aucune nouvelle » : ni succès, ni
+échec, parce que le service n'a pas été pris en défaut.
+
+**Et la sonde commande enfin quelque chose.** Un moteur qui a déclaré sain le
+fichier d'essai répond sans détecter ; le dépôt d'une pièce le lit et refuse.
+Auparavant il ne consultait que la configuration : les fichiers continuaient
+d'être acceptés et promus par un moteur qui ne lit rien, pendant que l'état
+de service le disait à qui voulait l'entendre. Une sonde dont rien ne dépend
+est un affichage. L'ignorance, elle, ne ferme rien — une pièce déposée sans
+constat reste en quarantaine, et n'est promue que sur un verdict « saine ».
 
 #### Le 503 qui ne pouvait pas s'éteindre
 

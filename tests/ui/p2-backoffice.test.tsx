@@ -871,8 +871,13 @@ const SERIE_PLEINE: readonly Journee[] = serieQuotidienne(
   14,
 );
 const CANDIDATS: readonly Depassement[] = [
-  { dossierId: "dossier-trop-cher", pack: "DOSSIER", part: 0.22, appels: 9 },
-  { dossierId: "dossier-sage", pack: "ESSENTIEL", part: 0.04, appels: 2 },
+  { dossierId: "dossier-trop-cher", pack: "DOSSIER", part: 0.22, appels: 9, nature: "marge" },
+  { dossierId: "dossier-sage", pack: "ESSENTIEL", part: 0.04, appels: 2, nature: "marge" },
+];
+
+/** Le dépassement qui se lit sans tarif : la part du quota de jetons. */
+const HORS_QUOTA: readonly Depassement[] = [
+  { dossierId: "dossier-gourmand", pack: "ESSENTIEL", part: 10, appels: 12, nature: "quota" },
 ];
 
 const coutsIa = (props: Partial<Parameters<typeof CoutsIa>[0]> = {}) =>
@@ -942,12 +947,39 @@ describe("B-07 — Coûts IA", () => {
     expect(texte).not.toContain("0,0 % au plus haut");
   });
 
-  it("ne relève aucun dépassement sans tarif, et le dit", () => {
+  it("ne relève aucune marge sans tarif, et le dit", () => {
     const { container } = coutsIa({ tarife: false, candidats: CANDIDATS });
     expect(container.textContent).toContain(
       "ne peuvent pas être relevés sans tarif",
     );
     expect(container.textContent).not.toContain("dossier-trop-cher");
+  });
+
+  /**
+   * **La liste ne pouvait pas être non vide sans tarif.** Elle écartait
+   * toute ligne dont la marge était inconnue, c'est-à-dire toutes — et
+   * un dossier à dix fois le quota de jetons de son pack n'apparaissait
+   * nulle part. Le quota, lui, se compare sans connaître le prix de rien.
+   */
+  it("relève un dossier hors quota même sans tarif", () => {
+    const { container } = coutsIa({ tarife: false, candidats: HORS_QUOTA });
+    expect(container.textContent).toContain("dossier-gourmand");
+    expect(espaces(container.textContent ?? "")).toContain(
+      "1 000 % du quota de jetons du pack ESSENTIEL",
+    );
+    // Et l'écran dit pourquoi cette alerte-là tient sans tarif.
+    expect(container.textContent).toContain("se compare sans tarif");
+  });
+
+  /** Les deux mesures se lisent côte à côte une fois le tarif posé. */
+  it("distingue la marge du quota dans le libellé", () => {
+    const { container } = coutsIa({
+      tarife: true,
+      candidats: [...CANDIDATS, ...HORS_QUOTA],
+    });
+    const texte = espaces(container.textContent ?? "");
+    expect(texte).toContain("du prix du pack DOSSIER");
+    expect(texte).toContain("du quota de jetons du pack ESSENTIEL");
   });
 
   it("nomme le dossier qui dépasse, une fois le tarif posé", () => {

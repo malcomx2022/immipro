@@ -32,15 +32,49 @@ import {
  * réponses écrites par le candidat. Supprimer le fichier en laissant tout
  * cela n'est pas une purge. `effacerLesDerives` les emporte avec lui.
  *
- * L'échec de suppression d'un objet ne fait pas échouer le lot. Une clé déjà
- * absente est le cas normal d'une reprise après incident, et s'arrêter au
- * premier objet manquant laisserait tous les suivants en place.
+ * L'échec de suppression d'un objet ne fait pas échouer le lot : s'arrêter
+ * au premier laisserait tous les suivants en place. Mais il n'efface pas
+ * la version pour autant — voir plus bas.
+ *
+ * ── Ce qu'un échec de suppression produisait (22/09/2026) ───────────
+ *
+ * Le `catch` portait « objet déjà absent : c'est l'état visé ». Deux
+ * choses fausses dans cette phrase.
+ *
+ * D'abord, un objet absent **ne lève pas** : `DELETE` sur une clé
+ * inconnue rend 204 chez S3 comme chez MinIO. Le cas que ce `catch`
+ * prétendait couvrir n'y passait jamais.
+ *
+ * Ensuite, ce qui y passait était l'inverse : une panne réelle — un 500,
+ * une coupure, un refus d'authentification. Elle était comptée
+ * « manquant », la version marquée purgée, et **`objectKey` effacée**.
+ * Le fichier restait donc dans le stockage, la base affirmait qu'il
+ * était parti, et plus aucune clé ne permettait de le retrouver. INV-5
+ * violé, sans le moindre signal.
+ *
+ * Pire : `acheverLaSuppression` (RG-10.4) prévoyait le cas — « une pièce
+ * n'a pas pu partir, on n'anonymise pas, anonymiser ici rendrait le
+ * fichier orphelin et introuvable ». Le chemin était **mort**, puisque
+ * le dossier se déclarait purgé quoi qu'il arrive. Le compte était
+ * anonymisé par-dessus le fichier survivant.
+ *
+ * Une version dont l'objet résiste n'est donc plus purgée : sa clé
+ * reste, le document garde son état, le dossier reste échu, et la passe
+ * du lendemain réessaie. C'est ce que `purgeDueAt` permet, et la purge
+ * est idempotente par construction.
  */
 export interface Bilan {
   dossiers: number;
   versions: number;
   objetsSupprimes: number;
-  objetsManquants: number;
+  /**
+   * Les objets que le stockage a refusé de supprimer. Anciennement
+   * `objetsManquants`, ce qui décrivait un cas qui ne passe pas par là :
+   * une clé absente est un succès, pas une erreur.
+   */
+  objetsEnEchec: number;
+  /** Dossiers laissés échus parce qu'au moins un objet a résisté. */
+  dossiersIncomplets: number;
 }
 
 /**
@@ -112,40 +146,75 @@ export async function purgerLesPiecesEchues(
     include: { documents: { include: { versions: { where: { purgedAt: null } } } } },
   });
 
-  const bilan: Bilan = { dossiers: 0, versions: 0, objetsSupprimes: 0, objetsManquants: 0 };
+  const bilan: Bilan = {
+    dossiers: 0,
+    versions: 0,
+    objetsSupprimes: 0,
+    objetsEnEchec: 0,
+    dossiersIncomplets: 0,
+  };
 
   for (const dossier of dossiers) {
     const versions = dossier.documents.flatMap((d) => d.versions);
 
+    /*
+      Les versions dont l'objet a résisté. Elles ne seront pas purgées :
+      effacer leur clé rendrait le fichier introuvable tout en le
+      laissant dans le stockage, ce qui est la pire des deux issues.
+    */
+    const resistent = new Set<string>();
+
     for (const version of versions) {
       if (!version.objectKey) continue;
       try {
+        // Une clé absente ne lève pas — `DELETE` rend 204. Ce qui passe
+        // par le `catch` est une panne, et rien d'autre.
         await removeObject(version.objectKey);
         bilan.objetsSupprimes += 1;
       } catch {
-        // Objet déjà absent : c'est l'état visé, pas un incident.
-        bilan.objetsManquants += 1;
+        resistent.add(version.id);
+        bilan.objetsEnEchec += 1;
       }
     }
 
+    const purgeables = versions.filter((v) => !resistent.has(v.id));
+    /*
+      Un document n'est « purgé » que si plus rien de lui ne reste à
+      purger. Ses réponses d'entretien partent avec lui : les effacer
+      pendant qu'une de ses versions survit ferait une purge à moitié
+      faite, qu'aucun compteur ne distinguerait d'une purge entière.
+    */
+    const documentsEntiers = dossier.documents.filter((d) =>
+      d.versions.every((v) => !resistent.has(v.id)),
+    );
+    const complet = resistent.size === 0;
+
     await db.$transaction([
       db.documentVersion.updateMany({
-        where: { id: { in: versions.map((v) => v.id) } },
+        where: { id: { in: purgeables.map((v) => v.id) } },
         // Le contenu s'en va, la trace reste : `objectKey` et `body` à nul,
         // `purgedAt` daté. Une contrainte de la base refuse une version
         // marquée purgée qui garderait sa clé.
         data: { objectKey: null, body: null, changeNote: null, purgedAt: maintenant },
       }),
       ...effacerLesDerives(
-        versions.map((v) => v.id),
-        dossier.documents.map((d) => d.id),
+        purgeables.map((v) => v.id),
+        documentsEntiers.map((d) => d.id),
       ),
       db.document.updateMany({
-        where: { applicationId: dossier.id },
+        where: { id: { in: documentsEntiers.map((d) => d.id) } },
         data: { status: "PURGEE" },
       }),
-      db.application.update({
-        where: { id: dossier.id },
+      /*
+        Le dossier ne se déclare purgé que si tout est parti. Sinon il
+        reste échu : il ressortira à la passe suivante, et
+        `acheverLaSuppression` verra qu'une pièce n'a pas pu partir — ce
+        qu'elle prévoyait déjà, sur un chemin que rien n'atteignait.
+      */
+      ...(complet
+        ? [
+            db.application.update({
+              where: { id: dossier.id },
         // Un brouillon qui n'a jamais figé de version de règle ne peut pas
         // passer en ARCHIVE : INV-3 l'interdit en base, et la contrainte a
         // raison — un dossier au-delà du brouillon sans version figée est
@@ -153,23 +222,28 @@ export async function purgerLesPiecesEchues(
         // purgé. Le chemin n'existait pas tant que seule la clôture
         // déclenchait la purge ; la suppression de compte, elle, purge
         // aussi les brouillons (RG-10.4).
-        data: {
-          purgedAt: maintenant,
-          ...(dossier.visaRuleId ? { status: "ARCHIVE" as const } : {}),
-        },
-      }),
+              data: {
+                purgedAt: maintenant,
+                ...(dossier.visaRuleId ? { status: "ARCHIVE" as const } : {}),
+              },
+            }),
+          ]
+        : []),
     ]);
 
     await journaliser({
       acteurId: "systeme:purge",
       action: "piece.purge",
       cible: `application:${dossier.id}`,
-      motif: "Purge automatique à l'échéance de rétention (INV-5)",
-      details: { versions: versions.length },
+      motif: complet
+        ? "Purge automatique à l'échéance de rétention (INV-5)"
+        : "Purge partielle : le stockage a refusé au moins un objet (INV-5)",
+      details: { versions: purgeables.length, enEchec: resistent.size },
     }).catch(() => undefined);
 
-    bilan.dossiers += 1;
-    bilan.versions += versions.length;
+    if (complet) bilan.dossiers += 1;
+    else bilan.dossiersIncomplets += 1;
+    bilan.versions += purgeables.length;
   }
 
   return bilan;

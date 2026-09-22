@@ -101,6 +101,8 @@ const { traiterLaNotification } = await import("../src/server/paiement/reception
 const { leTransport, TRANSPORT_JOURNAL, sonderLeCourrier, expedier } = await import(
   "../src/server/courrier"
 );
+const { lireLesConstats } = await import("../src/server/exploitation/constats");
+const { oublierLesFaits } = await import("../src/server/courrier");
 const { verifierLaConnexion, oublierLeTransporteur } = await import(
   "../src/server/courrier/smtp"
 );
@@ -197,6 +199,31 @@ try {
     verifier(
       sonderLeCourrier() === "CONCLUANTE",
       "et l'état de service le tient pour un fait établi",
+    );
+
+    /*
+      Et le fait franchit la frontière des processus — 22/09/2026.
+
+      Un courrier réel part du **processus web** ; l'état de service est
+      lu par la même adresse, mais après un redémarrage, ou depuis une
+      autre instance. Tant que le fait tenait dans une variable de
+      module, il mourait avec le processus. `oublierLesFaits` joue ici ce
+      qu'un autre processus aurait toujours eu : rien en mémoire.
+    */
+    const constats = await lireLesConstats();
+    verifier(
+      constats.messagerie?.reussi === true,
+      "l'envoi réel a laissé un constat en base",
+    );
+
+    oublierLesFaits();
+    verifier(
+      sonderLeCourrier() === "ABSENTE",
+      "la mémoire vidée, la sonde locale ne sait plus rien",
+    );
+    verifier(
+      sonderLeCourrier(process.env, constats.messagerie) === "CONCLUANTE",
+      "mais le constat lu en base la fait conclure — ce que la mémoire seule ne permettait pas",
     );
   }
 

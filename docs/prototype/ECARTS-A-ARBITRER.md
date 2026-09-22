@@ -5892,3 +5892,341 @@ Cinq mutations, cinq rouges :
 | le résolveur relit `process.env` | trois cas, dont l'adresse du moteur |
 | « aucune sonde sûre » se confond avec « aucune sonde » | la lecture d'ensemble |
 | une exception de plus, non justifiée | cinq cas, dont le plafond |
+
+---
+
+### S.32 — La sonde ne traversait pas la frontière des processus
+
+S.31 a rendu le 503 de `/api/health` extinguible. Il ne s'éteignait
+toujours pas, pour une seconde raison, cachée derrière la première.
+
+Deux sondes concluent sur un **fait** plutôt que sur la forme d'une
+variable : la messagerie a-t-elle parlé à un serveur, le moteur de
+balayage a-t-il reconnu le fichier d'essai. C'est la bonne règle, posée
+exprès le 21/09. Le fait était rangé dans une variable de module — et
+il est **établi par le worker**, qui est un service séparé
+(`docker-compose.prod.yml`), tandis que `/api/health` vit dans le
+processus web.
+
+Établi en exécutant les deux sondes dans un processus qui n'a rien
+sondé, c'est-à-dire dans la situation du serveur web :
+
+```
+messagerie : ABSENTE | fait : null
+antivirus  : ABSENTE | fait : null
+```
+
+Les deux dépendances sont bloquantes. L'instance restait donc inapte,
+indéfiniment, et aucun déploiement n'y aurait rien changé.
+
+#### Trois défauts, une seule cause
+
+**Le constat ne franchissait pas la frontière.** Il passe par la base
+(`ServiceProbe`), qui est le seul état que les deux processus partagent.
+Écrit par qui sonde, lu en une requête par `/api/health`, qui le passe
+aux sondes — celles-ci restent pures, aucune ne va chercher quoi que ce
+soit.
+
+**Il n'avait pas de date de péremption.** `DernierFait` portait sa date
+et personne ne la lisait : un envoi réussi il y a trois semaines aurait
+déclaré la messagerie opérationnelle devant un serveur éteint depuis.
+Trois heures de validité, soit le triple de la cadence de resonde — un
+retard de passe ne fait pas clignoter l'état, une panne installée se
+voit. Au-delà, le constat redevient « aucune nouvelle » : **ni succès,
+ni échec**, parce que le service n'a pas été pris en défaut.
+
+**Personne ne resondait.** Le worker sondait au démarrage et plus
+jamais : sans repasse, le constat se serait périmé après une matinée de
+fonctionnement normal. Une file horaire s'en charge, et une passe part
+aussi tout de suite — attendre l'heure ronde laisserait l'instance sans
+constat jusqu'à soixante minutes après un déploiement, c'est-à-dire
+exactement quand on la regarde.
+
+#### La sonde ne commandait rien
+
+C'est le point le plus important, et il n'était pas dans le périmètre
+annoncé.
+
+Le lot du balayage (S.30) a ajouté une sonde EICAR pour détecter « la
+seule panne de cette chaîne qui ne se remarquerait pas » — un moteur qui
+répond `clean` à tout. Elle la détectait, et le disait à l'état de
+service. **Rien n'en tirait de conséquence** : le dépôt d'une pièce ne
+consultait qu'`antivirusConfigure`, si bien que les fichiers
+continuaient d'être acceptés et promus par un moteur qui ne lit rien.
+
+Une sonde dont rien ne dépend est un affichage. Le dépôt lit maintenant
+le constat et refuse devant un moteur pris en défaut. L'ignorance, elle,
+ne ferme rien : une pièce déposée sans constat reste en quarantaine et
+n'est promue que sur un verdict « saine ». Fermer sur l'ignorance
+bloquerait chaque démarrage à froid sans rien protéger de plus. Un échec
+périmé ne ferme plus non plus — le moteur a pu être remplacé, et laisser
+un vieux constat fermer indéfiniment ferait d'une panne réparée une
+panne permanente.
+
+#### Le commentaire qui l'annonçait déjà
+
+Le lot du balayage avait écrit, dans le worker :
+
+> Son échec n'empêche pas le worker de démarrer. Il n'ouvre rien non
+> plus : `antivirusConfigure` commande le dépôt, et une sonde muette
+> laisse la capacité non vérifiée, donc l'instance inapte au
+> téléversement.
+
+Deux faits vrais, juxtaposés de façon à suggérer un mécanisme qui
+n'existait pas : l'inaptitude de l'instance ne ferme aucun dépôt, et la
+route ne consulte pas la capacité. C'est le troisième commentaire de
+cette série à décrire un garde-fou que le code ne tient pas — après
+l'avertissement de l'adaptateur FedaPay (S.29) et le test qui lisait un
+commentaire pour vérifier un commentaire.
+
+#### Ce que la mise à l'épreuve a trouvé
+
+Deux choses qu'aucune relecture n'aurait données, parce qu'elles
+n'apparaissent qu'en exécutant :
+
+- **`expedier` ne persistait pas son constat.** Le commentaire du module
+  disait « écrit par le worker et par le processus web à chaque courrier
+  réellement expédié » ; seule la première moitié existait. La fumée du
+  courrier l'a montrée : un envoi réel, puis aucune ligne en base.
+- **La fumée n'empruntait pas le chemin du worker.** Elle appelait
+  `verifierLeMoteur` directement, c'est-à-dire un enchaînement que la
+  production n'exécute pas — et ne voyait donc aucun constat écrit. Les
+  sondes ont été sorties dans `server/exploitation/sondes.ts`, appelé
+  par le worker **et** par la fumée.
+
+#### Vérifié en exécutant, et en mutant
+
+Six mutations, six rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la fraîcheur n'est plus lue | cinq cas, dont la capacité périmée |
+| un constat périmé bascule en échec | cinq cas |
+| l'absence de constat ferme le dépôt | le démarrage à froid |
+| un échec périmé ferme encore | la panne réparée qui resterait permanente |
+| le dépôt ne consulte plus le constat | le branchement de la route |
+| `expedier` ne persiste plus son constat | deux cas de la fumée du courrier |
+
+Deux garde-fous SQL de plus : un service que le code ne connaît pas est
+refusé, et un constat daté du futur aussi — une horloge déréglée rendrait
+un constat éternellement frais.
+
+#### Un bruit écarté, plutôt que toléré
+
+Persister depuis `expedier` a fait cracher à Prisma une erreur de
+configuration à chaque courrier journalisé en test, où aucune base
+n'existe. `noterLeConstat` sort maintenant sans rien tenter quand
+`DATABASE_URL` est absente : il n'y a pas de constat à écrire, et rien à
+signaler. Le bruit d'un journal finit par cacher les vraies erreurs —
+c'est la même leçon que la violation d'unicité du lot des remboursements.
+
+---
+
+### S.33 — Une pièce d'identité survivait à sa propre purge
+
+INV-5 : « Les pièces d'identité sont purgées automatiquement selon la
+politique de rétention. » Quand le stockage refusait une suppression, la
+version était tout de même marquée purgée, **sa clé effacée**, et le
+dossier déclaré purgé. Le fichier restait donc dans le stockage, la base
+affirmait qu'il était parti, et plus rien ne permettait de le retrouver.
+
+Établi en exécutant la purge sur une base réelle, devant un stockage
+d'essai qui répond 500 :
+
+```
+bilan : {"dossiers":1,"versions":1,"objetsSupprimes":0,"objetsManquants":1}
+dossier purgedAt : DATÉ — le dossier se déclare purgé
+version  purgedAt : DATÉ | objectKey : EFFACÉE
+restant pour acheverLaSuppression : 0
+```
+
+#### Deux erreurs dans une phrase de six mots
+
+Le `catch` portait : « Objet déjà absent : c'est l'état visé, pas un
+incident. »
+
+**Un objet absent ne lève pas.** `DELETE` sur une clé inconnue rend 204,
+chez S3 comme chez MinIO — vérifié contre le vrai client. Le cas que ce
+`catch` prétendait couvrir n'y passait jamais, et le compteur
+`objetsManquants` n'a jamais compté un objet manquant.
+
+**Ce qui y passait était l'inverse.** Une panne réelle — un 500, une
+coupure, un refus d'authentification — était rangée sous « déjà absent »,
+c'est-à-dire sous « tout va bien ». La purge continuait, effaçait la clé,
+et l'incident devenait invisible : rien dans le bilan, rien dans le
+journal, rien à l'écran.
+
+C'est la forme la plus coûteuse du motif que cette série accumule : non
+pas une promesse fausse, mais **une erreur rangée dans la case des
+succès**.
+
+#### Le garde-fou qui existait, et qui était mort
+
+`acheverLaSuppression` (RG-10.4) prévoyait exactement ce cas :
+
+> Une pièce n'a pas pu partir. On n'anonymise pas : le compte reste
+> « suppression demandée », visible en B-03, et la reprise réessaiera.
+> Anonymiser ici rendrait le fichier orphelin et introuvable.
+
+Le test était `restant > 0`, sur le nombre de dossiers non purgés. Comme
+la purge marquait le dossier purgé quoi qu'il arrive, ce compte valait
+**toujours zéro**. Le chemin n'était pas seulement inatteignable : il
+décrivait précisément le mal qu'il laissait faire — le compte anonymisé
+par-dessus un fichier survivant, devenu orphelin et introuvable.
+
+Un garde-fou dont la condition ne peut pas être vraie est le troisième
+de cette série, après le 503 qui ne pouvait pas s'éteindre (S.31) et la
+sonde dont rien ne dépendait (S.32). Les trois se ressemblent : le
+raisonnement était juste, et rien ne le reliait à l'exécution.
+
+#### Ce qui change
+
+Une version dont l'objet résiste n'est plus purgée : sa clé reste, son
+contenu aussi, et les copies dérivées avec — une purge à moitié faite ne
+doit pas se lire comme une purge entière. Le document n'est purgé que si
+plus rien de lui ne reste ; le dossier, que si tout est parti. Sinon il
+demeure échu, et la passe du lendemain réessaie : la purge est
+idempotente par construction, c'est ce que `purgeDueAt` permet.
+
+Le bilan dit maintenant ce qu'il compte : `objetsEnEchec` au lieu
+d'`objetsManquants`, et `dossiersIncomplets` à côté de `dossiers`.
+
+**Et le retard se voit.** Ne plus purger sur échec est la bonne conduite,
+mais elle a un revers : un stockage durablement fâché laisserait des
+pièces d'identité en place pendant que la purge repart en silence chaque
+nuit. `/api/health` compte les dossiers au-delà de leur échéance et
+l'ancienneté du plus ancien — la même mesure que pour les pièces bloquées
+au contrôle, et pour la même raison : un écran de back-office ne
+surveille que ceux qui l'ouvrent.
+
+#### Vérifié en exécutant, et en mutant
+
+`scripts/fumee-purge.mts` fait tourner la purge sur une base réelle
+devant un stockage objet de deux seaux auquel le vrai client MinIO parle,
+et qu'on fait refuser à volonté. Il couvre la purge ordinaire et ses
+copies, l'objet déjà absent, le refus, la reprise, le dossier à
+plusieurs pièces qui ne se purge pas à moitié, le dossier vivant qu'on ne
+touche pas, la contrainte SQL, et le bout de la chaîne : une suppression
+de compte qui **n'anonymise pas** par-dessus un fichier survivant, puis
+s'achève quand le stockage revient.
+
+Trois mutations, trois rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| les versions en échec sont purgées quand même | cinq vérifications, dont la clé effacée |
+| le dossier se déclare purgé malgré un échec | six, dont la suppression de compte |
+| un document à moitié purgé se déclare purgé | l'état des documents |
+
+C'est aussi le premier lot de la série où la mise à l'épreuve n'a rien
+appris de plus que ce que le diagnostic annonçait : le défaut avait été
+établi par exécution **avant** d'écrire une ligne de correction, et les
+fixtures ont seulement demandé quatre allers-retours pour trouver les
+champs obligatoires d'un entretien.
+
+---
+
+### S.34 — La liste d'alerte de B-07 ne pouvait pas être non vide
+
+`tokensIA` porte, depuis le premier jour, ce commentaire : « donnée
+d'exploitation, **lue par le back-office (B-07) pour l'alerte de
+marge** ». Elle ne l'était pas. Un dossier consommant dix fois le quota
+de son pack n'apparaissait nulle part.
+
+Établi en exécutant B-07 sur une base réelle, sans tarif de jeton
+configuré — l'état actuel du dépôt :
+
+```
+quota du pack essentiel : 120 000 jetons
+consommé               : 1 200 000 jetons
+soit                   : 1000 % du quota
+
+ce que B-07 rend : {"coutMicros":null,"partDuPrix":null,"pack":"essentiel"}
+```
+
+#### Une liste qui s'écartait elle-même
+
+`candidatsAuDepassement` filtrait ainsi :
+
+```ts
+l.partDuPrix === null || l.pack === null ? [] : [...]
+```
+
+`partDuPrix` est le rapport d'un **coût** à un prix, et le coût demande
+un tarif de jeton. Les trois variables de tarif ne sont pas renseignées
+— elles ne peuvent pas l'être avant le premier relevé du fournisseur
+d'inférence, ce que l'écran explique lui-même très bien. Donc
+`partDuPrix` vaut `null` sur chaque ligne, donc la liste était **vide
+par construction**, et l'écran affichait « les dépassements ne peuvent
+pas être relevés sans tarif ».
+
+Cette phrase est vraie de la marge. Elle était fausse de l'alerte : le
+quota du pack est un plafond **en jetons**, et les jetons se comptent
+sans connaître le prix de rien.
+
+Le module le disait déjà, à propos de l'histogramme : « en jetons, pas
+en argent — c'est la seule grandeur qui reste juste que le tarif soit
+configuré ou non ». Le raisonnement était écrit, appliqué à
+l'histogramme, et pas à l'alerte.
+
+#### Ce qui change
+
+`partDuQuotaIA` compare les jetons consommés au quota du pack acheté, et
+alimente la liste au même titre que la marge. Un dépassement porte
+désormais sa **nature** — `marge` ou `quota` —, parce que les deux ne se
+lisent pas pareil et ne se réparent pas pareil : une marge dépassée
+interroge la grille tarifaire, un quota dépassé interroge le dossier.
+
+Un dossier peut figurer pour les deux raisons. Les fondre en une seule
+ligne ferait disparaître celle qui tient sans tarif, qui est précisément
+celle qui manquait.
+
+Le seuil du quota est **cent pour cent**, et pas davantage : le quota est
+ce que le pack a vendu. Le dépasser n'est pas une erreur de la
+plateforme — rien n'arrête un appel là-dessus, et l'arbitrage en vigueur
+est que le candidat compte en analyses, pas en jetons (INV-6) — mais
+c'est exactement ce que l'exploitation doit voir : un dossier qui coûte
+plus qu'il n'a rapporté, avant même de savoir combien.
+
+Le tri des lignes suit maintenant **le plus alarmant des deux ratios**.
+Il suivait la marge seule, donc `null` partout sans tarif : le dossier à
+dix fois son quota pouvait finir en bas de liste.
+
+#### Un filtre placé deux fois, exprès
+
+Sans tarif, `candidatsAuDepassement` ne peut produire aucune ligne de
+marge — `partDuPrix` est `null`. L'écran filtre quand même sur la nature
+avant d'afficher. Ce n'est pas une redondance oisive : l'écran ne doit
+pas tenir sur une garantie que seule la lecture fournit, sous peine
+d'afficher un rapport entre un coût absent et un prix le jour où un
+appelant changera d'avis. La mutation « l'écran redevient muet sans
+tarif » le vérifie dans l'autre sens.
+
+#### Vérifié en exécutant, et en mutant
+
+Le même scénario, après correction :
+
+```
+partDuPrix  : null
+partDuQuota : 10
+alertes     : 1
+  · 537d6d84… — 1 000 % du quota de jetons du pack essentiel, sur 1 appel
+```
+
+Quatre mutations, quatre rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le quota n'alimente plus la liste | trois cas, dont le dossier sans tarif |
+| un quota nul divise quand même | l'infini que la grille produirait |
+| l'écran redevient muet sans tarif | le dossier hors quota, invisible |
+| le quota se juge au seuil de marge | un dossier à 15 % de son quota remonterait |
+
+#### Ce que ce lot ne fait pas
+
+Il n'arrête aucun appel. INV-6 est tenu côté candidat par le grand livre
+`AnalysisCredit`, avec son débit conditionnel en SQL — un mécanisme
+soigné, et qui compte des **analyses**, l'unité que le candidat achète.
+Les jetons sont la contrepartie interne ; l'arbitrage de la grille dit
+qu'ils ne se facturent pas au candidat. Ce lot les rend visibles à
+l'exploitation, il ne change pas ce qui est vendu.

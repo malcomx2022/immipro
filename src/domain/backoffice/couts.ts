@@ -91,6 +91,53 @@ export function coutMicrosDesJetons(
   return Math.round(unites * 1_000_000);
 }
 
+/* ── Le quota du pack, la grandeur qui tient sans tarif ──────────────── */
+
+/**
+ * Part du quota de jetons d'un pack déjà consommée — 22/09/2026.
+ *
+ * `tokensIA` portait, depuis le premier jour, ce commentaire : « donnée
+ * d'exploitation, **lue par le back-office (B-07) pour l'alerte de
+ * marge** ». Elle ne l'était pas. B-07 mesurait la marge en argent, et
+ * seulement en argent : sans tarif configuré, `coutMicros` vaut `null`,
+ * `partDuPrix` aussi, et un dossier à dix fois son quota n'apparaissait
+ * nulle part.
+ *
+ * Ce module dit pourtant déjà la bonne règle à propos de
+ * l'histogramme : « en jetons, pas en argent — c'est la seule grandeur
+ * qui reste juste que le tarif soit configuré ou non ». Elle vaut ici
+ * aussi. Le quota du pack est un plafond **en jetons** : il se compare
+ * sans connaître le prix de rien.
+ *
+ * Elle ne remplace pas `partDuPrix`, qui reste la mesure de marge quand
+ * un tarif existe. Elle la précède : une consommation hors normes se
+ * voit avant qu'on sache ce qu'elle coûte.
+ */
+export function partDuQuotaIA(jetons: number, quotaDuPack: number | null): number | null {
+  // Sans pack payé, il n'y a pas de quota à dépasser. Rendre zéro ferait
+  // lire « consommation nulle » là où il n'y a pas de référence.
+  if (quotaDuPack === null || quotaDuPack <= 0) return null;
+  return jetons / quotaDuPack;
+}
+
+/**
+ * Au-delà, la consommation de jetons d'un dossier appelle un regard.
+ *
+ * Cent pour cent, et pas davantage : le quota est ce que le pack a
+ * vendu. Le dépasser n'est pas une erreur de la plateforme — rien
+ * n'arrête un appel là-dessus, et l'arbitrage en vigueur est que le
+ * candidat compte en analyses, pas en jetons (INV-6) — mais c'est
+ * exactement ce que l'exploitation doit voir : un dossier qui coûte plus
+ * qu'il n'a rapporté, avant même de savoir combien.
+ */
+export const SEUIL_QUOTA_IA = 1;
+
+export const quotaDepasse = (part: number | null): boolean =>
+  part !== null && part >= SEUIL_QUOTA_IA;
+
+export const MENTION_QUOTA_SANS_TARIF =
+  "Le quota de jetons du pack se compare sans tarif : c'est la seule alerte disponible tant que le prix du jeton n'est pas renseigné.";
+
 export const MENTION_TARIF_ABSENT =
   "Aucun tarif de jeton n'est configuré : les jetons sont comptés, le coût ne l'est pas. Un tarif manquant ne vaut pas zéro, et un zéro affiché face à un plafond de 15 % se lirait comme de la marge.";
 
@@ -268,26 +315,51 @@ export const MENTION_HISTOGRAMME_EN_JETONS =
  * analyse à chaque dépassement individuel — elle ne peut pas commencer sur
  * un pourcentage anonyme.
  */
+/**
+ * Un dossier qui appelle un regard, et **ce qui le lui vaut**.
+ *
+ * La nature n'est pas décorative : les deux mesures ne se lisent pas de
+ * la même façon et ne se réparent pas pareil. Une marge dépassée
+ * interroge la grille tarifaire ; un quota de jetons dépassé interroge
+ * le dossier lui-même, et se voit **sans tarif configuré**.
+ */
+export type NatureDuDepassement = "marge" | "quota";
+
 export interface Depassement {
   dossierId: string;
   pack: string;
-  /** Part du prix du pack consommée en IA, en ratio. */
+  /** Part du prix du pack, ou part du quota de jetons, selon `nature`. */
   part: number;
+  nature: NatureDuDepassement;
   appels: number;
 }
 
+/**
+ * Les dossiers au-delà de leur seuil, le plus alarmant d'abord.
+ *
+ * Deux seuils, parce qu'il y a deux mesures et qu'elles ne partagent
+ * pas leur condition d'existence. Un dossier peut figurer pour les deux
+ * raisons : ce sont deux constats, et les confondre en un seul ferait
+ * disparaître celui qui tient sans tarif.
+ */
 export const depassements = (
   candidats: readonly Depassement[],
   seuil: number = SEUIL_MARGE_IA,
+  seuilDeQuota: number = SEUIL_QUOTA_IA,
 ): readonly Depassement[] =>
-  [...candidats].filter((d) => d.part > seuil).sort((a, b) => b.part - a.part);
+  [...candidats]
+    .filter((d) => d.part > (d.nature === "quota" ? seuilDeQuota : seuil))
+    .sort((a, b) => b.part - a.part);
 
 export function libelleDepassement(depassement: Depassement): string {
   const part = new Intl.NumberFormat("fr-FR", {
     style: "percent",
     maximumFractionDigits: 1,
   }).format(depassement.part);
-  return `${part} du prix du pack ${depassement.pack}, sur ${depassement.appels} appel${depassement.appels > 1 ? "s" : ""}`;
+  const appels = `${depassement.appels} appel${depassement.appels > 1 ? "s" : ""}`;
+  return depassement.nature === "quota"
+    ? `${part} du quota de jetons du pack ${depassement.pack}, sur ${appels}`
+    : `${part} du prix du pack ${depassement.pack}, sur ${appels}`;
 }
 
 export const MENTION_AUCUN_DEPASSEMENT =
@@ -362,6 +434,8 @@ export interface LigneMesurable {
   coutMicros: number | null;
   pack: string | null;
   partDuPrix: number | null;
+  /** Part du quota de jetons du pack. Ne demande aucun tarif. */
+  partDuQuota: number | null;
 }
 
 /**
@@ -397,14 +471,35 @@ export function mesureDepuisLesLignes(
 }
 
 /** Les dossiers dont la part du pack est connue : eux seuls peuvent dépasser. */
+/**
+ * Ce qui alimente la liste d'alerte — correctif du 22/09/2026.
+ *
+ * Elle écartait toute ligne dont `partDuPrix` valait `null`, c'est-à-dire
+ * **toutes** tant qu'aucun tarif de jeton n'est configuré. La liste ne
+ * pouvait donc pas être non vide, et un dossier à dix fois son quota
+ * n'apparaissait nulle part — alors que `tokensIA` existait pour cela, et
+ * que son commentaire annonçait déjà « lue par le back-office (B-07) pour
+ * l'alerte de marge ».
+ *
+ * Les deux mesures alimentent maintenant la liste, chacune quand elle
+ * existe. Sans tarif, il reste celle des jetons ; avec, les deux se
+ * lisent côte à côte.
+ */
 export const candidatsAuDepassement = (
   lignes: readonly LigneMesurable[],
 ): readonly Depassement[] =>
-  lignes.flatMap((l) =>
-    l.partDuPrix === null || l.pack === null
-      ? []
-      : [{ dossierId: l.dossierId, pack: l.pack, part: l.partDuPrix, appels: l.appels }],
-  );
+  lignes.flatMap((l) => {
+    if (l.pack === null) return [];
+    const commun = { dossierId: l.dossierId, pack: l.pack, appels: l.appels };
+    return [
+      ...(l.partDuPrix === null
+        ? []
+        : [{ ...commun, part: l.partDuPrix, nature: "marge" as const }]),
+      ...(l.partDuQuota === null
+        ? []
+        : [{ ...commun, part: l.partDuQuota, nature: "quota" as const }]),
+    ];
+  });
 
 export const COMMENT_SE_REMPLIT =
   "Dix dossiers complets réels passés dans le pipeline, AiUsage enregistré à chaque appel. Une semaine suffit pour obtenir le coût moyen par type de pièce.";

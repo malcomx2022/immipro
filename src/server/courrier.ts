@@ -7,12 +7,9 @@ import {
   type Creneau,
 } from "@/domain/consultants/rendez-vous";
 import { verifierTexte, INTERDITS_PARTOUT } from "@/domain/copy/vocabulaire-interdit";
-import {
-  sondeDuTransport,
-  traceDEnvoi,
-  type DernierFait,
-  type Envoi,
-} from "@/domain/courrier/transport";
+import { traceDEnvoi, type DernierFait, type Envoi } from "@/domain/courrier/transport";
+import { sondeDuConstat, type Constat } from "@/domain/exploitation/constats";
+import { noterLeConstat } from "@/server/exploitation/constats";
 import type { Sonde } from "@/domain/exploitation/dependances";
 import { configurationLisible, envoyerParSmtp } from "@/server/courrier/smtp";
 
@@ -139,11 +136,24 @@ export const leTransport = (
  * réellement parlé à un serveur. Le worker s'en charge au démarrage
  * (`verifierLaConnexion`), et chaque envoi rafraîchit le constat.
  *
+ * ── Il ne traversait pas la frontière des processus (22/09/2026) ────
+ *
+ * Il vivait ici, dans une variable de module. Le worker le posait, et
+ * `/api/health` — qui est dans **l'autre** processus — lisait toujours
+ * `null`. La messagerie étant bloquante, l'instance restait inapte
+ * indéfiniment, sans qu'aucun déploiement puisse y changer quoi que ce
+ * soit. Le constat passe maintenant par la base
+ * (`server/exploitation/constats.ts`), qui est le seul état partagé.
+ *
+ * La variable reste, et ne sert plus qu'au processus courant : elle
+ * évite une lecture en base là où le fait vient d'être établi, et elle
+ * porte la trace quand aucune base n'est là — les tests, une commande
+ * hors ligne. Elle n'est plus ce sur quoi l'état de service conclut.
+ *
  * Ce que cette lecture **ne** dit **pas** : que le transport marche en
  * ce moment. Elle dit ce qui s'est passé la dernière fois qu'on a
- * essayé. Le savoir en continu demanderait d'interroger le serveur
- * depuis `/api/health`, et cette adresse ne déclenche rien (décision du
- * 21/09).
+ * essayé — et, depuis ce lot, **quand**, parce qu'un constat périmé ne
+ * conclut plus rien.
  */
 let dernier: DernierFait | null = null;
 
@@ -158,11 +168,20 @@ export const oublierLesFaits = (): void => {
   signale = false;
 };
 
-/** La sonde de l'état de service. Locale, sans effet de bord, sans réseau. */
+/**
+ * La sonde de l'état de service. Locale, sans effet de bord, sans réseau.
+ *
+ * Le constat lui est **passé** : il vient de la base, et c'est ce qui
+ * lui permet de conclure sur ce que le worker a établi. À défaut — un
+ * test, une commande hors ligne —, elle retombe sur le fait du
+ * processus courant.
+ */
 export const sonderLeCourrier = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,
+  constat: Constat | undefined = dernier ?? undefined,
+  maintenant = new Date(),
 ): Sonde =>
-  sondeDuTransport(configurationLisible(environnement).lisible, dernier);
+  sondeDuConstat(configurationLisible(environnement).lisible, constat, maintenant);
 
 /**
  * Expédie, et rend ce qui s'est passé.
@@ -188,7 +207,18 @@ export async function expedier(courrier: Courrier): Promise<Envoi> {
   // Un envoi réel est la meilleure preuve qu'il y ait que le transport
   // fonctionne — et un échec réel, la meilleure qu'il ne fonctionne pas.
   // Le journal, lui, n'établit rien : il n'a parlé à personne.
-  if (issue.issue !== "journalise") noterLeFait(issue.issue === "envoye");
+  if (issue.issue !== "journalise") {
+    const reussi = issue.issue === "envoye";
+    noterLeFait(reussi);
+    /*
+      Et le constat va en base — 22/09/2026. Un courrier réel part du
+      **processus web**, et c'est la meilleure preuve qui soit ; le
+      garder en mémoire le laissait mourir avec le processus, et
+      laissait l'état de service dépendre du seul worker. Une écriture
+      ratée ne fait rien échouer : le courrier, lui, est parti.
+    */
+    await noterLeConstat("messagerie", reussi, issue.issue);
+  }
   return issue;
 }
 
