@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  ATTENTE_ORDINAIRE_MS,
+  MENTION_ATTENTE_PROLONGEE,
   consultable,
+  mentionDeLAttente,
   MENTION_EN_QUARANTAINE,
   mentionApercu,
   refusAuControle,
@@ -10,8 +13,12 @@ import {
 } from "@/domain/dossiers/quarantaine";
 import { antivirusConfigure, NON_BRANCHE, VARIABLES } from "@/server/securite/antivirus";
 import {
+  ATTENTE_AU_CONTROLE,
   TENTATIVES_AVANT_INCIDENT,
+  quiPeutAgir,
+  seReprendSeule,
   suiteDeLIndisponibilite,
+  type CauseDIndisponibilite,
   type Verdict,
 } from "@/domain/securite/balayage";
 import { ECHECS } from "@/server/http/echecs";
@@ -169,6 +176,127 @@ describe("les messages disent l'état réel, et le geste attendu", () => {
     expect(refus.corps).toMatch(/n'a pas été conservé/u);
     expect(`${refus.titre} ${refus.corps}`).not.toMatch(/virus|trojan|malware|signature/iu);
     expect(mentionApercu("INFECTEE")).toMatch(/écarté au contrôle/u);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * « Dans quelques instants », pendant trois jours.
+ * ------------------------------------------------------------------ */
+
+describe("ce que le candidat lit d'une attente au contrôle", () => {
+  const MAINTENANT = new Date("2026-09-22T12:00:00Z");
+  const ilYA = (ms: number) => new Date(MAINTENANT.getTime() - ms);
+
+  /** Le cas de tous les jours : quelques secondes, et c'est vrai. */
+  it("une pièce qui vient d'arriver lit le message ordinaire", () => {
+    expect(mentionDeLAttente({ depuis: ilYA(5_000) }, MAINTENANT)).toBe(MENTION_EN_QUARANTAINE);
+  });
+
+  /**
+   * **Le défaut corrigé.** Le message promettait « quelques instants »
+   * quelle que soit l'ancienneté, sur une pièce dont le contrôle pouvait
+   * ne jamais aboutir. Une promesse de durée qui ne tient pas est pire
+   * qu'une absence de promesse : elle empêche de s'inquiéter à temps.
+   */
+  it("une attente qui dure cesse de promettre une durée", () => {
+    const prolongee = mentionDeLAttente({ depuis: ilYA(ATTENTE_ORDINAIRE_MS + 1000) }, MAINTENANT);
+    expect(prolongee).toBe(MENTION_ATTENTE_PROLONGEE);
+    expect(prolongee).not.toMatch(/quelques instants/u);
+    // Elle ne demande rien pour autant : il n'y a rien à demander.
+    expect(prolongee).toMatch(/tu n'as rien à faire/u);
+  });
+
+  /**
+   * Une cause connue l'emporte sur la durée : elle dit ce qui se passe,
+   * et parfois quoi faire. C'est plus qu'un délai.
+   */
+  it("un fichier trop lourd dit quoi faire, et ne fait pas attendre", () => {
+    const message = mentionDeLAttente(
+      { depuis: ilYA(60_000), cause: "trop_volumineux" },
+      MAINTENANT,
+    );
+    expect(message).toMatch(/trop lourd/u);
+    expect(message).toMatch(/Dépose une version plus légère/u);
+    // Surtout pas : ni promesse de durée, ni « rien à faire ».
+    expect(message).not.toMatch(/quelques instants|rien à faire/u);
+  });
+
+  it("un fichier qui n'est pas arrivé se redépose", () => {
+    const message = mentionDeLAttente({ depuis: ilYA(60_000), cause: "objet_absent" }, MAINTENANT);
+    expect(message).toMatch(/dépose-le à nouveau/iu);
+    expect(message).not.toMatch(/rien à faire/u);
+  });
+
+  /**
+   * Une panne de notre côté ne se répare pas en redéposant. Demander un
+   * geste ici ferait tourner quelqu'un en rond sur un problème qui n'est
+   * pas le sien.
+   */
+  it("une panne de la plateforme ne demande rien au candidat", () => {
+    for (const cause of ["injoignable", "delai_depasse", "reponse_illisible", "non_configure"] as const) {
+      const message = mentionDeLAttente({ depuis: ilYA(60_000), cause }, MAINTENANT);
+      expect(message, cause).toMatch(/tu n'as rien à faire/u);
+      expect(message, cause).toMatch(/conservé/u);
+      expect(message, cause).not.toMatch(/[Dd]épose/u);
+    }
+  });
+
+  /** Aucun message ne nomme la panne, le moteur, ni un code. */
+  it("aucun message ne nomme ce qui ne regarde pas le candidat", () => {
+    for (const cause of Object.keys(ATTENTE_AU_CONTROLE) as CauseDIndisponibilite[]) {
+      const message = ATTENTE_AU_CONTROLE[cause];
+      expect(message, cause).not.toMatch(/antivirus|virus|moteur|EICAR|500|quarantaine/iu);
+      // RG-06.3 : un message d'échec est actionnable, donc il dit ce qui
+      // se passe et ce qui est attendu — jamais un constat sec.
+      expect(message.length, cause).toBeGreaterThan(60);
+    }
+  });
+
+  /**
+   * **Le garde-fou de la table.** `quiPeutAgir` classe chaque cause ;
+   * ce test vérifie que le message correspondant en tient compte. Sans
+   * lui, la fonction ne serait qu'un commentaire exécutable — une
+   * distinction écrite dont rien ne dépendrait —, et une cause ajoutée
+   * un jour pourrait dire « dépose à nouveau » sur une panne de notre
+   * côté, ou « tu n'as rien à faire » sur un fichier que le candidat
+   * pourrait remplacer en une minute.
+   */
+  it("chaque message dit un geste, ou n'en demande aucun, selon qui peut agir", () => {
+    for (const cause of Object.keys(ATTENTE_AU_CONTROLE) as CauseDIndisponibilite[]) {
+      const message = ATTENTE_AU_CONTROLE[cause];
+      if (quiPeutAgir(cause) === "candidat") {
+        expect(message, cause).toMatch(/[Dd]épose/u);
+        expect(message, cause).not.toMatch(/rien à faire/u);
+      } else {
+        expect(message, cause).toMatch(/tu n'as rien à faire/u);
+        expect(message, cause).not.toMatch(/[Dd]épose/u);
+      }
+    }
+  });
+
+  /**
+   * Les deux questions ne se recouvrent pas : la file demande « faut-il
+   * rejouer ? », le candidat demande « ai-je quelque chose à faire ? ».
+   * Un délai dépassé se rejoue et ne demande rien ; un fichier trop
+   * lourd ne se rejoue pas et demande un geste.
+   */
+  it("rejouer et agir sont deux questions distinctes", () => {
+    expect(seReprendSeule("delai_depasse")).toBe(true);
+    expect(quiPeutAgir("delai_depasse")).toBe("plateforme");
+
+    expect(seReprendSeule("trop_volumineux")).toBe(false);
+    expect(quiPeutAgir("trop_volumineux")).toBe("candidat");
+
+    // Et une cause qui ne se reprend pas seule n'appelle pas forcément
+    // un geste : une réponse hors contrat est notre affaire.
+    expect(seReprendSeule("reponse_illisible")).toBe(false);
+    expect(quiPeutAgir("reponse_illisible")).toBe("plateforme");
+  });
+
+  /** Sans rien savoir de l'attente, on ne fabrique pas d'inquiétude. */
+  it("sans information, le message ordinaire tient", () => {
+    expect(mentionDeLAttente(undefined, MAINTENANT)).toBe(MENTION_EN_QUARANTAINE);
+    expect(mentionApercu("EN_QUARANTAINE")).toBe(MENTION_EN_QUARANTAINE);
   });
 });
 
