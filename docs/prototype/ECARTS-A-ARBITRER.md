@@ -5607,3 +5607,170 @@ Un neuvième garde-fou a été **retiré** plutôt que réparé : un test lisait
 le source de l'adaptateur pour y vérifier la présence d'un commentaire.
 C'est une prose qui garde une prose. L'assertion de comportement — l'en-tête
 part, et il porte la clé de la tentative — reste seule.
+
+---
+
+### S.30 — Un fichier serait entré dans le stockage de confiance sans être balayé
+
+Le balayage antivirus est branché : `ANTIVIRUS_URL` désigne un moteur
+réel, les octets lui sont soumis, et un fichier ne quitte la quarantaine
+que sur un verdict « saine ». En l'écrivant, un défaut est apparu dans le
+code qui existait déjà, et il vaut d'être raconté avant le reste.
+
+#### Le `null` devenu objet
+
+Le balayeur rendait `null` quand il ne savait pas. Le job le testait
+ainsi :
+
+```ts
+const verdict = await balayer(cle);
+if (!verdict) throw new BalayageIndisponible(cle);
+```
+
+Correct tant qu'il n'y avait qu'une façon de ne pas savoir. Le moteur
+branché en a six — pas de configuration, injoignable, délai dépassé,
+réponse hors contrat, fichier trop volumineux, objet absent — et
+l'exploitant doit les distinguer pour savoir s'il faut attendre ou
+intervenir. L'indisponibilité est donc devenue un objet portant sa cause.
+
+**Un objet est toujours vrai.** `if (!verdict)` a cessé d'attraper quoi
+que ce soit, et le code tombait dans la branche suivante, qui est
+`promouvoir`. Une pièce que personne n'avait balayée serait entrée dans
+le stockage de confiance parce qu'un moteur n'avait pas répondu — et
+comme la promotion ne fait pas de bruit, rien ne l'aurait signalé.
+
+Le défaut n'a jamais été déployé : il est né et mort dans le même lot.
+Ce qui mérite d'être noté est qu'il n'est pas né d'une inattention, mais
+d'un **enrichissement de type** — la forme la plus ordinaire du travail.
+Le remède n'est donc pas la vigilance :
+
+```ts
+switch (verdict.etat) {
+  case "SAINE":        return admettre(version, tache);
+  case "INFECTEE":     return ecarter(version, tache, verdict.menace);
+  case "INDISPONIBLE": return sansVerdict(version, verdict.cause);
+  default: {
+    const jamais: never = verdict;
+    throw new Error(`Verdict de balayage non arbitré : ${JSON.stringify(jamais)}`);
+  }
+}
+```
+
+Un quatrième état ne compilera pas tant que personne n'aura dit ce qu'il
+promeut, et la réponse par défaut est « rien ».
+
+#### Le contrat, et pourquoi c'est nous qui l'écrivons
+
+La règle du lot FedaPay était : *si la documentation du fournisseur n'est
+pas disponible, ne rien inventer*. Elle ne s'applique pas ici, et la
+différence est entière. `ANTIVIRUS_URL` ne désigne pas un tiers dont il
+faudrait deviner l'interface : elle désigne **le moteur que l'exploitant
+met en face**. Inventer la forme d'une API tierce est une supposition ;
+publier la nôtre est la seule façon d'être branchable.
+
+Le contrat est donc délibérément minimal — un POST, des octets, deux
+réponses possibles — parce qu'il doit se satisfaire avec une trentaine de
+lignes de colle devant n'importe quel moteur : ClamAV et les autres
+n'exposent pas d'HTTP. Un contrat riche déplacerait le travail chez
+l'exploitant et se négocierait moteur par moteur.
+
+**Aucune URL ne part.** Ni présignée, ni permanente : le moteur n'a pas à
+pouvoir relire le fichier, ni demain, ni depuis ailleurs. C'est la raison
+d'être des deux seaux, et une adresse confiée à un tiers rouvrirait
+exactement ce que la quarantaine ferme, pour une durée qu'on ne
+contrôlerait plus.
+
+#### Rejouer et signaler ne sont pas la même question
+
+Une panne réseau se reprend. Un fichier trop volumineux se rejouerait à
+l'identique jusqu'à la fin des temps, et rejouer sans fin une tâche qui
+ne peut pas aboutir remplit la file et noie l'incident qu'il fallait
+voir. `seReprendSeule` tranche par `switch` exhaustif ; lever est la
+façon de demander une reprise à pg-boss, et on ne la demande que si elle
+peut aboutir.
+
+Le signalement suit une autre règle : tout de suite pour ce qui ne se
+reprend pas, au bout de trois tentatives pour le reste. La file porte
+six reprises avec délai croissant — le seuil est donc franchi **avant**
+que les reprises soient épuisées, ce qui est l'intérêt d'un seuil : être
+prévenu pendant qu'on peut encore agir.
+
+**Aucune combinaison n'accepte le fichier.** C'est la propriété que ce
+lot existe pour tenir : quelle que soit la cause, quel que soit le
+nombre de tentatives, la pièce reste en quarantaine. Signaler est une
+visibilité, pas une porte de sortie.
+
+Sans politique de reprise, pg-boss n'essayait **qu'une fois** : un moteur
+redémarré pendant un dépôt laissait la pièce en quarantaine pour de bon,
+et personne ne revenait la chercher. La politique est posée par
+`updateQueue` autant que par `createQueue`, cette dernière étant
+idempotente — sans quoi le correctif n'aurait valu que pour les
+installations neuves, ce qui est la façon la plus discrète d'avoir l'air
+déployé sans l'être.
+
+#### La sonde, et la panne qui ne se remarquerait pas
+
+Une `ANTIVIRUS_URL` bien formée devant un service qui répond poliment
+`{"status":"clean"}` à tout passerait pour opérationnelle **en laissant
+entrer chaque fichier**. C'est la seule panne de cette chaîne qui ne se
+verrait jamais : tout continuerait de fonctionner, et rien ne serait
+balayé.
+
+La sonde présente donc **EICAR** au moteur — une chaîne normalisée de 68
+octets, sans charge, que les moteurs se sont accordés à signaler
+précisément pour qu'on puisse les vérifier. `INFECTEE` vaut preuve ;
+`SAINE` sur EICAR est une panne, et il vaut mieux la lire au démarrage du
+worker que sur le premier fichier réellement infecté.
+
+Elle est dans le worker et non dans `/api/health`, pour la raison déjà
+retenue pour le courrier le 21/09 : cette adresse est interrogée par un
+répartiteur de charge et ne déclenche rien. Ce qu'elle gagne en échange :
+`/api/health` compte les pièces bloquées au contrôle et l'ancienneté de
+la plus vieille — un écran de back-office ne surveille que ceux qui
+l'ouvrent, une adresse d'état se surveille depuis l'extérieur.
+
+#### Ce que la base refuse désormais
+
+Cinq garde-fous de plus, soixante-dix en tout. Le plus utile est celui
+qui interdit **un incident ouvert sur une version décidée** : il oblige à
+solder l'attente au moment où un verdict tombe, donc il garantit que le
+compte d'exploitation ne compte que des pièces réellement bloquées. Une
+mutation l'a confirmé — retirer le soldage fait échouer l'écriture de
+promotion, et non un test.
+
+#### Vérifié en exécutant, et en mutant
+
+`scripts/fumee-balayage.mts` fait tourner la chaîne entière sur une base
+réelle, devant **deux serveurs d'essai** : le moteur, et un stockage
+objet de deux seaux devant lequel le vrai client MinIO parle pour de bon.
+C'est ce qui permet de vérifier que la promotion déplace réellement
+l'objet d'un seau à l'autre, plutôt qu'elle appelle les fonctions qu'on
+croit — et cela a appris au passage que le client rejoue de lui-même un
+5xx, ce qu'un faux objet aurait caché.
+
+Onze mutations, onze rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'indisponibilité promeut, comme le faisait `if (!verdict)` | huit vérifications de la chaîne |
+| l'attente n'est pas soldée à la promotion | la contrainte SQL refuse l'écriture |
+| l'incident rajeunit à chaque reprise | l'ancienneté cesse de dire depuis quand |
+| tout lève, même ce qui ne se rejoue pas | la tâche bloquée n'a plus de fin |
+| `status` ouvert à toute chaîne | l'état hors contrat, et la liste des refus |
+| une réponse illisible lue comme saine | trois cas, dont le corps non-JSON |
+| le code de retour n'est plus lu | le 500 dont le corps dit « clean » |
+| le délai de balayage retiré | le moteur muet immobilise l'ouvrier |
+| le plafond de taille annoncée retiré | un flux est ouvert là où rien ne devait l'être |
+| la lecture sous plafond retirée | des métadonnées qui mentent remplissent la mémoire |
+| la sonde conclut sans avoir rien essayé | trois cas, dont EICAR déclaré sain |
+
+Les deux plafonds de taille ont demandé **deux tests distincts** : ils se
+recouvrent, et retirer le premier passait inaperçu parce que le second
+rattrapait le verdict — après avoir tout chargé en mémoire. Le test
+compte maintenant les flux ouverts, ce qui les sépare.
+
+Trois tests qui lisaient le **source** du job ont été remplacés : ils
+existaient parce qu'il n'y avait pas de moteur à éprouver, et cette
+raison a disparu. Un quatrième, sur l'ordre de la promotion, est resté
+tel quel : il porte sur un ordre d'instructions qu'aucune exécution ne
+révèle.

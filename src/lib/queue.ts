@@ -38,8 +38,42 @@ export const JOBS = {
  */
 export const FILES: readonly string[] = Object.values(JOBS);
 
+/**
+ * La politique de reprise du balayage — I.D, lot du 22/09/2026.
+ *
+ * Sans elle, pg-boss n'essaie **qu'une fois** : un moteur antivirus
+ * redémarré pendant le dépôt laissait la pièce en quarantaine pour de
+ * bon, et personne ne revenait jamais la chercher. Le balayage est la
+ * seule file dont l'échec est attendu en exploitation ordinaire — un
+ * service tiers qui bouge —, et c'est la seule qui la porte.
+ *
+ * Six reprises avec délai croissant depuis dix secondes couvrent une
+ * indisponibilité de l'ordre de dix minutes, ce qui est la durée d'un
+ * redémarrage ou d'un déploiement du moteur. `TENTATIVES_AVANT_INCIDENT`
+ * vaut trois : l'incident devient donc visible **avant** que les reprises
+ * soient épuisées, ce qui est l'intérêt d'un seuil — être prévenu pendant
+ * qu'on peut encore agir, et non après.
+ *
+ * Une cause qui ne se reprend pas seule ne consomme aucune de ces
+ * reprises : `balayerUnePiece` ne lève pas dans ce cas et la tâche
+ * s'achève sur `BLOQUEE`, incident ouvert.
+ */
+export const REPRISES: Readonly<Record<string, PgBoss.RetryOptions>> = {
+  [JOBS.BALAYAGE_PIECE]: { retryLimit: 6, retryDelay: 10, retryBackoff: true },
+};
+
+/**
+ * `createQueue` est idempotente : sur une file qui existe déjà, elle sort
+ * sans rien changer. Une politique ajoutée après coup ne s'appliquerait
+ * donc qu'aux installations neuves — le genre de correctif qui a l'air
+ * déployé et ne l'est pas. `updateQueue` la pose sur l'existant.
+ */
 export async function declarerLesFiles(instance: PgBoss): Promise<void> {
-  for (const nom of FILES) await instance.createQueue(nom);
+  for (const nom of FILES) {
+    const reprises = REPRISES[nom];
+    await instance.createQueue(nom, reprises ? { name: nom, ...reprises } : undefined);
+    if (reprises) await instance.updateQueue(nom, { name: nom, ...reprises });
+  }
 }
 
 /** Files de jobs stockées dans PostgreSQL — pas de Redis au démarrage. */

@@ -9,6 +9,11 @@ import {
   type EtatBalayage,
 } from "@/domain/dossiers/quarantaine";
 import { antivirusConfigure, NON_BRANCHE, VARIABLES } from "@/server/securite/antivirus";
+import {
+  TENTATIVES_AVANT_INCIDENT,
+  suiteDeLIndisponibilite,
+  type Verdict,
+} from "@/domain/securite/balayage";
 import { ECHECS } from "@/server/http/echecs";
 
 /**
@@ -33,8 +38,10 @@ describe("un seul état ouvre les portes", () => {
 });
 
 describe("l'absence de balayeur ne se traduit jamais en acceptation", () => {
-  it("le balayeur non branché rend l'absence", async () => {
-    await expect(NON_BRANCHE("dossiers/x/passeport.pdf")).resolves.toBeNull();
+  it("le balayeur non branché rend l'indisponibilité, jamais la propreté", async () => {
+    const vu = await NON_BRANCHE("dossiers/x/passeport.pdf");
+    expect(vu).toMatchObject({ etat: "INDISPONIBLE", cause: "non_configure" });
+    expect(vu.etat).not.toBe("SAINE");
   });
 
   it("une variable vide ne vaut pas un moteur", () => {
@@ -45,17 +52,50 @@ describe("l'absence de balayeur ne se traduit jamais en acceptation", () => {
   });
 
   /**
-   * Le job lève plutôt que de décider. Une exception est la seule façon de
-   * dire à une file de jobs « reviens plus tard » ; un retour silencieux
-   * laisserait la pièce en quarantaine sans que rien ne la reprenne.
+   * **Le défaut que ce lot a rattrapé.**
+   *
+   * L'indisponibilité était rendue par `null` et testée par
+   * `if (!verdict)`. Le jour où elle est devenue un objet — pour porter
+   * sa cause —, ce test est passé à côté : un objet est toujours vrai, et
+   * le code tombait dans la branche de promotion. Une pièce que personne
+   * n'avait balayée serait entrée dans le stockage de confiance parce
+   * qu'un moteur n'avait pas répondu.
+   *
+   * Ce test ne lit plus le source : il éprouve le type. Le `switch` du
+   * job est exhaustif sur `Verdict`, et la propriété qui compte est que
+   * **l'indisponibilité en fasse partie** — un appelant ne peut pas
+   * l'oublier sans que le compilateur le lui dise, là où un `null` se
+   * teste distraitement.
    */
-  it("le job laisse la pièce en attente et se fait réessayer", () => {
-    const balayage = lire("src/server/jobs/balayage.ts");
-    expect(balayage).toMatch(/if \(!verdict\) throw new BalayageIndisponible/u);
-    expect(balayage).toMatch(/class BalayageIndisponible extends Error/u);
-    // La promotion n'a lieu que sur un verdict, jamais sur son absence.
-    const avantPromotion = balayage.slice(0, balayage.indexOf("await promouvoir("));
-    expect(avantPromotion).toContain("if (!verdict)");
+  it("l'indisponibilité est un verdict, pas une absence de verdict", () => {
+    const etats: Verdict["etat"][] = ["SAINE", "INFECTEE", "INDISPONIBLE"];
+    // Le `never` du job garantit qu'un quatrième état ne compilera pas
+    // tant que personne n'aura dit ce qu'il promeut.
+    expect(etats).toHaveLength(3);
+
+    const verdicts: Verdict[] = [
+      { etat: "SAINE" },
+      { etat: "INFECTEE", menace: "X" },
+      { etat: "INDISPONIBLE", cause: "injoignable", detail: "" },
+    ];
+    // Aucun n'est falsy : c'est précisément ce qui rendait `if (!verdict)`
+    // inoffensif en apparence et faux en fait.
+    for (const v of verdicts) expect(Boolean(v)).toBe(true);
+  });
+
+  /**
+   * La chaîne complète — dépôt, quarantaine, balayage, promotion, analyse
+   * — demande une base et un moteur, et vit dans
+   * `scripts/fumee-balayage.mts`. Les verdicts eux-mêmes s'éprouvent
+   * contre un vrai serveur dans `tests/balayage-moteur.test.ts`.
+   */
+  it("le seuil d'incident ne promeut rien : il rend visible", () => {
+    for (const tentatives of [1, TENTATIVES_AVANT_INCIDENT, 99]) {
+      const suite = suiteDeLIndisponibilite("injoignable", tentatives);
+      // Quelle que soit la combinaison, il n'existe aucune réponse qui
+      // accepte le fichier. Signaler est une visibilité, pas une porte.
+      expect(Object.keys(suite).sort()).toEqual(["rejouer", "signaler"]);
+    }
   });
 
   /** Le dépôt refuse, plutôt que d'accepter un fichier qu'il ne promouvra pas. */
@@ -146,5 +186,23 @@ describe("le balayage précède l'analyse, et rien ne les inverse", () => {
     const balayage = lire("src/server/jobs/balayage.ts");
     expect(balayage).toMatch(/await solde\(tache\.applicationId\)\) > 0\) return "ANALYSE"/u);
     expect(balayage.indexOf("await promouvoir(")).toBeLessThan(balayage.indexOf("await solde("));
+  });
+
+  /**
+   * L'ordre de la promotion, et ce qu'il coûte de l'inverser.
+   *
+   * La copie d'abord, l'écriture ensuite. Interrompue entre les deux,
+   * elle laisse une version en quarantaine dont l'objet est déjà passé :
+   * la reprise rebalaie, ne trouve plus rien, et rend `objet_absent` —
+   * une pièce bloquée et visible. L'ordre inverse écrirait « saine » sur
+   * une version dont les octets seraient restés en quarantaine :
+   * consultable et introuvable.
+   */
+  it("la promotion précède l'écriture, et non l'inverse", () => {
+    const balayage = lire("src/server/jobs/balayage.ts");
+    const admettre = /async function admettre[\s\S]*?\n\}/u.exec(balayage)![0];
+    expect(admettre.indexOf("await promouvoir(")).toBeLessThan(
+      admettre.indexOf('scanState: "SAINE"'),
+    );
   });
 });

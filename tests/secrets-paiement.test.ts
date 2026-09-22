@@ -110,8 +110,22 @@ describe("le registre des dépendances et `.env.example` disent la même chose",
       "remboursement",
     ]);
 
+    /*
+      Une valeur **plausible** par variable, et non « valeur » pour toutes.
+      Depuis que le balayeur a un adaptateur (22/09/2026),
+      `antivirusConfigure` exige une adresse http(s) utilisable et non une
+      variable non vide : une `ANTIVIRUS_URL` remplie avec « à définir »
+      passait le test de présence sans désigner aucun moteur, et le dépôt
+      se serait ouvert devant un balayage qui n'aurait jamais lieu. Ce test
+      doit donc fournir ce que chaque module attend réellement.
+    */
+    const PLAUSIBLES: Readonly<Record<string, string>> = {
+      ANTIVIRUS_URL: "http://antivirus.interne:3310/scan",
+      SMTP_URL: "smtp://messagerie.interne:25",
+      APP_URL: "https://immipro.test",
+    };
     const toutes = Object.fromEntries(
-      DEPENDANCES.flatMap((d) => d.variables).map((v) => [v, "valeur"]),
+      DEPENDANCES.flatMap((d) => d.variables).map((v) => [v, PLAUSIBLES[v] ?? "valeur"]),
     );
 
     for (const dependance of bloquantes) {

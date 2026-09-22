@@ -122,6 +122,39 @@ SELECT refuse(
        "scanState", "scannedAt")
      VALUES ('v8','d1',8,'minio/dd','dd1','INFECTEE', now())$q$);
 
+-- L'attente de balayage, et son incident (22/09/2026). Le balayeur parle
+-- maintenant à un moteur réel : une pièce peut rester en quarantaine, et
+-- c'est cette attente-là que la base tient cohérente.
+SELECT refuse(
+  'I.D · un incident de balayage sans cause, qui ne dirait pas quoi faire',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanAttempts", "scanLastAttemptAt", "scanIncidentAt")
+     VALUES ('v9','d1',9,'minio/ee','ee1', 3, now(), now())$q$);
+
+SELECT refuse(
+  'I.D · un incident ouvert sur une version déjà décidée',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanState", "scannedAt", "scanIncidentAt", "scanIncidentCause")
+     VALUES ('v10','d1',10,'minio/ff','ff1','SAINE', now(), now(), 'injoignable')$q$);
+
+SELECT refuse(
+  'I.D · une tentative de balayage comptée sans être datée',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanAttempts")
+     VALUES ('v11','d1',11,'minio/gg','gg1', 2)$q$);
+
+SELECT refuse(
+  'I.D · une date de tentative sans tentative comptée',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanLastAttemptAt")
+     VALUES ('v12','d1',12,'minio/hh','hh1', now())$q$);
+
+SELECT refuse(
+  'I.D · un compteur de tentatives négatif',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum,
+       "scanAttempts", "scanLastAttemptAt")
+     VALUES ('v13','d1',13,'minio/ii','ii1', -1, now())$q$);
+
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
 

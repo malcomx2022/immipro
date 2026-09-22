@@ -10,6 +10,7 @@
 import { getQueue, JOBS, poster } from "@/lib/queue";
 import { noterLeFait } from "@/server/courrier";
 import { verifierLaConnexion } from "@/server/courrier/smtp";
+import { verifierLeMoteur } from "@/server/securite/antivirus";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
@@ -38,6 +39,14 @@ async function main() {
       // pas marqué réussi, et le job est rejoué. Avec `send`, une analyse
       // perdue aurait laissé la pièce indéfiniment « en analyse ».
       if (suite === "ANALYSE") await poster(boss, JOBS.ANALYSE_DOCUMENT, job.data);
+      /*
+        `BLOQUEE` : le balayage n'a pas conclu et la cause ne se reprend
+        pas seule. La tâche s'achève — lever ferait rejouer à l'identique
+        jusqu'à épuisement des reprises, sans rien changer au fichier.
+        L'incident est écrit sur la version et se lit dans `/api/health` ;
+        la pièce, elle, reste en quarantaine.
+      */
+      if (suite === "BLOQUEE") console.warn("[balayage] pièce bloquée", job.data.versionId);
     },
   );
 
@@ -122,6 +131,30 @@ async function main() {
     noterLeFait(courrier.issue === "envoye");
     console.info(`[courrier] vérification de la connexion · ${courrier.issue}`);
   }
+
+  /*
+    La sonde du moteur de balayage, une fois au démarrage, et pour la même
+    raison que celle du courrier : `/api/health` est interrogée par un
+    répartiteur de charge et ne déclenche rien.
+
+    Ce qui part est le fichier d'essai **EICAR** — une chaîne normalisée,
+    sans charge, que les moteurs se sont accordés à signaler précisément
+    pour qu'on puisse les vérifier. Aucun fichier de candidat n'est
+    transmis, aucune version n'est touchée, rien n'est promu.
+
+    Le seul résultat qui vaut preuve est « infectée ». Un moteur qui
+    répond `clean` à EICAR répond sans détecter, et c'est la panne qu'il
+    faut lire ici plutôt que sur le premier fichier réellement infecté :
+    elle ne se remarquerait jamais autrement, puisque tout continuerait
+    de passer.
+
+    Son échec n'empêche pas le worker de démarrer. Il n'ouvre rien non
+    plus : `antivirusConfigure` commande le dépôt, et une sonde muette
+    laisse la capacité non vérifiée, donc l'instance inapte au
+    téléversement.
+  */
+  const moteur = await verifierLeMoteur().catch(() => null);
+  if (moteur) console.info(`[balayage] vérification du moteur · ${moteur.issue} — ${moteur.detail}`);
 
   console.log("worker démarré");
 }

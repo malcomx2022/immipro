@@ -529,7 +529,7 @@ model Transaction {
   /// Pourquoi il est dû, en clair. Une obligation sans motif ne se traite
   /// pas : l'opérateur qui la voit doit savoir si elle vient de la règle ou
   /// d'un geste, et lequel.
-  refundBasis String?
+  refundBasis       String?
 
   credits AnalysisCredit[]
   events  PaymentEvent[]
@@ -668,6 +668,18 @@ model DocumentVersion {
   /// jamais montré au candidat : il n'est pas actionnable (RG-06.3).
   scanFinding String?
 
+  /// Tentatives de balayage restées sans verdict. Remises à zéro dès qu'un
+  /// verdict tombe : le compteur mesure une attente en cours, pas un passé.
+  scanAttempts      Int       @default(0)
+  scanLastAttemptAt DateTime?
+  /// Posée quand l'attente cesse d'être ordinaire — tout de suite pour une
+  /// cause qui ne se reprend pas, au bout de trois tentatives sinon. Elle
+  /// rend l'incident visible en exploitation ; elle n'accepte rien.
+  scanIncidentAt    DateTime?
+  /// La cause, telle que `CauseDIndisponibilite` la nomme. Dit à
+  /// l'exploitant s'il doit attendre ou intervenir.
+  scanIncidentCause String?
+
   analyses DocumentAnalysis[]
   findings CritiqueFinding[]
 
@@ -675,6 +687,7 @@ model DocumentVersion {
   @@unique([documentId, checksum])
   @@index([documentId, uploadedAt])
   @@index([scanState, uploadedAt])
+  @@index([scanIncidentAt])
 }
 
 enum AnalysisVerdict {
@@ -1228,9 +1241,9 @@ model EditorialVersion {
   /// Rang de publication, continu par document : la première vaut 1.
   rang  Int
 
-  title      String
-  standfirst String
-  body       Json
+  title       String
+  standfirst  String
+  body        Json
   /// INV-8 au niveau de la version, et non nullable : ce qui a été public
   /// portait forcément sa source et sa date, puisque la base l'exigeait
   /// déjà du document. Une version qui pourrait s'en passer laisserait

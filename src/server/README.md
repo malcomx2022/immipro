@@ -370,11 +370,69 @@ traite son absence plutôt que de faire semblant :
 | Dépendance | Point de branchement | Sans elle |
 |---|---|---|
 | Messagerie | `courrier.ts`, `leTransport` / `brancherTransport` | Les courriers sont journalisés, l'absence de configuration est signalée une fois |
-| Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D) |
+| Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D). Avec un moteur, une indisponibilité laisse la pièce en quarantaine et ouvre un incident — jamais une promotion |
 | Extraction IA | `jobs/analyse.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture |
 | Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien |
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
+
+### Le balayage antivirus, et la seule issue qui promeut
+
+Branché le 22/09/2026. `ANTIVIRUS_URL` ne désigne pas un fournisseur connu
+dont il faudrait deviner l'interface : elle désigne **le moteur que
+l'exploitant met en face**, et c'est donc nous qui publions le contrat. Il
+tient en quatre lignes, pour qu'une trentaine de lignes de colle suffisent
+devant n'importe quel moteur — ClamAV et les autres n'exposent pas d'HTTP.
+
+```
+POST <ANTIVIRUS_URL>
+Content-Type: application/octet-stream
+<les octets du fichier>
+
+200 {"status":"clean"}
+200 {"status":"infected","signature":"Eicar-Test-Signature"}
+```
+
+**Aucune URL n'est transmise** — ni présignée, ni permanente. La
+quarantaine existe pour qu'il n'y ait aucune adresse de lecture sur ces
+octets ; en confier une à un tiers rouvrirait exactement ce qu'elle ferme,
+et pour une durée qu'on ne contrôlerait plus.
+
+Trois verdicts, et **un seul promeut** :
+
+| Verdict | Les octets | La version | La suite |
+|---|---|---|---|
+| `SAINE` | passent dans le stockage de confiance | `SAINE`, datée | l'analyse part si le quota la couvre (RG-06.5) |
+| `INFECTEE` | sont détruits | `INFECTEE`, sans clé | la pièce redevient à déposer, le candidat lit pourquoi |
+| `INDISPONIBLE` | **ne bougent pas** | reste en quarantaine, l'attente est comptée | reprise, ou incident ouvert |
+
+Le choix se fait par `switch` exhaustif sur `Verdict`, avec un
+`const jamais: never`. Ce n'est pas une élégance : l'indisponibilité était
+rendue par `null` et testée par `if (!verdict)` ; le jour où elle est
+devenue un objet — pour porter sa cause —, ce test est passé à côté, parce
+qu'un objet est toujours vrai. Le code tombait dans la branche de
+promotion, et une pièce que personne n'avait balayée serait entrée dans le
+stockage de confiance parce qu'un moteur n'avait pas répondu.
+
+**Rejouer et signaler sont deux questions distinctes.** Une panne réseau se
+reprend ; un fichier trop volumineux se rejouerait à l'identique jusqu'à la
+fin des temps, et rejouer sans fin une tâche qui ne peut pas aboutir remplit
+la file et noie l'incident qu'il fallait voir. `seReprendSeule` tranche, la
+file porte une politique de reprise, et le seuil d'incident est franchi
+**avant** que les reprises soient épuisées — être prévenu pendant qu'on peut
+encore agir. Aucune des combinaisons n'accepte le fichier : signaler est une
+visibilité, pas une porte de sortie. `/api/health` compte les pièces
+bloquées et l'ancienneté de la plus vieille.
+
+**La sonde présente EICAR au moteur**, une fois, au démarrage du worker.
+C'est la seule chose qui prouve quelque chose : une `ANTIVIRUS_URL` bien
+formée devant un service qui répond poliment `clean` à tout passerait pour
+opérationnelle en laissant entrer chaque fichier — la seule panne de cette
+chaîne qui ne se remarquerait pas. `INFECTEE` sur EICAR vaut preuve ;
+`SAINE` est une panne, et il vaut mieux la lire au démarrage que sur le
+premier fichier réellement infecté. La sonde est dans le worker et non dans
+`/api/health`, pour la même raison que celle du courrier : cette adresse est
+interrogée par un répartiteur de charge et ne déclenche rien.
 
 ### Le tunnel de paiement, et ce que l'ouverture ne fait pas
 

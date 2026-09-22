@@ -75,8 +75,55 @@ async function sonderLaFile(): Promise<EtatDeLaFile> {
   }
 }
 
+interface EtatDeLaQuarantaine {
+  lisible: boolean;
+  /** Pièces dont le balayage n'a pas conclu et dont l'incident est ouvert. */
+  incidents: number;
+  /** L'ancienneté du plus vieux, en heures. Zéro quand il n'y en a aucun. */
+  depuisHeures: number;
+}
+
+/**
+ * Les pièces bloquées au contrôle — I.D, ajouté le 22/09/2026.
+ *
+ * Le balayeur parle maintenant à un moteur réel, et un moteur réel tombe.
+ * Sans cette mesure, une pièce dont le balayage n'aboutit pas reste en
+ * quarantaine **en silence** : le candidat lit « contrôle en cours », ce
+ * qui est vrai, et personne d'autre n'apprend rien. La file de revue est
+ * ici pour la même raison — un écran de back-office ne surveille que ceux
+ * qui l'ouvrent, une adresse d'état se surveille depuis l'extérieur.
+ *
+ * Ce compte ne change rien au sort des fichiers : aucune pièce n'est
+ * promue parce qu'elle attend depuis longtemps. C'est une visibilité, pas
+ * une porte de sortie.
+ */
+async function sonderLaQuarantaine(): Promise<EtatDeLaQuarantaine> {
+  try {
+    const [incidents, plusAncienne] = await Promise.all([
+      db.documentVersion.count({ where: { scanIncidentAt: { not: null } } }),
+      db.documentVersion.findFirst({
+        where: { scanIncidentAt: { not: null } },
+        orderBy: { scanIncidentAt: "asc" },
+        select: { scanIncidentAt: true },
+      }),
+    ]);
+    const depuis = plusAncienne?.scanIncidentAt;
+    return {
+      lisible: true,
+      incidents,
+      depuisHeures: depuis ? Math.floor((Date.now() - depuis.getTime()) / 3_600_000) : 0,
+    };
+  } catch {
+    return { lisible: false, incidents: 0, depuisHeures: 0 };
+  }
+}
+
 export async function GET() {
-  const [base, file] = await Promise.all([sonderLaBase(), sonderLaFile()]);
+  const [base, file, quarantaine] = await Promise.all([
+    sonderLaBase(),
+    sonderLaFile(),
+    sonderLaQuarantaine(),
+  ]);
 
   const constats = constaterLesDependances();
   const etat = etatDesCapacites(constats);
@@ -108,6 +155,16 @@ export async function GET() {
           },
         ]),
       ),
+      quarantaine: {
+        lisible: quarantaine.lisible,
+        incidents: quarantaine.incidents,
+        depuisHeures: quarantaine.depuisHeures,
+        message: !quarantaine.lisible
+          ? "Les pièces en quarantaine n'ont pas pu être lues."
+          : quarantaine.incidents === 0
+            ? "Aucune pièce bloquée au contrôle."
+            : `${quarantaine.incidents} pièce(s) bloquée(s) au contrôle, la plus ancienne depuis ${quarantaine.depuisHeures} h. Elles restent en quarantaine.`,
+      },
       revue: {
         lisible: file.lisible,
         enAttente: file.enAttente,
