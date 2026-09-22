@@ -595,6 +595,39 @@ try {
       return a.id;
     };
 
+    /*
+      Et celui qui planifie loin. L'échéancier se calcule à rebours depuis
+      la date cible : viser 2029 place son premier geste en 2029, et rien
+      avant. Le fermer aujourd'hui reviendrait à lui reprocher d'avoir
+      suivi le plan que la plateforme lui a fait.
+    */
+    rang += 1;
+    const patient = await db.user.create({
+      data: { email: `fumee-inact-patient-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const loin = (await ouvrirDossier(patient.id, v.id, new Date("2029-09-01T00:00:00Z"))).id;
+    await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${ilYA(ABANDON_JOURS + 35)} WHERE id = ${loin.id}`;
+
+    /*
+      Et celui qui a coché toutes ses échéances, puis n'est jamais revenu.
+      Aucune ne lui reste à tenir : le plan ne suspend donc plus rien, et
+      c'est son dernier geste qui compte — il date de plus d'un an.
+      Compter une échéance **faite** la ferait passer pour une attente, et
+      son dossier ne se fermerait jamais.
+    */
+    rang += 1;
+    const coche = await db.user.create({
+      data: { email: `fumee-inact-coche-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const toutFait = (
+      await ouvrirDossier(coche.id, v.id, new Date("2029-09-01T00:00:00Z"))
+    ).id;
+    await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${ilYA(ABANDON_JOURS + 35)} WHERE id = ${toutFait}`;
+    await db.deadline.updateMany({
+      where: { applicationId: toutFait },
+      data: { doneAt: ilYA(ABANDON_JOURS + 30) },
+    });
+
     const jeune = await ouvrir("jeune", RELANCE_JOURS - 5);
     const aRelancer = await ouvrir("relance", RELANCE_JOURS + 30);
     /*
@@ -631,8 +664,8 @@ try {
 
     const bilan = await traiterLesBrouillonsInactifs(MAINTENANT);
     verifier(
-      bilan.relances === 1 && bilan.abandons === 1 && bilan.incidents.length === 0,
-      `un relancé, un clos, rien d'autre (${JSON.stringify(bilan)})`,
+      bilan.relances === 1 && bilan.abandons === 2 && bilan.incidents.length === 0,
+      `un relancé, deux clos, rien d'autre (${JSON.stringify(bilan)})`,
     );
     verifier(
       bilan.courriersRetenus === 1,
@@ -659,6 +692,20 @@ try {
     verifier(
       (await etat(actif)).status === "BROUILLON",
       "ni celui dont le candidat a déposé une pièce il y a dix jours",
+    );
+    verifier(
+      (await etat(loin)).status === "BROUILLON",
+      `ni celui dont la première échéance est en 2029 (${(await etat(loin)).status})`,
+    );
+    verifier(
+      (await db.notification.count({
+        where: { applicationId: loin, kind: "INACTIVITE" },
+      })) === 0,
+      "et il n'est pas même relancé : il n'a rien à faire pour l'instant",
+    );
+    verifier(
+      (await etat(toutFait)).status === "ABANDONNE",
+      `celui qui a tout coché puis disparu est clos (${(await etat(toutFait)).status})`,
     );
 
     const relance = await db.notification.findFirst({

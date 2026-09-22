@@ -3,6 +3,7 @@ import {
   ABANDON_JOURS,
   RELANCE_JOURS,
   abandonDeBrouillon,
+  debutDeLInactivite,
   joursDInactivite,
   jourDeLAbandon,
   relanceDeBrouillon,
@@ -144,5 +145,68 @@ describe("les deux textes passent le vocabulaire interdit", () => {
     for (const texte of textes) {
       expect(verifierTexte(texte, INTERDITS_PARTOUT), texte).toEqual([]);
     }
+  });
+});
+
+
+/**
+ * On ne compte pas comme inactif quelqu'un qui attend — correctif du
+ * 23/09/2026.
+ *
+ * L'horloge ignorait le plan que la plateforme avait elle-même construit.
+ * L'échéancier se calcule à rebours depuis la date cible : un candidat
+ * visant la rentrée 2029 a un premier geste au 4 mai 2029, et rien avant.
+ * Exécuté avant correction, sur un dossier ouvert quatre cents jours plus
+ * tôt :
+ *
+ *     échéance : 2029-05-04  À demander : Diplôme le plus élevé
+ *     échéance : 2029-06-03  Dépôt de la demande
+ *     inactivité : {"examines":1,"relances":0,"abandons":1,…}
+ *     [INACTIVITE] Ton dossier Pays-Bas a été clos
+ *
+ * Clos le 1er avril 2027, deux ans avant sa première tâche. La plateforme
+ * lui avait fait un plan disant « rien à faire avant mai 2029 », puis
+ * l'a fermé pour n'avoir rien fait.
+ */
+describe("l'horloge part du plan, pas seulement de l'ouverture", () => {
+  const OUVERTURE = new Date("2026-01-01T00:00:00Z");
+  const MAINTENANT = new Date("2027-04-01T00:00:00Z");
+
+  it("sans échéance, elle part de ce que le candidat a produit", () => {
+    expect(debutDeLInactivite(OUVERTURE, null)).toEqual(OUVERTURE);
+  });
+
+  /** Le cas du défaut : une première tâche à deux ans suspend le décompte. */
+  it("une échéance à venir suspend le décompte", () => {
+    const debut = debutDeLInactivite(OUVERTURE, new Date("2029-05-04T00:00:00Z"));
+    expect(joursDInactivite(debut, MAINTENANT)).toBeLessThan(0);
+    expect(suiteDInactivite({ inactifDepuis: joursDInactivite(debut, MAINTENANT), dejaRelance: false })).toBe(
+      "RIEN",
+    );
+  });
+
+  /**
+   * Et elle repart le jour où l'échéance arrive : c'est bien là que
+   * l'absence de geste devient un signe.
+   */
+  it("une échéance passée fait repartir le décompte depuis elle", () => {
+    const echeance = new Date("2026-02-01T00:00:00Z");
+    expect(debutDeLInactivite(OUVERTURE, echeance)).toEqual(echeance);
+    expect(joursDInactivite(echeance, MAINTENANT)).toBeGreaterThan(ABANDON_JOURS);
+  });
+
+  /**
+   * Un dépôt plus récent que l'échéance l'emporte : le candidat était là
+   * après la date, et c'est ce geste-là qui compte.
+   */
+  it("un dépôt postérieur à l'échéance l'emporte", () => {
+    const depot = new Date("2026-11-01T00:00:00Z");
+    expect(debutDeLInactivite(depot, new Date("2026-02-01T00:00:00Z"))).toEqual(depot);
+  });
+
+  /** Le décompte négatif n'est pas une relance à rebours. */
+  it("un décompte négatif ne déclenche rien, jamais", () => {
+    expect(suiteDInactivite({ inactifDepuis: -700, dejaRelance: false })).toBe("RIEN");
+    expect(suiteDInactivite({ inactifDepuis: -700, dejaRelance: true })).toBe("RIEN");
   });
 });

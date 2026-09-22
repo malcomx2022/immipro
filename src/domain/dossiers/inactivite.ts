@@ -48,6 +48,29 @@
  * — et la relance du quatre-vingt-dixième jour est là pour ça : elle part
  * neuf mois avant l'abandon, et dit ce qui arrivera.
  *
+ * ── On ne compte pas comme inactif quelqu'un qui attend ─────────────
+ *
+ * L'horloge, telle qu'elle était, ignorait le plan que la plateforme
+ * avait elle-même construit. L'échéancier se calcule à rebours depuis la
+ * date cible : un candidat qui vise la rentrée 2029 a un premier geste au
+ * 4 mai 2029, et rien avant. Exécuté avant correction, sur un dossier
+ * ouvert quatre cents jours plus tôt :
+ *
+ *     échéance : 2029-05-04  À demander : Diplôme le plus élevé
+ *     échéance : 2029-06-03  Dépôt de la demande
+ *     inactivité : {"examines":1,"relances":0,"abandons":1,…}
+ *     [INACTIVITE] Ton dossier Pays-Bas a été clos
+ *
+ * Clos le 1er avril 2027, deux ans avant sa première tâche. La plateforme
+ * lui avait fait un plan disant « rien à faire avant mai 2029 », puis
+ * l'a fermé pour n'avoir rien fait.
+ *
+ * L'horloge part donc du **plus tard** entre ce que le candidat a produit
+ * et sa première échéance non faite. Une échéance à venir la suspend : il
+ * n'y a rien à reprocher à qui n'avait rien à faire. Elle repart le jour
+ * où cette échéance arrive, et c'est bien le jour où l'absence de geste
+ * devient un signe.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
@@ -97,6 +120,29 @@ export function suiteDInactivite(etat: EtatDInactivite): SuiteDInactivite {
  */
 export const jourDeLAbandon = (derniereActivite: Date): Date =>
   new Date(derniereActivite.getTime() + ABANDON_JOURS * 24 * 60 * 60 * 1000);
+
+/**
+ * Le jour où l'inactivité commence à se compter.
+ *
+ * Le plus tard entre ce que le candidat a produit — ouverture, dernier
+ * dépôt — et sa première échéance non faite. Une échéance à venir place
+ * ce début dans le futur, et `joursDInactivite` rend alors un compte
+ * négatif : personne n'est inactif avant d'avoir eu quelque chose à
+ * faire.
+ *
+ * `null` quand le dossier n'a pas d'échéance — pas de date cible, donc
+ * pas de plan, donc rien qui suspende le décompte. C'est le cas courant,
+ * et celui que RG-04.2 vise en premier.
+ */
+export function debutDeLInactivite(
+  derniereActivite: Date,
+  premiereEcheanceNonFaite: Date | null,
+): Date {
+  if (premiereEcheanceNonFaite === null) return derniereActivite;
+  return premiereEcheanceNonFaite > derniereActivite
+    ? premiereEcheanceNonFaite
+    : derniereActivite;
+}
 
 /** Jours pleins écoulés, en UTC : une relance ne change pas de jour selon le fuseau. */
 export function joursDInactivite(derniereActivite: Date, maintenant: Date): number {

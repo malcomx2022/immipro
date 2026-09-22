@@ -7904,3 +7904,70 @@ et aucun écran ne le lit — mais ce n'est plus le même manque : le candidat
 voit désormais les pièces **avant** de trancher, et sa checklist les porte
 après. Le champ sert la fumée, qui vérifie que la migration ajoute bien les
 lignes annoncées.
+
+---
+
+### S.55 — Le dossier fermé pour avoir suivi le plan qu'on lui avait fait
+
+Le lot précédent a donné une horloge à RG-04.2. Elle ignorait le plan que la
+plateforme construit elle-même.
+
+L'échéancier se calcule **à rebours depuis la date cible** : un candidat qui
+vise la rentrée 2029 a un premier geste au 4 mai 2029, et rien avant. C'est le
+produit qui le lui dit. Exécuté sur un dossier ouvert quatre cents jours plus
+tôt :
+
+```
+=== Le dossier ===
+  statut            : BROUILLON, aucun dépôt
+  date cible        : 2029-09-01
+  échéance          : 2029-05-04  À demander : Diplôme le plus élevé
+  échéance          : 2029-06-03  Dépôt de la demande
+
+=== Les deux passes de la même nuit ===
+  inactivité  : {"examines":1,"relances":0,"abandons":1,…}
+
+=== Ce que le candidat reçoit ===
+  [INACTIVITE] Ton dossier Pays-Bas a été clos
+```
+
+Clos le 1er avril 2027, **deux ans avant sa première tâche**. La plateforme
+lui avait fait un plan disant « rien à faire avant mai 2029 », puis l'a fermé
+pour n'avoir rien fait. Ses pièces partaient à la purge trente jours plus
+tard.
+
+C'est une contradiction interne, pas une règle mal appliquée : les deux moitiés
+sont justes séparément, et fausses ensemble. Le projet l'avait déjà rencontrée
+— deux passes de nuit chacune correcte perdant la succession de version entre
+elles (S.44).
+
+**La règle retenue.** L'horloge part du **plus tard** entre ce que le candidat
+a produit et sa **première échéance non faite**. Une échéance à venir la
+suspend ; elle repart le jour où cette échéance arrive, et c'est bien là que
+l'absence de geste devient un signe.
+
+Trois cas, et ils tiennent ensemble :
+
+| Le dossier | Ce qui se passe |
+|---|---|
+| Sans date cible, 400 jours | Clos — c'est le cas courant que RG-04.2 vise |
+| Première échéance en 2029 | Rien, pas même une relance : il n'a rien à faire |
+| Échéance passée depuis 400 jours | Clos, compté depuis l'échéance |
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'horloge ignore de nouveau le plan | la fumée |
+| une échéance à venir ne suspend plus rien | les essais purs et la fumée |
+| une échéance déjà faite compte quand même | la fumée — **après couverture** |
+
+Trois mutations, trois rouges. La troisième n'a pas mordu d'abord : aucun
+dossier de la fumée n'avait d'échéance **cochée**, et `doneAt: null` n'était
+donc éprouvé par rien. La fumée porte désormais un candidat qui a tout coché
+puis disparu — son plan ne lui demande plus rien, c'est son dernier geste qui
+compte, et il date de plus d'un an. Sans le filtre, son dossier ne se
+fermerait jamais.
+
+**Ce qui reste ouvert.** Rien n'écrit encore `Deadline.doneAt` : aucun écran ne
+permet de cocher une échéance. Le filtre est donc correct et pour l'instant
+inerte en production — la fumée l'éprouve en posant la date directement, ce
+que fera l'écran le jour où il existera.
