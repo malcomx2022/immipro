@@ -599,6 +599,172 @@ cela (`parcours.ts`, `migration.ts`) : une route ne s'appelle pas depuis
 une fumée, et une fumée qui réécrit la décision de la route n'éprouve pas
 la route.
 
+### L'autorisation d'analyse, et ce que son retrait arrête
+
+Correctif du 23/09/2026. RG-02.1 annonce le consentement au traitement des
+pièces d'identité **révocable**. Il ne l'était que pour l'avenir : le retrait
+écrivait une ligne, refusait les dépôts suivants, et n'arrêtait rien de ce
+qui était déjà en file.
+
+Exécuté — le candidat autorise, dépose, se ravise, et le job reprend :
+
+```
+  autorisation accordée ?    false
+  un nouveau dépôt est refusé ? oui
+  appels au modèle           : 1
+  jetons débités             : 4500
+  analyses consommées        : 1
+  état de la pièce           : A_CORRIGER
+```
+
+Le fichier partait au service de lecture, une analyse était débitée, un
+verdict s'écrivait — après le retrait de l'accord.
+
+L'autorisation se relit désormais à deux endroits, et les deux sont
+nécessaires. À la **promotion** (`balayage`), parce que le candidat a pu se
+raviser entre le dépôt et le balayage. À l'**analyse**, parce qu'il peut se
+raviser pendant que le job attend dans la file — c'est même l'intervalle le
+plus probable. La lecture précède le débit et la lecture du fichier : ni
+jeton dépensé, ni octet transmis.
+
+Une lecture, pas deux. `exigerConsentementPieces` refaisait la requête que
+`autorisationAccordee` faisait déjà, avec sa propre version de « la dernière
+ligne l'emporte ». Deux lectures d'un même registre de preuve finissent par
+répondre différemment ; sur un registre de consentement, c'est la pire des
+divergences. Elle délègue.
+
+**La pièce dit pourquoi elle n'a pas été analysée.** Il y a deux motifs
+désormais, et une mention unique en démentirait un : envoyer recharger des
+analyses quelqu'un qui vient de retirer son accord lui ferait payer pour un
+geste qu'il a lui-même fait. Le motif est écrit sur la pièce
+(`MENTION_NON_ANALYSEE`), et la pastille reste « Conservée, non vérifiée » —
+ce qu'on veut savoir d'abord est que le fichier est arrivé.
+
+**Et l'écran des autorisations disait l'inverse de la règle.** « Sans cette
+autorisation, tu téléverses tes pièces sans analyse automatique » décrivait
+un parcours qui n'existe pas : RG-02.2 refuse le dépôt lui-même. Le candidat
+lisait l'inverse de ce qui allait se passer, au moment précis où il décidait.
+
+### Ce qui sépare deux versions d'une règle
+
+Correctif du 23/09/2026. La comparaison qui décide de l'impact d'une
+publication ne regardait que les **codes** des conditions bloquantes —
+apparition, disparition. Jamais leur valeur.
+
+Un seuil qui passe de 4 357 € à 1 000 € garde son code. La comparaison
+rendait donc `MINEUR` avec un diff vide, et `propagerLaPublication` sort
+immédiatement dans ce cas : **aucun dossier n'était prévenu**. C'est le
+changement réglementaire le plus régulier du produit qui passait ainsi —
+DOC-11 le nomme (« Majeur | **Seuil** ou pièce obligatoire modifié ») et
+RG-14.3 dit quand il revient : « les montants IND changent au 1er janvier ».
+
+La comparaison vit maintenant dans `domain/rules/comparaison.ts`, pure, et
+**deux appelants en dépendent** : la propagation de WF-11 et le contrôle de
+relecture de WF-14 §4. Une seule définition de « une condition bloquante a
+bougé » — la leçon de S.42, où la même relation écrite deux fois donnait
+deux réponses.
+
+**Durcir n'est pas assouplir.** Un seuil relevé retire l'éligibilité à qui
+l'atteignait tout juste : c'est le cas critique, mise en pause et email
+nominatif. Un seuil abaissé ne retire rien ; notification et proposition de
+migration suffisent.
+
+| Ce qui bouge | Sens | Impact |
+|---|---|---|
+| `gte` dont la valeur monte, `lte` dont elle baisse | durcit | critique |
+| l'inverse | assouplit | majeur |
+| l'opérateur, l'unité | inordonnable | critique |
+| une condition devient bloquante | durcit | critique |
+| elle quitte son groupe d'alternatives | durcit — elle devient exigible seule | critique |
+| elle change de pièce porteuse | la checklist bouge, l'exigence non | majeur |
+| `message_echec` seul | aucune exigence ne change | rien ne part |
+
+Quand les deux versions ne s'ordonnent pas, la réponse prudente est celle
+qui prévient. Se tromper dans ce sens fait lire un message de trop ; se
+tromper dans l'autre laisse quelqu'un déposer sous une exigence qu'il ne
+remplit plus.
+
+Le dernier point compte autant : réécrire une phrase ne change aucune
+exigence, et faire partir une alerte à tous les dossiers ouverts parce
+qu'un texte a été clarifié apprend à ignorer les suivantes.
+
+### Ce qui s'affiche, et ce qui est en vigueur
+
+Correctif du 23/09/2026, né de la rencontre de deux passes justes.
+
+RG-14.1 repasse en `DRAFT` une fiche dont la relecture est dépassée : « une
+donnée non relue ne peut pas continuer à se présenter comme fiable ». La
+passe est juste, et elle ne fait que de la tenue de livre — le filtre de
+lecture candidat écarte déjà ces fiches, requête par requête.
+
+La publication de la version suivante, elle, cherchait son prédécesseur par
+`status = 'PUBLISHED'`. Après une passe de veille, elle n'en trouvait plus :
+
+```
+La passe de veille de 3 h du matin (RG-14.1) :
+  1 fiche(s) dépubliée(s) — la v1 passe à DRAFT
+
+Puis le veilleur finit sa relecture, et un administrateur publie la v2 :
+  version archivée   : AUCUNE
+  divergence en file : false
+
+  le candidat est-il prévenu que son seuil passe de 4357 € à 5857 € ? NON
+```
+
+La v1 restait `DRAFT` pour toujours, sans date de fin ; la v2 se croyait
+première ; et le dossier figé sur la v1 n'apprenait rien. La relecture par
+défaut étant de quatre-vingt-dix jours, tout retard du veilleur ouvre cette
+fenêtre — et une nouvelle version paraît précisément quand il vient de
+relire.
+
+**`status` dit ce qui s'affiche ; `publishedAt` dit ce qui a été mis en
+vigueur.** Les deux étaient confondus. Une fiche dépubliée pour retard cesse
+d'être montrée, mais elle reste la version que des dossiers ont figée
+(INV-3) : elle est toujours en vigueur pour eux. La succession se lit donc
+sur la mise en vigueur — « mise en vigueur, jamais remplacée » —, que la
+dépublication ne touche pas.
+
+La date est posée **une fois**. Une fiche republiée après une échéance de
+relecture garde celle de son entrée en vigueur : la déplacer à chaque remise
+en ligne ferait passer une vieille version devant une plus récente.
+
+Deux gardes en base tiennent la cohérence : on n'archive pas ce qui n'a
+jamais été mis en vigueur, et on ne termine pas ce qui n'a pas commencé. La
+seconde répare au passage un silence de RG-14.4 — la version remplacée porte
+enfin sa date de fin, même lorsqu'elle était en brouillon au moment d'être
+remplacée.
+
+### La relecture par un second opérateur, et ce qu'elle n'était pas
+
+WF-14 §4 : « Relecture par un second opérateur pour toute modification de
+condition bloquante. » Le contrôle n'existait pas. Le commentaire de la
+route affirmait que la séparation veilleur / administrateur en tenait
+lieu — mais `ROLES_ADMIS` laisse un administrateur passer les deux portes,
+et rien ne comparait qui avait écrit à qui publiait.
+
+Exécuté : une version qui divise le seuil kennismigrant par quatre, écrite
+et publiée par la même personne, franchissait les quatre garde-fous de la
+publication — source (RG-14.2), schéma (WF-14 §3), vocabulaire (INV-1,
+INV-2), terminabilité (S.42) — sans qu'aucun ne regarde la seule chose qui
+comptait.
+
+`VisaRule.verifiedBy` porte l'email de qui a écrit la version : chaque
+édition l'y inscrit. Il n'y avait rien à ajouter en base, seulement à
+comparer. La décision descend dans `server/regles/publication.ts` pour
+qu'une fumée puisse publier pour de bon — même raison que le dépôt la
+veille.
+
+Le contrôle porte sur **toute** modification, pas seulement sur celles qui
+durcissent : abaisser un seuil n'enlève l'éligibilité à personne, et ouvre
+la procédure à des dossiers qu'elle n'aurait pas dû accueillir. Une version
+qui ne touche aucune bloquante — une clarification de formulation — se
+publie seule, sans quoi la relecture deviendrait une formalité qu'on
+apprend à contourner.
+
+Le journal d'audit garde les deux noms et la liste des conditions touchées :
+c'est la preuve de diligence de RG-14.4, et elle ne vaut que si elle dit qui
+a fait quoi.
+
 ### Une divergence réglementaire prévient tout le monde, ou rejoue
 
 `propagerLaPublication` tenait dans une boucle sans filet : le premier

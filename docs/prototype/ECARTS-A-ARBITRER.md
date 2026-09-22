@@ -7114,3 +7114,303 @@ objectivement complet plafonne à 75 sur 100. Les deux points tiennent
 ensemble et demandent un arbitrage produit — donner au barème le lecteur
 que le document lui prête, ou constater qu'il n'en a pas — plutôt qu'un
 correctif.
+
+---
+
+### S.46 — Un seuil qui change de valeur ne prévenait personne, et une seule paire d'yeux suffisait
+
+Le lot précédent avait rendu la propagation d'une divergence fiable :
+elle prévient tous les dossiers, ou rejoue. Restait à savoir **ce qu'elle
+tient pour une divergence**.
+
+La question posée au référentiel réel : que conclut `comparer` quand un
+seuil bloquant change de valeur ?
+
+```
+Le seuil bloquant « salaire_min_moins_30_ans » passe de 4357 € à 1000 €.
+
+Et ce que WF-11 conclut de ce changement de seuil :
+  impact : MINEUR
+  diff   : []
+  → la propagation sort sans rien faire : AUCUN dossier n'est prévenu
+```
+
+La comparaison diffait les **codes** des conditions bloquantes —
+apparition, disparition — et deux champs du payload, `preuve_fonds` et
+`niveau_langue_min`. Jamais la valeur d'une condition. Or un seuil qui
+change garde son code.
+
+C'est le changement réglementaire le plus régulier du produit qui passait
+ainsi. DOC-11 le nomme dans le tableau de WF-11 — « Majeur | **Seuil** ou
+pièce obligatoire modifié | Notification + proposition de migration » — et
+RG-14.3 dit quand il revient : « les montants IND changent au 1er janvier ».
+
+#### Durcir n'est pas assouplir
+
+Rattacher la valeur rend la comparaison possible — et découvre que les
+deux sens du même changement ne se traitent pas de la même façon. Un seuil
+**relevé** retire l'éligibilité à qui l'atteignait tout juste : c'est le
+cas critique, mise en pause et email nominatif. Un seuil **abaissé** ne
+retire rien à personne.
+
+Quand les deux versions ne s'ordonnent pas — l'opérateur change, l'unité
+change, la condition devient bloquante, elle quitte son groupe
+d'alternatives —, la réponse prudente est celle qui prévient. Se tromper
+dans ce sens fait lire un message de trop ; se tromper dans l'autre laisse
+quelqu'un déposer sous une exigence qu'il ne remplit plus.
+
+Et `message_echec` reste hors de la comparaison : le réécrire ne change
+aucune exigence, et faire partir une alerte à tous les dossiers ouverts
+parce qu'une phrase a été clarifiée apprend à ignorer les suivantes.
+
+#### WF-14 §4 n'avait aucun mécanisme
+
+« Relecture par un second opérateur pour toute modification de condition
+bloquante. » Le commentaire de la route disait que la séparation
+veilleur / administrateur en tenait lieu. Elle n'en tenait pas lieu :
+`ROLES_ADMIS` laisse un administrateur passer les deux portes, et rien ne
+comparait qui avait écrit à qui publiait.
+
+Les garde-fous que la publication applique, sur une version qui divise un
+seuil par quatre, écrite et publiée par la même personne :
+
+```
+  source publiable (RG-14.2)        : oui
+  schéma Zod (WF-14 étape 3)        : oui
+  vocabulaire (INV-1, INV-2)        : oui
+  règle terminable (S.42)           : oui
+  un second opérateur l'a relue     : jamais demandé
+
+Ce que la base sait, et que personne ne compare :
+  v1 PUBLISHED  écrite par veilleur@immipro.test
+  v2 DRAFT      écrite par veilleur@immipro.test
+  le publicateur serait veilleur@immipro.test — le même.
+```
+
+`VisaRule.verifiedBy` porte l'email de qui a écrit la version. Il n'y
+avait rien à ajouter en base, seulement à comparer.
+
+Le contrôle porte sur **toute** modification et non sur les seules
+durcissantes : abaisser un seuil n'enlève l'éligibilité à personne, et
+ouvre la procédure à des dossiers qu'elle n'aurait pas dû accueillir. Une
+version qui ne touche aucune bloquante se publie seule — sans quoi la
+relecture deviendrait une formalité qu'on apprend à contourner.
+
+#### Une seule définition, deux appelants
+
+La comparaison descend dans `domain/rules/comparaison.ts`. Le contrôle de
+relecture et la propagation l'appellent tous les deux : un contrôle qui
+s'appuierait sur une seconde définition de « une condition bloquante a
+bougé » finirait par diverger d'elle. C'est la leçon de S.42, où la même
+relation écrite à deux endroits donnait deux réponses et aucune juste.
+
+La décision de publication descend de sa route vers
+`server/regles/publication.ts`, pour la raison établie la veille : ce
+qu'aucun script ne peut appeler, rien n'éprouve.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la valeur d'une condition redevient invisible | les essais purs, et neuf assertions de la fumée |
+| tout changement de seuil devient majeur | les essais, et la mise en pause du dossier |
+| l'inordonnable est tenu pour un assouplissement | les essais seuls — la fumée ne change ni opérateur ni unité |
+| la relecture n'est plus exigée | les essais, et six assertions de la fumée |
+| le publicateur n'est plus comparé au rédacteur | la fumée seule — c'est une décision serveur |
+| réécrire un message redevient une modification | les essais, et la clarification qui ne passe plus |
+| le journal perd qui a rédigé | la fumée seule |
+
+Le partage est celui qu'on attend : ce qui se décide sans base est rouge
+dans les essais, ce qui demande une base et deux comptes l'est dans la
+fumée. Une mutation rouge des deux côtés dit que la règle est éprouvée
+deux fois ; une mutation rouge d'un seul côté dit où elle vit.
+
+---
+
+### S.47 — « Révocable » ne l'était que pour l'avenir
+
+RG-02.1 annonce le consentement au traitement des pièces d'identité
+**séparé et révocable**. La séparation était tenue. La révocation, non.
+
+Le candidat autorise, dépose une pièce, puis se ravise pendant que le job
+d'analyse attend dans la file :
+
+```
+  autorisation accordée ?       false
+  un nouveau dépôt est refusé ? oui
+
+Et la pièce déjà déposée, dont l'analyse est en file :
+  appels au modèle           : 1
+  jetons débités             : 4500
+  analyses consommées        : 1
+  état de la pièce           : A_CORRIGER
+```
+
+Le retrait écrivait une ligne et refusait les dépôts suivants. Le fichier
+déjà déposé partait au service de lecture, une analyse était débitée, un
+verdict s'écrivait sur la pièce — après le retrait de l'accord.
+
+L'autorisation se relit désormais à deux endroits : à la promotion, parce
+que le candidat a pu se raviser entre le dépôt et le balayage, et à
+l'analyse, parce qu'il peut se raviser pendant que le job attend — c'est
+même l'intervalle le plus probable. La lecture précède le débit et la
+lecture du fichier : ni jeton dépensé, ni octet transmis.
+
+#### Deux lectures d'un même registre de preuve
+
+`exigerConsentementPieces` refaisait la requête que `autorisationAccordee`
+faisait déjà, avec sa propre version de « la dernière ligne l'emporte ».
+C'est le défaut de S.42 — une relation écrite deux fois — sur un objet
+autrement plus sensible : deux lectures d'un registre de consentement qui
+finiraient par répondre différemment. Une seule reste.
+
+#### Ce que la pièce ne disait pas
+
+`MENTION_CONSERVEE_NON_VERIFIEE` était exportée, éprouvée par un test, et
+**affichée par aucun écran** : la pastille disait « Conservée, non
+vérifiée » et rien n'expliquait pourquoi.
+
+Avec un second motif, une mention unique en démentirait un — envoyer
+recharger des analyses quelqu'un qui vient de retirer son accord lui ferait
+payer pour un geste qu'il a lui-même fait. Le motif est donc porté par la
+pièce, et il atteint l'écran par le chemin ordinaire du message de pièce.
+
+#### L'écran des autorisations disait l'inverse de la règle
+
+« Sans cette autorisation, tu téléverses tes pièces sans analyse
+automatique. » RG-02.2 dit le contraire — « aucune pièce ne peut être
+téléversée avant ce consentement » — et c'est la règle que le code applique.
+Le candidat lisait l'inverse de ce qui allait se passer, au moment précis où
+il décidait.
+
+La phrase dit maintenant les deux moitiés : ce que le refus empêche, et ce
+que le retrait arrête.
+
+#### La fumée a dit ce qu'une fixture taisait
+
+La fumée du balayage ne posait aucune autorisation sur ses candidats. Le
+jour où la promotion a commencé à la lire, elle a viré au rouge — et elle
+avait raison deux fois : la lecture nouvelle mordait, et la fixture
+décrivait un dépôt impossible, puisqu'en production RG-02.2 refuse de
+déposer sans accord. Elle pose l'autorisation désormais, comme le ferait un
+vrai dépôt, et son remède aussi : sans lui, une pièce conservée sans analyse
+se relisait « Attendue · Ajouter » et le candidat renvoyait ce qu'il venait
+d'envoyer.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| l'analyse ne relit plus l'autorisation | sept assertions de la fumée d'extraction |
+| la promotion ne la lit plus | deux assertions de la fumée de balayage |
+| le retrait est lu comme un accord | les deux fumées |
+| un accord ancien suffit de nouveau (`asc` au lieu de `desc`) | dix-sept assertions |
+| les deux motifs redonnent le même message | les essais purs, et les deux fumées |
+| la pièce non analysée ne dit plus pourquoi | la fumée de balayage |
+
+Cinq des six ne virent au rouge que dans les fumées : ce sont des décisions
+de serveur, qui demandent une base et un registre de consentement. La
+sixième est une décision d'écriture, et elle est rouge des deux côtés.
+
+#### Relevé en passant, et laissé ouvert
+
+**Quelle autorisation couvre quelle pièce ?** Aucune ne le déclare.
+`exigerConsentementPieces` applique l'autorisation *sensible* à toutes les
+pièces, si bien qu'un candidat qui refuse l'analyse de ses pièces
+d'identité ne peut pas non plus déposer son relevé bancaire — et que
+l'autorisation « pièces financières », présentée séparément, ne commande
+rien du tout. Déclarer la relation dans le référentiel serait la réponse
+(c'est ce que S.42 a fait pour les conditions), mais elle butte sur une
+question qui n'est pas d'ingénierie : l'examen médical et l'assurance
+santé sont des **données de santé**, et aucune autorisation ne les couvre
+aujourd'hui. Inventer ce consentement serait décider à la place du produit
+et de son conseil juridique.
+
+**Le quota de jetons n'est pas un plafond.** INV-6 dit « débité d'un quota
+de tokens rattaché au pack ». Exécuté, un dossier atteint 225 % du quota de
+son pack sans que rien ne s'y oppose : ce qui est débité, ce sont des
+analyses, et les jetons sont seulement comptés. Ce n'est pas un défaut mais
+un arbitrage déjà pris, et `domain/backoffice/couts.ts` l'écrit : « le
+candidat compte en analyses, pas en jetons ». Il reste que `verifierQuota`,
+dans `lib/ai.ts`, calcule un refus que personne ne demande — une fonction
+sans appelant qui donne à l'invariant l'air d'être tenu.
+
+---
+
+### S.48 — Deux passes justes, et un défaut à leur rencontre
+
+Le lot précédent avait appris à la publication à voir la valeur d'un seuil.
+Restait à vérifier qu'elle trouve toujours la version qu'elle remplace.
+
+RG-14.1 repasse en `DRAFT` une fiche dont la relecture est dépassée : « une
+donnée non relue ne peut pas continuer à se présenter comme fiable ». La
+passe est juste, et elle est modeste — le filtre de lecture candidat écarte
+déjà ces fiches, requête par requête ; la passe ne fait que rendre l'état de
+la base conforme à ce qui s'affiche.
+
+La publication, elle, cherchait son prédécesseur par `status = 'PUBLISHED'`.
+Exécuté, sur un dossier prêt figé sur la version en vigueur :
+
+```
+La passe de veille de 3 h du matin (RG-14.1) :
+  1 fiche(s) dépubliée(s) — la v1 passe à DRAFT
+
+Puis le veilleur finit sa relecture, et un administrateur publie la v2 :
+  version archivée   : AUCUNE
+  divergence en file : false
+
+Ce qu'il reste :
+  v1 : DRAFT, effectiveTo nulle
+  versions en vigueur : v2
+  le dossier suit toujours v1
+  le candidat est-il prévenu que son seuil passe de 4357 € à 5857 € ? NON
+```
+
+Aucune des deux passes n'a tort séparément. Ensemble, elles perdent la
+succession : la v1 reste `DRAFT` pour toujours sans date de fin, la v2 se
+croit première, et le candidat dont le seuil vient de monter de mille cinq
+cents euros n'apprend rien.
+
+Et la fenêtre n'est pas étroite. RG-14.3 fixe la relecture par défaut à
+quatre-vingt-dix jours : tout retard du veilleur l'ouvre — précisément au
+moment où il vient de relire et où la version suivante va paraître.
+
+#### `status` n'est pas « en vigueur »
+
+Les deux étaient confondus dans une seule colonne. Une fiche dépubliée pour
+retard cesse d'être **montrée** ; elle reste la version que des dossiers ont
+figée (INV-3), donc en vigueur pour eux.
+
+`VisaRule.publishedAt` porte la mise en vigueur, posée une fois et jamais
+effacée. La succession se lit dessus — « mise en vigueur, jamais
+remplacée » —, et la dépublication ne la touche pas. Une republication après
+échéance garde la date d'origine : la déplacer à chaque remise en ligne
+ferait passer une vieille version devant une plus récente.
+
+Deux gardes en base : on n'archive pas ce qui n'a jamais été mis en vigueur,
+et on ne termine pas ce qui n'a pas commencé — la seconde tenant aussi
+l'ordre des deux dates. Elles réparent au passage un silence de RG-14.4 : la
+version remplacée porte enfin sa date de fin, même lorsqu'elle était en
+brouillon au moment d'être remplacée.
+
+#### Ce que les fixtures disaient sans le vouloir
+
+Une fixture qui crée une règle `PUBLISHED` sans date de mise en vigueur
+décrit une version publiée que personne n'a jamais mise en vigueur. La sonde
+l'a montré d'abord sur elle-même : le correctif écrit, elle rendait toujours
+« aucun prédécesseur » — et elle avait raison, puisque sa v1 n'avait jamais
+été mise en vigueur. C'est le même constat que la veille au soir sur les
+autorisations de la fumée de balayage, et il vaut d'être noté comme tel :
+une fixture décrit un état, et un état qu'aucun chemin du produit ne peut
+produire n'éprouve rien.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le prédécesseur se cherche de nouveau par statut | trois assertions : rien n'est archivé, rien n'est mis en file |
+| la mise en vigueur n'est plus posée à la publication | la chaîne s'arrête à la deuxième version |
+| une republication réécrit la date d'origine | l'ordre de la succession |
+
+Les trois ne mordent que dans la fumée : ce sont des décisions de base, et
+une règle pure ne peut pas éprouver la rencontre de deux passes nocturnes.

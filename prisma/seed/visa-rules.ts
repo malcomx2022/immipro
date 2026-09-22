@@ -39,11 +39,16 @@ async function main() {
     // vigueur. Elle reste visible au back-office et disparaît de l'affichage
     // candidat, ce qu'aucun écran ne signale : c'est le filtre de lecture
     // qui l'écarte, silencieusement et à juste titre.
+    // Le prédécesseur se cherche par sa **mise en vigueur** et non par son
+    // statut : une version dont la relecture était dépassée est repassée en
+    // DRAFT par la veille, et resterait sinon éternellement à côté de la
+    // nouvelle, ni publiée ni archivée.
     await prisma.visaRule.updateMany({
       where: {
         countryCode: r.countryCode,
         visaType: r.visaType,
-        status: "PUBLISHED",
+        publishedAt: { not: null },
+        effectiveTo: null,
         version: { not: r.version },
       },
       data: { status: "ARCHIVED", effectiveTo: new Date(r.effectiveFrom) },
@@ -71,6 +76,10 @@ async function main() {
         verifiedBy: r.verifiedBy,
         nextReviewAt: new Date(r.nextReviewAt),
         status,
+        // Le référentiel livré est mis en vigueur par le chargement, comme
+        // une publication le ferait : sans cette date, la version suivante
+        // ne trouverait pas son prédécesseur.
+        publishedAt: status === "PUBLISHED" ? new Date(r.effectiveFrom) : null,
       },
       create: {
         countryCode: r.countryCode,
@@ -87,6 +96,7 @@ async function main() {
         verifiedBy: r.verifiedBy,
         nextReviewAt: new Date(r.nextReviewAt),
         status,
+        publishedAt: status === "PUBLISHED" ? new Date(r.effectiveFrom) : null,
       },
     });
 

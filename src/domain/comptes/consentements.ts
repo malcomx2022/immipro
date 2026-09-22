@@ -36,8 +36,19 @@ export const CONSENTEMENTS: readonly Consentement[] = [
     titre: "Analyse de mes pièces d'identité",
     description:
       "Passeport, carte d'identité, acte de naissance. Lecture automatique des dates et des noms pour vérifier la conformité. Données supprimées à la clôture du dossier.",
+    /*
+      Ce que la phrase disait — « tu téléverses tes pièces sans analyse
+      automatique » — décrivait un parcours qui n'existe pas : RG-02.2
+      refuse le dépôt lui-même tant que l'autorisation manque, et le
+      candidat lisait donc, au moment de décider, l'inverse de ce qui
+      allait se passer.
+
+      Elle dit maintenant les deux moitiés de la règle : ce que le refus
+      empêche, et ce que le retrait arrête — car il arrête désormais
+      quelque chose.
+    */
     siRefuse:
-      "Sans cette autorisation, tu téléverses tes pièces sans analyse automatique.",
+      "Sans cette autorisation, aucune pièce ne peut être déposée : conserver un document, c'est déjà le traiter. Tu peux la retirer à tout moment, et le retrait arrête aussi l'analyse des pièces déjà déposées.",
     sensible: true,
   },
   {
