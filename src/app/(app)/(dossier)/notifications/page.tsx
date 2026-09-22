@@ -32,7 +32,18 @@ export default async function PageNotifications() {
     alertesDuCandidat(acteur.id),
     db.ruleMigration.findFirst({
       where: { decision: null, application: { userId: acteur.id } },
-      orderBy: { createdAt: "asc" },
+      /*
+        La divergence qui vise la **version la plus récente**, et non la
+        plus ancienne à avoir été posée.
+
+        Un dossier peut en porter plusieurs : depuis que la propagation
+        rattrape les dossiers restés deux versions en arrière, celui qui
+        n'a pas arbitré v2 reçoit aussi v3. Montrer la plus ancienne lui
+        présentait d'abord une comparaison morte — v2 est archivée, la
+        migration en est refusée — qu'il devait écarter avant de voir
+        celle qui compte.
+      */
+      orderBy: { toRule: { version: "desc" } },
       include: {
         application: {
           select: { targetDate: true, visaRule: { select: { rules: true } } },
@@ -52,7 +63,7 @@ export default async function PageNotifications() {
         ancienne: vue.ancienne,
         nouvelle: vue.nouvelle,
         pieces: vue.pieces,
-        migrable: vue.migrable,
+        blocage: vue.blocage,
         /*
           Le dépôt, et non la date cible : c'est le jour du dépôt qui
           décide de la version applicable. L'écran annonçait la nouvelle

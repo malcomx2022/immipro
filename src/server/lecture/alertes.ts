@@ -1,9 +1,12 @@
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { payload, reglePubliee } from "@/server/acces/regles";
+import { filtrePourCandidat, payload, reglePubliee } from "@/server/acces/regles";
 import { editorialDe } from "@/lib/contenu/destinations";
 import type { Alerte } from "@/domain/notifications/alerte";
-import type { VersionRegle } from "@/domain/notifications/divergence";
+import type {
+  BlocageDeMigration,
+  VersionRegle,
+} from "@/domain/notifications/divergence";
 import {
   comparerLesVersions,
   type EvolutionDesPieces,
@@ -75,13 +78,18 @@ export interface VueDivergence {
    */
   pieces: EvolutionDesPieces;
   /**
-   * La version visée est-elle encore en vigueur ? RG-14.1 la retire de
-   * l'affichage dès que sa relecture est dépassée, et une v3 l'archive
-   * quand elle paraît. L'écran doit le dire **avant** le clic : proposer
-   * un bouton que le serveur refusera est la même faute qu'un bouton qui
-   * ne fait rien.
+   * Ce qui empêche de migrer, quand quelque chose l'empêche — RG-14.1.
+   *
+   * Un booléen ne suffisait pas : `reglePubliee` rend `null` pour deux
+   * raisons qui ne se disent pas de la même façon. Une version **remplacée**
+   * ne reviendra jamais en vigueur ; une version **en relecture**
+   * reviendra. Les confondre faisait attendre une vérification qui n'a pas
+   * lieu.
+   *
+   * L'écran doit le dire **avant** le clic : proposer un bouton que le
+   * serveur refusera est la même faute qu'un bouton qui ne fait rien.
    */
-  migrable: boolean;
+  blocage: BlocageDeMigration;
 }
 
 /**
@@ -114,7 +122,7 @@ export async function divergenceAArbitrer(
       .piecesTouchees,
     // Le même filtre qu'à l'ouverture d'un dossier, et que l'arbitrage
     // applique côté écriture : une seule définition de « en vigueur ».
-    migrable: (await reglePubliee(migration.toRuleId)) !== null,
+    blocage: await blocageDeLaMigration(migration.toRule),
   };
 }
 
@@ -144,4 +152,32 @@ function versVersion(regle: {
     ...(regle.effectiveTo ? { applicableJusquau: iso(regle.effectiveTo) } : {}),
     applicableDepuis: iso(regle.effectiveFrom),
   };
+}
+
+
+/**
+ * Pourquoi cette version n'est plus applicable, et laquelle des deux
+ * raisons c'est — RG-14.1.
+ *
+ * Une version **remplacée** ne reviendra pas : une plus récente est en
+ * vigueur, et c'est elle que le candidat se verra proposer. Une version
+ * **en relecture** reviendra dès que nos veilleurs l'auront revérifiée.
+ * Dire l'une pour l'autre fait attendre pour rien.
+ */
+async function blocageDeLaMigration(visee: {
+  id: string;
+  countryCode: string;
+  visaType: string;
+  version: number;
+}): Promise<BlocageDeMigration> {
+  if ((await reglePubliee(visee.id)) !== null) return "AUCUN";
+  const plusRecente = await db.visaRule.count({
+    where: {
+      countryCode: visee.countryCode,
+      visaType: visee.visaType,
+      version: { gt: visee.version },
+      ...filtrePourCandidat(new Date()),
+    },
+  });
+  return plusRecente > 0 ? "REMPLACEE" : "EN_RELECTURE";
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AUCUNE_PIECE,
   MENTION_VERSION_EN_RELECTURE,
+  MENTION_VERSION_REMPLACEE,
   ceQuiSepare,
   ecartMontant,
   libelleDelaiVersion,
@@ -293,12 +294,30 @@ describe("les options d'arbitrage citent les pièces", () => {
  * plateforme refusait d'y commencer et acceptait d'y aller.
  */
 describe("une version retirée ne se propose plus", () => {
-  const options = (migrable: boolean) =>
-    optionsArbitrage(V1, V2, "11 500 €", "13 000 €", AUCUNE_PIECE, migrable);
+  const options = (blocage: "AUCUN" | "REMPLACEE" | "EN_RELECTURE") =>
+    optionsArbitrage(V1, V2, "11 500 €", "13 000 €", AUCUNE_PIECE, blocage);
 
   it("l'option « migrer » devient indisponible", () => {
-    expect(options(false)[0]!.desactivee).toBe(true);
-    expect(options(true)[0]!.desactivee).toBeUndefined();
+    expect(options("EN_RELECTURE")[0]!.desactivee).toBe(true);
+    expect(options("REMPLACEE")[0]!.desactivee).toBe(true);
+    expect(options("AUCUN")[0]!.desactivee).toBeUndefined();
+  });
+
+  /**
+   * Les deux causes ne se disent pas de la même façon, et un premier
+   * correctif les confondait : une version **remplacée** ne reviendra
+   * jamais en vigueur, une version **en relecture** reviendra. Annoncer
+   * une vérification sur une version remplacée fait attendre pour rien.
+   */
+  it("et la raison dit laquelle des deux causes c'est", () => {
+    expect(options("EN_RELECTURE")[0]!.detail).toBe(MENTION_VERSION_EN_RELECTURE);
+    expect(options("REMPLACEE")[0]!.detail).toBe(MENTION_VERSION_REMPLACEE);
+  });
+
+  it("une version remplacée ne promet pas de revenir", () => {
+    expect(MENTION_VERSION_REMPLACEE).not.toContain("revérifi");
+    expect(MENTION_VERSION_REMPLACEE).toContain("plus récente");
+    expect(MENTION_VERSION_REMPLACEE).toContain("C'est elle qui te sera proposée");
   });
 
   /**
@@ -306,7 +325,7 @@ describe("une version retirée ne se propose plus", () => {
    * fait, là où il n'y a rien à corriger de son côté.
    */
   it("mais elle reste affichée, avec sa raison", () => {
-    const [migrer] = options(false);
+    const [migrer] = options("EN_RELECTURE");
     expect(migrer!.titre).toContain("Migrer vers la version 2");
     expect(migrer!.detail).toBe(MENTION_VERSION_EN_RELECTURE);
   });
@@ -323,7 +342,9 @@ describe("une version retirée ne se propose plus", () => {
    * une relecture que le candidat ne peut pas faire avancer.
    */
   it("conserver reste disponible", () => {
-    expect(options(false)[1]!.desactivee).toBeUndefined();
-    expect(options(false)[1]!.detail).toContain("Ta checklist reste");
+    for (const blocage of ["REMPLACEE", "EN_RELECTURE"] as const) {
+      expect(options(blocage)[1]!.desactivee).toBeUndefined();
+      expect(options(blocage)[1]!.detail).toContain("Ta checklist reste");
+    }
   });
 });

@@ -236,12 +236,13 @@ export function optionsArbitrage(
   montantNouveau: string,
   pieces: EvolutionDesPieces = AUCUNE_PIECE,
   /**
-   * RG-14.1. Faux quand la version visée n'est plus en vigueur — relecture
-   * dépassée, ou archivée par une version suivante. L'option reste
-   * **affichée** et devient indisponible avec sa raison : la retirer
-   * ferait chercher ce qu'on a mal fait, là où il n'y a rien à corriger.
+   * RG-14.1. Ce qui empêche de migrer, quand quelque chose l'empêche.
+   * L'option reste **affichée** et devient indisponible avec sa raison :
+   * la retirer ferait chercher ce qu'on a mal fait, là où il n'y a rien à
+   * corriger. Et la raison dit la vraie cause — une version remplacée ne
+   * reviendra pas, une version en relecture reviendra.
    */
-  migrable = true,
+  blocage: BlocageDeMigration = "AUCUN",
 ): readonly OptionArbitrage[] {
   const limite = ancienne.applicableJusquau
     ? ` À ne garder que si tu déposes avant le ${formaterJour(ancienne.applicableJusquau)}.`
@@ -258,13 +259,14 @@ export function optionsArbitrage(
   */
   const ecart = ceQuiSepare(ancienne, nouvelle, pieces);
   const surLaChecklist = resumeDesPieces(pieces);
+  const migrable = blocage === "AUCUN";
   return [
     {
       cle: "MIGRER",
       titre: `Migrer vers la version ${nouvelle.numero}`,
       detail: migrable
         ? `Ta checklist passe à la version ${nouvelle.numero}${etCeQuiChange(ecart, montantNouveau, nouvelle.delai, surLaChecklist)}.${entree}`
-        : MENTION_VERSION_EN_RELECTURE,
+        : mentionDuBlocage(blocage),
       ...(migrable ? {} : { desactivee: true }),
     },
     {
@@ -305,15 +307,36 @@ export const mentionArbitrage = (choix: Arbitrage, pays: string): string =>
     : `Ta checklist ${pays} restera en version antérieure.`;
 
 /**
- * Ce que l'écran dit quand la version visée n'est plus en vigueur.
+ * Pourquoi une version visée n'est plus applicable — RG-14.1.
  *
- * Elle dit ce qui bloque, que rien n'est perdu, et le geste qui reste
- * possible. Le candidat n'a rien à corriger : c'est la relecture de nos
- * veilleurs qui est en retard, et le lui cacher le ferait chercher une
- * faute de son côté.
+ * `reglePubliee` rend `null` pour plusieurs raisons, et elles ne se disent
+ * pas de la même façon au candidat. Un premier correctif n'en nommait
+ * qu'une, la relecture, et se trompait sur l'autre :
+ *
+ *     v2 : statut ARCHIVED, relecture au 2029-01-01 — parfaitement à jour
+ *     la cause réelle : une version plus récente (v3) l'a remplacée
+ *     écran : « nos veilleurs la revérifient. Elle te sera proposée de
+ *              nouveau une fois vérifiée. »
+ *
+ * Elle ne le sera jamais : une version remplacée ne revient pas en
+ * vigueur. Le message envoyait attendre une vérification qui n'a pas lieu,
+ * au lieu de dire qu'une version plus récente l'attend déjà.
  */
+export type BlocageDeMigration = "AUCUN" | "REMPLACEE" | "EN_RELECTURE";
+
 export const MENTION_VERSION_EN_RELECTURE =
   "Cette version n'est plus celle en vigueur : nos veilleurs la revérifient. Elle te sera proposée de nouveau une fois vérifiée.";
+
+/**
+ * Une version plus récente est déjà en vigueur. Celle-ci ne reviendra pas,
+ * et le dire évite d'attendre pour rien — l'autre divergence, elle, est
+ * arbitrable dès maintenant.
+ */
+export const MENTION_VERSION_REMPLACEE =
+  "Une version plus récente est entrée en vigueur depuis. C'est elle qui te sera proposée : cette comparaison-ci n'a plus d'objet.";
+
+export const mentionDuBlocage = (blocage: BlocageDeMigration): string =>
+  blocage === "REMPLACEE" ? MENTION_VERSION_REMPLACEE : MENTION_VERSION_EN_RELECTURE;
 
 export const MENTION_SANS_ACCORD = "Nous ne modifions rien sans ton accord.";
 

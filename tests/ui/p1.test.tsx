@@ -931,7 +931,7 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
       <Alertes
         alertes={ALERTES}
         maintenant="2026-09-18T13:05:00Z"
-        divergence={{ ...MEME_MONTANT, migrable: false }}
+        divergence={{ ...MEME_MONTANT, blocage: "EN_RELECTURE" }}
       />,
     );
     fireEvent.click(

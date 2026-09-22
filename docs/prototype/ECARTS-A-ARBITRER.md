@@ -8156,3 +8156,66 @@ autres. Ce n'est pas le ciblage qui a tort — un dossier resté sur v1 **est**
 concerné par la publication de v3 — c'est la fixture qui était accidentelle.
 Chaque scénario a désormais sa propre procédure, le code pays servant
 d'espace de noms.
+
+---
+
+### S.59 — Le motif qui nommait la mauvaise cause, et l'écran qui ouvrait la mauvaise divergence
+
+Deux conséquences des deux lots précédents, et toutes deux visibles dès
+qu'un dossier porte plus d'une divergence en attente.
+
+**Le motif mentait sur la cause.** `reglePubliee` rend `null` pour deux
+raisons, et S.57 n'en nommait qu'une :
+
+```
+=== L'état ===
+  v2 : statut ARCHIVED, relecture au 2029-01-01 — parfaitement à jour
+  la cause réelle : une version plus récente (v3) l'a remplacée
+
+=== Ce que le candidat lit sur la divergence v1→v2 ===
+  écran : « nos veilleurs la revérifient. Elle te sera proposée de
+            nouveau une fois vérifiée. »
+```
+
+Elle ne le sera jamais : une version remplacée ne revient pas en vigueur. Le
+message envoyait attendre une vérification qui n'a pas lieu, alors qu'une
+divergence arbitrable l'attendait déjà. Une phrase actionnable qui désigne la
+mauvaise cause est pire qu'une phrase vague — elle fait attendre.
+
+Le blocage porte donc sa raison : `REMPLACEE` ou `EN_RELECTURE`, décidé par
+la présence d'une version plus récente **en vigueur**. Les deux messages
+disent des choses opposées, et c'est le point : l'une reviendra, l'autre non.
+
+**L'écran ouvrait la mauvaise divergence.** Depuis S.58, un dossier resté sur
+v1 en porte deux : v1→v2 (morte) et v1→v3 (vivante). La page prenait « la
+plus ancienne non arbitrée » — ce qui était juste tant qu'un dossier n'en
+portait qu'une. Le candidat devait écarter une comparaison sans objet avant
+de voir celle qui compte. Elle ouvre désormais celle qui vise la version la
+plus récente.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le blocage retombe toujours sur la relecture | la fumée |
+| le serveur promet une vérification quoi qu'il arrive | la fumée |
+| l'écran rouvre la plus ancienne | la fumée |
+
+Trois mutations, trois rouges.
+
+**Ce que ce lot a découvert et ne corrige pas.** En renommant `migrable` en
+`blocage`, j'ai cassé deux assertions de `fumee-publication.mts` — et
+`npm run typecheck` est resté vert. La raison : `tsconfig.json` inclut
+`**/*.ts`, qui ne couvre pas `.mts`. **Les fumées ne sont pas typées**, alors
+qu'elles sont la couche de vérification la plus précieuse du dépôt : un champ
+renommé dans un module serveur les casse en silence, et seul un passage
+complet le dit.
+
+Étendre la portée fait apparaître deux défauts réels et antérieurs :
+
+```
+scripts/fumee-balayage.mts(349,5): TS1117 — An object literal cannot have
+  multiple properties with the same name.
+scripts/fumee-publication.mts(362,7): TS2554 — Expected 2 arguments, but got 1.
+```
+
+Une clé `user` écrite deux fois, et un `editorialDe("AE")` à un argument
+masqué par un `as never`. C'est le lot suivant, et il tient debout seul.

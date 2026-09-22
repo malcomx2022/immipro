@@ -1462,6 +1462,29 @@ Une conséquence pour les fixtures, et elle vaut d'être dite : une fumée dont
 les scénarios partagent une procédure les fait se compter les uns les autres.
 Chaque scénario a maintenant son pays, qui ne sert que d'espace de noms.
 
+## Une phrase actionnable qui désigne la mauvaise cause fait attendre
+
+`reglePubliee` refuse pour deux raisons, et elles ne se disent pas de la
+même façon. Une version **remplacée** par une plus récente ne reviendra
+jamais en vigueur ; une version **en relecture** reviendra dès que nos
+veilleurs l'auront revérifiée.
+
+Un premier correctif n'en nommait qu'une. Sur une version archivée par sa
+suivante — dont la relecture était parfaitement à jour — l'écran annonçait
+« nos veilleurs la revérifient » et promettait qu'elle serait « proposée de
+nouveau une fois vérifiée ». Le candidat attendait un événement qui n'aurait
+pas lieu, pendant qu'une divergence arbitrable l'attendait.
+
+Le blocage porte donc sa raison. C'est la même exigence que pour un message
+d'échec : actionnable veut dire « qui désigne le bon geste », et désigner le
+mauvais est pire que rester vague.
+
+Et l'écran d'alertes ouvre la divergence qui vise la version la **plus
+récente**, non la plus ancienne posée. Un dossier peut en porter plusieurs
+depuis que la propagation rattrape les retardataires ; la plus ancienne est
+alors une comparaison sans objet qu'il fallait écarter avant de voir celle
+qui compte.
+
 ## Vérifier
 
 ```

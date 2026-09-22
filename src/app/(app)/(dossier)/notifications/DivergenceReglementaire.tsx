@@ -22,6 +22,7 @@ import {
   optionsArbitrage,
 } from "@/domain/notifications/divergence";
 import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
+import type { BlocageDeMigration } from "@/domain/notifications/divergence";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -70,10 +71,10 @@ export interface DivergenceProps {
    */
   pieces?: EvolutionDesPieces;
   /**
-   * RG-14.1. Faux quand la version visée n'est plus en vigueur : l'option
-   * « migrer » s'affiche alors indisponible, avec sa raison.
+   * RG-14.1. Ce qui empêche de migrer : l'option « migrer » s'affiche
+   * alors indisponible, avec la vraie raison — remplacée, ou en relecture.
    */
-  migrable?: boolean;
+  blocage?: BlocageDeMigration;
   /**
    * Date de **dépôt** du dossier concerné — la cible moins le délai
    * d'instruction —, si elle est fixée. C'est elle qui décide de la
@@ -94,7 +95,7 @@ export function DivergenceReglementaire({
   ancienne,
   nouvelle,
   pieces = AUCUNE_PIECE,
-  migrable = true,
+  blocage = "AUCUN",
   depot,
   detecteeLe,
   verifieeLe,
@@ -112,7 +113,7 @@ export function DivergenceReglementaire({
     montant(ancienne),
     montant(nouvelle),
     pieces,
-    migrable,
+    blocage,
   );
   const lignes = lignesDesPieces(pieces);
   const retenue = options.find((o) => o.cle === choix);

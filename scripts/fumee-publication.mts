@@ -767,7 +767,7 @@ try {
     });
 
     verifier(
-      (await divergenceAArbitrer(aArbitrer.id, candidat.id)).migrable,
+      (await divergenceAArbitrer(aArbitrer.id, candidat.id)).blocage === "AUCUN",
       "tant qu'elle est en vigueur, la migration est proposée",
     );
 
@@ -775,8 +775,8 @@ try {
     verifier(retirees >= 1, `la veille retire la version visée (${retirees})`);
 
     verifier(
-      (await divergenceAArbitrer(aArbitrer.id, candidat.id)).migrable === false,
-      "l'écran ne la propose plus",
+      (await divergenceAArbitrer(aArbitrer.id, candidat.id)).blocage === "EN_RELECTURE",
+      "l'écran ne la propose plus, et dit que la relecture est en cause",
     );
 
     const dossierDuCandidat = await db.application.findUniqueOrThrow({ where: { id: sien.id } });
@@ -901,8 +901,49 @@ try {
     );
 
     verifier(
-      (await divergenceAArbitrer(vers3.id, distrait.id)).migrable,
+      (await divergenceAArbitrer(vers3.id, distrait.id)).blocage === "AUCUN",
       "cette fois, il peut migrer",
+    );
+
+    /*
+      Et la divergence morte dit la **vraie** cause. v2 n'est pas en
+      relecture — la sienne est au 2029 — elle est remplacée. Annoncer une
+      vérification ferait attendre une remise en vigueur qui n'aura jamais
+      lieu, alors qu'une divergence arbitrable l'attend déjà.
+    */
+    const vers2 = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: sonDossier.id, toRuleId: deux.id },
+    });
+    verifier(
+      (await divergenceAArbitrer(vers2.id, distrait.id)).blocage === "REMPLACEE",
+      `la comparaison morte se dit remplacée, non en relecture (${(await divergenceAArbitrer(vers2.id, distrait.id)).blocage})`,
+    );
+    const motifServeur = await arbitrerLaDivergence(
+      await db.application.findUniqueOrThrow({ where: { id: sonDossier.id } }),
+      vers2.id,
+      "MIGRER",
+    )
+      .then(() => null)
+      .catch((e: { echec?: { corps?: string } }) => e.echec?.corps ?? "");
+    verifier(
+      motifServeur?.includes("plus récente") === true &&
+        motifServeur?.includes("revérifi") === false,
+      `et le serveur dit la même chose (${motifServeur?.slice(0, 46)}…)`,
+    );
+
+    /*
+      L'écran ouvre la divergence qui vise la version la plus récente. La
+      plus ancienne non arbitrée lui présentait d'abord une comparaison
+      morte, qu'il devait écarter avant de voir celle qui compte.
+    */
+    const ouverte = await db.ruleMigration.findFirstOrThrow({
+      where: { decision: null, application: { userId: distrait.id } },
+      orderBy: { toRule: { version: "desc" } },
+      include: { toRule: true },
+    });
+    verifier(
+      ouverte.toRule.version === 3,
+      `et l'écran ouvre celle qui compte (v${ouverte.toRule.version})`,
     );
   }
 } catch (erreur) {
