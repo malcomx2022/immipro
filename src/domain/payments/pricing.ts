@@ -9,10 +9,19 @@ export interface Pack {
   libelle: string;
   prix: Record<Devise, number>;
   /**
-   * Quota IA du pack. Donnée d'exploitation : lue par le back-office (B-07)
-   * pour l'alerte de marge, JAMAIS sérialisée vers le client, qui ne voit
-   * qu'un compteur d'analyses. Valeurs = ordres de grandeur à régler après
-   * l'export du fournisseur sur les dix premiers dossiers réels.
+   * Quota IA du pack. Donnée d'exploitation, JAMAIS sérialisée vers le
+   * client, qui ne voit qu'un compteur d'analyses.
+   *
+   * Ce commentaire annonçait « lue par le back-office (B-07) pour
+   * l'alerte de marge ». Elle ne l'était pas : B-07 mesurait la marge en
+   * argent, et sa liste de dépassements écartait toute ligne dont le
+   * coût était inconnu — c'est-à-dire toutes, tant qu'aucun tarif de
+   * jeton n'est configuré. Un dossier à dix fois son quota
+   * n'apparaissait nulle part. Depuis le 22/09/2026, `partDuQuotaIA` la
+   * lit pour de bon, et c'est la seule alerte qui tient sans tarif.
+   *
+   * Valeurs = ordres de grandeur à régler après l'export du fournisseur
+   * sur les dix premiers dossiers réels.
    */
   tokensIA: number;
   /**

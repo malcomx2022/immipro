@@ -6123,3 +6123,110 @@ appris de plus que ce que le diagnostic annonçait : le défaut avait été
 établi par exécution **avant** d'écrire une ligne de correction, et les
 fixtures ont seulement demandé quatre allers-retours pour trouver les
 champs obligatoires d'un entretien.
+
+---
+
+### S.34 — La liste d'alerte de B-07 ne pouvait pas être non vide
+
+`tokensIA` porte, depuis le premier jour, ce commentaire : « donnée
+d'exploitation, **lue par le back-office (B-07) pour l'alerte de
+marge** ». Elle ne l'était pas. Un dossier consommant dix fois le quota
+de son pack n'apparaissait nulle part.
+
+Établi en exécutant B-07 sur une base réelle, sans tarif de jeton
+configuré — l'état actuel du dépôt :
+
+```
+quota du pack essentiel : 120 000 jetons
+consommé               : 1 200 000 jetons
+soit                   : 1000 % du quota
+
+ce que B-07 rend : {"coutMicros":null,"partDuPrix":null,"pack":"essentiel"}
+```
+
+#### Une liste qui s'écartait elle-même
+
+`candidatsAuDepassement` filtrait ainsi :
+
+```ts
+l.partDuPrix === null || l.pack === null ? [] : [...]
+```
+
+`partDuPrix` est le rapport d'un **coût** à un prix, et le coût demande
+un tarif de jeton. Les trois variables de tarif ne sont pas renseignées
+— elles ne peuvent pas l'être avant le premier relevé du fournisseur
+d'inférence, ce que l'écran explique lui-même très bien. Donc
+`partDuPrix` vaut `null` sur chaque ligne, donc la liste était **vide
+par construction**, et l'écran affichait « les dépassements ne peuvent
+pas être relevés sans tarif ».
+
+Cette phrase est vraie de la marge. Elle était fausse de l'alerte : le
+quota du pack est un plafond **en jetons**, et les jetons se comptent
+sans connaître le prix de rien.
+
+Le module le disait déjà, à propos de l'histogramme : « en jetons, pas
+en argent — c'est la seule grandeur qui reste juste que le tarif soit
+configuré ou non ». Le raisonnement était écrit, appliqué à
+l'histogramme, et pas à l'alerte.
+
+#### Ce qui change
+
+`partDuQuotaIA` compare les jetons consommés au quota du pack acheté, et
+alimente la liste au même titre que la marge. Un dépassement porte
+désormais sa **nature** — `marge` ou `quota` —, parce que les deux ne se
+lisent pas pareil et ne se réparent pas pareil : une marge dépassée
+interroge la grille tarifaire, un quota dépassé interroge le dossier.
+
+Un dossier peut figurer pour les deux raisons. Les fondre en une seule
+ligne ferait disparaître celle qui tient sans tarif, qui est précisément
+celle qui manquait.
+
+Le seuil du quota est **cent pour cent**, et pas davantage : le quota est
+ce que le pack a vendu. Le dépasser n'est pas une erreur de la
+plateforme — rien n'arrête un appel là-dessus, et l'arbitrage en vigueur
+est que le candidat compte en analyses, pas en jetons (INV-6) — mais
+c'est exactement ce que l'exploitation doit voir : un dossier qui coûte
+plus qu'il n'a rapporté, avant même de savoir combien.
+
+Le tri des lignes suit maintenant **le plus alarmant des deux ratios**.
+Il suivait la marge seule, donc `null` partout sans tarif : le dossier à
+dix fois son quota pouvait finir en bas de liste.
+
+#### Un filtre placé deux fois, exprès
+
+Sans tarif, `candidatsAuDepassement` ne peut produire aucune ligne de
+marge — `partDuPrix` est `null`. L'écran filtre quand même sur la nature
+avant d'afficher. Ce n'est pas une redondance oisive : l'écran ne doit
+pas tenir sur une garantie que seule la lecture fournit, sous peine
+d'afficher un rapport entre un coût absent et un prix le jour où un
+appelant changera d'avis. La mutation « l'écran redevient muet sans
+tarif » le vérifie dans l'autre sens.
+
+#### Vérifié en exécutant, et en mutant
+
+Le même scénario, après correction :
+
+```
+partDuPrix  : null
+partDuQuota : 10
+alertes     : 1
+  · 537d6d84… — 1 000 % du quota de jetons du pack essentiel, sur 1 appel
+```
+
+Quatre mutations, quatre rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le quota n'alimente plus la liste | trois cas, dont le dossier sans tarif |
+| un quota nul divise quand même | l'infini que la grille produirait |
+| l'écran redevient muet sans tarif | le dossier hors quota, invisible |
+| le quota se juge au seuil de marge | un dossier à 15 % de son quota remonterait |
+
+#### Ce que ce lot ne fait pas
+
+Il n'arrête aucun appel. INV-6 est tenu côté candidat par le grand livre
+`AnalysisCredit`, avec son débit conditionnel en SQL — un mécanisme
+soigné, et qui compte des **analyses**, l'unité que le candidat achète.
+Les jetons sont la contrepartie interne ; l'arbitrage de la grille dit
+qu'ils ne se facturent pas au candidat. Ce lot les rend visibles à
+l'exploitation, il ne change pas ce qui est vendu.

@@ -19,6 +19,7 @@ import { aReconcilier } from "@/server/paiement/cycle";
 import { getPack, type Devise } from "@/domain/payments/pricing";
 import {
   coutMicrosDesJetons,
+  partDuQuotaIA,
   tarifDepuisEnvironnement,
   type Journee,
   type TarifIA,
@@ -555,6 +556,16 @@ export interface LigneDeCout {
   devise: string | null;
   /** Part du prix du pack, ratio. `null` sans tarif ou sans pack payé. */
   partDuPrix: number | null;
+  /** Quota de jetons du pack acheté. `null` sans pack payé. */
+  quotaJetons: number | null;
+  /**
+   * Part du quota de jetons déjà consommée. `null` sans pack payé.
+   *
+   * Elle ne demande **aucun tarif** : c'est ce qui la distingue de
+   * `partDuPrix`, et c'est la seule alerte disponible tant que le prix
+   * du jeton n'est pas renseigné.
+   */
+  partDuQuota: number | null;
 }
 
 export async function coutsParDossier(
@@ -594,10 +605,23 @@ export async function coutsParDossier(
           devise: achat?.currency ?? null,
           partDuPrix:
             prix && coutMicros !== null ? coutMicros / 1_000_000 / prix : null,
+          quotaJetons: pack?.tokensIA ?? null,
+          partDuQuota: partDuQuotaIA(jetonsEntree + jetonsSortie, pack?.tokensIA ?? null),
         },
       ];
     })
-    .sort((a, b) => (b.partDuPrix ?? 0) - (a.partDuPrix ?? 0));
+    /*
+      Le plus alarmant des deux d'abord, et non la marge seule : sans
+      tarif, `partDuPrix` vaut `null` partout, et le tri se faisait alors
+      sur rien — le dossier à dix fois son quota pouvait finir en bas de
+      liste. Les deux ratios sont comparables, puisque les deux disent
+      « part de ce que le pack a vendu ».
+    */
+    .sort(
+      (a, b) =>
+        Math.max(b.partDuPrix ?? 0, b.partDuQuota ?? 0) -
+        Math.max(a.partDuPrix ?? 0, a.partDuQuota ?? 0),
+    );
 }
 
 /**
