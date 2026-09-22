@@ -38,13 +38,13 @@ import { tauxCommissionFormate } from "@/domain/payments/pricing";
  * C'est la leçon de S.1, sur B-02.
  */
 const appels: { url: string; corps: unknown; methode?: string }[] = [];
-let reponse: { ok: boolean } = { ok: true };
+let reponse: { ok: boolean; donnees?: unknown } = { ok: true };
 vi.mock("@/lib/api", () => ({
   appeler: (url: string, options: { corps?: unknown; methode?: string } = {}) => {
     appels.push({ url, corps: options.corps, methode: options.methode });
     return Promise.resolve(
       reponse.ok
-        ? { ok: true, donnees: {} }
+        ? { ok: true, donnees: reponse.donnees ?? {} }
         : {
             ok: false,
             echec: {
@@ -789,13 +789,62 @@ describe("T-02 — Divergence réglementaire", () => {
    * garderait l'alerte que l'on vient de trancher, et le candidat
    * rouvrirait un arbitrage déjà rendu — que le serveur refuse.
    */
-  it("ne se ferme qu'une fois écrit, et rafraîchit la liste", async () => {
+  it("rafraîchit la liste dès que c'est écrit", async () => {
     ouvrir();
     fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
     fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
     await attendre();
-    expect(screen.queryByRole("dialog")).toBeNull();
     expect(rafraichit).toHaveBeenCalled();
+  });
+
+  /**
+   * ── La réponse que l'écran jetait ────────────────────────────────
+   *
+   * L'écran promettait au futur — « Ta checklist … sera mise à jour » —,
+   * fermait la feuille, et ne rendait jamais le passé. Le serveur, lui,
+   * nommait les pièces ajoutées et celles qui ne sont plus demandées.
+   * Exécuté avant correction :
+   *
+   *     donnees : { piecesAjoutees: [« Diplôme… »], piecesLiberees: [« Casier… »] }
+   *     l'écran : onFermer(); router.refresh();
+   *     ce que le candidat lit : rien
+   *
+   * Trois lots ont enrichi cette réponse sans que rien ne la regarde.
+   */
+  it("rend au passé ce qu'elle promettait au futur, et nomme les pièces", async () => {
+    ouvrir();
+    reponse = {
+      ok: true,
+      donnees: {
+        mention: "Aucune pièce déjà validée n'a été retirée.",
+        piecesAjoutees: ["Diplôme le plus élevé, légalisé"],
+        piecesLiberees: ["Casier judiciaire"],
+      },
+    };
+    fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
+    await attendre();
+
+    const dialogue = screen.getByRole("dialog");
+    expect(dialogue.textContent).toContain("suit la nouvelle version");
+    expect(dialogue.textContent).toContain("À fournir en plus : Diplôme le plus élevé, légalisé.");
+    // « N'est plus demandée » seul se lit comme « jette-la ».
+    expect(dialogue.textContent).toContain("ce que tu as déjà déposé est conservé");
+    expect(dialogue.textContent).toContain("Aucune pièce déjà validée n'a été retirée.");
+    // Et le choix qui n'est plus à faire a disparu : le serveur refuse un
+    // second arbitrage, un bouton qui le propose ne mène qu'à un échec.
+    expect(screen.queryByRole("radio", { name: /Migrer vers la version 5/ })).toBeNull();
+  });
+
+  it("c'est le candidat qui ferme, une fois la confirmation lue", async () => {
+    ouvrir();
+    fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
+    await attendre();
+
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Voir ma checklist" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   /**

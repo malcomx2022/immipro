@@ -375,6 +375,71 @@ export const MENTION_VERSION_REMPLACEE =
 export const mentionDuBlocage = (blocage: BlocageDeMigration): string =>
   blocage === "REMPLACEE" ? MENTION_VERSION_REMPLACEE : MENTION_VERSION_EN_RELECTURE;
 
+/**
+ * Ce que l'arbitrage a **réellement** changé — T-02, WF-11 étape 4.
+ *
+ * ── Une réponse que personne ne lisait ──────────────────────────────
+ *
+ * Avant de cliquer, l'écran promettait au futur : « Ta checklist Pays-Bas
+ * sera mise à jour. » Après le clic, la feuille se fermait et la page se
+ * rafraîchissait. Le serveur, lui, rendait la liste des pièces ajoutées
+ * et libérées — et l'écran la jetait :
+ *
+ *     appeler(…) → { ok: true, donnees: { piecesAjoutees: [« Diplôme… »],
+ *                                          piecesLiberees: [« Casier… »] } }
+ *     l'écran     : onFermer(); router.refresh();
+ *     le candidat : rien
+ *
+ * La promesse au futur n'était jamais rendue au passé. Le candidat
+ * retrouvait l'information sur sa checklist s'il pensait à la relire, mais
+ * pas au moment du geste, là où il venait de décider.
+ *
+ * Trois lots ont enrichi cette réponse — les pièces durcies, les pièces
+ * libérées — sans que rien ne la regarde. Une donnée que personne ne lit
+ * est une donnée dont on ne sait pas si elle est juste.
+ *
+ * ── Ce que la confirmation dit, et dans quel ordre ──────────────────
+ *
+ * Ce qui demande un geste vient en premier : une pièce à fournir en plus
+ * est ce qui change le travail du candidat aujourd'hui. Ce qui est libéré
+ * vient ensuite, avec la précision qui compte — la ligne reste, le
+ * document déposé aussi —, parce que « n'est plus demandée » se lit
+ * facilement comme « jette-la ».
+ */
+export interface Confirmation {
+  titre: string;
+  lignes: readonly string[];
+}
+
+export function confirmationDArbitrage(
+  choix: Arbitrage,
+  pays: string,
+  /**
+   * La phrase de clôture, telle que **le serveur** la rend. Elle n'est pas
+   * réécrite ici : deux copies de la même phrase finiraient par diverger,
+   * et c'est celle qui accompagne l'écriture qui fait foi.
+   */
+  mention: string,
+  piecesAjoutees: readonly string[] = [],
+  piecesLiberees: readonly string[] = [],
+): Confirmation {
+  if (choix === "CONSERVER") {
+    return { titre: `Ta checklist ${pays} reste en version antérieure.`, lignes: [mention] };
+  }
+
+  const lignes: string[] = [];
+  if (piecesAjoutees.length > 0) {
+    lignes.push(`À fournir en plus : ${enumerer(piecesAjoutees)}.`);
+  }
+  if (piecesLiberees.length > 0) {
+    lignes.push(
+      `Plus demandé : ${enumerer(piecesLiberees)}. La ligne reste dans ta checklist, et ce que tu as déjà déposé est conservé.`,
+    );
+  }
+  lignes.push(mention);
+  return { titre: `Ta checklist ${pays} suit la nouvelle version.`, lignes };
+}
+
 export const MENTION_SANS_ACCORD = "Nous ne modifions rien sans ton accord.";
 
 export const MENTION_HISTORIQUE =

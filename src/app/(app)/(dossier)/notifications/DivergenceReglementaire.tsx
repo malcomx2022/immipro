@@ -9,11 +9,12 @@ import { RadioGroup } from "@/components/ui/RadioGroup";
 import { SourceNote } from "@/components/ui/SourceNote";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
-import type { Arbitrage, VersionRegle } from "@/domain/notifications/divergence";
+import type { Arbitrage, Confirmation, VersionRegle } from "@/domain/notifications/divergence";
 import {
   AUCUNE_PIECE,
   MENTION_HISTORIQUE,
   MENTION_SANS_ACCORD,
+  confirmationDArbitrage,
   ecartMontant,
   libelleDelaiVersion,
   libelleImpact,
@@ -105,6 +106,7 @@ export function DivergenceReglementaire({
   const [choix, setChoix] = useState<Arbitrage | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [fait, setFait] = useState<Confirmation | null>(null);
 
   const montant = (v: VersionRegle) => formatMontant(v.montant, v.devise);
   const options = optionsArbitrage(
@@ -119,29 +121,72 @@ export function DivergenceReglementaire({
   const retenue = options.find((o) => o.cle === choix);
 
   /**
-   * L'arbitrage part, et la feuille ne se ferme qu'une fois écrit.
+   * L'arbitrage part, et la feuille ne se ferme qu'une fois écrit — ni sur
+   * un échec, ni sur une réussite.
    *
-   * Fermer d'abord ferait disparaître le seul endroit où l'échec peut se
-   * lire — et sur une décision qui déplace un échéancier entier, « ça n'a
-   * pas marché » doit se voir là où le geste a été fait. `router.refresh()`
-   * parce que la page est rendue côté serveur : sans lui, la liste
-   * garderait l'alerte que l'on vient de trancher.
+   * Fermer sur l'échec ferait disparaître le seul endroit où il peut se
+   * lire, et sur une décision qui déplace un échéancier entier, « ça n'a
+   * pas marché » doit se voir là où le geste a été fait.
+   *
+   * Fermer sur la réussite jetait la réponse du serveur, qui nomme les
+   * pièces ajoutées et celles qui ne sont plus demandées. L'écran
+   * promettait au futur — « ta checklist sera mise à jour » — et ne rendait
+   * jamais le passé. La confirmation se lit donc ici, et c'est le candidat
+   * qui ferme.
+   *
+   * `router.refresh()` parce que la page est rendue côté serveur : sans
+   * lui, la liste garderait l'alerte que l'on vient de trancher. Il part
+   * tout de suite, pendant que la confirmation se lit.
    */
   async function appliquer() {
     if (!choix) return;
     setEnvoi(true);
     setEchec(null);
-    const resultat = await appeler(
-      `/api/dossiers/${dossierId}/migrations/${migrationId}`,
-      { corps: { decision: choix } },
-    );
+    const resultat = await appeler<{
+      mention?: string;
+      piecesAjoutees?: readonly string[];
+      piecesLiberees?: readonly string[];
+    }>(`/api/dossiers/${dossierId}/migrations/${migrationId}`, { corps: { decision: choix } });
+    setEnvoi(false);
     if (resultat.ok) {
-      onFermer();
+      setFait(
+        confirmationDArbitrage(
+          choix,
+          pays,
+          resultat.donnees?.mention ?? mentionArbitrage(choix, pays),
+          resultat.donnees?.piecesAjoutees ?? [],
+          resultat.donnees?.piecesLiberees ?? [],
+        ),
+      );
       router.refresh();
       return;
     }
-    setEnvoi(false);
     setEchec(resultat.echec);
+  }
+
+  /*
+    Une fois l'arbitrage écrit, la feuille ne montre plus les deux versions
+    ni les options : elles décrivent un choix qui n'est plus à faire, et le
+    bouton ne pourrait que refuser un second envoi — l'arbitrage n'est pas
+    reprenable côté serveur.
+  */
+  if (fait) {
+    return (
+      <BottomSheet ouverte={ouverte} onFermer={onFermer} ancrage="adaptatif" titre={fait.titre}>
+        <ul aria-live="polite" className="flex flex-col gap-2">
+          {fait.lignes.map((ligne) => (
+            <li key={ligne} className="text-pretty text-14 text-ink-700">
+              {ligne}
+            </li>
+          ))}
+        </ul>
+        <div className="border-t border-ink-300 pt-3">
+          <Button pleineLargeur className="min-h-action" onClick={onFermer}>
+            Voir ma checklist
+          </Button>
+        </div>
+      </BottomSheet>
+    );
   }
 
   return (
