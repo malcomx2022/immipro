@@ -273,3 +273,67 @@ export interface DernierBalayageDEssai {
   reconnu: boolean;
   quand: Date;
 }
+
+/* ------------------------------------------------------------------ *
+ * Ce que le candidat lit d'une attente au contrôle.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Qui peut lever le blocage — arbitrage du 22/09/2026.
+ *
+ * `seReprendSeule` répond à la question de la file : faut-il rejouer ?
+ * Celle-ci répond à une autre, et elles ne se recouvrent pas : parmi les
+ * causes qui ne se reprennent pas seules, certaines se lèvent d'un geste
+ * du candidat — un fichier trop lourd, un fichier qui n'est pas arrivé —
+ * et d'autres pas du tout, parce que la panne est de notre côté.
+ *
+ * La distinction n'est pas cosmétique. Demander à quelqu'un de réparer
+ * une panne qui n'est pas la sienne le fait tourner en rond ; ne rien
+ * lui demander quand un geste suffirait le fait attendre pour rien.
+ *
+ * Son rôle est de **tenir `ATTENTE_AU_CONTROLE` cohérente** : un test
+ * vérifie que tout message d'une cause « candidat » demande un geste, et
+ * qu'aucun message d'une cause « plateforme » n'en demande. Sans cet
+ * emploi, elle ne serait qu'un commentaire exécutable — une distinction
+ * écrite dont rien ne dépendrait, ce que ce dépôt a déjà payé plusieurs
+ * fois.
+ */
+export function quiPeutAgir(cause: CauseDIndisponibilite): "candidat" | "plateforme" {
+  switch (cause) {
+    case "trop_volumineux":
+    case "objet_absent":
+      return "candidat";
+    case "non_configure":
+    case "injoignable":
+    case "delai_depasse":
+    case "reponse_illisible":
+      return "plateforme";
+    default: {
+      const jamais: never = cause;
+      throw new Error(`Cause d'indisponibilité non arbitrée : ${JSON.stringify(jamais)}`);
+    }
+  }
+}
+
+/**
+ * Le message du candidat, par cause — RG-06.3 appliqué à l'attente.
+ *
+ * Aucun ne nomme la panne, le moteur, ni un code : ils ne sont pas
+ * actionnables et inquiètent. Ceux qui demandent un geste le disent en
+ * premier ; les autres disent que le fichier est conservé et que rien
+ * n'est attendu — ce qui est vrai, et vaut mieux qu'un silence.
+ */
+export const ATTENTE_AU_CONTROLE: Record<CauseDIndisponibilite, string> = {
+  trop_volumineux:
+    "Ce fichier est trop lourd pour passer le contrôle. Dépose une version plus légère : réexporte le PDF depuis ton application, ou reprends la photo en résolution moindre.",
+  objet_absent:
+    "Ton fichier n'est pas arrivé jusqu'au contrôle. Il n'a pas été conservé — dépose-le à nouveau.",
+  non_configure:
+    "Le contrôle des fichiers est interrompu de notre côté. Ton fichier est conservé et sera contrôlé dès que le service revient, tu n'as rien à faire.",
+  injoignable:
+    "Le contrôle prend plus de temps que prévu. Ton fichier est conservé et sera traité dès que possible, tu n'as rien à faire.",
+  delai_depasse:
+    "Le contrôle prend plus de temps que prévu. Ton fichier est conservé et sera traité dès que possible, tu n'as rien à faire.",
+  reponse_illisible:
+    "Le contrôle des fichiers est interrompu de notre côté. Ton fichier est conservé, nous reprenons la main dessus, tu n'as rien à faire.",
+};

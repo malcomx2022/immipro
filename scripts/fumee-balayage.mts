@@ -216,6 +216,10 @@ const { leBalayeur, verifierLeMoteur, sonderLeBalayage, oublierLesEssais } = awa
 );
 const { TENTATIVES_AVANT_INCIDENT, EICAR } = await import("../src/domain/securite/balayage");
 const { noterLeConstat, lireLesConstats } = await import("../src/server/exploitation/constats");
+const { raisonSansApercu } = await import("../src/server/acces/pieces");
+const { MENTION_EN_QUARANTAINE, ATTENTE_ORDINAIRE_MS } = await import(
+  "../src/domain/dossiers/quarantaine"
+);
 const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
   "../src/domain/exploitation/constats"
 );
@@ -617,6 +621,71 @@ try {
     verifier(
       version.scanState === "EN_QUARANTAINE" && version.scanIncidentCause === "objet_absent",
       `elle attend une main, sans être déclarée saine (${version.scanIncidentCause})`,
+    );
+  }
+
+  console.log("\nCe que le candidat lit d'une pièce bloquée");
+  {
+    reponseDuMoteur = { statut: 200, corps: "<html>une passerelle qui répond à sa façon</html>" };
+    const p = await piece({ avecQuota: true });
+
+    // Avant toute tentative : l'attente est ordinaire, et le message vrai.
+    let version = await relire(p.tache.versionId);
+    verifier(
+      raisonSansApercu(version) === MENTION_EN_QUARANTAINE,
+      "à l'arrivée, la pièce annonce quelques instants — ce qui est vrai",
+    );
+
+    await sousEcoute(() => balayerUnePiece(p.tache, leBalayeur()));
+    version = await relire(p.tache.versionId);
+    verifier(
+      version.scanIncidentCause === "reponse_illisible",
+      `l'incident est ouvert (${version.scanIncidentCause})`,
+    );
+
+    /*
+      Le défaut corrigé : la pièce ne passera pas, l'exploitation le
+      sait, et le candidat lisait toujours « dans quelques instants, tu
+      n'as rien à faire ».
+    */
+    const message = raisonSansApercu(version)!;
+    verifier(
+      !message.includes("quelques instants"),
+      "et le message cesse de promettre une durée",
+    );
+    verifier(
+      message.includes("tu n'as rien à faire"),
+      "sans rien demander : la panne est de notre côté",
+    );
+
+    // Un fichier trop lourd, lui, se redépose — et le message le dit.
+    await db.documentVersion.update({
+      where: { id: p.tache.versionId },
+      data: { scanIncidentCause: "trop_volumineux" },
+    });
+    const lourd = raisonSansApercu(await relire(p.tache.versionId))!;
+    verifier(lourd.includes("Dépose une version plus légère"), "un fichier trop lourd dit quoi faire");
+    verifier(!lourd.includes("rien à faire"), "et ne fait plus attendre pour rien");
+  }
+
+  console.log("\nUne attente sans incident finit par se dire");
+  {
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    const p = await piece({ avecQuota: true });
+    // Rien n'a été tenté — un worker arrêté, une file qui n'a pas
+    // démarré : aucune tentative, donc aucun incident, donc aucun signal.
+    const version = await relire(p.tache.versionId);
+    verifier(version.scanAttempts === 0, "aucune tentative n'a eu lieu");
+
+    const tard = new Date(version.uploadedAt.getTime() + ATTENTE_ORDINAIRE_MS + 60_000);
+    const message = raisonSansApercu(version, tard)!;
+    verifier(
+      !message.includes("quelques instants"),
+      "passé le délai ordinaire, la promesse de durée tombe",
+    );
+    verifier(
+      raisonSansApercu(version, version.uploadedAt) === MENTION_EN_QUARANTAINE,
+      "alors qu'à l'instant du dépôt, elle tient",
     );
   }
 

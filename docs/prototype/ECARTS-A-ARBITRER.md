@@ -6230,3 +6230,107 @@ soigné, et qui compte des **analyses**, l'unité que le candidat achète.
 Les jetons sont la contrepartie interne ; l'arbitrage de la grille dit
 qu'ils ne se facturent pas au candidat. Ce lot les rend visibles à
 l'exploitation, il ne change pas ce qui est vendu.
+
+---
+
+### S.35 — « Dans quelques instants », pendant trois jours
+
+Le message d'une pièce en quarantaine était unique, et il promettait une
+durée :
+
+> Ton fichier est en cours de contrôle. Il sera consultable dans
+> quelques instants, tu n'as rien à faire.
+
+Vrai pendant les quelques secondes d'un balayage ordinaire. Le lot du
+balayage (S.30) a rendu possibles des attentes qui n'en sont pas, et ce
+message n'a pas bougé.
+
+Établi en exécutant la fonction d'affichage sur trois situations :
+
+```
+déposée il y a 10 secondes                          → « … dans quelques instants, tu n'as rien à faire. »
+déposée il y a 3 heures                             → « … dans quelques instants, tu n'as rien à faire. »
+bloquée depuis 3 jours (trop volumineuse)           → « … dans quelques instants, tu n'as rien à faire. »
+```
+
+Sur la troisième, l'exploitation lit « le fichier dépasse la taille que
+le balayage accepte de transmettre, il n'y passera jamais ». Le candidat
+lit qu'il n'a rien à faire, alors qu'un redépôt d'une version plus légère
+aurait réglé la question en une minute.
+
+#### C'est le lot précédent qui a créé l'attente
+
+Avant S.30, une indisponibilité levait et la file rejouait : l'attente
+était toujours courte ou la pièce finissait par passer. Depuis, une cause
+qui ne se reprend pas seule laisse la pièce en quarantaine
+**définitivement**, avec un incident ouvert que l'exploitation voit.
+
+Le lot a donc rendu l'exploitation lucide et laissé le candidat dans le
+noir. Ce n'est pas un oubli isolé : c'est la moitié qu'on ne voit pas
+quand on regarde un mécanisme depuis le serveur.
+
+#### Trois cas, et la durée n'est promise que dans le premier
+
+| Situation | Ce qui est dit |
+|---|---|
+| attente ordinaire | le message d'origine — « quelques instants » |
+| attente prolongée sans cause connue | plus de promesse de durée, et rien à faire |
+| incident dont la cause est connue | ce qui se passe, et un geste s'il y en a un |
+
+Le seuil d'attente ordinaire couvre le cas où **rien** n'a été tenté —
+un worker arrêté, une file qui n'a pas démarré : aucune tentative, donc
+aucun incident, donc aucun signal. Sans lui, une pièce déposée un
+vendredi soir devant un worker éteint lirait « dans quelques instants »
+jusqu'au lundi.
+
+#### Deux questions qui ne se recouvrent pas
+
+`seReprendSeule` répond à la file : faut-il rejouer ? `quiPeutAgir`
+répond au candidat : ai-je quelque chose à faire ? Les réponses ne se
+déduisent pas l'une de l'autre.
+
+| Cause | Se rejoue | Qui peut agir |
+|---|---|---|
+| `delai_depasse` | oui | la plateforme |
+| `trop_volumineux` | non | le candidat |
+| `reponse_illisible` | non | la plateforme |
+| `objet_absent` | non | le candidat |
+
+Demander un geste sur une panne qui n'est pas la sienne fait tourner
+quelqu'un en rond ; n'en demander aucun quand un geste suffirait le fait
+attendre pour rien.
+
+#### Une fonction qui ne servait à rien, jusqu'à ce qu'elle serve
+
+`quiPeutAgir` a d'abord été écrite pour expliquer la distinction, et
+**rien n'en dépendait** — la table des messages était rédigée à la main
+à côté. Une mutation l'a montré : déplacer `objet_absent` d'une case à
+l'autre ne faisait rien échouer.
+
+C'est exactement le défaut que les quatre lots précédents ont traqué
+ailleurs, écrit ici de ma main. Elle a donc reçu son emploi : un test
+vérifie que tout message d'une cause « candidat » demande un geste, et
+qu'aucun message d'une cause « plateforme » n'en demande. La mutation
+mord depuis.
+
+#### Vérifié en exécutant, et en mutant
+
+`scripts/fumee-balayage.mts` couvre maintenant ce que le candidat lit à
+chaque étape, sur une base réelle : à l'arrivée, après un incident dont
+la cause est de notre côté, et sur un fichier trop lourd.
+
+Quatre mutations, quatre rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la cause n'est plus lue | trois cas, dont le fichier trop lourd |
+| l'ancienneté n'est plus lue | l'attente prolongée |
+| le fichier trop lourd redevient une attente | deux cas, dont la longueur du message |
+| un fichier absent devient notre affaire | la cohérence de la table |
+
+#### Ce qui reste vrai
+
+Aucun message ne nomme la panne, le moteur, ni un code. RG-06.3 vaut ici
+comme pour un refus : ce qui n'est pas actionnable n'est pas dit, et ce
+qui l'est se dit en premier. Le message d'un fichier écarté au contrôle
+(`refusAuControle`) n'a pas bougé — il était déjà juste.

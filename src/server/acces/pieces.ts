@@ -5,6 +5,10 @@ import { presignedGet, presignedPut } from "@/lib/storage";
 import { cleObjet } from "@/server/securite/secret";
 import { refusDuFichier, TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
 import { consultable, mentionApercu } from "@/domain/dossiers/quarantaine";
+import {
+  ATTENTE_AU_CONTROLE,
+  type CauseDIndisponibilite,
+} from "@/domain/securite/balayage";
 
 /**
  * Dépôt et lecture des pièces — WF-06.
@@ -132,11 +136,34 @@ export async function urlDeLecture(version: DocumentVersion): Promise<string | n
  * quarantaine et un fichier purgé se ressemblent à l'écran : deux absences
  * identiques, dont l'une se résout toute seule en quelques secondes et
  * l'autre jamais.
+ *
+ * L'attente est **passée** au domaine, et non résumée ici : la version
+ * porte depuis quand elle attend et, le cas échéant, la cause de
+ * l'incident ouvert. Sans ces deux-là, le message promettait « quelques
+ * instants » sur une pièce qui n'aboutirait jamais.
  */
-export function raisonSansApercu(version: DocumentVersion): string | null {
+export function raisonSansApercu(version: DocumentVersion, maintenant = new Date()): string | null {
   if (version.purgedAt) return null;
-  return mentionApercu(version.scanState);
+  return mentionApercu(
+    version.scanState,
+    {
+      depuis: version.uploadedAt,
+      ...(estUneCause(version.scanIncidentCause)
+        ? { cause: version.scanIncidentCause }
+        : {}),
+    },
+    maintenant,
+  );
 }
+
+/**
+ * La cause est une chaîne en base : rien n'empêche une valeur écrite à
+ * la main d'y arriver. On ne la traduit que si le domaine la connaît —
+ * sinon on retombe sur le message d'attente ordinaire, qui ne promet
+ * rien de faux.
+ */
+const estUneCause = (valeur: string | null): valeur is CauseDIndisponibilite =>
+  valeur !== null && valeur in ATTENTE_AU_CONTROLE;
 
 export async function enregistrerLaVersion(
   documentId: string,
