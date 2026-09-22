@@ -1,6 +1,11 @@
 import { db } from "@/lib/db";
 import { promouvoir, removeQuarantaine } from "@/lib/storage";
 import { leBalayeur, type Balayeur } from "@/server/securite/antivirus";
+import {
+  MOTIF_INDISPONIBILITE,
+  suiteDeLIndisponibilite,
+  type CauseDIndisponibilite,
+} from "@/domain/securite/balayage";
 import { refusAuControle } from "@/domain/dossiers/quarantaine";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { solde } from "@/server/acces/quota";
@@ -18,10 +23,27 @@ import { solde } from "@/server/acces/quota";
  *   porte sa date de balayage, et l'analyse peut partir ;
  * - **infectée** → les octets sont détruits, la pièce redevient à
  *   déposer, et le candidat lit pourquoi sans lire le nom de la menace ;
- * - **pas de réponse** → rien ne change, et la fonction lève. C'est pg-boss
- *   qui réessaie, avec son délai croissant. Un fichier en attente vaut
- *   mieux qu'un fichier accepté par défaut, et une exception est la seule
- *   façon de le dire à une file de jobs.
+ * - **pas de verdict** → rien n'est promu, l'attente est comptée et datée,
+ *   et la fonction lève **si la cause peut disparaître d'elle-même**.
+ *   Une exception est la seule façon de demander une reprise à une file
+ *   de jobs ; en lever une sur un fichier trop volumineux ferait rejouer
+ *   sans fin une tâche qui ne peut pas aboutir, et noierait l'incident
+ *   qu'il fallait voir. La distinction vit dans le domaine
+ *   (`suiteDeLIndisponibilite`), pas ici.
+ *
+ * ── Le `switch` exhaustif, et ce qu'il a rattrapé ────────────────────
+ *
+ * L'indisponibilité était rendue par `null`, testée par `if (!verdict)`.
+ * Le jour où elle est devenue un objet — pour porter sa cause —, ce test
+ * est passé à côté : un objet est toujours vrai, et le code tombait
+ * **dans la branche de promotion**. Une pièce que personne n'avait
+ * balayée serait entrée dans le stockage de confiance parce qu'un
+ * moteur n'avait pas répondu.
+ *
+ * D'où la forme ci-dessous : un `switch` sur `verdict.etat`, avec un
+ * `const jamais: never`. Un quatrième état ne compilera pas tant qu'on
+ * n'aura pas dit ce qu'il promeut — et la réponse par défaut, ici, est
+ * « rien ».
  *
  * La fonction est idempotente : une version déjà décidée ressort sans rien
  * écrire. C'est ce qui permet de rejouer la file après une reprise.
@@ -40,15 +62,39 @@ export type Suite =
   | "CONSERVEE"
   /** Écartée au contrôle. */
   | "REFUSEE"
+  /**
+   * Aucun verdict, et la cause ne se reprend pas seule : la pièce reste en
+   * quarantaine, l'incident est ouvert, et rejouer ne changerait rien.
+   */
+  | "BLOQUEE"
   /** Rien à faire : version inconnue, sans octet, ou déjà décidée. */
   | "SANS_OBJET";
 
 export class BalayageIndisponible extends Error {
-  constructor(objectKey: string) {
-    super(`Balayeur sans réponse pour ${objectKey} — la pièce reste en quarantaine.`);
+  /** La cause voyage avec l'exception : le journal de file la portera. */
+  readonly cause: CauseDIndisponibilite;
+
+  constructor(objectKey: string, cause: CauseDIndisponibilite) {
+    super(`Balayeur sans verdict pour ${objectKey} (${cause}) — la pièce reste en quarantaine.`);
     this.name = "BalayageIndisponible";
+    this.cause = cause;
   }
 }
+
+const inclusDuDocument = {
+  document: { include: { application: { select: { userId: true } } } },
+} as const;
+
+type Version = NonNullable<
+  Awaited<
+    ReturnType<
+      typeof db.documentVersion.findUnique<{
+        where: { id: string };
+        include: typeof inclusDuDocument;
+      }>
+    >
+  >
+>;
 
 export async function balayerUnePiece(
   tache: Tache,
@@ -56,60 +102,63 @@ export async function balayerUnePiece(
 ): Promise<Suite> {
   const version = await db.documentVersion.findUnique({
     where: { id: tache.versionId },
-    include: { document: { include: { application: { select: { userId: true } } } } },
+    include: inclusDuDocument,
   });
   if (!version || !version.objectKey) return "SANS_OBJET";
-  const cle = version.objectKey;
   // Déjà décidée : une reprise de file ne rebalaie pas, et surtout ne
   // redescend pas une version saine en quarantaine.
   if (version.scanState !== "EN_QUARANTAINE") return "SANS_OBJET";
 
-  const verdict = await balayer(cle);
-  if (!verdict) throw new BalayageIndisponible(cle);
+  const verdict = await balayer(version.objectKey);
 
-  if (verdict.etat === "INFECTEE") {
-    await removeQuarantaine(cle);
-    // L'ordre compte : les octets partent d'abord. La contrainte
-    // `document_version_infectee_sans_octets` refuserait la ligne si la clé
-    // survivait, ce qui évite qu'une suppression manquée passe inaperçue.
-    await db.documentVersion.update({
-      where: { id: version.id },
-      data: {
-        scanState: "INFECTEE",
-        scannedAt: new Date(),
-        scanFinding: verdict.menace,
-        objectKey: null,
-      },
-    });
-
-    const refus = refusAuControle(version.document.label);
-    await db.document.update({
-      where: { id: version.documentId },
-      data: {
-        status: "A_CORRIGER",
-        feedback: refus.corps,
-        // La pièce est de nouveau à déposer, et rien n'en tient lieu : le
-        // remède redevient « téléverser », pas « remplacer ».
-        remedy: "TELEVERSER",
-      },
-    });
-    await db.notification.create({
-      data: {
-        userId: version.document.application.userId,
-        applicationId: tache.applicationId,
-        kind: "ANALYSE",
-        title: refus.titre,
-        body: refus.corps,
-      },
-    });
-    await recalculerCompletude(tache.applicationId);
-    return "REFUSEE";
+  switch (verdict.etat) {
+    case "SAINE":
+      return admettre(version, tache);
+    case "INFECTEE":
+      return ecarter(version, tache, verdict.menace);
+    case "INDISPONIBLE":
+      return sansVerdict(version, verdict.cause);
+    default: {
+      /*
+        La garantie du lot. Un état que personne n'a arbitré ne promeut
+        pas « par défaut » : il ne compile pas. C'est exactement ce qui
+        manquait quand l'indisponibilité est passée de `null` à un objet,
+        et que `if (!verdict)` a cessé de l'attraper.
+      */
+      const jamais: never = verdict;
+      throw new Error(`Verdict de balayage non arbitré : ${JSON.stringify(jamais)}`);
+    }
   }
+}
 
-  await promouvoir(cle);
+/* ------------------------------------------------------------------ *
+ * Les trois suites, une par état — et une seule promeut.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Saine : la frontière est franchie, et dans cet ordre.
+ *
+ * La promotion d'abord, l'écriture ensuite. Interrompue entre les deux,
+ * elle laisse une version en quarantaine dont l'objet est déjà passé :
+ * la reprise rebalaie, `tailleEnQuarantaine` ne trouve plus rien, et le
+ * verdict est `objet_absent` — une pièce bloquée, visible, jamais une
+ * pièce promue sans balayage. L'ordre inverse écrirait « saine » sur une
+ * version dont les octets seraient restés en quarantaine, c'est-à-dire
+ * une pièce déclarée consultable et introuvable.
+ */
+async function admettre(version: Version, tache: Tache): Promise<Suite> {
+  await promouvoir(version.objectKey!);
   await db.documentVersion.update({
     where: { id: version.id },
-    data: { scanState: "SAINE", scannedAt: new Date() },
+    data: {
+      scanState: "SAINE",
+      scannedAt: new Date(),
+      // L'attente est soldée. La contrainte
+      // `document_version_incident_en_quarantaine` refuserait la ligne
+      // sinon : une version décidée ne traîne pas son incident derrière
+      // elle, et le compte d'exploitation ne compte que du vivant.
+      ...SOLDE_DE_LATTENTE,
+    },
   });
 
   // RG-06.5 — le quota n'interdit pas le dépôt, il n'interdit que l'analyse.
@@ -123,4 +172,99 @@ export async function balayerUnePiece(
   });
   await recalculerCompletude(tache.applicationId);
   return "CONSERVEE";
+}
+
+/** Infectée : les octets partent d'abord, la pièce redevient à déposer. */
+async function ecarter(version: Version, tache: Tache, menace: string): Promise<Suite> {
+  await removeQuarantaine(version.objectKey!);
+  // L'ordre compte : les octets partent d'abord. La contrainte
+  // `document_version_infectee_sans_octets` refuserait la ligne si la clé
+  // survivait, ce qui évite qu'une suppression manquée passe inaperçue.
+  await db.documentVersion.update({
+    where: { id: version.id },
+    data: {
+      scanState: "INFECTEE",
+      scannedAt: new Date(),
+      scanFinding: menace,
+      objectKey: null,
+      ...SOLDE_DE_LATTENTE,
+    },
+  });
+
+  const refus = refusAuControle(version.document.label);
+  await db.document.update({
+    where: { id: version.documentId },
+    data: {
+      status: "A_CORRIGER",
+      feedback: refus.corps,
+      // La pièce est de nouveau à déposer, et rien n'en tient lieu : le
+      // remède redevient « téléverser », pas « remplacer ».
+      remedy: "TELEVERSER",
+    },
+  });
+  await db.notification.create({
+    data: {
+      userId: version.document.application.userId,
+      applicationId: tache.applicationId,
+      kind: "ANALYSE",
+      title: refus.titre,
+      body: refus.corps,
+    },
+  });
+  await recalculerCompletude(tache.applicationId);
+  return "REFUSEE";
+}
+
+/** Une décision tombe : l'attente n'a plus lieu d'être comptée. */
+const SOLDE_DE_LATTENTE = {
+  scanAttempts: 0,
+  scanLastAttemptAt: null,
+  scanIncidentAt: null,
+  scanIncidentCause: null,
+} as const;
+
+/**
+ * Pas de verdict : on compte, on date, et **rien ne bouge**.
+ *
+ * Ni promotion, ni destruction. On ne sait rien de ce fichier, et
+ * détruire ce qu'on n'a pas su lire serait aussi faux que l'admettre.
+ * Seule l'attente est écrite.
+ *
+ * Les deux champs d'incident sont posés **ensemble**, en une écriture :
+ * la contrainte `document_version_incident_nomme` exige qu'ils soient
+ * nuls ou renseignés de concert. La date garde sa valeur d'origine — son
+ * ancienneté est ce qui dit depuis quand la chaîne est arrêtée, et la
+ * réécrire rajeunirait indéfiniment une panne installée — tandis que la
+ * cause suit la dernière tentative, parce que c'est elle qui dit à
+ * l'exploitant s'il doit attendre ou intervenir.
+ */
+async function sansVerdict(version: Version, cause: CauseDIndisponibilite): Promise<Suite> {
+  const tentatives = version.scanAttempts + 1;
+  const suite = suiteDeLIndisponibilite(cause, tentatives);
+
+  await db.documentVersion.update({
+    where: { id: version.id },
+    data: {
+      scanAttempts: tentatives,
+      scanLastAttemptAt: new Date(),
+      ...(suite.signaler
+        ? {
+            scanIncidentAt: version.scanIncidentAt ?? new Date(),
+            scanIncidentCause: cause,
+          }
+        : {}),
+    },
+  });
+
+  /*
+    Lever, c'est demander une reprise à pg-boss. On ne la demande que si
+    elle peut aboutir. Sur une cause qui se rejouerait à l'identique —
+    fichier trop volumineux, réponse hors contrat, objet absent — la
+    tâche s'arrête ici : l'incident est ouvert, il se lit dans l'état de
+    service, et la pièce reste en quarantaine. Rejouer aurait rempli la
+    file et noyé ce qu'il fallait voir.
+  */
+  if (suite.rejouer) throw new BalayageIndisponible(version.objectKey!, cause);
+  console.warn(`[balayage] ${version.id} — ${MOTIF_INDISPONIBILITE[cause]}`);
+  return "BLOQUEE";
 }

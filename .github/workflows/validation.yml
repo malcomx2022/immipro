@@ -123,6 +123,13 @@ jobs:
         run: npm run smoke:courrier
       - run: echo "- **Transport SMTP** — envoi réel sur serveur local, rejeu sans doublon, journal sans code" >> "$GITHUB_STEP_SUMMARY"
 
+      # La chaîne dépôt → quarantaine → balayage → promotion → analyse,
+      # contre un moteur et un stockage objet d'essai. Ce qu'elle tient :
+      # un fichier ne change de zone que sur un verdict « saine ».
+      - name: Chaîne de balayage
+        run: npm run smoke:balayage
+      - run: echo "- **Balayage antivirus** — chaîne complète, promotion sur le seul verdict « saine », incident visible sans acceptation" >> "$GITHUB_STEP_SUMMARY"
+
       # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
       # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.
       - name: Bac à sable des fournisseurs

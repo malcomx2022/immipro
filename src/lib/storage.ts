@@ -58,6 +58,23 @@ export const presignedPut = (key: string) =>
 export const lireEnQuarantaine = (key: string) => connexion().getObject(quarantaine(), key);
 
 /**
+ * La taille d'un objet en quarantaine, sans le lire.
+ *
+ * Demandée avant le flux : un objet trop volumineux se refuse sans qu'un
+ * seul octet soit chargé en mémoire. Rend `null` quand l'objet n'existe
+ * pas — ce qui arrive pour de bon, quand une reprise de file suit une
+ * promotion déjà faite.
+ */
+export async function tailleEnQuarantaine(key: string): Promise<number | null> {
+  try {
+    const etat = await connexion().statObject(quarantaine(), key);
+    return etat.size;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Promotion — la frontière de sécurité, franchie une fois le balayage fait.
  *
  * Copie puis suppression, dans cet ordre : interrompue entre les deux, elle

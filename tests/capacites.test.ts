@@ -197,7 +197,15 @@ describe("un `.env` complet devant des points de branchement vides", () => {
    * déclaration — un adaptateur réel ne rendrait pas `null`.
    */
   it("et les fonctions que l'appelant obtient ne rendent rien", async () => {
-    expect(await leBalayeur()("pieces/essai.pdf")).toBeNull();
+    /*
+      Le balayeur a désormais un adaptateur HTTP, et il n'est pas branché
+      pour autant : sans `ANTIVIRUS_URL` utilisable, le résolveur rend
+      `NON_BRANCHE`, qui rend l'indisponibilité — **jamais** « saine ».
+      C'est la seule réponse qui ne laisserait rien entrer.
+    */
+    const sansMoteur = await leBalayeur({})("pieces/essai.pdf");
+    expect(sansMoteur).toMatchObject({ etat: "INDISPONIBLE", cause: "non_configure" });
+    expect(sansMoteur.etat).not.toBe("SAINE");
     /*
       Le remboursement a désormais un adaptateur écrit pour Stripe, et
       aucun pour FedaPay : la capacité se lit non branchée tant que les

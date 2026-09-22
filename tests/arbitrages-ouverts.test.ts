@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { versXOF, convertible, MENTION_NON_COMPARABLE } from "@/domain/format/change";
 import { sansCommentaires } from "@/domain/copy/source";
+import { NON_BRANCHE } from "@/server/securite/antivirus";
 import {
   LIBELLE_JALON,
   PREALABLES,
@@ -297,15 +298,27 @@ describe("I.D (tranché) — rien ne déclare un balayage qui n'a pas eu lieu", 
    * rien ne l'écrive sans qu'un moteur ait lu le fichier. C'est la seule
    * façon de tricher qui reste, et elle est silencieuse.
    */
-  it("le balayeur non branché rend l'absence, jamais la santé", () => {
+  it("le balayeur non branché rend l'indisponibilité, jamais la santé", async () => {
+    const vu = await NON_BRANCHE("dossiers/x/passeport.pdf");
+    expect(vu).toMatchObject({ etat: "INDISPONIBLE", cause: "non_configure" });
+    expect(vu.etat).not.toBe("SAINE");
+
     const antivirus = lire("src/server/securite/antivirus.ts");
-    expect(antivirus).toMatch(/NON_BRANCHE: Balayeur = async \(\) => null/u);
     // Aucun repli vers « saine » : ni valeur par défaut, ni court-circuit
     // quand le moteur ne répond pas.
     expect(antivirus).not.toMatch(/\?\?\s*\{\s*etat:\s*"SAINE"/u);
     const balayage = lire("src/server/jobs/balayage.ts");
-    expect(balayage).toMatch(/if \(!verdict\) throw new BalayageIndisponible/u);
     expect(balayage).not.toMatch(/catch[\s\S]{0,120}"SAINE"/u);
+    /*
+      La promotion n'est atteignable que depuis la branche « saine » du
+      `switch`. Un `if (!verdict)` a laissé passer une indisponibilité le
+      jour où elle a cessé d'être `null` ; une branche nommée ne le peut
+      pas, et le `never` refuse un état de plus.
+    */
+    const admettre = /async function admettre[\s\S]*?\n\}/u.exec(balayage)![0];
+    expect(admettre).toContain("await promouvoir(");
+    expect(balayage.match(/await promouvoir\(/gu)).toHaveLength(1);
+    expect(balayage).toMatch(/const jamais: never = verdict/u);
   });
 
   /**
