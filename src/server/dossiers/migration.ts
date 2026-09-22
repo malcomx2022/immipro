@@ -4,7 +4,7 @@ import { echec } from "@/server/http/echecs";
 import { miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
 import { checklistDepuis, recalculerCompletude } from "@/server/acces/dossiers";
 import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
-import { payload, reglePubliee } from "@/server/acces/regles";
+import { filtrePourCandidat, payload, reglePubliee } from "@/server/acces/regles";
 
 /**
  * Arbitrage d'une divergence réglementaire — T-02, WF-11 étape 4.
@@ -90,6 +90,14 @@ const MENTION_MIGREE = "Aucune pièce déjà validée n'a été retirée.";
  * pas, et le geste qui reste possible. « Migration impossible » seul
  * laisserait chercher ce qu'on a mal fait.
  */
+/**
+ * Une version plus récente est déjà en vigueur : celle-ci ne reviendra
+ * pas, et la divergence qui compte est ailleurs. Le dire évite d'attendre
+ * une vérification qui n'aura pas lieu.
+ */
+export const MENTION_REMPLACEE =
+  "Une version plus récente est entrée en vigueur depuis : c'est elle qui t'est proposée. Ton dossier garde la sienne et rien n'est perdu ; tu peux conserver ta version, ou appliquer la plus récente.";
+
 export const MENTION_VERSION_RETIREE =
   "Cette version n'est plus celle en vigueur : nos veilleurs la revérifient. Ton dossier garde la sienne et rien n'est perdu. Tu peux conserver ta version dès maintenant ; si une nouvelle est mise en vigueur, elle te sera proposée.";
 
@@ -144,7 +152,23 @@ export async function arbitrerLaDivergence(
     sens.
   */
   if ((await reglePubliee(migration.toRuleId, maintenant)) === null) {
-    throw echec("etat_incompatible", { corps: MENTION_VERSION_RETIREE });
+    /*
+      La cause décide du message. Une version **remplacée** ne reviendra
+      jamais en vigueur ; une version **en relecture** reviendra. Promettre
+      une vérification sur la première fait attendre pour rien, alors
+      qu'une divergence arbitrable l'attend déjà.
+    */
+    const plusRecente = await db.visaRule.count({
+      where: {
+        countryCode: migration.toRule.countryCode,
+        visaType: migration.toRule.visaType,
+        version: { gt: migration.toRule.version },
+        ...filtrePourCandidat(maintenant),
+      },
+    });
+    throw echec("etat_incompatible", {
+      corps: plusRecente > 0 ? MENTION_REMPLACEE : MENTION_VERSION_RETIREE,
+    });
   }
 
   const nouvelles = checklistDepuis(payload(migration.toRule));

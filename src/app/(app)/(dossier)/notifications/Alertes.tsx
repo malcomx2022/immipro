@@ -16,6 +16,7 @@ import {
 } from "@/domain/notifications/alerte";
 import type { VersionRegle } from "@/domain/notifications/divergence";
 import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
+import type { BlocageDeMigration } from "@/domain/notifications/divergence";
 import { cn } from "@/lib/utils";
 import { DivergenceReglementaire } from "./DivergenceReglementaire";
 
@@ -44,8 +45,8 @@ export interface AlertesProps {
     nouvelle: VersionRegle;
     /** Ce que la checklist gagne et perd — nommé, jamais par son code. */
     pieces?: EvolutionDesPieces;
-    /** RG-14.1 — la version visée est-elle encore en vigueur ? */
-    migrable?: boolean;
+    /** RG-14.1 — ce qui empêche de migrer, quand quelque chose l'empêche. */
+    blocage?: BlocageDeMigration;
     depot?: string;
     detecteeLe: string;
     verifieeLe: string;
