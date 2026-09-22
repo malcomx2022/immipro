@@ -129,8 +129,14 @@ export async function GET() {
   const etat = etatDesCapacites(constats);
   const intitules = new Map(DEPENDANCES.map((d) => [d.cle, d.intitule]));
 
-  // Une base muette est une panne ; une bloquante non opérationnelle est une
-  // inaptitude. Les deux se répondent 503, et le corps dit laquelle.
+  /*
+    Une base muette est une panne ; une bloquante réparable non
+    opérationnelle est une inaptitude. Les deux se répondent 503, et le
+    corps dit laquelle.
+
+    Une **réserve** n'en est pas une : elle ne se répare pas, elle
+    s'arbitre, et la compter ici revenait à ne jamais répondre 200.
+  */
   const enService = base === "up" && etat.aptitude !== "INAPTE";
 
   return Response.json(
@@ -139,6 +145,21 @@ export async function GET() {
       aptitude: etat.aptitude,
       db: base,
       bloquantes: etat.bloquantes,
+      /*
+        Les réserves, à part des bloquantes — 22/09/2026.
+
+        Ce sont les dépendances bloquantes qu'aucun déploiement ne rendra
+        opérationnelles : configurées, et sans sonde sûre possible. Les
+        compter comme des bloquantes rendait cette adresse **inapte pour
+        toujours**, et un 503 qui ne peut pas s'éteindre n'est pas une
+        mesure — ou bien l'instance n'entre jamais en service, ou bien on
+        cesse de la lire, et c'est la panne suivante qu'on ne verra pas.
+
+        Elles sont dites, et elles n'empêchent pas de servir. Elles
+        empêchent en revanche de se déclarer prête : l'aptitude reste
+        `PILOTE` tant qu'il en reste une.
+      */
+      reserves: etat.reserves,
       dependances: Object.fromEntries(
         constats.map((c) => [
           c.cle,

@@ -676,22 +676,59 @@ branchée : la présence d'un adaptateur se déduit, elle ne se déclare pas. Le
 jour du branchement, une ligne change dans le point de branchement, et
 l'appelant comme l'état de service en tiennent compte au même instant.
 
-Six capacités, et il en faut trois pour atteindre la dernière :
+**Le résolveur reçoit l'environnement observé**, et non `process.env`
+(correctif du 22/09/2026). Il était appelé sans argument, si bien que les
+trois mesures d'une même observation ne portaient pas sur la même chose :
+`configuree` et la sonde lisaient l'environnement passé, normalisé, et le
+résolveur lisait celui du processus, brut. Tant qu'aucun résolveur ne lisait
+l'environnement, cela ne se voyait pas. Le balayeur branché l'a rendu
+visible — une `ANTIVIRUS_URL` valide se lisait « aucun adaptateur ».
+
+Sept capacités, et il en faut trois pour atteindre `OPERATIONNELLE` :
 
 | Capacité | Ce qu'elle dit |
 |---|---|
 | `IMPLEMENTATION_ABSENTE` | aucun adaptateur — quelles que soient les variables |
 | `NON_CONFIGUREE` | adaptateur présent, configuration absente |
-| `CONFIGUREE_NON_VERIFIEE` | configuré, aucune sonde concluante |
+| `CONFIGUREE_NON_VERIFIEE` | configuré, une sonde existe, elle n'a pas conclu |
+| `NON_VERIFIABLE` | configuré, et aucune sonde sûre **ne peut** exister |
 | `OPERATIONNELLE` | adaptateur, configuration, sonde — les trois |
 | `DEGRADEE` | facultative indisponible, le repli fonctionne |
 | `EN_PANNE` | attendue et injoignable |
 
-Une bloquante n'est acquittée que par `OPERATIONNELLE`. Les sondes sont
-locales et sans effet de bord : aucun courrier, aucun appel de fournisseur,
-aucun jeton d'IA, aucune écriture. La seule concluante aujourd'hui signe un
-corps connu et vérifie que la fonction qu'appellent les routes de webhook
-accepte la bonne signature **et refuse** une signature altérée.
+Les sondes sont locales et sans effet de bord : aucun courrier, aucun appel
+de fournisseur, aucun jeton d'IA, aucune écriture. Celles qui concluent
+aujourd'hui lisent un **fait déjà établi** — une signature vérifiée, un
+courrier réellement parti, EICAR réellement signalé —, jamais la forme d'une
+variable.
+
+#### Le 503 qui ne pouvait pas s'éteindre
+
+Une bloquante n'est acquittée que par `OPERATIONNELLE`, et c'est la bonne
+règle : « configurée » était l'état que produisait une variable factice.
+Mais `ouverture_paiement` est bloquante et **ne peut pas** être sondée sans
+effet de bord — ouvrir une session chez le fournisseur est un appel facturé
+au temps. Elle plafonnait donc par construction, comptait parmi les
+bloquantes, et rendait l'instance `INAPTE` quelle que soit la configuration,
+pour toujours. `/api/health` répondait 503 en permanence.
+
+Une adresse d'état qui ne peut pas être verte n'est pas une mesure : ou bien
+l'instance n'entre jamais en service, ou bien on cesse de la lire, et c'est
+la panne suivante qu'on ne verra pas. Deux choses étaient confondues, elles
+sont séparées :
+
+- une **bloquante** est un défaut d'installation : elle se répare, et elle
+  inapte l'instance ;
+- une **réserve** est une bloquante `NON_VERIFIABLE` : rien dans le
+  déploiement ne la lèvera, elle est dite, comptée à part, et elle
+  n'empêche pas de servir.
+
+Une réserve n'acquitte pas pour autant : tant qu'il en reste une, l'aptitude
+plafonne à `PILOTE`, et `/api/health` la nomme. Et ce n'est pas une
+échappatoire — `sansSondeSure` exige sa raison, et un test la plafonne à
+deux, sur le modèle de `copy-exceptions.json`. Le plafond est bas exprès :
+une sonde sûre est presque toujours écrivable, et le balayage vient de le
+montrer — on la croyait impossible, EICAR la rend triviale.
 
 ## Vérifier
 

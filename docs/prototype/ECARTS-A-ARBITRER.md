@@ -5774,3 +5774,121 @@ existaient parce qu'il n'y avait pas de moteur à éprouver, et cette
 raison a disparu. Un quatrième, sur l'ordre de la promotion, est resté
 tel quel : il porte sur un ordre d'instructions qu'aucune exécution ne
 révèle.
+
+---
+
+### S.31 — L'état de service ne pouvait pas être vert
+
+`/api/health` répondait **503 en permanence**, quelle que soit la
+configuration, et rien dans un déploiement n'aurait pu l'en faire sortir.
+Constaté en exécutant le calcul d'aptitude sur un environnement
+entièrement renseigné, pendant le lot du balayage.
+
+#### Pourquoi
+
+Une dépendance bloquante n'est acquittée que par `OPERATIONNELLE` — la
+bonne règle, et celle qui avait été posée exprès : « configurée » était
+l'état que produisait une variable factice, et c'est l'état qui faisait
+passer une installation vide pour prête.
+
+Mais `ouverture_paiement` est bloquante et **ne peut pas** être sondée
+sans effet de bord : ouvrir une session chez le fournisseur est un appel
+facturé au temps, et l'arbitrage du 21/09 l'a acté en lui donnant
+`sansSondeSure`. Elle plafonnait donc à `CONFIGUREE_NON_VERIFIEE` par
+construction, comptait parmi les bloquantes, et rendait l'instance
+`INAPTE` pour toujours.
+
+Le défaut n'était pas dans la prudence du calcul. Il était dans le fait
+de confondre deux choses que rien ne distinguait dans le vocabulaire :
+
+| | Ce que c'est | Ce qu'on en fait |
+|---|---|---|
+| « la sonde n'a pas encore tourné » | un état passager | on répare, ou on attend |
+| « aucune sonde sûre ne peut exister » | une propriété du point, connue à l'écriture | on arbitre, une fois |
+
+#### Ce qu'une mesure qui ne peut pas être verte produit
+
+Deux issues, et les deux sont mauvaises. Ou bien le répartiteur de charge
+prend l'adresse au mot, et l'instance n'entre jamais en service. Ou bien
+quelqu'un remarque qu'elle ment, et cesse de la lire — et c'est alors la
+panne suivante, la vraie, qu'on ne verra pas.
+
+C'est le même défaut de forme que ceux des lots précédents, pris par un
+autre bout : une alarme qui sonne toujours ne dit rien, comme un
+commentaire qui prévient « ceci est peut-être faux » ne prévient de rien.
+
+#### La distinction
+
+Une capacité de plus, `NON_VERIFIABLE`, dérivée du point de branchement
+et jamais déclarée dans une observation. Et, dans l'état d'ensemble, les
+bloquantes se séparent en deux listes :
+
+- **bloquantes** — un défaut d'installation, qui se répare, et qui inapte
+  l'instance ;
+- **réserves** — configurées, sans sonde sûre possible : dites, comptées
+  à part, sans effet sur la mise en service.
+
+Une réserve n'acquitte rien pour autant : tant qu'il en reste une,
+l'aptitude plafonne à `PILOTE`, et l'adresse la nomme. La prudence
+d'origine est intacte là où elle sert — une bloquante réparable inapte
+toujours, réserve ou pas, et un test le tient.
+
+**Ce n'est pas une échappatoire**, et c'est le risque qu'il fallait
+fermer : il suffirait d'écrire `sansSondeSure` pour qu'une dépendance
+cesse d'inapter. Trois garde-fous, sur le modèle de
+`copy-exceptions.json` : la raison est exigée et doit tenir en une phrase
+qui dit ce que la sonde coûterait ; les exceptions sont **plafonnées à
+deux** ; elles ne concernent que des bloquantes. Le plafond est bas
+exprès — une sonde sûre est presque toujours écrivable, et le lot du
+balayage vient de le montrer : on la croyait impossible, EICAR la rend
+triviale.
+
+#### Le second défaut, trouvé en mesurant le premier
+
+`observer()` reçoit un environnement, le normalise, et le passe à
+`configuree` et à la sonde. Il ne le passait **pas au résolveur** :
+`brancheEcrit` appelait `point.resolveur()` sans argument, donc le
+résolveur lisait `process.env`. Les trois mesures d'une même observation
+ne portaient pas sur la même chose.
+
+Tant qu'aucun résolveur ne lisait l'environnement, cela ne se voyait pas
+— tous rendaient leur fonction non branchée. Le balayeur branché la
+veille l'a rendu visible : avec `ANTIVIRUS_URL` renseignée et valide, la
+capacité se lisait `IMPLEMENTATION_ABSENTE`, c'est-à-dire « aucun
+adaptateur : le point de branchement ne rend rien ». Le lot précédent a
+donc créé une mesure fausse sans s'en apercevoir.
+
+Le même défaut porte une conséquence qui ne se voit pas encore, faute
+d'un résolveur qui lise une clé normalisée : un déploiement resté sur une
+graphie dépréciée (`FEDAPAY_SECRET_KEY`) se lirait **configuré** — la
+normalisation fait son travail — et **sans adaptateur** — le résolveur
+lisant le nom brut. L'exploitant serait envoyé chercher du code absent là
+où il fallait renommer une variable. Un message d'échec doit être
+actionnable ; celui-là aurait été faux.
+
+#### Ce que cela ne corrige pas
+
+L'instance reste `INAPTE` aujourd'hui, et c'est la vérité : la messagerie
+n'a parlé à aucun serveur, personne n'a présenté EICAR à un moteur, et le
+remboursement n'a pas ses deux rails — FedaPay n'expose aucune API
+(S.29). Ce lot ne rend pas l'adresse verte ; il la rend **informative**.
+Elle ne dit plus « inapte pour une raison que rien ne réparera », elle
+dit « inapte pour trois raisons nommées, plus une réserve ».
+
+#### Vérifié en exécutant, et en mutant
+
+Le constat de départ a été établi en exécutant `constaterLesDependances`
+puis `etatDesCapacites` sur un environnement complet et plausible, avant
+d'écrire une ligne : `INAPTE`, avec `ouverture_paiement` parmi les
+bloquantes, et `antivirus` en `IMPLEMENTATION_ABSENTE` malgré une URL
+valide.
+
+Cinq mutations, cinq rouges :
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| une réserve recompte comme une bloquante | trois cas, dont le 503 permanent |
+| une réserve laisse déclarer l'instance prête | trois cas, dont le pilote |
+| le résolveur relit `process.env` | trois cas, dont l'adresse du moteur |
+| « aucune sonde sûre » se confond avec « aucune sonde » | la lecture d'ensemble |
+| une exception de plus, non justifiée | cinq cas, dont le plafond |
