@@ -358,8 +358,13 @@ function evolutionDuDelai(avant: Delai, apres: Delai): EvolutionDuDelai | null {
  *
  * Le tiret plutôt que « à » : la mention compose « passe de … à … », et
  * « passe de 60 à 90 jours à 60 à 150 jours » ne se lit pas.
+ *
+ * Exporté parce que l'écran d'arbitrage T-02 affiche le même délai sur ses
+ * deux cartes de version : deux façons d'écrire une fourchette de jours
+ * dans le même produit finiraient par diverger, et c'est au moment de
+ * comparer deux versions que l'écart se remarquerait.
  */
-const delaiLisible = (delai: Delai): string =>
+export const delaiLisible = (delai: Delai): string =>
   delai === null
     ? "non annoncé"
     : delai.min === delai.max

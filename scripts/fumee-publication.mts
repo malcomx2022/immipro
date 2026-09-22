@@ -80,6 +80,7 @@ const { declarerLeDepot } = await import("../src/server/dossiers/parcours");
 const { arbitrerLaDivergence } = await import("../src/server/dossiers/migration");
 const { ouvrirDossier } = await import("../src/server/acces/dossiers");
 const { remplacementDeLEcheancier } = await import("../src/server/dossiers/echeancier");
+const { divergenceAArbitrer } = await import("../src/server/lecture/alertes");
 const { payload } = await import("../src/server/acces/regles");
 const { MENTION_EN_PAUSE } = await import("../src/domain/dossiers/dossier");
 const { editorialDe } = await import("../src/lib/contenu/destinations");
@@ -635,6 +636,18 @@ try {
     const migration = await db.ruleMigration.findFirstOrThrow({
       where: { applicationId: ouvert.id, toRuleId: v2.id },
     });
+    /*
+      Ce que l'écran d'arbitrage T-02 recevra, lu depuis le référentiel
+      réel. Le délai y est facultatif : sans cette vérification, il
+      pourrait cesser de remonter sans que rien ne le signale, et les deux
+      cartes afficheraient « non renseigné » pour toujours.
+    */
+    const vue = await divergenceAArbitrer(migration.id, user.id);
+    verifier(
+      vue.ancienne.delai?.max === 90 && vue.nouvelle.delai?.max === 150,
+      `l'arbitrage reçoit les deux délais (${JSON.stringify([vue.ancienne.delai, vue.nouvelle.delai])})`,
+    );
+
     const dossier = await db.application.findUniqueOrThrow({ where: { id: ouvert.id } });
     await arbitrerLaDivergence(dossier, migration.id, "MIGRER");
 

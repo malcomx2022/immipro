@@ -7671,3 +7671,88 @@ côte sur le seul montant : `DivergenceReglementaire` ne montre pas le délai,
 et son bouton « Appliquer mon choix » ferme la feuille sans appeler
 l'arbitrage. C'est un écart d'écran, pas de règle — la décision, elle, est
 branchée et éprouvée.
+
+---
+
+### S.52 — L'arbitrage qu'on recueillait et qu'on jetait
+
+S.51 s'est arrêté sur un écart consigné : l'écran T-02 ne montrait que le
+montant, et son bouton « Appliquer mon choix » fermait la feuille. C'était
+l'écart le plus proche, et il valait d'être posé au même endroit que la règle
+qu'il dessert.
+
+La question posée à l'écran : **que se passe-t-il quand le candidat applique
+son choix ?** Exécuté avant correction, après un clic sur « Migrer » puis sur
+le bouton :
+
+```
+  le candidat a choisi « Migrer » puis cliqué le bouton.
+  appels réseau partis    : 0
+  la feuille s'est fermée : true
+  ce que l'écran lui dit  : « Ta checklist Pays-Bas sera mise à jour. »
+  et plus haut            : « Nous ne modifions rien sans ton accord. »
+```
+
+Rien ne part. La feuille se ferme. Et l'écran annonce au futur — « **sera**
+mise à jour » — une mise à jour qui n'aura pas lieu.
+
+La phrase du haut d'écran, « Nous ne modifions rien sans ton accord », n'était
+tenue que parce que rien n'était jamais modifié. Le candidat donnait son
+accord ; rien n'était modifié quand même.
+
+`arbitrerLaDivergence` existait pourtant, éprouvée par une fumée depuis S.48,
+et n'avait **aucun appelant**. Les props de l'écran ne portaient ni le
+dossier ni la divergence : il n'aurait pas pu appeler la route même s'il
+l'avait voulu.
+
+**Le second défaut, que S.51 venait de rendre atteignable.** Depuis que la
+comparaison voit le délai d'instruction, une version peut n'en changer que
+lui. L'écran supposait que le montant sépare toujours les deux versions :
+
+```
+  une version qui ne change que le délai d'instruction :
+  ce que ça change pour ton dossier :
+    « … c'est la version 2 qui s'appliquera, et il te faut 0 € de plus. »
+  option : « Ta checklist et tes montants passent à 11 500 €. »
+  option : « Ta checklist reste à 11 500 €. »
+  le mot « délai » apparaît-il ? false
+```
+
+Deux cartes portant la même somme, un chiffre donné pour ne rien dire, et
+deux options présentées comme la même. On demandait de trancher entre elles.
+
+**Ce qui est retenu.** L'écran écrit son arbitrage par `appeler`, comme la
+clôture C-11 : `envoi`, `echec`, `BlocEchec`, et la feuille ne se ferme
+qu'une fois écrit — sur une décision qui déplace un échéancier entier,
+l'échec doit se lire là où le geste a été fait. Le domaine ne parle plus que
+de ce qui a bougé : `ceQuiSepare` décide, le montant se tait quand il n'a pas
+changé, le délai est nommé quand il change, et chaque carte de version porte
+le sien.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le bouton se contente de fermer, comme avant | les essais d'écran |
+| la feuille se ferme avant la réponse | l'essai du refus serveur |
+| « il te faut 0 € de plus » revient | les essais purs et d'écran |
+| les options citent le montant quoi qu'il arrive | les essais purs et d'écran |
+| la carte de version ne montre plus le délai | l'essai d'écran — **après renforcement** |
+| le délai ne remonte plus du référentiel | la fumée — **après couverture** |
+
+Deux mutations n'ont d'abord pas mordu, et c'est la partie instructive.
+
+La cinquième : les mêmes chaînes « 60–90 jours » apparaissant dans le détail
+des options, retirer le délai des **cartes** laissait tout au vert. L'essai a
+été resserré sur le libellé propre à la carte — c'est la comparaison côte à
+côte qui donne à voir ce qui sépare les deux versions, pas le détail d'une
+option.
+
+La sixième : `delai` est facultatif sur `VersionRegle`. Cesser de le faire
+remonter du référentiel passait le typage, et les deux cartes auraient
+affiché « non renseigné » pour toujours sans qu'un seul essai ne bronche. La
+fumée de publication lit désormais `divergenceAArbitrer` sur des règles
+réelles et vérifie que les deux délais arrivent.
+
+**Ce qui reste ouvert.** L'écran ne montre toujours pas les **pièces**
+ajoutées ou retirées par la nouvelle version — `arbitrerLaDivergence` les
+rend pourtant dans `piecesAjoutees`, et personne ne les lit. Un candidat qui
+migre découvre les nouvelles lignes sur sa checklist après coup.

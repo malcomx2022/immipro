@@ -21,6 +21,7 @@ import {
 } from "@/lib/contenu/redaction";
 import {
   ALERTES,
+  DIVERGENCE,
   MOTIF_PARTENAIRE,
   PARTENAIRE,
   REGLE_ANCIENNE,
@@ -71,6 +72,13 @@ const DOSSIER = dossierParId("nl-4471")!;
 const MOTIVATION = PIECES_REDIGEABLES[0]!;
 const MAINTENANT = "2026-09-18T09:41:00Z";
 const espaces = (t: string) => t.replace(/[\s  ]/gu, " ");
+
+/** Laisse partir l'appel et revenir sa réponse, sans avertissement React. */
+const attendre = () =>
+  act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 
 describe("R-01 — Type de pièce", () => {
   const rendre = () =>
@@ -609,6 +617,10 @@ describe("R-04 — Analyse critique", () => {
 
 describe("T-01 — Alertes", () => {
   const divergence = {
+    // De quoi écrire l'arbitrage : le bouton se contentait de fermer la
+    // feuille, et les props ne nommaient ni le dossier ni la divergence.
+    dossierId: "dossier-allemagne",
+    migrationId: "migration-1",
     pays: "Allemagne",
     ancienne: REGLE_ANCIENNE,
     nouvelle: REGLE_NOUVELLE,
@@ -665,6 +677,10 @@ describe("T-01 — Alertes", () => {
 
 describe("T-02 — Divergence réglementaire", () => {
   const divergence = {
+    // De quoi écrire l'arbitrage : le bouton se contentait de fermer la
+    // feuille, et les props ne nommaient ni le dossier ni la divergence.
+    dossierId: "dossier-allemagne",
+    migrationId: "migration-1",
     pays: "Allemagne",
     ancienne: REGLE_ANCIENNE,
     nouvelle: REGLE_NOUVELLE,
@@ -673,6 +689,9 @@ describe("T-02 — Divergence réglementaire", () => {
     source: "make-it-in-germany.com",
   };
   const ouvrir = () => {
+    appels.length = 0;
+    reponse = { ok: true };
+    rafraichit.mockClear();
     render(
       <Alertes alertes={ALERTES} maintenant="2026-09-18T13:05:00Z" divergence={divergence} />,
     );
@@ -724,6 +743,155 @@ describe("T-02 — Divergence réglementaire", () => {
     ouvrir();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  /**
+   * ── L'arbitrage que l'écran recueillait et jetait ────────────────
+   *
+   * Le bouton appelait `onFermer`. Rien ne partait, rien n'était écrit, et
+   * l'écran annonçait « Ta checklist Allemagne **sera** mise à jour ».
+   * Exécuté avant correction, après un choix « Migrer » et un clic :
+   *
+   *     appels réseau partis    : 0
+   *     la feuille s'est fermée : true
+   *     ce que l'écran lui dit  : « Ta checklist … sera mise à jour. »
+   *     et plus haut            : « Nous ne modifions rien sans ton accord. »
+   *
+   * La promesse du haut d'écran n'était tenue que parce que rien n'était
+   * jamais modifié. `arbitrerLaDivergence` existait, éprouvée par une
+   * fumée, et n'avait aucun appelant.
+   *
+   * Le test porte sur l'appel réseau et non sur le source : on peut
+   * débrancher une fonction en la laissant intacte plus bas dans le
+   * fichier, et tout garde-fou qui relit le source passe encore (S.1).
+   */
+  it("écrit l'arbitrage retenu, là où il ne partait rien", async () => {
+    ouvrir();
+    fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
+    await attendre();
+
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.url).toBe("/api/dossiers/dossier-allemagne/migrations/migration-1");
+    expect(appels[0]!.corps).toEqual({ decision: "MIGRER" });
+  });
+
+  it("conserver s'écrit aussi : c'est une décision, pas une abstention", async () => {
+    ouvrir();
+    fireEvent.click(screen.getByRole("radio", { name: /Conserver la version 4/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Conserver la version 4" }));
+    await attendre();
+    expect(appels[0]!.corps).toEqual({ decision: "CONSERVER" });
+  });
+
+  /**
+   * La page est rendue côté serveur : sans rafraîchissement, la liste
+   * garderait l'alerte que l'on vient de trancher, et le candidat
+   * rouvrirait un arbitrage déjà rendu — que le serveur refuse.
+   */
+  it("ne se ferme qu'une fois écrit, et rafraîchit la liste", async () => {
+    ouvrir();
+    fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
+    await attendre();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(rafraichit).toHaveBeenCalled();
+  });
+
+  /**
+   * L'échec se lit là où le geste a été fait. Fermer d'abord ferait
+   * disparaître le seul endroit où il peut s'afficher, sur une décision
+   * qui déplace un échéancier entier.
+   */
+  it("un refus du serveur garde la feuille ouverte et se lit dedans", async () => {
+    ouvrir();
+    reponse = { ok: false };
+    fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
+    await attendre();
+
+    const dialogue = screen.getByRole("dialog");
+    expect(dialogue.textContent).toContain("Le serveur a refusé");
+    expect(dialogue.textContent).toContain("Ta saisie est là.");
+    expect(rafraichit).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T-02 — ce que l'écran montre quand seul le délai a changé.
+ *
+ * Depuis que la comparaison voit le délai d'instruction (RG-09.3), une
+ * version peut n'en changer que lui. L'écran supposait que le montant
+ * sépare toujours les deux versions : il posait deux cartes portant la
+ * même somme, annonçait « il te faut 0 € de plus », et offrait le choix
+ * entre « tes montants passent à 11 500 € » et « ta checklist reste à
+ * 11 500 € ». Exécuté avant correction :
+ *
+ *     ce que ça change : « … et il te faut 0 € de plus. »
+ *     option : « Ta checklist et tes montants passent à 11 500 €. »
+ *     option : « Ta checklist reste à 11 500 €. »
+ *     le mot « délai » apparaît-il ? false
+ *
+ * On demandait de trancher entre deux options présentées comme la même.
+ */
+describe("T-02 — une divergence qui ne porte que sur le délai", () => {
+  const MEME_MONTANT = {
+    ...DIVERGENCE,
+    dossierId: "dossier-allemagne",
+    migrationId: "migration-2",
+    ancienne: { ...REGLE_ANCIENNE, delai: { min: 60, max: 90 } },
+    nouvelle: { ...REGLE_NOUVELLE, montant: REGLE_ANCIENNE.montant, delai: { min: 60, max: 150 } },
+  };
+  const ouvrir = () => {
+    render(
+      <Alertes
+        alertes={ALERTES}
+        maintenant="2026-09-18T13:05:00Z"
+        divergence={MEME_MONTANT}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choisir la version à appliquer" }),
+    );
+    return screen.getByRole("dialog");
+  };
+
+  it("ne donne plus un chiffre pour ne rien dire", () => {
+    expect(espaces(ouvrir().textContent ?? "")).not.toContain("0 € de plus");
+  });
+
+  it("nomme le délai, qui est ce qui a réellement bougé", () => {
+    const texte = espaces(ouvrir().textContent ?? "");
+    expect(texte).toContain("60–90 jours");
+    expect(texte).toContain("60–150 jours");
+  });
+
+  /**
+   * Et il est sur les **cartes**, où les deux versions sont posées côte à
+   * côte. Le lire seulement dans le détail d'une option ne suffit pas :
+   * c'est la comparaison des cartes qui donne à voir ce qui sépare les
+   * deux, et elle n'affichait que la somme.
+   */
+  it("et il figure sur chacune des deux cartes de version", () => {
+    ouvrir();
+    const cartes = screen
+      .getAllByText(/^Instruction :/u)
+      .map((n) => espaces(n.textContent ?? ""));
+    expect(cartes).toEqual(["Instruction : 60–90 jours", "Instruction : 60–150 jours"]);
+  });
+
+  it("et dit que l'échéancier se recalcule dessus", () => {
+    expect(ouvrir().textContent).toContain("ton échéancier se recalcule");
+  });
+
+  /** Deux options identiques ne sont pas un arbitrage. */
+  it("les deux options ne se lisent plus à l'identique", () => {
+    ouvrir();
+    const details = screen.getAllByRole("radio").map((r) => espaces(r.textContent ?? ""));
+    expect(details).toHaveLength(2);
+    expect(details[0]).not.toBe(details[1]);
+    // Et aucune des deux ne cite un montant que l'autre cite à l'identique.
+    expect(details.join(" ")).not.toContain("11 208 €");
   });
 });
 

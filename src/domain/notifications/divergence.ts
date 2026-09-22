@@ -13,7 +13,29 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 import { jourEnFrancais as formaterJour } from "@/domain/format/moment";
+import { delaiLisible, type Delai } from "@/domain/rules/comparaison";
 
+/**
+ * ── Un arbitrage entre deux versions qu'on montrait identiques ──────
+ *
+ * Cet écran a longtemps supposé que ce qui sépare deux versions est le
+ * **montant**. C'était vrai des cas qu'il avait vus. Depuis que la
+ * comparaison voit aussi le délai d'instruction (RG-09.3), une version
+ * peut n'en changer que le délai — et l'écran posait alors deux cartes
+ * portant la même somme, annonçait « il te faut 0 € de plus », et offrait
+ * le choix entre « tes montants passent à 11 500 € » et « ta checklist
+ * reste à 11 500 € ». Exécuté avant correction :
+ *
+ *     ce que ça change pour ton dossier :
+ *       « … c'est la version 2 qui s'appliquera, et il te faut 0 € de plus. »
+ *     option : « Ta checklist et tes montants passent à 11 500 €. »
+ *     option : « Ta checklist reste à 11 500 €. »
+ *     le mot « délai » apparaît-il ? false
+ *
+ * On demandait de trancher entre deux options qu'on présentait comme la
+ * même. Ce module dit désormais ce qui sépare réellement les deux
+ * versions, et se tait sur ce qui n'a pas bougé.
+ */
 
 export interface VersionRegle {
   /** Rang de version du référentiel `visa_rules` (`Application.visaRuleId`). */
@@ -24,10 +46,42 @@ export interface VersionRegle {
   /** Ce que le montant couvre : « sur compte bloqué ». */
   intitule: string;
   publieeLe: string;
+  /**
+   * Délai d'instruction annoncé, qui décide de la date de dépôt de
+   * l'échéancier. Facultatif : toutes les procédures n'en annoncent pas.
+   */
+  delai?: Delai;
   /** Bornes d'application, ISO. Au moins une des deux est posée. */
   applicableJusquau?: string;
   applicableDepuis?: string;
 }
+
+/**
+ * Ce qui sépare réellement les deux versions.
+ *
+ * L'écran s'en sert pour ne parler que de ce qui a bougé : une phrase sur
+ * un montant inchangé apprend au candidat à ne plus lire les phrases sur
+ * les montants.
+ */
+export interface Ecart {
+  montant: boolean;
+  delai: boolean;
+}
+
+export const ceQuiSepare = (ancienne: VersionRegle, nouvelle: VersionRegle): Ecart => ({
+  montant: ancienne.montant !== nouvelle.montant || ancienne.devise !== nouvelle.devise,
+  delai:
+    (ancienne.delai?.min ?? null) !== (nouvelle.delai?.min ?? null) ||
+    (ancienne.delai?.max ?? null) !== (nouvelle.delai?.max ?? null),
+});
+
+/** « 60–90 jours », ou l'absence, sur la carte d'une version. */
+export const libelleDelaiVersion = (version: VersionRegle): string =>
+  version.delai === undefined
+    ? "Délai d'instruction non renseigné"
+    : version.delai === null
+      ? "Aucun délai d'instruction annoncé"
+      : `Instruction : ${delaiLisible(version.delai)}`;
 
 export type Arbitrage = "MIGRER" | "CONSERVER";
 
@@ -64,15 +118,27 @@ export function libelleImpact(
     ? `à partir du ${formaterJour(nouvelle.applicableDepuis)}`
     : "dès sa publication";
 
+  /*
+    Ce que la nouvelle version demande de plus — et rien quand elle ne
+    demande rien de plus. « Il te faut 0 € de plus » est la phrase qu'on
+    lisait quand seul le délai avait changé : elle donne un chiffre pour
+    ne rien dire, et elle éteint la seule qui comptait.
+  */
+  const ecart = ceQuiSepare(ancienne, nouvelle);
+  const enPlus = ecart.montant ? `, et il te faut ${ecartFormate} de plus` : "";
+  const calendrier = ecart.delai
+    ? ` Son délai d'instruction est de ${delaiLisible(nouvelle.delai ?? null)} : ton échéancier se recalcule sur ce délai.`
+    : "";
+
   if (!depot) {
-    return `Ta date de départ n'est pas fixée, et le dépôt s'en déduit. Si tu déposes ${application}, c'est la version ${nouvelle.numero} qui s'applique et il te faut ${ecartFormate} de plus.`;
+    return `Ta date de départ n'est pas fixée, et le dépôt s'en déduit. Si tu déposes ${application}, c'est la version ${nouvelle.numero} qui s'applique${enPlus}.${calendrier}`;
   }
 
   const sousNouvelle =
     nouvelle.applicableDepuis !== undefined && depot >= nouvelle.applicableDepuis;
 
   return sousNouvelle
-    ? `Ton dépôt tombe au ${formaterJour(depot)} : c'est la version ${nouvelle.numero} qui s'appliquera, et il te faut ${ecartFormate} de plus.`
+    ? `Ton dépôt tombe au ${formaterJour(depot)} : c'est la version ${nouvelle.numero} qui s'appliquera${enPlus}.${calendrier}`
     : `Ton dépôt tombe au ${formaterJour(depot)}, avant l'entrée en vigueur : la version ${ancienne.numero} reste celle de ton dossier.`;
 }
 
@@ -96,18 +162,37 @@ export function optionsArbitrage(
     ? ` C'est le choix cohérent si tu déposes à partir du ${formaterJour(nouvelle.applicableDepuis)}.`
     : "";
 
+  /*
+    Chaque option nomme ce que **ce choix-ci** change, et rien d'autre. Un
+    détail qui cite un montant identique des deux côtés présente deux
+    options comme la même, et c'est précisément l'arbitrage qu'on demande
+    de trancher.
+  */
+  const ecart = ceQuiSepare(ancienne, nouvelle);
   return [
     {
       cle: "MIGRER",
       titre: `Migrer vers la version ${nouvelle.numero}`,
-      detail: `Ta checklist et tes montants passent à ${montantNouveau}.${entree}`,
+      detail: `Ta checklist passe à la version ${nouvelle.numero}${etCeQuiChange(ecart, montantNouveau, nouvelle.delai)}.${entree}`,
     },
     {
       cle: "CONSERVER",
       titre: `Conserver la version ${ancienne.numero}`,
-      detail: `Ta checklist reste à ${montantAncien}.${limite}`,
+      detail: `Ta checklist reste à la version ${ancienne.numero}${etCeQuiChange(ecart, montantAncien, ancienne.delai)}.${limite}`,
     },
   ];
+}
+
+/**
+ * « , avec 13 000 € à prouver et un délai de 60–150 jours » — et rien pour
+ * ce qui n'a pas bougé.
+ */
+function etCeQuiChange(ecart: Ecart, montant: string, delai: Delai | undefined): string {
+  const parts: string[] = [];
+  if (ecart.montant) parts.push(`${montant} à prouver`);
+  if (ecart.delai) parts.push(`un délai d'instruction de ${delaiLisible(delai ?? null)}`);
+  if (parts.length === 0) return "";
+  return `, avec ${parts.join(" et ")}`;
 }
 
 export const mentionArbitrage = (choix: Arbitrage, pays: string): string =>

@@ -1292,6 +1292,32 @@ Trois choses en découlent :
 qui portait l'ancienne ne vaut plus, et le garder ferait taire le seul rappel
 qui compte.
 
+## Une décision éprouvée par une fumée, et que personne n'appelait
+
+`arbitrerLaDivergence` était branchée sur sa route, éprouvée sur une base
+réelle, et **aucun écran ne l'appelait**. Le bouton « Appliquer mon choix »
+de T-02 fermait la feuille ; l'écran annonçait « Ta checklist sera mise à
+jour » au futur, sous une phrase qui promettait « Nous ne modifions rien sans
+ton accord ». La promesse n'était tenue que parce que rien n'était jamais
+modifié.
+
+C'est le revers de la méthode qui a servi tout le reste : descendre une
+décision d'une route vers un module serveur la rend éprouvable, et une fumée
+verte peut alors décrire un chemin que personne n'emprunte. La fumée dit que
+la décision est juste ; elle ne dit pas qu'elle est atteignable.
+
+Le garde-fou est du côté de l'écran, et il porte sur **l'appel réseau** et non
+sur le source : `@/lib/api` est remplacé dans les essais, et l'essai lit
+l'URL et le corps partis. Relire le source ne suffit pas — on peut débrancher
+une fonction d'un bouton en la laissant intacte plus bas dans le fichier, et
+tout essai qui l'inspecte passe encore. C'est la leçon de S.1, appliquée ici
+à un bouton qui, lui, n'était branché à rien du tout.
+
+L'écriture suit le patron de la clôture C-11 : `appeler`, `envoi`, `echec`,
+`BlocEchec`, `router.refresh()`. Et la feuille ne se ferme **qu'une fois
+écrit** — fermer d'abord ferait disparaître le seul endroit où l'échec peut
+se lire, sur une décision qui remplace un échéancier entier.
+
 ## Vérifier
 
 ```

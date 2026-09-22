@@ -113,6 +113,10 @@ function versVersion(regle: {
       ? `à prouver, ${fonds.periodicite === "mensuel" ? "par mois" : "pour l'année"}`
       : "aucune ressource à prouver",
     publieeLe: iso(regle.createdAt),
+    // Ce qui décide de la date de dépôt de l'échéancier : l'arbitrage le
+    // montre, sans quoi une version qui ne change que lui s'affiche à
+    // l'identique de l'autre.
+    delai: p.delai_traitement_jours,
     ...(regle.effectiveTo ? { applicableJusquau: iso(regle.effectiveTo) } : {}),
     applicableDepuis: iso(regle.effectiveFrom),
   };
