@@ -44,6 +44,8 @@ export interface AlertesProps {
     nouvelle: VersionRegle;
     /** Ce que la checklist gagne et perd — nommé, jamais par son code. */
     pieces?: EvolutionDesPieces;
+    /** RG-14.1 — la version visée est-elle encore en vigueur ? */
+    migrable?: boolean;
     depot?: string;
     detecteeLe: string;
     verifieeLe: string;

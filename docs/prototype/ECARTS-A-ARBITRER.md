@@ -8026,3 +8026,67 @@ exactement le cas qu'il devait couvrir.
 état d'incident : il n'apparaît que si le stockage objet était indisponible,
 et `acheverLesSuppressionsEnAttente` le reprend chaque nuit. Le filtre ne le
 raccourcit pas — il empêche seulement d'écrire à quelqu'un pendant qu'il dure.
+
+---
+
+### S.57 — On refusait d'ouvrir un dossier sur cette règle, et on acceptait d'y migrer
+
+RG-14.1 : « une fiche dont `nextReviewAt` est dépassée **repasse
+automatiquement en `DRAFT`** et disparaît de l'affichage utilisateur. Une
+donnée non relue ne peut pas continuer à se présenter comme fiable. »
+
+La veille dépubliait. L'arbitrage proposait quand même. Exécuté avant
+correction :
+
+```
+=== 1. La veille passe ===
+  fiches dépubliées : 1
+  v2 : relecture au 2027-01-01, statut DRAFT
+
+=== 2. Ce que l'écran d'arbitrage montre encore ===
+  version proposée  : 2
+
+=== 3. Et si le candidat accepte ? ===
+  arbitrage : {"decision":"MIGRER",…}
+  son dossier est désormais figé sur la v2, statut DRAFT
+```
+
+Le candidat accepte, et son dossier se fige sur une règle que la plateforme
+a elle-même jugée non fiable. Sa checklist, son échéancier et ses conditions
+en découlent.
+
+**Le point qui tranche la question.** `ouvrirDossier` **refuse** d'ouvrir un
+dossier sur cette règle : elle passe par `reglePubliee`, qui porte le filtre
+candidat. La plateforme refusait donc d'y commencer et acceptait d'y aller.
+Il n'y a pas d'arbitrage à rendre ici — c'est une incohérence entre deux
+chemins vers le même état.
+
+Le même filtre garde désormais les deux. Il couvre plus que la relecture
+dépassée : une version archivée depuis qu'une v3 est parue en sort aussi, et
+migrer vers elle aurait figé le dossier sur une règle que la suivante a déjà
+remplacée.
+
+**Ce qui n'est pas contradictoire avec le bloc RG-14.1 existant.** Une fiche
+dépubliée pour retard **reste la version en vigueur** au sens de la
+succession : sa mise en vigueur tient, sa fin n'est pas posée, et la version
+suivante la trouvera comme prédécesseur. Ce que RG-14.1 lui retire, c'est de
+se **proposer** au candidat. Les deux tiennent ensemble, et c'est la même
+phrase qui le dit : « disparaît de l'affichage utilisateur ».
+
+**« Conserver » reste ouvert, toujours.** C'est le choix sûr, et il met fin à
+la pause d'une divergence critique. Fermer les deux laisserait le dossier
+suspendu pour une relecture que le candidat ne peut pas faire avancer — il
+serait puni du retard de nos veilleurs.
+
+**L'écran le dit avant le clic.** L'option reste affichée et devient
+indisponible, avec sa raison : la retirer ferait chercher ce qu'on a mal
+fait, là où il n'y a rien à corriger de son côté. Proposer un bouton que le
+serveur refusera est la même faute qu'un bouton qui ne fait rien (S.52).
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| le serveur accepte de nouveau | la fumée |
+| l'écran la propose de nouveau | la fumée |
+| « conserver » devient indisponible aussi | les essais purs et d'écran |
+
+Trois mutations, trois rouges.

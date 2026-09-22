@@ -725,6 +725,83 @@ try {
       `replanifier recalcule sur la version figée, pas sur la publiée (${replanifie})`,
     );
   }
+  console.log("\nRG-14.1 — une version retirée ne se propose plus, et ne s'accepte plus");
+  {
+    /*
+      « Une donnée non relue ne peut pas continuer à se présenter comme
+      fiable. » La veille dépubliait, et l'arbitrage proposait quand même :
+      le candidat acceptait, et son dossier se figeait sur une règle DRAFT.
+      `ouvrirDossier` la refuse pourtant — la plateforme refusait d'y
+      commencer et acceptait d'y aller.
+    */
+    rang += 10;
+    const commune = {
+      countryCode: "IT" as const, visaType: "emploi_kennismigrant" as const,
+      category: "EMPLOI" as const, effectiveFrom: new Date("2026-01-01"),
+      rules: brute.rules as never, sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      publishedAt: new Date("2026-01-01"),
+    };
+    const ancienne = await db.visaRule.create({
+      data: { ...commune, version: 1, nextReviewAt: new Date("2029-01-01"),
+        status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    // Relecture dépassée : c'est elle que la veille va retirer.
+    const visee = await db.visaRule.create({
+      data: { ...commune, version: 2, nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED" },
+    });
+
+    const MOMENT = new Date("2027-04-01T08:00:00Z");
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-veille-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const sien = await db.application.create({
+      data: { userId: candidat.id, visaRuleId: ancienne.id, status: "ACTIF" },
+    });
+    const aArbitrer = await db.ruleMigration.create({
+      data: {
+        applicationId: sien.id, fromRuleId: ancienne.id, toRuleId: visee.id,
+        impact: "MAJEUR", diff: [] as never, alertedAt: MOMENT,
+      },
+    });
+
+    verifier(
+      (await divergenceAArbitrer(aArbitrer.id, candidat.id)).migrable,
+      "tant qu'elle est en vigueur, la migration est proposée",
+    );
+
+    const retirees = await depublierLesFichesEchues(MOMENT);
+    verifier(retirees >= 1, `la veille retire la version visée (${retirees})`);
+
+    verifier(
+      (await divergenceAArbitrer(aArbitrer.id, candidat.id)).migrable === false,
+      "l'écran ne la propose plus",
+    );
+
+    const dossierDuCandidat = await db.application.findUniqueOrThrow({ where: { id: sien.id } });
+    const refus = await arbitrerLaDivergence(dossierDuCandidat, aArbitrer.id, "MIGRER", MOMENT)
+      .then(() => null)
+      .catch((e: { echec?: { corps?: string } }) => e.echec?.corps ?? "refus sans motif");
+    verifier(
+      refus?.includes("nos veilleurs la revérifient") === true,
+      `et le serveur la refuse, avec son motif (${refus?.slice(0, 44)}…)`,
+    );
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: sien.id } })).visaRuleId ===
+        ancienne.id,
+      "le dossier garde sa version",
+    );
+
+    /* « Conserver » reste ouvert : c'est le choix sûr, et il met fin à la pause. */
+    const garde = await arbitrerLaDivergence(
+      await db.application.findUniqueOrThrow({ where: { id: sien.id } }),
+      aArbitrer.id,
+      "CONSERVER",
+      MOMENT,
+    );
+    verifier(garde.decision === "CONSERVER", "et conserver reste possible");
+  }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");
