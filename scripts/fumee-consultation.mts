@@ -68,6 +68,7 @@ const { demanderLaSuppression, acheverLaSuppression } = await import(
   "../src/server/acces/suppression"
 );
 const { TENUE_MINUTES } = await import("../src/domain/consultants/tenue");
+const { consultationDuPaiement } = await import("../src/server/lecture/paiements");
 
 let rang = 0;
 const JOUR = 86_400_000;
@@ -381,6 +382,78 @@ try {
     verifier(
       (await db.transaction.count({ where: { userId: c.userId, refundDueAt: { not: null } } })) === 0,
       "et aucune obligation de remboursement n'est ouverte pour rien",
+    );
+  }
+  // ── 8. Ce que l'écran d'attente lit — arbitrage du 22/09/2026 ───────
+  console.log("\nCe que l'écran d'attente lit du rendez-vous");
+  {
+    /*
+      $-03 annonçait « ton pack s'ouvre » à qui payait une consultation,
+      et ne nommait ni le créneau, ni le consultant, ni l'heure jusqu'à
+      laquelle le créneau est tenu. Il les lit maintenant — et la lecture
+      se vérifie sur une base, parce que c'est une jointure sur
+      `Appointment.transactionId` et non une mise en forme.
+    */
+    const c = await candidat();
+    const consultant = await leConsultant();
+    const debut = new Date(Date.now() + 5 * JOUR);
+    const tenue = await tenir(c.applicationId, consultant.id, debut, `RDV-L-${process.pid}`);
+    const transaction = await transactionDeConsultation(c.userId, c.applicationId);
+    await rattacherLePaiement(tenue.reference, transaction.id);
+
+    const pendant = await consultationDuPaiement(transaction.reference, c.userId);
+    verifier(pendant !== null, "la consultation d'un paiement en attente se lit");
+    verifier(
+      pendant?.consultant === consultant.name,
+      `le consultant est nommé (${pendant?.consultant})`,
+    );
+    verifier(
+      pendant?.debut === debut.toISOString(),
+      "l'heure est celle que la base a écrite, pas une recomposition",
+    );
+    verifier(pendant?.tenuJusqua !== null, "et la tenue porte son échéance");
+    verifier(pendant?.confirme === false, "rien n'est confirmé avant la notification signée");
+
+    // Après la notification signée : plus rien n'est tenu, tout est réservé.
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_lecture_${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "CONFIRMEE",
+    });
+    const apres = await consultationDuPaiement(transaction.reference, c.userId);
+    verifier(apres?.confirme === true, "la confirmation se lit une fois la notification passée");
+    verifier(apres?.tenuJusqua === null, "et plus rien n'est tenu : tout est réservé");
+
+    /*
+      Trois absences, et aucune ne doit faire planter l'écran : un
+      paiement qui n'est pas une consultation, une référence qui
+      n'existe pas, et la transaction d'un autre candidat.
+    */
+    const pack = await db.transaction.create({
+      data: {
+        reference: `IMP-PACK-${process.pid}`,
+        userId: c.userId,
+        applicationId: c.applicationId,
+        packCode: "dossier",
+        amount: 29,
+        currency: "EUR",
+        provider: "STRIPE",
+        status: "CONFIRMEE",
+      },
+    });
+    verifier(
+      (await consultationDuPaiement(pack.reference, c.userId)) === null,
+      "un paiement de pack ne rend aucune consultation",
+    );
+    verifier(
+      (await consultationDuPaiement("IMP-INVENTEE", c.userId)) === null,
+      "une référence inconnue rend l'absence",
+    );
+    const autre = await candidat();
+    verifier(
+      (await consultationDuPaiement(transaction.reference, autre.userId)) === null,
+      "et un autre candidat ne lit pas le rendez-vous de celui-ci",
     );
   }
 } finally {

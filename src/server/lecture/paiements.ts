@@ -4,6 +4,7 @@ import { versFiche } from "@/server/acces/regles";
 import { etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
 import { deviseParDefaut, estDevise, type Devise } from "@/domain/payments/pricing";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
+import { achatDepuisLeCode } from "@/domain/payments/achat";
 
 /**
  * Lecture d'un reçu — $-04 et $-06.
@@ -76,6 +77,69 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
         ? { id: transaction.application.id, pays: fiche.pays, intitule: fiche.intitule }
         : null,
     adresse: transaction.user.email,
+  };
+}
+
+/**
+ * La consultation qu'un paiement paie — $-03 et $-04, arbitrage du
+ * 22/09/2026.
+ *
+ * Lecture **séparée**, et non un champ de plus sur `Recu`. Le reçu est un
+ * document comptable : il nomme le moyen de paiement et jamais le
+ * portefeuille, par minimisation. Y ajouter le nom d'un consultant et un
+ * horaire ferait entrer dans une pièce conservée à des fins comptables
+ * des données qui n'ont rien à y faire — et les deux écrans du tunnel qui
+ * en ont besoin peuvent les demander eux-mêmes.
+ *
+ * Rend `null` quand le paiement n'est pas une consultation, et aussi
+ * quand il en est une sans rendez-vous : ce second cas ne devrait plus se
+ * produire depuis que $-02 refuse d'ouvrir une consultation, mais le
+ * supposer ferait planter l'écran d'attente d'un paiement déjà encaissé.
+ */
+export interface ConsultationPayee {
+  /** La référence du rendez-vous, distincte de celle du paiement. */
+  reference: string;
+  debut: string;
+  dureeMinutes: number;
+  consultant: string;
+  /**
+   * Jusqu'à quand le créneau est tenu. Nul quand le rendez-vous est déjà
+   * confirmé : plus rien n'est tenu, tout est réservé.
+   */
+  tenuJusqua: string | null;
+  confirme: boolean;
+}
+
+export async function consultationDuPaiement(
+  reference: string,
+  userId: string,
+): Promise<ConsultationPayee | null> {
+  /*
+    Le filtre sur `userId` est dans la requête, comme partout ici : une
+    référence de paiement est courte et se devine, et ce qu'on rendrait
+    nomme un consultant et un horaire.
+  */
+  const transaction = await db.transaction.findFirst({
+    where: { reference, userId },
+    select: { id: true, packCode: true },
+  });
+  if (!transaction) return null;
+  const achat = achatDepuisLeCode(transaction.packCode);
+  if (achat?.type !== "consultation") return null;
+
+  const rendezVous = await db.appointment.findFirst({
+    where: { transactionId: transaction.id },
+    include: { consultant: { select: { name: true } } },
+  });
+  if (!rendezVous) return null;
+
+  return {
+    reference: rendezVous.reference,
+    debut: rendezVous.startsAt.toISOString(),
+    dureeMinutes: rendezVous.durationMin,
+    consultant: rendezVous.consultant.name,
+    tenuJusqua: rendezVous.heldUntil?.toISOString() ?? null,
+    confirme: rendezVous.status === "RESERVE",
   };
 }
 
