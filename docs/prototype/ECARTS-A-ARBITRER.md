@@ -7114,3 +7114,113 @@ objectivement complet plafonne à 75 sur 100. Les deux points tiennent
 ensemble et demandent un arbitrage produit — donner au barème le lecteur
 que le document lui prête, ou constater qu'il n'en a pas — plutôt qu'un
 correctif.
+
+---
+
+### S.46 — Un seuil qui change de valeur ne prévenait personne, et une seule paire d'yeux suffisait
+
+Le lot précédent avait rendu la propagation d'une divergence fiable :
+elle prévient tous les dossiers, ou rejoue. Restait à savoir **ce qu'elle
+tient pour une divergence**.
+
+La question posée au référentiel réel : que conclut `comparer` quand un
+seuil bloquant change de valeur ?
+
+```
+Le seuil bloquant « salaire_min_moins_30_ans » passe de 4357 € à 1000 €.
+
+Et ce que WF-11 conclut de ce changement de seuil :
+  impact : MINEUR
+  diff   : []
+  → la propagation sort sans rien faire : AUCUN dossier n'est prévenu
+```
+
+La comparaison diffait les **codes** des conditions bloquantes —
+apparition, disparition — et deux champs du payload, `preuve_fonds` et
+`niveau_langue_min`. Jamais la valeur d'une condition. Or un seuil qui
+change garde son code.
+
+C'est le changement réglementaire le plus régulier du produit qui passait
+ainsi. DOC-11 le nomme dans le tableau de WF-11 — « Majeur | **Seuil** ou
+pièce obligatoire modifié | Notification + proposition de migration » — et
+RG-14.3 dit quand il revient : « les montants IND changent au 1er janvier ».
+
+#### Durcir n'est pas assouplir
+
+Rattacher la valeur rend la comparaison possible — et découvre que les
+deux sens du même changement ne se traitent pas de la même façon. Un seuil
+**relevé** retire l'éligibilité à qui l'atteignait tout juste : c'est le
+cas critique, mise en pause et email nominatif. Un seuil **abaissé** ne
+retire rien à personne.
+
+Quand les deux versions ne s'ordonnent pas — l'opérateur change, l'unité
+change, la condition devient bloquante, elle quitte son groupe
+d'alternatives —, la réponse prudente est celle qui prévient. Se tromper
+dans ce sens fait lire un message de trop ; se tromper dans l'autre laisse
+quelqu'un déposer sous une exigence qu'il ne remplit plus.
+
+Et `message_echec` reste hors de la comparaison : le réécrire ne change
+aucune exigence, et faire partir une alerte à tous les dossiers ouverts
+parce qu'une phrase a été clarifiée apprend à ignorer les suivantes.
+
+#### WF-14 §4 n'avait aucun mécanisme
+
+« Relecture par un second opérateur pour toute modification de condition
+bloquante. » Le commentaire de la route disait que la séparation
+veilleur / administrateur en tenait lieu. Elle n'en tenait pas lieu :
+`ROLES_ADMIS` laisse un administrateur passer les deux portes, et rien ne
+comparait qui avait écrit à qui publiait.
+
+Les garde-fous que la publication applique, sur une version qui divise un
+seuil par quatre, écrite et publiée par la même personne :
+
+```
+  source publiable (RG-14.2)        : oui
+  schéma Zod (WF-14 étape 3)        : oui
+  vocabulaire (INV-1, INV-2)        : oui
+  règle terminable (S.42)           : oui
+  un second opérateur l'a relue     : jamais demandé
+
+Ce que la base sait, et que personne ne compare :
+  v1 PUBLISHED  écrite par veilleur@immipro.test
+  v2 DRAFT      écrite par veilleur@immipro.test
+  le publicateur serait veilleur@immipro.test — le même.
+```
+
+`VisaRule.verifiedBy` porte l'email de qui a écrit la version. Il n'y
+avait rien à ajouter en base, seulement à comparer.
+
+Le contrôle porte sur **toute** modification et non sur les seules
+durcissantes : abaisser un seuil n'enlève l'éligibilité à personne, et
+ouvre la procédure à des dossiers qu'elle n'aurait pas dû accueillir. Une
+version qui ne touche aucune bloquante se publie seule — sans quoi la
+relecture deviendrait une formalité qu'on apprend à contourner.
+
+#### Une seule définition, deux appelants
+
+La comparaison descend dans `domain/rules/comparaison.ts`. Le contrôle de
+relecture et la propagation l'appellent tous les deux : un contrôle qui
+s'appuierait sur une seconde définition de « une condition bloquante a
+bougé » finirait par diverger d'elle. C'est la leçon de S.42, où la même
+relation écrite à deux endroits donnait deux réponses et aucune juste.
+
+La décision de publication descend de sa route vers
+`server/regles/publication.ts`, pour la raison établie la veille : ce
+qu'aucun script ne peut appeler, rien n'éprouve.
+
+#### Vérifié en mutant
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la valeur d'une condition redevient invisible | les essais purs, et neuf assertions de la fumée |
+| tout changement de seuil devient majeur | les essais, et la mise en pause du dossier |
+| l'inordonnable est tenu pour un assouplissement | les essais seuls — la fumée ne change ni opérateur ni unité |
+| la relecture n'est plus exigée | les essais, et six assertions de la fumée |
+| le publicateur n'est plus comparé au rédacteur | la fumée seule — c'est une décision serveur |
+| réécrire un message redevient une modification | les essais, et la clarification qui ne passe plus |
+| le journal perd qui a rédigé | la fumée seule |
+
+Le partage est celui qu'on attend : ce qui se décide sans base est rouge
+dans les essais, ce qui demande une base et deux comptes l'est dans la
+fumée. Une mutation rouge des deux côtés dit que la règle est éprouvée
+deux fois ; une mutation rouge d'un seul côté dit où elle vit.

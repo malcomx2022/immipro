@@ -599,6 +599,80 @@ cela (`parcours.ts`, `migration.ts`) : une route ne s'appelle pas depuis
 une fumée, et une fumée qui réécrit la décision de la route n'éprouve pas
 la route.
 
+### Ce qui sépare deux versions d'une règle
+
+Correctif du 23/09/2026. La comparaison qui décide de l'impact d'une
+publication ne regardait que les **codes** des conditions bloquantes —
+apparition, disparition. Jamais leur valeur.
+
+Un seuil qui passe de 4 357 € à 1 000 € garde son code. La comparaison
+rendait donc `MINEUR` avec un diff vide, et `propagerLaPublication` sort
+immédiatement dans ce cas : **aucun dossier n'était prévenu**. C'est le
+changement réglementaire le plus régulier du produit qui passait ainsi —
+DOC-11 le nomme (« Majeur | **Seuil** ou pièce obligatoire modifié ») et
+RG-14.3 dit quand il revient : « les montants IND changent au 1er janvier ».
+
+La comparaison vit maintenant dans `domain/rules/comparaison.ts`, pure, et
+**deux appelants en dépendent** : la propagation de WF-11 et le contrôle de
+relecture de WF-14 §4. Une seule définition de « une condition bloquante a
+bougé » — la leçon de S.42, où la même relation écrite deux fois donnait
+deux réponses.
+
+**Durcir n'est pas assouplir.** Un seuil relevé retire l'éligibilité à qui
+l'atteignait tout juste : c'est le cas critique, mise en pause et email
+nominatif. Un seuil abaissé ne retire rien ; notification et proposition de
+migration suffisent.
+
+| Ce qui bouge | Sens | Impact |
+|---|---|---|
+| `gte` dont la valeur monte, `lte` dont elle baisse | durcit | critique |
+| l'inverse | assouplit | majeur |
+| l'opérateur, l'unité | inordonnable | critique |
+| une condition devient bloquante | durcit | critique |
+| elle quitte son groupe d'alternatives | durcit — elle devient exigible seule | critique |
+| elle change de pièce porteuse | la checklist bouge, l'exigence non | majeur |
+| `message_echec` seul | aucune exigence ne change | rien ne part |
+
+Quand les deux versions ne s'ordonnent pas, la réponse prudente est celle
+qui prévient. Se tromper dans ce sens fait lire un message de trop ; se
+tromper dans l'autre laisse quelqu'un déposer sous une exigence qu'il ne
+remplit plus.
+
+Le dernier point compte autant : réécrire une phrase ne change aucune
+exigence, et faire partir une alerte à tous les dossiers ouverts parce
+qu'un texte a été clarifié apprend à ignorer les suivantes.
+
+### La relecture par un second opérateur, et ce qu'elle n'était pas
+
+WF-14 §4 : « Relecture par un second opérateur pour toute modification de
+condition bloquante. » Le contrôle n'existait pas. Le commentaire de la
+route affirmait que la séparation veilleur / administrateur en tenait
+lieu — mais `ROLES_ADMIS` laisse un administrateur passer les deux portes,
+et rien ne comparait qui avait écrit à qui publiait.
+
+Exécuté : une version qui divise le seuil kennismigrant par quatre, écrite
+et publiée par la même personne, franchissait les quatre garde-fous de la
+publication — source (RG-14.2), schéma (WF-14 §3), vocabulaire (INV-1,
+INV-2), terminabilité (S.42) — sans qu'aucun ne regarde la seule chose qui
+comptait.
+
+`VisaRule.verifiedBy` porte l'email de qui a écrit la version : chaque
+édition l'y inscrit. Il n'y avait rien à ajouter en base, seulement à
+comparer. La décision descend dans `server/regles/publication.ts` pour
+qu'une fumée puisse publier pour de bon — même raison que le dépôt la
+veille.
+
+Le contrôle porte sur **toute** modification, pas seulement sur celles qui
+durcissent : abaisser un seuil n'enlève l'éligibilité à personne, et ouvre
+la procédure à des dossiers qu'elle n'aurait pas dû accueillir. Une version
+qui ne touche aucune bloquante — une clarification de formulation — se
+publie seule, sans quoi la relecture deviendrait une formalité qu'on
+apprend à contourner.
+
+Le journal d'audit garde les deux noms et la liste des conditions touchées :
+c'est la preuve de diligence de RG-14.4, et elle ne vaut que si elle dit qui
+a fait quoi.
+
 ### Une divergence réglementaire prévient tout le monde, ou rejoue
 
 `propagerLaPublication` tenait dans une boucle sans filet : le premier

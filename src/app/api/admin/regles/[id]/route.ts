@@ -2,17 +2,14 @@ import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { journaliser } from "@/server/acces/journal";
-import { getQueue, JOBS, poster } from "@/lib/queue";
 import {
   avecLesTextesCandidat,
   visaRulesSchema,
   SCHEMA_VERSION,
-  peutEtrePubliee,
-  raisonsDIncompletabilite,
   textesCandidat,
 } from "@/domain/rules/schema";
 import { verifierPayloadCandidat, messageDeRefusPayload } from "@/domain/backoffice/regle";
+import { publierLaRegle } from "@/server/regles/publication";
 
 /**
  * Édition et publication d'une règle — B-02, WF-14.
@@ -135,100 +132,18 @@ export const PUT = route({
  * Publication — WF-14 étape 5. La version en vigueur passe en `ARCHIVED`
  * avec son `effectiveTo`, la nouvelle en `PUBLISHED`, et WF-11 se déclenche.
  *
- * L'accès est administrateur et non veilleur : RG-14.2 demande une relecture
- * par un second opérateur pour toute modification de condition bloquante, et
- * séparer qui rédige de qui publie est la forme la plus simple de cette
- * relecture.
+ * L'accès est administrateur et non veilleur : séparer qui rédige de qui
+ * publie est la première moitié de la relecture que WF-14 §4 demande pour
+ * toute modification de condition bloquante. Elle ne suffisait pas — un
+ * administrateur passe les deux portes —, et la seconde moitié vit
+ * désormais dans `server/regles/publication.ts` : le publicateur ne peut
+ * pas être celui qui a écrit la version.
  */
 export const POST = route({
   nom: "admin.regle.publication",
   acces: "admin",
   limite: "sensible",
   corps: z.object({ motif: z.string().trim().min(3).max(500) }),
-  async traiter({ corps, params, acteur }) {
-    const regle = await db.visaRule.findUnique({ where: { id: params.id } });
-    if (!regle) throw echec("introuvable");
-
-    if (!peutEtrePubliee(regle.sourceTier)) {
-      throw echec("etat_incompatible", {
-        corps:
-          "Cette fiche s'appuie sur une source secondaire. Rattache-la à une source officielle ou institutionnelle avant de publier (RG-14.2).",
-      });
-    }
-
-    const lu = visaRulesSchema.safeParse(regle.rules);
-    if (!lu.success) {
-      throw echec("etat_incompatible", {
-        corps: "Le contenu de cette version ne passe plus la validation. Reprends l'édition.",
-      });
-    }
-    const fautes = verifierPayloadCandidat(textesCandidat(lu.data));
-    if (fautes.length > 0) {
-      throw echec("etat_incompatible", { corps: messageDeRefusPayload(fautes[0]!) });
-    }
-
-    /*
-      Et la règle doit pouvoir être terminée. Une condition bloquante qui
-      ne nomme aucune pièce n'est satisfaite par aucun dépôt : le dossier
-      resterait `ACTIF` avec une exigence que le candidat ne peut lever.
-      Le refus est ici parce que c'est le dernier moment où personne n'a
-      encore ouvert de dossier dessus.
-    */
-    const impossibles = raisonsDIncompletabilite(lu.data);
-    if (impossibles.length > 0) {
-      throw echec("etat_incompatible", { corps: impossibles[0]! });
-    }
-
-    const veille = await db.visaRule.findFirst({
-      where: {
-        countryCode: regle.countryCode,
-        visaType: regle.visaType,
-        status: "PUBLISHED",
-        id: { not: regle.id },
-      },
-    });
-
-    const aujourdhui = new Date();
-    await db.$transaction([
-      ...(veille
-        ? [
-            db.visaRule.update({
-              where: { id: veille.id },
-              data: { status: "ARCHIVED" as const, effectiveTo: aujourdhui },
-            }),
-          ]
-        : []),
-      db.visaRule.update({
-        where: { id: regle.id },
-        data: { status: "PUBLISHED" as const, effectiveFrom: aujourdhui },
-      }),
-    ]);
-
-    await journaliser({
-      acteurId: acteur!.id,
-      action: "regle.publication",
-      cible: `visaRule:${regle.id}`,
-      motif: corps.motif,
-      details: { pays: regle.countryCode, type: regle.visaType, version: regle.version },
-    });
-
-    // WF-11 : la divergence est calculée par un job, pas ici. Une
-    // publication ne doit pas attendre le parcours de tous les dossiers
-    // rattachés, ni échouer parce que l'un d'eux pose problème.
-    if (veille) {
-      const file = await getQueue();
-      // La réponse annonce `divergenceMiseEnFile` : elle ne doit pas
-      // l'annoncer si rien n'a été mis en file.
-      await poster(file, JOBS.DIVERGENCE_REGLEMENTAIRE, {
-        ancienneId: veille.id,
-        nouvelleId: regle.id,
-      });
-    }
-
-    return {
-      publiee: regle.id,
-      archivee: veille?.id ?? null,
-      divergenceMiseEnFile: veille !== null,
-    };
-  },
+  traiter: ({ corps, params, acteur }) =>
+    publierLaRegle(params.id!, { id: acteur!.id, email: acteur!.email }, corps.motif),
 });

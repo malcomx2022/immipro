@@ -165,6 +165,14 @@ jobs:
         run: npm run smoke:transitions
       - run: echo "- **Transitions d'état** — dépôt, clôture, divergence, arbitrage, pack et purge passent depuis un dossier prêt ; une alerte perdue par personne" >> "$GITHUB_STEP_SUMMARY"
 
+      # La publication d'une règle, et ce qu'elle déclenche. Deux choses
+      # qu'aucun test pur ne peut tenir : la relecture par un second
+      # opérateur, qui compare qui a écrit à qui publie, et la propagation
+      # d'un seuil modifié jusqu'à la mise en pause du dossier.
+      - name: Publication d'une règle
+        run: npm run smoke:publication
+      - run: echo "- **Publication d'une règle** — un seuil modifié est vu, relu par un second opérateur, et propagé selon son sens" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention

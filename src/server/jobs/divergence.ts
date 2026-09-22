@@ -1,6 +1,11 @@
 import type { VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
 import { payload } from "@/server/acces/regles";
+import {
+  comparerLesVersions,
+  type Changement,
+  type Impact,
+} from "@/domain/rules/comparaison";
 import { envoyerAlerteCritique } from "@/server/courrier";
 import { suiteDeLEnvoi } from "@/domain/courrier/transport";
 import { miseEnEtat } from "@/domain/dossiers/etat";
@@ -21,68 +26,24 @@ import { editorialDe } from "@/lib/contenu/destinations";
  *   (RG-11.3), parce qu'une notification dans l'application n'est pas lue
  *   par quelqu'un qui n'ouvre pas l'application.
  */
-export type Impact = "MINEUR" | "MAJEUR" | "CRITIQUE";
-
-export interface Changement {
-  champ: string;
-  avant: unknown;
-  apres: unknown;
-}
+export type { Impact, Changement } from "@/domain/rules/comparaison";
 
 /**
  * Comparaison de deux versions.
  *
- * Seules les conditions bloquantes et les pièces obligatoires décident de
- * l'impact : un délai de traitement qui s'allonge gêne, il ne rend pas
- * inéligible. Une condition bloquante qui disparaît est critique au même
- * titre qu'une qui apparaît — un dispositif supprimé fait perdre
- * l'éligibilité aussi sûrement qu'un seuil relevé.
+ * La comparaison elle-même vit dans `domain/rules/comparaison.ts` : elle
+ * est pure, et **deux appelants en dépendent** — cette propagation, et le
+ * contrôle de relecture de WF-14 §4 à la publication. Une seule définition
+ * de « une condition bloquante a bougé », pour les mêmes raisons qui ont
+ * fait descendre le rattachement d'une condition à sa pièce (S.42).
+ *
+ * Ce qui reste ici : lire les deux payloads, ce qui demande Prisma.
  */
-export function comparer(avant: VisaRule, apres: VisaRule): { impact: Impact; diff: Changement[] } {
-  const a = payload(avant);
-  const b = payload(apres);
-  const diff: Changement[] = [];
-
-  const bloquantesAvant = new Set(a.conditions.filter((c) => c.bloquant).map((c) => c.code));
-  const bloquantesApres = new Set(b.conditions.filter((c) => c.bloquant).map((c) => c.code));
-  const obligatoiresAvant = new Set(a.pieces_requises.filter((p) => p.obligatoire).map((p) => p.code));
-  const obligatoiresApres = new Set(b.pieces_requises.filter((p) => p.obligatoire).map((p) => p.code));
-
-  for (const code of bloquantesApres) {
-    if (!bloquantesAvant.has(code)) diff.push({ champ: `condition.${code}`, avant: null, apres: "exigée" });
-  }
-  for (const code of bloquantesAvant) {
-    if (!bloquantesApres.has(code)) diff.push({ champ: `condition.${code}`, avant: "exigée", apres: null });
-  }
-  for (const code of obligatoiresApres) {
-    if (!obligatoiresAvant.has(code)) diff.push({ champ: `piece.${code}`, avant: null, apres: "obligatoire" });
-  }
-  for (const code of obligatoiresAvant) {
-    if (!obligatoiresApres.has(code)) diff.push({ champ: `piece.${code}`, avant: "obligatoire", apres: null });
-  }
-
-  const fondsAvant = a.preuve_fonds?.valeur ?? null;
-  const fondsApres = b.preuve_fonds?.valeur ?? null;
-  if (fondsAvant !== fondsApres) {
-    diff.push({ champ: "preuve_fonds", avant: fondsAvant, apres: fondsApres });
-  }
-
-  const langueAvant = a.niveau_langue_min;
-  const langueApres = b.niveau_langue_min;
-  if (langueAvant !== langueApres) {
-    diff.push({ champ: "niveau_langue_min", avant: langueAvant, apres: langueApres });
-  }
-
-  const dispositifPerdu = a.apres_etudes?.dispositif != null && b.apres_etudes?.dispositif == null;
-  const conditionPerdue = [...bloquantesAvant].some((c) => !bloquantesApres.has(c));
-
-  const impact: Impact =
-    dispositifPerdu || conditionPerdue
-      ? "CRITIQUE"
-      : diff.length > 0
-        ? "MAJEUR"
-        : "MINEUR";
-
+export function comparer(
+  avant: VisaRule,
+  apres: VisaRule,
+): { impact: Impact; diff: Changement[] } {
+  const { impact, diff } = comparerLesVersions(payload(avant), payload(apres));
   return { impact, diff };
 }
 
