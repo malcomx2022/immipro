@@ -1441,6 +1441,27 @@ rien.
 fin à la pause d'une divergence critique — fermer les deux punirait le
 candidat du retard de nos veilleurs.
 
+## Une publication ne parle qu'à ceux qu'elle remplace
+
+La propagation d'une divergence partait de `visaRuleId: ancienne.id` : les
+dossiers de la version que cette publication remplace, et eux seuls. Un
+candidat qui n'arbitrait pas restait sur v1, et la publication de v3 —
+qui vise les dossiers de v2 — ne le voyait plus. Il n'entendait plus jamais
+parler de rien.
+
+Elle vise désormais **toutes** les versions antérieures du même pays et type
+de visa, et compare chaque dossier **depuis la sienne**. Les deux vont
+ensemble : viser un dossier resté sur v1 sans lui montrer le diff v1→v3 lui
+cacherait la moitié de ce qui a changé pour lui.
+
+`ancienneId` a donc quitté le travail de la file. La passe n'a besoin que de
+la version publiée ; les jobs déjà en file le portent encore et il est
+ignoré.
+
+Une conséquence pour les fixtures, et elle vaut d'être dite : une fumée dont
+les scénarios partagent une procédure les fait se compter les uns les autres.
+Chaque scénario a maintenant son pays, qui ne sert que d'espace de noms.
+
 ## Vérifier
 
 ```

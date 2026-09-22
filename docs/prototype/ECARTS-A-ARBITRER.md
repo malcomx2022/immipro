@@ -8090,3 +8090,69 @@ serveur refusera est la même faute qu'un bouton qui ne fait rien (S.52).
 | « conserver » devient indisponible aussi | les essais purs et d'écran |
 
 Trois mutations, trois rouges.
+
+---
+
+### S.58 — Le dossier qu'une publication manquée laissait en arrière pour toujours
+
+S.57 refuse de migrer vers une version que la veille a retirée. Ce lot-là est
+juste, et il a rendu visible une conséquence qui ne l'était pas.
+
+La question : **que devient un candidat qui n'arbitre pas tout de suite ?**
+
+```
+=== 1. v2 paraît — le dossier est sur v1 ===
+  propagation v1→v2 : {"dossiers":1,"alertes":1,…}
+
+=== 2. Le candidat n'arbitre pas. v3 paraît. ===
+  propagation v2→v3 : {"dossiers":0,"alertes":0,…}
+
+=== 3. Ce que le candidat a devant lui ===
+  divergence vers v2 (ARCHIVED) — migrable : false
+  sa version figée  : v1
+  la version en vigueur aujourd'hui : v3
+  une divergence v1→v3 existe-t-elle ? false
+```
+
+Il est **sans issue**. Sa seule divergence pointe une v2 que v3 a archivée —
+donc non migrable depuis S.57 — et aucune divergence v1→v3 n'existe : la
+propagation ne visait que les dossiers de la version immédiatement
+précédente, `visaRuleId: ancienne.id`.
+
+Le défaut précède S.57. Avant, il pouvait migrer vers v2 : il atterrissait
+sur une règle archivée — ce qui est faux aussi — et n'entendait toujours
+jamais parler de v3. S.57 a transformé une mauvaise issue silencieuse en
+impasse visible, ce qui est un progrès, mais une impasse reste une impasse.
+
+**Deux corrections, et la seconde est la plus importante.**
+
+La propagation vise désormais **toutes** les versions antérieures du même
+pays et type de visa. Et la comparaison se fait depuis la version **du
+dossier**, pas depuis celle que la publication remplace : un dossier resté
+sur v1 doit lire ce qui sépare v1 de v3. Lui montrer le diff v2→v3 lui
+cacherait la moitié de ce qui a changé pour lui — la fumée le vérifie sur le
+montant de preuve de fonds, 10 000 → 15 000 et non 12 000 → 15 000.
+
+`ancienneId` disparaît donc du travail de la file : la passe n'a besoin que
+de la version publiée. Les jobs déjà en file le portent encore, et il est
+simplement ignoré.
+
+**Et une omission de S.56, réparée ici.** Ce lot-là filtrait les comptes en
+cours de suppression dans les deux passes de nuit. La propagation d'une
+divergence envoie elle aussi un courrier, et ne filtrait rien. Je l'avais
+manquée.
+
+| Mutation | Ce qui vire au rouge |
+|---|---|
+| la propagation revient à la seule version précédente | la fumée |
+| le diff se calcule depuis la version remplacée | la fumée |
+| la propagation écrit aux comptes en suppression | la fumée — **après couverture** |
+
+Trois mutations, trois rouges.
+
+**Ce que la fumée a appris au passage.** Ses blocs partageaient tous
+`NL/etudes_mvv_vvr` : avec le nouveau ciblage, ils se comptaient les uns les
+autres. Ce n'est pas le ciblage qui a tort — un dossier resté sur v1 **est**
+concerné par la publication de v3 — c'est la fixture qui était accidentelle.
+Chaque scénario a désormais sa propre procédure, le code pays servant
+d'espace de noms.

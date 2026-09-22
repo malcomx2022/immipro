@@ -335,7 +335,7 @@ try {
     });
 
     await publierLaRegle(v2.id, AUTRE, "Montants IND au 1er janvier");
-    const bilan = await propagerLaPublication(v1.id, v2.id);
+    const bilan = await propagerLaPublication(v2.id);
     verifier(
       bilan.critiques === 1,
       `le seuil relevé met le dossier en pause (${JSON.stringify(bilan)})`,
@@ -447,7 +447,7 @@ try {
     verifier(publiee.archivee === v1.id, `la version dépubliée est bien archivée (${publiee.archivee})`);
     verifier(publiee.divergenceMiseEnFile, "et la divergence part en file");
 
-    const bilan = await propagerLaPublication(v1.id, v2.id);
+    const bilan = await propagerLaPublication(v2.id);
     verifier(bilan.critiques === 1, `le dossier est prévenu (${JSON.stringify(bilan)})`);
     const dossier = await db.application.findUniqueOrThrow({
       where: { id: p.application.id },
@@ -530,7 +530,7 @@ try {
     });
 
     await publierLaRegle(v2.id, AUTRE, "Seuil abaissé par l'IND");
-    const bilan = await propagerLaPublication(v1.id, v2.id);
+    const bilan = await propagerLaPublication(v2.id);
     verifier(
       bilan.alertes === 1 && bilan.critiques === 0,
       `le dossier est prévenu sans être mis en pause (${JSON.stringify(bilan)})`,
@@ -629,7 +629,7 @@ try {
     });
     await publierLaRegle(v2.id, AUTRE, "Délai d'instruction allongé par l'autorité");
 
-    const bilan = await propagerLaPublication(v1.id, v2.id);
+    const bilan = await propagerLaPublication(v2.id);
     verifier(
       bilan.dossiers === 2 && bilan.alertes === 2,
       `les deux candidats sont prévenus (${JSON.stringify(bilan)})`,
@@ -801,6 +801,109 @@ try {
       MOMENT,
     );
     verifier(garde.decision === "CONSERVER", "et conserver reste possible");
+  }
+  console.log("\nWF-11 — le dossier resté deux versions en arrière est rattrapé");
+  {
+    /*
+      La propagation ne visait que les dossiers de la version
+      immédiatement précédente. Un candidat qui n'arbitre pas restait sur
+      v1 : la publication de v3 ciblait les dossiers de v2, et il
+      n'entendait plus jamais parler de rien. Depuis que migrer vers une
+      version archivée est refusé (RG-14.1), il était même sans issue —
+      sa seule divergence pointait une v2 que v3 avait archivée.
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "PT" as const, visaType: "etudes_mvv_vvr" as const,
+      category: "ETUDES" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2029-01-01"), publishedAt: new Date("2026-01-01"),
+    };
+    const avecFonds = (valeur: number) => ({
+      ...(brute.rules as object),
+      preuve_fonds: { valeur, devise: "EUR", periodicite: "annuel" },
+    });
+
+    const un = await db.visaRule.create({
+      data: { ...socle, version: 1, rules: avecFonds(10000) as never,
+        status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    rang += 1;
+    const distrait = await db.user.create({
+      data: { email: `fumee-succ-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const sonDossier = await db.application.create({
+      data: { userId: distrait.id, visaRuleId: un.id, status: "ACTIF" },
+    });
+
+    /*
+      Et un candidat qui a demandé l'oubli. Une alerte réglementaire part
+      par courrier : RG-10.4 vaut ici comme pour les passes de nuit, et
+      cette passe-ci ne filtrait rien.
+    */
+    rang += 1;
+    const partant = await db.user.create({
+      data: {
+        email: `fumee-succ-partant-${rang}-${process.pid}@exemple.test`,
+        role: "CANDIDAT",
+        deletionRequestedAt: new Date("2027-03-30"),
+      },
+    });
+    const dossierDuPartant = await db.application.create({
+      data: { userId: partant.id, visaRuleId: un.id, status: "ACTIF" },
+    });
+
+    const deux = await db.visaRule.create({
+      data: { ...socle, version: 2, rules: avecFonds(12000) as never, status: "PUBLISHED" },
+    });
+    verifier(
+      (await propagerLaPublication(deux.id)).alertes === 1,
+      "v2 le prévient",
+    );
+    verifier(
+      (await db.notification.count({ where: { applicationId: dossierDuPartant.id } })) === 0,
+      "et celui qui a demandé l'oubli n'est pas prévenu (RG-10.4)",
+    );
+
+    /* Il n'arbitre pas. v3 paraît. */
+    await db.visaRule.update({
+      where: { id: deux.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-09-01") },
+    });
+    const trois = await db.visaRule.create({
+      data: { ...socle, version: 3, rules: avecFonds(15000) as never, status: "PUBLISHED" },
+    });
+    const bilanTrois = await propagerLaPublication(trois.id);
+    verifier(
+      bilanTrois.alertes === 1,
+      `et v3 le rattrape, deux versions plus loin (${JSON.stringify(bilanTrois)})`,
+    );
+
+    const vers3 = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: sonDossier.id, toRuleId: trois.id },
+    });
+    verifier(
+      vers3.fromRuleId === un.id,
+      "la divergence part de SA version, pas de celle que v3 remplace",
+    );
+
+    /*
+      Et le diff qu'il lit est celui de v1 à v3 : lui montrer v2→v3 lui
+      cacherait la moitié de ce qui a changé pour lui. 10 000 → 15 000, et
+      non 12 000 → 15 000.
+    */
+    const lignes = vers3.diff as unknown as { champ: string; avant: unknown; apres: unknown }[];
+    const fonds = lignes.find((l) => l.champ === "preuve_fonds");
+    verifier(
+      fonds?.avant === 10000 && fonds?.apres === 15000,
+      `et il porte l'écart depuis sa version (${JSON.stringify(fonds)})`,
+    );
+
+    verifier(
+      (await divergenceAArbitrer(vers3.id, distrait.id)).migrable,
+      "cette fois, il peut migrer",
+    );
   }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);

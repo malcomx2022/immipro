@@ -12,6 +12,7 @@ import { envoyerAlerteCritique } from "@/server/courrier";
 import { suiteDeLEnvoi } from "@/domain/courrier/transport";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { editorialDe } from "@/lib/contenu/destinations";
+import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 
 /**
  * Divergence réglementaire — WF-11.
@@ -53,7 +54,13 @@ export function comparer(
 }
 
 export interface Bilan {
-  /** Dossiers rattachés à la version précédente, donc concernés. */
+  /**
+   * Dossiers rattachés à **une** version antérieure, donc concernés.
+   *
+   * Pas seulement celle que cette publication remplace : un dossier qui
+   * n'a pas arbitré la fois d'avant est resté plus loin en arrière, et
+   * c'est précisément lui qu'on perdait.
+   */
   dossiers: number;
   /** Dossiers alertés par cette passe. */
   alertes: number;
@@ -119,22 +126,34 @@ const BILAN_VIDE: Bilan = {
  *    fois.
  */
 export async function propagerLaPublication(
-  ancienneId: string,
   nouvelleId: string,
   maintenant: Date = new Date(),
 ): Promise<Bilan> {
-  const [ancienne, nouvelle] = await Promise.all([
-    db.visaRule.findUnique({ where: { id: ancienneId } }),
-    db.visaRule.findUnique({ where: { id: nouvelleId } }),
-  ]);
-  if (!ancienne || !nouvelle) return { ...BILAN_VIDE };
+  const nouvelle = await db.visaRule.findUnique({ where: { id: nouvelleId } });
+  if (!nouvelle) return { ...BILAN_VIDE };
 
-  const { impact, diff, delaiDInstruction } = comparer(ancienne, nouvelle);
-  if (impact === "MINEUR" && diff.length === 0) return { ...BILAN_VIDE };
+  /*
+    Toutes les versions antérieures, et pas seulement celle que cette
+    publication remplace. Un dossier qui n'a pas arbitré la fois d'avant
+    est resté sur v1 ; viser les seuls dossiers de v2 le laissait sans
+    rien — et depuis que migrer vers une version archivée est refusé
+    (RG-14.1), sans issue.
 
+    Le filtre de compte est celui des passes de nuit : une alerte
+    réglementaire part par courrier, et on n'écrit pas à qui a demandé
+    l'oubli.
+  */
   const dossiers = await db.application.findMany({
-    where: { visaRuleId: ancienne.id, status: { in: ["ACTIF", "PRET"] } },
-    include: { user: { select: { email: true } } },
+    where: {
+      status: { in: ["ACTIF", "PRET"] },
+      user: COMPTE_JOIGNABLE,
+      visaRule: {
+        countryCode: nouvelle.countryCode,
+        visaType: nouvelle.visaType,
+        version: { lt: nouvelle.version },
+      },
+    },
+    include: { user: { select: { email: true } }, visaRule: true },
   });
 
   const edito = editorialDe(nouvelle.countryCode, nouvelle.visaType);
@@ -145,11 +164,21 @@ export async function propagerLaPublication(
 
   for (const dossier of dossiers) {
     try {
+      if (!dossier.visaRule) continue;
+      /*
+        La comparaison se fait depuis **sa** version, pas depuis celle que
+        la publication remplace. Un dossier resté sur v1 doit lire ce qui
+        sépare v1 de v3 : lui montrer le diff v2→v3 lui cacherait la
+        moitié de ce qui a changé pour lui.
+      */
+      const { impact, diff, delaiDInstruction } = comparer(dossier.visaRule, nouvelle);
+      if (impact === "MINEUR" && diff.length === 0) continue;
+
       const migration = await db.ruleMigration.upsert({
         where: { applicationId_toRuleId: { applicationId: dossier.id, toRuleId: nouvelle.id } },
         create: {
           applicationId: dossier.id,
-          fromRuleId: ancienne.id,
+          fromRuleId: dossier.visaRule.id,
           toRuleId: nouvelle.id,
           impact,
           diff: diff as never,
