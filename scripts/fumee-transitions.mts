@@ -638,7 +638,7 @@ try {
       data: { email: `fumee-inact-patient-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
     });
     const loin = (await ouvrirDossier(patient.id, v.id, new Date("2029-09-01T00:00:00Z"))).id;
-    await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${ilYA(ABANDON_JOURS + 35)} WHERE id = ${loin.id}`;
+    await db.$executeRaw`UPDATE "Application" SET "createdAt" = ${ilYA(ABANDON_JOURS + 35)} WHERE id = ${loin}`;
 
     /*
       Et celui qui a coché toutes ses échéances, puis n'est jamais revenu.

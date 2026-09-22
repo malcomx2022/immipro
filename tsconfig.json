@@ -17,6 +17,16 @@
     "plugins": [{ "name": "next" }],
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    // Les fumées, qui sont des `.mts` : `**/*.ts` ne les couvrait pas.
+    // Elles sont la couche de vérification la plus précieuse du dépôt, et
+    // un champ renommé dans un module serveur les cassait en silence — le
+    // typage restait vert, et seul un passage complet le disait.
+    "**/*.mts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }

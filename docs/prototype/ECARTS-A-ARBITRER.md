@@ -8219,3 +8219,47 @@ scripts/fumee-publication.mts(362,7): TS2554 — Expected 2 arguments, but got 1
 
 Une clé `user` écrite deux fois, et un `editorialDe("AE")` à un argument
 masqué par un `as never`. C'est le lot suivant, et il tient debout seul.
+
+---
+
+### S.60 — La couche de vérification que le garde-fou ne regardait pas
+
+Le lot précédent s'est terminé sur un constat : en renommant `migrable` en
+`blocage`, j'ai cassé deux assertions de `fumee-publication.mts`, et
+`npm run typecheck` est resté vert.
+
+`tsconfig.json` incluait `**/*.ts`. Les fumées sont des `.mts`. **Elles
+n'étaient pas typées** — alors qu'elles sont, dans ce dépôt, la couche qui
+attrape ce qu'aucun essai pur n'attrape : un champ renommé dans un module
+serveur les cassait en silence, et seul un passage complet le disait.
+
+La portée étendue fait apparaître quatre défauts, tous antérieurs :
+
+```
+scripts/fumee-balayage.mts(349,5)    TS1117  clé « user » écrite deux fois
+scripts/fumee-publication.mts(362,7) TS2554  editorialDe("AE") — un argument sur deux
+scripts/fumee-transitions.mts(641)   TS2339  `loin.id` sur une chaîne
+scripts/sandbox-paiement.mts(73,32)  TS2554  retrouver() — deux arguments sur trois
+```
+
+Plus `@types/pg`, absent, que tous les scripts touchent.
+
+**Le troisième est le plus instructif, et il est de moi.** Il vient du lot
+S.55 : `loin` est déjà un identifiant, et `${loin.id}` valait `undefined`.
+L'`UPDATE` ne touchait aucune ligne, le dossier n'était donc **pas** antidaté,
+et l'assertion « ni celui dont la première échéance est en 2029 » passait
+parce qu'un dossier ouvert le jour même n'est inactif pour personne — pas
+parce que l'échéance à venir suspendait l'horloge.
+
+Elle passait pour la mauvaise raison. La mutation le confirme : avant
+réparation, débrancher la suspension donnait `relances: 2` — le dossier était
+relancé, pas clos ; après réparation, elle le ferme, et l'assertion mord pour
+ce qu'elle prétend éprouver.
+
+`editorialDe("AE")` mérite une ligne aussi : l'argument manquant était masqué
+par un `as never`. Une assertion de type qui fait taire le compilateur fait
+taire ce qu'il avait à dire.
+
+**Ce que ce lot ne fait pas.** Il ne change aucun comportement du produit :
+quatre scripts de vérification et un fichier de configuration. C'est le
+garde-fou qu'il déplace, pas la règle.
