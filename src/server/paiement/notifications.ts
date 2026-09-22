@@ -14,7 +14,20 @@ import type { CauseRefus } from "@/domain/paiement/echec";
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-const ETATS_FEDAPAY: Record<string, TransactionStatus> = {
+/**
+ * Les états de transaction de FedaPay.
+ *
+ * Écrite d'après des charges utiles de notification observées, puis
+ * **confirmée par la documentation publique** le 22/09/2026, qui donne la
+ * même liste : `pending`, `approved`, `canceled`, `refunded`, `declined`,
+ * `transferred`. Deux sources indépendantes qui concordent.
+ *
+ * Exportée pour que la consultation (RG-05.4) lise la même table que la
+ * notification signée. Une seconde table divergerait au premier
+ * correctif, et les deux chemins se mettraient à traduire le même mot
+ * différemment — sur une décision qui crédite ou impute un échec.
+ */
+export const ETATS_FEDAPAY: Record<string, TransactionStatus> = {
   approved: "CONFIRMEE",
   transferred: "CONFIRMEE",
   pending: "EN_ATTENTE",
@@ -49,7 +62,7 @@ const ETATS_FEDAPAY: Record<string, TransactionStatus> = {
  * et **ne bloque rien** ; elle décidera si une valeur stable existe. Un
  * test tient la condition d'ici là.
  */
-const CAUSES_FEDAPAY: Record<string, CauseRefus> = {
+export const CAUSES_FEDAPAY: Record<string, CauseRefus> = {
   declined: "REFUS_EMETTEUR",
   canceled: "ANNULE_PAR_LE_PAYEUR",
   failed: "INCIDENT_TECHNIQUE",

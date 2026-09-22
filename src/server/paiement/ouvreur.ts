@@ -78,6 +78,14 @@ export interface Ouvreur {
    * La référence attendue est passée, et non déduite de la réponse : une
    * session retrouvée doit porter **notre** référence, sans quoi ce n'est
    * pas la nôtre. La vérifier contre elle-même ne vérifierait rien.
+   *
+   * La devise l'est aussi, et pour une raison moins évidente : un
+   * fournisseur peut rendre une transaction **sans code ISO** — FedaPay
+   * documente `currency_id`, un entier, sur sa lecture. Sans elle, la
+   * reprise rendait une devise vide, la concordance échouait, et
+   * **toute reprise se soldait par un écart** là où rien ne divergeait.
+   * Elle ne sert que de repli : dès que le fournisseur dit la devise,
+   * c'est la sienne qui est rendue et comparée.
    */
-  retrouver: (providerTxId: string, reference: string) => Promise<Ouverture>;
+  retrouver: (providerTxId: string, reference: string, devise: Devise) => Promise<Ouverture>;
 }

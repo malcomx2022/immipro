@@ -74,7 +74,7 @@ export function leConsultant(
   const lu = environnementNormalise(environnement);
   if (fournisseur === "FEDAPAY") {
     const cle = (lu[CLES.FEDAPAY.apiKey] ?? "").trim();
-    return cle ? consultantFedaPay() : null;
+    return cle ? consultantFedaPay(cle, lu[CLES.FEDAPAY.environnement]) : null;
   }
   const cle = (lu[CLES.STRIPE.apiKey] ?? "").trim();
   return cle ? consultantStripe(cle) : null;

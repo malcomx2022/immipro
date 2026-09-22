@@ -187,7 +187,7 @@ export async function ouvrirLeTunnel(
   const { transaction, reprise } = await creerOuReprendre(userId, achat, devise);
 
   const ouverture = transaction.providerTxId
-    ? await ouvreur.retrouver(transaction.providerTxId, transaction.reference)
+    ? await ouvreur.retrouver(transaction.providerTxId, transaction.reference, devise)
     : await ouvreur.creer({
         reference: transaction.reference,
         // Recalculé par `creerOuReprendre`, jamais reçu du navigateur.
