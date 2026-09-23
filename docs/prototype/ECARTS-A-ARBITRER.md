@@ -9493,3 +9493,75 @@ Le fait est consigné parce qu'il dit quelque chose de ces tests : un
 garde-fou qui lit des sources se trompe d'abord contre le code honnête, et
 c'est le sens de l'accusation qui trompe — un test rouge fait chercher le
 défaut dans le code accusé, jamais dans le test.
+
+## S.80 — Le pack Pro vendait ce que tout le monde a déjà
+
+J'avais consigné au registre que « le comparateur vendu dans le pack Pro
+n'existe pas ». **C'était faux, et le vérifier valait mieux que le répéter.**
+C-03 existe, il est bien construit, et son commentaire dit même pourquoi :
+« un comparateur qui contredit la fiche qu'il compare est pire qu'un
+comparateur absent ».
+
+Le défaut est ailleurs, et il est réel.
+
+### Ce que la page vendait, en regard de ce que le code donne
+
+```
+Essentiel     — analyses 10, destinations 1
+    "Checklist complète et échéancier jusqu'au dépôt"
+    "Analyse de 10 pièces, avec message de correction"
+    "Complétude du dossier et prochaine action"
+Dossier       — analyses 30, destinations 1
+    "Tout l'Essentiel, sur une destination"
+    "Analyse de 30 pièces"
+    "Rédaction assistée de la lettre de motivation"
+Dossier Pro   — analyses 90, destinations 3
+    "Tout le pack Dossier, sur trois destinations"
+    "Analyse de 90 pièces"
+    "Comparateur des trois dossiers en parallèle"
+```
+
+Deux lignes sur douze sont fausses.
+
+**« Comparateur des trois dossiers en parallèle »** — C-03 compare des
+**destinations** publiées, pas des dossiers. Et sa page n'appelle que
+`exigerCandidat` : aucune garde de pack, une entrée inconditionnelle dans la
+navigation principale. Le pack le plus cher vendait donc ce que tout
+candidat a déjà, sous un nom qui désigne autre chose.
+
+**« Rédaction assistée de la lettre de motivation »** — les routes de
+rédaction ne vérifient aucun pack ; elles débitent le quota d'analyses. Un
+acheteur d'Essentiel en a dix, donc il l'a aussi. L'annoncer au seul Dossier
+laissait entendre le contraire.
+
+Le reste est exact, y compris pour le pack gratuit : un brouillon fige sa
+version de règle à l'ouverture (`ouvrirDossier`), il reçoit donc bien les
+alertes de changement.
+
+### Le pack Dossier n'a plus que deux lignes
+
+Ce qui le distingue d'Essentiel est son volume d'analyses, et rien d'autre :
+même destination, mêmes écrans, même rédaction. Lui inventer une troisième
+ligne pour égaliser les cartes aurait été la faute qu'on corrige — un
+avantage écrit pour remplir une place, comme le « 0 pièce à réunir » de S.76
+ou le zéro de B-07.
+
+### Ce qui rend la dérive plus difficile
+
+Les phrases quittent l'écran pour `domain/payments/avantages.ts`, et les
+nombres y sont **interpolés depuis `PACKS`** au lieu d'être recopiés. Un
+test les compare un à un, refuse qu'un pack revende le comparateur, vérifie
+que la rédaction est annoncée au palier où elle s'ouvre, et qu'aucune ligne
+n'est trop courte pour dire quelque chose.
+
+Trois mutations le tiennent : le comparateur remis dans Pro, un nombre
+recopié à la main, la rédaction remontée au seul Dossier — chacune ne fait
+tomber que son assertion.
+
+### Ce que ce lot ne tranche pas
+
+Le positionnement. Si l'intention commerciale est que la rédaction distingue
+Dossier, ce n'est pas la page qu'il faut corriger mais la route, qui ne
+vérifie aucun pack. Et si un comparateur **de dossiers** est prévu — ce que
+WF-03 laisse entendre —, la ligne pourra revenir quand il existera. Ce lot
+fait dire à la page ce que le code fait aujourd'hui, rien de plus.
