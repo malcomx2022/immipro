@@ -144,9 +144,17 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
         l&apos;administration.
       </SourceNote>
 
-      {/* Barre d'action : dernier élément du DOM, règle clavier 12. */}
+      {/* Barre d'action : dernier élément du DOM, règle clavier 12.
+
+          Elle concluait à partir des seules pièces, et disait « Rien ne
+          bloque le dépôt » soixante-dix lignes sous un en-tête qui annonce
+          « Dossier incomplet — 1 exigence n'est pas remplie ». Les deux
+          nombres qui décident sont dans la complétude, déjà lue par le
+          bloc de palier au-dessus. */}
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row md:items-center md:justify-between">
-        <p className="text-14 text-ink-700">{libelleBlocage(pieces)}</p>
+        <p className="text-14 text-ink-700">
+          {libelleBlocage(dossier.completude.compteurs)}
+        </p>
         {premiere ? (
           <LienBouton
             href={lienDePiece(id, premiere)}

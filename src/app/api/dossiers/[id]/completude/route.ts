@@ -40,7 +40,7 @@ export const GET = route({
         Le même nombre que l'en-tête, sans quoi les deux phrases se
         contredisent à quelques lignes d'écart sur le même écran.
       */
-      blocage: libelleBlocage(pieces, completude.compteurs.exigencesNonTenues),
+      blocage: libelleBlocage(completude.compteurs),
       pieces,
     };
   },

@@ -8955,3 +8955,74 @@ Ce qui manque est un garde-fou, pas un correctif de plus : un test qui refuse
 qu'une conclusion sur le dépôt se calcule sans le compteur d'exigences. Je ne
 sais pas encore l'écrire sans qu'il soit un test de source, ce que S.1 a
 enseigné à se méfier.
+
+## S.72 — Le garde-fou, et la sixième occurrence qu'il a trouvée
+
+S.71 s'est arrêté sur une phrase : « ce qui manque est un garde-fou, pas un
+correctif de plus ». Ce lot l'écrit. Il a trouvé la sixième occurrence en
+moins d'une minute, et ce n'est pas une coïncidence : c'est ce qui distingue
+un garde-fou d'un correctif.
+
+### Ce que la valeur par défaut rendait légal
+
+S.70 a donné un second paramètre à `libelleBlocage` et `libelleAPreparer`,
+avec une valeur par défaut : `exigences = 0`. La valeur par défaut est
+exactement le trou. Elle rend l'omission légale, silencieuse et rassurante —
+un appelant qui ne connaît pas le paramètre obtient la phrase d'avant, sans
+rien voir.
+
+C-06 l'appelait ainsi. Sur un dossier dont toutes les pièces sont conformes
+et qu'une exigence tient à « incomplet », l'écran affichait, de haut en bas :
+
+    Dossier incomplet
+    1 exigence n'est pas remplie
+    8 pièces déjà conformes
+    […]
+    Rien ne bloque le dépôt
+
+Soixante-dix lignes d'écart, le même écran, la contradiction complète. Le
+compilateur l'a nommée dès que la valeur par défaut a disparu ; six lots de
+lecture ne l'avaient pas vue.
+
+### Le garde-fou : le type, pas le test
+
+`libelleBlocage` ne reçoit plus de pièces du tout. Les deux nombres qui
+décident vivent ensemble dans `compteurs`, et le type `CompteursDeBlocage`
+les extrait de là plutôt que de les redéfinir. `prochaineAction` perd de même
+ses deux paramètres facultatifs.
+
+Il n'y a donc plus d'appel qui conclue à partir des seules pièces, parce que
+le type n'en accepte plus. Écrire `{ obligatoiresManquantes: 0,
+exigencesNonTenues: 0 }` reste possible — c'est alors une affirmation qui
+apparaît dans la diff et se justifie, comme une entrée de
+`copy-exceptions.json`, et non un oubli.
+
+Au passage, une seconde implémentation disparaît : `libelleBlocage`
+recomptait ses bloquantes avec `grouperPourCompletude`. Les deux comptages
+ont été comparés sur les 256 combinaisons de deux pièces avant le
+déplacement — ils ne diffèrent jamais. C'est ce qu'il fallait établir pour
+que le déplacement ne change rien d'autre.
+
+### Le dossier témoin
+
+Un fixture, une fois : toutes les pièces conformes, une exigence de la règle
+figée qu'aucune pièce ne lève. Cinq phrases de conclusion passent dessus dans
+un `it.each`, et aucune n'a le droit de rassurer. Le contrôle négatif vérifie
+que les mêmes phrases rassurent bien quand plus rien ne bloque — sans lui, le
+tableau passerait aussi sur un code qui ne saurait plus rien dire.
+
+Les deux sens ont été vérifiés par mutation : `libelleBlocage` qui ignore les
+exigences fait tomber quatre tests, `libelleAPreparer` qui tait la mention en
+fait tomber trois, et une phrase qui alarme sans raison fait tomber le
+contrôle négatif.
+
+### Ce que ce garde-fou ne fait pas
+
+Il ne découvre pas une septième phrase. Aucun test ici ne lit les sources :
+S.1 a enseigné qu'un test qui grep le dépôt vérifie l'écriture et non le
+comportement. Le tableau **nomme** l'invariant et offre l'endroit où une
+septième ligne s'ajoute ; ce qui rend l'omission impossible est le type.
+
+Une fonction entièrement nouvelle qui conclurait depuis `readonly Piece[]`
+reste écrivable. Ce qui ne l'est plus, c'est de la brancher sur les phrases
+existantes sans que le compilateur le demande.

@@ -7,7 +7,7 @@ import {
   type StatutDossier,
 } from "@/domain/dossiers/dossier";
 import { prochaineAction, versStatut } from "@/server/vue/dossier";
-import type { Piece } from "@/domain/dossiers/piece";
+import { completudeDesPieces, type Piece } from "@/domain/dossiers/piece";
 
 /**
  * Un dossier mis en pause par une divergence critique — WF-11, C-01, C-07.
@@ -63,16 +63,24 @@ describe("Ce que la prochaine action annonce", () => {
     // Toutes les pièces conformes : c'est précisément le cas où l'ancienne
     // phrase était fausse.
     const conforme = [piece("CONFORME")];
-    expect(prochaineAction(conforme, "PRET")).toBe("Rien ne bloque un dépôt.");
-    expect(prochaineAction(conforme, "EN_PAUSE")).toBe(MENTION_EN_PAUSE);
+    expect(prochaineAction(conforme, "PRET", completudeDesPieces(conforme))).toBe(
+      "Rien ne bloque un dépôt.",
+    );
+    expect(prochaineAction(conforme, "EN_PAUSE", completudeDesPieces(conforme))).toBe(
+      MENTION_EN_PAUSE,
+    );
   });
 
   it("la dit aussi quand des pièces manquent : la pause prime", () => {
     // Réunir la pièce ne lèverait pas la pause. Envoyer le candidat la
     // chercher d'abord lui ferait faire le travail dans le mauvais ordre.
     const manquante = [piece("ATTENDUE")];
-    expect(prochaineAction(manquante, "EN_PAUSE")).toBe(MENTION_EN_PAUSE);
-    expect(prochaineAction(manquante, "ACTIF")).toMatch(/passeport/u);
+    expect(prochaineAction(manquante, "EN_PAUSE", completudeDesPieces(manquante))).toBe(
+      MENTION_EN_PAUSE,
+    );
+    expect(prochaineAction(manquante, "ACTIF", completudeDesPieces(manquante))).toMatch(
+      /passeport/u,
+    );
   });
 
   /** Le constat, puis le geste, puis où il se fait (doctrine d'erreur). */

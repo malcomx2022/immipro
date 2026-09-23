@@ -139,7 +139,7 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row md:items-center md:justify-between">
         <p className="text-14 text-ink-700">
-          {libelleBlocage(pieces, exigences.length)}
+          {libelleBlocage(dossier.completude.compteurs)}
         </p>
         <LienBouton
           href={`/dossiers/${id}`}

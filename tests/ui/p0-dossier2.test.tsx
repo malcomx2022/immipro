@@ -53,6 +53,36 @@ const rendrePiece = (props: Partial<Parameters<typeof PieceDuDossier>[0]> = {}) 
     />,
   );
 
+/**
+ * Le dossier témoin, rendu — toutes les pièces conformes, une exigence de
+ * la règle figée qu'aucune pièce ne lève.
+ *
+ * Les deux écrans qui portent une barre d'action le rendent, et aucun n'a
+ * le droit d'y écrire « Rien ne bloque le dépôt ».
+ */
+const conformes = PIECES_NL.map((p) => ({ ...p, etat: "CONFORME" as const }));
+const DOSSIER_BLOQUE = {
+  ...DOSSIER,
+  completude: {
+    palier: "INCOMPLET" as const,
+    ready: false,
+    missing: [
+      {
+        code: "attestation_prealable",
+        message: "L'autorité exige une attestation préalable de l'établissement.",
+        bloquant: true,
+        origine: "exigence" as const,
+      },
+    ],
+    compteurs: {
+      obligatoiresManquantes: 0,
+      exigencesNonTenues: 1,
+      facultativesManquantes: 0,
+      conformes: conformes.length,
+    },
+  },
+};
+
 describe("C-06 — Checklist", () => {
   /**
    * La fausse alarme que le nom du champ produisait.
@@ -155,6 +185,23 @@ describe("C-06 — Checklist", () => {
     const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toMatch(/Information vérifiée le .* source : ind\.nl/);
   });
+
+  /**
+   * L'écran se contredisait sur soixante-dix lignes : l'en-tête annonçait
+   * « Dossier incomplet — 1 exigence n'est pas remplie », la barre d'action
+   * « Rien ne bloque le dépôt ». Elle concluait à partir des seules pièces,
+   * qui sont toutes conformes ici.
+   */
+  it("ne dit pas « rien ne bloque » sous un en-tête qui dit l'inverse", () => {
+    const { container } = render(
+      <Checklist dossier={DOSSIER_BLOQUE} pieces={conformes} />,
+    );
+    const texte = container.textContent ?? "";
+
+    expect(texte).toContain("1 exigence n'est pas remplie");
+    expect(texte).toContain("1 exigence bloque le dépôt");
+    expect(texte).not.toContain("Rien ne bloque le dépôt");
+  });
 });
 
 describe("C-09 — Complétude", () => {
@@ -192,28 +239,7 @@ describe("C-09 — Complétude", () => {
    * manque » — vrai sur les pièces, et muet sur le seul blocage.
    */
   describe("quand une exigence de la règle bloque", () => {
-    const conformes = PIECES_NL.map((p) => ({ ...p, etat: "CONFORME" as const }));
-    const bloque = {
-      ...DOSSIER,
-      completude: {
-        palier: "INCOMPLET" as const,
-        ready: false,
-        missing: [
-          {
-            code: "attestation_prealable",
-            message: "L'autorité exige une attestation préalable de l'établissement.",
-            bloquant: true,
-            origine: "exigence" as const,
-          },
-        ],
-        compteurs: {
-          obligatoiresManquantes: 0,
-          exigencesNonTenues: 1,
-          facultativesManquantes: 0,
-          conformes: conformes.length,
-        },
-      },
-    };
+    const bloque = DOSSIER_BLOQUE;
 
     it("énumère l'exigence avec son message, là où l'écran promet les blocages", () => {
       const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
