@@ -3,7 +3,7 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
-import { libellePieces, type FicheDestination } from "@/domain/destinations/fiche";
+import { LISTE_VIDE, libellePieces, type FicheDestination } from "@/domain/destinations/fiche";
 import { cn } from "@/lib/utils";
 
 /**
@@ -108,7 +108,14 @@ export function FicheDetaillee({ fiche }: { fiche: FicheDestination }) {
         tabIndex={0}
         className="flex flex-col gap-4 outline-none"
       >
-        {actif === "conditions" ? (
+        {/* Chaque onglet dit ce qu'il en est quand sa liste est vide. Un
+            panneau blanc sous l'onglet qu'on vient de choisir se lit comme
+            un écran qui a échoué à charger, et n'apprend rien. */}
+        {actif === "conditions" && fiche.conditions.length === 0 ? (
+          <p className="text-pretty text-14 text-ink-700">{LISTE_VIDE.conditions}</p>
+        ) : null}
+
+        {actif === "conditions" && fiche.conditions.length > 0 ? (
           <dl className="flex flex-col">
             {fiche.conditions.map((c) => (
               <div
@@ -122,7 +129,11 @@ export function FicheDetaillee({ fiche }: { fiche: FicheDestination }) {
           </dl>
         ) : null}
 
-        {actif === "couts" ? (
+        {actif === "couts" && fiche.reperes.length === 0 ? (
+          <p className="text-pretty text-14 text-ink-700">{LISTE_VIDE.couts}</p>
+        ) : null}
+
+        {actif === "couts" && fiche.reperes.length > 0 ? (
           <dl className="flex flex-col">
             {fiche.reperes.map((r) => (
               <div
@@ -140,16 +151,23 @@ export function FicheDetaillee({ fiche }: { fiche: FicheDestination }) {
 
         {actif === "pieces" ? (
           <div className="flex flex-col gap-3">
+            {/* « 0 pièce à réunir … le détail, pièce par pièce » promettait
+                un détail sur une liste vide. */}
             <p className="text-16 text-ink-700">
-              {libellePieces(fiche.piecesAReunir)} pour cette destination. Le
-              détail, pièce par pièce, s&apos;ouvre avec le dossier.
+              {fiche.piecesAReunir > 0
+                ? `${libellePieces(fiche.piecesAReunir)} pour cette destination. Le détail, pièce par pièce, s'ouvre avec le dossier.`
+                : `${libellePieces(fiche.piecesAReunir)} pour cette destination. La checklist se construit à l'ouverture du dossier, depuis la version de la règle qui y est figée.`}
             </p>
             <p className="text-pretty text-14 text-ink-700">{fiche.travailEtudiant}</p>
             <p className="text-pretty text-14 text-ink-700">{fiche.apresDiplome}</p>
           </div>
         ) : null}
 
-        {actif === "reserves" ? (
+        {actif === "reserves" && fiche.reserves.length === 0 ? (
+          <p className="text-pretty text-14 text-ink-700">{LISTE_VIDE.reserves}</p>
+        ) : null}
+
+        {actif === "reserves" && fiche.reserves.length > 0 ? (
           <div className="flex flex-col gap-3">
             {fiche.reserves.map((r) => (
               <div

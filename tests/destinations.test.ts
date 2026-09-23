@@ -17,6 +17,13 @@ describe("fiches destination", () => {
   it("accorde le décompte des pièces", () => {
     expect(libellePieces(8)).toBe("8 pièces à réunir");
     expect(libellePieces(1)).toBe("1 pièce à réunir");
+    /*
+      Zéro n'est pas un nombre de pièces mais une absence de liste. La forme
+      accordée rendait « 0 pièce à réunir », et C-04 enchaînait « le détail,
+      pièce par pièce, s'ouvre avec le dossier » — un détail promis sur une
+      liste vide. Quatre écrans lisent ce libellé.
+    */
+    expect(libellePieces(0)).toBe("Aucune pièce n'est consignée");
   });
 });
 

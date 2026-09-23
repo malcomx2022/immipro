@@ -4,6 +4,7 @@ import { TableauDeBord } from "@/app/(app)/(dossier)/tableau-de-bord/TableauDeBo
 import { Comparateur } from "@/app/(app)/(dossier)/comparateur/Comparateur";
 import { Profil } from "@/app/(app)/(dossier)/profil/Profil";
 import { FicheDetaillee } from "@/app/(app)/(dossier)/fiches/[slug]/FicheDetaillee";
+import { LISTE_VIDE } from "@/domain/destinations/fiche";
 import {
   OuvertureDossier,
   datesProposees,
@@ -195,6 +196,68 @@ describe("C-04 — Fiche détaillée", () => {
     render(<FicheDetaillee fiche={PAYS_BAS} />);
     fireEvent.click(screen.getByRole("tab", { name: "Réserves" }));
     expect(screen.getByText(/réévalué chaque année en janvier/)).toBeDefined();
+  });
+
+  /**
+   * ── Trois onglets se taisaient ──────────────────────────────────────
+   *
+   * Sondé avant correction, sur une fiche dont les listes sont vides :
+   *
+   *     Conditions   → ""
+   *     Coûts        → ""
+   *     Réserves     → ""
+   *
+   * Un panneau blanc sous l'onglet qu'on vient de choisir. Le cas n'est pas
+   * théorique : `reserves` porte `.default([])` dans le schéma, et ni
+   * `conditions` ni `pieces_requises` n'ont de minimum.
+   */
+  describe("quand une section n'a rien à montrer", () => {
+    const depouillee = {
+      ...PAYS_BAS,
+      conditions: [],
+      reperes: [],
+      reserves: [],
+      piecesAReunir: 0,
+    };
+
+    it.each([
+      ["Conditions", LISTE_VIDE.conditions],
+      ["Coûts", LISTE_VIDE.couts],
+      ["Réserves", LISTE_VIDE.reserves],
+    ])("l'onglet %s dit ce qu'il en est au lieu de se taire", (onglet, phrase) => {
+      render(<FicheDetaillee fiche={depouillee} />);
+      fireEvent.click(screen.getByRole("tab", { name: onglet }));
+
+      const panneau = screen.getByRole("tabpanel");
+      expect(panneau.textContent).not.toBe("");
+      expect(panneau.textContent).toContain(phrase);
+    });
+
+    /*
+      « Aucune réserve » se lirait comme « aucun risque » — une promesse sur
+      une décision qui ne nous appartient pas. La phrase dit que le
+      référentiel n'en consigne pas, et le test tient cette nuance-là.
+    */
+    it("ne transforme pas une absence de réserve en absence de risque", () => {
+      render(<FicheDetaillee fiche={depouillee} />);
+      fireEvent.click(screen.getByRole("tab", { name: "Réserves" }));
+
+      expect(screen.getByRole("tabpanel").textContent).toContain(
+        "pas qu'il n'y a rien à surveiller",
+      );
+    });
+
+    /* « 0 pièce à réunir … le détail, pièce par pièce » promettait un
+       détail sur une liste vide. */
+    it("ne promet pas un détail pièce par pièce sur une checklist vide", () => {
+      render(<FicheDetaillee fiche={depouillee} />);
+      fireEvent.click(screen.getByRole("tab", { name: "Pièces" }));
+
+      const panneau = screen.getByRole("tabpanel");
+      expect(panneau.textContent).toContain("Aucune pièce n'est consignée");
+      expect(panneau.textContent).not.toContain("pièce par pièce");
+      expect(panneau.textContent).not.toContain("0 pièce");
+    });
   });
 });
 

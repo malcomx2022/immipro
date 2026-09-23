@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
-import { libellePieces } from "@/domain/destinations/fiche";
+import { LISTE_VIDE, libellePieces } from "@/domain/destinations/fiche";
 import { ficheParSlugPubliee } from "@/server/lecture/destinations";
 
 /**
@@ -103,6 +103,11 @@ export default async function PageDestination({
 
         <section className="flex flex-col gap-3">
           <h2 className="text-19 font-semibold text-ink-900">Conditions principales</h2>
+          {/* Un titre sans rien dessous se lit comme une page qui a échoué
+              à charger. La section dit ce qu'il en est. */}
+          {fiche.conditions.length === 0 ? (
+            <p className="text-pretty text-16 text-ink-700">{LISTE_VIDE.conditions}</p>
+          ) : null}
           <dl className="flex flex-col">
             {fiche.conditions.map((c) => (
               <div
@@ -128,6 +133,9 @@ export default async function PageDestination({
 
         <section className="flex flex-col gap-3">
           <h2 className="text-19 font-semibold text-ink-900">Réserves</h2>
+          {fiche.reserves.length === 0 ? (
+            <p className="text-pretty text-16 text-ink-700">{LISTE_VIDE.reserves}</p>
+          ) : null}
           {fiche.reserves.map((r) => (
             <div
               key={r.texte}
