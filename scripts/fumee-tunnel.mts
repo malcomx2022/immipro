@@ -70,6 +70,10 @@ if (migration.status !== 0) {
 */
 const { db } = await import("../src/lib/db");
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
+const { ouvrirDossier } = await import("../src/server/acces/dossiers");
+const { solde } = await import("../src/server/acces/quota");
+const { getPack, analysesParDestination } = await import("../src/domain/payments/pricing");
+const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
 const { cleDOuverture } = await import("../src/domain/paiement/ouverture");
 const { tarifDe } = await import("../src/domain/payments/achat");
 const { estAbouti } = await import("../src/server/paiement/cycle");
@@ -433,6 +437,80 @@ try {
       (await db.analysisCredit.count({ where: { applicationId } })) === 0,
       "et n'ouvre évidemment aucun quota",
     );
+  }
+
+  // ── Un pack qui annonce trois destinations en couvre trois ──────────
+  console.log("\nRG-03.1 — un pack couvre le nombre de destinations qu'il annonce");
+  {
+    /*
+      `Pack.destinations` — Essentiel 1, Dossier 1, Pro 3 — était déclaré
+      et lu par personne. Un Pro à 45 000 XOF, dont le badge annonce
+      « Trois destinations comparées en parallèle », ouvrait ses
+      quatre-vingt-dix analyses sur un seul dossier : le candidat payait
+      trois fois le prix de Dossier et recevait un seul dossier servi.
+
+      La grille dit l'intention : 90 = 3 × 30, donc une destination de Pro
+      ouvre exactement ce qu'ouvre un pack Dossier. Le prix n'est pas
+      linéaire — 59 € ne font pas trois fois 29 —, c'est un lot remisé.
+    */
+    const { userId, applicationId } = await candidat();
+    const pro = getPack("pro")!;
+    const part = analysesParDestination(pro);
+    verifier(part * pro.destinations === pro.analyses, `la part se divise sans reste (${part})`);
+
+    const ouvert = await ouvrirLeTunnel(
+      userId,
+      { type: "pack", code: "pro", applicationId } as const,
+      "XOF",
+      ouvreurSimule(),
+    );
+    const achat = await db.transaction.findFirstOrThrow({ where: { userId } });
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_pro_${process.pid}`,
+      providerTxId: achat.providerTxId!,
+      reference: ouvert.reference,
+      statut: "CONFIRMEE" as const,
+    });
+
+    const vise = await solde(applicationId);
+    verifier(vise === part, `le dossier visé reçoit sa part, pas le pack entier (${vise})`);
+
+    /*
+      Les deux destinations restantes s'ouvrent avec les dossiers, et il
+      faut pour cela une vraie règle : `candidat()` fabrique un payload
+      vide, que `ouvrirDossier` refuse à juste titre — il en dérive une
+      checklist.
+    */
+    const reference = REGLES_DE_REFERENCE[0]!;
+    const regle = await db.visaRule.create({
+      data: {
+        countryCode: "MA", visaType: reference.visaType, category: reference.category,
+        version: 1, effectiveFrom: new Date("2026-01-01"), rules: reference.rules as never,
+        sourceUrl: reference.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"), verifiedBy: "fumée",
+        nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const deux = await ouvrirDossier(userId, regle.id, null);
+    const trois = await ouvrirDossier(userId, regle.id, null);
+    const [s2, s3] = [await solde(deux.id), await solde(trois.id)];
+    verifier(s2 === part && s3 === part, `les deux autres destinations sont servies (${s2}, ${s3})`);
+
+    const lignes = await db.analysisCredit.findMany({ where: { transactionId: achat.id } });
+    const total = lignes.reduce((n, l) => n + l.delta, 0);
+    verifier(total === pro.analyses, `le total ouvert est celui du pack, ni plus ni moins (${total})`);
+    const couvertes = new Set(lignes.map((l) => l.applicationId)).size;
+    verifier(couvertes === pro.destinations, `sur exactement ${pro.destinations} destinations (${couvertes})`);
+
+    /*
+      Et la couverture s'épuise. Sans cette assertion, un quatrième dossier
+      servi passerait pour une générosité et coûterait un pack.
+    */
+    await db.application.update({ where: { id: trois.id }, data: { status: "ARCHIVE" } });
+    const quatre = await ouvrirDossier(userId, regle.id, null);
+    const s4 = await solde(quatre.id);
+    verifier(s4 === 0, `le quatrième dossier n'est pas servi (${s4})`);
   }
 } finally {
   await db.$disconnect().catch(() => {});

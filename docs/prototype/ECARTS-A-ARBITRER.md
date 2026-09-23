@@ -8614,3 +8614,82 @@ qui ferme, une fois la confirmation lue.
 vérifiait que la feuille disparaissait après succès. Elle reste désormais
 ouverte pour porter la confirmation ; l'assertion sur le rafraîchissement, elle,
 tient toujours et garde son nom propre.
+
+---
+
+## S.67 — Le pack annonçait trois destinations et n'en servait qu'une
+
+Trouvé en balayant les règles de DOC-11 qui n'apparaissent nulle part dans le
+code. Deux fausses pistes d'abord, et elles méritent d'être notées :
+
+- **RG-12.5** (suppression de compte, libération des créneaux) est tenue, et
+  soigneusement — elle est implémentée sous le nom de son arbitrage, `K.C`, pas
+  sous son numéro. Un balayage par numéro de règle ne la voyait pas.
+- **RG-03.1** (« la comparaison au-delà de 3 destinations est réservée au pack
+  supérieur ») n'est **pas** violée : WF-03 étape 3 pose « vue comparative
+  jusqu'à 3 destinations » comme le socle, et trois destinations exactement sont
+  publiées. Je l'avais d'abord lue comme une brèche ouverte ; elle ne le devient
+  que le jour où une quatrième fiche paraît.
+
+Le vrai défaut était à côté. `Pack.destinations` — Essentiel 1, Dossier 1,
+Pro 3 — est déclaré sur les trois packs et **lu par aucun code** : ni le
+serveur, ni un écran, ni un test.
+
+**Établi par exécution**, après l'achat d'un Pro à 45 000 XOF dont le badge
+annonce « Trois destinations comparées en parallèle » :
+
+```
+dossier 1 : 90 analyses
+dossier 2 : 0
+dossier 3 : 0
+destinations réellement couvertes : 1 sur 3
+```
+
+`crediterLAchat` ouvrait `pack.analyses` sur le seul `applicationId` porté par
+la transaction. Le candidat payait pour trois destinations et n'en recevait
+qu'une de servie.
+
+### Ce que la grille dit, et ce qu'elle ne dit pas
+
+**90 = 3 × 30** : une destination de Pro ouvre exactement ce qu'ouvre un pack
+Dossier. C'est cette arithmétique qui fixe la part, et elle tombe juste sur les
+trois packs.
+
+Le **prix**, en revanche, n'est pas une multiplication. 45 000 XOF font bien
+trois fois 15 000, mais **59 € ne font pas trois fois 29 €** — Pro est un lot
+remisé en euros. Je l'avais écrit comme une preuve de linéarité ; le test
+`tarification` l'a démenti avant que ça n'atteigne une PR, et la formulation a
+été corrigée partout. Le prix conforte la lecture « trois destinations », il ne
+la démontre pas.
+
+### La couverture se déduit, elle ne se stocke pas
+
+`AnalysisCredit` porte déjà `transactionId`. Les destinations qu'un achat a
+couvertes, ce sont les dossiers distincts qu'il a crédités — rien à mémoriser,
+rien à tenir à jour, rien qui puisse diverger. C'est le choix qu'avait fait le
+solde, et pour la même raison.
+
+Elle s'applique à deux moments, et deux seulement : la confirmation du paiement,
+qui sert le dossier visé puis rattrape les dossiers déjà ouverts que rien ne
+sert, et chaque ouverture de dossier. Sans le rattrapage, un candidat ayant deux
+dossiers ouverts avant d'acheter aurait retrouvé le même défaut en plus étroit.
+
+### Ce que la mutation a révélé
+
+Débrancher la couverture à la confirmation, en gardant celle de l'ouverture,
+donne **150 analyses pour un pack de 90** : 90 sur le dossier visé, puis 30 + 30
+sur les deux suivants. Les deux moments doivent s'accorder, et c'est l'assertion
+sur le total ouvert qui le garantit — pas celle sur le nombre de destinations,
+qui reste verte dans cette mutation.
+
+### Conséquence assumée
+
+Un acheteur de Pro qui n'ouvre **qu'un** dossier y reçoit désormais trente
+analyses et non quatre-vingt-dix. Les deux destinations restantes ne sont pas
+perdues : elles s'ouvrent quand il ouvre les dossiers, sans limite de temps.
+Mais elles ne se reportent pas sur le premier.
+
+C'est le sens de « trois destinations ». Cumuler quatre-vingt-dix analyses sur
+un seul dossier, c'est acheter trois fois Dossier — ce que le produit permet
+déjà, et que le code commente explicitement. **Si cette lecture n'est pas la
+bonne, c'est ici qu'il faut revenir** : le reste du lot en découle.
