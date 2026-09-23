@@ -8859,3 +8859,47 @@ un et pas l'autre. Un test fige les deux formes.
 Remettre la somme fait tomber **huit** des douze assertions, sur les quatre
 textes à la fois. Les quatre qui restent vertes sont les témoins : ce que le
 lot ne devait pas changer.
+
+**Suite, dans le même lot.** `libelleBlocage` — la barre d'action sous la
+checklist de C-09 — ne comptait elle aussi que des pièces. Les deux phrases
+s'affichaient donc ensemble, à quelques lignes d'écart :
+
+```
+en-tête : « 1 exigence n'est pas remplie »
+blocage : « Rien ne bloque le dépôt »
+palier  : INCOMPLET — prêt : false
+```
+
+Elle reçoit le nombre d'exigences plutôt que de le déduire : elle ne voit que
+des pièces, et une pièce ne dit rien d'une exigence qu'aucune pièce n'établit.
+Le verbe s'accorde sur l'ensemble et non sur le dernier membre — « 1 pièce et
+1 exigence **bloquent** le dépôt ».
+
+C'est la troisième phrase de la même famille corrigée en deux lots
+(`prochaineAction`, le dénombrement, le blocage), et elles se sont révélées une
+par une. Plutôt que d'attendre la quatrième, j'ai balayé les fonctions
+exportées qui concluent à partir des seules pièces.
+
+### La quatrième, trouvée en balayant plutôt qu'en attendant
+
+`libelleAPreparer` prépare un **rendez-vous payant** de quarante-cinq minutes
+avec un consultant. Sur un dossier dont toutes les pièces sont conformes et
+qu'une exigence tient à « incomplet », elle disait :
+
+> « Toutes les pièces demandées sont conformes : l'appel peut porter sur le
+> fond du dossier. »
+
+Le candidat entrait dans l'appel en croyant n'avoir rien à y régler, et le seul
+sujet qui restait n'était pas nommé — alors que c'est **exactement** ce qu'un
+consultant sait débloquer et pas la plateforme : une exigence de l'autorité
+qu'aucun téléversement ne lève.
+
+L'exigence passe donc devant les pièces dans la phrase, parce qu'elle ne se
+règle pas en téléversant.
+
+**La leçon.** Quatre phrases, quatre fois la même cause : une fonction qui
+conclut à partir des seules pièces, dans un produit dont le calcul en voit
+davantage depuis S.68. Les trois premières se sont révélées une par une, en
+production de la suivante ; la quatrième a été trouvée par un balayage des
+signatures `(pieces: readonly Piece[])`. C'est le balayage qu'il fallait faire
+au moment de S.68, et pas trois lots plus tard.

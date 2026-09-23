@@ -25,17 +25,22 @@ export const GET = route({
     */
     const aujourdhui = new Date().toISOString().slice(0, 10);
     const pieces = dossier.documents.map((d) => versPiece(d, aujourdhui));
+    /*
+      La règle **figée** entre dans le calcul : ses conditions déterministes
+      en font partie, et sans elles cet écran conclut « complet » sur un
+      dossier que le serveur refuse de déclarer prêt.
+    */
+    const completude = completudeDesPieces(pieces, {
+      regle: dossier.visaRule?.rules,
+      conformes: codesConformes(dossier.documents),
+    });
     return {
+      completude,
       /*
-        La règle **figée** entre dans le calcul : ses conditions
-        déterministes en font partie, et sans elles cet écran conclut
-        « complet » sur un dossier que le serveur refuse de déclarer prêt.
+        Le même nombre que l'en-tête, sans quoi les deux phrases se
+        contredisent à quelques lignes d'écart sur le même écran.
       */
-      completude: completudeDesPieces(pieces, {
-        regle: dossier.visaRule?.rules,
-        conformes: codesConformes(dossier.documents),
-      }),
-      blocage: libelleBlocage(pieces),
+      blocage: libelleBlocage(pieces, completude.compteurs.exigencesNonTenues),
       pieces,
     };
   },

@@ -7,6 +7,16 @@ import {
   expliquerLaCompletude,
 } from "@/domain/completeness/explication";
 import { resumeDuJour, type Dossier } from "@/domain/dossiers/dossier";
+import { libelleAPreparer, libelleBlocage, type Piece } from "@/domain/dossiers/piece";
+
+const piece = (code: string, etat: Piece["etat"]): Piece => ({
+  id: code,
+  code: code.slice(0, 3).toUpperCase(),
+  libelle: code,
+  famille: "OBLIGATOIRE",
+  etat,
+  remede: "TELEVERSER",
+});
 
 /**
  * Une exigence n'est pas une pièce — correctif du lot précédent.
@@ -152,5 +162,93 @@ describe("le résumé du tableau de bord", () => {
 
   it("dit « rien ne bloque » quand rien ne bloque", () => {
     expect(resumeDuJour([dossier(resultat(0))])).toBe("1 dossier ouvert, rien ne bloque un dépôt.");
+  });
+});
+
+/**
+ * La barre d'action et l'en-tête, sur le même écran — C-09.
+ *
+ * ── Le défaut, tel qu'il s'est présenté ─────────────────────────────
+ *
+ * `libelleBlocage` ne comptait que des pièces. Depuis que le calcul des
+ * écrans évalue les conditions de la règle figée, C-09 affichait les deux
+ * phrases ensemble, à quelques lignes d'écart :
+ *
+ *     en-tête : « 1 exigence n'est pas remplie »
+ *     blocage : « Rien ne bloque le dépôt »
+ *     palier  : INCOMPLET — prêt : false
+ */
+describe("la barre d'action ne contredit pas l'en-tête", () => {
+  const pieces = (bloquantes: number): Piece[] => [
+    ...Array.from({ length: bloquantes }, (_, i) => piece(`manquante_${i}`, "ATTENDUE")),
+    piece("passeport", "CONFORME"),
+  ];
+
+  it("n'annonce pas « rien ne bloque » quand une exigence bloque", () => {
+    expect(libelleBlocage(pieces(0), 1)).toBe("1 exigence bloque le dépôt");
+  });
+
+  it("nomme les deux, et accorde le verbe sur l'ensemble", () => {
+    expect(libelleBlocage(pieces(1), 1)).toBe("1 pièce et 1 exigence bloquent le dépôt");
+    expect(libelleBlocage(pieces(2), 3)).toBe("2 pièces et 3 exigences bloquent le dépôt");
+  });
+
+  it("garde ses phrases d'origine quand aucune exigence n'est en jeu", () => {
+    expect(libelleBlocage(pieces(0))).toBe("Rien ne bloque le dépôt");
+    expect(libelleBlocage(pieces(1))).toBe("1 pièce bloque le dépôt");
+    expect(libelleBlocage(pieces(2))).toBe("2 pièces bloquent le dépôt");
+  });
+
+  it("dit la même chose que l'en-tête sur le même dossier", () => {
+    const { compteurs } = resultat(1);
+
+    expect(libelleDenombrement(compteurs)).toContain("exigence");
+    expect(libelleBlocage(pieces(0), compteurs.exigencesNonTenues)).toContain("exigence");
+  });
+});
+
+/**
+ * Ce qu'il reste à préparer avant un rendez-vous — T-05.
+ *
+ * La phrase la plus coûteuse de la famille : elle prépare un appel payant
+ * de quarante-cinq minutes. Sur un dossier dont toutes les pièces sont
+ * conformes et qu'une exigence tient à « incomplet », elle disait :
+ *
+ *     « Toutes les pièces demandées sont conformes : l'appel peut porter
+ *       sur le fond du dossier. »
+ *
+ * Le candidat entrait dans l'appel en croyant n'avoir rien à y régler, et
+ * le seul sujet qui restait n'était pas nommé — alors que c'est
+ * exactement ce qu'un consultant sait débloquer et pas la plateforme.
+ */
+describe("ce qu'il reste à préparer avant un rendez-vous", () => {
+  const conformes = [piece("passeport", "CONFORME"), piece("preuve_fonds", "CONFORME")];
+
+  it("nomme l'exigence plutôt que d'annoncer un dossier sans reste", () => {
+    const phrase = libelleAPreparer(conformes, 1);
+
+    expect(phrase).not.toContain("l'appel peut porter sur le fond");
+    expect(phrase).toBe(
+      "1 exigence de la règle de ton dossier reste à lever, et aucune pièce ne la lève : c'est le premier sujet à porter à l'appel.",
+    );
+  });
+
+  it("met l'exigence avant les pièces : elle ne se règle pas en téléversant", () => {
+    const phrase = libelleAPreparer([...conformes, piece("diplome", "ATTENDUE")], 1);
+
+    expect(phrase.indexOf("exigence")).toBeLessThan(phrase.indexOf("diplome"));
+    expect(phrase).toContain("1 pièce obligatoire reste à traiter : diplome.");
+  });
+
+  it("accorde au pluriel", () => {
+    expect(libelleAPreparer(conformes, 2)).toContain(
+      "2 exigences de la règle de ton dossier restent à lever, et aucune pièce ne les lève",
+    );
+  });
+
+  it("garde sa phrase d'origine quand rien ne reste", () => {
+    expect(libelleAPreparer(conformes)).toBe(
+      "Toutes les pièces demandées sont conformes : l'appel peut porter sur le fond du dossier.",
+    );
   });
 });
