@@ -57,6 +57,25 @@ export interface Couverture {
 const SANS_EFFET: Couverture = { servis: [], analyses: 0 };
 
 /**
+ * Les destinations qu'un achat a déjà servies : les dossiers distincts
+ * qu'il a crédités.
+ *
+ * Extraite pour que l'écran de confirmation la lise **sans la
+ * recalculer**. Deux dérivations de la même mesure finissent par
+ * diverger, et celle-ci décide à la fois ce qui s'ouvre et ce qu'on
+ * annonce au candidat — les voir se contredire serait pire que les deux
+ * défauts qu'elles corrigent séparément.
+ */
+export async function destinationsServies(transactionId: string): Promise<string[]> {
+  const lignes = await db.analysisCredit.findMany({
+    where: { transactionId, delta: { gt: 0 } },
+    select: { applicationId: true },
+    distinct: ["applicationId"],
+  });
+  return lignes.map((l) => l.applicationId);
+}
+
+/**
  * Applique la couverture restante des packs confirmés d'un candidat.
  *
  * `prioritaire` est le dossier visé par l'achat qui déclenche l'appel : il
@@ -82,11 +101,7 @@ export async function appliquerLaCouverture(
     const pack = getPack(achat.packCode);
     if (!pack) continue;
 
-    const dejaCouverts = await db.analysisCredit.findMany({
-      where: { transactionId: achat.id, delta: { gt: 0 } },
-      select: { applicationId: true },
-      distinct: ["applicationId"],
-    });
+    const dejaCouverts = await destinationsServies(achat.id);
     let restantes = pack.destinations - dejaCouverts.length;
     if (restantes <= 0) continue;
 
@@ -100,7 +115,7 @@ export async function appliquerLaCouverture(
     */
     if (
       prioritaire?.transactionId === achat.id &&
-      !dejaCouverts.some((d) => d.applicationId === prioritaire.applicationId)
+      !dejaCouverts.includes(prioritaire.applicationId)
     ) {
       cibles.push(prioritaire.applicationId);
     }
@@ -110,7 +125,7 @@ export async function appliquerLaCouverture(
         where: {
           userId,
           status: { in: ["BROUILLON", "ACTIF", "PRET"] },
-          id: { notIn: [...cibles, ...dejaCouverts.map((d) => d.applicationId)] },
+          id: { notIn: [...cibles, ...dejaCouverts] },
           // Un dossier que rien ne sert. Celui qui porte déjà des analyses
           // a sa couverture ; lui en donner une seconde retirerait une
           // destination à un dossier qui n'en a aucune.

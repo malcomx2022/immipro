@@ -9026,3 +9026,74 @@ septième ligne s'ajoute ; ce qui rend l'omission impossible est le type.
 Une fonction entièrement nouvelle qui conclurait depuis `readonly Piece[]`
 reste écrivable. Ce qui ne l'est plus, c'est de la brancher sur les phrases
 existantes sans que le compilateur le demande.
+
+## S.73 — Les deux tiers du pack qui n'étaient nommés nulle part
+
+S.67 a fait couvrir au pack Pro les trois destinations qu'il annonce. La
+répartition était juste et **muette**. Sondé sur PostgreSQL à l'instant où
+l'écran s'affiche, après un Pro à 45 000 XOF :
+
+```
+l'écran annonce : « Ton dossier est ouvert. »
+destinations    : 3 payées, 1 servie
+analyses        : 90 payées, 30 ouvertes
+```
+
+Les deux tiers de l'achat existent, lui sont réservés, et ne sont nommés
+nulle part. C'est plus qu'une omission : la couverture ne s'applique qu'à
+**l'ouverture d'un dossier**, et rien ne demandait au candidat d'en ouvrir
+un. Un candidat qui n'ouvre jamais de second dossier ne reçoit jamais ce
+qu'il a payé — et ce qu'il a payé est précisément la comparaison de
+plusieurs destinations, c'est-à-dire ce pour quoi il a choisi ce pack.
+
+Le correctif de S.67 avait donc créé ce silence : avant lui, les 90
+analyses partaient sur le seul dossier visé, et il n'y avait rien à
+annoncer.
+
+### La phrase
+
+Elle nomme le reste, dit le geste qui le débloque, et s'arrête là. « Sans
+repayer » est la moitié de l'information qui compte : sans elle, la phrase
+se lit comme une proposition d'achat sur l'écran où l'on vient de payer.
+Elle est nulle quand il n'y a rien à dire — un pack à une destination, une
+couverture déjà prise — parce qu'une phrase annonçant zéro destination
+restante est un bruit.
+
+### Une seule dérivation, pas deux
+
+`destinationsServies` est extraite de `couverture.ts` et lue par l'écran.
+Elle décide à la fois **ce qui s'ouvre** et **ce qu'on annonce** : deux
+mesures de la même chose finissent par diverger, et le candidat verrait
+cette contradiction-là avant nous. La lecture reste séparée du reçu, comme
+celle de la consultation et pour la même raison — le reçu est une pièce
+comptable, le nombre de destinations restantes n'y a rien à faire.
+
+### Ce que ce lot n'a pas fait, et pourquoi
+
+**$-01 n'explique pas le pack Pro.** `ChoixDuPack` écrit
+`description: p.misEnAvant ? p.justification : undefined` : seul le pack
+mis en avant montre ce qu'il couvre. L'écran affiche donc
+
+```
+Essentiel · 5 000 F
+Dossier · 15 000 F     Couvre l'ensemble des pièces exigées…
+Dossier Pro · 45 000 F
+```
+
+Pro coûte trois fois Dossier et ne dit rien. Le texte existe pourtant dans
+la grille — `tests/tarification.test.ts` vérifie que **chaque** pack porte
+une justification factuelle. La page publique `/tarifs`, elle, détaille les
+trois.
+
+Ce n'est pas corrigé ici parce que le correctif évident touche une règle
+déclarée : `RadioOption.misEnAvant` porte « l'information est aussi portée
+par la description, jamais par la seule couleur ». Donner une description à
+tous retire au pack conseillé son seul marqueur textuel, et le remplacer
+demande de trancher comment la mise en avant se dit — une décision d'écran
+partagée avec `/tarifs`, pas un rider de ce lot.
+
+**Et un point à arbitrer, déjà ouvert.** La page publique vend au pack Pro
+un « comparateur des trois dossiers en parallèle ». C'est RG-03.2 / WF-03,
+consigné plus haut comme sans modèle `Recommendation` ni écran. Tant qu'il
+n'existe pas, cette ligne annonce une fonctionnalité absente ; elle relève
+d'une décision produit, pas d'un correctif.

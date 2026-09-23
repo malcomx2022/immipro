@@ -475,6 +475,37 @@ try {
     const vise = await solde(applicationId);
     verifier(vise === part, `le dossier visé reçoit sa part, pas le pack entier (${vise})`);
 
+
+    /*
+      Et ce que le candidat en apprend. La répartition était juste et
+      muette : sondé ici avant correction, l'écran de confirmation
+      annonçait « Ton dossier est ouvert. » sur 3 destinations payées et
+      1 servie, 90 analyses payées et 30 ouvertes. Les deux tiers de
+      l'achat lui étaient réservés, et la couverture ne s'applique qu'à
+      l'ouverture d'un dossier — geste que rien ne lui demandait.
+    */
+    {
+      const { couvertureDuPaiement } = await import("../src/server/lecture/paiements");
+      const { mentionDeLaCouverture } = await import("../src/domain/paiement/contrepartie");
+
+      const lue = await couvertureDuPaiement(ouvert.reference, userId);
+      verifier(
+        lue?.destinations === pro.destinations && lue?.servies === 1,
+        `l'écran lit la couverture réelle (${lue?.servies} sur ${lue?.destinations})`,
+      );
+
+      /*
+        Sans repli, une lecture fausse ferait lever cette ligne au lieu de
+        la faire échouer : la fumée dirait « erreur » là où elle doit dire
+        laquelle des deux assertions tombe.
+      */
+      const mention = lue ? (mentionDeLaCouverture(lue.destinations, lue.servies) ?? "") : "";
+      verifier(
+        mention.includes("2 restent à ouvrir") && mention.includes("sans repayer"),
+        `et nomme ce qui reste, avec le geste qui le débloque (« ${mention} »)`,
+      );
+    }
+
     /*
       Les deux destinations restantes s'ouvrent avec les dossiers, et il
       faut pour cela une vraie règle : `candidat()` fabrique un payload
