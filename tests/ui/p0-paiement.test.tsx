@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ChoixDuPack } from "@/app/(app)/paiement/pack/ChoixDuPack";
+import { MENTION_MISE_EN_AVANT } from "@/components/ui/RadioGroup";
 import { Recapitulatif } from "@/app/(app)/paiement/recapitulatif/Recapitulatif";
 import { Attente } from "@/app/(app)/paiement/attente/Attente";
 import { Echec } from "@/app/(app)/paiement/echec/Echec";
@@ -79,12 +80,63 @@ describe("$-01 — Choix du pack", () => {
     }
   });
 
-  it("met en avant le seul pack que le domaine désigne, par sa justification", () => {
+  /**
+   * ── Deux packs sur trois n'expliquaient rien ────────────────────────
+   *
+   * La description n'allait qu'au pack conseillé. Rendu avant correction :
+   *
+   *     Essentiel · 5 000 F
+   *     Dossier · 15 000 F     Couvre l'ensemble des pièces exigées…
+   *     Dossier Pro · 45 000 F
+   *
+   * Pro coûte trois fois Dossier et ne disait rien — alors que la grille
+   * écrit sa phrase, et que `tarification.test.ts` vérifie déjà que les
+   * trois en portent une.
+   */
+  it("donne à chaque pack ce que la grille écrit de lui", () => {
+    const { container } = render(<ChoixDuPack tunnel={TUNNEL} />);
+    for (const pack of PACKS) {
+      expect(container.textContent, pack.code).toContain(pack.justification);
+    }
+  });
+
+  /*
+    La mise en avant ne se lisait que dans le cadre coloré et dans le fait
+    d'être la seule option décrite — une couleur et une absence. Elle
+    s'écrit, ce qui est aussi ce que le commentaire de `RadioOption`
+    exigeait déjà sans que rien ne le tienne.
+  */
+  it("écrit la mise en avant plutôt que de la peindre", () => {
     render(<ChoixDuPack tunnel={TUNNEL} />);
     const misEnAvant = PACKS.filter((p) => p.misEnAvant);
     expect(misEnAvant).toHaveLength(1);
-    expect(screen.getByText(misEnAvant[0]?.justification as string)).toBeDefined();
-    expect(screen.queryByText(/le plus choisi|populaire/i)).toBeNull();
+
+    const marque = screen.getAllByText(MENTION_MISE_EN_AVANT);
+    expect(marque).toHaveLength(1);
+    expect(marque[0]?.closest("[role=radio]")?.textContent).toContain(
+      misEnAvant[0]?.libelle as string,
+    );
+  });
+
+  /*
+    Elle entre dans le nom accessible de l'option : lue à la voix, elle
+    s'entend. C'est toute la raison de l'écrire — la couleur ne s'entend
+    pas, et le cadre non plus.
+  */
+  it("la mention s'entend, elle n'est pas décorative", () => {
+    render(<ChoixDuPack tunnel={TUNNEL} />);
+    const conseille = PACKS.find((p) => p.misEnAvant)!;
+
+    expect(
+      screen.getByRole("radio", {
+        name: new RegExp(`${conseille.libelle}.*${MENTION_MISE_EN_AVANT}`, "su"),
+      }),
+    ).toBeDefined();
+  });
+
+  it("ne vend ni popularité ni superlatif", () => {
+    render(<ChoixDuPack tunnel={TUNNEL} />);
+    expect(screen.queryByText(/le plus choisi|populaire|meilleur/i)).toBeNull();
   });
 
   it("débloque la suite une fois un pack retenu, et emporte le dossier", () => {
