@@ -11,7 +11,6 @@ import {
 } from "@/domain/consultants/access";
 import { versFiche } from "@/server/acces/regles";
 import { jourEnFrancais } from "@/domain/format/moment";
-import { editorialDe } from "@/lib/contenu/destinations";
 
 /**
  * Lecture des consultants — T-04 et T-05, WF-12.
@@ -51,15 +50,6 @@ export async function annuaire(countryCode?: string): Promise<ConsultantHabilite
 export const consultantParId = async (id: string): Promise<ConsultantHabilite | null> =>
   (await annuaire()).find((c) => c.id === id) ?? null;
 
-/** Nom affichable d'une destination, depuis la part éditoriale du référentiel. */
-export async function nomDeLaDestination(countryCode: string): Promise<string> {
-  const regle = await db.visaRule.findFirst({
-    where: { countryCode, status: "PUBLISHED" },
-    select: { countryCode: true, visaType: true },
-  });
-  if (!regle) return countryCode;
-  return editorialDe(regle.countryCode, regle.visaType)?.pays ?? countryCode;
-}
 
 /**
  * Créneaux proposés — T-05.

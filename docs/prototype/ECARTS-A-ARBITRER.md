@@ -9444,3 +9444,52 @@ sur la date du dernier dépôt, plus fine. Elle suffit pour lever la main.
 | `ACTIF`, `PRET` | Le candidat a payé et n'a pas déposé. Même règle que le brouillon — douze mois puis trente jours — ou plus long parce qu'il a payé ? |
 | `SOUMIS` | L'administration n'a pas répondu. Aucune durée d'inactivité ne devrait suffire seule ; faut-il une relance, une date de décision attendue ? |
 | `SUSPENDU` | Le dossier attend **notre** arbitrage de divergence. Le fermer serait nous faire oublier une dette. |
+
+## S.79 — Le garde-fou d'INV-4 promettait plus que sa portée, et s'est accusé lui-même
+
+Ce point était consigné comme « à arbitrer » au lot S.76 : je l'avais différé
+parce qu'élargir la vérification demandait d'établir la liste des lecteurs
+légitimement non filtrés. Le balayage de S.77 l'a établie. Il n'y avait donc
+plus rien à arbitrer.
+
+### Ce que le garde-fou disait, et ce qu'il regardait
+
+Son nom : « seul le module d'accès et le back-office interrogent le
+référentiel ». Sa portée : `src/app/api/**` seulement. Tout `src/server/**`
+lui échappait — et c'est là que vivait la seule requête non filtrée du
+dépôt, `nomDeLaDestination`, qui lisait `visaRule` avec le seul
+`status: "PUBLISHED"`, sans `sourceTier`, sans date de relecture.
+
+Elle n'a jamais rien laissé fuir : personne ne l'appelait, l'annuaire
+utilisant `nomDestination`, une table en mémoire. Elle aurait fui le jour où
+quelqu'un l'aurait appelée, et le garde-fou ne l'aurait pas dit. Elle est
+supprimée.
+
+### Une liste, et pas une interdiction
+
+Interdire toute requête non filtrée casserait le référentiel lui-même : la
+publication doit chercher le prédécesseur d'une version, la propagation doit
+voir la règle qu'elle vient de publier, le back-office voit tout par
+fonction. Six lecteurs sont donc nommés **avec leur raison** — c'est ce qui
+rend la liste relisible, et ce qui oblige à justifier une entrée nouvelle
+plutôt qu'à l'ajouter en silence.
+
+Une seconde assertion refuse les noms morts : sans elle, la liste enfle
+d'anciens chemins et cesse de dire quoi que ce soit.
+
+### Le garde-fou s'est accusé lui-même, au premier passage
+
+Son motif était `visaRule\.(find|count|aggregate|groupBy)`. Il a signalé
+deux fichiers corrects — `jobs/inactivite.ts` et `lecture/partenaires.ts` —
+parce que **`visaRule.count` correspond à l'intérieur de
+`dossier.visaRule.countryCode`**.
+
+C'est exactement la faute que raconte le commentaire du garde-fou B-07 :
+« deux critères syntaxiques qui accusaient du code correct ». Refaite ici,
+au premier essai, par quelqu'un qui venait de la lire. Le motif exige
+maintenant la parenthèse d'appel.
+
+Le fait est consigné parce qu'il dit quelque chose de ces tests : un
+garde-fou qui lit des sources se trompe d'abord contre le code honnête, et
+c'est le sens de l'accusation qui trompe — un test rouge fait chercher le
+défaut dans le code accusé, jamais dans le test.
