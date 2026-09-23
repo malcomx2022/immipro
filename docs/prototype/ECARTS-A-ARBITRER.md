@@ -9097,3 +9097,67 @@ un « comparateur des trois dossiers en parallèle ». C'est RG-03.2 / WF-03,
 consigné plus haut comme sans modèle `Recommendation` ni écran. Tant qu'il
 n'existe pas, cette ligne annonce une fonctionnalité absente ; elle relève
 d'une décision produit, pas d'un correctif.
+
+## S.74 — Deux packs sur trois n'expliquaient rien, et la mise en avant était une couleur
+
+Le point que S.73 avait consigné sans le corriger. Il n'attendait pas un
+arbitrage produit : il attendait qu'on regarde pourquoi la place était
+prise.
+
+### Ce que l'écran disait
+
+Rendu avant correction, $-01 affichait :
+
+```
+Essentiel · 5 000 F
+Dossier · 15 000 F     Couvre l'ensemble des pièces exigées pour cette destination
+Dossier Pro · 45 000 F
+```
+
+Pro coûte trois fois Dossier et ne disait rien de ce qu'il apporte. La
+grille écrit pourtant sa phrase — « Trois destinations comparées en
+parallèle » — et `tests/tarification.test.ts` vérifie depuis le début que
+**chaque** pack en porte une, factuelle et non commerciale. Trois phrases
+écrites, une seule affichée. Pour savoir ce qu'il achetait, le candidat
+devait quitter le tunnel de paiement et aller sur la page publique des
+tarifs, qui les détaille toutes les trois.
+
+### Pourquoi la place était prise
+
+`ChoixDuPack` écrivait `description: p.misEnAvant ? p.justification :
+undefined`. La description servait donc à deux choses à la fois : décrire
+le pack, et signaler par sa **seule présence** lequel est conseillé.
+
+Et le commentaire de `RadioOption.misEnAvant` énonçait déjà la règle que
+cela violait : « l'information est aussi portée par la description, jamais
+par la seule couleur ». Elle ne l'était pas. La description du pack
+conseillé disait ce qu'il couvre, jamais qu'il est conseillé. Ce qui
+distinguait l'option était le cadre coloré, plus le fait d'être la seule
+décrite — une couleur et une absence. Le commentaire de `ChoixDuPack`
+l'admettait à sa façon, deux fichiers plus loin : « la mise en avant reste
+visuelle ».
+
+Deux commentaires en contradiction directe, et l'écran suivait le plus
+faible. C'est la même famille que tout ce que cette session a corrigé : du
+code qui affirme ce qu'il ne fait pas.
+
+### Le correctif
+
+La mise en avant s'écrit — `MENTION_MISE_EN_AVANT`, un seul mot, dans le
+nom accessible de l'option. Un lecteur d'écran l'annonce ; un cadre coloré
+ne s'entend pas. La description redevient libre de décrire, et les trois
+packs portent la leur.
+
+Le mot est factuel : il annonce une suggestion de la plateforme, pas une
+popularité. La grille interdit déjà « le plus choisi » et « populaire »
+dans ses justifications, et le test le vérifie sur l'écran rendu.
+
+### Ce que ce lot ne touche pas
+
+La page publique `/tarifs` détaille déjà les trois packs par leurs
+`AVANTAGES`, et son badge de mise en avant affiche la `justification`.
+Elle n'a donc pas le défaut corrigé ici. Les deux écrans expriment
+maintenant la mise en avant différemment — un mot sur $-01, un badge de
+couverture sur `/tarifs`. Ce n'est pas une divergence de fond, les
+composants n'étant pas les mêmes, mais si `/tarifs` devait s'aligner,
+`MENTION_MISE_EN_AVANT` est l'endroit où le mot est écrit une fois.

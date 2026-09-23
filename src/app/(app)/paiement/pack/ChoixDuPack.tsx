@@ -15,7 +15,27 @@ import { formatMontant } from "@/lib/utils";
  *
  * Aucun pack n'est retenu au départ : le prototype démarrait sur Essentiel
  * présélectionné, ce qui fait un choix à la place du candidat sur l'écran
- * qui débite. La mise en avant reste visuelle, portée par `misEnAvant`.
+ * qui débite. La mise en avant est portée par `misEnAvant`, et `RadioGroup`
+ * l'écrit en toutes lettres — elle était « visuelle », c'est-à-dire un
+ * cadre coloré.
+ *
+ * ── Deux packs sur trois n'expliquaient rien ────────────────────────
+ *
+ * La description n'était donnée qu'au pack conseillé. Rendu avant
+ * correction, l'écran disait :
+ *
+ *     Essentiel · 5 000 F
+ *     Dossier · 15 000 F     Couvre l'ensemble des pièces exigées…
+ *     Dossier Pro · 45 000 F
+ *
+ * Pro coûte trois fois Dossier et ne disait rien de ce qu'il apporte —
+ * alors que la grille écrit sa phrase, et qu'un test vérifie que les trois
+ * en portent une. Le candidat devait deviner, ou quitter le tunnel pour la
+ * page publique des tarifs, qui les détaille toutes les trois.
+ *
+ * La description servait en fait à deux choses : décrire le pack, et
+ * signaler par sa seule présence lequel est conseillé. Séparer les deux
+ * libère la place.
  *
  * Les trois packs forment un seul arrêt de tabulation — flèches, Origine et
  * Fin — tenu par `RadioGroup` (règle clavier 4).
@@ -95,7 +115,7 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
           options={PACKS.map((p) => ({
             valeur: p.code,
             libelle: `${p.libelle} · ${prix(p.prix)}`,
-            description: p.misEnAvant ? p.justification : undefined,
+            description: p.justification,
             misEnAvant: p.misEnAvant,
           }))}
         />

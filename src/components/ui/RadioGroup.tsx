@@ -13,6 +13,14 @@ import { cn } from "@/lib/utils";
  * `aria-checked` porte l'état ; la ligne entière est cliquable et mesure au
  * moins 44 px. Une option indisponible garde son libellé et sa raison.
  */
+/**
+ * Comment une mise en avant se dit. Un seul mot, factuel : il annonce une
+ * suggestion de la plateforme, pas une popularité ni un superlatif — la
+ * grille tarifaire interdit déjà « le plus choisi » et « populaire » dans
+ * ses justifications, et ce mot-ci n'en est pas un déguisement.
+ */
+export const MENTION_MISE_EN_AVANT = "Conseillé";
+
 export interface RadioOption {
   valeur: string;
   libelle: string;
@@ -21,8 +29,21 @@ export interface RadioOption {
   desactivee?: boolean;
   /**
    * Option mise en avant. Elle est cadrée sans être retenue : une mise en
-   * avant n'est pas un choix fait à la place de qui lit. L'information est
-   * aussi portée par la description, jamais par la seule couleur.
+   * avant n'est pas un choix fait à la place de qui lit.
+   *
+   * ── La règle que ce commentaire énonçait sans la tenir ──────────────
+   *
+   * Il disait déjà « l'information est aussi portée par la description,
+   * jamais par la seule couleur ». Elle ne l'était pas. Sur $-01, la
+   * description du pack conseillé disait ce qu'il **couvre** — « couvre
+   * l'ensemble des pièces exigées pour cette destination » — et jamais
+   * qu'il est conseillé. Ce qui distinguait l'option était le cadre
+   * coloré, plus le fait d'être la seule à porter une description ;
+   * autrement dit, une absence, et une couleur.
+   *
+   * La mise en avant se dit donc en toutes lettres, et la description
+   * redevient libre de décrire. Elles ne se disputent plus la même place,
+   * et les deux autres options peuvent enfin porter la leur.
    */
   misEnAvant?: boolean;
 }
@@ -140,14 +161,25 @@ export function RadioGroup({
                 )}
               />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span
-                  className={cn(
-                    "text-15",
-                    retenue && "font-medium",
-                    o.desactivee ? "text-ink-500" : "text-ink-900",
-                  )}
-                >
-                  {o.libelle}
+                <span className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={cn(
+                      "text-15",
+                      retenue && "font-medium",
+                      o.desactivee ? "text-ink-500" : "text-ink-900",
+                    )}
+                  >
+                    {o.libelle}
+                  </span>
+                  {/* La mise en avant, écrite. Elle passe à la ligne
+                      plutôt que d'écraser le libellé sur un écran
+                      étroit, et reste dans le nom accessible de
+                      l'option : c'est une information, pas un décor. */}
+                  {o.misEnAvant ? (
+                    <span className="flex-none rounded-full bg-accent-50 px-2 py-0.5 text-13 font-medium text-accent-700">
+                      {MENTION_MISE_EN_AVANT}
+                    </span>
+                  ) : null}
                 </span>
                 {o.description ? (
                   <span className="text-13 text-ink-500">{o.description}</span>
