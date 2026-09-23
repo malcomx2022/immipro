@@ -39,6 +39,16 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
 
   const { bloquantes, ensuite, conformes } = grouperPourCompletude(pieces);
   const mention = dossier.destination.mention;
+  /*
+    Les exigences de la règle figée qu'aucune pièce n'établit. Cette
+    section s'intitule « ce qui bloque le dépôt » et n'affichait que des
+    pièces : sur un dossier qu'une seule exigence tient à « incomplet »,
+    elle annonçait « aucune pièce obligatoire ne manque » — vrai sur les
+    pièces, et muet sur le seul blocage.
+  */
+  const exigences = dossier.completude.missing.filter(
+    (m) => m.origine === "exigence" && m.bloquant,
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -66,8 +76,39 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
         pieces={bloquantes}
         dossierId={id}
         depot={dossier.depot}
-        vide="Aucune pièce obligatoire ne manque."
+        vide={
+          exigences.length > 0
+            ? "Aucune pièce obligatoire ne manque ; ce qui bloque est ci-dessous."
+            : "Aucune pièce obligatoire ne manque."
+        }
       />
+
+      {exigences.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-19 font-semibold text-ink-900">
+            {exigences.length > 1
+              ? "Exigences de la règle à lever"
+              : "Exigence de la règle à lever"}
+          </h2>
+          {/* Aucun lien : ces exigences ne se lèvent pas par un dépôt, et
+              un bouton mènerait à un écran qui ne peut rien pour elles. */}
+          <ul className="flex flex-col gap-2">
+            {exigences.map((exigence) => (
+              <li
+                key={exigence.code}
+                className="rounded-md border border-ink-300 p-3.5 text-pretty text-14 text-ink-700"
+              >
+                {exigence.message}
+              </li>
+            ))}
+          </ul>
+          <p className="text-13 text-ink-500">
+            Aucune pièce de ta checklist ne lève {exigences.length > 1 ? "ces" : "cette"}{" "}
+            {exigences.length > 1 ? "exigences" : "exigence"} : elles viennent de la règle
+            figée à l&apos;ouverture de ton dossier.
+          </p>
+        </section>
+      ) : null}
       <Groupe
         titre="À traiter ensuite"
         pieces={ensuite}
@@ -97,7 +138,9 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
       </SourceNote>
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row md:items-center md:justify-between">
-        <p className="text-14 text-ink-700">{libelleBlocage(pieces)}</p>
+        <p className="text-14 text-ink-700">
+          {libelleBlocage(pieces, exigences.length)}
+        </p>
         <LienBouton
           href={`/dossiers/${id}`}
           variante="secondaire"

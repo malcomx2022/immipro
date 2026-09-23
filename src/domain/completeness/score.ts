@@ -52,6 +52,20 @@ export interface MissingPoint {
   /** Message actionnable — jamais « document non conforme » (RG-06.3). */
   message: string;
   bloquant: boolean;
+  /**
+   * D'où vient le manque : une pièce de la checklist, ou une exigence de la
+   * règle figée qu'aucune pièce n'établit.
+   *
+   * Les deux se lisaient pareil dans cette liste, et un écran ne pouvait
+   * donc pas les distinguer — celui qui s'intitule « ce qui bloque le
+   * dépôt » n'affichait que les pièces, et omettait le seul blocage sur un
+   * dossier qu'une exigence tient à « incomplet ».
+   *
+   * Le rapprocher par le code était exclu : `Piece.code` est une pastille
+   * de trois lettres, et rapprocher `PAS` de `passeport` ne rapproche rien.
+   * L'origine se déclare ici, où elle est connue.
+   */
+  origine: "piece" | "exigence";
 }
 
 /**
@@ -130,9 +144,24 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
   const conditionsEchouees = bloquantes.filter((c) => !c.satisfaite);
 
   const missing: MissingPoint[] = [
-    ...requisManquants.map((d) => ({ code: d.code, message: messagePourPiece(d), bloquant: true })),
-    ...conditionsEchouees.map((c) => ({ code: c.code, message: c.messageEchec, bloquant: true })),
-    ...facultatifsManquants.map((d) => ({ code: d.code, message: messagePourPiece(d), bloquant: false })),
+    ...requisManquants.map((d) => ({
+      code: d.code,
+      message: messagePourPiece(d),
+      bloquant: true,
+      origine: "piece" as const,
+    })),
+    ...conditionsEchouees.map((c) => ({
+      code: c.code,
+      message: c.messageEchec,
+      bloquant: true,
+      origine: "exigence" as const,
+    })),
+    ...facultatifsManquants.map((d) => ({
+      code: d.code,
+      message: messagePourPiece(d),
+      bloquant: false,
+      origine: "piece" as const,
+    })),
   ];
 
   // Une bonne lettre de motivation ne compense jamais une pièce bloquante

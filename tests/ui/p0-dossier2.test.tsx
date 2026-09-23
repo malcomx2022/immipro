@@ -183,6 +183,69 @@ describe("C-09 — Complétude", () => {
     const { container } = render(<Completude dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toContain("Un dossier complet n'est pas un dossier accepté");
   });
+
+  /**
+   * Une section intitulée « ce qui bloque le dépôt » doit énumérer ce qui
+   * bloque le dépôt. Elle n'affichait que des pièces : sur un dossier dont
+   * toutes les pièces sont conformes et qu'une exigence de la règle figée
+   * tient à « incomplet », elle annonçait « aucune pièce obligatoire ne
+   * manque » — vrai sur les pièces, et muet sur le seul blocage.
+   */
+  describe("quand une exigence de la règle bloque", () => {
+    const conformes = PIECES_NL.map((p) => ({ ...p, etat: "CONFORME" as const }));
+    const bloque = {
+      ...DOSSIER,
+      completude: {
+        palier: "INCOMPLET" as const,
+        ready: false,
+        missing: [
+          {
+            code: "attestation_prealable",
+            message: "L'autorité exige une attestation préalable de l'établissement.",
+            bloquant: true,
+            origine: "exigence" as const,
+          },
+        ],
+        compteurs: {
+          obligatoiresManquantes: 0,
+          exigencesNonTenues: 1,
+          facultativesManquantes: 0,
+          conformes: conformes.length,
+        },
+      },
+    };
+
+    it("énumère l'exigence avec son message, là où l'écran promet les blocages", () => {
+      const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
+
+      expect(
+        screen.getByRole("heading", { name: "Exigence de la règle à lever" }),
+      ).toBeDefined();
+      expect(container.textContent).toContain(
+        "L'autorité exige une attestation préalable de l'établissement.",
+      );
+    });
+
+    it("dit qu'aucune pièce ne la lève, pour ne pas envoyer chercher", () => {
+      const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
+      expect(container.textContent).toContain("Aucune pièce de ta checklist ne lève");
+    });
+
+    it("ne propose aucun lien : un dépôt ne lève pas une exigence", () => {
+      render(<Completude dossier={bloque} pieces={conformes} />);
+      const section = screen
+        .getByRole("heading", { name: "Exigence de la règle à lever" })
+        .parentElement!;
+      expect(within(section).queryByRole("link")).toBeNull();
+    });
+
+    it("la barre d'action ne dit plus « rien ne bloque »", () => {
+      const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
+
+      expect(container.textContent).toContain("1 exigence bloque le dépôt");
+      expect(container.textContent).not.toContain("Rien ne bloque le dépôt");
+    });
+  });
 });
 
 describe("C-07 — Téléversement", () => {

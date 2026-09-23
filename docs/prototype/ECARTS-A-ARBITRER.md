@@ -8903,3 +8903,55 @@ davantage depuis S.68. Les trois premières se sont révélées une par une, en
 production de la suivante ; la quatrième a été trouvée par un balayage des
 signatures `(pieces: readonly Piece[])`. C'est le balayage qu'il fallait faire
 au moment de S.68, et pas trois lots plus tard.
+
+---
+
+## S.71 — La section qui promettait les blocages n'en listait qu'une sorte
+
+Le balayage de S.70 s'était arrêté aux fonctions du domaine. Il restait l'écran.
+
+C-09 porte une section intitulée **« Ce qui bloque le dépôt »**, remplie depuis
+`grouperPourCompletude(pieces).bloquantes`. Sur un dossier dont toutes les
+pièces sont conformes et qu'une exigence tient à « incomplet », elle affichait
+son état vide :
+
+> « Aucune pièce obligatoire ne manque. »
+
+Vrai sur les pièces. Muet sur le seul blocage — sous un titre qui promet de les
+énumérer.
+
+**Et la barre d'action du même écran appelait `libelleBlocage(pieces)` sans le
+compteur.** S.70 avait corrigé la fonction et son appel dans la route, pas
+celui-ci : le correctif n'atteignait donc pas l'écran qu'il visait. C'est la
+cinquième occurrence de la même cause, et la première que j'ai introduite en
+croyant la refermer.
+
+### Distinguer une pièce d'une exigence dans la liste des manques
+
+`MissingPoint` ne portait que `code`, `message`, `bloquant` : les deux sortes
+s'y lisaient pareil, et l'écran ne pouvait pas les séparer. Les rapprocher par
+le code était exclu — `Piece.code` est une pastille de trois lettres, et
+rapprocher `PAS` de `passeport` ne rapproche rien (la faute de S.68, qui n'est
+pas à refaire).
+
+`origine: "piece" | "exigence"` se déclare donc là où c'est connu, dans
+`computeCompleteness`. C'est aussi le premier lecteur d'écran que `missing` ait
+jamais eu : la liste existait depuis le début et seul l'export la lisait.
+
+### Ce que la section montre, et ce qu'elle ne montre pas
+
+Le message du référentiel, tel quel. **Aucun lien** : ces exigences ne se lèvent
+pas par un dépôt, et un bouton mènerait à un écran qui ne peut rien pour elles.
+Et une phrase qui dit où ne pas chercher — « aucune pièce de ta checklist ne
+lève cette exigence ».
+
+### Ce qui reste ouvert
+
+**Le balayage n'est toujours pas prouvé complet.** Cinq occurrences, trouvées
+par trois méthodes différentes : l'exécution, la lecture des signatures, puis
+la lecture des écrans. Rien ne garantit qu'un sixième endroit ne conclut pas
+depuis les seules pièces — un écran de démonstration, un courriel, un export.
+Ce qui manque est un garde-fou, pas un correctif de plus : un test qui refuse
+qu'une conclusion sur le dépôt se calcule sans le compteur d'exigences. Je ne
+sais pas encore l'écrire sans qu'il soit un test de source, ce que S.1 a
+enseigné à se méfier.
