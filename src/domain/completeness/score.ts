@@ -74,8 +74,25 @@ export interface CompletenessResult {
   ready: boolean;
   /** Bloquants d'abord, puis facultatifs ; à l'intérieur, ordre du gain interne décroissant. */
   missing: MissingPoint[];
-  /** Compteurs affichables : « 2 pièces obligatoires manquent, 2 complémentaires restent à traiter ». */
-  compteurs: { obligatoiresManquantes: number; facultativesManquantes: number; conformes: number };
+  /**
+   * Compteurs affichables : « 2 pièces obligatoires manquent, 2
+   * complémentaires restent à traiter ».
+   *
+   * `obligatoiresManquantes` ne compte **que des pièces**. Il additionnait
+   * les conditions bloquantes non tenues, et quatre écrans disaient donc
+   * « 1 pièce obligatoire manque » sur un dossier dont la checklist est
+   * entièrement verte — le candidat voyait la contradiction de ses yeux.
+   * C'est resté invisible tant que le chemin des écrans passait
+   * `conditions: []` ; le lot qui a réuni les deux calculs l'a rendu
+   * visible, et celui-ci le répare.
+   */
+  compteurs: {
+    obligatoiresManquantes: number;
+    /** Conditions bloquantes de la règle figée qu'aucune pièce ne tient. */
+    exigencesNonTenues: number;
+    facultativesManquantes: number;
+    conformes: number;
+  };
   /** Back-office seul. Ne jamais inclure dans une réponse destinée au candidat. */
   interne: {
     score: number;
@@ -133,7 +150,8 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     ready,
     missing,
     compteurs: {
-      obligatoiresManquantes: requisManquants.length + conditionsEchouees.length,
+      obligatoiresManquantes: requisManquants.length,
+      exigencesNonTenues: conditionsEchouees.length,
       facultativesManquantes: facultatifsManquants.length,
       conformes: conformes.length,
     },

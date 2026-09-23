@@ -32,21 +32,51 @@ const pieces = (n: number, singulier: string, pluriel: string) =>
 export function libelleDenombrement(
   compteurs: CompletenessPublic["compteurs"],
 ): string {
-  const { obligatoiresManquantes: obligatoires, facultativesManquantes: complementaires } =
-    compteurs;
+  const {
+    obligatoiresManquantes: obligatoires,
+    exigencesNonTenues: exigences,
+    facultativesManquantes: complementaires,
+  } = compteurs;
 
-  if (obligatoires === 0 && complementaires === 0) {
-    return "Toutes les pièces demandées sont conformes";
+  /*
+    Une exigence n'est pas une pièce, et la phrase ne les confond plus.
+    Le compteur des obligatoires additionnait les conditions bloquantes non
+    tenues : sur un dossier dont la checklist est entièrement verte, cet
+    en-tête annonçait « 1 pièce obligatoire manque », et le candidat voyait
+    la contradiction de ses yeux en descendant d'un écran.
+
+    Ce qu'une exigence demande se lit ailleurs — dans la prochaine action et
+    dans la liste des manques, qui portent son message du référentiel. Ici,
+    il s'agit seulement de ne pas mentir sur ce qui est compté.
+  */
+  const membres: string[] = [];
+  if (obligatoires > 0) {
+    membres.push(pieces(obligatoires, "pièce obligatoire manque", "pièces obligatoires manquent"));
   }
-  if (obligatoires === 0) {
+  if (exigences > 0) {
+    membres.push(
+      pieces(exigences, "exigence n'est pas remplie", "exigences ne sont pas remplies"),
+    );
+  }
+  if (complementaires > 0) {
+    membres.push(
+      `${complementaires} ${
+        complementaires > 1 ? "complémentaires restent" : "complémentaire reste"
+      } à traiter`,
+    );
+  }
+
+  if (membres.length === 0) return "Toutes les pièces demandées sont conformes";
+  /*
+    Le premier membre porte le sujet — « 1 pièce obligatoire manque » —,
+    les suivants s'y enchaînent par une virgule. « Reste à traiter » ne
+    commence donc jamais une phrase seul, sauf quand il est le seul membre :
+    la formulation d'origine est conservée dans ce cas.
+  */
+  if (membres.length === 1 && obligatoires === 0 && exigences === 0) {
     return `${pieces(complementaires, "pièce complémentaire reste", "pièces complémentaires restent")} à traiter`;
   }
-  if (complementaires === 0) {
-    return `${pieces(obligatoires, "pièce obligatoire manque", "pièces obligatoires manquent")}`;
-  }
-  return `${pieces(obligatoires, "pièce obligatoire manque", "pièces obligatoires manquent")}, ${complementaires} ${
-    complementaires > 1 ? "complémentaires restent" : "complémentaire reste"
-  } à traiter`;
+  return membres.join(", ");
 }
 
 export interface CompletenessTierProps {

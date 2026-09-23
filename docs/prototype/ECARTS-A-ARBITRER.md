@@ -8785,3 +8785,77 @@ C'est l'usage existant de `computeCompleteness` (`requisManquants.length +
 conditionsEchouees.length`), que ce lot ne change pas — mais le nom dit
 « obligatoires manquantes » et compte désormais, sur le chemin de l'écran, des
 choses qui ne sont pas des pièces. À renommer ou à scinder, dans un lot à part.
+
+---
+
+## S.69 — Une exigence n'est pas une pièce
+
+Le point que S.68 avait laissé ouvert, et qu'il avait lui-même rendu visible.
+
+`compteurs.obligatoiresManquantes` additionnait les pièces obligatoires non
+conformes **et** les conditions bloquantes non tenues :
+
+```ts
+obligatoiresManquantes: requisManquants.length + conditionsEchouees.length,
+```
+
+Tant que le chemin des écrans passait `conditions: []`, la somme ne portait que
+des pièces et personne ne pouvait le voir. S.68 a réuni les deux calculs — et a
+donc mis des conditions dans un compteur nommé « pièces obligatoires ».
+
+**Établi par exécution**, sur un dossier dont toutes les pièces sont conformes et
+dont une seule condition bloque :
+
+```
+compteurs    : {"obligatoiresManquantes":1,"conformes":2}
+dénombrement : « 1 pièce obligatoire manque »
+```
+
+Le candidat lisait « 1 pièce obligatoire manque », descendait d'un écran, et
+trouvait une checklist entièrement verte. La contradiction était visible à
+l'œil nu, et elle envoyait chercher quelque chose qui n'existe pas.
+
+**Quatre textes lisaient ce compteur**, tous en disant « pièce » :
+l'en-tête de complétude (C-01 et C-09), l'explication du palier, le message de
+progression d'une alerte, et le résumé du tableau de bord.
+
+### L'explication disait aussi le contraire d'elle-même
+
+`CE_QUI_NE_PESE_PAS` rangeait les conditions parmi ce qui ne pèse pas. C'était
+vrai avant S.68. Depuis, elles pèsent — l'explication du palier contredisait
+donc le palier qu'elle explique. Elles passent dans `CE_QUI_DECIDE`, à la place
+que leur poids leur donne : après les pièces obligatoires, avant les
+complémentaires.
+
+### Le compteur se scinde, les phrases suivent
+
+`exigencesNonTenues` rejoint `obligatoiresManquantes`, qui ne compte plus que
+des pièces. Chaque texte nomme ce qu'il compte :
+
+```
+« 1 exigence n'est pas remplie »
+« 1 pièce obligatoire manque, 2 exigences ne sont pas remplies »
+« 1 dossier ouvert, 1 exigence à lever. »
+```
+
+Et l'explication dit **où ne pas chercher** : « aucune pièce ne la lève ».
+
+**Le résumé du tableau de bord aurait fait reparaître la contradiction par la
+porte d'à côté.** Il somme `obligatoiresManquantes` sur les dossiers et conclut
+« rien ne bloque un dépôt » à zéro. Le compteur ne portant plus que des pièces,
+un dossier bloqué par une seule exigence serait redevenu « rien ne bloque » —
+exactement ce que S.68 venait de supprimer. Il somme donc les deux.
+
+### Une faute d'accord, attrapée en la relisant
+
+La première version de la phrase des exigences composait l'accord morceau par
+morceau et produisait « n'est pas remplies ». Deux gabarits complets
+remplacent le nid de ternaires : l'accord porte sur le verbe, le participe et
+le pronom à la fois, et une phrase assemblée bout à bout finit par en accorder
+un et pas l'autre. Un test fige les deux formes.
+
+### Ce que la mutation dit
+
+Remettre la somme fait tomber **huit** des douze assertions, sur les quatre
+textes à la fois. Les quatre qui restent vertes sont les témoins : ce que le
+lot ne devait pas changer.

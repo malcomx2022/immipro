@@ -139,7 +139,24 @@ export function resumeDuJour(dossiers: readonly Dossier[]): string {
     (total, d) => total + d.completude.compteurs.obligatoiresManquantes,
     0,
   );
-  if (aReunir === 0) return `${ouverts}, rien ne bloque un dépôt.`;
+  /*
+    Une exigence qu'aucune pièce ne tient bloque le dépôt sans rien ajouter
+    à la checklist. Depuis que le compteur des obligatoires ne compte plus
+    que des pièces, l'ignorer ici ferait annoncer « rien ne bloque un
+    dépôt » sur un dossier que le serveur refuse de déclarer prêt — la
+    contradiction que le lot précédent est venu supprimer, reparue par la
+    porte d'à côté.
+  */
+  const exigences = dossiers.reduce(
+    (total, d) => total + d.completude.compteurs.exigencesNonTenues,
+    0,
+  );
+  if (aReunir === 0 && exigences === 0) return `${ouverts}, rien ne bloque un dépôt.`;
+  if (aReunir === 0) {
+    const mot = exigences > 1 ? `${exigences} exigences à lever` : "1 exigence à lever";
+    return `${ouverts}, ${mot}.`;
+  }
   const pieces = aReunir > 1 ? `${aReunir} pièces obligatoires` : "1 pièce obligatoire";
-  return `${ouverts}, ${pieces} à réunir.`;
+  const suite = exigences > 0 ? ` et ${exigences > 1 ? `${exigences} exigences` : "1 exigence"} à lever` : "";
+  return `${ouverts}, ${pieces} à réunir${suite}.`;
 }

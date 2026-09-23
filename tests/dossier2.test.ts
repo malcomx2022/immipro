@@ -116,6 +116,7 @@ describe("C-06 — pièces de la checklist", () => {
     const completude = completudeDesPieces(PIECES_NL);
     expect(completude.compteurs).toEqual({
       obligatoiresManquantes: 2,
+      exigencesNonTenues: 0,
       facultativesManquantes: 2,
       conformes: 4,
     });

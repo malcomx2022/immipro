@@ -24,7 +24,12 @@ const dossier = (statut: Dossier["statut"], obligatoires: number): Dossier => ({
     palier: "INCOMPLET",
     ready: false,
     missing: [],
-    compteurs: { obligatoiresManquantes: obligatoires, facultativesManquantes: 0, conformes: 0 },
+    compteurs: {
+      obligatoiresManquantes: obligatoires,
+      exigencesNonTenues: 0,
+      facultativesManquantes: 0,
+      conformes: 0,
+    },
   },
   prochaineAction: "Téléverser le passeport.",
 });
