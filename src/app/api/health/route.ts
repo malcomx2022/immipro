@@ -9,6 +9,7 @@ import {
 import { constaterLesDependances } from "@/server/exploitation/capacites";
 import { lireLesConstats } from "@/server/exploitation/constats";
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
+import { ABANDON_JOURS } from "@/domain/dossiers/inactivite";
 
 /**
  * État de service — I.C, tranché le 20/09/2026 ; capacités réelles,
@@ -125,6 +126,15 @@ interface EtatDeLaPurge {
   enRetard: number;
   /** L'ancienneté du plus ancien retard, en heures. */
   depuisHeures: number;
+  /**
+   * Dossiers longtemps inactifs qui portent encore des pièces et **n'ont
+   * aucune échéance de rétention**.
+   *
+   * Distinct de `enRetard`, et c'est tout l'objet : une échéance dépassée
+   * est une purge qui n'aboutit pas, une échéance absente est une purge
+   * qui n'a jamais été programmée. La première se voyait, la seconde non.
+   */
+  sansEcheance: number;
 }
 
 /**
@@ -143,13 +153,35 @@ interface EtatDeLaPurge {
  */
 async function sonderLaPurge(): Promise<EtatDeLaPurge> {
   const maintenant = new Date();
+  const seuilDInactivite = new Date(
+    maintenant.getTime() - ABANDON_JOURS * 24 * 60 * 60 * 1000,
+  );
   try {
-    const [enRetard, plusAncien] = await Promise.all([
+    const [enRetard, plusAncien, sansEcheance] = await Promise.all([
       db.application.count({ where: { purgedAt: null, purgeDueAt: { lte: maintenant } } }),
       db.application.findFirst({
         where: { purgedAt: null, purgeDueAt: { lte: maintenant } },
         orderBy: { purgeDueAt: "asc" },
         select: { purgeDueAt: true },
+      }),
+      /*
+        Le compte qui manquait. `traiterLesBrouillonsInactifs` ne regarde
+        que les brouillons — son nom le dit —, et rien d'autre ne pose
+        `purgeDueAt` en dehors d'une clôture déclarée. Un dossier actif,
+        prêt, soumis ou suspendu dont le candidat ne revient jamais garde
+        donc ses pièces d'identité sans terme.
+
+        `updatedAt` est une approximation : le job mesure l'inactivité sur
+        la date du dernier dépôt, plus fine. Elle suffit ici — cette sonde
+        lève la main, elle ne décide de rien.
+      */
+      db.application.count({
+        where: {
+          purgedAt: null,
+          purgeDueAt: null,
+          updatedAt: { lte: seuilDInactivite },
+          documents: { some: { versions: { some: { purgedAt: null } } } },
+        },
       }),
     ]);
     const depuis = plusAncien?.purgeDueAt;
@@ -159,10 +191,29 @@ async function sonderLaPurge(): Promise<EtatDeLaPurge> {
       depuisHeures: depuis
         ? Math.floor((maintenant.getTime() - depuis.getTime()) / 3_600_000)
         : 0,
+      sansEcheance,
     };
   } catch {
-    return { lisible: false, enRetard: 0, depuisHeures: 0 };
+    return { lisible: false, enRetard: 0, depuisHeures: 0, sansEcheance: 0 };
   }
+}
+
+/**
+ * Ce que la sonde de rétention annonce — INV-5.
+ *
+ * Deux manques distincts, et les confondre en effacerait un : une
+ * échéance **dépassée** est une purge qui n'aboutit pas, une échéance
+ * **absente** est une purge qui n'a jamais été programmée. La seconde ne
+ * se voyait nulle part, et c'est la plus durable des deux — rien ne la
+ * rattrape à la passe du lendemain.
+ */
+function messageDeLaPurge(purge: EtatDeLaPurge): string {
+  const retard =
+    purge.enRetard === 0
+      ? "Aucune purge en retard."
+      : `${purge.enRetard} dossier(s) au-delà de leur échéance de rétention, le plus ancien depuis ${purge.depuisHeures} h.`;
+  if (purge.sansEcheance === 0) return retard;
+  return `${retard} ${purge.sansEcheance} dossier(s) inactifs depuis plus de ${ABANDON_JOURS} jours portent encore des pièces sans aucune échéance de rétention.`;
 }
 
 export async function GET() {
@@ -252,11 +303,10 @@ export async function GET() {
         lisible: purge.lisible,
         enRetard: purge.enRetard,
         depuisHeures: purge.depuisHeures,
+        sansEcheance: purge.sansEcheance,
         message: !purge.lisible
           ? "Les échéances de rétention n'ont pas pu être lues."
-          : purge.enRetard === 0
-            ? "Aucune purge en retard."
-            : `${purge.enRetard} dossier(s) au-delà de leur échéance de rétention, le plus ancien depuis ${purge.depuisHeures} h.`,
+          : messageDeLaPurge(purge),
       },
       revue: {
         lisible: file.lisible,
