@@ -446,6 +446,106 @@ try {
       await client.end();
     }
   }
+
+  /* ── INV-5 : un dossier sans échéance n'est purgé par personne ────── */
+  console.log("\nUn dossier qu'aucune échéance ne vise reste entier, et se voit");
+  {
+    /*
+      Établi par exécution avant d'être signalé : cinq dossiers inactifs
+      depuis vingt mois, chacun portant un passeport déposé, un par statut.
+      Après deux passes du job d'inactivité —
+
+        BROUILLON   ABANDONNE   purge prévue : 2026-10-23
+        ACTIF       ACTIF       purge prévue : — JAMAIS —
+        PRET        PRET        purge prévue : — JAMAIS —
+        SOUMIS      SOUMIS      purge prévue : — JAMAIS —
+        SUSPENDU    SUSPENDU    purge prévue : — JAMAIS —
+
+      `traiterLesBrouillonsInactifs` ne regarde que les brouillons — son nom
+      le dit — et rien d'autre ne pose `purgeDueAt` hors d'une clôture
+      déclarée. Combien de temps garder un dossier soumis dont
+      l'administration n'a pas encore répondu est une décision de
+      rétention, pas un correctif. Ce que ce lot tient, c'est que le
+      silence cesse d'être silencieux.
+    */
+    const { ABANDON_JOURS } = await import("../src/domain/dossiers/inactivite");
+    const vieux = new Date(Date.now() - (ABANDON_JOURS + 30) * 24 * 3_600_000);
+
+    const user = await db.user.create({
+      data: { email: `fumee-p-sans-echeance-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    /* INV-3 : un dossier non brouillon fige sa version de règle, et la base
+       le fait respecter. C'est la contrainte qui l'a rappelé ici. */
+    const regle = await db.visaRule.create({
+      data: {
+        countryCode: "NL",
+        visaType: `purge_${process.pid}`,
+        category: "ETUDES",
+        version: 1,
+        effectiveFrom: new Date("2020-01-01"),
+        rules: { conditions: [], pieces_requises: [], reserves: [] } as never,
+        sourceUrl: "https://ind.nl",
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"),
+        verifiedBy: "fumée",
+        nextReviewAt: new Date("2027-01-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2020-01-01"),
+      },
+    });
+    const orphelin = await db.application.create({
+      data: {
+        userId: user.id,
+        visaRuleId: regle.id,
+        status: "SOUMIS",
+        createdAt: vieux,
+        updatedAt: vieux,
+      },
+    });
+    const doc = await db.document.create({
+      data: {
+        applicationId: orphelin.id,
+        code: "passeport",
+        label: "Passeport",
+        status: "CONFORME",
+        required: true,
+      },
+    });
+    await db.documentVersion.create({
+      data: {
+        documentId: doc.id,
+        rank: 1,
+        objectKey: `dossiers/${orphelin.id}/passeport.pdf`,
+        checksum: `somme-orpheline-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 42,
+        uploadedAt: vieux,
+      },
+    });
+
+    await purgerLesPiecesEchues(new Date());
+    const apres = await db.application.findUniqueOrThrow({ where: { id: orphelin.id } });
+    verifier(
+      apres.purgeDueAt === null && apres.purgedAt === null,
+      "la purge ne le voit pas : il n'a aucune échéance à dépasser",
+    );
+
+    /*
+      Ce que la sonde de santé compte désormais. Elle ne supprime rien et ne
+      décide rien : elle refuse seulement que ce dossier n'existe pour
+      personne.
+    */
+    const sansEcheance = await db.application.count({
+      where: {
+        purgedAt: null,
+        purgeDueAt: null,
+        updatedAt: { lte: new Date(Date.now() - ABANDON_JOURS * 24 * 3_600_000) },
+        documents: { some: { versions: { some: { purgedAt: null } } } },
+      },
+    });
+    verifier(sansEcheance >= 1, `mais la sonde de rétention le compte (${sansEcheance})`);
+  }
+
 } finally {
   await new Promise<void>((ok) => {
     stockage.closeAllConnections();

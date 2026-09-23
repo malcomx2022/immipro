@@ -9382,3 +9382,65 @@ Il ne nomme plus de chemin : il **cherche** les écrivains de `AiUsage` sous
 tenait, et cela vise la cause d'origine — deux écrivains, dont l'un posait
 `costMicros: 0` en dur pendant que l'autre tarifait. Une mutation qui
 recrée un second écrivain le fait tomber.
+
+## S.78 — INV-5 ne couvre qu'un statut sur cinq, et rien ne le disait
+
+INV-5 : « les pièces d'identité sont purgées automatiquement selon la
+politique de rétention ». La purge sélectionne sur `purgeDueAt`. La question
+est donc : **qui pose cette date, et un chemin de fin de vie l'oublie-t-il ?**
+
+Deux écrivains, chacun commenté INV-5 : la clôture déclarée
+(`cloturerLeDossier`) et l'abandon pour inactivité (`inactivite.ts`). Un
+troisième, la suppression de compte (RG-10.4), la pose à l'instant même.
+
+### Établi par exécution
+
+Cinq dossiers inactifs depuis vingt mois, chacun portant un passeport
+déposé, un par statut. Après deux passes du job d'inactivité — la première
+relance, la seconde abandonne :
+
+```
+BROUILLON   statut après : ABANDONNE    purge prévue : 2026-10-23
+ACTIF       statut après : ACTIF        purge prévue : — JAMAIS —
+PRET        statut après : PRET         purge prévue : — JAMAIS —
+SOUMIS      statut après : SOUMIS       purge prévue : — JAMAIS —
+SUSPENDU    statut après : SUSPENDU     purge prévue : — JAMAIS —
+```
+
+Le job s'appelle `traiterLesBrouillonsInactifs`, et son nom dit la vérité :
+il ne sélectionne que `status: "BROUILLON"`. Or un brouillon est
+précisément le dossier qui n'a **pas** de pièces analysées — le pack n'est
+pas payé, et l'écran le dit. Le mécanisme couvre donc les dossiers les moins
+susceptibles de porter une pièce d'identité, et ignore ceux qui en portent
+certainement.
+
+La première sonde a d'ailleurs rendu `examines: 0` sur les cinq : elle
+déposait les pièces à la date du jour, donc aucun dossier n'était inactif.
+Le défaut n'a été retenu qu'une fois le **cas témoin** — le brouillon —
+effectivement abandonné.
+
+### Ce que ce lot fait, et ce qu'il ne fait pas
+
+Il ne fixe aucune durée. Combien de temps garder un dossier **soumis** dont
+l'administration n'a pas encore répondu n'est pas un correctif : certaines
+procédures instruisent plus de douze mois, et fermer le dossier de
+quelqu'un qui attend — ou pire, qui attend **notre** arbitrage, dans le cas
+`SUSPENDU` — serait un dommage, pas une conformité. Les quatre durées sont
+une décision de rétention.
+
+Ce qu'il fait : la sonde de santé compte désormais les dossiers longtemps
+inactifs qui portent encore des pièces **et n'ont aucune échéance**. Elle
+comptait les échéances **dépassées** — une purge qui n'aboutit pas — et
+était aveugle aux échéances **absentes**, qui sont le manque le plus
+durable : rien ne les rattrape à la passe du lendemain.
+
+`updatedAt` y est une approximation assumée : le job mesure l'inactivité
+sur la date du dernier dépôt, plus fine. Elle suffit pour lever la main.
+
+### À arbitrer
+
+| Statut | Question |
+|---|---|
+| `ACTIF`, `PRET` | Le candidat a payé et n'a pas déposé. Même règle que le brouillon — douze mois puis trente jours — ou plus long parce qu'il a payé ? |
+| `SOUMIS` | L'administration n'a pas répondu. Aucune durée d'inactivité ne devrait suffire seule ; faut-il une relance, une date de décision attendue ? |
+| `SUSPENDU` | Le dossier attend **notre** arbitrage de divergence. Le fermer serait nous faire oublier une dette. |
