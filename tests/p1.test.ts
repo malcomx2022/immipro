@@ -227,15 +227,45 @@ describe("T-01 — alertes", () => {
     expect(compterNonLues(ALERTES)).toBe(2);
   });
 
-  it("date en relatif et nomme la source ou le dossier", () => {
+  /**
+   * ── Une source sans sa date de vérification (INV-8) ─────────────────
+   *
+   * L'écran affichait « Il y a 2 heures · source : make-it-in-germany.com »
+   * — sur celui qui annonce précisément qu'une règle a changé. INV-8
+   * demande la source **et** la date à laquelle elle a été vérifiée, et
+   * tous les autres écrans les donnent : `SourceNote` en fait deux
+   * propriétés obligatoires, `mentionDe` les construit ensemble.
+   *
+   * L'assertion d'origine était un `toContain` sur le début de la phrase.
+   * Elle passait avant le correctif comme après, ce qui est la raison pour
+   * laquelle le défaut a tenu : elle vérifiait qu'une source est nommée,
+   * pas ce que la ligne dit. Elle porte maintenant sur la phrase entière.
+   */
+  it("date en relatif, puis la provenance complète", () => {
     expect(libelleMoment("2026-09-18T11:05:00Z", maintenant)).toBe("Il y a 2 heures");
     expect(libelleMoment("2026-09-17T08:00:00Z", maintenant)).toBe("Hier à 08 h 00");
+
     const reglementaire = ALERTES.find((a) => a.id === "de-compte-bloque")!;
-    expect(libelleContexte(reglementaire, maintenant)).toContain(
-      "source : make-it-in-germany.com",
+    expect(libelleContexte(reglementaire, maintenant)).toBe(
+      "Il y a 2 heures · source : make-it-in-germany.com, vérifiée le 11/09/2026",
     );
+
     const echeance = ALERTES.find((a) => a.id === "passeport-echeance")!;
-    expect(libelleContexte(echeance, maintenant)).toContain("dossier Pays-Bas");
+    expect(libelleContexte(echeance, maintenant)).toBe("Hier à 08 h 00 · dossier Pays-Bas");
+  });
+
+  /*
+    Le champ porte les deux valeurs ou aucune : une alerte cite une source
+    complète ou n'en cite pas. C'est ce qui rend le défaut inécrivable, et
+    non l'assertion ci-dessus — elle ne fait que le constater.
+  */
+  it("aucune alerte ne cite une source sans sa date", () => {
+    for (const alerte of ALERTES) {
+      if (!alerte.mention) continue;
+      expect(alerte.mention.source, alerte.id).not.toBe("");
+      expect(alerte.mention.verifieeLe, alerte.id).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
+      expect(libelleContexte(alerte, maintenant), alerte.id).toContain("vérifiée le");
+    }
   });
 
   it("recalcule le délai d'une échéance au lieu de le figer dans le titre", () => {

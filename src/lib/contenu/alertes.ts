@@ -44,7 +44,7 @@ export const ALERTES: readonly Alerte[] = [
     corps:
       "Applicable aux demandes déposées à partir du 1er janvier 2027. Ton dossier Allemagne est concerné : à toi de dire s'il suit la nouvelle règle.",
     emiseLe: "2026-09-18T11:05:00Z",
-    source: "make-it-in-germany.com",
+    mention: { source: "make-it-in-germany.com", verifieeLe: "2026-09-11" },
     lue: false,
     arbitrage: "de-8820",
   },
@@ -82,7 +82,7 @@ export const ALERTES: readonly Alerte[] = [
     titre: "Fiche Pays-Bas relue",
     corps: "Aucun changement d'exigence depuis la dernière vérification.",
     emiseLe: "2026-09-04T07:30:00Z",
-    source: "ind.nl",
+    mention: { source: "ind.nl", verifieeLe: "2026-09-04" },
     lue: true,
   },
 ];

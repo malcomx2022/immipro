@@ -655,6 +655,35 @@ try {
       "et l'alerte dit le nouveau délai et l'avance qu'il impose",
     );
 
+    /*
+      INV-8 de bout en bout. L'alerte citait sa source sans la date de
+      vérification — « source : ind.nl » seul, sur l'écran qui annonce
+      qu'une règle a changé. Trois choses se vérifient ici et nulle part
+      ailleurs : que la propagation écrit les deux, qu'elles désignent la
+      **nouvelle** version et non la règle figée du dossier, et que la
+      lecture les rend ensemble jusqu'à la phrase affichée.
+    */
+    {
+      const { alertesDuCandidat } = await import("../src/server/lecture/alertes");
+      const { libelleContexte } = await import("../src/domain/notifications/alerte");
+      const neuve = await db.visaRule.findUniqueOrThrow({ where: { id: v2.id } });
+
+      verifier(
+        alerte.sourceUrl === neuve.sourceUrl &&
+          alerte.sourceVerifiedAt?.toISOString().slice(0, 10) ===
+            neuve.verifiedAt.toISOString().slice(0, 10),
+        `la source et sa date viennent de la version publiée (${alerte.sourceVerifiedAt?.toISOString().slice(0, 10)})`,
+      );
+
+      const lues = await alertesDuCandidat(alerte.userId);
+      const lue = lues.find((a) => a.id === alerte.id);
+      const phrase = lue ? libelleContexte(lue, new Date()) : "";
+      verifier(
+        phrase.includes("source :") && phrase.includes("vérifiée le"),
+        `et la ligne affichée porte les deux (« ${phrase} »)`,
+      );
+    }
+
     // INV-3 : rien n'a bougé tant qu'il n'a pas tranché.
     verifier(
       (await depotDe()) === avant,
