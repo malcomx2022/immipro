@@ -4,7 +4,6 @@ import { reglesPubliees, mentionDe } from "@/server/acces/regles";
 import { versEvaluable } from "@/server/vue/destinations";
 import { classer, TROIS_MEILLEURES } from "@/domain/simulateur/classement";
 import { rangAffiche } from "@/domain/destinations/fiche";
-import { MENTION_HORS_CLASSEMENT } from "@/domain/format/change";
 
 /**
  * WF-01 — simulateur d'éligibilité.
@@ -55,12 +54,11 @@ export const POST = route({
           code: r.destination.code,
           pays: r.destination.pays,
           motifs: r.motifs,
-          // La réserve suit ce que le classement a réellement fait, et non
-          // la seule monnaie : un candidat qui n'a pas déclaré de budget voit
-          // la même composante sortir, pour une autre raison (I.B).
-          ...(r.nonPesees.length > 0 && r.destination.coutPremiereAnneeXOF === null
-            ? { reserve: MENTION_HORS_CLASSEMENT }
-            : {}),
+          // La réserve vient telle quelle du classement, qui sait pourquoi
+          // le budget n'y est pas entré (I.B). La route la composait
+          // elle-même, par un prédicat qui redisait la monnaie et retirait
+          // l'autre cause — celle que le candidat peut lever.
+          ...(r.reserve ? { reserve: r.reserve } : {}),
           // INV-8 : chaque donnée affichée porte sa source et sa date.
           mention: regle ? mentionDe(regle) : undefined,
         };
