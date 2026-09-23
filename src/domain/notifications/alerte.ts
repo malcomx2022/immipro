@@ -36,8 +36,28 @@ export interface Alerte {
   emiseLe: string;
   /** Dossier concerné, quand l'alerte en vise un. */
   dossier?: string;
-  /** Source réglementaire, quand l'alerte en cite une (INV-8). */
-  source?: string;
+  /**
+   * Mention de source — INV-8, quand l'alerte en cite une.
+   *
+   * ── Ce que le champ précédent laissait passer ───────────────────────
+   *
+   * Il s'appelait `source` et ne portait qu'un nom d'hôte. L'écran
+   * affichait donc, sur celui qui annonce précisément qu'une règle a
+   * changé :
+   *
+   *     Il y a 1 heure · source : make-it-in-germany.com
+   *
+   * La source sans sa date de vérification. INV-8 demande les deux, et
+   * tous les autres écrans les donnent — `SourceNote` en fait deux
+   * propriétés obligatoires, `mentionDe` les construit ensemble depuis la
+   * règle. La lecture des alertes, elle, refabriquait la source toute
+   * seule avec un petit `hote()` local, et c'est en la refabriquant
+   * qu'elle a perdu la date.
+   *
+   * Un objet, donc, et non deux champs facultatifs : une alerte cite une
+   * source complète ou n'en cite pas.
+   */
+  mention?: { source: string; verifieeLe: string };
   lue: boolean;
   /** Arbitrage à rendre : l'alerte ouvre T-02 au lieu de se contenter d'informer. */
   arbitrage?: string;
@@ -108,11 +128,29 @@ export function titreAlerte(alerte: Alerte, aujourdhui: string): string {
   return `${alerte.titre} · ${delai.toLowerCase()}`;
 }
 
-/** Ligne de contexte sous l'alerte : quand, puis d'où ça vient. */
+const FORMAT_DATE = new Intl.DateTimeFormat("fr-FR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/**
+ * Ligne de contexte sous l'alerte : quand, puis d'où ça vient.
+ *
+ * La provenance se dit comme partout ailleurs — source **et** date de
+ * vérification (INV-8). L'ordre suit `SourceNote` : ce qui a été vérifié,
+ * puis quand.
+ */
 export function libelleContexte(alerte: Alerte, maintenant: Date): string {
   const parties = [libelleMoment(alerte.emiseLe, maintenant)];
-  if (alerte.source) parties.push(`source : ${alerte.source}`);
-  else if (alerte.dossier) parties.push(`dossier ${alerte.dossier}`);
+  if (alerte.mention) {
+    parties.push(
+      `source : ${alerte.mention.source}, vérifiée le ${FORMAT_DATE.format(
+        new Date(alerte.mention.verifieeLe),
+      )}`,
+    );
+  } else if (alerte.dossier) parties.push(`dossier ${alerte.dossier}`);
   return parties.join(" · ");
 }
 

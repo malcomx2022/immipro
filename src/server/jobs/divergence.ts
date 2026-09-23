@@ -225,8 +225,14 @@ export async function propagerLaPublication(
             kind: "REGLEMENTATION",
             title: titreDeLAlerte(impact, destination),
             body: corpsDeLAlerte(impact, delaiDInstruction),
-            // INV-8 : l'alerte cite la source de la règle qui a changé.
+            /*
+              INV-8 : l'alerte cite la source de la règle qui a changé, et
+              la date à laquelle elle a été vérifiée. Les deux sortent du
+              même objet, dans la même expression : elles ne peuvent pas
+              désigner deux versions différentes.
+            */
             sourceUrl: nouvelle.sourceUrl,
+            sourceVerifiedAt: nouvelle.verifiedAt,
             migrationId: migration.id,
           },
         }),

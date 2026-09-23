@@ -41,7 +41,16 @@ export async function alertesDuCandidat(userId: string): Promise<Alerte[]> {
     // un identifiant technique se recopie. C'est l'écran d'alertes, pas le
     // journal d'audit.
     ...(a.application ? { dossier: nomDuDossier(a.application) } : {}),
-    ...(a.sourceUrl ? { source: hote(a.sourceUrl) } : {}),
+    /*
+      INV-8 : source et date de vérification, ou rien. Elles sont écrites
+      ensemble par la propagation, depuis la règle qui a changé ; les
+      relire ensemble est la seule façon de ne pas répéter le défaut —
+      cette lecture refabriquait la source avec un `hote()` local et
+      laissait la date en base.
+    */
+    ...(a.sourceUrl && a.sourceVerifiedAt
+      ? { mention: { source: hote(a.sourceUrl), verifieeLe: iso(a.sourceVerifiedAt) } }
+      : {}),
     lue: a.readAt !== null,
     ...(a.migrationId ? { arbitrage: a.migrationId } : {}),
     ...(a.dueAt ? { echeanceLe: iso(a.dueAt) } : {}),

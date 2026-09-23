@@ -939,7 +939,19 @@ model Notification {
   title         String
   body          String
   /// Source réglementaire, quand l'alerte en cite une (INV-8).
+  ///
+  /// Elle ne voyage jamais seule. INV-8 demande la source **et** la date de
+  /// vérification, et l'écran d'alertes n'affichait que la première : « 4
+  /// septembre · source : ind.nl », sur l'écran qui annonce précisément
+  /// qu'une règle a changé. Les deux colonnes sont écrites d'un même geste,
+  /// depuis la règle qui a changé, et ne peuvent donc pas se contredire.
+  ///
+  /// La date ne se dérive pas : `migrationId` est une colonne nue, sans clé
+  /// étrangère, et la règle figée du dossier est celle qu'on quitte — sa
+  /// date de vérification dirait quand l'ancienne version a été contrôlée.
   sourceUrl     String?
+  /// Date de vérification de cette source. Toujours présente avec `sourceUrl`.
+  sourceVerifiedAt DateTime?     @db.Date
   dueAt         DateTime?        @db.Date
   /// Migration à arbitrer, le cas échéant : l'alerte ouvre T-02.
   migrationId   String?

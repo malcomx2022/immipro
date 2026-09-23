@@ -9161,3 +9161,77 @@ maintenant la mise en avant différemment — un mot sur $-01, un badge de
 couverture sur `/tarifs`. Ce n'est pas une divergence de fond, les
 composants n'étant pas les mêmes, mais si `/tarifs` devait s'aligner,
 `MENTION_MISE_EN_AVANT` est l'endroit où le mot est écrit une fois.
+
+## S.75 — L'écran qui annonce un changement de règle citait la source sans sa date
+
+INV-8 : « toute information réglementaire affichée porte sa source **et** sa
+date de vérification ». Balayage des écrans qui affichent du réglementaire :
+tous portent `SourceNote`, sauf un — T-01, les alertes. Rendu avant
+correction :
+
+```
+Le compte bloqué allemand passe à 11 904 €
+Applicable aux demandes déposées à partir du 1er janvier 2027. […]
+Il y a 1 heure · source : make-it-in-germany.com
+```
+
+La source, sans la date. Sur l'écran qui annonce précisément qu'une règle a
+changé, c'est-à-dire celui où savoir quand l'information a été contrôlée
+compte le plus.
+
+### Ce qui l'avait laissée passer
+
+Trois choses, et aucune n'est un oubli isolé.
+
+**Une seconde implémentation.** `mentionDe(regle)` est l'endroit unique qui
+construit une mention INV-8 — source, date de vérification, date de
+relecture — et son commentaire dit pourquoi : « une fiche sans source ne
+doit pas pouvoir exister ». La lecture des alertes ne l'appelait pas : elle
+refabriquait la source avec un `hote()` local. C'est en la refabriquant
+qu'elle a perdu la date.
+
+**Un champ qui pouvait être à moitié là.** `Alerte.source?: string` portait
+un nom d'hôte seul. Rien, dans le type, ne demandait la date.
+
+**Un test trop large.** `tests/p1.test.ts` vérifiait déjà cette ligne — en
+`toContain("source : make-it-in-germany.com")`. L'assertion passait avant
+le correctif comme après : elle vérifiait qu'une source est nommée, pas ce
+que la ligne dit. Les 2 112 tests sont restés verts après la correction du
+défaut, ce qui est la mesure exacte de ce qu'ils en couvraient.
+
+### D'où vient la date — elle se déclare, elle ne se devine pas
+
+Trois candidats, dont deux faux :
+
+- `application.visaRule.verifiedAt` — la règle **figée** du dossier (INV-3),
+  c'est-à-dire la version qu'on quitte. Sa date dirait quand l'ancienne a
+  été contrôlée, sous une alerte qui annonce la nouvelle.
+- `migrationId → toRule.verifiedAt` — juste, mais **impossible** :
+  `Notification.migrationId` est une colonne nue, sans clé étrangère. Il n'y
+  a pas de relation à traverser.
+- La règle qui a changé, au moment où l'alerte est écrite. C'est déjà d'elle
+  que vient `sourceUrl` : `sourceUrl: nouvelle.sourceUrl`.
+
+La date est donc écrite avec la source, depuis le même objet, dans la même
+expression. Elles ne peuvent pas désigner deux versions différentes.
+
+### Ce qui rend le défaut inécrivable
+
+`Alerte.mention?: { source; verifieeLe }` — un objet, pas deux champs
+facultatifs. Une alerte cite une source complète ou n'en cite pas. C'est le
+même garde-fou que `CompteursDeBlocage` deux lots plus tôt, et pour la même
+raison : ce qui doit voyager ensemble se déclare ensemble.
+
+### Ce que la fumée tient et que rien d'autre ne peut tenir
+
+Trois choses, sur PostgreSQL : que la propagation écrit les deux, qu'elles
+désignent la version **publiée** et non la règle figée, et que la lecture les
+rend ensemble jusqu'à la phrase affichée. Vérifié par trois mutations — pas
+de date écrite, une date valide mais étrangère, une lecture qui laisse la
+date en base — chacune ne faisant tomber que son assertion.
+
+### Au passage
+
+La CI n'ayant rien validé depuis le 22/09, les quinze fumées ont été jouées
+localement sur `4fd6179` avant ce lot : toutes vertes. Le trou laissé par
+l'indisponibilité des exécuteurs ne cachait rien.
