@@ -1035,7 +1035,7 @@ const OFFRE = {
 
 describe("T-06 — Services partenaires", () => {
   const rendre = () =>
-    render(<Services dossier={DOSSIER} offres={[OFFRE]} autorise />);
+    render(<Services dossier={DOSSIER} offres={[OFFRE]} autorisation="accordee" />);
 
   it("rattache chaque offre à une pièce que le dossier demande", () => {
     const { container } = rendre();
@@ -1089,7 +1089,7 @@ describe("T-06 — Services partenaires", () => {
 
   it("dit pourquoi la page est vide, plutôt que de ne rien dire", () => {
     const { container } = render(
-      <Services dossier={DOSSIER} offres={[]} autorise />,
+      <Services dossier={DOSSIER} offres={[]} autorisation="accordee" />,
     );
     expect(container.textContent).toContain("Aucun partenaire n'est référencé");
     expect(container.textContent).toContain("vérification destination par destination");
@@ -1097,11 +1097,30 @@ describe("T-06 — Services partenaires", () => {
 
   it("dit que l'autorisation est coupée, et où la rétablir", () => {
     const { container } = render(
-      <Services dossier={DOSSIER} offres={[]} autorise={false} />,
+      <Services dossier={DOSSIER} offres={[]} autorisation="retiree" />,
     );
     expect(container.textContent).toContain("Tu as coupé les offres de partenaire");
     expect(
       screen.getByRole("link", { name: "Ouvrir mes consentements" }).getAttribute("href"),
+    ).toBe("/consentements");
+  });
+
+  /**
+   * Le cas de tout le monde, et c'était celui qui mentait. Aucune
+   * autorisation n'est active au premier passage (RG-02.1) : l'écran
+   * annonçait donc à chaque candidat qu'il avait coupé des offres qu'il
+   * n'avait jamais autorisées, et l'invitait à « rétablir » un accord qui
+   * n'avait jamais existé.
+   */
+  it("n'impute aucun geste à qui n'a rien fait", () => {
+    const { container } = render(
+      <Services dossier={DOSSIER} offres={[]} autorisation="jamais_donnee" />,
+    );
+    expect(container.textContent).toContain("Tu n'as pas encore autorisé");
+    expect(container.textContent).not.toContain("coupé");
+    expect(container.textContent).not.toContain("rétablie");
+    expect(
+      screen.getByRole("link", { name: "Autoriser depuis mes consentements" }).getAttribute("href"),
     ).toBe("/consentements");
   });
 });

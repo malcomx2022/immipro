@@ -1,6 +1,6 @@
 import type { ConsentKind } from "@prisma/client";
 import { db } from "@/lib/db";
-import type { CodeConsentement } from "@/domain/comptes/consentements";
+import type { CodeConsentement, EtatAutorisation } from "@/domain/comptes/consentements";
 
 /**
  * Consentements — A-05, RG-02.1.
@@ -34,16 +34,34 @@ export const VERSION_TEXTES = "1.0";
  * l'accorde et n'a pas été retirée. Pas « une ligne à `granted: true`
  * quelque part » : un accord donné puis retiré laisse deux lignes, et la
  * première dirait oui pour toujours.
+ *
+ * L'absence de ligne n'est pas un refus, c'est une question jamais posée, et
+ * les deux se distinguent ici plutôt que chez l'appelant. Un écran qui ne
+ * reçoit qu'un booléen doit deviner laquelle des deux il a sous les yeux, et
+ * T-06 devinait « retirée » — la seule des deux qui soit fausse par défaut.
+ */
+export async function etatDeLAutorisation(
+  userId: string,
+  code: CodeConsentement,
+): Promise<EtatAutorisation> {
+  const derniere = await db.consent.findFirst({
+    where: { userId, kind: GENRE_DU_CONSENTEMENT[code] },
+    orderBy: { grantedAt: "desc" },
+  });
+  if (!derniere) return "jamais_donnee";
+  return derniere.granted && !derniere.revokedAt ? "accordee" : "retiree";
+}
+
+/**
+ * La même lecture, ramenée à la décision. Les appelants qui n'écrivent rien
+ * à l'écran — l'analyse, le balayage, le dépôt d'une pièce — n'ont que faire
+ * de la nuance, et la dériver ici garde une seule interrogation du registre.
  */
 export async function autorisationAccordee(
   userId: string,
   code: CodeConsentement,
 ): Promise<boolean> {
-  const derniere = await db.consent.findFirst({
-    where: { userId, kind: GENRE_DU_CONSENTEMENT[code] },
-    orderBy: { grantedAt: "desc" },
-  });
-  return Boolean(derniere?.granted && !derniere.revokedAt);
+  return (await etatDeLAutorisation(userId, code)) === "accordee";
 }
 
 /**

@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/Card";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { Offre } from "@/server/lecture/partenaires";
 import { ENGAGEMENTS, MENTION_INDEPENDANCE } from "@/domain/consultants/proposition";
-import { FORMULATION } from "@/domain/partenaires/affiliation";
+import { FORMULATION, SILENCE } from "@/domain/partenaires/affiliation";
+import type { EtatAutorisation } from "@/domain/comptes/consentements";
 import { appeler } from "@/lib/api";
 import { EnteteDossier } from "../dossiers/[id]/EnteteDossier";
 
@@ -33,11 +34,15 @@ import { EnteteDossier } from "../dossiers/[id]/EnteteDossier";
 export interface ServicesProps {
   dossier: Dossier;
   offres: readonly Offre[];
-  /** Faux quand l'autorisation de recevoir des offres a été retirée. */
-  autorise: boolean;
+  /**
+   * L'état de l'autorisation de recevoir des offres. Un booléen ne suffisait
+   * pas : l'écran doit dire « tu n'as pas encore autorisé » à qui n'a rien
+   * fait, et « tu as coupé » à qui a coupé.
+   */
+  autorisation: EtatAutorisation;
 }
 
-export function Services({ dossier, offres, autorise }: ServicesProps) {
+export function Services({ dossier, offres, autorisation }: ServicesProps) {
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
@@ -61,22 +66,8 @@ export function Services({ dossier, offres, autorise }: ServicesProps) {
         </p>
       </div>
 
-      {!autorise ? (
-        <Card>
-          <h2 className="text-16 font-semibold text-ink-900">
-            Tu as coupé les offres de partenaire
-          </h2>
-          <p className="text-pretty text-14 text-ink-700">
-            Cette page reste vide tant que l&apos;autorisation n&apos;est pas rétablie.
-            Elle se règle depuis tes consentements, avec les autres.
-          </p>
-          <Link
-            href="/consentements"
-            className="flex min-h-touch items-center text-14 text-accent-600"
-          >
-            Ouvrir mes consentements
-          </Link>
-        </Card>
+      {autorisation !== "accordee" ? (
+        <SansAutorisation autorisation={autorisation} />
       ) : offres.length === 0 ? (
         <Card>
           <h2 className="text-16 font-semibold text-ink-900">
@@ -115,6 +106,29 @@ export function Services({ dossier, offres, autorise }: ServicesProps) {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * L'écran quand la liste ne s'affiche pas faute d'autorisation.
+ *
+ * Les deux textes viennent du domaine : ce sont eux qui portent la
+ * distinction, et les écrire ici les mettrait hors de portée du garde-fou du
+ * vocabulaire comme du test qui les rattache à l'état.
+ */
+function SansAutorisation({ autorisation }: { autorisation: "retiree" | "jamais_donnee" }) {
+  const mots = SILENCE[autorisation];
+  return (
+    <Card>
+      <h2 className="text-16 font-semibold text-ink-900">{mots.titre}</h2>
+      <p className="text-pretty text-14 text-ink-700">{mots.explication}</p>
+      <Link
+        href="/consentements"
+        className="flex min-h-touch items-center text-14 text-accent-600"
+      >
+        {mots.lien}
+      </Link>
+    </Card>
   );
 }
 

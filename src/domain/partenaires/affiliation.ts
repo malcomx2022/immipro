@@ -160,6 +160,43 @@ const SERVICE = (quoi: string): Formulation => ({
   responsabilite: `Les partenaires ${quoi} sont indépendants et responsables de leurs prestations.`,
 });
 
+/**
+ * Ce que T-06 dit quand la liste ne s'affiche pas faute d'autorisation.
+ *
+ * Une seule phrase existait, et elle disait « tu as coupé les offres de
+ * partenaire » — un geste. Or aucune autorisation n'est active au premier
+ * passage (RG-02.1, `ETAT_INITIAL`), si bien que la phrase s'adressait
+ * d'abord à ceux qui n'avaient rien coupé du tout, et les renvoyait
+ * « rétablir » ce qu'ils n'avaient jamais accordé. Le mot présuppose un
+ * passé que la plupart n'ont pas.
+ *
+ * Les deux textes disent la même chose du produit et une chose différente de
+ * la personne, ce qui est exactement la distinction que porte
+ * `EtatAutorisation`. Aucun ne reproche le refus : l'un annonce une question
+ * jamais posée, l'autre prend acte d'une décision.
+ */
+export interface Silence {
+  titre: string;
+  explication: string;
+  /** Libellé du lien vers les consentements, accordé à la situation. */
+  lien: string;
+}
+
+export const SILENCE: Record<"retiree" | "jamais_donnee", Silence> = {
+  jamais_donnee: {
+    titre: "Tu n'as pas encore autorisé les propositions de partenaire",
+    explication:
+      "Aucune autorisation n'est active tant que tu ne l'as pas donnée. Cette page reste vide d'ici là, et ton dossier n'en dépend pas.",
+    lien: "Autoriser depuis mes consentements",
+  },
+  retiree: {
+    titre: "Tu as coupé les offres de partenaire",
+    explication:
+      "Cette page reste vide tant que l'autorisation n'est pas rétablie. Elle se règle depuis tes consentements, avec les autres.",
+    lien: "Ouvrir mes consentements",
+  },
+};
+
 export const FORMULATION: Record<GenrePartenaire, Formulation> = {
   CONSULTANT: {
     titre: "Ce point dépasse ce que nous savons faire",

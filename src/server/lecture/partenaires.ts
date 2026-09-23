@@ -5,7 +5,8 @@ import {
   tauxConformeALAnnonce,
   type GenrePartenaire,
 } from "@/domain/partenaires/affiliation";
-import { autorisationAccordee } from "@/server/acces/consentements";
+import type { EtatAutorisation } from "@/domain/comptes/consentements";
+import { etatDeLAutorisation } from "@/server/acces/consentements";
 
 /**
  * Lecture des offres de partenaire — WF-13, écran T-06.
@@ -64,8 +65,15 @@ export interface Offre {
 }
 
 export interface OffresDuDossier {
-  /** Faux quand le candidat a retiré l'autorisation : l'écran le dit. */
-  autorise: boolean;
+  /**
+   * L'état de l'autorisation, et non le seul fait qu'elle manque.
+   *
+   * Le champ valait `false` dans deux situations que l'écran ne pouvait plus
+   * séparer — jamais donnée, retirée — et il en annonçait une seule : la
+   * retirée. Comme aucune autorisation n'est active au premier passage
+   * (RG-02.1), c'était la mauvaise pour presque tout le monde.
+   */
+  autorisation: EtatAutorisation;
   offres: readonly Offre[];
 }
 
@@ -91,11 +99,12 @@ export async function offresDuDossier(
       documents: { select: { code: true, label: true } },
     },
   });
-  if (!dossier?.visaRule) return { autorise: true, offres: [] };
-
-  if (!(await autorisationAccordee(userId, "partenaires"))) {
-    return { autorise: false, offres: [] };
-  }
+  const autorisation = await etatDeLAutorisation(userId, "partenaires");
+  // Le dossier introuvable rend l'état réel, et non « accordée » : l'écran
+  // n'a alors rien à dire de l'autorisation, et lui en faire dire une fausse
+  // par commodité serait le défaut qu'on corrige.
+  if (!dossier?.visaRule) return { autorisation, offres: [] };
+  if (autorisation !== "accordee") return { autorisation, offres: [] };
 
   const pays = dossier.visaRule.countryCode;
   const offres: Offre[] = [];
@@ -146,7 +155,7 @@ export async function offresDuDossier(
     });
   }
 
-  return { autorise: true, offres };
+  return { autorisation, offres };
 }
 
 const versPartenaire = (

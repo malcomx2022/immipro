@@ -40,7 +40,7 @@ export default async function PageServices({
   const vue = await vueDuDossier(choisi, acteur.id).catch(() => null);
   if (!vue) notFound();
 
-  const { autorise, offres } = await offresDuDossier(vue.dossier.id, acteur.id);
+  const { autorisation, offres } = await offresDuDossier(vue.dossier.id, acteur.id);
 
-  return <Services dossier={vue.dossier} offres={offres} autorise={autorise} />;
+  return <Services dossier={vue.dossier} offres={offres} autorisation={autorisation} />;
 }
