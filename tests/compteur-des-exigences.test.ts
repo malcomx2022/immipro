@@ -7,6 +7,7 @@ import {
   expliquerLaCompletude,
 } from "@/domain/completeness/explication";
 import { resumeDuJour, type Dossier } from "@/domain/dossiers/dossier";
+import { prochaineAction } from "@/server/vue/dossier";
 import { libelleAPreparer, libelleBlocage, type Piece } from "@/domain/dossiers/piece";
 
 const piece = (code: string, etat: Piece["etat"]): Piece => ({
@@ -179,31 +180,36 @@ describe("le résumé du tableau de bord", () => {
  *     palier  : INCOMPLET — prêt : false
  */
 describe("la barre d'action ne contredit pas l'en-tête", () => {
-  const pieces = (bloquantes: number): Piece[] => [
-    ...Array.from({ length: bloquantes }, (_, i) => piece(`manquante_${i}`, "ATTENDUE")),
-    piece("passeport", "CONFORME"),
-  ];
+  const compteurs = (obligatoiresManquantes: number, exigencesNonTenues: number) => ({
+    obligatoiresManquantes,
+    exigencesNonTenues,
+  });
 
   it("n'annonce pas « rien ne bloque » quand une exigence bloque", () => {
-    expect(libelleBlocage(pieces(0), 1)).toBe("1 exigence bloque le dépôt");
+    expect(libelleBlocage(compteurs(0, 1))).toBe("1 exigence bloque le dépôt");
   });
 
   it("nomme les deux, et accorde le verbe sur l'ensemble", () => {
-    expect(libelleBlocage(pieces(1), 1)).toBe("1 pièce et 1 exigence bloquent le dépôt");
-    expect(libelleBlocage(pieces(2), 3)).toBe("2 pièces et 3 exigences bloquent le dépôt");
+    expect(libelleBlocage(compteurs(1, 1))).toBe("1 pièce et 1 exigence bloquent le dépôt");
+    expect(libelleBlocage(compteurs(2, 3))).toBe("2 pièces et 3 exigences bloquent le dépôt");
   });
 
   it("garde ses phrases d'origine quand aucune exigence n'est en jeu", () => {
-    expect(libelleBlocage(pieces(0))).toBe("Rien ne bloque le dépôt");
-    expect(libelleBlocage(pieces(1))).toBe("1 pièce bloque le dépôt");
-    expect(libelleBlocage(pieces(2))).toBe("2 pièces bloquent le dépôt");
+    expect(libelleBlocage(compteurs(0, 0))).toBe("Rien ne bloque le dépôt");
+    expect(libelleBlocage(compteurs(1, 0))).toBe("1 pièce bloque le dépôt");
+    expect(libelleBlocage(compteurs(2, 0))).toBe("2 pièces bloquent le dépôt");
   });
 
+  /*
+    Les deux phrases lisent désormais le même objet, et c'est tout
+    l'intérêt : le test ne peut plus les faire diverger même en le
+    voulant. Il reste parce qu'il dit ce que l'écran affiche.
+  */
   it("dit la même chose que l'en-tête sur le même dossier", () => {
-    const { compteurs } = resultat(1);
+    const { compteurs: mesure } = resultat(1);
 
-    expect(libelleDenombrement(compteurs)).toContain("exigence");
-    expect(libelleBlocage(pieces(0), compteurs.exigencesNonTenues)).toContain("exigence");
+    expect(libelleDenombrement(mesure)).toContain("exigence");
+    expect(libelleBlocage(mesure)).toContain("exigence");
   });
 });
 
@@ -225,7 +231,7 @@ describe("ce qu'il reste à préparer avant un rendez-vous", () => {
   const conformes = [piece("passeport", "CONFORME"), piece("preuve_fonds", "CONFORME")];
 
   it("nomme l'exigence plutôt que d'annoncer un dossier sans reste", () => {
-    const phrase = libelleAPreparer(conformes, 1);
+    const phrase = libelleAPreparer(conformes, { obligatoiresManquantes: 0, exigencesNonTenues: 1 });
 
     expect(phrase).not.toContain("l'appel peut porter sur le fond");
     expect(phrase).toBe(
@@ -234,21 +240,118 @@ describe("ce qu'il reste à préparer avant un rendez-vous", () => {
   });
 
   it("met l'exigence avant les pièces : elle ne se règle pas en téléversant", () => {
-    const phrase = libelleAPreparer([...conformes, piece("diplome", "ATTENDUE")], 1);
+    const phrase = libelleAPreparer([...conformes, piece("diplome", "ATTENDUE")], {
+      obligatoiresManquantes: 1,
+      exigencesNonTenues: 1,
+    });
 
     expect(phrase.indexOf("exigence")).toBeLessThan(phrase.indexOf("diplome"));
     expect(phrase).toContain("1 pièce obligatoire reste à traiter : diplome.");
   });
 
   it("accorde au pluriel", () => {
-    expect(libelleAPreparer(conformes, 2)).toContain(
+    expect(
+      libelleAPreparer(conformes, { obligatoiresManquantes: 0, exigencesNonTenues: 2 }),
+    ).toContain(
       "2 exigences de la règle de ton dossier restent à lever, et aucune pièce ne les lève",
     );
   });
 
   it("garde sa phrase d'origine quand rien ne reste", () => {
-    expect(libelleAPreparer(conformes)).toBe(
+    expect(
+      libelleAPreparer(conformes, { obligatoiresManquantes: 0, exigencesNonTenues: 0 }),
+    ).toBe(
       "Toutes les pièces demandées sont conformes : l'appel peut porter sur le fond du dossier.",
     );
+  });
+});
+
+/**
+ * Le dossier témoin — le garde-fou, plutôt qu'un sixième correctif.
+ *
+ * ── Ce que six lots ont appris ──────────────────────────────────────
+ *
+ * Six phrases ont conclu tour à tour à partir des seules pièces : la
+ * section des blocages de C-09, sa barre d'action, l'en-tête de
+ * dénombrement, le résumé du tableau de bord, le texte de préparation
+ * d'un rendez-vous payant, et enfin la barre d'action de C-06 — trouvée
+ * par le compilateur, une fois la valeur par défaut retirée. Chacune
+ * était rassurante, et chacune l'était sur le seul dossier qu'on ne
+ * pouvait pas déposer. Les cinq premières ont été trouvées une par une,
+ * chaque correctif produisant la suivante.
+ *
+ * Le dossier témoin est ce cas-là, écrit une fois : toutes les pièces
+ * conformes, une exigence de la règle figée qu'aucune pièce ne lève. Rien
+ * de ce que la plateforme dit d'un tel dossier n'a le droit de rassurer.
+ *
+ * ── Pourquoi un tableau et non six tests ───────────────────────────
+ *
+ * Le tableau nomme l'invariant au lieu de le répéter, et c'est l'endroit
+ * où une septième phrase s'ajoute. Il ne prétend pas la découvrir : aucun
+ * test ne lit les sources ici — la leçon de S.1 est qu'un test qui grep
+ * le dépôt vérifie l'écriture et non le comportement. Ce qui rend
+ * l'omission impossible est ailleurs, dans le type `CompteursDeBlocage` :
+ * une phrase qui conclut ne compile plus sans les deux nombres qui
+ * décident.
+ */
+describe("le dossier témoin — toutes les pièces conformes, une exigence en travers", () => {
+  const pieces: Piece[] = [
+    piece("passeport", "CONFORME"),
+    piece("preuve_fonds", "CONFORME"),
+  ];
+  const completude = resultat(1);
+  const { compteurs } = completude;
+
+  const dossier = {
+    id: "d",
+    destination: { slug: "s", pays: "P", resume: "", autorite: "" },
+    statut: "ACTIF",
+    completude,
+    prochaineAction: "",
+    pieces: [],
+  } as unknown as Dossier;
+
+  /** Ce qu'aucune de ces phrases n'a le droit de dire sur ce dossier. */
+  const RASSURANT =
+    /rien ne bloque|toutes les pièces demandées sont conformes|aucune pièce obligatoire ne manque/iu;
+
+  const conclusions: readonly { ou: string; phrase: string }[] = [
+    { ou: "C-09 — en-tête de dénombrement", phrase: libelleDenombrement(compteurs) },
+    { ou: "C-06 et C-09 — barre d'action", phrase: libelleBlocage(compteurs) },
+    { ou: "T-05 — préparation du rendez-vous", phrase: libelleAPreparer(pieces, compteurs) },
+    { ou: "C-01 — résumé du tableau de bord", phrase: resumeDuJour([dossier]) },
+    {
+      ou: "C-01 et C-06 — prochaine action",
+      phrase: prochaineAction(pieces, "ACTIF", completude),
+    },
+  ];
+
+  it.each(conclusions)("$ou ne rassure pas", ({ phrase }) => {
+    expect(phrase).not.toMatch(RASSURANT);
+  });
+
+  /*
+    Le palier est la conclusion que toutes les autres paraphrasent. S'il
+    passait à COMPLET, chacune des phrases ci-dessus aurait raison de
+    rassurer, et le tableau vérifierait le contraire de ce qu'il croit.
+  */
+  it("le palier lui-même tient le dossier à incomplet", () => {
+    expect(completude.palier).toBe("INCOMPLET");
+    expect(completude.ready).toBe(false);
+  });
+
+  /*
+    Le contrôle négatif : sans l'exigence, ces mêmes phrases rassurent, et
+    c'est correct. Sans lui, le tableau passerait aussi sur une version du
+    code qui ne sait plus rien dire du tout.
+  */
+  it("les mêmes phrases rassurent quand plus rien ne bloque", () => {
+    const sans = resultat(0);
+    const apaise = { ...dossier, completude: sans } as Dossier;
+
+    expect(libelleBlocage(sans.compteurs)).toMatch(RASSURANT);
+    expect(libelleAPreparer(pieces, sans.compteurs)).toMatch(RASSURANT);
+    expect(resumeDuJour([apaise])).toMatch(RASSURANT);
+    expect(prochaineAction(pieces, "ACTIF", sans)).toMatch(RASSURANT);
   });
 });

@@ -102,9 +102,16 @@ describe("C-06 — pièces de la checklist", () => {
   });
 
   it("annonce le blocage sans parler de reprise", () => {
-    expect(libelleBlocage(PIECES_NL)).toBe("2 pièces bloquent le dépôt");
-    expect(libelleBlocage([piece({ etat: "CONFORME" })])).toBe("Rien ne bloque le dépôt");
-    expect(libelleBlocage([piece()])).toBe("1 pièce bloque le dépôt");
+    expect(libelleBlocage(completudeDesPieces(PIECES_NL).compteurs)).toBe(
+      "2 pièces bloquent le dépôt",
+    );
+    const conforme = [piece({ etat: "CONFORME" })];
+    expect(libelleBlocage(completudeDesPieces(conforme).compteurs)).toBe(
+      "Rien ne bloque le dépôt",
+    );
+    expect(libelleBlocage(completudeDesPieces([piece()]).compteurs)).toBe(
+      "1 pièce bloque le dépôt",
+    );
   });
 
   it("propose d'abord ce qui bloque", () => {
@@ -345,7 +352,7 @@ describe("lot Dossier 2 — vocabulaire", () => {
       ...EFFETS_CLOTURE,
       ...ISSUES.map((i) => i.libelle),
       ...ISSUES.map((i) => mentionCloture(i.cle)),
-      libelleBlocage(PIECES_NL),
+      libelleBlocage(completudeDesPieces(PIECES_NL).compteurs),
       libelleQuota(QUOTA),
     ];
     for (const texte of textes) {

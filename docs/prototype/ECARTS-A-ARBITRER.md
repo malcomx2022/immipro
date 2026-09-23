@@ -8903,3 +8903,197 @@ davantage depuis S.68. Les trois premières se sont révélées une par une, en
 production de la suivante ; la quatrième a été trouvée par un balayage des
 signatures `(pieces: readonly Piece[])`. C'est le balayage qu'il fallait faire
 au moment de S.68, et pas trois lots plus tard.
+
+---
+
+## S.71 — La section qui promettait les blocages n'en listait qu'une sorte
+
+Le balayage de S.70 s'était arrêté aux fonctions du domaine. Il restait l'écran.
+
+C-09 porte une section intitulée **« Ce qui bloque le dépôt »**, remplie depuis
+`grouperPourCompletude(pieces).bloquantes`. Sur un dossier dont toutes les
+pièces sont conformes et qu'une exigence tient à « incomplet », elle affichait
+son état vide :
+
+> « Aucune pièce obligatoire ne manque. »
+
+Vrai sur les pièces. Muet sur le seul blocage — sous un titre qui promet de les
+énumérer.
+
+**Et la barre d'action du même écran appelait `libelleBlocage(pieces)` sans le
+compteur.** S.70 avait corrigé la fonction et son appel dans la route, pas
+celui-ci : le correctif n'atteignait donc pas l'écran qu'il visait. C'est la
+cinquième occurrence de la même cause, et la première que j'ai introduite en
+croyant la refermer.
+
+### Distinguer une pièce d'une exigence dans la liste des manques
+
+`MissingPoint` ne portait que `code`, `message`, `bloquant` : les deux sortes
+s'y lisaient pareil, et l'écran ne pouvait pas les séparer. Les rapprocher par
+le code était exclu — `Piece.code` est une pastille de trois lettres, et
+rapprocher `PAS` de `passeport` ne rapproche rien (la faute de S.68, qui n'est
+pas à refaire).
+
+`origine: "piece" | "exigence"` se déclare donc là où c'est connu, dans
+`computeCompleteness`. C'est aussi le premier lecteur d'écran que `missing` ait
+jamais eu : la liste existait depuis le début et seul l'export la lisait.
+
+### Ce que la section montre, et ce qu'elle ne montre pas
+
+Le message du référentiel, tel quel. **Aucun lien** : ces exigences ne se lèvent
+pas par un dépôt, et un bouton mènerait à un écran qui ne peut rien pour elles.
+Et une phrase qui dit où ne pas chercher — « aucune pièce de ta checklist ne
+lève cette exigence ».
+
+### Ce qui reste ouvert
+
+**Le balayage n'est toujours pas prouvé complet.** Cinq occurrences, trouvées
+par trois méthodes différentes : l'exécution, la lecture des signatures, puis
+la lecture des écrans. Rien ne garantit qu'un sixième endroit ne conclut pas
+depuis les seules pièces — un écran de démonstration, un courriel, un export.
+Ce qui manque est un garde-fou, pas un correctif de plus : un test qui refuse
+qu'une conclusion sur le dépôt se calcule sans le compteur d'exigences. Je ne
+sais pas encore l'écrire sans qu'il soit un test de source, ce que S.1 a
+enseigné à se méfier.
+
+## S.72 — Le garde-fou, et la sixième occurrence qu'il a trouvée
+
+S.71 s'est arrêté sur une phrase : « ce qui manque est un garde-fou, pas un
+correctif de plus ». Ce lot l'écrit. Il a trouvé la sixième occurrence en
+moins d'une minute, et ce n'est pas une coïncidence : c'est ce qui distingue
+un garde-fou d'un correctif.
+
+### Ce que la valeur par défaut rendait légal
+
+S.70 a donné un second paramètre à `libelleBlocage` et `libelleAPreparer`,
+avec une valeur par défaut : `exigences = 0`. La valeur par défaut est
+exactement le trou. Elle rend l'omission légale, silencieuse et rassurante —
+un appelant qui ne connaît pas le paramètre obtient la phrase d'avant, sans
+rien voir.
+
+C-06 l'appelait ainsi. Sur un dossier dont toutes les pièces sont conformes
+et qu'une exigence tient à « incomplet », l'écran affichait, de haut en bas :
+
+    Dossier incomplet
+    1 exigence n'est pas remplie
+    8 pièces déjà conformes
+    […]
+    Rien ne bloque le dépôt
+
+Soixante-dix lignes d'écart, le même écran, la contradiction complète. Le
+compilateur l'a nommée dès que la valeur par défaut a disparu ; six lots de
+lecture ne l'avaient pas vue.
+
+### Le garde-fou : le type, pas le test
+
+`libelleBlocage` ne reçoit plus de pièces du tout. Les deux nombres qui
+décident vivent ensemble dans `compteurs`, et le type `CompteursDeBlocage`
+les extrait de là plutôt que de les redéfinir. `prochaineAction` perd de même
+ses deux paramètres facultatifs.
+
+Il n'y a donc plus d'appel qui conclue à partir des seules pièces, parce que
+le type n'en accepte plus. Écrire `{ obligatoiresManquantes: 0,
+exigencesNonTenues: 0 }` reste possible — c'est alors une affirmation qui
+apparaît dans la diff et se justifie, comme une entrée de
+`copy-exceptions.json`, et non un oubli.
+
+Au passage, une seconde implémentation disparaît : `libelleBlocage`
+recomptait ses bloquantes avec `grouperPourCompletude`. Les deux comptages
+ont été comparés sur les 256 combinaisons de deux pièces avant le
+déplacement — ils ne diffèrent jamais. C'est ce qu'il fallait établir pour
+que le déplacement ne change rien d'autre.
+
+### Le dossier témoin
+
+Un fixture, une fois : toutes les pièces conformes, une exigence de la règle
+figée qu'aucune pièce ne lève. Cinq phrases de conclusion passent dessus dans
+un `it.each`, et aucune n'a le droit de rassurer. Le contrôle négatif vérifie
+que les mêmes phrases rassurent bien quand plus rien ne bloque — sans lui, le
+tableau passerait aussi sur un code qui ne saurait plus rien dire.
+
+Les deux sens ont été vérifiés par mutation : `libelleBlocage` qui ignore les
+exigences fait tomber quatre tests, `libelleAPreparer` qui tait la mention en
+fait tomber trois, et une phrase qui alarme sans raison fait tomber le
+contrôle négatif.
+
+### Ce que ce garde-fou ne fait pas
+
+Il ne découvre pas une septième phrase. Aucun test ici ne lit les sources :
+S.1 a enseigné qu'un test qui grep le dépôt vérifie l'écriture et non le
+comportement. Le tableau **nomme** l'invariant et offre l'endroit où une
+septième ligne s'ajoute ; ce qui rend l'omission impossible est le type.
+
+Une fonction entièrement nouvelle qui conclurait depuis `readonly Piece[]`
+reste écrivable. Ce qui ne l'est plus, c'est de la brancher sur les phrases
+existantes sans que le compilateur le demande.
+
+## S.73 — Les deux tiers du pack qui n'étaient nommés nulle part
+
+S.67 a fait couvrir au pack Pro les trois destinations qu'il annonce. La
+répartition était juste et **muette**. Sondé sur PostgreSQL à l'instant où
+l'écran s'affiche, après un Pro à 45 000 XOF :
+
+```
+l'écran annonce : « Ton dossier est ouvert. »
+destinations    : 3 payées, 1 servie
+analyses        : 90 payées, 30 ouvertes
+```
+
+Les deux tiers de l'achat existent, lui sont réservés, et ne sont nommés
+nulle part. C'est plus qu'une omission : la couverture ne s'applique qu'à
+**l'ouverture d'un dossier**, et rien ne demandait au candidat d'en ouvrir
+un. Un candidat qui n'ouvre jamais de second dossier ne reçoit jamais ce
+qu'il a payé — et ce qu'il a payé est précisément la comparaison de
+plusieurs destinations, c'est-à-dire ce pour quoi il a choisi ce pack.
+
+Le correctif de S.67 avait donc créé ce silence : avant lui, les 90
+analyses partaient sur le seul dossier visé, et il n'y avait rien à
+annoncer.
+
+### La phrase
+
+Elle nomme le reste, dit le geste qui le débloque, et s'arrête là. « Sans
+repayer » est la moitié de l'information qui compte : sans elle, la phrase
+se lit comme une proposition d'achat sur l'écran où l'on vient de payer.
+Elle est nulle quand il n'y a rien à dire — un pack à une destination, une
+couverture déjà prise — parce qu'une phrase annonçant zéro destination
+restante est un bruit.
+
+### Une seule dérivation, pas deux
+
+`destinationsServies` est extraite de `couverture.ts` et lue par l'écran.
+Elle décide à la fois **ce qui s'ouvre** et **ce qu'on annonce** : deux
+mesures de la même chose finissent par diverger, et le candidat verrait
+cette contradiction-là avant nous. La lecture reste séparée du reçu, comme
+celle de la consultation et pour la même raison — le reçu est une pièce
+comptable, le nombre de destinations restantes n'y a rien à faire.
+
+### Ce que ce lot n'a pas fait, et pourquoi
+
+**$-01 n'explique pas le pack Pro.** `ChoixDuPack` écrit
+`description: p.misEnAvant ? p.justification : undefined` : seul le pack
+mis en avant montre ce qu'il couvre. L'écran affiche donc
+
+```
+Essentiel · 5 000 F
+Dossier · 15 000 F     Couvre l'ensemble des pièces exigées…
+Dossier Pro · 45 000 F
+```
+
+Pro coûte trois fois Dossier et ne dit rien. Le texte existe pourtant dans
+la grille — `tests/tarification.test.ts` vérifie que **chaque** pack porte
+une justification factuelle. La page publique `/tarifs`, elle, détaille les
+trois.
+
+Ce n'est pas corrigé ici parce que le correctif évident touche une règle
+déclarée : `RadioOption.misEnAvant` porte « l'information est aussi portée
+par la description, jamais par la seule couleur ». Donner une description à
+tous retire au pack conseillé son seul marqueur textuel, et le remplacer
+demande de trancher comment la mise en avant se dit — une décision d'écran
+partagée avec `/tarifs`, pas un rider de ce lot.
+
+**Et un point à arbitrer, déjà ouvert.** La page publique vend au pack Pro
+un « comparateur des trois dossiers en parallèle ». C'est RG-03.2 / WF-03,
+consigné plus haut comme sans modèle `Recommendation` ni écran. Tant qu'il
+n'existe pas, cette ligne annonce une fonctionnalité absente ; elle relève
+d'une décision produit, pas d'un correctif.

@@ -94,3 +94,51 @@ export function actionApresLAchat(achat: Achat): string {
     }
   }
 }
+
+/**
+ * Ce qu'un pack a payé et que le candidat n'a pas encore pris — $-04.
+ *
+ * ── Ce que l'écran taisait ──────────────────────────────────────────
+ *
+ * Exécuté à l'instant où le candidat le lit, après un Pro à 45 000 XOF :
+ *
+ *     l'écran annonce : « Ton dossier est ouvert. »
+ *     destinations    : 3 payées, 1 servie
+ *     analyses        : 90 payées, 30 ouvertes
+ *
+ * Les deux tiers de l'achat existent, lui sont réservés, et ne sont
+ * nommés nulle part. Le lot qui a fait couvrir au pack les destinations
+ * qu'il annonce a réparti la somme correctement et a laissé le candidat
+ * sans moyen de savoir qu'il restait quelque chose à prendre : la
+ * couverture ne s'applique qu'à l'ouverture d'un dossier, et rien ne lui
+ * disait d'en ouvrir un.
+ *
+ * ── Ce que la phrase doit faire ─────────────────────────────────────
+ *
+ * Nommer le reste, dire comment il s'obtient, et ne rien promettre
+ * d'autre (INV-1, INV-2). Le geste est « ouvrir un dossier pour une
+ * autre destination » — c'est-à-dire exactement ce que le pack vend, et
+ * la seule chose à faire. « Sans repayer » est la moitié de l'information
+ * qui compte : sans elle, la phrase se lit comme une proposition d'achat.
+ *
+ * Rend `null` quand il n'y a rien à dire — un pack à une destination, ou
+ * une couverture déjà entièrement prise. Une phrase qui annonce zéro
+ * destination restante est un bruit sur un écran de confirmation.
+ */
+export function mentionDeLaCouverture(
+  destinations: number,
+  servies: number,
+): string | null {
+  const restantes = destinations - servies;
+  if (destinations <= 1 || restantes <= 0) return null;
+
+  /*
+    Le singulier et le pluriel s'écrivent en entier. Une phrase à trous
+    autour du nombre produit les accords faux que ce module a déjà payés
+    une fois — et celle-ci en porte quatre : « destinations », « restent »,
+    « elles », « ouvertes ».
+  */
+  return restantes > 1
+    ? `Ton pack couvre ${destinations} destinations. ${restantes} restent à ouvrir : elles se débloquent quand tu ouvres un dossier pour une autre destination, sans repayer.`
+    : `Ton pack couvre ${destinations} destinations. 1 reste à ouvrir : elle se débloque quand tu ouvres un dossier pour une autre destination, sans repayer.`;
+}

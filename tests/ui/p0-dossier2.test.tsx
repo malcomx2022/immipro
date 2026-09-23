@@ -53,6 +53,36 @@ const rendrePiece = (props: Partial<Parameters<typeof PieceDuDossier>[0]> = {}) 
     />,
   );
 
+/**
+ * Le dossier témoin, rendu — toutes les pièces conformes, une exigence de
+ * la règle figée qu'aucune pièce ne lève.
+ *
+ * Les deux écrans qui portent une barre d'action le rendent, et aucun n'a
+ * le droit d'y écrire « Rien ne bloque le dépôt ».
+ */
+const conformes = PIECES_NL.map((p) => ({ ...p, etat: "CONFORME" as const }));
+const DOSSIER_BLOQUE = {
+  ...DOSSIER,
+  completude: {
+    palier: "INCOMPLET" as const,
+    ready: false,
+    missing: [
+      {
+        code: "attestation_prealable",
+        message: "L'autorité exige une attestation préalable de l'établissement.",
+        bloquant: true,
+        origine: "exigence" as const,
+      },
+    ],
+    compteurs: {
+      obligatoiresManquantes: 0,
+      exigencesNonTenues: 1,
+      facultativesManquantes: 0,
+      conformes: conformes.length,
+    },
+  },
+};
+
 describe("C-06 — Checklist", () => {
   /**
    * La fausse alarme que le nom du champ produisait.
@@ -155,6 +185,23 @@ describe("C-06 — Checklist", () => {
     const { container } = render(<Checklist dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toMatch(/Information vérifiée le .* source : ind\.nl/);
   });
+
+  /**
+   * L'écran se contredisait sur soixante-dix lignes : l'en-tête annonçait
+   * « Dossier incomplet — 1 exigence n'est pas remplie », la barre d'action
+   * « Rien ne bloque le dépôt ». Elle concluait à partir des seules pièces,
+   * qui sont toutes conformes ici.
+   */
+  it("ne dit pas « rien ne bloque » sous un en-tête qui dit l'inverse", () => {
+    const { container } = render(
+      <Checklist dossier={DOSSIER_BLOQUE} pieces={conformes} />,
+    );
+    const texte = container.textContent ?? "";
+
+    expect(texte).toContain("1 exigence n'est pas remplie");
+    expect(texte).toContain("1 exigence bloque le dépôt");
+    expect(texte).not.toContain("Rien ne bloque le dépôt");
+  });
 });
 
 describe("C-09 — Complétude", () => {
@@ -182,6 +229,48 @@ describe("C-09 — Complétude", () => {
   it("rappelle qu'un dossier complet n'est pas un dossier accepté", async () => {
     const { container } = render(<Completude dossier={DOSSIER} pieces={PIECES_NL} />);
     expect(container.textContent).toContain("Un dossier complet n'est pas un dossier accepté");
+  });
+
+  /**
+   * Une section intitulée « ce qui bloque le dépôt » doit énumérer ce qui
+   * bloque le dépôt. Elle n'affichait que des pièces : sur un dossier dont
+   * toutes les pièces sont conformes et qu'une exigence de la règle figée
+   * tient à « incomplet », elle annonçait « aucune pièce obligatoire ne
+   * manque » — vrai sur les pièces, et muet sur le seul blocage.
+   */
+  describe("quand une exigence de la règle bloque", () => {
+    const bloque = DOSSIER_BLOQUE;
+
+    it("énumère l'exigence avec son message, là où l'écran promet les blocages", () => {
+      const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
+
+      expect(
+        screen.getByRole("heading", { name: "Exigence de la règle à lever" }),
+      ).toBeDefined();
+      expect(container.textContent).toContain(
+        "L'autorité exige une attestation préalable de l'établissement.",
+      );
+    });
+
+    it("dit qu'aucune pièce ne la lève, pour ne pas envoyer chercher", () => {
+      const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
+      expect(container.textContent).toContain("Aucune pièce de ta checklist ne lève");
+    });
+
+    it("ne propose aucun lien : un dépôt ne lève pas une exigence", () => {
+      render(<Completude dossier={bloque} pieces={conformes} />);
+      const section = screen
+        .getByRole("heading", { name: "Exigence de la règle à lever" })
+        .parentElement!;
+      expect(within(section).queryByRole("link")).toBeNull();
+    });
+
+    it("la barre d'action ne dit plus « rien ne bloque »", () => {
+      const { container } = render(<Completude dossier={bloque} pieces={conformes} />);
+
+      expect(container.textContent).toContain("1 exigence bloque le dépôt");
+      expect(container.textContent).not.toContain("Rien ne bloque le dépôt");
+    });
   });
 });
 

@@ -2,7 +2,8 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { versFiche } from "@/server/acces/regles";
 import { etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
-import { deviseParDefaut, estDevise, type Devise } from "@/domain/payments/pricing";
+import { deviseParDefaut, estDevise, getPack, type Devise } from "@/domain/payments/pricing";
+import { destinationsServies } from "@/server/acces/couverture";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
 import { achatDepuisLeCode } from "@/domain/payments/achat";
 
@@ -260,4 +261,40 @@ export async function paiementDuTunnel(
     dossierId: transaction.applicationId,
     telephone: transaction.user.phone ? masquerNumero(transaction.user.phone) : null,
   };
+}
+
+/**
+ * La couverture qu'un pack a payée et que le candidat n'a pas prise —
+ * $-04.
+ *
+ * Lecture **séparée**, comme celle de la consultation et pour la même
+ * raison : le reçu est une pièce comptable, et le nombre de destinations
+ * restant à ouvrir n'a rien à y faire. Un écran qui en a besoin le
+ * demande.
+ *
+ * Les destinations servies viennent de `destinationsServies`, la
+ * dérivation qui décide aussi de ce qui s'ouvre. Les recalculer ici
+ * ferait deux mesures de la même chose, dont l'une annonce et l'autre
+ * sert : elles se contrediraient un jour, et le candidat verrait la
+ * contradiction avant nous.
+ *
+ * Rend `null` quand l'achat n'est pas un pack de la grille, quand la
+ * transaction n'est pas confirmée — il n'y a rien de payé à annoncer —,
+ * ou quand elle n'est pas celle de ce candidat.
+ */
+export async function couvertureDuPaiement(
+  reference: string,
+  userId: string,
+): Promise<{ destinations: number; servies: number } | null> {
+  const transaction = await db.transaction.findFirst({
+    where: { reference, userId, status: "CONFIRMEE" },
+    select: { id: true, packCode: true },
+  });
+  if (!transaction) return null;
+
+  const pack = getPack(transaction.packCode);
+  if (!pack) return null;
+
+  const servies = await destinationsServies(transaction.id);
+  return { destinations: pack.destinations, servies: servies.length };
 }

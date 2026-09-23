@@ -34,7 +34,7 @@ import {
   PORTEE_CONSULTANT,
   peutLire,
 } from "@/domain/consultants/access";
-import { libelleAPreparer } from "@/domain/dossiers/piece";
+import { completudeDesPieces, libelleAPreparer } from "@/domain/dossiers/piece";
 import {
   CONSULTATION,
   CONSULTATION_ANNULATION_HEURES,
@@ -267,7 +267,7 @@ describe("T-05 — ce qu'il reste à préparer, sans pourcentage", () => {
   it("nomme les pièces au lieu d'annoncer une part", () => {
     // Le prototype écrivait « Ta checklist est à 80 % : les deux pièces à
     // reprendre sont… » — le dernier pourcentage de l'interface candidat.
-    const texte = libelleAPreparer(PIECES_NL);
+    const texte = libelleAPreparer(PIECES_NL, completudeDesPieces(PIECES_NL).compteurs);
     expect(texte).toBe(
       "2 pièces obligatoires restent à traiter : passeport et attestation de ressources.",
     );
@@ -279,16 +279,22 @@ describe("T-05 — ce qu'il reste à préparer, sans pourcentage", () => {
     const sansBloquante = PIECES_NL.map((p) =>
       p.famille === "OBLIGATOIRE" ? { ...p, etat: "CONFORME" as const } : p,
     );
-    expect(libelleAPreparer(sansBloquante)).toContain("pièces complémentaires");
+    expect(
+      libelleAPreparer(sansBloquante, completudeDesPieces(sansBloquante).compteurs),
+    ).toContain("pièces complémentaires");
   });
 
   it("se tait autrement quand tout est conforme", () => {
     const tout = PIECES_NL.map((p) => ({ ...p, etat: "CONFORME" as const }));
-    expect(libelleAPreparer(tout)).toContain("Toutes les pièces demandées sont conformes");
+    expect(libelleAPreparer(tout, completudeDesPieces(tout).compteurs)).toContain(
+      "Toutes les pièces demandées sont conformes",
+    );
   });
 
   it("accorde le singulier", () => {
     const une = PIECES_DE.slice(0, 1);
-    expect(libelleAPreparer(une)).toBe("1 pièce obligatoire reste à traiter : passeport.");
+    expect(libelleAPreparer(une, completudeDesPieces(une).compteurs)).toBe(
+      "1 pièce obligatoire reste à traiter : passeport.",
+    );
   });
 });

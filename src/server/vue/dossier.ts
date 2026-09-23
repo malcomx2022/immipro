@@ -177,15 +177,21 @@ export function versDossier(
  */
 export function prochaineAction(
   pieces: readonly Piece[],
-  statut: StatutDossier = "ACTIF",
+  statut: StatutDossier,
   /**
    * La complétude, qui voit ce que la checklist ne voit pas : les
    * conditions déterministes de la règle figée. Sans elle, la phrase
    * annonçait « Rien ne bloque un dépôt » sur un dossier dont une
    * condition bloquante n'était pas tenue — donc sur le seul dossier que
    * la plateforme ne laissait pas déposer.
+   *
+   * Les deux paramètres étaient facultatifs, et l'omission redonnait
+   * exactement cette phrase-là : le repli était silencieux et rassurant.
+   * Ils ne le sont plus. `completudeDesPieces(pieces)` est ce qu'écrit un
+   * appelant qui n'a rien d'autre sous la main, et il dit alors ce qu'il
+   * fait.
    */
-  completude?: CompletenessPublic,
+  completude: CompletenessPublic,
 ): string {
   /*
     La pause passe avant la checklist, et c'est tout le correctif : sur un

@@ -3,13 +3,21 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { LienBouton } from "@/components/ui/LienBouton";
-import { consultationDuPaiement, recuDuPaiement } from "@/server/lecture/paiements";
+import {
+  consultationDuPaiement,
+  couvertureDuPaiement,
+  recuDuPaiement,
+} from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
 import { momentEnFrancais } from "@/domain/format/moment";
 import { libelleLimiteAnnulation, libelleRendezVous } from "@/domain/consultants/rendez-vous";
 import { MENTION_REVOCATION } from "@/domain/consultants/access";
 import { achatDepuisLeCode } from "@/domain/payments/achat";
-import { actionApresLAchat, phraseDeConfirmation } from "@/domain/paiement/contrepartie";
+import {
+  actionApresLAchat,
+  mentionDeLaCouverture,
+  phraseDeConfirmation,
+} from "@/domain/paiement/contrepartie";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -76,6 +84,17 @@ export default async function PageConfirme({
 
   const montant = formatMontant(recu.montant, recu.devise);
   const consultation = await consultationDuPaiement(tx, acteur.id).catch(() => null);
+  /*
+    Ce qu'un pack multi-destinations a payé et que le candidat n'a pas
+    encore pris. Sondé sur PostgreSQL avant correction : après un Pro,
+    l'écran annonçait « Ton dossier est ouvert. » sur 3 destinations
+    payées et 1 servie, 90 analyses payées et 30 ouvertes. Les deux tiers
+    lui étaient réservés et n'étaient nommés nulle part.
+  */
+  const couverture = await couvertureDuPaiement(tx, acteur.id).catch(() => null);
+  const mentionCouverture = couverture
+    ? mentionDeLaCouverture(couverture.destinations, couverture.servies)
+    : null;
   /*
     La contrepartie vient du domaine, exhaustive par catégorie, et non
     d'un ternaire ici : les deux écrans du bout du tunnel avaient déjà
@@ -150,6 +169,28 @@ export default async function PageConfirme({
             Passé ce délai, la consultation est due.
           </p>
           <p className="text-pretty text-13 text-ink-500">{MENTION_REVOCATION}</p>
+        </section>
+      ) : null}
+
+      {/* Ce qui reste du pack, et le geste qui le débloque. Sous le reçu,
+          parce que c'est une suite et non une ligne comptable ; au-dessus
+          des trois étapes, parce qu'ouvrir une autre destination change
+          lesquelles on suivra. Rien ne s'affiche quand il n'y a rien à
+          prendre : la mention est nulle. */}
+      {mentionCouverture ? (
+        <section className="flex flex-col gap-2 rounded-lg border border-ink-300 p-5">
+          <h2 className="text-16 font-semibold text-ink-900">
+            Ton pack couvre d&apos;autres destinations
+          </h2>
+          <p className="text-pretty text-14 text-ink-700">{mentionCouverture}</p>
+          <LienBouton
+            href="/dossiers/nouveau"
+            variante="secondaire"
+            pleineLargeur
+            className="md:w-auto md:self-start"
+          >
+            Ouvrir un autre dossier
+          </LienBouton>
         </section>
       ) : null}
 

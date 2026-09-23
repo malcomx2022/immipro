@@ -285,6 +285,24 @@ export function mentionDeLaPiece(piece: Piece, depot?: string): string | null {
 }
 
 /**
+ * Les deux seuls nombres qui bloquent un dépôt : les pièces obligatoires
+ * qui manquent, et les exigences de la règle figée qu'aucune pièce ne
+ * tient.
+ *
+ * Le type existe pour qu'une phrase de conclusion ne puisse pas se
+ * calculer sans les deux. Cinq phrases ont conclu tour à tour à partir des
+ * seules pièces — la barre d'action de C-06, celle de C-09, la section des
+ * blocages, l'en-tête de dénombrement, le texte de préparation d'un
+ * rendez-vous payant — et chacune était rassurante sur le seul dossier
+ * qu'on ne pouvait pas déposer. Il est extrait de `compteurs` plutôt que
+ * redéfini : c'est la même mesure, calculée une fois.
+ */
+export type CompteursDeBlocage = Pick<
+  CompletenessPublic["compteurs"],
+  "obligatoiresManquantes" | "exigencesNonTenues"
+>;
+
+/**
  * Ce que la barre d'action annonce sous la checklist.
  *
  * « Pièces à reprendre » décrirait une correction ; une pièce jamais déposée
@@ -301,12 +319,31 @@ export function mentionDeLaPiece(piece: Piece, depot?: string): string | null {
  *     blocage : « Rien ne bloque le dépôt »
  *     palier  : INCOMPLET — prêt : false
  *
- * Sur le même écran, à quelques lignes d'écart. `exigences` est donc un
- * paramètre et non une déduction : cette fonction ne reçoit que des pièces,
- * et une pièce ne dit rien d'une exigence qu'aucune pièce n'établit.
+ * Sur le même écran, à quelques lignes d'écart.
+ *
+ * ── Le paramètre facultatif était la sixième occurrence ────────────────
+ *
+ * Le correctif précédent a ajouté `exigences = 0`. La valeur par défaut
+ * rendait l'omission légale : `libelleBlocage(pieces)` compilait et
+ * rendait la phrase d'avant. C-06 l'appelait ainsi, et affichait donc
+ * « Dossier incomplet », « 1 exigence n'est pas remplie » et « Rien ne
+ * bloque le dépôt » sur un même écran, à soixante-dix lignes d'écart.
+ *
+ * La fonction ne prend donc plus de pièces du tout. Les deux nombres qui
+ * décident vivent ensemble dans `compteurs`, calculés au même endroit ;
+ * les recompter ici, c'était la seconde implémentation qui a fini par
+ * diverger de la première. `grouperPourCompletude(pieces).bloquantes.length`
+ * et `compteurs.obligatoiresManquantes` ont été comparés sur les 256
+ * combinaisons de deux pièces : ils ne diffèrent jamais.
+ *
+ * Il n'y a plus d'appel qui conclue à partir des seules pièces, parce que
+ * le type n'en accepte plus. Écrire `{ obligatoiresManquantes: 0,
+ * exigencesNonTenues: 0 }` reste possible ; c'est alors une affirmation
+ * dans la diff, plus un oubli.
  */
-export function libelleBlocage(pieces: readonly Piece[], exigences = 0): string {
-  const bloquantes = grouperPourCompletude(pieces).bloquantes.length;
+export function libelleBlocage(compteurs: CompteursDeBlocage): string {
+  const bloquantes = compteurs.obligatoiresManquantes;
+  const exigences = compteurs.exigencesNonTenues;
   if (bloquantes === 0 && exigences === 0) return "Rien ne bloque le dépôt";
 
   const membres: string[] = [];
@@ -350,7 +387,11 @@ const enumerer = (libelles: readonly string[]): string => {
  * appel de quarante-cinq minutes. Le chiffre n'ajoutait qu'une note à
  * retenir de travers (arbitrage C-09).
  */
-export function libelleAPreparer(pieces: readonly Piece[], exigences = 0): string {
+export function libelleAPreparer(
+  pieces: readonly Piece[],
+  compteurs: CompteursDeBlocage,
+): string {
+  const exigences = compteurs.exigencesNonTenues;
   const { bloquantes, ensuite } = grouperPourCompletude(pieces);
   const aTraiter = bloquantes.length > 0 ? bloquantes : ensuite;
 
@@ -364,6 +405,12 @@ export function libelleAPreparer(pieces: readonly Piece[], exigences = 0): strin
     qu'une exigence tient à « incomplet ». Le candidat entrait dans un appel
     payant en croyant n'avoir rien à y régler, et le seul sujet qui restait
     n'était pas nommé.
+
+    Il a d'abord eu une valeur par défaut, et l'omission restait donc
+    légale : c'est ainsi que C-06 a gardé sa phrase d'avant. Elle n'en a
+    plus. Les noms des pièces viennent de la checklist, le nombre
+    d'exigences vient du calcul — ils ne se déduisent pas l'un de l'autre,
+    et la fonction demande les deux.
   */
   const mention =
     exigences > 0
