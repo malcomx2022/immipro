@@ -8693,3 +8693,95 @@ C'est le sens de « trois destinations ». Cumuler quatre-vingt-dix analyses sur
 un seul dossier, c'est acheter trois fois Dossier — ce que le produit permet
 déjà, et que le code commente explicitement. **Si cette lecture n'est pas la
 bonne, c'est ici qu'il faut revenir** : le reste du lot en découle.
+
+---
+
+## S.68 — Deux calculs de la même chose, et un seul voyait les conditions
+
+`completudeDesPieces` appelait `computeCompleteness` avec `conditions: []`, en
+dur. `recalculerCompletude`, côté serveur, les évaluait pour de bon et décidait
+le passage à `PRET`. Les deux prétendaient répondre à « le dossier est-il
+prêt ? », et l'un ignorait la moitié de la question.
+
+**Établi par exécution**, sur un dossier dont **toutes** les pièces sont
+conformes et dont la règle figée porte une condition bloquante qu'aucune pièce
+n'établit :
+
+```
+la vue candidat : palier COMPLET, ready true, missing []
+                  « Rien ne bloque un dépôt. »
+la base         : ACTIF — le serveur a refusé de le déclarer prêt
+```
+
+Le candidat lisait que rien ne bloquait son dépôt sur le seul dossier que la
+plateforme ne le laisserait pas déposer : `declarerLeDepot` n'accepte que
+`PRET`.
+
+Le commentaire de `completudeDesPieces` promettait pourtant que « le tableau de
+bord, la checklist et l'écran de complétude comptent la même chose ». Ils
+comptaient bien la même chose — **entre eux**. Aucun des trois ne comptait comme
+la base.
+
+### Une seule évaluation, dans le domaine
+
+`conditionTenue` vivait dans le module d'accès du serveur. Elle est pure, et
+elle est désormais dans `domain/completeness/conditions.ts` avec
+`conditionsDeLaRegle` — une lecture **défensive** de la règle figée, sur le
+modèle de `delaiInstructionJours` : une règle gelée par un dossier ouvert avant
+une évolution du référentiel doit rester lisible (INV-3), et une vue candidat n'a
+pas à échouer parce qu'un champ a changé de forme.
+
+Quatre appelants la partagent : la vue du dossier, l'écran de complétude,
+l'export de portabilité, et `recalculerCompletude`.
+
+### La faute que j'ai failli commettre, et qui aurait tout cassé en silence
+
+J'ai d'abord construit l'ensemble des pièces conformes depuis les `Piece` de
+l'écran. `versPiece` fait pourtant :
+
+```ts
+code: codeCourt(document.code)   // `passeport` → `PAS`
+```
+
+`Piece.code` est une **pastille de trois lettres**, pas le code du référentiel.
+Rapprocher `PAS` de `passeport` ne rapproche rien : **toutes** les conditions se
+lisaient non satisfaites, sur tous les dossiers. La sonde l'a montré du premier
+coup — trois conditions en échec là où une seule devait l'être — mais ni le
+typage ni aucun test existant ne l'aurait dit.
+
+L'ensemble se construit donc depuis les **documents**, et l'appelant le fournit :
+`completudeDesPieces` ne peut pas le déduire de ce qu'elle reçoit. C'est la même
+leçon que le rattachement des conditions aux pièces — **la relation se déclare,
+elle ne se devine pas** — et je l'ai réapprise en une heure.
+
+### Le garde-fou d'architecture a mordu
+
+Ma première version lisait la règle figée depuis la route de complétude, avec un
+`db.visaRule.findUnique`. `tests/api-invariants.test.ts` l'a refusée : INV-4 veut
+que le référentiel ne soit interrogé que depuis le module d'accès, et le test lit
+le **source des routes** pour le vérifier.
+
+La règle vient donc avec le dossier, dans `dossierAvecPieces` — et sans le filtre
+candidat, parce qu'INV-3 la garde au dossier même archivée ou retirée de la
+vitrine.
+
+### Ce que l'écran dit maintenant
+
+`prochaineAction` nommait « Rien ne bloque un dépôt » dès que la checklist était
+servie. Elle nomme désormais la première exigence bloquante non tenue, avec son
+`message_echec` du référentiel — écrit pour être lu par le candidat (RG-07.1).
+
+### Ce qui reste à arbitrer
+
+**La portée du défaut est étroite aujourd'hui, et c'est important de le dire.**
+Une condition bloquante sans pièce est refusée à la publication : elle ne
+subsiste que sur une règle **figée avant cette garde**. Sur une règle publiée
+aujourd'hui, les deux calculs coïncidaient déjà. Ce lot corrige la structure —
+deux calculs devenus un — plus qu'un incident de production observable sur le
+référentiel actuel.
+
+**`compteurs.obligatoiresManquantes` additionne les pièces et les conditions.**
+C'est l'usage existant de `computeCompleteness` (`requisManquants.length +
+conditionsEchouees.length`), que ce lot ne change pas — mais le nom dit
+« obligatoires manquantes » et compte désormais, sur le chemin de l'écran, des
+choses qui ne sont pas des pièces. À renommer ou à scinder, dans un lot à part.

@@ -1602,6 +1602,35 @@ ne se voit pas tout de suite — une mutation le montre : garder l'ouverture et
 débrancher la confirmation distribue cent cinquante analyses pour un pack qui en
 annonce quatre-vingt-dix.
 
+## Deux calculs de la même chose finissent par diverger
+
+`completudeDesPieces` répondait « le dossier est-il prêt ? » avec
+`conditions: []` écrit en dur. `recalculerCompletude` répondait à la même
+question en évaluant les conditions, et c'est elle qui décide `PRET`. Un dossier
+dont toutes les pièces sont conformes et dont une condition bloquante ne l'est
+pas s'affichait « COMPLET — rien ne bloque un dépôt » pendant que la base
+refusait de le déclarer prêt.
+
+Le commentaire du calcul d'écran promettait que « le tableau de bord, la
+checklist et l'écran de complétude comptent la même chose ». C'était vrai entre
+eux, et faux avec la base. **Trois lecteurs d'accord ne font pas une vérité** :
+ce qui compte, c'est l'accord avec celui qui écrit.
+
+L'évaluation est une, dans le domaine, et la règle figée se lit défensivement —
+comme `delaiInstructionJours` —, parce qu'un dossier ouvert avant une évolution
+du référentiel doit rester lisible (INV-3).
+
+Deux garde-fous ont mordu pendant ce lot, et méritent d'être connus :
+
+- `Piece.code` est une **pastille** de trois lettres (`passeport` → `PAS`), pas
+  le code du référentiel. L'ensemble des pièces conformes se construit depuis
+  les **documents**, et l'appelant le fournit. Le déduire des `Piece` faisait
+  lire toutes les conditions non satisfaites, sur tous les dossiers, sans
+  qu'aucun type ne bronche.
+- `tests/api-invariants.test.ts` refuse un `visaRule.find` dans une route
+  (INV-4). La règle figée vient donc avec le dossier, depuis le module d'accès,
+  et sans le filtre candidat — INV-3 la garde au dossier même archivée.
+
 ## Vérifier
 
 ```

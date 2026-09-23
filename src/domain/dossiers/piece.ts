@@ -1,5 +1,6 @@
 import type { CompletenessPublic, DocumentState } from "@/domain/completeness/score";
 import { computeCompleteness, versClient } from "@/domain/completeness/score";
+import { conditionsEvaluees } from "@/domain/completeness/conditions";
 import { TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
 import { mentionEchue } from "./peremption";
 
@@ -171,16 +172,40 @@ export function grouperPourCompletude(pieces: readonly Piece[]): GroupesCompletu
 }
 
 /**
- * Complétude calculée à partir de la checklist, jamais saisie à la main.
+ * Complétude calculée à partir de la checklist **et de la règle figée**,
+ * jamais saisie à la main.
  *
  * C'est ce qui garantit que le tableau de bord, la checklist et l'écran de
- * complétude comptent la même chose : trois écrans, un seul calcul.
- * `versClient` retire le barème interne, qui ne franchit jamais la frontière
- * (arbitrage C-09).
+ * complétude comptent la même chose. Ils la comptaient déjà — entre eux :
+ * `conditions: []` était écrit en dur ici, et aucun des trois ne comptait
+ * comme la base, qui évalue les conditions et décide le passage à `PRET`.
+ * Un dossier dont toutes les pièces sont conformes et dont une condition
+ * bloquante ne l'est pas s'affichait « COMPLET — rien ne bloque un dépôt »
+ * alors que le serveur refusait de le déclarer prêt.
+ *
+ * `regle` porte les `rules` **figées** du dossier (INV-3). Absente — la
+ * démonstration statique, un dossier sans version — le calcul se réduit
+ * aux pièces, comme avant.
+ *
+ * `conformes` porte les codes **du référentiel** des pièces conformes, et
+ * l'appelant les fournit parce que `Piece.code` ne les a plus : c'est une
+ * pastille de trois lettres, `passeport` y devient `PAS`. Les déduire
+ * d'ici rapprochait `PAS` de `passeport`, donc rien du tout : **toutes**
+ * les conditions se seraient lues non satisfaites, sur tous les dossiers,
+ * sans qu'un type ni un test s'en aperçoive. La relation se déclare, elle
+ * ne se devine pas.
+ *
+ * `versClient` retire le barème interne, qui ne franchit jamais la
+ * frontière (arbitrage C-09).
  */
 export function completudeDesPieces(
   pieces: readonly Piece[],
-  options: { coherence?: number; redaction?: number } = {},
+  options: {
+    coherence?: number;
+    redaction?: number;
+    regle?: unknown;
+    conformes?: ReadonlySet<string>;
+  } = {},
 ): CompletenessPublic {
   return versClient(
     computeCompleteness({
@@ -190,12 +215,13 @@ export function completudeDesPieces(
         required: p.famille === "OBLIGATOIRE",
         status: p.etat,
       })),
-      conditions: [],
+      conditions: conditionsEvaluees(options.regle, options.conformes ?? new Set()),
       coherence: options.coherence ?? 1,
       redaction: options.redaction ?? 1,
     }),
   );
 }
+
 
 /**
  * Péremption d'une pièce au regard de la date de dépôt.

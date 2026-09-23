@@ -5,6 +5,7 @@ import { versFiche, mentionDe } from "@/server/acces/regles";
 import { versPiece } from "@/server/vue/dossier";
 import { LIBELLE_PALIER } from "@/domain/completeness/score";
 import { completudeDesPieces } from "@/domain/dossiers/piece";
+import { codesConformes } from "@/domain/completeness/conditions";
 import { expliquerLaCompletude } from "@/domain/completeness/explication";
 import { A_PROPOS, VERSION_EXPORT } from "@/domain/comptes/portabilite";
 import { CONSENTEMENTS } from "@/domain/comptes/consentements";
@@ -128,7 +129,11 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
     dossiers: compte.applications.map((a) => {
       const fiche = a.visaRule ? versFiche(a.visaRule) : null;
       const pieces: Piece[] = a.documents.map((d) => versPiece(d, aujourdhui));
-      const completude = completudeDesPieces(pieces);
+      // La règle figée, pour que l'export dise ce qui manque vraiment.
+      const completude = completudeDesPieces(pieces, {
+        regle: a.visaRule?.rules,
+        conformes: codesConformes(a.documents),
+      });
       return {
         destination: fiche
           ? { pays: fiche.pays, intitule: fiche.intitule, code: fiche.code }
