@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   LIBELLE_ETAT,
+  SUITE_DU_REFUS,
   MENTION_SUITE,
   MOTS_PAR_MINUTE,
   corpsSchema,
@@ -24,6 +25,7 @@ import {
 } from "@/domain/editorial/document";
 import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 import { ECHECS } from "@/server/http/echecs";
+import { exigerUnTexteAffichable } from "@/server/editorial/publication";
 
 const lire = (f: string) => readFileSync(f, "utf8");
 
@@ -524,15 +526,142 @@ describe("le back-office", () => {
     }
   });
 
-  it("l'enregistrement d'un brouillon n'est pas bloqué, seule la publication l'est", () => {
+  it("l'enregistrement d'un brouillon n'est pas bloqué", () => {
     // Refuser aussi le brouillon pousserait à rédiger ailleurs pour
-    // recoller à la fin — c'est-à-dire hors du garde-fou.
+    // recoller à la fin — c'est-à-dire hors du garde-fou. Les fautes sont
+    // rendues à l'écran, qui les affiche à côté du champ.
     const route = lire("src/app/api/admin/contenus/[id]/route.ts");
     const put = route.slice(route.indexOf("export const PUT"), route.indexOf("export const POST"));
     expect(put).toMatch(/refus: verifierLeDocument/u);
-    expect(put).not.toMatch(/throw echec\("champs_invalides", \{\s*champs: Object\.fromEntries\(refus/u);
+    // Le refus du PUT est conditionné à l'état : c'est lui qui distingue le
+    // brouillon, qu'on sauve, du document en ligne, qu'on publie.
+    expect(put).toMatch(/if \(document\.status === "PUBLIE"\) \{\s*exigerUnTexteAffichable/u);
+  });
+
+  /**
+   * ── Trois chemins mettaient en ligne, un seul refusait ──────────────
+   *
+   * La route appelait `revalider` à quatre endroits : l'enregistrement d'un
+   * document déjà publié, le retrait, la restauration d'une version, la
+   * publication. Le retrait ne met rien en ligne ; les trois autres si, et
+   * le refus n'était opposé que sur le dernier.
+   *
+   * Un veilleur pouvait donc écrire « ton visa est garanti » dans un guide
+   * en ligne et l'enregistrer : la page publique le servait, une version
+   * l'archivait, le journal l'enregistrait comme une publication. INV-2 dit
+   * « nulle part ».
+   */
+  it("les trois chemins qui mettent un texte en ligne passent la même porte", () => {
+    const route = lire("src/app/api/admin/contenus/[id]/route.ts");
     const post = route.slice(route.indexOf("export const POST"));
-    expect(post).toMatch(/refus\.length > 0/u);
+    const restaurer = post.slice(post.indexOf('corps.action === "restaurer"'));
+    // Le chemin de publication est la queue du POST, après les deux branches
+    // qui rendent avant lui.
+    const publier = post.slice(post.lastIndexOf('status: "PUBLIE"') - 2000);
+
+    // Trois appels, un par chemin qui met un texte en ligne. La définition
+    // vit dans `server/editorial/publication.ts`, où un essai peut l'exécuter.
+    expect(route.match(/exigerUnTexteAffichable\(/gu)).toHaveLength(3);
+    expect(restaurer).toMatch(/exigerUnTexteAffichable\([\s\S]{0,240}"restauration"/u);
+    expect(publier).toMatch(/exigerUnTexteAffichable\([\s\S]{0,240}"publication"/u);
+    /*
+      La route ne lit plus la règle qu'une fois, et cette lecture n'oppose
+      rien : c'est celle du brouillon, dont le PUT rend les fautes pour que
+      l'écran les affiche à côté du champ. C'est la nuance de `CLAUDE.md`, et
+      la confondre avec un refus rendrait le brouillon insauvable.
+    */
+    expect(route.match(/verifierLeDocument\(/gu)).toHaveLength(1);
+    expect(route).toMatch(/refus: verifierLeDocument/u);
+  });
+
+  /**
+   * Le garde-fou, exécuté.
+   *
+   * Les assertions au-dessus lisent la source : elles tiennent que les trois
+   * chemins l'appellent. Aucune ne tenait qu'il **refuse** — la mutation qui
+   * remplaçait `fautes.length === 0` par `>= 0`, c'est-à-dire un garde-fou
+   * muet, les passait toutes. C'est pour l'exécuter que la décision a quitté
+   * la route : derrière `next/headers`, rien ne pouvait l'appeler.
+   */
+  describe("le garde-fou de mise en ligne", () => {
+    const CORPS: Corps = {
+      blocs: [{ type: "paragraphe", texte: "Ce que le dossier demande." }],
+      appel: {
+        titre: "Ouvrir un dossier",
+        texte: "Commence ta checklist.",
+        action: "Ouvrir",
+        href: "/inscription",
+      },
+    };
+
+    it("laisse passer un texte affichable", () => {
+      expect(() =>
+        exigerUnTexteAffichable(
+          { titre: "Étudier aux Pays-Bas", chapeau: "Ce que le dossier demande." },
+          CORPS,
+          "enLigne",
+        ),
+      ).not.toThrow();
+    });
+
+    it("refuse une promesse de résultat, où qu'elle soit écrite", () => {
+      const promesse = "Avec ce guide, ton visa est garanti.";
+      for (const document of [
+        { titre: promesse, chapeau: "Ce que le dossier demande." },
+        { titre: "Étudier aux Pays-Bas", chapeau: promesse },
+      ]) {
+        expect(() => exigerUnTexteAffichable(document, CORPS, "enLigne")).toThrow();
+      }
+      // Et dans le corps, qui est le plus long et le moins relu.
+      expect(() =>
+        exigerUnTexteAffichable(
+          { titre: "Étudier aux Pays-Bas", chapeau: "Ce que le dossier demande." },
+          { ...CORPS, blocs: [{ type: "paragraphe", texte: promesse }] },
+          "publication",
+        ),
+      ).toThrow();
+    });
+
+    it("le refus porte la suite du geste refusé, pas une suite générique", () => {
+      const faute = { titre: "Ton visa est garanti", chapeau: "Ce que le dossier demande." };
+      for (const suite of ["enLigne", "publication", "restauration"] as const) {
+        let attrape: unknown;
+        try {
+          exigerUnTexteAffichable(faute, CORPS, suite);
+        } catch (erreur) {
+          attrape = erreur;
+        }
+        const corps = (attrape as { echec?: { corps?: string } }).echec?.corps ?? "";
+        expect(corps, suite).toContain(SUITE_DU_REFUS[suite]);
+        // Le terme fautif est cité : sans lui, on réécrit la phrase entière
+        // au hasard jusqu'à ce que ça passe.
+        expect(corps, suite).toContain("garanti");
+      }
+    });
+
+    it("la négation reste écrivable — c'est la phrase qui protège", () => {
+      expect(() =>
+        exigerUnTexteAffichable(
+          {
+            titre: "Étudier aux Pays-Bas",
+            chapeau: "ImmiPro ne garantit pas l'obtention du visa.",
+          },
+          CORPS,
+          "publication",
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  it("chaque refus dit quoi faire ensuite, et ce n'est pas le même geste", () => {
+    const suites = Object.values(SUITE_DU_REFUS);
+    expect(new Set(suites).size).toBe(suites.length);
+    // Sur un document en ligne, le geste est de le retirer : on ne
+    // retravaille pas un texte que le public lit.
+    expect(SUITE_DU_REFUS.enLigne).toMatch(/Retire/u);
+    expect(SUITE_DU_REFUS.restauration).toMatch(/Retire/u);
+    // Aucun ne se contente de constater.
+    for (const suite of suites) expect(suite).toMatch(/Reformule|Retire|corrige/u);
   });
 
   it("le refus nomme le fait : la publication, pas des champs invalides", () => {
@@ -549,7 +678,12 @@ describe("le back-office", () => {
     const route = lire("src/app/api/admin/contenus/[id]/route.ts");
     const post = route.slice(route.indexOf("export const POST"));
     expect(post).not.toMatch(/echec\("champs_invalides"/u);
-    expect(post.match(/echec\("publication_refusee"/gu)).toHaveLength(2);
+    // Un seul refus de publication reste dans la route : la source manquante
+    // (INV-8). Celui de la formulation a rejoint le garde-fou partagé.
+    expect(post.match(/echec\("publication_refusee"/gu)).toHaveLength(1);
+    expect(lire("src/server/editorial/publication.ts")).toMatch(
+      /echec\("publication_refusee"/u,
+    );
   });
 
   it("la publication est journalisée avec son motif", () => {

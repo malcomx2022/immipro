@@ -207,6 +207,24 @@ export function verifierLeDocument(
 export const messageDeRefusEditorial = (faute: FauteEditoriale): string =>
   `« ${faute.extrait} » ne peut pas s'afficher chez le candidat — ${faute.raison}. Reformule « ${faute.chemin} ».`;
 
+/**
+ * Ce que le refus dit ensuite, selon le geste refusé.
+ *
+ * Le message nomme la formulation, puis le geste attendu — un refus qui ne
+ * dit pas quoi faire se contourne en réécrivant au hasard jusqu'à ce que ça
+ * passe. Les trois suites diffèrent parce que l'issue diffère : un document
+ * en ligne se retire avant d'être retravaillé, une restauration ne se
+ * corrige pas dans le passé.
+ */
+export const SUITE_DU_REFUS = {
+  publication:
+    "Reformule ce passage, puis publie : rien ne s'affiche chez le candidat tant qu'il est refusé.",
+  enLigne:
+    "Ce document est en ligne : l'enregistrer le publie. Retire-le pour retravailler ce passage, puis republie-le.",
+  restauration:
+    "Cette version a été écrite avant que la formulation soit refusée. Retire le document, restaure-la, corrige le passage, puis republie.",
+} as const;
+
 /** Rien ne se publie tant qu'un texte est refusé. */
 export const publiable = (
   document: { titre: string; chapeau: string },
