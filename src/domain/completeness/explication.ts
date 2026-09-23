@@ -49,11 +49,18 @@ export interface ExplicationCompletude {
  */
 export const CE_QUI_DECIDE: readonly string[] = [
   "L'état de chaque pièce obligatoire de ta checklist. C'est le facteur principal : tant qu'il en manque une, le dossier reste incomplet, quoi que disent les autres.",
+  /*
+    Les conditions ont changé de colonne, et ce n'est pas une reformulation.
+    Elles figuraient sous « ce qui ne pèse pas » tant que le calcul des
+    écrans les ignorait ; depuis qu'il les évalue comme le fait le serveur,
+    les laisser là faisait dire à l'explication le contraire du palier
+    qu'elle explique.
+  */
+  "Les conditions bloquantes de la règle figée à l'ouverture de ton dossier — durée de validité d'un passeport, montant de ressources à prouver. La plupart sont tenues par une pièce, et leur résultat est le verdict de cette pièce ; celles qu'aucune pièce n'établit tiennent le palier à « incomplet » tant qu'elles ne sont pas levées.",
   "L'état des pièces complémentaires. Elles ne bloquent rien ; elles font la différence entre « presque complet » et « complet ».",
 ];
 
 export const CE_QUI_NE_PESE_PAS: readonly string[] = [
-  "Les conditions chiffrées de la destination — durée de validité d'un passeport, montant de ressources à prouver. Elles sont vérifiées pièce par pièce, et leur résultat est le verdict de la pièce concernée, que cet export contient.",
   "La cohérence entre tes pièces et la qualité rédactionnelle de tes textes. Le référentiel les prévoit ; elles n'entrent pas dans le palier qui t'est montré aujourd'hui.",
 ];
 
@@ -87,7 +94,7 @@ export function expliquerLaCompletude(
 }
 
 function surTonDossier(completude: CompletenessPublic): string[] {
-  const { obligatoiresManquantes, facultativesManquantes, conformes } =
+  const { obligatoiresManquantes, exigencesNonTenues, facultativesManquantes, conformes } =
     completude.compteurs;
 
   const phrases = [
@@ -103,6 +110,14 @@ function surTonDossier(completude: CompletenessPublic): string[] {
       ),
     );
   }
+  /*
+    Une exigence qu'aucune pièce ne tient se dit à part : l'annoncer comme
+    une pièce manquante envoyait le candidat chercher dans une checklist
+    entièrement verte.
+  */
+  if (exigencesNonTenues > 0) {
+    phrases.push(majuscule(phraseDesExigences(exigencesNonTenues)));
+  }
   if (facultativesManquantes > 0) {
     phrases.push(
       majuscule(
@@ -110,11 +125,22 @@ function surTonDossier(completude: CompletenessPublic): string[] {
       ),
     );
   }
-  if (obligatoiresManquantes === 0 && facultativesManquantes === 0) {
+  if (obligatoiresManquantes === 0 && exigencesNonTenues === 0 && facultativesManquantes === 0) {
     phrases.push("Rien ne manque : le palier ne peut pas monter plus haut.");
   }
   return phrases;
 }
+
+/**
+ * Deux gabarits plutôt qu'un nid de ternaires : l'accord porte sur le
+ * verbe, le participe et le pronom à la fois, et une phrase composée
+ * morceau par morceau finit par accorder l'un et pas l'autre. La première
+ * version de celle-ci écrivait « n'est pas remplies ».
+ */
+const phraseDesExigences = (n: number): string =>
+  n > 1
+    ? `${nombre(n)} exigences de la règle de ton dossier ne sont pas remplies : elles tiennent aussi le palier à « incomplet », et aucune pièce ne les lève.`
+    : `${nombre(n)} exigence de la règle de ton dossier n'est pas remplie : elle tient aussi le palier à « incomplet », et aucune pièce ne la lève.`;
 
 const pluriel = (n: number) => (n > 1 ? "s" : "");
 

@@ -242,7 +242,7 @@ export function PriseDeRendezVous({
               pourcentage de l'interface candidat, et le plus inutile — la
               phrase nommait déjà les pièces, qui sont la seule chose à savoir
               avant un appel de quarante-cinq minutes. */}
-          <p className="text-pretty text-16 text-ink-700">{libelleAPreparer(pieces)}</p>
+          <p className="text-pretty text-16 text-ink-700">{libelleAPreparer(pieces, dossier.completude.compteurs.exigencesNonTenues)}</p>
           <p className="text-pretty text-14 text-ink-700">
             Le consultant y aura accès pendant l&apos;appel, avec ton accord, que tu peux
             retirer à tout moment.

@@ -257,10 +257,11 @@ describe("T-01 — alertes", () => {
 
   it("annonce une progression en pièces, jamais en note sur cent", () => {
     // Dernier endroit où « 58 à 68 sur 100 » avait survécu à l'arbitrage C-09.
-    const avant = { obligatoiresManquantes: 3, facultativesManquantes: 2, conformes: 3 };
+    const avant = { obligatoiresManquantes: 3, exigencesNonTenues: 0, facultativesManquantes: 2, conformes: 3 };
     expect(
       libelleProgression(avant, {
         obligatoiresManquantes: 2,
+        exigencesNonTenues: 0,
         facultativesManquantes: 2,
         conformes: 4,
       }),
@@ -269,6 +270,7 @@ describe("T-01 — alertes", () => {
     expect(
       libelleProgression(avant, {
         obligatoiresManquantes: 1,
+        exigencesNonTenues: 0,
         facultativesManquantes: 2,
         conformes: 5,
       }),
@@ -277,6 +279,7 @@ describe("T-01 — alertes", () => {
     expect(
       libelleProgression(avant, {
         obligatoiresManquantes: 0,
+        exigencesNonTenues: 0,
         facultativesManquantes: 2,
         conformes: 6,
       }),
@@ -285,6 +288,7 @@ describe("T-01 — alertes", () => {
     expect(
       libelleProgression(avant, {
         obligatoiresManquantes: 3,
+        exigencesNonTenues: 0,
         facultativesManquantes: 1,
         conformes: 4,
       }),
@@ -293,6 +297,7 @@ describe("T-01 — alertes", () => {
     expect(
       libelleProgression(avant, {
         obligatoiresManquantes: 3,
+        exigencesNonTenues: 0,
         facultativesManquantes: 0,
         conformes: 5,
       }),
@@ -300,7 +305,7 @@ describe("T-01 — alertes", () => {
   });
 
   it("se tait quand rien n'a progressé", () => {
-    const etat = { obligatoiresManquantes: 2, facultativesManquantes: 2, conformes: 4 };
+    const etat = { obligatoiresManquantes: 2, exigencesNonTenues: 0, facultativesManquantes: 2, conformes: 4 };
     expect(libelleProgression(etat, etat)).toBe("");
   });
 

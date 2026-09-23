@@ -2,6 +2,7 @@ import type { Application, Document, Prisma, VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { appliquerLaCouverture } from "@/server/acces/couverture";
+import { codesConformes, conditionsEvaluees } from "@/domain/completeness/conditions";
 import { DOSSIERS_MAX } from "@/domain/dossiers/dossier";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
 import { computeCompleteness } from "@/domain/completeness/score";
@@ -56,10 +57,23 @@ export async function dossierAvecSaRegle(
 export async function dossierAvecPieces(
   id: string,
   userId: string,
-): Promise<Application & { documents: Document[] }> {
+): Promise<Application & { documents: Document[]; visaRule: { rules: unknown } | null }> {
+  /*
+    La règle **figée** vient avec le dossier, et sans le filtre candidat :
+    INV-3 la lui garde même archivée ou retirée de la vitrine. Elle porte
+    les conditions déterministes, sans lesquelles un écran conclut
+    « complet » sur un dossier que le serveur refuse de déclarer prêt.
+
+    Elle est lue ici, dans le module d'accès, et non depuis la route :
+    INV-4 veut que le référentiel ne soit interrogé que d'ici, et un test
+    d'architecture le vérifie sur le source des routes.
+  */
   const dossier = await db.application.findFirst({
     where: { id, userId },
-    include: { documents: { orderBy: [{ family: "asc" }, { createdAt: "asc" }] } },
+    include: {
+      documents: { orderBy: [{ family: "asc" }, { createdAt: "asc" }] },
+      visaRule: { select: { rules: true } },
+    },
   });
   if (!dossier) throw echec("introuvable");
   return dossier;
@@ -238,16 +252,10 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
     une règle figée avant cette garde, et l'écarter reviendrait à
     déclarer un dossier prêt sur une exigence que personne n'a vérifiée.
   */
-  const conditions = dossier.visaRule
-    ? payload(dossier.visaRule)
-        .conditions.filter((c) => c.piece !== undefined || c.bloquant)
-        .map((c) => ({
-          code: c.code,
-          bloquant: c.bloquant,
-          satisfaite: conditionTenue(c, dossier.documents),
-          messageEchec: c.message_echec,
-        }))
-    : [];
+  const conditions = conditionsEvaluees(
+    dossier.visaRule?.rules,
+    codesConformes(dossier.documents),
+  );
 
   const resultat = computeCompleteness({
     documents: dossier.documents.map((d) => ({
@@ -295,14 +303,6 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
     },
   });
 }
-
-const conditionTenue = (
-  condition: { piece?: string | undefined },
-  documents: readonly Document[],
-): boolean => {
-  const porteuse = documents.find((d) => d.code === condition.piece);
-  return porteuse ? porteuse.status === "CONFORME" : false;
-};
 
 /**
  * Clôture — WF-10. La date de purge est annoncée à l'avance, parce qu'elle

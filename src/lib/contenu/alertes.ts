@@ -32,8 +32,8 @@ import type { Partenaire, MotifProposition } from "@/domain/consultants/proposit
  * survécu à l'arbitrage C-09.
  */
 const DIPLOME_CONFORME = libelleProgression(
-  { obligatoiresManquantes: 3, facultativesManquantes: 2, conformes: 3 },
-  { obligatoiresManquantes: 2, facultativesManquantes: 2, conformes: 4 },
+  { obligatoiresManquantes: 3, exigencesNonTenues: 0, facultativesManquantes: 2, conformes: 3 },
+  { obligatoiresManquantes: 2, exigencesNonTenues: 0, facultativesManquantes: 2, conformes: 4 },
 );
 
 export const ALERTES: readonly Alerte[] = [

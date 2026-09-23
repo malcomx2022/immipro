@@ -2,6 +2,7 @@ import { route } from "@/server/http/route";
 import { dossierAvecPieces } from "@/server/acces/dossiers";
 import { versPiece } from "@/server/vue/dossier";
 import { completudeDesPieces, libelleBlocage } from "@/domain/dossiers/piece";
+import { codesConformes } from "@/domain/completeness/conditions";
 
 /**
  * Complétude — C-09, WF-07.
@@ -24,9 +25,22 @@ export const GET = route({
     */
     const aujourdhui = new Date().toISOString().slice(0, 10);
     const pieces = dossier.documents.map((d) => versPiece(d, aujourdhui));
+    /*
+      La règle **figée** entre dans le calcul : ses conditions déterministes
+      en font partie, et sans elles cet écran conclut « complet » sur un
+      dossier que le serveur refuse de déclarer prêt.
+    */
+    const completude = completudeDesPieces(pieces, {
+      regle: dossier.visaRule?.rules,
+      conformes: codesConformes(dossier.documents),
+    });
     return {
-      completude: completudeDesPieces(pieces),
-      blocage: libelleBlocage(pieces),
+      completude,
+      /*
+        Le même nombre que l'en-tête, sans quoi les deux phrases se
+        contredisent à quelques lignes d'écart sur le même écran.
+      */
+      blocage: libelleBlocage(pieces, completude.compteurs.exigencesNonTenues),
       pieces,
     };
   },

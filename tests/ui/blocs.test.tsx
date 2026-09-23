@@ -103,7 +103,7 @@ describe("CompletenessTier", () => {
           : "COMPLET",
     ready: obligatoiresManquantes === 0,
     missing: [],
-    compteurs: { obligatoiresManquantes, facultativesManquantes, conformes },
+    compteurs: { obligatoiresManquantes, exigencesNonTenues: 0, facultativesManquantes, conformes },
   });
 
   it("dénombre les manques et nomme le palier", () => {
@@ -116,11 +116,11 @@ describe("CompletenessTier", () => {
   });
 
   it("accorde le dénombrement au singulier", () => {
-    expect(libelleDenombrement({ obligatoiresManquantes: 1, facultativesManquantes: 0, conformes: 3 }))
+    expect(libelleDenombrement({ obligatoiresManquantes: 1, exigencesNonTenues: 0, facultativesManquantes: 0, conformes: 3 }))
       .toBe("1 pièce obligatoire manque");
-    expect(libelleDenombrement({ obligatoiresManquantes: 0, facultativesManquantes: 1, conformes: 3 }))
+    expect(libelleDenombrement({ obligatoiresManquantes: 0, exigencesNonTenues: 0, facultativesManquantes: 1, conformes: 3 }))
       .toBe("1 pièce complémentaire reste à traiter");
-    expect(libelleDenombrement({ obligatoiresManquantes: 0, facultativesManquantes: 0, conformes: 5 }))
+    expect(libelleDenombrement({ obligatoiresManquantes: 0, exigencesNonTenues: 0, facultativesManquantes: 0, conformes: 5 }))
       .toBe("Toutes les pièces demandées sont conformes");
   });
 

@@ -1,6 +1,8 @@
 import type { Application, Document, VisaRule } from "@prisma/client";
 import type { Piece } from "@/domain/dossiers/piece";
 import { completudeDesPieces, premiereATraiter, libelleAction } from "@/domain/dossiers/piece";
+import type { CompletenessPublic } from "@/domain/completeness/score";
+import { codesConformes } from "@/domain/completeness/conditions";
 import type { Dossier, StatutDossier } from "@/domain/dossiers/dossier";
 import { MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDeDepot } from "@/domain/dossiers/faisabilite";
@@ -125,6 +127,13 @@ export function versDossier(
   aujourdhui = iso(new Date()),
 ): Dossier {
   const pieces = documents.map((d) => versPiece(d, aujourdhui));
+  /* La règle figée entre dans le calcul : sans elle, les conditions
+     déterministes n'y sont pas, et l'écran conclut « rien ne bloque » sur
+     un dossier que le serveur refuse de déclarer prêt. */
+  const completude = completudeDesPieces(pieces, {
+    regle: regle?.rules,
+    conformes: codesConformes(documents),
+  });
   /*
     Deux dates, et elles ne se confondent plus.
 
@@ -150,8 +159,8 @@ export function versDossier(
           depot: dateDeDepot(cible, delaiInstructionJours(regle?.rules)),
         }
       : {}),
-    completude: completudeDesPieces(pieces),
-    prochaineAction: prochaineAction(pieces, versStatut(dossier.status)),
+    completude,
+    prochaineAction: prochaineAction(pieces, versStatut(dossier.status), completude),
   };
 }
 
@@ -169,6 +178,14 @@ export function versDossier(
 export function prochaineAction(
   pieces: readonly Piece[],
   statut: StatutDossier = "ACTIF",
+  /**
+   * La complétude, qui voit ce que la checklist ne voit pas : les
+   * conditions déterministes de la règle figée. Sans elle, la phrase
+   * annonçait « Rien ne bloque un dépôt » sur un dossier dont une
+   * condition bloquante n'était pas tenue — donc sur le seul dossier que
+   * la plateforme ne laissait pas déposer.
+   */
+  completude?: CompletenessPublic,
 ): string {
   /*
     La pause passe avant la checklist, et c'est tout le correctif : sur un
@@ -179,7 +196,16 @@ export function prochaineAction(
   if (statut === "EN_PAUSE") return MENTION_EN_PAUSE;
 
   const suivante = premiereATraiter(pieces);
-  if (!suivante) return "Rien ne bloque un dépôt.";
+  if (!suivante) {
+    /*
+      Les pièces ne suffisent pas à conclure. Une exigence que le candidat
+      ne peut pas lever par un dépôt reste une exigence, et la nommer vaut
+      mieux que de promettre le contraire : son `message_echec` vient du
+      référentiel, où il est écrit pour être lu par lui (RG-07.1).
+    */
+    const bloquant = completude?.missing.find((m) => m.bloquant);
+    return bloquant ? bloquant.message : "Rien ne bloque un dépôt.";
+  }
 
   const verbe = libelleAction(suivante).toLowerCase();
   const quoi = `${verbe} ton ${suivante.libelle.toLowerCase()}`;

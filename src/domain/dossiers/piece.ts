@@ -1,5 +1,6 @@
 import type { CompletenessPublic, DocumentState } from "@/domain/completeness/score";
 import { computeCompleteness, versClient } from "@/domain/completeness/score";
+import { conditionsEvaluees } from "@/domain/completeness/conditions";
 import { TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
 import { mentionEchue } from "./peremption";
 
@@ -171,16 +172,40 @@ export function grouperPourCompletude(pieces: readonly Piece[]): GroupesCompletu
 }
 
 /**
- * Complétude calculée à partir de la checklist, jamais saisie à la main.
+ * Complétude calculée à partir de la checklist **et de la règle figée**,
+ * jamais saisie à la main.
  *
  * C'est ce qui garantit que le tableau de bord, la checklist et l'écran de
- * complétude comptent la même chose : trois écrans, un seul calcul.
- * `versClient` retire le barème interne, qui ne franchit jamais la frontière
- * (arbitrage C-09).
+ * complétude comptent la même chose. Ils la comptaient déjà — entre eux :
+ * `conditions: []` était écrit en dur ici, et aucun des trois ne comptait
+ * comme la base, qui évalue les conditions et décide le passage à `PRET`.
+ * Un dossier dont toutes les pièces sont conformes et dont une condition
+ * bloquante ne l'est pas s'affichait « COMPLET — rien ne bloque un dépôt »
+ * alors que le serveur refusait de le déclarer prêt.
+ *
+ * `regle` porte les `rules` **figées** du dossier (INV-3). Absente — la
+ * démonstration statique, un dossier sans version — le calcul se réduit
+ * aux pièces, comme avant.
+ *
+ * `conformes` porte les codes **du référentiel** des pièces conformes, et
+ * l'appelant les fournit parce que `Piece.code` ne les a plus : c'est une
+ * pastille de trois lettres, `passeport` y devient `PAS`. Les déduire
+ * d'ici rapprochait `PAS` de `passeport`, donc rien du tout : **toutes**
+ * les conditions se seraient lues non satisfaites, sur tous les dossiers,
+ * sans qu'un type ni un test s'en aperçoive. La relation se déclare, elle
+ * ne se devine pas.
+ *
+ * `versClient` retire le barème interne, qui ne franchit jamais la
+ * frontière (arbitrage C-09).
  */
 export function completudeDesPieces(
   pieces: readonly Piece[],
-  options: { coherence?: number; redaction?: number } = {},
+  options: {
+    coherence?: number;
+    redaction?: number;
+    regle?: unknown;
+    conformes?: ReadonlySet<string>;
+  } = {},
 ): CompletenessPublic {
   return versClient(
     computeCompleteness({
@@ -190,12 +215,13 @@ export function completudeDesPieces(
         required: p.famille === "OBLIGATOIRE",
         status: p.etat,
       })),
-      conditions: [],
+      conditions: conditionsEvaluees(options.regle, options.conformes ?? new Set()),
       coherence: options.coherence ?? 1,
       redaction: options.redaction ?? 1,
     }),
   );
 }
+
 
 /**
  * Péremption d'une pièce au regard de la date de dépôt.
@@ -265,13 +291,31 @@ export function mentionDeLaPiece(piece: Piece, depot?: string): string | null {
  * n'a rien à reprendre, et un passeport trop court se remplace à
  * l'administration, pas dans l'application. La phrase dit donc ce qui est
  * vrai des deux : elles bloquent le dépôt.
+ *
+ * ── Deux phrases côte à côte qui se contredisaient ──────────────────
+ *
+ * Elle ne comptait que des pièces. Depuis que le calcul des écrans évalue
+ * les conditions de la règle figée, C-09 affichait les deux ensemble :
+ *
+ *     en-tête : « 1 exigence n'est pas remplie »
+ *     blocage : « Rien ne bloque le dépôt »
+ *     palier  : INCOMPLET — prêt : false
+ *
+ * Sur le même écran, à quelques lignes d'écart. `exigences` est donc un
+ * paramètre et non une déduction : cette fonction ne reçoit que des pièces,
+ * et une pièce ne dit rien d'une exigence qu'aucune pièce n'établit.
  */
-export function libelleBlocage(pieces: readonly Piece[]): string {
+export function libelleBlocage(pieces: readonly Piece[], exigences = 0): string {
   const bloquantes = grouperPourCompletude(pieces).bloquantes.length;
-  if (bloquantes === 0) return "Rien ne bloque le dépôt";
-  return bloquantes > 1
-    ? `${bloquantes} pièces bloquent le dépôt`
-    : "1 pièce bloque le dépôt";
+  if (bloquantes === 0 && exigences === 0) return "Rien ne bloque le dépôt";
+
+  const membres: string[] = [];
+  if (bloquantes > 0) membres.push(bloquantes > 1 ? `${bloquantes} pièces` : "1 pièce");
+  if (exigences > 0) membres.push(exigences > 1 ? `${exigences} exigences` : "1 exigence");
+
+  /* Le verbe s'accorde sur l'ensemble, pas sur le dernier membre. */
+  const pluriel = bloquantes + exigences > 1;
+  return `${membres.join(" et ")} ${pluriel ? "bloquent" : "bloque"} le dépôt`;
 }
 
 /**
@@ -306,17 +350,40 @@ const enumerer = (libelles: readonly string[]): string => {
  * appel de quarante-cinq minutes. Le chiffre n'ajoutait qu'une note à
  * retenir de travers (arbitrage C-09).
  */
-export function libelleAPreparer(pieces: readonly Piece[]): string {
+export function libelleAPreparer(pieces: readonly Piece[], exigences = 0): string {
   const { bloquantes, ensuite } = grouperPourCompletude(pieces);
   const aTraiter = bloquantes.length > 0 ? bloquantes : ensuite;
 
+  /*
+    Une exigence qu'aucune pièce ne lève est précisément ce qu'un rendez-vous
+    sert à débloquer : la plateforme ne sait pas la vérifier, le consultant
+    si. L'annoncer en premier, et ne jamais la passer sous silence.
+
+    Sans ce paramètre, la phrase disait « toutes les pièces demandées sont
+    conformes : l'appel peut porter sur le fond du dossier » sur un dossier
+    qu'une exigence tient à « incomplet ». Le candidat entrait dans un appel
+    payant en croyant n'avoir rien à y régler, et le seul sujet qui restait
+    n'était pas nommé.
+  */
+  const mention =
+    exigences > 0
+      ? exigences > 1
+        ? `${exigences} exigences de la règle de ton dossier restent à lever, et aucune pièce ne les lève : c'est le premier sujet à porter à l'appel.`
+        : "1 exigence de la règle de ton dossier reste à lever, et aucune pièce ne la lève : c'est le premier sujet à porter à l'appel."
+      : "";
+
   if (aTraiter.length === 0) {
-    return "Toutes les pièces demandées sont conformes : l'appel peut porter sur le fond du dossier.";
+    return mention !== ""
+      ? mention
+      : "Toutes les pièces demandées sont conformes : l'appel peut porter sur le fond du dossier.";
   }
 
   const noms = enumerer(aTraiter.map((p) => p.libelle.toLowerCase()));
   const nature = bloquantes.length > 0 ? "obligatoires" : "complémentaires";
-  return aTraiter.length > 1
-    ? `${aTraiter.length} pièces ${nature} restent à traiter : ${noms}.`
-    : `1 pièce ${nature === "obligatoires" ? "obligatoire" : "complémentaire"} reste à traiter : ${noms}.`;
+  const phrase =
+    aTraiter.length > 1
+      ? `${aTraiter.length} pièces ${nature} restent à traiter : ${noms}.`
+      : `1 pièce ${nature === "obligatoires" ? "obligatoire" : "complémentaire"} reste à traiter : ${noms}.`;
+  /* L'exigence passe devant : elle ne se règle pas en téléversant. */
+  return mention !== "" ? `${mention} ${phrase}` : phrase;
 }

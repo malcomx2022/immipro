@@ -8693,3 +8693,213 @@ C'est le sens de « trois destinations ». Cumuler quatre-vingt-dix analyses sur
 un seul dossier, c'est acheter trois fois Dossier — ce que le produit permet
 déjà, et que le code commente explicitement. **Si cette lecture n'est pas la
 bonne, c'est ici qu'il faut revenir** : le reste du lot en découle.
+
+---
+
+## S.68 — Deux calculs de la même chose, et un seul voyait les conditions
+
+`completudeDesPieces` appelait `computeCompleteness` avec `conditions: []`, en
+dur. `recalculerCompletude`, côté serveur, les évaluait pour de bon et décidait
+le passage à `PRET`. Les deux prétendaient répondre à « le dossier est-il
+prêt ? », et l'un ignorait la moitié de la question.
+
+**Établi par exécution**, sur un dossier dont **toutes** les pièces sont
+conformes et dont la règle figée porte une condition bloquante qu'aucune pièce
+n'établit :
+
+```
+la vue candidat : palier COMPLET, ready true, missing []
+                  « Rien ne bloque un dépôt. »
+la base         : ACTIF — le serveur a refusé de le déclarer prêt
+```
+
+Le candidat lisait que rien ne bloquait son dépôt sur le seul dossier que la
+plateforme ne le laisserait pas déposer : `declarerLeDepot` n'accepte que
+`PRET`.
+
+Le commentaire de `completudeDesPieces` promettait pourtant que « le tableau de
+bord, la checklist et l'écran de complétude comptent la même chose ». Ils
+comptaient bien la même chose — **entre eux**. Aucun des trois ne comptait comme
+la base.
+
+### Une seule évaluation, dans le domaine
+
+`conditionTenue` vivait dans le module d'accès du serveur. Elle est pure, et
+elle est désormais dans `domain/completeness/conditions.ts` avec
+`conditionsDeLaRegle` — une lecture **défensive** de la règle figée, sur le
+modèle de `delaiInstructionJours` : une règle gelée par un dossier ouvert avant
+une évolution du référentiel doit rester lisible (INV-3), et une vue candidat n'a
+pas à échouer parce qu'un champ a changé de forme.
+
+Quatre appelants la partagent : la vue du dossier, l'écran de complétude,
+l'export de portabilité, et `recalculerCompletude`.
+
+### La faute que j'ai failli commettre, et qui aurait tout cassé en silence
+
+J'ai d'abord construit l'ensemble des pièces conformes depuis les `Piece` de
+l'écran. `versPiece` fait pourtant :
+
+```ts
+code: codeCourt(document.code)   // `passeport` → `PAS`
+```
+
+`Piece.code` est une **pastille de trois lettres**, pas le code du référentiel.
+Rapprocher `PAS` de `passeport` ne rapproche rien : **toutes** les conditions se
+lisaient non satisfaites, sur tous les dossiers. La sonde l'a montré du premier
+coup — trois conditions en échec là où une seule devait l'être — mais ni le
+typage ni aucun test existant ne l'aurait dit.
+
+L'ensemble se construit donc depuis les **documents**, et l'appelant le fournit :
+`completudeDesPieces` ne peut pas le déduire de ce qu'elle reçoit. C'est la même
+leçon que le rattachement des conditions aux pièces — **la relation se déclare,
+elle ne se devine pas** — et je l'ai réapprise en une heure.
+
+### Le garde-fou d'architecture a mordu
+
+Ma première version lisait la règle figée depuis la route de complétude, avec un
+`db.visaRule.findUnique`. `tests/api-invariants.test.ts` l'a refusée : INV-4 veut
+que le référentiel ne soit interrogé que depuis le module d'accès, et le test lit
+le **source des routes** pour le vérifier.
+
+La règle vient donc avec le dossier, dans `dossierAvecPieces` — et sans le filtre
+candidat, parce qu'INV-3 la garde au dossier même archivée ou retirée de la
+vitrine.
+
+### Ce que l'écran dit maintenant
+
+`prochaineAction` nommait « Rien ne bloque un dépôt » dès que la checklist était
+servie. Elle nomme désormais la première exigence bloquante non tenue, avec son
+`message_echec` du référentiel — écrit pour être lu par le candidat (RG-07.1).
+
+### Ce qui reste à arbitrer
+
+**La portée du défaut est étroite aujourd'hui, et c'est important de le dire.**
+Une condition bloquante sans pièce est refusée à la publication : elle ne
+subsiste que sur une règle **figée avant cette garde**. Sur une règle publiée
+aujourd'hui, les deux calculs coïncidaient déjà. Ce lot corrige la structure —
+deux calculs devenus un — plus qu'un incident de production observable sur le
+référentiel actuel.
+
+**`compteurs.obligatoiresManquantes` additionne les pièces et les conditions.**
+C'est l'usage existant de `computeCompleteness` (`requisManquants.length +
+conditionsEchouees.length`), que ce lot ne change pas — mais le nom dit
+« obligatoires manquantes » et compte désormais, sur le chemin de l'écran, des
+choses qui ne sont pas des pièces. À renommer ou à scinder, dans un lot à part.
+
+---
+
+## S.69 — Une exigence n'est pas une pièce
+
+Le point que S.68 avait laissé ouvert, et qu'il avait lui-même rendu visible.
+
+`compteurs.obligatoiresManquantes` additionnait les pièces obligatoires non
+conformes **et** les conditions bloquantes non tenues :
+
+```ts
+obligatoiresManquantes: requisManquants.length + conditionsEchouees.length,
+```
+
+Tant que le chemin des écrans passait `conditions: []`, la somme ne portait que
+des pièces et personne ne pouvait le voir. S.68 a réuni les deux calculs — et a
+donc mis des conditions dans un compteur nommé « pièces obligatoires ».
+
+**Établi par exécution**, sur un dossier dont toutes les pièces sont conformes et
+dont une seule condition bloque :
+
+```
+compteurs    : {"obligatoiresManquantes":1,"conformes":2}
+dénombrement : « 1 pièce obligatoire manque »
+```
+
+Le candidat lisait « 1 pièce obligatoire manque », descendait d'un écran, et
+trouvait une checklist entièrement verte. La contradiction était visible à
+l'œil nu, et elle envoyait chercher quelque chose qui n'existe pas.
+
+**Quatre textes lisaient ce compteur**, tous en disant « pièce » :
+l'en-tête de complétude (C-01 et C-09), l'explication du palier, le message de
+progression d'une alerte, et le résumé du tableau de bord.
+
+### L'explication disait aussi le contraire d'elle-même
+
+`CE_QUI_NE_PESE_PAS` rangeait les conditions parmi ce qui ne pèse pas. C'était
+vrai avant S.68. Depuis, elles pèsent — l'explication du palier contredisait
+donc le palier qu'elle explique. Elles passent dans `CE_QUI_DECIDE`, à la place
+que leur poids leur donne : après les pièces obligatoires, avant les
+complémentaires.
+
+### Le compteur se scinde, les phrases suivent
+
+`exigencesNonTenues` rejoint `obligatoiresManquantes`, qui ne compte plus que
+des pièces. Chaque texte nomme ce qu'il compte :
+
+```
+« 1 exigence n'est pas remplie »
+« 1 pièce obligatoire manque, 2 exigences ne sont pas remplies »
+« 1 dossier ouvert, 1 exigence à lever. »
+```
+
+Et l'explication dit **où ne pas chercher** : « aucune pièce ne la lève ».
+
+**Le résumé du tableau de bord aurait fait reparaître la contradiction par la
+porte d'à côté.** Il somme `obligatoiresManquantes` sur les dossiers et conclut
+« rien ne bloque un dépôt » à zéro. Le compteur ne portant plus que des pièces,
+un dossier bloqué par une seule exigence serait redevenu « rien ne bloque » —
+exactement ce que S.68 venait de supprimer. Il somme donc les deux.
+
+### Une faute d'accord, attrapée en la relisant
+
+La première version de la phrase des exigences composait l'accord morceau par
+morceau et produisait « n'est pas remplies ». Deux gabarits complets
+remplacent le nid de ternaires : l'accord porte sur le verbe, le participe et
+le pronom à la fois, et une phrase assemblée bout à bout finit par en accorder
+un et pas l'autre. Un test fige les deux formes.
+
+### Ce que la mutation dit
+
+Remettre la somme fait tomber **huit** des douze assertions, sur les quatre
+textes à la fois. Les quatre qui restent vertes sont les témoins : ce que le
+lot ne devait pas changer.
+
+**Suite, dans le même lot.** `libelleBlocage` — la barre d'action sous la
+checklist de C-09 — ne comptait elle aussi que des pièces. Les deux phrases
+s'affichaient donc ensemble, à quelques lignes d'écart :
+
+```
+en-tête : « 1 exigence n'est pas remplie »
+blocage : « Rien ne bloque le dépôt »
+palier  : INCOMPLET — prêt : false
+```
+
+Elle reçoit le nombre d'exigences plutôt que de le déduire : elle ne voit que
+des pièces, et une pièce ne dit rien d'une exigence qu'aucune pièce n'établit.
+Le verbe s'accorde sur l'ensemble et non sur le dernier membre — « 1 pièce et
+1 exigence **bloquent** le dépôt ».
+
+C'est la troisième phrase de la même famille corrigée en deux lots
+(`prochaineAction`, le dénombrement, le blocage), et elles se sont révélées une
+par une. Plutôt que d'attendre la quatrième, j'ai balayé les fonctions
+exportées qui concluent à partir des seules pièces.
+
+### La quatrième, trouvée en balayant plutôt qu'en attendant
+
+`libelleAPreparer` prépare un **rendez-vous payant** de quarante-cinq minutes
+avec un consultant. Sur un dossier dont toutes les pièces sont conformes et
+qu'une exigence tient à « incomplet », elle disait :
+
+> « Toutes les pièces demandées sont conformes : l'appel peut porter sur le
+> fond du dossier. »
+
+Le candidat entrait dans l'appel en croyant n'avoir rien à y régler, et le seul
+sujet qui restait n'était pas nommé — alors que c'est **exactement** ce qu'un
+consultant sait débloquer et pas la plateforme : une exigence de l'autorité
+qu'aucun téléversement ne lève.
+
+L'exigence passe donc devant les pièces dans la phrase, parce qu'elle ne se
+règle pas en téléversant.
+
+**La leçon.** Quatre phrases, quatre fois la même cause : une fonction qui
+conclut à partir des seules pièces, dans un produit dont le calcul en voit
+davantage depuis S.68. Les trois premières se sont révélées une par une, en
+production de la suivante ; la quatrième a été trouvée par un balayage des
+signatures `(pieces: readonly Piece[])`. C'est le balayage qu'il fallait faire
+au moment de S.68, et pas trois lots plus tard.
