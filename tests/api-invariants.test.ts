@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { filtrePourCandidat } from "@/server/acces/regles";
 import { evaluerConditions, moisEntre } from "@/domain/dossiers/verification";
@@ -34,6 +34,16 @@ function fichiersDeRoute(dir = "src/app/api", acc: string[] = []): string[] {
     const chemin = join(dir, nom);
     if (statSync(chemin).isDirectory()) fichiersDeRoute(chemin, acc);
     else if (nom === "route.ts") acc.push(chemin);
+  }
+  return acc;
+}
+
+/** Tous les fichiers TypeScript d'une arborescence, chemins en barres obliques. */
+function fichiers(dir: string, acc: string[] = []): string[] {
+  for (const nom of readdirSync(dir)) {
+    const chemin = join(dir, nom);
+    if (statSync(chemin).isDirectory()) fichiers(chemin, acc);
+    else if (/\.tsx?$/u.test(nom)) acc.push(chemin.replace(/\\/gu, "/"));
   }
   return acc;
 }
@@ -130,11 +140,71 @@ describe("INV-4 — le filtrage est dans la requête", () => {
     ]);
   });
 
-  it("seul le module d'accès et le back-office interrogent le référentiel", () => {
-    const fautives = ROUTES.filter(
-      (f) => lire(f).includes("visaRule.find") && !f.includes("admin"),
-    );
-    expect(fautives).toEqual([]);
+  /**
+   * ── Le garde-fou promettait plus que sa portée ──────────────────────
+   *
+   * Il s'appelait « seul le module d'accès et le back-office interrogent
+   * le référentiel » et ne balayait que `src/app/api/**`. Tout
+   * `src/server/**` lui échappait — et c'est là que vivait la seule
+   * requête non filtrée du dépôt, `nomDeLaDestination`, qui lisait
+   * `visaRule` avec le seul `status: "PUBLISHED"`.
+   *
+   * Elle n'a jamais rien laissé fuir : personne ne l'appelait, l'annuaire
+   * utilisant une table en mémoire. Elle aurait fui le jour où quelqu'un
+   * l'aurait appelée, et le garde-fou ne l'aurait pas dit.
+   *
+   * ── Pourquoi une liste, et pas une interdiction ─────────────────────
+   *
+   * Tous les lecteurs non filtrés ne sont pas fautifs, et les interdire
+   * tous casserait le référentiel lui-même. Chacun est nommé avec sa
+   * raison : c'est ce qui rend la liste relisible, et ce qui oblige à
+   * justifier une entrée nouvelle plutôt qu'à l'ajouter.
+   */
+  const LECTEURS_LEGITIMES: Readonly<Record<string, string>> = {
+    "src/server/acces/regles.ts":
+      "le module d'accès — il **porte** `filtrePourCandidat` et c'est sa raison d'être",
+    "src/server/lecture/backoffice.ts":
+      "le back-office voit tout, y compris les sources secondaires : c'est son travail",
+    "src/server/regles/publication.ts":
+      "la publication cherche le prédécesseur d'une version, publiée ou non",
+    "src/server/jobs/divergence.ts":
+      "la propagation doit voir la règle qu'elle vient de publier",
+    "src/server/dossiers/migration.ts":
+      "il passe par `filtrePourCandidat`, et lit en plus les versions écartées pour dire pourquoi",
+    "src/server/lecture/alertes.ts":
+      "il passe par `filtrePourCandidat` pour décider ce qu'une migration bloquée annonce",
+  };
+
+  it("aucun lecteur du référentiel hors de la liste, sur tout le serveur", () => {
+    const interrogent = fichiers("src/server")
+      .concat(ROUTES)
+      /*
+        La parenthèse d'appel est obligatoire dans le motif, et ce n'est pas
+        un détail : sans elle, `visaRule.count` correspondait à l'intérieur
+        de `dossier.visaRule.countryCode`, et ce garde-fou accusait deux
+        fichiers corrects à son premier passage. C'est la faute que le
+        commentaire de `B-07` raconte — « deux critères syntaxiques qui
+        accusaient du code correct » — refaite ici.
+      */
+      .filter((f) =>
+        /visaRule\.(findMany|findFirst|findUnique|findUniqueOrThrow|findFirstOrThrow|count|aggregate|groupBy)\s*\(/u.test(
+          sansCommentaires(lire(f)),
+        ),
+      )
+      .filter((f) => !f.includes("/admin/"));
+
+    const inconnus = interrogent.filter((f) => !(f in LECTEURS_LEGITIMES));
+    expect(inconnus).toEqual([]);
+  });
+
+  /*
+    L'autre moitié : une entrée de la liste qui disparaît n'a plus de
+    raison d'y être. Sans cette assertion, la liste enfle d'anciens noms
+    et cesse de dire quoi que ce soit.
+  */
+  it("la liste ne garde aucun nom mort", () => {
+    const disparus = Object.keys(LECTEURS_LEGITIMES).filter((f) => !existsSync(f));
+    expect(disparus).toEqual([]);
   });
 });
 
