@@ -9235,3 +9235,73 @@ date en base — chacune ne faisant tomber que son assertion.
 La CI n'ayant rien validé depuis le 22/09, les quinze fumées ont été jouées
 localement sur `4fd6179` avant ce lot : toutes vertes. Le trou laissé par
 l'indisponibilité des exécuteurs ne cachait rien.
+
+## S.76 — Quatre sections de fiche se taisaient quand leur liste était vide
+
+La liste de contrôle du dépôt demande que « les états vide, chargement et
+erreur soient traités ». Balayage des écrans qui itèrent sur une collection
+sans aucune garde : huit sur trente-huit. Cinq itèrent sur des constantes —
+une navigation, trois étapes de démarrage — où le vide est impossible. Trois
+lisent le référentiel, où il ne l'est pas.
+
+### Ce que les écrans affichaient
+
+Sondé sur une fiche dont les listes sont vides, C-04 rendait :
+
+```
+Conditions   → ""
+Coûts        → ""
+Réserves     → ""
+```
+
+Un panneau entièrement blanc sous l'onglet qu'on vient de choisir. P-04, la
+page publique, était pire : ses listes vivent sous des titres — « Conditions
+principales », « Réserves » — donc un titre avec rien dessous, ce qui se lit
+comme une page qui a échoué à charger. C'est la forme exacte du défaut de
+S.71, sur d'autres sections.
+
+Et un quatrième, dans la même famille : `libellePieces(0)` rendait « 0 pièce
+à réunir », suivi de « le détail, pièce par pièce, s'ouvre avec le dossier ».
+Un détail promis sur une liste vide.
+
+### Le cas n'est pas théorique
+
+`reserves: z.array(z.string()).default([])` — une règle écrite sans réserve
+en a zéro, et c'est la règle qu'on écrit par défaut. Ni `conditions` ni
+`pieces_requises` n'ont de minimum : les trois listes peuvent être vides sur
+une règle parfaitement valide et publiée.
+
+### Ce que chaque phrase tient
+
+Elle dit que **le référentiel n'en consigne pas**, jamais qu'il n'y en a pas.
+La nuance porte tout le poids sur « Réserves » : « aucune réserve » se
+lirait comme « aucun risque », c'est-à-dire comme une promesse sur une
+décision qui ne nous appartient pas (INV-1). La phrase ajoute donc « son
+absence dit qu'il n'y en a pas de relevée, pas qu'il n'y a rien à
+surveiller », et un test tient cette nuance seule — une mutation qui retire
+la seconde moitié le fait tomber sans toucher aux trois autres.
+
+Les phrases vivent dans `domain/destinations/fiche.ts`, lues par les deux
+écrans : une seule formulation pour une seule situation.
+
+### Balayage INV-4, fait au passage et sans résultat
+
+L'invariant demande que le filtrage des sources `SECONDAIRE` soit dans la
+requête. Toutes les requêtes sur `VisaRule` ont été relues : `migration.ts`
+et `alertes.ts` passent par `filtrePourCandidat` ; `jobs/divergence.ts` et
+`regles/publication.ts` lisent sans filtre, et c'est correct — une
+propagation doit voir la règle qu'elle publie. Le dépôt est discipliné.
+
+Une seule exception, et c'est du code mort : `nomDeLaDestination`
+(`lecture/consultants.ts`) interroge `visaRule` avec le seul `status:
+"PUBLISHED"`, sans le filtre canonique. Personne ne l'appelle — l'écran de
+l'annuaire utilise `nomDestination`, une table en mémoire. Rien ne fuit
+aujourd'hui ; ce serait une fuite le jour où quelqu'un l'appellerait.
+
+**Et le garde-fou existant ne l'aurait pas vue.** `api-invariants.test.ts`
+dit « seul le module d'accès et le back-office interrogent le référentiel »,
+mais ne balaie que `src/app/api/**`. Son nom promet plus que sa portée.
+Ce n'est pas corrigé ici : élargir cette vérification demande de distinguer
+les lecteurs légitimement non filtrés — jobs, publication, back-office — de
+ceux qui servent un candidat, et c'est une liste à établir, pas un
+correctif. Consigné.
