@@ -546,7 +546,22 @@ describe("aucune action auditée n'est déclarée sans être écrite", () => {
  */
 describe("B-07 — un coût manquant ne vaut jamais zéro", () => {
   const LECTURE = "src/server/lecture/backoffice.ts";
-  const ECRITURE = "src/server/jobs/analyse.ts";
+
+  /*
+    L'écrivain n'est plus nommé par son chemin : il l'était, et le lot qui
+    a réuni les deux copies de `noterLesJetons` a fait tomber ce test sans
+    qu'aucun comportement change — troisième fois que ce bloc se fait
+    prendre par sa propre forme, après les deux critères syntaxiques que
+    son commentaire raconte.
+
+    Il est cherché, et le test tient au passage quelque chose de plus fort
+    que ce qu'il tenait : qu'il n'y en ait **qu'un**. Deux écrivains de
+    `AiUsage` sont ce qui avait produit la divergence d'origine — une
+    route qui posait `costMicros: 0` en dur pendant que l'autre tarifait.
+  */
+  const ECRIVAINS = fichiers("src/server").filter((f) =>
+    sansCommentaires(lire(f)).includes("aiUsage.create"),
+  );
 
   it("la lecture ne somme plus la colonne de coût", () => {
     const code = sansCommentaires(lire(LECTURE));
@@ -559,9 +574,10 @@ describe("B-07 — un coût manquant ne vaut jamais zéro", () => {
     expect(bloc).toContain("coutMicrosDesJetons");
   });
 
-  it("l'écriture tarife ses jetons au lieu de poser un littéral", () => {
-    const code = sansCommentaires(lire(ECRITURE));
-    expect(code).toContain("aiUsage.create");
+  it("n'a qu'un seul écrivain, et il tarife ses jetons", () => {
+    expect(ECRIVAINS).toHaveLength(1);
+
+    const code = sansCommentaires(lire(ECRIVAINS[0]!));
     expect(code).toContain("coutMicrosDesJetons");
     expect(code).not.toMatch(/costMicros:\s*\d/u);
   });

@@ -1,5 +1,6 @@
 import type { ReviewReason } from "@prisma/client";
 import { db } from "@/lib/db";
+import { noterLesJetons } from "@/server/ia/appel";
 import { payload } from "@/server/acces/regles";
 import {
   debiterUneAnalyse,
@@ -21,10 +22,6 @@ import {
   type DemandeDeLecture,
 } from "@/domain/dossiers/extraction";
 import { lExtracteur, type Extracteur } from "@/server/dossiers/extracteur";
-import {
-  coutMicrosDesJetons,
-  tarifDepuisEnvironnement,
-} from "@/domain/backoffice/couts";
 
 /**
  * Analyse d'une pièce — WF-06.
@@ -116,38 +113,6 @@ function motifDeRevue(cause: CauseDeNonLecture): ReviewReason {
   }
 }
 
-/**
- * Enregistre ce qui a été consommé — y compris quand rien n'a été rendu.
- *
- * Le prix du jeton n'est pas mesuré tant qu'aucun tarif n'est configuré.
- * `costMicros` porte alors zéro, et B-07 ne le lit pas : il recalcule le
- * coût depuis les jetons et le tarif du jour, pour qu'une ligne écrite
- * avant le tarif ne compte pas comme gratuite.
- */
-async function noterLesJetons(
-  tache: Tache,
-  userId: string,
-  operation: string,
-  jetonsEntree: number,
-  jetonsSortie: number,
-): Promise<void> {
-  if (jetonsEntree === 0 && jetonsSortie === 0) return;
-  await db.aiUsage.create({
-    data: {
-      userId,
-      applicationId: tache.applicationId,
-      operation,
-      inputTokens: jetonsEntree,
-      outputTokens: jetonsSortie,
-      costMicros:
-        coutMicrosDesJetons(
-          tarifDepuisEnvironnement(process.env),
-          jetonsEntree,
-          jetonsSortie,
-        ) ?? 0,
-    },
-  });
-}
 
 export async function analyserUnePiece(
   tache: Tache,
@@ -220,8 +185,8 @@ export async function analyserUnePiece(
   );
 
   await noterLesJetons(
-    tache,
     application.userId,
+    tache.applicationId,
     `analyse:${document.code}`,
     lu.jetonsEntree,
     lu.jetonsSortie,

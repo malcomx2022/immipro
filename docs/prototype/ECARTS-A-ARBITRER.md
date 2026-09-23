@@ -9305,3 +9305,80 @@ Ce n'est pas corrigé ici : élargir cette vérification demande de distinguer
 les lecteurs légitimement non filtrés — jobs, publication, back-office — de
 ceux qui servent un candidat, et c'est une liste à établir, pas un
 correctif. Consigné.
+
+## S.77 — Le domaine avait unifié la politique, la plomberie était restée en double
+
+Deux balayages d'invariant avant celui-ci, et aucun n'a trouvé de défaut.
+Ils comptent quand même, et sont consignés ici pour qu'on ne les refasse
+pas sans raison.
+
+**INV-4 — le filtrage des sources `SECONDAIRE` est dans la requête.** Tenu.
+Les lectures candidat passent par `filtrePourCandidat` ; les deux qui ne
+filtrent pas sont une propagation et une publication, où c'est correct. La
+seule requête non filtrée est du code mort.
+
+**INV-6 — tout appel IA est débité, jamais de dépassement silencieux.**
+Tenu, et mieux que l'énoncé ne l'exige : le débit **précède** l'appel dans
+les trois chemins (`jobs/analyse.ts`, les deux routes de rédaction), il est
+atomique — `debiterUneAnalyse` insère sous condition de solde en une seule
+requête et lève `quota_epuise` —, il est rendu sur reprise, et les jetons
+sont écrits même quand l'appel n'a rien rendu. Les deux adaptateurs sont
+symétriques sur leurs chemins d'échec : tout ce qui échoue **après** la
+réponse rend les jetons réels ; seul un échec avant la réponse n'en compte
+aucun, et c'est honnête — l'usage n'est pas connu.
+
+Reste, hors de ce lot, que `Pack.tokensIA` n'est pas **appliqué** : il
+alimente une alerte de marge en back-office, pas un plafond. C'est RG-15.2,
+déjà consigné comme demandant un arbitrage.
+
+### Ce que le troisième balayage a trouvé
+
+Les fonctions définies dans plusieurs fichiers : cinquante-deux noms, dont
+la plupart sont légitimes — `generateMetadata` est une convention Next, les
+fumées sont des scripts autonomes, `iso` et `majuscule` sont des trivialités
+locales. Trois ne le sont pas, et elles sont toutes dans la même couche.
+
+`domain/ia/appel.ts` avait déjà unifié la **politique** des appels au
+modèle : six causes, et lesquelles se rejouent. Son commentaire dit
+exactement pourquoi il existe — « recopier ces six causes dans le second
+module aurait produit deux sources pour une même règle ; elles divergent
+toujours, et c'est celle qu'on n'a pas sous les yeux qu'on oublie de
+corriger ».
+
+La plomberie qui l'alimente était restée en double :
+
+| Fonction | Copies | Ce qu'elle décide |
+|---|---|---|
+| `causeDeLErreur` | extracteur, adaptateur | laquelle des six causes ; donc si l'on rejoue, si le quota est rendu |
+| `texteRendu` | extracteur, adaptateur | ce qu'on lit de la réponse |
+| `noterLesJetons` | jobs/analyse, redaction/usage | la ligne `AiUsage` de B-07 |
+
+Elles ne pouvaient pas rejoindre le domaine : il s'interdit le SDK et
+Prisma, et c'est précisément ce que ces trois-là touchent. Elles vivent
+maintenant dans `server/ia/appel.ts`, le pendant serveur du module de
+domaine.
+
+### L'équivalence a été établie avant la fusion, pas supposée
+
+Les deux `causeDeLErreur` ont été comparées par exécution sur onze erreurs
+— les sept classes du SDK, un `TimeoutError` et un `AbortError` nus, une
+`Error` quelconque, `null` : **zéro écart**. La fusion ne change donc aucun
+comportement, et le test qui l'a établi reste comme contrat. Deux mutations
+le tiennent : intervertir l'ordre des branches — `APIConnectionTimeoutError`
+étend `APIConnectionError`, qui étend `APIError`, et tester la générale
+d'abord absorbe les deux autres — et faire pencher le repli du mauvais
+côté, vers un abandon au lieu d'une reprise.
+
+### Un test de source qui s'est fait prendre pour la troisième fois
+
+`B-07 — un coût manquant ne vaut jamais zéro` lisait `jobs/analyse.ts` en
+le nommant par son chemin. La fusion l'a fait tomber sans qu'aucun
+comportement change. Son propre commentaire raconte qu'il avait déjà été
+réécrit deux fois « après deux critères syntaxiques qui accusaient du code
+correct » ; c'était la troisième.
+
+Il ne nomme plus de chemin : il **cherche** les écrivains de `AiUsage` sous
+`src/server` et exige qu'il n'y en ait qu'un. C'est plus fort que ce qu'il
+tenait, et cela vise la cause d'origine — deux écrivains, dont l'un posait
+`costMicros: 0` en dur pendant que l'autre tarifait. Une mutation qui
+recrée un second écrivain le fait tomber.

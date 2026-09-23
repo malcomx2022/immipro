@@ -35,6 +35,11 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  causeDeLErreur as classer,
+  texteRendu,
+  type ChaineDAppel,
+} from "@/server/ia/appel";
+import {
   DELAI_EXTRACTION_MS,
   TAILLE_MAXI_EXTRACTION_OCTETS,
   TYPES_LISIBLES,
@@ -142,47 +147,16 @@ function blocDeLaPiece(
 }
 
 /**
- * Ce qu'une erreur du SDK vaut comme cause.
- *
- * La chaîne est ordonnée du plus précis au plus général : les sous-types
- * d'`APIError` se rattraperaient sans cela sous le cas le plus large, et
- * une clé refusée se lirait « service injoignable » — un message qui
- * envoie chercher une panne réseau là où il faut renseigner un secret.
+ * La classification des erreurs du SDK et la lecture du texte rendu
+ * vivent dans `server/ia/appel.ts` : les deux chaînes d'appel au modèle
+ * en avaient chacune une copie identique, et le domaine s'interdit le
+ * SDK. Ce qui reste propre à cette chaîne-ci est son vocabulaire.
  */
-export function causeDeLErreur(erreur: unknown): { cause: CauseDeNonLecture; detail: string } {
-  if (erreur instanceof Anthropic.AuthenticationError) {
-    return { cause: "non_configure", detail: "la clé d'extraction est refusée" };
-  }
-  if (erreur instanceof Anthropic.PermissionDeniedError) {
-    return { cause: "non_configure", detail: "la clé d'extraction n'a pas accès à ce modèle" };
-  }
-  if (erreur instanceof Anthropic.RateLimitError) {
-    return { cause: "service_sature", detail: "la cadence d'appel est dépassée" };
-  }
-  if (erreur instanceof Anthropic.BadRequestError) {
-    return { cause: "reponse_illisible", detail: "la demande a été refusée telle qu'elle est formée" };
-  }
-  if (erreur instanceof Anthropic.APIConnectionTimeoutError) {
-    return { cause: "delai_depasse", detail: `sans réponse après ${DELAI_EXTRACTION_MS} ms` };
-  }
-  if (erreur instanceof Anthropic.APIConnectionError) {
-    return { cause: "injoignable", detail: "le service de lecture n'a pas répondu" };
-  }
-  if (erreur instanceof Anthropic.APIError) {
-    return { cause: "injoignable", detail: `réponse ${erreur.status ?? "sans code"}` };
-  }
-  const nom = (erreur as { name?: unknown })?.name;
-  return nom === "TimeoutError" || nom === "AbortError"
-    ? { cause: "delai_depasse", detail: `sans réponse après ${DELAI_EXTRACTION_MS} ms` }
-    : { cause: "injoignable", detail: "le service de lecture n'a pas répondu" };
-}
-
-/** Le texte que le modèle a rendu, concaténé. Les blocs de réflexion sont ignorés. */
-const texteRendu = (message: Anthropic.Message): string =>
-  message.content
-    .filter((bloc): bloc is Anthropic.TextBlock => bloc.type === "text")
-    .map((bloc) => bloc.text)
-    .join("");
+const CHAINE: ChaineDAppel = {
+  cle: "la clé d'extraction",
+  service: "le service de lecture",
+  delaiMs: DELAI_EXTRACTION_MS,
+};
 
 /**
  * L'appel lui-même, sur des octets déjà en main.
@@ -226,7 +200,7 @@ export async function lireDesOctets(
       mesure, alors que ce serait une estimation — et B-07 recalcule des
       coûts à partir de ces nombres.
     */
-    const { cause, detail } = causeDeLErreur(erreur);
+    const { cause, detail } = classer(erreur, CHAINE);
     return sansJetons(cause, detail);
   }
 
