@@ -37,6 +37,20 @@ export interface Pack {
   analyses: number;
   destinations: number;
   /**
+   * La rédaction assistée — arbitrage S.80.
+   *
+   * Ce que le pack ouvre, c'est l'intervention du service d'IA sur une
+   * pièce rédigée : la proposition d'un texte à partir des réponses, la
+   * reformulation, l'analyse critique, les recoupements qui demandent de
+   * lire des pièces. Jamais le droit d'écrire : l'entretien, l'écriture et
+   * la réécriture manuelles, les versions et les exports sont à tous.
+   *
+   * Le droit se lit sur la **couverture attribuée au dossier**, pas sur le
+   * dernier achat du compte (`server/acces/droits`). Une recharge n'est pas
+   * un pack, et n'en ouvre aucun.
+   */
+  redactionAssistee: boolean;
+  /**
    * Mise en avant de $-01. Un seul pack la porte, et le test le garantit :
    * la décision sort du domaine, jamais du composant, pour que l'écran ne
    * puisse pas rediverger du code comme le prototype l'a fait.
@@ -63,6 +77,7 @@ export const PACKS: Pack[] = [
     tokensIA: 120_000,
     analyses: 10,
     destinations: 1,
+    redactionAssistee: false,
     misEnAvant: false,
     justification: "Une destination, dix analyses de pièces",
   },
@@ -73,6 +88,7 @@ export const PACKS: Pack[] = [
     tokensIA: 400_000,
     analyses: 30,
     destinations: 1,
+    redactionAssistee: true,
     misEnAvant: true,
     justification: "Couvre l'ensemble des pièces exigées pour cette destination",
   },
@@ -83,8 +99,14 @@ export const PACKS: Pack[] = [
     tokensIA: 1_200_000,
     analyses: 90,
     destinations: 3,
+    redactionAssistee: true,
     misEnAvant: false,
-    justification: "Trois destinations comparées en parallèle",
+    /*
+      « Trois destinations comparées en parallèle » annonçait un
+      comparateur de dossiers qui n'existe pas et n'entre pas en V1
+      (arbitrage S.80). Le badge dit ce que le pack donne.
+    */
+    justification: "Trois couvertures Dossier, ouvertes à ton rythme",
   },
 ];
 

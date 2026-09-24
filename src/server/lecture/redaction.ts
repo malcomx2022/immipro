@@ -182,6 +182,8 @@ export interface VueDeLaRelecture {
   texteExistant: boolean;
   /** Le service peut être appelé — jamais « il l'a été ». */
   analysePossible: boolean;
+  /** La couverture du dossier ouvre l'analyse critique (arbitrage S.80). */
+  redactionAssistee: boolean;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
   relectureLe: string;
 }
@@ -191,6 +193,8 @@ export async function vueDeLaRelecture(
   faits: FaitsDuDossier,
   /** Passée plutôt que lue : la fumée éprouve les deux réponses. */
   analysePossible: boolean,
+  /** Passée pour la même raison : lue par `redactionAssisteeDuDossier`. */
+  redactionAssistee: boolean,
 ): Promise<VueDeLaRelecture> {
   const derniere = await db.documentVersion.findFirst({
     where: { documentId },
@@ -210,6 +214,7 @@ export async function vueDeLaRelecture(
     recoupements: derniere?.body ? recoupements(derniere.body, faits) : AUCUN_RECOUPEMENT,
     texteExistant: derniere !== null,
     analysePossible,
+    redactionAssistee,
     relectureLe: (derniere?.uploadedAt ?? new Date()).toISOString().slice(0, 10),
   };
 }

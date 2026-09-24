@@ -105,6 +105,12 @@ export interface RedactionProps {
    * dit au lieu de proposer un bouton qui ne rendrait rien (règle de Q.A).
    */
   redactionDisponible: boolean;
+  /**
+   * La couverture du dossier ouvre la rédaction assistée (arbitrage S.80).
+   * Sans elle, l'écran propose l'écriture manuelle et le chemin vers les
+   * packs — jamais un bouton qui serait refusé.
+   */
+  redactionAssistee: boolean;
   /** Horodatage de rendu, passé par le serveur pour que « il y a 4 minutes » soit stable. */
   maintenant: string;
 }
@@ -118,6 +124,7 @@ export function Redaction({
   versions,
   suggestion,
   redactionDisponible,
+  redactionAssistee,
   maintenant,
 }: RedactionProps) {
   const router = useRouter();
@@ -142,6 +149,7 @@ export function Redaction({
     versions,
     reponses: nombreDeReponsesTexte(reponses),
     redactionDisponible,
+    redactionAssistee,
   });
   const message = messageDEtat(etat, nombreDeReponsesTexte(reponses));
 
@@ -340,6 +348,19 @@ export function Redaction({
             Passer cette question
           </Button>
           <p className="text-pretty text-center text-13 text-ink-500">{MENTION_PASSER}</p>
+          {/*
+            Arbitrage S.80 : écrire sa pièce soi-même est un droit de tous,
+            et l'entretien est une aide, pas un passage obligé. Il fallait
+            passer chaque question pour atteindre l'éditeur ; la réponse en
+            cours est conservée comme par les autres boutons.
+          */}
+          <Button
+            variante="lien"
+            className="self-center"
+            onClick={() => conserverPuis(() => setVue("EDITEUR"))}
+          >
+            Écrire directement dans l&apos;éditeur
+          </Button>
         </div>
       </div>
     );
@@ -405,7 +426,15 @@ export function Redaction({
               <p className="max-w-[68ch] text-pretty text-14 text-ink-700">
                 {message.corps}
               </p>
-              {message.action ? (
+              {etat === "MISE_EN_FORME_RESERVEE" && message.action ? (
+                <LienBouton
+                  href="/tarifs"
+                  variante="secondaire"
+                  className="mt-1"
+                >
+                  {message.action}
+                </LienBouton>
+              ) : message.action ? (
                 <Button
                   className="mt-1"
                   disabled={envoi !== ""}
@@ -422,48 +451,55 @@ export function Redaction({
             </div>
           ) : null}
 
-          {courante ? (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="texte" className="text-14 font-medium text-ink-900">
-                Ton texte
-              </label>
-              {/*
-                Un champ, et non des paragraphes en lecture seule. L'onglet
-                s'appelait « Éditeur » et n'éditait rien : le texte du
-                candidat lui appartient, et chaque enregistrement laisse une
-                version restaurable.
+          {/*
+            Le champ est toujours là — arbitrage S.80. Il n'apparaissait
+            qu'une fois une première version produite, c'est-à-dire après
+            une mise en forme par le service : sans elle, le candidat ne
+            pouvait pas écrire sa propre pièce dans l'application. Écrire
+            est un droit de tous ; seule l'assistance dépend du pack.
+          */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="texte" className="text-14 font-medium text-ink-900">
+              Ton texte
+            </label>
+            {/*
+              Un champ, et non des paragraphes en lecture seule. L'onglet
+              s'appelait « Éditeur » et n'éditait rien : le texte du
+              candidat lui appartient, et chaque enregistrement laisse une
+              version restaurable.
 
-                Le texte entier plutôt qu'un champ par paragraphe : on
-                réécrit une lettre, pas un tableau de morceaux, et déplacer
-                une phrase d'un paragraphe à l'autre est le geste le plus
-                courant d'une relecture.
-              */}
-              <textarea
-                id="texte"
-                rows={18}
-                value={brouillon}
-                onChange={(e) => setBrouillon(e.target.value)}
-                aria-describedby="texte-aide"
-                className={cn(CHAMP_CONTROLE, "h-auto max-w-[68ch] py-3 leading-relaxed")}
-              />
-              <p id="texte-aide" className="max-w-[68ch] text-pretty text-13 text-ink-500">
-                {MENTION_AIDE_A_LA_REDACTION}
-              </p>
-              <div className="flex flex-col items-start gap-2 pt-1 sm:flex-row sm:items-center">
-                <Button
-                  variante="secondaire"
-                  disabled={manque !== null || envoi !== ""}
-                  raisonDesactivation={manque ?? "Enregistrement en cours."}
-                  onClick={() => ecrire("reecriture", { geste: "reecriture", texte: brouillon })}
-                >
-                  {envoi === "reecriture" ? "Enregistrement…" : "Enregistrer une version"}
-                </Button>
-                <span className="text-13 text-ink-500">
-                  {`Version ${courante.rang} en cours · une nouvelle version est créée, l'ancienne reste`}
-                </span>
-              </div>
+              Le texte entier plutôt qu'un champ par paragraphe : on
+              réécrit une lettre, pas un tableau de morceaux, et déplacer
+              une phrase d'un paragraphe à l'autre est le geste le plus
+              courant d'une relecture.
+            */}
+            <textarea
+              id="texte"
+              rows={18}
+              value={brouillon}
+              onChange={(e) => setBrouillon(e.target.value)}
+              aria-describedby="texte-aide"
+              className={cn(CHAMP_CONTROLE, "h-auto max-w-[68ch] py-3 leading-relaxed")}
+            />
+            <p id="texte-aide" className="max-w-[68ch] text-pretty text-13 text-ink-500">
+              {MENTION_AIDE_A_LA_REDACTION}
+            </p>
+            <div className="flex flex-col items-start gap-2 pt-1 sm:flex-row sm:items-center">
+              <Button
+                variante="secondaire"
+                disabled={manque !== null || envoi !== ""}
+                raisonDesactivation={manque ?? "Enregistrement en cours."}
+                onClick={() => ecrire("reecriture", { geste: "reecriture", texte: brouillon })}
+              >
+                {envoi === "reecriture" ? "Enregistrement…" : "Enregistrer une version"}
+              </Button>
+              <span className="text-13 text-ink-500">
+                {courante
+                  ? `Version ${courante.rang} en cours · une nouvelle version est créée, l'ancienne reste`
+                  : "Ton premier enregistrement crée la version 1 : tu pourras toujours y revenir"}
+              </span>
             </div>
-          ) : null}
+          </div>
 
           {/*
             La suggestion se pose au-dessus du champ, et non sous le

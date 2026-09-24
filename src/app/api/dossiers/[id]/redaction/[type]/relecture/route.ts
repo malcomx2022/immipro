@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
 import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
+import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { laCritique } from "@/server/redaction/service";
 import { noterLesJetons } from "@/server/redaction/usage";
@@ -43,6 +44,10 @@ export const POST = route({
   limite: "sensible",
   async traiter({ params, acteur }) {
     const piece = await pieceARediger(params.id!, params.type!, acteur!.id);
+    // Arbitrage S.80 : l'analyse critique est un droit des packs Dossier et
+    // Dossier Pro. Avant le débit, avant l'appel ; les recoupements
+    // déterministes, eux, restent calculés pour tous à la lecture.
+    await exigerRedactionAssistee(params.id!);
 
     if (!piece.pays) {
       throw echec("etat_incompatible", {

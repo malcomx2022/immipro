@@ -330,6 +330,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-08.2 : aucun formulaire officiel n'est rempli ni soumis par la plateforme (INV-1).
 - RG-08.3 : cohérence croisée obligatoire — si la lettre mentionne un financement familial et que le relevé est au nom du candidat, l'incohérence est signalée.
 - RG-08.4 : chaque itération débite le quota de tokens ; le compteur restant est visible en permanence.
+- RG-08.5 : la rédaction assistée — proposition de texte à partir des réponses, reformulation, analyse critique, recoupements qui exigent la lecture automatique de pièces — est un droit des packs Dossier et Dossier Pro, dérivé de la couverture attribuée au dossier et jamais du dernier pack acheté par le compte. Une recharge d'analyses ne l'ouvre pas. Tous les packs gardent l'entretien guidé, l'écriture et la réécriture manuelles, les versions, les exports et les recoupements déterministes. Un refus ne perd jamais les réponses, le texte ni les versions (arbitrage S.80).
 
 ---
 

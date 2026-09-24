@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
 import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
+import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { leRedacteur } from "@/server/redaction/service";
 import { compterMotsTexte } from "@/domain/redaction/versions";
@@ -93,6 +94,15 @@ export const POST = route({
     }
 
     // ── Mise en forme ───────────────────────────────────────────────────
+
+    /*
+      Arbitrage S.80 : la proposition de texte est un droit des packs
+      Dossier et Dossier Pro, lu sur la couverture de ce dossier. La garde
+      passe avant tout le reste — débit, appel, et même la lecture des
+      réponses : un refus ne coûte rien et ne touche à rien. La réécriture
+      et la restauration, au-dessus, restent à tous.
+    */
+    await exigerRedactionAssistee(params.id!);
 
     /**
      * Sans pays, pas de mise en forme : les attendus d'une pièce diffèrent

@@ -196,6 +196,7 @@ describe("RG-08.3 — l'état de R-04", () => {
       remarques: null,
       texteExistant: true,
       recoupementsEffectues: true,
+      redactionAssistee: true,
     });
     expect(recoupee).toBe("RECOUPEE_SEULEMENT");
     expect(
@@ -203,6 +204,7 @@ describe("RG-08.3 — l'état de R-04", () => {
         remarques: null,
         texteExistant: true,
         recoupementsEffectues: false,
+        redactionAssistee: true,
       }),
     ).toBe("ANALYSE_INDISPONIBLE");
   });

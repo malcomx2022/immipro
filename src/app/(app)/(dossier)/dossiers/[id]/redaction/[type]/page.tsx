@@ -9,6 +9,7 @@ import {
 } from "@/server/lecture/redaction";
 import { exigerCandidat } from "@/server/securite/page";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
+import { redactionAssisteeDuDossier } from "@/server/acces/droits";
 
 /**
  * R-02 entretien et R-03 éditeur — WF-08.
@@ -62,6 +63,9 @@ export default async function PagePieceRedigee({
       // c'est la dégradation que le registre des dépendances décrit pour
       // `redaction`, et qu'aucune ligne ne tenait.
       redactionDisponible={redactionConfiguree()}
+      // Arbitrage S.80 : la couverture de ce dossier, pas le dernier achat
+      // du compte. Lu après `vueDuDossier`, qui a vérifié la propriété.
+      redactionAssistee={await redactionAssisteeDuDossier(id)}
       maintenant={new Date().toISOString()}
     />
   );
