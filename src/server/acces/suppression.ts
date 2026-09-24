@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ETATS_ANNULABLES } from "@/domain/consultants/annulation";
 import { jeton } from "@/server/securite/secret";
 import { fermerToutesLesSessions } from "@/server/securite/session";
 import { journaliser } from "@/server/acces/journal";
@@ -130,7 +131,7 @@ export async function acheverLaSuppression(
     where: {
       application: { userId },
       startsAt: { gt: maintenant },
-      status: { in: ["RESERVE", "REPORTE"] },
+      status: { in: [...ETATS_ANNULABLES] },
     },
     select: { id: true, startsAt: true, freeUntil: true, transactionId: true },
   });
@@ -206,7 +207,7 @@ export async function acheverLaSuppression(
       where: {
         application: { userId },
         startsAt: { gt: maintenant },
-        status: { in: ["RESERVE", "REPORTE"] },
+        status: { in: [...ETATS_ANNULABLES] },
       },
       data: { status: "ANNULE" },
     }),

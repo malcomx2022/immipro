@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import {
   ETATS_ANNULABLES,
+  ETATS_VIVANTS,
   avertissementAnnulation,
   issueDeLAnnulation,
   type IssueAnnulation,
@@ -92,16 +93,25 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
     Un créneau **tenu** est pris, tant que sa tenue court. L'afficher
     libre ferait choisir un horaire que l'unicité refusera ensuite : le
     candidat remplirait l'accord de partage pour buter sur « ce créneau
-    vient d'être pris ». Une tenue échue, elle, ne tient plus rien.
+    vient d'être pris ». Une tenue échue, elle, ne tient plus rien —
+    `tenirLeCreneau` la reprend par une mise à jour.
+
+    La liste des états occupants vient du domaine, qui la tient avec
+    l'unicité partielle de la base. Elle était recopiée ici, dans la
+    fonction même que `ETATS_VIVANTS` cite comme ayant divergé : « une
+    seule règle, à deux endroits qui ne peuvent plus diverger » ne valait
+    pas encore pour celle-ci.
+
+    L'échéance se compare à l'horloge de l'appelant, et non à `new Date()` :
+    cette fonction en reçoit une, et en lire deux ferait juger les tenues
+    à un instant que le reste du calcul ignore.
   */
   const pris = await db.appointment.findMany({
     where: {
       consultantId,
       startsAt: { in: proposes },
-      OR: [
-        { status: { in: ["RESERVE", "REPORTE"] } },
-        { status: "TENU", heldUntil: { gte: new Date() } },
-      ],
+      status: { in: [...ETATS_VIVANTS] },
+      NOT: { AND: [{ status: "TENU" }, { heldUntil: { lt: aujourdhui } }] },
     },
     select: { startsAt: true },
   });
@@ -234,7 +244,9 @@ export async function rendezVousQueLaSuppressionAnnule(
     where: {
       application: { userId },
       startsAt: { gt: maintenant },
-      status: { in: ["RESERVE", "REPORTE"] },
+      // La même liste que l'annulation applique : l'en-tête ci-dessus dit
+      // que ce n'est pas une prévision mais la règle elle-même.
+      status: { in: [...ETATS_ANNULABLES] },
     },
     orderBy: { startsAt: "asc" },
     select: { startsAt: true, freeUntil: true },
