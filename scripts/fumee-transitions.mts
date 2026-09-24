@@ -135,6 +135,8 @@ type Ouvreur = Parameters<typeof ouvrirLeTunnel>[3];
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
 const { connecter } = await import("../src/server/acces/comptes");
 const { empreinte } = await import("../src/server/securite/secret");
+const { enregistrerLeProfil } = await import("../src/server/acces/profil");
+const { corpsDuProfil, CHAMPS_PROFIL } = await import("../src/domain/comptes/profil");
 const { ESSAIS_AVANT_BLOCAGE, finDuBlocage } = await import(
   "../src/domain/comptes/connexion"
 );
@@ -908,6 +910,90 @@ try {
       trancher appartient au produit : la question est posée dans
       `domain/comptes/connexion`, à côté de la règle qu'elle met en tension.
     */
+  }
+
+  // ── C-02 : l'enregistrement du profil n'efface plus ce qu'on ne lui
+  //          donne pas ──────────────────────────────────────────────
+  /*
+    Les colonnes de `Profile` étaient écrites `corps.X ?? null` : une
+    valeur absente devenait un effacement. C-02 n'envoie ni objectif, ni
+    domaine, ni expérience, ni budget — il les vidait donc à chaque clic
+    sur « Enregistrer », alors que l'en-tête de la route dit que ces
+    colonnes portent les réponses du simulateur, « pour que le candidat
+    ne resaisisse rien ».
+
+    Une fumée, parce qu'un effacement de colonnes ne se voit qu'en
+    relisant la ligne après coup — et parce que l'écriture était derrière
+    `next/headers`, donc hors de portée de tout essai.
+  */
+  console.log("\nC-02 — enregistrer son profil n'efface pas ce qu'on n'a pas envoyé");
+  {
+    const compte = await db.user.create({
+      data: {
+        email: `profil-${process.pid}@exemple.test`,
+        role: "CANDIDAT",
+        emailVerified: new Date(),
+      },
+    });
+    const venuDuSimulateur = {
+      objectif: "Étudier",
+      fieldOfStudy: "Informatique",
+      yearsExperience: 3,
+      budgetTotal: 4_000_000,
+      budgetCurrency: "XOF",
+      highestDegree: "Licence",
+    };
+    await db.profile.create({ data: { userId: compte.id, ...venuDuSimulateur } });
+
+    // Exactement ce que C-02 compose : les trois champs qu'il affiche.
+    await enregistrerLeProfil(compte.id, corpsDuProfil({
+      nom: "Awa Diallo",
+      diplome: "Master",
+      anglais: "B2",
+    }));
+
+    const apres = await db.profile.findUniqueOrThrow({ where: { userId: compte.id } });
+    verifier(apres.objectif === "Étudier", `l'objectif du simulateur survit (${apres.objectif})`);
+    verifier(
+      apres.fieldOfStudy === "Informatique" && apres.yearsExperience === 3,
+      `le domaine et l'expérience survivent (${apres.fieldOfStudy}, ${apres.yearsExperience})`,
+    );
+    verifier(
+      apres.budgetTotal === 4_000_000 && apres.budgetCurrency === "XOF",
+      `le budget survit (${apres.budgetTotal} ${apres.budgetCurrency})`,
+    );
+    verifier(apres.highestDegree === "Master", `le diplôme envoyé est bien écrit (${apres.highestDegree})`);
+    verifier(
+      JSON.stringify(apres.languages) === '{"en":"B2"}',
+      `la langue envoyée est écrite telle quelle (${JSON.stringify(apres.languages)})`,
+    );
+    const nomme = await db.user.findUniqueOrThrow({ where: { id: compte.id } });
+    verifier(
+      nomme.firstName === "Awa" && nomme.lastName === "Diallo",
+      `le nom se coupe au premier blanc (${nomme.firstName} / ${nomme.lastName})`,
+    );
+
+    /*
+      Et vider un champ reste un geste qui part. Sans cette seconde règle,
+      le correctif rendrait les champs ineffaçables — le défaut inverse.
+    */
+    await enregistrerLeProfil(compte.id, corpsDuProfil({ nom: "Awa Diallo" }));
+    const vide = await db.profile.findUniqueOrThrow({ where: { userId: compte.id } });
+    verifier(vide.highestDegree === null, `le diplôme effacé s'efface (${vide.highestDegree})`);
+    verifier(vide.languages === null, `la langue effacée s'efface (${JSON.stringify(vide.languages)})`);
+    verifier(vide.objectif === "Étudier", `et l'objectif du simulateur survit encore (${vide.objectif})`);
+
+    /*
+      Enfin : l'écran n'affiche plus que ce qu'il sait garder. Quatre
+      champs — date de naissance, nationalité, personnes à charge, refus
+      antérieur — étaient rendus, comptés dans « 4 à renseigner » et
+      jetés avant l'envoi, faute de colonne où les ranger.
+    */
+    const composees = Object.keys(corpsDuProfil({ nom: "x", diplome: "y", anglais: "z" }));
+    verifier(
+      CHAMPS_PROFIL.length === 3 && composees.length === 4,
+      `les trois champs affichés composent quatre clés (${CHAMPS_PROFIL.length} → ${composees.join(", ")})`,
+    );
   }
 
 } catch (erreur) {

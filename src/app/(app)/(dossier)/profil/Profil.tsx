@@ -9,6 +9,7 @@ import type { EchecCandidat } from "@/server/http/echecs";
 import {
   CHAMPS_PROFIL,
   champsRestants,
+  corpsDuProfil,
   libelleAvancementProfil,
   profilComplet,
   type CleChampProfil,
@@ -26,8 +27,13 @@ import {
  * ne fait pas : deviner des valeurs par défaut. Un champ vide se voit et se
  * remplit, un champ pré-rempli au hasard se relit une fois et ne se corrige
  * jamais.
+ *
+ * Il n'affiche plus que ce qu'il sait garder. Quatre champs — date de
+ * naissance, nationalité, personnes à charge, refus antérieur — étaient
+ * rendus, comptés et jetés à l'envoi, faute de colonne où les ranger ;
+ * l'arbitrage qui les rétablirait est noté dans `domain/comptes/profil`.
  */
-const SECTIONS = ["Identité", "Parcours", "Situation"] as const;
+const SECTIONS = ["Identité", "Parcours"] as const;
 
 export function Profil({ initial }: { initial: ProfilCandidat }) {
   const [profil, setProfil] = useState<ProfilCandidat>(initial);
@@ -43,15 +49,17 @@ export function Profil({ initial }: { initial: ProfilCandidat }) {
   async function enregistrer() {
     setEnvoi(true);
     setEchec(null);
-    const [prenom, ...reste] = (profil.nom ?? "").trim().split(/\s+/u);
+    /*
+      La composition vient du domaine, à côté de la liste des champs
+      affichés. Écrite ici à la main, elle nommait trois clés pendant que
+      l'écran en affichait sept : les quatre autres — date de naissance,
+      nationalité, personnes à charge, refus antérieur — étaient saisies,
+      comptées dans « 4 à renseigner », puis jetées avant l'envoi, et
+      l'écran répondait « Profil enregistré. »
+    */
     const resultat = await appeler("/api/comptes/profil", {
       methode: "PUT",
-      corps: {
-        ...(prenom ? { prenom } : {}),
-        ...(reste.length > 0 ? { nom: reste.join(" ") } : {}),
-        ...(profil.diplome ? { diplome: profil.diplome } : {}),
-        ...(profil.anglais ? { langues: { en: profil.anglais } } : {}),
-      },
+      corps: corpsDuProfil(profil),
     });
     setEnvoi(false);
     if (resultat.ok) setEnregistre(true);
