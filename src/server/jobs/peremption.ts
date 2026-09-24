@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { corpsEchue, TITRE_ECHUE } from "@/domain/dossiers/peremption";
+import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 
 /**
  * Péremption des pièces — RG-07.4, WF-09 étape 2.
@@ -25,6 +26,27 @@ import { corpsEchue, TITRE_ECHUE } from "@/domain/dossiers/peremption";
  * Le remède passe à `REMPLACER` : « Ajouter » sur une ligne où un fichier
  * existe déjà fait croire qu'il manque, et fait chercher ce qu'on a déjà
  * envoyé. Même raison qu'à l'analyse.
+ *
+ * ── RG-10.4, la troisième passe de nuit ─────────────────────────────
+ *
+ * `server/acces/suppression.ts` énonce la règle et nomme ses coupables :
+ * « Les deux passes de nuit ne regardaient que `deletedAt` […] on invite
+ * à revenir quelqu'un qui vient de demander à partir. » Il y en avait
+ * trois. Celle-ci écrivait sans filtre — constaté en exécution, compte
+ * dont la suppression était demandée depuis deux jours :
+ *
+ *     SONDE RG-10.4 : sa pièce = EXPIREE
+ *     SONDE RG-10.4 : notifications reçues = 1
+ *       [ECHEANCE] Passeport : la validité est dépassée
+ *
+ * Le corps finit par « Téléverse une version à jour pour la remplacer » :
+ * une consigne d'agir, adressée à quelqu'un qui a demandé à partir.
+ *
+ * Le filtre porte sur le dossier entier et non sur la seule notification.
+ * Déclasser la pièce d'un compte qui s'en va n'apprend rien à personne :
+ * ses pièces sont sur le chemin de la purge, et rien n'efface
+ * `deletionRequestedAt` — le compte ne revient pas. C'est le même choix
+ * que les deux autres passes, qui excluent le dossier de la requête.
  */
 export interface BilanPeremption {
   /** Pièces déclassées. */
@@ -53,7 +75,12 @@ export async function declasserLesPiecesEchues(
     where: {
       status: "CONFORME",
       expiresAt: { lt: jour },
-      application: { status: { in: ["BROUILLON", "ACTIF", "PRET"] } },
+      application: {
+        status: { in: ["BROUILLON", "ACTIF", "PRET"] },
+        // RG-10.4 — voir l'en-tête. La demande, et non son achèvement :
+        // entre les deux, `deletedAt` est nul et le compte existe encore.
+        user: COMPTE_JOIGNABLE,
+      },
     },
     select: {
       id: true,

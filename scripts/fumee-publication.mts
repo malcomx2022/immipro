@@ -1419,11 +1419,66 @@ try {
       Et la suite ne s'invente pas ici : la passe de péremption reprend la
       pièce avec le message actionnable qu'elle sait déjà écrire.
     */
+    /*
+      RG-10.4 — et elle n'écrit rien à qui a demandé l'oubli.
+
+      `acces/suppression.ts` énonce la règle et nomme « les deux passes de
+      nuit » qui l'ignoraient. Il y en avait trois : celle-ci écrivait sans
+      filtre. Le corps qu'elle envoie finit par « Téléverse une version à
+      jour pour la remplacer » — une consigne d'agir, adressée à quelqu'un
+      qui vient de demander à partir.
+
+      Le compte est dans l'état que la règle vise : suppression demandée,
+      anonymisation pas encore faite, donc `deletedAt` nul. C'est celui
+      qu'ouvre une panne du stockage objet, et il peut durer jusqu'à la
+      reprise du lendemain.
+    */
+    const partant = await db.user.create({
+      data: {
+        email: `fumee-perem-oubli-${process.pid}@exemple.test`,
+        role: "CANDIDAT",
+        deletionRequestedAt: new Date(MAINTENANT.getTime() - 2 * 86400000),
+      },
+    });
+    const sonDossier = await db.application.create({
+      data: { userId: partant.id, visaRuleId: v1.id, status: "ACTIF" },
+    });
+    const saPiece = await db.document.create({
+      data: {
+        applicationId: sonDossier.id,
+        code: "passeport",
+        label: "Passeport",
+        family: "OBLIGATOIRE",
+        required: true,
+        status: "CONFORME",
+        expiresAt: new Date(MAINTENANT.getTime() - 3 * 86400000),
+      },
+    });
+
     const bilan = await declasserLesPiecesEchues(MAINTENANT);
     const final = await db.document.findUniqueOrThrow({ where: { id: piece.id } });
     verifier(
       bilan.pieces === 1 && final.status === "EXPIREE" && final.remedy === "REMPLACER",
       `la passe du jour la déclasse et dit quoi faire (${final.status}/${final.remedy}, ${JSON.stringify(bilan)})`,
+    );
+
+    verifier(
+      (await db.notification.count({ where: { userId: partant.id } })) === 0,
+      "et celui qui a demandé l'oubli ne reçoit rien (RG-10.4)",
+    );
+    /*
+      Ni ne voit sa pièce retouchée : le filtre porte sur le dossier, pas
+      sur la seule notification. Déclasser la pièce d'un compte qui s'en
+      va n'apprend rien à personne — elle est sur le chemin de la purge,
+      et rien n'efface `deletionRequestedAt`.
+    */
+    verifier(
+      (await db.document.findUniqueOrThrow({ where: { id: saPiece.id } })).status === "CONFORME",
+      "ni ne voit sa pièce retouchée par une passe qui ne le concerne plus",
+    );
+    verifier(
+      bilan.pieces === 1,
+      `et le bilan ne la compte pas (${JSON.stringify(bilan)})`,
     );
   }
 
