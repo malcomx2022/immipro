@@ -23,15 +23,62 @@ import {
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-export async function alertesDuCandidat(userId: string): Promise<Alerte[]> {
-  const lignes = await db.notification.findMany({
-    where: { userId },
-    orderBy: [{ readAt: "asc" }, { createdAt: "desc" }],
-    take: 50,
-    include: { application: { include: { visaRule: true } } },
-  });
+/** Ce qu'une page d'alertes montre, et ce qu'elle ne montre pas. */
+export interface PageDAlertes {
+  alertes: Alerte[];
+  /** Non lues du compte — comptées en base, pas sur la page servie. */
+  nonLues: number;
+  /** Total en base. La page en montre au plus `PAR_PAGE`. */
+  total: number;
+}
 
-  return lignes.map((a) => ({
+export const PAR_PAGE = 50;
+
+/**
+ * Les alertes d'un candidat — T-01.
+ *
+ * ── Les non lues étaient les premières coupées ──────────────────────
+ *
+ * L'ordre était `[{ readAt: "asc" }, { createdAt: "desc" }]`, et il disait
+ * l'inverse de son intention. En PostgreSQL, `ORDER BY ... ASC` place les
+ * `NULL` **en dernier** : une alerte non lue porte `readAt: null`, elle
+ * partait donc à la fin, et `take: 50` la coupait avant toutes les autres.
+ * Constaté en exécution, sur un compte de 55 alertes lues anciennes et 3
+ * non lues récentes :
+ *
+ *     alertes rendues : 50
+ *     non lues rendues : 0 sur 3
+ *     première : « lue 0 » · dernière : « lue 49 »
+ *
+ * Les cinquante servies étaient les **plus anciennement lues**. Ni les
+ * récentes ni les non lues n'y figuraient, et la route comptait ses non
+ * lues sur cette page-là : le bandeau annonçait « Aucune alerte non lue »
+ * à quelqu'un qui en avait trois, dont une divergence critique ayant mis
+ * son dossier en pause.
+ *
+ * `desc` avec `nulls: "first"` dit ce que l'ordre voulait dire : les non
+ * lues d'abord, puis les lues de la plus récemment lue à la plus ancienne.
+ * L'écran retrie par date de toute façon — cet ordre-ci ne sert qu'à
+ * décider **lesquelles survivent à la coupe**, et c'est précisément ce
+ * qu'il faisait à l'envers.
+ *
+ * Le compte des non lues est une donnée du compte, pas de la page : il se
+ * compte en base. Le tiré de la page redevenait faux dès la première
+ * coupe, ce qui est exactement ce qui s'est produit.
+ */
+export async function alertesDuCandidat(userId: string): Promise<PageDAlertes> {
+  const [lignes, nonLues, total] = await Promise.all([
+    db.notification.findMany({
+      where: { userId },
+      orderBy: [{ readAt: { sort: "desc", nulls: "first" } }, { createdAt: "desc" }],
+      take: PAR_PAGE,
+      include: { application: { include: { visaRule: true } } },
+    }),
+    db.notification.count({ where: { userId, readAt: null } }),
+    db.notification.count({ where: { userId } }),
+  ]);
+
+  const alertes = lignes.map((a) => ({
     id: a.id,
     genre: a.kind,
     titre: a.title,
@@ -55,6 +102,8 @@ export async function alertesDuCandidat(userId: string): Promise<Alerte[]> {
     ...(a.migrationId ? { arbitrage: a.migrationId } : {}),
     ...(a.dueAt ? { echeanceLe: iso(a.dueAt) } : {}),
   }));
+
+  return { alertes, nonLues, total };
 }
 
 function nomDuDossier(application: {

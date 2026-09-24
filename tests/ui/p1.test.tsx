@@ -27,6 +27,7 @@ import {
   REGLE_ANCIENNE,
   REGLE_NOUVELLE,
 } from "@/lib/contenu/alertes";
+import { compterNonLues } from "@/domain/notifications/alerte";
 import { tauxCommissionFormate } from "@/domain/payments/pricing";
 import {
   AUCUN_PARTENAIRE_ACTIVE,
@@ -635,7 +636,13 @@ describe("T-01 — Alertes", () => {
   };
   const rendre = () =>
     render(
-      <Alertes alertes={ALERTES} maintenant="2026-09-18T13:05:00Z" divergence={divergence} />,
+      <Alertes
+        alertes={ALERTES}
+        nonLues={compterNonLues(ALERTES)}
+        total={ALERTES.length}
+        maintenant="2026-09-18T13:05:00Z"
+        divergence={divergence}
+      />,
     );
 
   it("dit ce que le changement implique pour le dossier, avec sa source", () => {
@@ -666,12 +673,61 @@ describe("T-01 — Alertes", () => {
     expect(screen.getByText("Le compte bloqué allemand passe à 11 904 €")).toBeDefined();
   });
 
-  it("marque tout lu, puis désactive le bouton en disant pourquoi", () => {
+  /**
+   * ── Le bouton ne marquait rien ────────────────────────────────────
+   *
+   * Cet essai existait, et il passait : il vérifiait que l'état **local**
+   * changeait. `toutMarquerLu` est une fonction pure, l'écran posait son
+   * résultat dans son `useState`, et aucun appel ne partait —
+   * `PUT /api/notifications/[id]`, seule écriture de `readAt` du produit,
+   * n'était invoqué par aucun écran. Les pastilles disparaissaient
+   * jusqu'au rechargement, puis revenaient toutes.
+   *
+   * Il vérifie donc désormais les deux : que l'écran le dit, et que le
+   * serveur l'apprend.
+   */
+  it("marque tout lu côté serveur, puis désactive le bouton en disant pourquoi", async () => {
     rendre();
     expect(screen.getByText("2 alertes non lues.")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Tout marquer lu" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Tout marquer lu" }));
+    });
+    expect(appels.at(-1)).toMatchObject({ url: "/api/notifications", methode: "PUT" });
     expect(screen.getByText("Aucune alerte non lue.")).toBeDefined();
     expect(screen.getByText("Toutes tes alertes sont déjà lues.")).toBeDefined();
+  });
+
+  /** Un refus du serveur ne doit pas laisser une liste lue à l'écran. */
+  it("garde les alertes non lues quand le serveur refuse, et le dit", async () => {
+    reponse = { ok: false };
+    rendre();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Tout marquer lu" }));
+    });
+    expect(screen.getByText("2 alertes non lues.")).toBeDefined();
+    expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+    reponse = { ok: true };
+  });
+
+  /**
+   * Le compte affiché vient du serveur, et non d'un recomptage de la page :
+   * elle est coupée à cinquante, et l'ordre de la coupe plaçait les non
+   * lues en dernier — le bandeau annonçait « Aucune alerte non lue » à
+   * quelqu'un qui en avait.
+   */
+  it("affiche le compte du compte, pas celui de la page servie", () => {
+    render(
+      <Alertes
+        alertes={ALERTES}
+        nonLues={7}
+        total={58}
+        maintenant="2026-09-18T13:05:00Z"
+      />,
+    );
+    expect(screen.getByText("7 alertes non lues.")).toBeDefined();
+    expect(
+      screen.getByText(/alertes plus anciennes ne sont pas affichées/u),
+    ).toBeDefined();
   });
 
   it("ne porte pas l'état non lu par la seule couleur", () => {
@@ -698,7 +754,13 @@ describe("T-02 — Divergence réglementaire", () => {
     reponse = { ok: true };
     rafraichit.mockClear();
     render(
-      <Alertes alertes={ALERTES} maintenant="2026-09-18T13:05:00Z" divergence={divergence} />,
+      <Alertes
+        alertes={ALERTES}
+        nonLues={compterNonLues(ALERTES)}
+        total={ALERTES.length}
+        maintenant="2026-09-18T13:05:00Z"
+        divergence={divergence}
+      />,
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Choisir la version à appliquer" }),
@@ -900,6 +962,8 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
     render(
       <Alertes
         alertes={ALERTES}
+        nonLues={compterNonLues(ALERTES)}
+        total={ALERTES.length}
         maintenant="2026-09-18T13:05:00Z"
         divergence={MEME_MONTANT}
       />,
@@ -953,6 +1017,8 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
     render(
       <Alertes
         alertes={ALERTES}
+        nonLues={compterNonLues(ALERTES)}
+        total={ALERTES.length}
         maintenant="2026-09-18T13:05:00Z"
         divergence={{
           ...MEME_MONTANT,
@@ -985,6 +1051,8 @@ describe("T-02 — une divergence qui ne porte que sur le délai", () => {
     render(
       <Alertes
         alertes={ALERTES}
+        nonLues={compterNonLues(ALERTES)}
+        total={ALERTES.length}
         maintenant="2026-09-18T13:05:00Z"
         divergence={{ ...MEME_MONTANT, blocage: "EN_RELECTURE" }}
       />,

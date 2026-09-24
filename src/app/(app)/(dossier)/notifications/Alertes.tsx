@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
+import { appeler } from "@/lib/api";
+import type { EchecCandidat } from "@/server/http/echecs";
 import type { Alerte, FiltreAlerte } from "@/domain/notifications/alerte";
 import {
   FILTRES,
@@ -11,6 +14,7 @@ import {
   compterNonLues,
   filtrer,
   libelleContexte,
+  mentionDeLaCoupe,
   titreAlerte,
   toutMarquerLu,
 } from "@/domain/notifications/alerte";
@@ -29,6 +33,18 @@ import { DivergenceReglementaire } from "./DivergenceReglementaire";
  */
 export interface AlertesProps {
   alertes: readonly Alerte[];
+  /**
+   * Non lues du **compte**, comptées en base.
+   *
+   * Et non de la liste servie : elle est coupée à cinquante, et l'ordre de
+   * la coupe plaçait les non lues en dernier — le bandeau annonçait donc
+   * « Aucune alerte non lue » à quelqu'un qui en avait trois. Le compte
+   * local reste celui qui suit les clics, le serveur donne le point de
+   * départ.
+   */
+  nonLues: number;
+  /** Total en base, pour dire ce que la page ne montre pas. */
+  total: number;
   /** Horodatage de rendu, passé par le serveur pour que « Il y a 2 heures » soit stable. */
   maintenant: string;
   /**
@@ -54,14 +70,43 @@ export interface AlertesProps {
   };
 }
 
-export function Alertes({ alertes, maintenant, divergence }: AlertesProps) {
+export function Alertes({ alertes, nonLues: nonLuesServeur, total, maintenant, divergence }: AlertesProps) {
   const [liste, setListe] = useState<readonly Alerte[]>(alertes);
   const [filtre, setFiltre] = useState<FiltreAlerte>("TOUTES");
   const [arbitrageOuvert, setArbitrageOuvert] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+
+  /*
+    Le bouton marquait la liste **en mémoire** et n'appelait rien : les
+    pastilles disparaissaient jusqu'au rechargement, puis revenaient
+    toutes. `PUT /api/notifications/[id]`, seule écriture de `readAt` du
+    produit, n'était invoqué par aucun écran.
+
+    L'état local ne bouge qu'après la réponse : montrer une liste lue que
+    le serveur n'a pas enregistrée redirait le même mensonge, une seconde
+    plus tôt.
+  */
+  async function marquerTout() {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler("/api/notifications", { methode: "PUT" });
+    setEnvoi(false);
+    if (resultat.ok) setListe(toutMarquerLu(liste));
+    else setEchec(resultat.echec);
+  }
 
   const date = new Date(maintenant);
   const visibles = filtrer(liste, filtre);
-  const nonLues = compterNonLues(liste);
+  /*
+    Le serveur donne le compte du compte ; les clics de cette page le font
+    baisser. `lues` est ce que cette page a marqué lu depuis le rendu, et
+    non un recomptage de la liste — recompter sur une liste coupée est
+    précisément ce qui faisait dire « aucune » à trois non lues.
+  */
+  const lues = compterNonLues(alertes) - compterNonLues(liste);
+  const nonLues = Math.max(0, nonLuesServeur - lues);
+  const coupe = mentionDeLaCoupe(alertes.length, total);
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -76,12 +121,15 @@ export function Alertes({ alertes, maintenant, divergence }: AlertesProps) {
         <Button
           variante="lien"
           disabled={nonLues === 0}
+          chargement={envoi}
           raisonDesactivation="Toutes tes alertes sont déjà lues."
-          onClick={() => setListe(toutMarquerLu(liste))}
+          onClick={() => void marquerTout()}
         >
           Tout marquer lu
         </Button>
       </div>
+
+      {echec ? <BlocEchec echec={echec} /> : null}
 
       <p aria-live="polite" className="text-14 text-ink-700">
         {nonLues === 0
@@ -152,6 +200,11 @@ export function Alertes({ alertes, maintenant, divergence }: AlertesProps) {
           ))}
         </ul>
       )}
+
+      {/* Une liste coupée qui ne dit pas qu'elle est coupée se lit comme une
+          liste complète. La phrase nomme aussi l'ordre de la coupe : savoir
+          ce qui manque vaut mieux que savoir qu'il manque quelque chose. */}
+      {coupe ? <p className="text-pretty text-13 text-ink-500">{coupe}</p> : null}
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
         <Link

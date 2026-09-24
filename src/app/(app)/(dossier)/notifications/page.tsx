@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 export default async function PageNotifications() {
   const acteur = await exigerCandidat("/notifications");
 
-  const [alertes, migration] = await Promise.all([
+  const [page, migration] = await Promise.all([
     alertesDuCandidat(acteur.id),
     db.ruleMigration.findFirst({
       where: { decision: null, application: { userId: acteur.id } },
@@ -79,7 +79,9 @@ export default async function PageNotifications() {
 
   return (
     <Alertes
-      alertes={alertes}
+      alertes={page.alertes}
+      nonLues={page.nonLues}
+      total={page.total}
       maintenant={new Date().toISOString()}
       divergence={divergence}
     />
