@@ -40,7 +40,14 @@ export const GET = route({
   }),
   async traiter({ requete, acteur }) {
     const jour = requete.jour ?? new Date().toISOString().slice(0, 10);
-    const [lignes, operateur] = await Promise.all([paiements(), etatOperateur()]);
+    /*
+      Le jour borne enfin ce qu'il exporte — 24/09/2026. Il nommait le
+      fichier et la ligne de journal (`grand-livre:<jour>`) en appelant un
+      lecteur qui rendait les cent dernières transactions, toutes dates
+      confondues : demander le 15 janvier produisait le livre du jour, sous
+      un nom de janvier et une attestation d'audit qui le disait.
+    */
+    const [lignes, operateur] = await Promise.all([paiements(jour), etatOperateur()]);
     const livre = { paiements: lignes, operateur, journee: jour };
     const totaux = totauxDeLExport(livre);
 

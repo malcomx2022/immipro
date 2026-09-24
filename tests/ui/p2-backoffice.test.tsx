@@ -801,6 +801,69 @@ describe("B-03 — Utilisateurs", () => {
 });
 
 describe("B-04 — Paiements", () => {
+  /**
+   * L'écran annonce « Journée du 18 septembre 2026 » et son tableau porte
+   * « Paiements de la journée ». Le lecteur rendait les **cent dernières
+   * transactions, toutes dates confondues**. Exécuté :
+   *
+   *     l'écran annonce « Journée du 24 septembre 2026 » et reçoit 3 lignes
+   *     total affiché : 100 000 XOF
+   *     total réel de la journée : 50 000 XOF
+   *
+   * Et l'export porte le jour dans son nom de fichier et dans sa ligne de
+   * journal — `grand-livre:<jour>` — en appelant le même lecteur non
+   * filtré : un livre attesté pour une date qu'il ne couvre pas.
+   *
+   * Une journée réellement bornée est souvent creuse, et quatre compteurs à
+   * zéro au-dessus d'un tableau sans ligne ne disent pas si la lecture a
+   * échoué.
+   */
+  it("une journée sans paiement le dit, au lieu d'un tableau vide", () => {
+    const { container } = render(
+      <Paiements
+        paiements={[]}
+        operateur={OPERATEUR}
+        journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
+      />,
+    );
+    expect(container.textContent).toContain("Aucun paiement ce jour-là");
+    // La doctrine du journal d'audit, reprise : un vide est un fait.
+    expect(container.textContent).toMatch(/rien n'a été encaissé ni tenté/u);
+    // Et l'en-tête du tableau ne reste pas seul au-dessus de rien.
+    expect(container.querySelector("table")).toBeNull();
+  });
+
+  it("et une journée à venir se distingue d'une journée creuse", () => {
+    // Rien n'a pu y être encaissé : le dire épargne de chercher une panne.
+    const { container } = render(
+      <Paiements
+        paiements={[]}
+        operateur={OPERATEUR}
+        journee="Journée du 30 septembre 2026"
+        jourIso="2026-09-30"
+        aujourdhuiIso="2026-09-18"
+      />,
+    );
+    expect(container.textContent).toContain("n'est pas encore venue");
+    expect(container.textContent).not.toContain("Aucun paiement ce jour-là");
+  });
+
+  it("le tableau revient dès qu'il y a une ligne", () => {
+    const { container } = render(
+      <Paiements
+        paiements={PAIEMENTS}
+        operateur={OPERATEUR}
+        journee="Journée du 18 septembre 2026"
+        jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
+      />,
+    );
+    expect(container.querySelector("table")).not.toBeNull();
+    expect(container.textContent).not.toContain("Aucun paiement ce jour-là");
+  });
+
   it("affiche le total quand l'opérateur répond", () => {
     const { container } = render(
       <Paiements
@@ -808,6 +871,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     expect(espaces(container.textContent ?? "")).toContain("60 000 F");
@@ -821,6 +885,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR_MUET}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     expect(container.textContent).toContain("ne répond plus");
@@ -843,6 +908,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     await act(async () => {
@@ -866,6 +932,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR_MUET}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     const bouton = screen.getByRole("button", { name: /Exporter le grand livre/ });
@@ -885,6 +952,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     await act(async () => {
@@ -902,6 +970,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     expect(screen.queryByRole("button", { name: /rapprochement/i })).toBeNull();
@@ -915,6 +984,7 @@ describe("B-04 — Paiements", () => {
         operateur={OPERATEUR_MUET}
         journee="Journée du 18 septembre 2026"
         jourIso="2026-09-18"
+        aujourdhuiIso="2026-09-18"
       />,
     );
     expect(screen.getAllByText("En attente de rapprochement").length).toBeGreaterThan(0);

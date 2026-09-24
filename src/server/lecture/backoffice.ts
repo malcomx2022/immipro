@@ -242,10 +242,34 @@ const statutDuCompte = (u: {
  * l'opérateur laisse une transaction confirmée non rapprochée, et aucun
  * paiement n'est accusé sur l'absence de réponse d'un tiers.
  */
-export async function paiements(maintenant = new Date()): Promise<Paiement[]> {
+export async function paiements(
+  jourIso: string,
+  maintenant = new Date(),
+): Promise<Paiement[]> {
+  /*
+    Les transactions **de la journée**, et elles seules — 24/09/2026.
+
+    Le lecteur rendait les cent dernières, toutes dates confondues, sous un
+    écran qui annonce « Journée du 24 septembre 2026 » et un tableau qui
+    porte « Paiements de la journée ». Exécuté : trois lignes, 100 000 XOF
+    affichés pour une journée qui en avait encaissé 50 000. Et l'export
+    nomme son fichier d'après le jour et le journalise comme
+    `grand-livre:<jour>` en appelant ce même lecteur — un livre attesté
+    pour une date qu'il ne couvre pas.
+
+    **`createdAt` et non `confirmedAt`** : le tableau liste aussi ce qui
+    est en attente et ce qui a échoué, qui n'ont pas de date
+    d'encaissement. Le jour d'une transaction est celui où elle existe.
+
+    **Aucun plafond.** Un livre tronqué en silence est précisément ce que
+    ce tableau doit prévenir, et une journée est bornée par l'activité
+    plutôt que par une constante choisie ici.
+  */
+  const debut = new Date(`${jourIso}T00:00:00.000Z`);
+  const fin = new Date(debut.getTime() + 24 * 60 * 60 * 1000);
   const transactions = await db.transaction.findMany({
+    where: { createdAt: { gte: debut, lt: fin } },
     orderBy: { createdAt: "desc" },
-    take: 100,
     include: { user: { select: { email: true } } },
   });
 

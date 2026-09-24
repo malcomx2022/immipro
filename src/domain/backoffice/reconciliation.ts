@@ -251,6 +251,60 @@ export const COLONNES_GRAND_LIVRE: readonly string[] = [
 export const ATTESTATION_TOTAL_SUSPENDU =
   "Total non calculé : l'opérateur ne répondait pas au moment de l'export, et un total partiel présenté comme un total est une erreur comptable. Les lignes ci-dessous sont exactes ; leur somme ne l'est pas encore.";
 
+/**
+ * Une journée sans paiement — B-04, et la case de `CLAUDE.md` qui demande
+ * que l'état vide soit traité.
+ *
+ * ── Le tableau n'avait pas d'état vide, et son titre était faux ──────
+ *
+ * L'écran annonce « Journée du 24 septembre 2026 » et son tableau porte
+ * « Paiements de la journée ». Le lecteur rendait les **cent dernières
+ * transactions, toutes dates confondues**. Exécuté :
+ *
+ *     l'écran annonce « Journée du 24 septembre 2026 » et reçoit 3 lignes
+ *     total affiché : 100 000 XOF
+ *     total réel de la journée : 50 000 XOF
+ *
+ * Les deux paiements du 20 entraient dans les totaux du 24. Et l'export,
+ * lui, porte le jour dans son nom de fichier et dans sa ligne de journal —
+ * `grand-livre:2026-09-24` — en appelant le même lecteur non filtré : un
+ * livre attesté pour une date qu'il ne couvre pas.
+ *
+ * Une fois la journée réellement bornée, une journée creuse devient
+ * fréquente, et un tableau vide sous quatre compteurs à zéro ne dit pas si
+ * la lecture a échoué. Il le dit maintenant, comme le journal d'audit le
+ * fait déjà : « s'il n'affiche rien, il ne s'est rien passé ».
+ *
+ * Une journée à venir se distingue d'une journée creuse : rien n'a pu y
+ * être encaissé, et l'annoncer comme un fait épargne de chercher une
+ * panne.
+ */
+export interface JourneeSansPaiement {
+  message: string;
+  /** Ce que l'absence ne veut pas dire. */
+  precision: string;
+}
+
+export function diagnostiquerLaJournee(
+  paiements: readonly Paiement[],
+  jourIso: string,
+  aujourdhuiIso: string,
+): JourneeSansPaiement | null {
+  if (paiements.length > 0) return null;
+  if (jourIso > aujourdhuiIso) {
+    return {
+      message: "Cette journée n'est pas encore venue.",
+      precision:
+        "Aucun paiement ne peut y figurer : le livre d'une journée à venir est vide par construction.",
+    };
+  }
+  return {
+    message: "Aucun paiement ce jour-là.",
+    precision:
+      "Le tableau ne comble jamais une journée creuse : s'il n'affiche rien, rien n'a été encaissé ni tenté. L'export reste possible et produit un livre attestant l'absence.",
+  };
+}
+
 export const MENTION_UNE_SOMME_PAR_MONNAIE =
   "Une somme par monnaie, jamais une somme tout court : additionner des francs et des euros produit un nombre qui n'est ce qu'il annonce dans aucune des deux.";
 

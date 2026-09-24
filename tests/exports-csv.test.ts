@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { nomDeLEntete } from "@/lib/telechargement";
 import { sansCommentaires } from "@/domain/copy/source";
+import { diagnostiquerLaJournee } from "@/domain/backoffice/reconciliation";
 import {
   BOM,
   SEPARATEUR,
@@ -431,3 +432,77 @@ describe("le nom du fichier se lit dans l'en-tête", () => {
     expect(nomDeLEntete("")).toBeNull();
   });
 });
+
+/**
+ * Le livre d'une journée couvre cette journée — B-04, 24/09/2026.
+ *
+ * L'écran annonce « Journée du 24 septembre 2026 » et son tableau porte
+ * « Paiements de la journée » ; le lecteur rendait les **cent dernières
+ * transactions, toutes dates confondues**. Exécuté :
+ *
+ *     l'écran annonce « Journée du 24 septembre 2026 » et reçoit 3 lignes
+ *     total affiché : 100 000 XOF
+ *     total réel de la journée : 50 000 XOF
+ *
+ * L'export, lui, portait le jour dans son nom de fichier et dans sa ligne
+ * de journal — `grand-livre:<jour>` — en appelant ce même lecteur :
+ * demander le 15 janvier produisait le livre du jour, sous un nom de
+ * janvier et une attestation d'audit qui le disait.
+ */
+describe("le jour borne ce qu'il nomme", () => {
+  const lecture = sansCommentaires(readFileSync("src/server/lecture/backoffice.ts", "utf8"));
+  const bloc = lecture.slice(lecture.indexOf("export async function paiements"));
+
+  it("le lecteur filtre sur la journée demandée", () => {
+    expect(bloc).toMatch(/jourIso: string/u);
+    expect(bloc).toMatch(/createdAt: \{ gte: debut, lt: fin \}/u);
+  });
+
+  it("et ne tronque pas : un livre incomplet en silence est le défaut", () => {
+    // `take: 100` bornait la lecture. Un grand livre tronqué sans le dire
+    // est exactement ce que ce tableau doit prévenir.
+    expect(bloc.slice(0, bloc.indexOf("return"))).not.toMatch(/take:/u);
+  });
+
+  it("le jour de l'export borne l'export, et pas seulement son nom", () => {
+    const route = sansCommentaires(
+      readFileSync("src/app/api/admin/paiements/export/route.ts", "utf8"),
+    );
+    expect(route).toMatch(/paiements\(jour\)/u);
+    // Et le nom du fichier comme la ligne de journal citent le même jour.
+    expect(route).toMatch(/nomDuGrandLivre\(jour\)/u);
+    expect(route).toMatch(/grand-livre:\$\{jour\}/u);
+  });
+
+  it("et la route de lecture accepte ce jour plutôt que de le supposer", () => {
+    const route = sansCommentaires(
+      readFileSync("src/app/api/admin/paiements/route.ts", "utf8"),
+    );
+    expect(route).toMatch(/paiements\(jour\)/u);
+  });
+
+  it("une journée vide se dit, et se distingue d'une journée à venir", () => {
+    const creuse = diagnostiquerLaJournee([], "2026-09-18", "2026-09-18");
+    expect(creuse?.message).toMatch(/Aucun paiement/u);
+    expect(creuse?.precision).toMatch(/rien n'a été encaissé ni tenté/u);
+    // L'export reste possible : il atteste l'absence, comme celui du journal.
+    expect(creuse?.precision).toMatch(/attestant l'absence/u);
+
+    const aVenir = diagnostiquerLaJournee([], "2026-09-30", "2026-09-18");
+    expect(aVenir?.message).toMatch(/pas encore venue/u);
+
+    expect(diagnostiquerLaJournee(PAIEMENTS_DU_JOUR, "2026-09-18", "2026-09-18")).toBeNull();
+  });
+});
+
+const PAIEMENTS_DU_JOUR = [
+  {
+    reference: "IMP-260918-AAAAAA",
+    compte: "awa@example.bj",
+    montant: 20_000,
+    devise: "XOF",
+    moyen: "Mobile money",
+    recuLe: "2026-09-18T09:12:00.000Z",
+    etat: "RAPPROCHE" as const,
+  },
+];
