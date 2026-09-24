@@ -6,7 +6,12 @@ import {
   issueDeLAnnulation,
   type IssueAnnulation,
 } from "@/domain/consultants/annulation";
-import { libelleLimite, libelleRendezVous } from "@/domain/consultants/rendez-vous";
+import {
+  instantDeLHeureLocale,
+  jourDuFuseau,
+  libelleLimite,
+  libelleRendezVous,
+} from "@/domain/consultants/rendez-vous";
 import { echec } from "@/server/http/echecs";
 import type { ConsultantHabilite } from "@/domain/consultants/annuaire";
 import type { Creneau } from "@/domain/consultants/rendez-vous";
@@ -76,16 +81,38 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
   });
   if (!consultant) throw echec("introuvable");
 
-  const debut = new Date(
-    Date.UTC(aujourdhui.getUTCFullYear(), aujourdhui.getUTCMonth(), aujourdhui.getUTCDate()),
-  );
+  /*
+    Les heures proposées sont **locales** — I.E.
+
+    Elles étaient posées par `setUTCHours`, pendant que les formateurs de
+    T-05 les rendent dans le fuseau d'affichage. Le tableau se lit comme
+    des heures de bureau ; le candidat se voyait proposer dix heures,
+    midi, seize heures et dix-huit heures — jamais neuf, et un rendez-vous
+    après la journée d'un consultant du même fuseau.
+
+    Le jour est celui du fuseau lui aussi : « les trois prochains jours »
+    est une phrase de calendrier local, et entre vingt-trois heures et
+    minuit UTC les deux ne désignent pas le même jour.
+  */
+  const cejour = jourDuFuseau(aujourdhui);
   const proposes: Date[] = [];
   for (let jour = 1; jour <= JOURS_PROPOSES; jour += 1) {
+    /*
+      Le quantième d'abord, l'instant ensuite — et non l'inverse. Ajouter
+      vingt-quatre heures à un instant déjà calculé rejouerait la même
+      faute d'un cran : un jour de calendrier ne dure pas toujours
+      vingt-quatre heures là où l'heure d'été existe.
+    */
+    const cible = new Date(Date.UTC(cejour.annee, cejour.mois - 1, cejour.jour + jour));
     for (const heure of HEURES_PROPOSEES) {
-      const quand = new Date(debut);
-      quand.setUTCDate(quand.getUTCDate() + jour);
-      quand.setUTCHours(heure, 0, 0, 0);
-      proposes.push(quand);
+      proposes.push(
+        instantDeLHeureLocale(
+          cible.getUTCFullYear(),
+          cible.getUTCMonth() + 1,
+          cible.getUTCDate(),
+          heure,
+        ),
+      );
     }
   }
 

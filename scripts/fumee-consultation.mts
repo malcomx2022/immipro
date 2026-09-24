@@ -780,6 +780,58 @@ try {
     brancherTransport(null);
   }
 
+  /*
+    T-05 — l'heure écrite dans la grille est celle que le candidat lit.
+
+    `HEURES_PROPOSEES` se lit comme des heures de bureau, et les créneaux
+    étaient posés par `setUTCHours` pendant que les formateurs de T-05 les
+    rendent dans le fuseau d'affichage. Constaté en exécution : neuf,
+    onze, quinze et dix-sept devenaient dix heures, midi, seize heures et
+    dix-huit heures — jamais de créneau à neuf, un en plein midi, un après
+    la journée d'un consultant du même fuseau.
+
+    Une fumée, parce que la grille est produite par une lecture serveur :
+    la liste des heures, le fuseau et les formateurs ne se rencontrent
+    qu'ici.
+  */
+  console.log("\nT-05 — chaque créneau proposé s'affiche à l'heure où il est écrit");
+  {
+    const { creneaux, HEURES_PROPOSEES, JOURS_PROPOSES } = await import(
+      "../src/server/lecture/consultants"
+    );
+    const { libelleHeure, jourDuFuseau } = await import(
+      "../src/domain/consultants/rendez-vous"
+    );
+    const consultant = await leConsultant();
+
+    /* Minuit passé dans le fuseau d'affichage, et pas encore en UTC. */
+    const minuitLocal = new Date("2026-10-04T23:30:00Z");
+    const grille = await creneaux(consultant.id, minuitLocal);
+
+    const attendues = HEURES_PROPOSEES.map((h) => `${String(h).padStart(2, "0")} h 00`);
+    const lues = [...new Set(grille.map((c) => libelleHeure(c)))].sort();
+    verifier(
+      lues.join(", ") === [...attendues].sort().join(", "),
+      `les heures lues sont celles de la grille (${lues.join(", ")})`,
+    );
+    verifier(
+      grille.length === HEURES_PROPOSEES.length * JOURS_PROPOSES,
+      `la grille porte ${JOURS_PROPOSES} jours (${grille.length} créneaux)`,
+    );
+
+    /*
+      Et « les trois prochains jours » compte des jours du fuseau : entre
+      vingt-trois heures et minuit UTC, le jour local est déjà le suivant,
+      et la grille partait du jour d'hier.
+    */
+    const demain = jourDuFuseau(new Date(minuitLocal.getTime() + 86_400_000));
+    const premier = jourDuFuseau(new Date(grille[0]!.debut));
+    verifier(
+      premier.annee === demain.annee && premier.mois === demain.mois && premier.jour === demain.jour,
+      `le premier jour proposé est demain, au calendrier du candidat (${JSON.stringify(premier)})`,
+    );
+  }
+
 } finally {
   await db.$disconnect().catch(() => {});
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
