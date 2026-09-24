@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { PACKS, RECHARGE_ANALYSES, type Devise } from "@/domain/payments/pricing";
+import { obstacleAuRecapitulatif } from "@/domain/paiement/commande";
 import { PRECISION_MOBILE_MONEY, moyenDeLaGrille, railDe } from "@/domain/payments/rail";
 import type { Tunnel } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
@@ -50,6 +51,10 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
   const [choisi, setChoisi] = useState<string | null>(null);
 
   const pack = PACKS.find((p) => p.code === choisi) ?? null;
+  // La raison vient du domaine : elle y était déjà, et l'écran la réécrivait
+  // à l'identique. Deux copies d'une même phrase finissent par diverger, et
+  // c'est la copie tenue par un test qui était la morte.
+  const obstacle = obstacleAuRecapitulatif(pack);
   const prix = (montants: Record<Devise, number>) =>
     formatMontant(montants[devise], devise);
 
@@ -164,7 +169,7 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
             pleineLargeur
             className="min-h-action"
             disabled
-            raisonDesactivation="Choisis un pack pour continuer."
+            raisonDesactivation={obstacle ?? undefined}
           >
             Continuer
           </Button>
