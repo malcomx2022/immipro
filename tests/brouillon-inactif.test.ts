@@ -4,6 +4,7 @@ import {
   RELANCE_JOURS,
   abandonDeBrouillon,
   debutDeLInactivite,
+  derniereActiviteDuCandidat,
   joursDInactivite,
   jourDeLAbandon,
   relanceDeBrouillon,
@@ -208,5 +209,60 @@ describe("l'horloge part du plan, pas seulement de l'ouverture", () => {
   it("un décompte négatif ne déclenche rien, jamais", () => {
     expect(suiteDInactivite({ inactifDepuis: -700, dejaRelance: false })).toBe("RIEN");
     expect(suiteDInactivite({ inactifDepuis: -700, dejaRelance: true })).toBe("RIEN");
+  });
+});
+
+/**
+ * L'entretien de rédaction compte — correctif du 24/09/2026.
+ *
+ * L'horloge ne lisait que `DocumentVersion`. Un entretien de rédaction se
+ * remplit sur des semaines, une réponse par question quittée, et aucune ne
+ * produit de version : la mise en forme, qui en produirait une, demande un
+ * pack qu'un brouillon n'a pas. Constaté sur une vraie base, dossier
+ * ouvert quatre cents jours plus tôt, une réponse écrite l'avant-veille :
+ *
+ *     SONDE entretien : statut = ABANDONNE | purgeDueAt = 2027-07-01
+ *     SONDE entretien : notifications = 1
+ *
+ * Clos, pièces programmées à la purge, et l'unique notification est l'avis
+ * de clôture — pas même la relance, que l'abandon précède à cet âge.
+ *
+ * La garde qui mord est dans `scripts/fumee-transitions.mts` : le défaut
+ * était dans la **requête** du job, et une matière fabriquée ici lui
+ * donnerait justement la date qu'il ne savait pas aller chercher. Ce qui
+ * se vérifie ici est la règle de composition, qui a désormais un nom.
+ */
+describe("tous les gestes du candidat portent l'horloge, pas seulement le dépôt", () => {
+  const OUVERTURE = new Date("2026-01-01T00:00:00Z");
+  const DEPOT = new Date("2026-03-01T00:00:00Z");
+  const REPONSE = new Date("2026-09-01T00:00:00Z");
+
+  it("sans aucun geste, l'ouverture fait plancher", () => {
+    expect(derniereActiviteDuCandidat(OUVERTURE, [])).toEqual(OUVERTURE);
+  });
+
+  it("le geste le plus récent l'emporte, quelle que soit sa nature", () => {
+    expect(derniereActiviteDuCandidat(OUVERTURE, [DEPOT, REPONSE])).toEqual(REPONSE);
+    expect(derniereActiviteDuCandidat(OUVERTURE, [REPONSE, DEPOT])).toEqual(REPONSE);
+  });
+
+  /**
+   * Le cas du défaut : une réponse d'entretien seule, sans aucun dépôt.
+   * C'est l'état ordinaire d'un brouillon qui rédige sa lettre.
+   */
+  it("une réponse d'entretien seule suffit à tenir l'horloge", () => {
+    expect(derniereActiviteDuCandidat(OUVERTURE, [REPONSE])).toEqual(REPONSE);
+    const debut = debutDeLInactivite(
+      derniereActiviteDuCandidat(OUVERTURE, [REPONSE]),
+      null,
+    );
+    const jours = joursDInactivite(debut, new Date("2026-09-03T00:00:00Z"));
+    expect(suiteDInactivite({ inactifDepuis: jours, dejaRelance: false })).toBe("RIEN");
+  });
+
+  /** Et un dépôt plus récent qu'une réponse reste le geste qui compte. */
+  it("un dépôt postérieur à la dernière réponse l'emporte", () => {
+    const tardif = new Date("2026-10-01T00:00:00Z");
+    expect(derniereActiviteDuCandidat(OUVERTURE, [REPONSE, tardif])).toEqual(tardif);
   });
 });

@@ -6,6 +6,7 @@ import { PURGE_JOURS } from "@/domain/dossiers/cloture";
 import {
   abandonDeBrouillon,
   debutDeLInactivite,
+  derniereActiviteDuCandidat,
   joursDInactivite,
   relanceDeBrouillon,
   suiteDInactivite,
@@ -37,8 +38,15 @@ import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
  * seraient jamais arrivés.
  *
  * L'horloge est donc ce que le candidat a produit : l'ouverture du
- * dossier, et le dernier dépôt de pièce. Aucune passe de nuit n'écrit de
- * `DocumentVersion`.
+ * dossier, le dernier dépôt de pièce, et la dernière réponse d'entretien.
+ * Aucune passe de nuit n'écrit de `DocumentVersion` ni d'`InterviewAnswer`
+ * — la purge en efface, elle n'en crée pas.
+ *
+ * L'entretien manquait, et c'est le travail le plus long du parcours : il
+ * se remplit sur des semaines sans jamais produire de version, puisque la
+ * mise en forme demande un pack qu'un brouillon n'a pas. La sonde est dans
+ * `domain/dossiers/inactivite` — un dossier dont une réponse datait de
+ * l'avant-veille était clos, sans même la relance.
  *
  * ── Ce que l'abandon emporte ────────────────────────────────────────
  *
@@ -116,11 +124,22 @@ export async function traiterLesBrouillonsInactifs(
       readyAt: true,
       visaRule: { select: { countryCode: true, visaType: true } },
       user: { select: { email: true } },
+      /*
+        Les deux gestes du candidat, et rien d'autre. `take: 1` sur chacun :
+        seule la plus récente compte, et charger tout l'historique d'un
+        entretien de cinquante questions pour n'en garder qu'une date
+        coûterait sans rien apprendre.
+      */
       documents: {
         select: {
           versions: {
             select: { uploadedAt: true },
             orderBy: { uploadedAt: "desc" },
+            take: 1,
+          },
+          interview: {
+            select: { updatedAt: true },
+            orderBy: { updatedAt: "desc" },
             take: 1,
           },
         },
@@ -148,10 +167,13 @@ export async function traiterLesBrouillonsInactifs(
       const depots = dossier.documents
         .flatMap((d) => d.versions)
         .map((v) => v.uploadedAt);
-      const derniereActivite = depots.reduce(
-        (tard, date) => (date > tard ? date : tard),
-        dossier.createdAt,
-      );
+      const reponses = dossier.documents
+        .flatMap((d) => d.interview)
+        .map((r) => r.updatedAt);
+      const derniereActivite = derniereActiviteDuCandidat(dossier.createdAt, [
+        ...depots,
+        ...reponses,
+      ]);
       const debut = debutDeLInactivite(
         derniereActivite,
         dossier.deadlines[0]?.dueAt ?? null,

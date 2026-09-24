@@ -37,16 +37,42 @@
  * seraient jamais arrivés. Un dossier mort serait resté vivant parce que
  * la plateforme lui écrivait.
  *
- * L'horloge est donc ce que **le candidat** a produit : l'ouverture du
- * dossier, et le dernier dépôt de pièce. Aucune passe de nuit n'écrit de
- * `DocumentVersion` — l'analyse note un verdict, la péremption déclasse,
- * la purge efface un contenu, aucune n'en crée. La mesure ne peut pas
- * être remise à zéro par la plateforme elle-même.
+ * L'horloge est donc ce que **le candidat** a produit. Deux gestes la
+ * portent, et ils ont la même propriété : aucune passe de nuit ne les
+ * écrit — l'analyse note un verdict, la péremption déclasse, la purge
+ * efface, aucune n'en crée. La mesure ne peut pas être remise à zéro par
+ * la plateforme elle-même.
  *
- * Ce qu'elle ne compte pas : un candidat qui ne ferait que déplacer sa
- * date cible, sans jamais rien déposer, pendant douze mois. C'est assumé
- * — et la relance du quatre-vingt-dixième jour est là pour ça : elle part
- * neuf mois avant l'abandon, et dit ce qui arrivera.
+ * - le **dépôt d'une pièce** (`DocumentVersion.uploadedAt`) ;
+ * - la **réponse d'entretien** (`InterviewAnswer.updatedAt`), WF-08.
+ *
+ * ── Le geste qui ne comptait pas ────────────────────────────────────
+ *
+ * Le second manquait, et c'est le travail le plus long du parcours. Un
+ * entretien de rédaction se remplit sur des semaines, réponse par
+ * réponse — la route le dit elle-même, « conservées à mesure », une
+ * écriture par question quittée. Aucune ne produit de `DocumentVersion` :
+ * la mise en forme, qui en produit une, demande un pack, et un brouillon
+ * n'en a pas. Un candidat pouvait donc travailler son entretien toutes
+ * les semaines pendant un an sans que l'horloge bouge d'un jour.
+ *
+ * Constaté en exécution, sur une vraie base, dossier ouvert quatre cents
+ * jours plus tôt et une réponse écrite **l'avant-veille** :
+ *
+ *     SONDE entretien : réponse écrite il y a 2 jours
+ *     SONDE entretien : statut = ABANDONNE | purgeDueAt = 2027-07-01
+ *     SONDE entretien : notifications = 1
+ *
+ * Clos, pièces programmées à la purge, et l'unique notification est
+ * l'avis de clôture : pas même la relance des quatre-vingt-dix jours,
+ * que l'abandon précède. La plateforme a fermé le dossier de quelqu'un
+ * qui s'en occupait cette semaine-là, et le lui a appris après coup.
+ *
+ * Ce qu'elle ne compte toujours pas : un candidat qui ne ferait que
+ * déplacer sa date cible, sans jamais rien déposer ni répondre, pendant
+ * douze mois. C'est assumé — et la relance du quatre-vingt-dixième jour
+ * est là pour ça : elle part neuf mois avant l'abandon, et dit ce qui
+ * arrivera.
  *
  * ── On ne compte pas comme inactif quelqu'un qui attend ─────────────
  *
@@ -120,6 +146,29 @@ export function suiteDInactivite(etat: EtatDInactivite): SuiteDInactivite {
  */
 export const jourDeLAbandon = (derniereActivite: Date): Date =>
   new Date(derniereActivite.getTime() + ABANDON_JOURS * 24 * 60 * 60 * 1000);
+
+/**
+ * La dernière chose que le candidat a produite.
+ *
+ * L'ouverture du dossier fait plancher : un dossier sans aucun geste est
+ * inactif depuis son ouverture, pas depuis toujours.
+ *
+ * Les gestes arrivent en vrac et de plusieurs tables — dépôts de pièces,
+ * réponses d'entretien. Ils sont pris ensemble et non l'un après l'autre
+ * parce que la question n'est pas « a-t-il déposé ? » mais « a-t-il fait
+ * quelque chose ? » : les traiter séparément est précisément ce qui a
+ * laissé l'entretien hors du compte.
+ *
+ * Une date antérieure à l'ouverture ne peut pas exister et n'est pas
+ * écartée : `max` s'en charge, et une garde de plus dirait qu'on s'y
+ * attend.
+ */
+export function derniereActiviteDuCandidat(
+  ouverture: Date,
+  gestes: readonly Date[],
+): Date {
+  return gestes.reduce((tard, date) => (date > tard ? date : tard), ouverture);
+}
 
 /**
  * Le jour où l'inactivité commence à se compter.
