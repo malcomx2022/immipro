@@ -222,6 +222,34 @@ export function EditionContenu({ document }: { document: DocumentEnEdition }) {
           </p>
         ) : null}
 
+        {/*
+          Le corps ne se relit plus. L'éditeur le remplaçait par un
+          paragraphe vide — `document.corps ? [...blocs] : [blocVide()]` —
+          et présentait donc un document neuf à quelqu'un qui en ouvrait un
+          rempli : enregistrer aurait écrasé le texte d'origine sans que
+          personne sache qu'il y en avait un.
+
+          Le panneau des versions dit déjà la même chose de son côté ; la
+          suite est là aussi, puisque chaque version se restaure.
+        */}
+        {document.corpsLisible ? null : (
+          <section className="flex flex-col gap-2 rounded-lg border border-echec bg-white p-5">
+            <h2 className="text-16 font-semibold text-echec">
+              Le texte de ce document ne se relit plus
+            </h2>
+            <p className="text-pretty text-14 text-ink-700">
+              Sa page publique répond « introuvable » et la rubrique ne le
+              montre plus. Les blocs ci-dessous sont vides : ce ne sont pas
+              ceux du document, ils attendent une nouvelle saisie.
+              Enregistrer maintenant remplacerait le texte d&apos;origine.
+            </p>
+            <p className="text-pretty text-14 text-ink-700">
+              Pour le retrouver, restaure une publication depuis
+              l&apos;historique, en bas de cette page.
+            </p>
+          </section>
+        )}
+
         {/* Le refus, en tête et pendant la saisie. Il cite la formulation
             et dit où elle se corrige. */}
         {refus.length > 0 ? (

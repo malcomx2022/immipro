@@ -40,7 +40,13 @@ export function Contenus({ documents }: { documents: readonly LigneDocument[] })
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
   const publies = documents.filter((d) => d.etat === "PUBLIE").length;
-  const bloques = documents.filter((d) => d.fautes > 0).length;
+  /*
+    Un corps illisible bloque plus sûrement qu'une formulation refusée :
+    la page publique répond « introuvable » et la rubrique l'a retiré.
+    Il ne comptait pas — `fautes` vaut zéro faute de corps à vérifier, et
+    zéro se lit « rien à signaler ».
+  */
+  const bloques = documents.filter((d) => d.fautes > 0 || !d.corpsLisible).length;
 
   async function creer() {
     setEnvoi(true);
@@ -174,6 +180,11 @@ export function Contenus({ documents }: { documents: readonly LigneDocument[] })
                       {/* Ce qui bloque se lit dans la liste, avant qu'on
                           ouvre : découvrir un refus à la validation fait
                           réécrire au hasard. */}
+                      {d.corpsLisible ? null : (
+                        <span className="text-13 text-echec">
+                          Corps illisible : la page ne s&apos;affiche plus
+                        </span>
+                      )}
                       {d.fautes > 0 ? (
                         <span className="text-13 text-echec">
                           {d.fautes === 1

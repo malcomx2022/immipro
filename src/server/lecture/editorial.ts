@@ -160,6 +160,33 @@ export interface LigneDocument {
   titre: string;
   /** Ce qui bloque la publication, compté pour la liste. */
   fautes: number;
+  /**
+   * Le corps se relit-il encore ?
+   *
+   * ── Un document mort se lisait « rien à signaler » ──────────────────
+   *
+   * `fautes` valait `0` quand le corps ne se relisait plus : le compte des
+   * formulations refusées ne se calcule pas sur un corps qu'on ne peut pas
+   * lire, et zéro veut dire « rien ne bloque ». B-08 montrait donc la ligne
+   * la plus propre possible pour le document le plus cassé. Constaté en
+   * exécution, sur deux guides publiés dont un au corps illisible :
+   *
+   *     allemagne    état PUBLIE · fautes 0
+   *     pays-bas     état PUBLIE · fautes 0
+   *     « bloqués » comptés par l'écran : 0
+   *
+   *     page allemagne : introuvable
+   *     rubrique       : pays-bas
+   *
+   * Le public reçoit un 404 et la rubrique l'a retiré ; l'administrateur
+   * n'avait qu'un `console.error` sur le serveur pour l'apprendre.
+   *
+   * L'en-tête de ce module et le panneau des versions disent déjà la
+   * règle — « un guide dont le corps ne se relit plus vaut mieux absent
+   * qu'à moitié rendu », « une version illisible se dit ». La liste était
+   * le seul endroit qui ne la disait pas.
+   */
+  corpsLisible: boolean;
   source: string | null;
   verifieeLe: string | null;
   publieLe: string | null;
@@ -184,6 +211,7 @@ export async function documentsEditoriaux(): Promise<LigneDocument[]> {
       fautes: lu.success
         ? verifierLeDocument({ titre: doc.title, chapeau: doc.standfirst }, lu.data).length
         : 0,
+      corpsLisible: lu.success,
       source: doc.sourceLabel,
       verifieeLe: iso(doc.verifiedAt),
       publieLe: iso(doc.publishedAt),
@@ -283,6 +311,7 @@ export async function documentPourEdition(id: string): Promise<DocumentEnEdition
     chapeau: doc.standfirst,
     corps,
     fautes: refus.length,
+    corpsLisible: corps !== null,
     refus,
     sommaire: corps ? sommaireDe(corps.blocs) : [],
     duree: corps ? dureeLecture(corps.blocs) : null,

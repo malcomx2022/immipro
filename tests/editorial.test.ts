@@ -739,3 +739,57 @@ describe("ce qui a disparu du dépôt", () => {
     }
   });
 });
+
+/**
+ * ── Un document mort se lisait « rien à signaler » ────────────────────
+ *
+ * `LigneDocument.fautes` compte les formulations refusées, et il vaut zéro
+ * quand le corps ne se relit plus : il n'y a rien à vérifier. Zéro se lit
+ * « rien ne bloque », et B-08 montrait donc la ligne la plus propre
+ * possible pour le document le plus cassé. Constaté en exécution, sur deux
+ * guides publiés dont un au corps illisible :
+ *
+ *     allemagne    état PUBLIE · fautes 0
+ *     pays-bas     état PUBLIE · fautes 0
+ *     « bloqués » comptés par l'écran : 0
+ *
+ *     page allemagne : introuvable
+ *     rubrique       : pays-bas
+ *
+ * L'en-tête du module de lecture et le panneau des versions disent déjà la
+ * règle — « un guide dont le corps ne se relit plus vaut mieux absent qu'à
+ * moitié rendu », « une version illisible se dit ». La liste et l'éditeur
+ * étaient les deux endroits qui ne la disaient pas.
+ */
+describe("un corps illisible se dit, là où quelqu'un peut agir", () => {
+  it("la lecture rapporte si le corps se relit, et ne le déduit pas du compte", () => {
+    const lecture = sansCommentaires(lire("src/server/lecture/editorial.ts"));
+    // Les deux lectures du back-office le portent, depuis l'analyse et non
+    // depuis `fautes` — qui vaut zéro dans les deux cas.
+    expect(lecture).toMatch(/corpsLisible: lu\.success/u);
+    expect(lecture).toMatch(/corpsLisible: corps !== null/u);
+  });
+
+  it("la liste le montre et le compte parmi ce qui bloque", () => {
+    const ecran = sansCommentaires(lire("src/app/(admin)/contenus/Contenus.tsx"));
+    expect(ecran).toMatch(/d\.fautes > 0 \|\| !d\.corpsLisible/u);
+    expect(ecran).toContain("Corps illisible");
+  });
+
+  /**
+   * L'éditeur remplaçait un corps illisible par un paragraphe vide et
+   * présentait un document neuf à quelqu'un qui en ouvrait un rempli :
+   * enregistrer aurait écrasé le texte d'origine sans que personne sache
+   * qu'il y en avait un. La suite proposée est celle qui existe —
+   * l'historique, dont chaque version se restaure.
+   */
+  it("l'éditeur dit qu'il n'a pas pu lire le texte, et où le retrouver", () => {
+    const ecran = lire("src/app/(admin)/contenus/[id]/EditionContenu.tsx");
+    expect(ecran).toMatch(/document\.corpsLisible \? null : \(/u);
+    expect(ecran).toContain("Le texte de ce document ne se relit plus");
+    expect(ecran).toMatch(/restaure une publication depuis/u);
+    // Et le repli sur un bloc vide reste — on peut réécrire — mais il n'est
+    // plus silencieux.
+    expect(ecran).toMatch(/document\.corps \? \[\.\.\.document\.corps\.blocs\] : \[blocVide/u);
+  });
+});
