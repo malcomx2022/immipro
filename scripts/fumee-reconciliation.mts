@@ -61,7 +61,9 @@ if (migration.status !== 0) {
 
 const { db } = await import("../src/lib/db");
 const { reconcilierLesPaiements } = await import("../src/server/jobs/reconciliation");
-const { appliquerLaNotification } = await import("../src/server/acces/paiements");
+const { appliquerLaNotification, acheverLeCredit } = await import(
+  "../src/server/acces/paiements"
+);
 const { cleDEvenementDeReconciliation } = await import("../src/domain/paiement/ouverture");
 const { solde } = await import("../src/server/acces/quota");
 const { appliquerLaCouverture } = await import("../src/server/acces/couverture");
@@ -416,6 +418,65 @@ try {
     const seconde = await reconcilierLesPaiements(new Date(), () => null);
     verifier(seconde.creditsAcheves === 0, `une seconde passe n'achève rien (${seconde.creditsAcheves})`);
     verifier(await solde(applicationId) === ouvert, "et ne crédite pas deux fois");
+  }
+
+  // ── 8 bis. Deux achèvements simultanés du même paiement ────────────
+  /*
+    La lecture de la contrepartie rend l'achèvement rejouable ; elle ne le
+    rendait pas sûr à deux. La notification signée l'appelle juste après
+    avoir commité `CONFIRMEE`, la passe de réconciliation balaie les
+    paiements confirmés et appelle la même : entre le commit et le crédit,
+    les deux lisaient « rien d'ouvert ».
+
+    Constaté en exécution avant la garde — un pack payé une fois, deux
+    fois crédité, quota doublé. Une fumée, parce que la course n'existe
+    qu'en base : c'est le verrou de ligne du `UPDATE` conditionnel qui
+    arbitre, et rien d'autre ne peut le simuler.
+  */
+  console.log("\nDeux achèvements simultanés n'ouvrent qu'une contrepartie");
+  {
+    const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 5 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date(), packCode: "essentiel" },
+    });
+    const confirmee = await relire(transaction.id);
+
+    const retours = await Promise.all([acheverLeCredit(confirmee), acheverLeCredit(confirmee)]);
+    /*
+      C'est ici que la vérification porte, et pas sur le nombre de lignes
+      écrites : combien d'argent le second appelant ouvre dépend de
+      l'entrelacement — parfois deux crédits, parfois un, selon que sa
+      lecture tombe avant ou après l'écriture du premier. Ce qui ne dépend
+      d'aucun entrelacement, c'est qu'un seul appelant obtienne le bail.
+    */
+    verifier(
+      retours.filter(Boolean).length === 1,
+      `un seul appelant ouvre la contrepartie (${JSON.stringify(retours)})`,
+    );
+    const lignes = await db.analysisCredit.count({ where: { transactionId: transaction.id } });
+    verifier(lignes === 1, `et une seule ligne de crédit est écrite (${lignes})`);
+    const ouvert = await solde(applicationId);
+
+    /*
+      Et le bail se reprend : un processus arrêté entre la prise et le
+      crédit laisserait la ligne tenue pour toujours, et le filet qui
+      rattrape un crédit interrompu ne reviendrait jamais.
+    */
+    const perime = await transactionEnAttente({ ilYAMinutes: 5 });
+    await db.transaction.update({
+      where: { id: perime.transaction.id },
+      data: {
+        status: "CONFIRMEE",
+        confirmedAt: new Date(),
+        packCode: "essentiel",
+        creditingAt: new Date(Date.now() - 10 * MINUTE),
+      },
+    });
+    const reprise = await reconcilierLesPaiements(new Date(), () => null);
+    verifier(reprise.creditsAcheves === 1, `un bail périmé se reprend (${reprise.creditsAcheves})`);
+    verifier(await solde(perime.applicationId) > 0, "et la contrepartie s'ouvre");
+    verifier(await solde(applicationId) === ouvert, "sans toucher au dossier déjà servi");
   }
 
   /* Une couverture partielle est un état normal : elle n'est pas reprise. */
