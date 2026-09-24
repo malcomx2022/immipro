@@ -138,7 +138,9 @@ export const POST = route({
     await debiterUneAnalyse(params.id!);
 
     const produit = await leRedacteur()({
-      type: piece.type,
+      // La pièce et la destination sont nommées : ce qui écrit pour le
+      // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
+      piece: piece.libelle,
       objet: piece.objet,
       // Le pays vient de la règle figée à l'ouverture (INV-3), pas de la
       // règle publiée aujourd'hui : les attendus d'une pièce sont ceux de

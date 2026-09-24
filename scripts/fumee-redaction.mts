@@ -146,7 +146,10 @@ process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${portService}`;
 const { db } = await import("../src/lib/db");
 const { leRedacteur, laCritique } = await import("../src/server/redaction/service");
 const { redactionConfiguree } = await import("../src/server/redaction/redacteur");
-const { faitsDuDossier, vueDeLaRelecture } = await import("../src/server/lecture/redaction");
+const { faitsDuDossier, piecesARediger, vueDeLaRelecture } = await import(
+  "../src/server/lecture/redaction"
+);
+const { instructionsDeRedaction } = await import("../src/domain/redaction/commande");
 const { etatDeLaRelecture, resumeSelonLEtat } = await import("../src/domain/redaction/relecture");
 const { solde } = await import("../src/server/acces/quota");
 const { noterLesJetons } = await import("../src/server/redaction/usage");
@@ -173,9 +176,12 @@ const REGLE = {
 };
 
 const MATIERE = {
-  type: "lettre-motivation",
+  // La pièce et la destination sont **nommées** : la matière portait le
+  // segment de route et le code ISO, que les instructions recopiaient au
+  // modèle — « une pièce : lettre-motivation, pour une demande vers NL ».
+  piece: "Lettre de motivation",
   objet: "Motiver la candidature auprès de l'établissement",
-  pays: "NL",
+  pays: "les Pays-Bas",
   reponses: { 0: "J'ai terminé une licence d'informatique à Cotonou en 2025." },
   questions: [{ rang: 0, section: "PARCOURS", intitule: "Quel est ton parcours ?" }],
 };
@@ -474,6 +480,52 @@ try {
     const avis = await laCritique({})(LETTRE, MATIERE);
     verifier(avis.etat === "SANS_AVIS", `aucun avis n'est fabriqué (${avis.etat})`);
     verifier(recusParLeService.length === 0, "et aucun appel n'est parti");
+  }
+
+  // ── WF-08 : ce qu'on donne au modèle est nommé, jamais codé ────────
+  /*
+    `piecesARediger` posait `pays: visaRule.countryCode`, et les deux
+    instructions recopiaient le code tel quel :
+
+        Destination du dossier : NL. Les attendus d'une administration à
+        l'autre diffèrent — écris pour celle-là.
+
+    Ce que cette ligne existe pour dire tient au nom, et le nom était dans
+    `domain/redaction/coherence`, à quelques lignes de l'appel. Une fumée,
+    parce que le défaut est dans la **lecture** : les essais de la commande
+    partent d'une matière écrite à la main, et restaient verts.
+  */
+  console.log("\nWF-08 — la destination donnée au modèle est nommée, pas codée");
+  {
+    const { application, user, document } = await piece({ avecTexte: false });
+    // `piecesARediger` ne retient que les pièces dont le remède est
+    // « rédiger » : c'est ce qui distingue une lettre d'un téléversement.
+    await db.document.update({ where: { id: document.id }, data: { remedy: "REDIGER" } });
+
+    const pieces = await piecesARediger(application.id, user.id);
+    const lettre = pieces[0];
+    verifier(pieces.length === 1, `la pièce à rédiger est lue (${pieces.length})`);
+    verifier(
+      lettre?.pays === "les Pays-Bas",
+      `la destination est nommée (${String(lettre?.pays)})`,
+    );
+
+    // Et le prompt qui en découle ne porte ni le code, ni le segment de route.
+    const consigne = instructionsDeRedaction({
+      piece: lettre!.libelle,
+      objet: lettre!.objet,
+      pays: lettre!.pays!,
+      reponses: {},
+      questions: [],
+    });
+    verifier(
+      consigne.includes("Destination du dossier : les Pays-Bas."),
+      "et l'instruction la nomme",
+    );
+    verifier(
+      !/(?<!\p{L})NL(?!\p{L})/u.test(consigne) && !consigne.includes("lettre-motivation"),
+      "sans code ISO ni segment de route",
+    );
   }
 } finally {
   await db.$disconnect().catch(() => undefined);

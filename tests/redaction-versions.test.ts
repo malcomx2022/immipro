@@ -243,9 +243,9 @@ describe("aucun service absent n'est simulé", () => {
    */
   it("la mise en forme et la critique ne rendent aucun texte, et disent pourquoi", async () => {
     const matiere = {
-      type: "lettre-motivation",
+      piece: "Lettre de motivation",
       objet: "Motiver la candidature",
-      pays: "NL",
+      pays: "les Pays-Bas",
       reponses: { 0: "Une réponse." },
       questions: [{ rang: 0, section: "PARCOURS", intitule: "Ton parcours ?" }],
     };

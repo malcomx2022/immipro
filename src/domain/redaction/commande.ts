@@ -49,11 +49,26 @@ export type { CauseDAppel };
  * ------------------------------------------------------------------ */
 
 export interface MatiereDeLaPiece {
-  /** Le type de pièce, tel que le référentiel le nomme. */
-  type: string;
+  /**
+   * La pièce, **nommée** : « Lettre de motivation ».
+   *
+   * Le champ s'appelait `type` et recevait le segment de route —
+   * `lettre-motivation` —, que les deux instructions recopiaient au
+   * modèle : « Tu relis une pièce d'un dossier d'immigration :
+   * lettre-motivation ». Un identifiant d'adresse n'est pas un nom, et
+   * ce qui écrit pour le candidat n'a pas à le déchiffrer.
+   */
+  piece: string;
   /** Ce que la pièce doit établir, repris du référentiel. */
   objet: string;
-  /** Le pays de destination : les attendus diffèrent fortement (WF-08, étape 1). */
+  /**
+   * La destination, **nommée** : « les Pays-Bas ».
+   *
+   * Le champ recevait le code ISO de la règle figée, et l'instruction
+   * disait « Destination du dossier : NL ». Ce que cette ligne existe
+   * pour dire — les attendus diffèrent fortement d'une administration à
+   * l'autre, écris pour celle-là (WF-08 étape 1) — tient au nom.
+   */
   pays: string;
   /** Les réponses de l'entretien, par rang de question. */
   reponses: Reponses;
@@ -150,7 +165,7 @@ export function reponsesSituees(matiere: MatiereDeLaPiece): readonly ReponseSitu
 export function instructionsDeRedaction(matiere: MatiereDeLaPiece): string {
   const reponses = reponsesSituees(matiere);
   return [
-    `Tu mets en forme une pièce d'un dossier d'immigration : ${matiere.type}.`,
+    `Tu mets en forme une pièce d'un dossier d'immigration : ${matiere.piece}.`,
     `Ce que la pièce doit établir : ${matiere.objet}`,
     `Destination du dossier : ${matiere.pays}. Les attendus d'une administration à l'autre diffèrent — écris pour celle-là.`,
     "",
@@ -207,7 +222,7 @@ export const REMARQUES_MAXI = 8;
  */
 export function instructionsDeCritique(texte: string, matiere: MatiereDeLaPiece): string {
   return [
-    `Tu relis une pièce d'un dossier d'immigration : ${matiere.type}, pour une demande vers ${matiere.pays}.`,
+    `Tu relis une pièce d'un dossier d'immigration : ${matiere.piece}, pour une demande vers ${matiere.pays}.`,
     `Ce que la pièce doit établir : ${matiere.objet}`,
     "",
     "Relève ce qui affaiblit le texte, et rien d'autre.",
