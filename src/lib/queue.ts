@@ -36,6 +36,18 @@ export const JOBS = {
    * et n'avait reçu aucune relance.
    */
   BROUILLONS_INACTIFS: "dossier.inactivite",
+
+  /**
+   * Reprise des contrôles restés sans verdict — I.D, branchée le
+   * 24/09/2026.
+   *
+   * Quatre causes sur six laissent le fichier en quarantaine en disant
+   * au candidat « tu n'as rien à faire » : deux ne consomment aucune
+   * reprise de `REPRISES`, les deux autres les épuisent en dix minutes.
+   * Passé cela, plus rien ne revenait chercher la pièce, et l'incident
+   * se lisait dans l'état de service sans être traité.
+   */
+  REPRISE_QUARANTAINE: "document.reprise",
 } as const;
 
 /**

@@ -14,14 +14,18 @@ import {
 import { antivirusConfigure, NON_BRANCHE, VARIABLES } from "@/server/securite/antivirus";
 import {
   ATTENTE_AU_CONTROLE,
+  REPOS_AVANT_REPRISE_MINUTES,
   TENTATIVES_AVANT_INCIDENT,
   quiPeutAgir,
+  reprendreAuControle,
   seReprendSeule,
   suiteDeLIndisponibilite,
   type CauseDIndisponibilite,
   type Verdict,
 } from "@/domain/securite/balayage";
 import { ECHECS } from "@/server/http/echecs";
+import { JOBS, REPRISES } from "@/lib/queue";
+import { sansCommentaires } from "@/domain/copy/source";
 
 /**
  * I.D, tranché le 20/09/2026 — quarantaine, balayage, promotion.
@@ -365,5 +369,97 @@ describe("le balayage précède l'analyse, et rien ne les inverse", () => {
     expect(admettre.indexOf("await promouvoir(")).toBeLessThan(
       admettre.indexOf('scanState: "SAINE"'),
     );
+  });
+});
+
+/**
+ * Ce que quatre messages promettaient — I.D, RG-06.3.
+ *
+ * `quiPeutAgir` range chaque cause d'indisponibilité du côté du candidat
+ * ou du côté de la plateforme, et les messages de `ATTENTE_AU_CONTROLE`
+ * suivent ce partage : ceux qui demandent un geste le disent en premier,
+ * les autres disent « tu n'as rien à faire ».
+ *
+ * Personne ne tenait la seconde moitié. `BALAYAGE_PIECE` n'était postée
+ * que par la confirmation du dépôt, une fois ; `non_configure` et
+ * `reponse_illisible` ne consommaient aucune reprise de la file, et les
+ * deux autres les épuisaient en une dizaine de minutes. Passé cela, le
+ * fichier restait en quarantaine et l'incident se lisait dans l'état de
+ * service sans être traité — une visibilité, pas une reprise.
+ *
+ * Les garde-fous ci-dessous sont les deux réciproques : ce qui promet
+ * une reprise est repris, et ce qui demande un geste ne l'est pas. Les
+ * énumérer à la main ici les aurait figés à quatre ; une cause nouvelle
+ * arrive avec son message, et c'est le message qui doit décider.
+ */
+describe("Ce qui dit « tu n'as rien à faire » est repris", () => {
+  const CAUSES = Object.keys(ATTENTE_AU_CONTROLE) as CauseDIndisponibilite[];
+  const jamais = new Date("2026-01-01T00:00:00Z");
+  const apresLeRepos = new Date(
+    jamais.getTime() + (REPOS_AVANT_REPRISE_MINUTES + 1) * 60 * 1000,
+  );
+
+  it("chaque message sans geste attendu annonce bien une reprise", () => {
+    // La promesse et la reprise sortent du même partage : si un message
+    // cessait de promettre, ou si la reprise cessait de le tenir, cet
+    // essai le dirait — et non une relecture des quatre phrases.
+    const promettent = CAUSES.filter((c) => quiPeutAgir(c) === "plateforme");
+    expect(promettent.length).toBeGreaterThan(0);
+    for (const cause of promettent) {
+      expect(ATTENTE_AU_CONTROLE[cause]).toMatch(/tu n'as rien à faire/u);
+      expect(
+        reprendreAuControle({ cause, derniereTentative: jamais, maintenant: apresLeRepos }),
+      ).toBe(true);
+    }
+  });
+
+  it("et ce qui demande un geste au candidat n'est jamais rejoué par-dessus", () => {
+    // Rejouer ferait mentir la consigne qu'il vient de lire : un fichier
+    // trop lourd ne rétrécit pas, un objet absent ne revient pas.
+    const siennes = CAUSES.filter((c) => quiPeutAgir(c) === "candidat");
+    expect(siennes.length).toBeGreaterThan(0);
+    for (const cause of siennes) {
+      expect(ATTENTE_AU_CONTROLE[cause]).not.toMatch(/tu n'as rien à faire/u);
+      expect(
+        reprendreAuControle({ cause, derniereTentative: jamais, maintenant: apresLeRepos }),
+      ).toBe(false);
+    }
+  });
+
+  it("une version sans cause se reprend : rien n'a conclu, rien n'a été demandé", () => {
+    // Un ouvrier tué avant la première tentative laisse exactement cela.
+    expect(
+      reprendreAuControle({ cause: null, derniereTentative: null, maintenant: apresLeRepos }),
+    ).toBe(true);
+  });
+
+  it("le repos couvre les reprises de la file, sans les doubler", () => {
+    /*
+      Reprendre pendant que pg-boss rejoue encore ferait balayer deux
+      fois le même fichier. Le repos est donc plus long que les six
+      reprises réunies — dix secondes, doublées à chaque fois.
+      La borne se calcule depuis la politique, et non recopiée : les
+      deux bougeraient sinon séparément.
+      */
+    const politique = REPRISES[JOBS.BALAYAGE_PIECE]!;
+    const limite = politique.retryLimit ?? 0;
+    const delai = politique.retryDelay ?? 0;
+    const cumul = Array.from({ length: limite }, (_, i) => delai * 2 ** i).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    expect(REPOS_AVANT_REPRISE_MINUTES * 60).toBeGreaterThan(cumul);
+  });
+
+  it("et la passe est branchée : une file déclarée, travaillée et planifiée", () => {
+    /*
+      Une passe écrite et non branchée est le défaut lui-même, d'un cran
+      déplacé : `RAPPEL_ECHEANCIER` a vécu ainsi, déclarée sans écrivain.
+      Les trois preuves se lisent dans le source de l'ouvrier.
+      */
+    const ouvrier = sansCommentaires(readFileSync("src/server/jobs/worker.ts", "utf8"));
+    expect(JOBS.REPRISE_QUARANTAINE).toBeTruthy();
+    expect(ouvrier).toMatch(/work\(JOBS\.REPRISE_QUARANTAINE/u);
+    expect(ouvrier).toMatch(/schedule\(JOBS\.REPRISE_QUARANTAINE/u);
   });
 });
