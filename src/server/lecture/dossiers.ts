@@ -8,7 +8,7 @@ import { compteur } from "@/server/acces/quota";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import { trierDossiers } from "@/domain/dossiers/dossier";
 import type { Piece } from "@/domain/dossiers/piece";
-import { grouperPourCompletude } from "@/domain/dossiers/piece";
+import { estEncoreDemandee, grouperPourCompletude } from "@/domain/dossiers/piece";
 import type { Echeance } from "@/domain/dossiers/echeancier";
 import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
 import type { CalendrierAEvaluer } from "@/domain/dossiers/faisabilite";
@@ -166,7 +166,7 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
 
   const perissables: Echeance[] = reference
     ? dossier.documents
-        .filter((d) => d.validityMonths !== null && d.status !== "CONFORME")
+        .filter((d) => d.validityMonths !== null && estEncoreDemandee(d.status))
         .map((d) => ({
           id: `${d.code}-au-plus-tot`,
           date: dateAuPlusTot(reference, d.validityMonths!),
@@ -219,7 +219,7 @@ export function calendrierAEvaluer(
     dateCible: dossier.targetDate ? iso(dossier.targetDate) : null,
     delaiInstructionJours: p?.delai_traitement_jours?.max ?? null,
     aObtenir: dossier.documents
-      .filter((d) => d.status !== "CONFORME" && d.remedy !== "REDIGER")
+      .filter((d) => estEncoreDemandee(d.status) && d.remedy !== "REDIGER")
       .map((d) => ({
         code: d.code,
         libelle: d.label,

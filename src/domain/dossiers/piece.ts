@@ -63,6 +63,34 @@ export const LIBELLE_FAMILLE: Record<FamillePiece, string> = {
 export const estConforme = (piece: Piece): boolean => piece.etat === "CONFORME";
 
 /**
+ * Une pièce que le dossier demande encore — et la seule définition de
+ * cette question.
+ *
+ * Elle porte sur l'état et non sur la vue `Piece`, parce que trois
+ * lectures serveur la posent sur une ligne de base : l'échéancier, qui
+ * calcule la date « au plus tôt » d'une pièce périssable ; le calendrier,
+ * qui juge ce qu'il reste à obtenir ; et les offres de partenaire, qui
+ * rattachent chacune à une pièce demandée.
+ *
+ * Cette dernière ne la posait pas du tout. Elle lisait `code` et `label`,
+ * jamais l'état, et proposait donc un prestataire payant pour une pièce
+ * déjà déposée, lue et acceptée. Constaté en exécution, sur un dossier
+ * dont l'assurance maladie était `CONFORME` :
+ *
+ *     offre sur « assurance_maladie » — Ton dossier demande une pièce :
+ *                                        assurance maladie.
+ *
+ * C'est exactement ce que l'en-tête de ce chemin-là refuse : « chaque
+ * offre se rattache à une pièce que le dossier demande, et le dit. Une
+ * liste sans motif serait un annuaire publicitaire. »
+ *
+ * `PURGEE` reste demandée : la complétude compte déjà la pièce comme
+ * manquante — « supprimé conformément à la politique de rétention » —, et
+ * deux définitions de ce qui manque finiraient par se contredire.
+ */
+export const estEncoreDemandee = (etat: DocumentState): boolean => etat !== "CONFORME";
+
+/**
  * Déposée, conservée, jamais analysée — RG-06.5.
  *
  * L'état se dérive sans champ nouveau, et la dérivation est exacte :

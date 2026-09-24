@@ -6,6 +6,7 @@ import {
   type GenrePartenaire,
 } from "@/domain/partenaires/affiliation";
 import type { EtatAutorisation } from "@/domain/comptes/consentements";
+import { estEncoreDemandee } from "@/domain/dossiers/piece";
 import { etatDeLAutorisation } from "@/server/acces/consentements";
 
 /**
@@ -96,7 +97,7 @@ export async function offresDuDossier(
     where: { id: applicationId, userId },
     include: {
       visaRule: { select: { countryCode: true } },
-      documents: { select: { code: true, label: true } },
+      documents: { select: { code: true, label: true, status: true } },
     },
   });
   const autorisation = await etatDeLAutorisation(userId, "partenaires");
@@ -112,6 +113,14 @@ export async function offresDuDossier(
   for (const piece of dossier.documents) {
     const genre = GENRE_DE_LETAPE[piece.code];
     if (!genre) continue;
+    /*
+      Et la pièce doit être encore demandée. La lecture ne lisait pas
+      l'état : un dossier dont l'assurance maladie était déjà déposée, lue
+      et acceptée s'en voyait proposer une, sous « ton dossier demande une
+      pièce ». Une ligne de suivi était écrite avec, si bien que
+      l'affiliation se mesurait sur une offre qui n'avait pas lieu d'être.
+    */
+    if (!estEncoreDemandee(piece.status)) continue;
 
     const partenaire = await db.partner.findFirst({
       where: {
