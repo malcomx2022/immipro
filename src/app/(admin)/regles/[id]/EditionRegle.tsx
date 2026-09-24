@@ -13,7 +13,6 @@ import {
   CHAMPS_CANDIDAT,
   LIBELLE_NIVEAU,
   MENTION_SANS_MIGRATION,
-  SUITE_DU_REFUS_EN_VIGUEUR,
   aChange,
   comparer,
   compterChangements,
@@ -94,11 +93,13 @@ export interface EditionRegleProps {
    */
   peutPublier: boolean;
   /**
-   * La version ouverte est-elle celle que le candidat lit ? L'enregistrer
-   * est alors une publication, et le vocabulaire y est refusé. Sur un
-   * brouillon, l'enregistrement passe.
+   * Un brouillon existe-t-il déjà ? Sinon, `brouillon` porte les valeurs de
+   * la version en vigueur — le point de départ de la suivante — et l'écran
+   * doit le dire au lieu de les appeler « brouillon ».
    */
-  enregistrementEnLigne: boolean;
+  brouillonExistant: boolean;
+  /** Le numéro que l'enregistrement écrira, annoncé avant le clic. */
+  versionAEcrire: number;
 }
 
 export function EditionRegle({
@@ -109,7 +110,8 @@ export function EditionRegle({
   dossiersSousLaNouvelleRegle,
   historique,
   peutPublier: habiliteAPublier,
-  enregistrementEnLigne,
+  brouillonExistant,
+  versionAEcrire,
 }: EditionRegleProps) {
   const router = useRouter();
   const [textes, setTextes] = useState<Record<ChampCandidat, string>>({
@@ -125,12 +127,6 @@ export function EditionRegle({
   const fautes = verifierTextesCandidat(textes);
   const textesRecevables = publiable(textes);
   const peutPublier = textesRecevables && motif.trim().length > 0 && habiliteAPublier;
-  /**
-   * Ce qui empêche d'enregistrer, et rien de plus. Une faute n'empêche
-   * l'enregistrement que sur une version en vigueur, où enregistrer publie
-   * — c'est le refus que le serveur opposerait, annoncé avant le clic.
-   */
-  const refusDeLEnregistrement = enregistrementEnLigne && fautes.length > 0;
 
   /** Le corps de la branche `textes` : ce que l'écran édite, et rien de plus. */
   const corpsDesTextes = {
@@ -139,36 +135,44 @@ export function EditionRegle({
     reserveCandidat: textes.reserveCandidat,
   };
 
-  async function enregistrer(): Promise<boolean> {
+  /**
+   * Rend la ligne écrite, ou `null` si le serveur a refusé.
+   *
+   * L'identifiant compte : l'enregistrement peut avoir **ouvert** la version
+   * suivante, qui n'est pas celle de l'adresse. Publier `id` mettrait alors
+   * en vigueur la version qu'on vient de quitter.
+   */
+  async function enregistrer(): Promise<string | null> {
     setEchec(null);
     setFait(null);
-    const resultat = await appeler<{ version: number }>(`/api/admin/regles/${id}`, {
-      methode: "PUT",
-      corps: corpsDesTextes,
-    });
+    const resultat = await appeler<{ id: string; version: number }>(
+      `/api/admin/regles/${id}`,
+      { methode: "PUT", corps: corpsDesTextes },
+    );
     if (!resultat.ok) {
       setEchec(resultat.echec);
-      return false;
+      return null;
     }
-    return true;
+    return resultat.donnees.id;
   }
 
   async function enregistrerLeBrouillon() {
     setEnvoi("brouillon");
-    const ok = await enregistrer();
+    const ecrite = await enregistrer();
     setEnvoi("");
-    if (!ok) return;
+    if (!ecrite) return;
     setFait("enregistre");
     router.refresh();
   }
 
   async function publier() {
     setEnvoi("publication");
-    if (!(await enregistrer())) {
+    const ecrite = await enregistrer();
+    if (!ecrite) {
       setEnvoi("");
       return;
     }
-    const resultat = await appeler<{ publiee: string }>(`/api/admin/regles/${id}`, {
+    const resultat = await appeler<{ publiee: string }>(`/api/admin/regles/${ecrite}`, {
       corps: { motif },
     });
     setEnvoi("");
@@ -197,20 +201,24 @@ export function EditionRegle({
     <div className="flex flex-col">
       <EnteteAdmin
         titre={`${brouillon.pays} — ${brouillon.procedure}`}
-        resume={`Brouillon version ${brouillon.version} · version ${enVigueur.version} en vigueur pour ${dossiersConcernes} dossiers`}
+        resume={
+          brouillonExistant
+            ? `Brouillon version ${brouillon.version} · version ${enVigueur.version} en vigueur pour ${dossiersConcernes} dossiers`
+            : `Version ${enVigueur.version} en vigueur pour ${dossiersConcernes} dossiers · enregistrer ouvrira la version ${versionAEcrire}`
+        }
         actions={
           <>
             <Button
               variante="secondaire"
-              disabled={refusDeLEnregistrement || envoi !== ""}
-              raisonDesactivation={
-                refusDeLEnregistrement
-                  ? SUITE_DU_REFUS_EN_VIGUEUR
-                  : "Enregistrement en cours."
-              }
+              disabled={envoi !== ""}
+              raisonDesactivation="Enregistrement en cours."
               onClick={enregistrerLeBrouillon}
             >
-              {envoi === "brouillon" ? "Enregistrement…" : "Enregistrer le brouillon"}
+              {envoi === "brouillon"
+                ? "Enregistrement…"
+                : brouillonExistant
+                  ? "Enregistrer le brouillon"
+                  : `Ouvrir la version ${versionAEcrire}`}
             </Button>
             <Button
               disabled={!peutPublier || envoi !== ""}
@@ -227,7 +235,7 @@ export function EditionRegle({
             >
               {envoi === "publication"
                 ? "Publication…"
-                : `Publier la version ${brouillon.version}`}
+                : `Publier la version ${versionAEcrire}`}
             </Button>
           </>
         }

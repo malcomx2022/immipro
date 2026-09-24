@@ -1,7 +1,15 @@
+import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { textesCandidat, type VisaRulesPayload } from "@/domain/rules/schema";
+import {
+  avecLesTextesCandidat,
+  textesCandidat,
+  visaRulesSchema,
+  SCHEMA_VERSION,
+  type VisaRulesPayload,
+} from "@/domain/rules/schema";
 import {
   SUITE_DU_REFUS_EN_VIGUEUR,
+  destinationDeLEnregistrement,
   messageDeRefus,
   messageDeRefusPayload,
   verifierPayloadCandidat,
@@ -69,7 +77,14 @@ import {
 /** Ce que l'enregistrement soumet, selon la branche employée par l'écran. */
 export type Ecrit =
   | ({ champ: "textes" } & Pick<Regle, ChampCandidat>)
-  | { champ: "payload"; payload: VisaRulesPayload };
+  | {
+      champ: "payload";
+      payload: VisaRulesPayload;
+      /** Métadonnées que seul un éditeur complet renseigne (WF-14 étape 3). */
+      sourceUrl?: string;
+      nextReviewAt?: string;
+      notes?: string;
+    };
 
 /** Une formulation refusée, ramenée à un chemin et à son message. */
 interface Refus {
@@ -116,4 +131,150 @@ export function exigerUnEnregistrementAffichable(
     corps: `${refus[0]!.message} ${SUITE_DU_REFUS_EN_VIGUEUR}`,
     champs: Object.fromEntries(refus.map((r) => [r.chemin, r.message])),
   });
+}
+
+/**
+ * Les métadonnées qu'un éditeur complet renseigne, quand il en renseigne.
+ * La branche `textes` n'en porte aucune : l'écran ne les montre pas, il ne
+ * les décide pas.
+ */
+function metadonnees(ecrit: Ecrit) {
+  if (ecrit.champ !== "payload") return {};
+  return {
+    ...(ecrit.sourceUrl ? { sourceUrl: ecrit.sourceUrl } : {}),
+    ...(ecrit.nextReviewAt
+      ? { nextReviewAt: new Date(`${ecrit.nextReviewAt}T00:00:00Z`) }
+      : {}),
+    ...(ecrit.notes !== undefined ? { notes: ecrit.notes } : {}),
+  };
+}
+
+export interface Enregistrement {
+  /** La ligne écrite — pas nécessairement celle que l'adresse désignait. */
+  id: string;
+  version: number;
+  statut: string;
+  /** Vrai quand cet enregistrement vient d'ouvrir la version suivante. */
+  versionOuverte: boolean;
+}
+
+/**
+ * Enregistre les textes de B-02 — WF-14 étape 3, INV-3.
+ *
+ * ── La commande écrivait dans la version que les dossiers ont figée ──
+ *
+ * `editionDeLaRegle` rendait `versions.find(DRAFT) ?? cible`, et rien dans
+ * `src/` ne créait de version. Les trois procédures publiées de la graine
+ * n'ont pas de brouillon : l'écran ouvrait la ligne en vigueur, l'appelait
+ * « brouillon », et le `PUT` la réécrivait. `Application.visaRuleId` fige
+ * cette ligne — la réécrire change d'un coup la checklist de tous les
+ * dossiers ouverts dessus, ce qu'INV-3 interdit en propres termes.
+ *
+ * L'enregistrement écrit donc **toujours un brouillon**, celui qui existe
+ * ou celui qu'il ouvre à partir de la version en vigueur. La ligne en
+ * vigueur n'est plus jamais touchée ici : c'est `publierLaRegle` qui la
+ * remplace, en l'archivant et en datant sa fin de validité.
+ *
+ * ── Ce qui reste du garde-fou du vocabulaire ────────────────────────
+ *
+ * Il reste, et il change de rôle. Il refusait un enregistrement que le
+ * candidat lirait ; désormais aucun n'est dans ce cas, et le refus devient
+ * l'affirmation que ce n'arrive pas — la dernière ligne d'INV-3, opposée
+ * à la ligne qu'on s'apprête à écrire. Le retirer rendrait l'invariant
+ * dépendant de la seule lecture de `destinationDeLEnregistrement`.
+ */
+export async function enregistrerLesTextes(
+  regleId: string,
+  ecrit: Ecrit,
+  acteur: { email: string },
+): Promise<Enregistrement> {
+  const cible = await db.visaRule.findUnique({ where: { id: regleId } });
+  if (!cible) throw echec("introuvable");
+  if (cible.status === "ARCHIVED") {
+    throw echec("etat_incompatible", {
+      corps: "Une version archivée ne se modifie plus. Repars de la version en vigueur.",
+    });
+  }
+
+  const versions = await db.visaRule.findMany({
+    where: { countryCode: cible.countryCode, visaType: cible.visaType },
+    orderBy: { version: "desc" },
+  });
+  const destination = destinationDeLEnregistrement(
+    versions.map((v) => ({ id: v.id, version: v.version, statut: v.status })),
+  );
+  if (!destination) throw echec("introuvable");
+
+  /*
+    Le payload de départ vient de la ligne dont on part — le brouillon
+    qu'on continue, ou la version en vigueur qu'on prolonge —, jamais de
+    ce que le client a chargé : entre l'ouverture de la page et le clic,
+    un autre veilleur a pu écrire dans les champs que l'écran ne montre pas.
+  */
+  const source =
+    destination.quoi === "brouillon"
+      ? versions.find((v) => v.id === destination.id)!
+      : versions.find((v) => v.id === destination.depuis)!;
+
+  const enBase = visaRulesSchema.safeParse(source.rules);
+  if (!enBase.success) {
+    throw echec("etat_incompatible", {
+      corps: "Le contenu de cette version ne passe plus la validation. Reprends l'édition.",
+    });
+  }
+
+  const propose =
+    ecrit.champ === "textes" ? avecLesTextesCandidat(enBase.data, ecrit) : ecrit.payload;
+
+  const lu = visaRulesSchema.safeParse(propose);
+  if (!lu.success) {
+    throw echec("champs_invalides", {
+      champs: Object.fromEntries(
+        lu.error.issues.map((i) => [i.path.map(String).join(".") || "rules", i.message]),
+      ),
+    });
+  }
+
+  if (destination.quoi === "brouillon") {
+    // INV-3, dernière ligne : on n'écrit jamais dans ce que le candidat lit.
+    exigerUnEnregistrementAffichable(source, ecrit);
+    const maj = await db.visaRule.update({
+      where: { id: destination.id },
+      data: {
+        rules: lu.data as never,
+        schemaVersion: SCHEMA_VERSION,
+        ...metadonnees(ecrit),
+        verifiedAt: new Date(),
+        verifiedBy: acteur.email,
+      },
+    });
+    return { id: maj.id, version: maj.version, statut: maj.status, versionOuverte: false };
+  }
+
+  /*
+    La version suivante s'ouvre en brouillon, copiée sur celle en vigueur.
+    Ce qui ne se copie pas : `status`, `publishedAt`, `effectiveTo` — une
+    version qui naît n'est en vigueur nulle part —, et `effectiveFrom`, que
+    la publication posera au jour où elle prendra effet.
+  */
+  const ouverte = await db.visaRule.create({
+    data: {
+      countryCode: source.countryCode,
+      category: source.category,
+      visaType: source.visaType,
+      version: destination.version,
+      rules: lu.data as never,
+      schemaVersion: SCHEMA_VERSION,
+      sourceUrl: source.sourceUrl,
+      sourceTier: source.sourceTier,
+      status: "DRAFT",
+      effectiveFrom: source.effectiveFrom,
+      notes: source.notes,
+      nextReviewAt: source.nextReviewAt,
+      ...metadonnees(ecrit),
+      verifiedAt: new Date(),
+      verifiedBy: acteur.email,
+    },
+  });
+  return { id: ouverte.id, version: ouverte.version, statut: ouverte.status, versionOuverte: true };
 }

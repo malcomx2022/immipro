@@ -682,16 +682,20 @@ export interface VueEditionRegle {
   dossiersSousLaNouvelleRegle: number;
   historique: readonly { version: number; le: string; par: string }[];
   /**
-   * La version que l'enregistrement écrira est-elle celle que le candidat
-   * lit ? Elle se lit sur la ligne que l'adresse désigne — la même que le
-   * `PUT` relira —, et non sur `brouillon` : l'écran s'adresse à `id`.
+   * Un brouillon existe-t-il déjà ?
    *
-   * L'écran en a besoin pour dire la vérité sur sa propre commande. Écrire
-   * une version en vigueur est une publication ; le vocabulaire y est donc
-   * refusé, et le bouton doit le dire avant le clic. Sur un brouillon, il
-   * n'a rien à empêcher (`CLAUDE.md`).
+   * `brouillon` portait `versions.find(DRAFT) ?? cible` : faute de
+   * brouillon, l'écran affichait la version en vigueur sous ce nom. Les
+   * valeurs restent le bon point de départ — la suivante s'écrit à partir
+   * d'elles —, mais l'écran ne doit pas les appeler « brouillon » ni
+   * laisser croire qu'une seconde ligne existe.
    */
-  enregistrementEnLigne: boolean;
+  brouillonExistant: boolean;
+  /**
+   * Le numéro que l'enregistrement écrira : celui du brouillon, ou le
+   * suivant s'il faut l'ouvrir. L'écran l'annonce avant le clic.
+   */
+  versionAEcrire: number;
 }
 
 export async function editionDeLaRegle(id: string): Promise<VueEditionRegle | null> {
@@ -704,7 +708,13 @@ export async function editionDeLaRegle(id: string): Promise<VueEditionRegle | nu
   });
 
   const enVigueur = versions.find((v) => v.status === "PUBLISHED") ?? cible;
-  const brouillon = versions.find((v) => v.status === "DRAFT") ?? cible;
+  const existant = versions.find((v) => v.status === "DRAFT");
+  /*
+    Faute de brouillon, la version en vigueur sert de **point de départ** :
+    c'est d'elle que la suivante sera copiée, et c'est donc elle qu'il faut
+    montrer. Ce qui change, c'est ce que l'écran en dit.
+  */
+  const brouillon = existant ?? enVigueur;
 
   const [concernes, sousLaNouvelle] = await Promise.all([
     db.application.count({ where: { visaRuleId: enVigueur.id } }),
@@ -721,9 +731,10 @@ export async function editionDeLaRegle(id: string): Promise<VueEditionRegle | nu
       le: iso(v.verifiedAt),
       par: v.verifiedBy,
     })),
-    // `cible`, et non `brouillon` : c'est la ligne que l'adresse désigne,
-    // donc celle que le `PUT` relira et réécrira.
-    enregistrementEnLigne: cible.status === "PUBLISHED",
+    brouillonExistant: existant !== undefined,
+    versionAEcrire: existant
+      ? existant.version
+      : Math.max(...versions.map((v) => v.version)) + 1,
   };
 }
 

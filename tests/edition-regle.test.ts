@@ -10,6 +10,7 @@ import {
 import { exigerUnEnregistrementAffichable } from "@/server/regles/edition";
 import {
   SUITE_DU_REFUS_EN_VIGUEUR,
+  destinationDeLEnregistrement,
   refusDuReferentiel,
 } from "@/domain/backoffice/regle";
 import { EchecHttp } from "@/server/http/echecs";
@@ -127,6 +128,7 @@ describe("les textes de B-02 se recollent sur le payload en base", () => {
 
 describe("la route n'accepte que ce que l'écran édite", () => {
   const route = lire("src/app/api/admin/regles/[id]/route.ts");
+  const edition = lire("src/server/regles/edition.ts");
 
   /**
    * Faire porter le payload entier au formulaire aurait été le plus
@@ -136,25 +138,20 @@ describe("la route n'accepte que ce que l'écran édite", () => {
    */
   it("la branche des textes relit la base plutôt que de croire le client", () => {
     expect(route).toContain('champ: z.literal("textes")');
-    expect(route).toMatch(/visaRulesSchema\.safeParse\(regle\.rules\)/u);
-    expect(route).toContain("avecLesTextesCandidat(enBase.data, corps)");
+    expect(edition).toMatch(/visaRulesSchema\.safeParse\(source\.rules\)/u);
+    expect(edition).toContain("avecLesTextesCandidat(enBase.data, ecrit)");
   });
 
   /**
-   * Les deux branches convergent sur une seule écriture et un seul
-   * garde-fou — et il n'est plus dans la route.
-   *
-   * Il y était, et y levait avant toute écriture : la route refusait
-   * l'enregistrement d'un brouillon, que `CLAUDE.md` protège. La décision
-   * est partie dans `server/regles/edition.ts`, où des essais peuvent
-   * l'exécuter au lieu de compter ses appels.
+   * La route ne décide plus rien : ni où écrire, ni quoi refuser. Les deux
+   * sont dans `server/regles/edition.ts`, hors de `next/headers`, où des
+   * essais peuvent les exécuter au lieu de compter des appels.
    */
-  it("les deux branches passent par le même garde-fou, et il est exécutable", () => {
-    const put = route.slice(route.indexOf("export const PUT"), route.indexOf("export const POST"));
-    expect([...put.matchAll(/exigerUnEnregistrementAffichable\(/gu)]).toHaveLength(1);
-    expect([...put.matchAll(/db\.visaRule\.update\(/gu)]).toHaveLength(1);
-    // Et la route ne rejuge rien elle-même.
-    expect(put).not.toMatch(/verifierPayloadCandidat|verifierTextesCandidat/u);
+  it("la route ne touche plus la base, et ne rejuge rien", () => {
+    expect(route).toContain("enregistrerLesTextes(");
+    expect(route).not.toMatch(/db\.visaRule\./u);
+    expect(route).not.toMatch(/verifierPayloadCandidat|verifierTextesCandidat/u);
+    expect(route).not.toMatch(/exigerUnEnregistrementAffichable/u);
   });
 
   /**
@@ -175,7 +172,14 @@ describe("l'écran ne dit plus rien que le serveur n'ait répondu", () => {
 
   it("les deux commandes partent vers leur route", () => {
     expect(ecran).toMatch(/methode: "PUT"[\s\S]{0,80}corps: corpsDesTextes/u);
-    expect(ecran).toMatch(/appeler<\{ publiee: string \}>\(`\/api\/admin\/regles\/\$\{id\}`/u);
+    /*
+      La publication vise la ligne **écrite**, et non celle de l'adresse :
+      l'enregistrement peut venir d'ouvrir la version suivante, et publier
+      `id` mettrait alors en vigueur celle qu'on quitte.
+    */
+    expect(ecran).toMatch(
+      /appeler<\{ publiee: string \}>\(\s*`\/api\/admin\/regles\/\$\{ecrite\}`/u,
+    );
   });
 
   /**
@@ -185,7 +189,7 @@ describe("l'écran ne dit plus rien que le serveur n'ait répondu", () => {
    */
   it("publier enregistre d'abord, et s'arrête si l'enregistrement est refusé", () => {
     const fonction = /async function publier\(\)[\s\S]*?\n {2}\}/u.exec(ecran)![0];
-    expect(fonction).toMatch(/if \(!\(await enregistrer\(\)\)\) \{[\s\S]*?return;/u);
+    expect(fonction).toMatch(/const ecrite = await enregistrer\(\);[\s\S]*?if \(!ecrite\) \{[\s\S]*?return;/u);
     expect(fonction.indexOf("enregistrer()")).toBeLessThan(fonction.indexOf("appeler<"));
   });
 
@@ -761,12 +765,15 @@ describe("le vocabulaire n'est refusé que là où le candidat lira", () => {
    * qui décide, jamais `brouillon`, qui retombe sur `cible` faute de
    * brouillon et n'est donc pas une réponse à la question posée.
    */
-  it("l'écran lit le statut de la ligne que la route réécrira", () => {
+  it("l'écran sait si un brouillon existe, et lequel numéro il écrira", () => {
     const lecture = lire("src/server/lecture/backoffice.ts");
-    expect(lecture).toContain('enregistrementEnLigne: cible.status === "PUBLISHED"');
-    expect(lecture).not.toMatch(/enregistrementEnLigne: brouillon\./u);
+    expect(lecture).toContain("brouillonExistant: existant !== undefined");
+    // La ligne en vigueur n'est plus rendue sous le nom de brouillon sans
+    // que l'écran sache que c'en est une.
+    expect(lecture).not.toMatch(/const brouillon = versions\.find\(\(v\) => v\.status === "DRAFT"\) \?\? cible/u);
+    expect(lecture).toContain("versionAEcrire: existant");
     expect(lire("src/app/(admin)/regles/[id]/page.tsx")).toContain(
-      "enregistrementEnLigne={vue.enregistrementEnLigne}",
+      "brouillonExistant={vue.brouillonExistant}",
     );
   });
 
@@ -775,5 +782,97 @@ describe("le vocabulaire n'est refusé que là où le candidat lira", () => {
     const publication = lire("src/server/regles/publication.ts");
     expect(publication).toContain("refusDuReferentiel(lu.data)");
     expect(lire("prisma/seed/visa-rules.ts")).toContain("refusDuReferentiel");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Où va l'enregistrement — INV-3
+ * ------------------------------------------------------------------ */
+
+/**
+ * L'écran appelait « brouillon » la version que les dossiers ont figée.
+ *
+ * `editionDeLaRegle` rendait `versions.find(DRAFT) ?? cible`, et **rien
+ * dans `src/` ne créait de version**. Les trois procédures publiées du
+ * référentiel livré n'ont pas de brouillon : l'écran ouvrait la ligne en
+ * vigueur, l'intitulait « Brouillon version 1 · version 1 en vigueur », et
+ * « Enregistrer le brouillon » la réécrivait — sans nouvelle version, sans
+ * publication, sans ligne au journal.
+ *
+ * `Application.visaRuleId` fige cette ligne. INV-3 : « Un dossier fige la
+ * version de règle utilisée. Une évolution réglementaire ne casse jamais
+ * une checklist en cours. »
+ *
+ * L'arbitrage que ce lot tranche : **le veilleur ouvre la version suivante
+ * en enregistrant.** RG-14.2 sépare qui rédige de qui publie, et le `PUT`
+ * est ouvert au veilleur quand le `POST` est réservé à l'administrateur ;
+ * `publierLaRegle` archive le prédécesseur ; l'écran dit déjà « Publier la
+ * version N ». Il ne manquait que la création.
+ *
+ * `smoke:publication` exécute la chaîne entière contre PostgreSQL : la
+ * version figée ne bouge pas, le dossier garde la sienne, et la
+ * publication archive l'ancienne.
+ */
+describe("l'enregistrement de B-02 ne touche jamais la version en vigueur", () => {
+  const v = (id: string, version: number, statut: "DRAFT" | "PUBLISHED" | "ARCHIVED") => ({
+    id,
+    version,
+    statut,
+  });
+
+  it("écrit le brouillon quand il en existe un", () => {
+    expect(destinationDeLEnregistrement([v("b", 2, "DRAFT"), v("p", 1, "PUBLISHED")])).toEqual({
+      quoi: "brouillon",
+      id: "b",
+      version: 2,
+    });
+  });
+
+  it("ouvre la suivante quand il n'y en a pas", () => {
+    expect(destinationDeLEnregistrement([v("p", 1, "PUBLISHED")])).toEqual({
+      quoi: "a_ouvrir",
+      depuis: "p",
+      version: 2,
+    });
+  });
+
+  /**
+   * Le texte de départ vient de la version **en vigueur**, jamais de la
+   * plus haute : une archivée peut porter un numéro supérieur — elle a été
+   * mise en vigueur puis remplacée —, et repartir d'elle ressusciterait un
+   * texte que la publication a retiré. Le rang, lui, suit le plus haut :
+   * deux versions ne peuvent pas porter le même.
+   */
+  it("part de la version en vigueur, et numérote après la plus haute", () => {
+    const destination = destinationDeLEnregistrement([
+      v("archivee", 3, "ARCHIVED"),
+      v("vigueur", 2, "PUBLISHED"),
+      v("ancienne", 1, "ARCHIVED"),
+    ]);
+    expect(destination).toEqual({ quoi: "a_ouvrir", depuis: "vigueur", version: 4 });
+  });
+
+  it("ne décide rien sans version", () => {
+    expect(destinationDeLEnregistrement([])).toBeNull();
+  });
+
+  /** Et le serveur écrit ce qu'elle dit, jamais la ligne de l'adresse. */
+  it("le serveur suit la destination, et refuse d'écrire en ligne", () => {
+    const edition = lire("src/server/regles/edition.ts");
+    expect(edition).toContain("destinationDeLEnregistrement(");
+    expect(edition).toMatch(/destination\.quoi === "brouillon"/u);
+    expect(edition).toMatch(/status: "DRAFT"/u);
+    // La dernière ligne d'INV-3 : on n'écrit jamais dans ce que le
+    // candidat lit, et le garde-fou l'affirme sur la ligne visée.
+    expect(edition).toContain("exigerUnEnregistrementAffichable(source, ecrit)");
+    // Une version qui naît n'est en vigueur nulle part.
+    expect(edition).not.toMatch(/publishedAt:/u);
+  });
+
+  /** La fumée exécute ce que ces lignes ne font que lire. */
+  it("la fumée tient INV-3 sur une base réelle", () => {
+    const fumee = lire("scripts/fumee-publication.mts");
+    expect(fumee).toContain("la version que le dossier a figée n'a pas bougé — INV-3");
+    expect(fumee).toContain("publier ne migre personne (INV-3)");
   });
 });

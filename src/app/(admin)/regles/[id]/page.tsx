@@ -44,10 +44,11 @@ export default async function PageEditionRegle({
       // L'écran lit le même rôle, pour le dire avant le clic plutôt que
       // de laisser un veilleur enregistrer puis buter sur un refus.
       peutPublier={acteur.role === "ADMIN"}
-      // Écrire une version en vigueur est une publication : le vocabulaire
-      // y est refusé, et l'écran l'annonce avant le clic. Le fait se lit sur
-      // la ligne que l'adresse désigne, celle que la route réécrira.
-      enregistrementEnLigne={vue.enregistrementEnLigne}
+      // L'enregistrement écrit toujours un brouillon : celui qui existe, ou
+      // celui qu'il ouvre. L'écran annonce lequel avant le clic, plutôt que
+      // d'appeler « brouillon » la version que les dossiers ont figée.
+      brouillonExistant={vue.brouillonExistant}
+      versionAEcrire={vue.versionAEcrire}
       enVigueur={vue.enVigueur}
       brouillon={vue.brouillon}
       dossiersConcernes={vue.dossiersConcernes}
