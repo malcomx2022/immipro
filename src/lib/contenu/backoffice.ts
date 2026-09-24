@@ -155,8 +155,7 @@ export const REGLE_EN_VIGUEUR: Regle = {
   procedure: "Séjour études",
   niveauSource: "OFFICIEL",
   source: "make-it-in-germany.com",
-  montant: 11208,
-  devise: "EUR",
+  montant: { valeur: 11208, devise: "EUR" },
   intituleMontant: "Montant du compte bloqué",
   applicableDepuis: "2026-01-12",
   delaiInstruction: "6 à 12 semaines",
@@ -170,7 +169,7 @@ export const REGLE_EN_VIGUEUR: Regle = {
 export const REGLE_BROUILLON: Regle = {
   ...REGLE_EN_VIGUEUR,
   version: 5,
-  montant: 11904,
+  montant: { valeur: 11904, devise: "EUR" },
   applicableDepuis: "2027-01-01",
   prochaineRelecture: "2026-12-09",
   libelleCandidat:

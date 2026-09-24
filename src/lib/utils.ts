@@ -26,11 +26,35 @@ export const cn = (...inputs: ClassValue[]) => merge(clsx(inputs));
  * décimales quand elles sont nulles : la grille annonce « 12 € », pas
  * « 12,00 € ». Les deux formes sont celles du prototype, qui fait foi pour
  * les textes, et elles servent aussi bien P-06 que les écrans de paiement.
+ *
+ * ── Toute autre devise s'écrit avec la sienne ───────────────────────
+ *
+ * Le dernier cas rendait l'euro. Pas « par défaut » : **toujours**. Les
+ * deux devises du produit sont le franc CFA et l'euro, et la grille
+ * tarifaire n'en connaît pas d'autre — mais le référentiel réglementaire,
+ * lui, cite la monnaie de chaque autorité. Constaté en exécution sur le
+ * référentiel livré :
+ *
+ *     CH/etudes_permis_b : devise réelle = CHF | affiché = « 21 000 € »
+ *
+ * Vingt et un mille francs suisses annoncés en euros. Ce n'est pas une
+ * approximation, c'est une autre somme — et le produit retire ailleurs
+ * jusqu'aux conversions de parité fixe pour ne pas donner « pour un
+ * montant opposable ce qui n'est qu'un ordre de grandeur »
+ * (`domain/notifications/divergence`). Afficher un montant dans une
+ * monnaie que l'autorité n'emploie pas est le même défaut, en pire : il
+ * ne s'annonce pas comme une conversion.
+ *
+ * Le code ISO plutôt qu'un symbole : « 21 000 CHF » se lit sans savoir
+ * quel pays écrit « Fr. » et lequel écrit « CHF », et il n'y a pas de
+ * table de symboles à tenir à jour derrière le référentiel.
  */
 export function formatMontant(valeur: number, devise: string): string {
   const nombre = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: devise === "XOF" ? 0 : 2,
   }).format(valeur);
-  return devise === "XOF" ? `${nombre} F` : `${nombre} €`;
+  if (devise === "XOF") return `${nombre} F`;
+  if (devise === "EUR") return `${nombre} €`;
+  return `${nombre} ${devise}`;
 }

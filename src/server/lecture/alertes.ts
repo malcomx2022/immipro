@@ -197,8 +197,12 @@ function versVersion(regle: {
   const fonds = p.preuve_fonds;
   return {
     numero: regle.version,
-    montant: fonds?.valeur ?? 0,
-    devise: fonds?.devise ?? "",
+    /*
+      `null` quand l'autorité ne publie rien, et non `0` avec une devise
+      vide. Le couple a été remplacé par un champ unique précisément pour
+      qu'on ne puisse plus écrire l'un sans l'autre.
+    */
+    montant: fonds ? { valeur: fonds.valeur, devise: fonds.devise } : null,
     intitule: fonds
       ? `à prouver, ${fonds.periodicite === "mensuel" ? "par mois" : "pour l'année"}`
       : "aucune ressource à prouver",

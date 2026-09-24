@@ -126,15 +126,13 @@ describe("la péremption se juge au jour du dépôt", () => {
 describe("la version applicable se décide au jour du dépôt", () => {
   const ancienne: VersionRegle = {
     numero: 4,
-    devise: "EUR",
-    montant: 1000,
+    montant: { valeur: 1000, devise: "EUR" },
     intitule: "sur compte bloqué",
     publieeLe: "2026-01-15",
   };
   const nouvelle: VersionRegle = {
     numero: 5,
-    devise: "EUR",
-    montant: 1696,
+    montant: { valeur: 1696, devise: "EUR" },
     intitule: "sur compte bloqué",
     publieeLe: "2026-09-01",
     applicableDepuis: "2027-07-01",

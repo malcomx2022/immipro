@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   CHAMPS_CANDIDAT,
+  MENTION_SANS_MONTANT,
   aChange,
   comparer,
   compterChangements,
@@ -181,6 +182,7 @@ describe("B-02 — versionnement et INV-3", () => {
       REGLE_EN_VIGUEUR,
       REGLE_BROUILLON,
       formatMontant,
+      MENTION_SANS_MONTANT,
       jourEnFrancais,
     );
     expect(differences).toHaveLength(4);
