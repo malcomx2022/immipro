@@ -180,6 +180,11 @@ const messageDe = (erreur: unknown): string => {
   return porte?.echec?.code ? String(porte.echec.code) : String(erreur);
 };
 
+/** Ce que le back-office lit sous l'échec — et que le candidat ne voit pas. */
+const diagnosticDe = (erreur: unknown): { service?: string; statutAmont?: number; trace?: string } =>
+  (erreur as { diagnostic?: { service?: string; statutAmont?: number; trace?: string } })
+    .diagnostic ?? {};
+
 try {
   // ── 1. Double soumission ────────────────────────────────────────────
   console.log("\nDouble soumission");
@@ -288,9 +293,86 @@ try {
     } catch (erreur) {
       refus = messageDe(erreur);
     }
-    verifier(refus === "paiement_indisponible", `le refus est immédiat (${refus})`);
+    verifier(refus === "ouverture_impossible", `le refus est immédiat (${refus})`);
     const lignes = await db.transaction.count({ where: { userId } });
     verifier(lignes === 0, `aucune transaction locale orpheline (${lignes})`);
+
+    // Et il dit lequel des cinq. Le service se déduit de la devise même
+    // quand aucun adaptateur n'est branché : c'est celui dont la clé
+    // manque, et c'est ce que l'exploitant a besoin de lire.
+    let vu: unknown = null;
+    try {
+      await ouvrirLeTunnel(userId, ACHAT(applicationId), "EUR", null);
+    } catch (erreur) {
+      vu = erreur;
+    }
+    const sans = diagnosticDe(vu);
+    verifier(sans.service === "stripe", `le service est nommé (${sans.service})`);
+    verifier(
+      (sans.trace ?? "").startsWith("sans référence · aucun_adaptateur"),
+      `la trace dit qu'aucune transaction n'a été écrite (${sans.trace})`,
+    );
+  }
+
+  // ── 4 bis. Cinq causes, cinq échecs distincts ───────────────────────
+  /*
+    Le contrat d'ouverture annonce que « les trois issues ne se traitent
+    pas pareil — réessayer, refuser, alerter ». Son unique lecteur les
+    traitait toutes pareil : cinq causes, `paiement_indisponible` au
+    caractère près, sans diagnostic — et sans ligne de journal, puisque
+    `route.ts` ne journalise que ce qui n'est **pas** un échec du
+    catalogue. Une clé expirée ne laissait donc aucune trace nulle part.
+
+    Ce bloc le constate là où cela se joue : sur la fonction qui écrit en
+    base, avec un vrai enchaînement, et non sur un adaptateur isolé.
+  */
+  console.log("\nCinq causes, cinq échecs distincts");
+  {
+    const causes: [string, Ouverture, string, number | undefined][] = [
+      ["injoignable", { issue: "injoignable", statut: 503, detail: "le fournisseur est en panne" }, "paiement_indisponible", 503],
+      ["refusee", { issue: "refusee", statut: 401, detail: "api_key_expired" }, "ouverture_impossible", 401],
+      [
+        "reponse_inattendue",
+        { issue: "reponse_inattendue", detail: "montant ou devise absents de la session" },
+        "ouverture_impossible",
+        undefined,
+      ],
+      [
+        "creee_sans_url",
+        { issue: "creee_sans_url", providerTxId: "stripe:cs_muette", detail: "url absente" },
+        "paiement_indisponible",
+        undefined,
+      ],
+    ];
+
+    const traces = new Set<string>();
+    for (const [nom, ouverture, attendu, statut] of causes) {
+      const { userId, applicationId } = await candidat();
+      let vu: unknown = null;
+      try {
+        await ouvrirLeTunnel(
+          userId,
+          ACHAT(applicationId),
+          "EUR",
+          ouvreurSimule({ creer: () => ouverture }),
+        );
+      } catch (erreur) {
+        vu = erreur;
+      }
+      const code = messageDe(vu);
+      const diagnostic = diagnosticDe(vu);
+      verifier(code === attendu, `${nom} rend ${attendu} (${code})`);
+      verifier(
+        diagnostic.statutAmont === statut,
+        `${nom} porte le statut du fournisseur (${String(diagnostic.statutAmont)})`,
+      );
+      verifier(
+        (diagnostic.trace ?? "").includes(nom),
+        `${nom} se nomme dans la trace (${diagnostic.trace})`,
+      );
+      traces.add(diagnostic.trace?.split(" · ")[1] ?? "");
+    }
+    verifier(traces.size === causes.length, `les quatre traces diffèrent (${traces.size})`);
   }
 
   // ── 5. Retour navigateur sans webhook ───────────────────────────────

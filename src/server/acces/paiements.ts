@@ -37,9 +37,13 @@ import {
   cleDOuverture,
   motifDeDivergence,
   ouvertureConcorde,
+  ouvertureReessayable,
+  traceDeLOuverture,
+  OUVERTURE_SANS_PAGE,
+  type CauseDEchecDOuverture,
 } from "@/domain/paiement/ouverture";
 import { lOuvreur } from "@/server/paiement/ouvreurs";
-import type { Ouvreur } from "@/server/paiement/ouvreur";
+import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 
 /**
@@ -147,6 +151,57 @@ export async function creerOuReprendre(
 }
 
 /**
+ * L'échec d'une ouverture, avec ce qui l'a causé.
+ *
+ * ── Cinq causes, une seule réponse ──────────────────────────────────
+ *
+ * Le contrat d'ouverture annonce que « les trois issues ne se traitent
+ * pas pareil — réessayer, refuser, alerter ». Cette fonction-ci les
+ * traitait toutes pareil :
+ *
+ *     if (ouverture.issue !== "ouverte") throw echec("paiement_indisponible");
+ *
+ * Aucun adaptateur branché, un fournisseur muet, une demande refusée,
+ * une réponse hors contrat, une session créée sans adresse : cinq
+ * causes, une réponse identique au caractère près, sans diagnostic. Et
+ * sans trace non plus — `route.ts` ne journalise que ce qui **n'est
+ * pas** un échec du catalogue, si bien qu'une clé expirée ne laissait
+ * aucune ligne nulle part. Le `detail` que chaque adaptateur compose
+ * pour être lu — « api_key_expired », « montant ou devise absents de la
+ * session » — n'atteignait personne.
+ *
+ * ── Ce que chacune rend maintenant ──────────────────────────────────
+ *
+ * Le domaine décide de la nature — passagère ou installée — et elle
+ * décide du code : `paiement_indisponible` propose de réessayer,
+ * `ouverture_impossible` dit que réessayer ne servira à rien. Le
+ * diagnostic nomme le service, porte le statut rendu par le fournisseur
+ * quand il y en a un, et range la cause et le constat dans la trace.
+ *
+ * Le diagnostic ne quitte jamais le serveur vers un écran candidat :
+ * `pourCandidat` ne le sérialise pas. C'est précisément ce qui permet
+ * d'y écrire ce qui est utile plutôt que ce qui est présentable.
+ */
+function echecDOuverture(
+  fournisseur: string,
+  cause: CauseDEchecDOuverture,
+  reference: string | null,
+  constat: Constat,
+) {
+  return echec(ouvertureReessayable(cause) ? "paiement_indisponible" : "ouverture_impossible", {
+    // La seule cause dont la phrase du catalogue serait fausse : le
+    // fournisseur a répondu, et la transaction existe chez lui.
+    ...(cause === "creee_sans_url" ? { corps: OUVERTURE_SANS_PAGE } : {}),
+    diagnostic: {
+      service: fournisseur.toLowerCase(),
+      ...(constat.statut === undefined ? {} : { statutAmont: constat.statut }),
+      survenuA: new Date().toISOString(),
+      trace: traceDeLOuverture(reference, cause, constat.detail),
+    },
+  });
+}
+
+/**
  * Ouvre le paiement : transaction locale, puis session chez le fournisseur.
  *
  * ── L'ordre, et pourquoi il est celui-là ─────────────────────────────
@@ -184,7 +239,14 @@ export async function ouvrirLeTunnel(
 ): Promise<{ transactionId: string; reference: string; url: string; reprise: boolean }> {
   // Avant la moindre écriture. Un échec honnête vaut mieux qu'une attente
   // impossible, et il ne laisse aucune transaction derrière lui.
-  if (!ouvreur) throw echec("paiement_indisponible");
+  if (!ouvreur) {
+    // Ni clé, ni racine d'application : personne n'a été appelé. Le
+    // service est nommé quand même — il se déduit de la devise, et c'est
+    // celui dont la configuration manque.
+    throw echecDOuverture(fournisseurDe(devise), "aucun_adaptateur", null, {
+      detail: "aucun adaptateur branché (clé ou racine d'application absente)",
+    });
+  }
 
   const { transaction, reprise } = await creerOuReprendre(userId, achat, devise);
 
@@ -206,9 +268,15 @@ export async function ouvrirLeTunnel(
     // La session existe chez eux : on garde son identifiant, sinon la
     // prochaine tentative en ouvrirait une seconde.
     await noterLIdentifiantFournisseur(transaction.id, ouverture.providerTxId);
-    throw echec("paiement_indisponible");
   }
-  if (ouverture.issue !== "ouverte") throw echec("paiement_indisponible");
+  if (ouverture.issue !== "ouverte") {
+    throw echecDOuverture(
+      ouvreur.fournisseur,
+      ouverture.issue,
+      transaction.reference,
+      ouverture,
+    );
+  }
 
   await noterLIdentifiantFournisseur(transaction.id, ouverture.session.providerTxId);
 

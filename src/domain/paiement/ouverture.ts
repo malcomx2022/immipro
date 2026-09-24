@@ -146,3 +146,105 @@ export const cheminDeRetour = (reference: string): string =>
  */
 export const cleDEvenementDeReconciliation = (reference: string, statut: string): string =>
   `reconciliation:${reference}:${statut}`;
+
+/* ------------------------------------------------------------------ *
+ * Ce que l'ouverture échouée avait à dire — 24/09/2026.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Les causes d'une ouverture qui n'aboutit pas.
+ *
+ * ── La cause était calculée, et jetée ───────────────────────────────
+ *
+ * Le contrat d'ouverture annonce que « les trois issues ne se traitent
+ * pas pareil — réessayer, refuser, alerter ». Son unique lecteur les
+ * traitait toutes de la même façon :
+ *
+ *     if (ouverture.issue !== "ouverte") throw echec("paiement_indisponible");
+ *
+ * Cinq causes distinctes — aucun adaptateur branché, un fournisseur
+ * muet, une demande refusée, une réponse hors contrat, une session
+ * créée sans adresse — produisaient la même réponse au caractère près,
+ * sans diagnostic, et sans ligne de journal : la route ne journalise
+ * que ce qui **n'est pas** un échec du catalogue. Le `detail` que
+ * chaque adaptateur compose pour être lu — « api_key_expired »,
+ * « montant ou devise absents de la session », « url domaine_inattendu »
+ * — n'était lu par personne.
+ *
+ * ── Et la phrase servie n'était vraie que d'une des cinq ────────────
+ *
+ * « Notre prestataire de paiement n'a pas répondu » est faux quand
+ * aucun adaptateur n'est branché — personne n'a été appelé —, quand le
+ * fournisseur refuse la demande, quand il répond hors contrat, et quand
+ * il a créé la session : dans quatre cas sur cinq, il a répondu, ou il
+ * n'a pas été interrogé. « Réessayer » l'est tout autant : une clé
+ * expirée rendra le même refus au centième essai.
+ */
+export type CauseDEchecDOuverture =
+  | "aucun_adaptateur"
+  | "injoignable"
+  | "creee_sans_url"
+  | "refusee"
+  | "reponse_inattendue";
+
+/**
+ * Passagère, ou installée.
+ *
+ * C'est la seule distinction que le candidat a besoin de lire, et elle
+ * décide de tout le reste : ce qu'on lui dit, et ce qu'on lui propose de
+ * faire. Une panne passagère se réessaie — le fournisseur peut répondre
+ * à la seconde tentative, et une session déjà créée est reprise par
+ * `retrouver` plutôt que dupliquée. Une panne installée, non : la
+ * configuration ou le contrat est en cause, et seul un opérateur peut y
+ * revenir. Lui proposer « Réessayer » lui ferait perdre son temps à la
+ * place du nôtre.
+ */
+export type NatureDEchecDOuverture = "passagere" | "installee";
+
+export const NATURE_DE_LA_CAUSE: Record<CauseDEchecDOuverture, NatureDEchecDOuverture> = {
+  // Clé absente, racine d'application absente : rien n'a été appelé.
+  aucun_adaptateur: "installee",
+  // Réseau, délai, 5xx : la prochaine tentative peut aboutir.
+  injoignable: "passagere",
+  // L'identifiant est gardé ; la reprise repart de la session existante.
+  creee_sans_url: "passagere",
+  // Compte, clé, montant hors bornes : le même appel rendra le même refus.
+  refusee: "installee",
+  // Le contrat a bougé, ou la réponse n'est pas la nôtre : à relire.
+  reponse_inattendue: "installee",
+};
+
+export const ouvertureReessayable = (cause: CauseDEchecDOuverture): boolean =>
+  NATURE_DE_LA_CAUSE[cause] === "passagere";
+
+/**
+ * Ce que l'opérateur lit sous l'échec, et retrouve au journal.
+ *
+ * La référence d'abord : c'est par elle que la transaction se retrouve en
+ * base. Puis la cause, puis ce que l'adaptateur a constaté — dans cet
+ * ordre, parce que les deux premiers sont toujours là et le troisième
+ * pas toujours.
+ *
+ * Rien du corps reçu n'y entre : les adaptateurs composent un `detail`
+ * qui décrit la forme du problème, jamais la réponse elle-même.
+ */
+export const traceDeLOuverture = (
+  /** Nulle quand rien n'a été écrit — aucun adaptateur, aucune transaction. */
+  reference: string | null,
+  cause: CauseDEchecDOuverture,
+  detail?: string,
+): string =>
+  `${reference ?? "sans référence"} · ${cause}${detail ? ` : ${detail}` : ""}`;
+
+/**
+ * Ce qu'on dit au candidat quand la session existe sans son adresse.
+ *
+ * La phrase du catalogue — « notre prestataire de paiement n'a pas
+ * répondu » — est vraie du fournisseur muet et fausse de celui-ci : il a
+ * répondu, il a même créé la transaction. La reprise passera par
+ * `retrouver`, qui repart de l'identifiant enregistré ; c'est ce que le
+ * candidat a besoin de savoir, parce que la question qu'il se pose en
+ * recliquant sur « Payer » est celle du double débit.
+ */
+export const OUVERTURE_SANS_PAGE =
+  "Notre prestataire n'a pas rendu la page de paiement. Ta demande est enregistrée chez lui : en reprenant, tu retomberas sur la même, et rien ne sera débité deux fois.";

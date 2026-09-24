@@ -45,6 +45,7 @@
  */
 import { z } from "zod";
 import { verifierLUrlHebergee } from "@/domain/paiement/ouverture";
+import { SANS_REPONSE } from "./ouvreur";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
 import type { Consultant, EtatConsulte } from "./consultation";
 import { CAUSES_FEDAPAY, ETATS_FEDAPAY } from "./notifications";
@@ -166,8 +167,10 @@ async function appeler(
 
 /** Traduit un code de réponse en issue, avant toute lecture du corps. */
 const issueDuStatut = (statut: number): Ouverture | null => {
-  if (statut >= 500) return { issue: "injoignable" };
-  if (statut >= 400) return { issue: "refusee", detail: `réponse ${statut}` };
+  if (statut >= 500) {
+    return { issue: "injoignable", statut, detail: "le fournisseur est en panne" };
+  }
+  if (statut >= 400) return { issue: "refusee", statut, detail: `réponse ${statut}` };
   return null;
 };
 
@@ -181,10 +184,17 @@ export const adaptateurFedaPay = (
   /** La seconde étape, partagée par `creer` et `retrouver`. */
   async function page(providerTxId: string, identifiant: string): Promise<Ouverture> {
     const jeton = await appeler(base, cle, `/transactions/${identifiant}/token`, { corps: {} });
-    if (!jeton) return { issue: "creee_sans_url", providerTxId, detail: "jeton injoignable" };
+    if (!jeton) {
+      return { issue: "creee_sans_url", providerTxId, detail: `jeton : ${SANS_REPONSE}` };
+    }
     const mauvais = issueDuStatut(jeton.statut);
     if (mauvais) {
-      return { issue: "creee_sans_url", providerTxId, detail: `jeton refusé (${jeton.statut})` };
+      return {
+        issue: "creee_sans_url",
+        providerTxId,
+        statut: jeton.statut,
+        detail: `jeton refusé (${jeton.statut})`,
+      };
     }
 
     const lu = schemaJeton.safeParse(jeton.charge);
@@ -268,7 +278,7 @@ export const adaptateurFedaPay = (
           callback_url: retourAbsolu(demande.retour),
         },
       });
-      if (!reponse) return { issue: "injoignable" };
+      if (!reponse) return { issue: "injoignable", detail: SANS_REPONSE };
       const mauvais = issueDuStatut(reponse.statut);
       if (mauvais) return mauvais;
       return depuisLEntite(reponse.charge, demande.reference, demande.devise);
@@ -282,7 +292,7 @@ export const adaptateurFedaPay = (
         `/transactions/${encodeURIComponent(identifiant)}`,
         {},
       );
-      if (!reponse) return { issue: "injoignable" };
+      if (!reponse) return { issue: "injoignable", detail: SANS_REPONSE };
       const mauvais = issueDuStatut(reponse.statut);
       if (mauvais) return mauvais;
 
