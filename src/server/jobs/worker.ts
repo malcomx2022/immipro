@@ -23,6 +23,10 @@ import {
   traiterLesBrouillonsInactifs,
   doitRejouer as doitRejouerLInactivite,
 } from "./inactivite";
+import {
+  relancerLesRemboursements,
+  doitRejouer as doitRejouerLesRelances,
+} from "./relances";
 
 async function main() {
   // `getQueue` déclare les files avant de rendre la main (voir
@@ -146,6 +150,20 @@ async function main() {
     if (bilan.remises > 0 || bilan.moteurMuet) console.info("[quarantaine]", bilan);
   });
 
+  await boss.work(JOBS.RELANCE_REMBOURSEMENT, async () => {
+    const bilan = await relancerLesRemboursements();
+    /*
+      Silencieuse quand il n'y a rien : une dette ouverte est rare, et un
+      journal qui dit « 0 » tous les quarts d'heure noie celui qui dit
+      autre chose. Un abandon, lui, se voit toujours — c'est une somme
+      qu'un humain doit reprendre.
+    */
+    if (bilan.relancees > 0 || bilan.abandonnees > 0) console.info("[relances]", bilan);
+    if (doitRejouerLesRelances(bilan)) {
+      throw new Error(`Remboursements non relancés : ${bilan.incidents.join(" | ")}`);
+    }
+  });
+
   await boss.work(JOBS.BROUILLONS_INACTIFS, async () => {
     const bilan = await traiterLesBrouillonsInactifs();
     console.info("[inactivite]", bilan);
@@ -229,6 +247,19 @@ async function main() {
     jusqu'au lendemain trois heures.
   */
   await boss.schedule(JOBS.REPRISE_QUARANTAINE, "20 * * * *");
+
+  /*
+    Les relances de remboursement suivent la cadence du rapprochement, et
+    pour la même raison : c'est de l'argent, et le repos de trente minutes
+    de `suiteDeLaDette` décide seul du rythme réel. Une passe plus lente
+    laisserait une dette attendre la nuit ; une plus rapide ne changerait
+    rien, le repos la retiendrait.
+
+    Décalée de sept minutes sur le quart d'heure du rapprochement : les
+    deux passes écrivent sur `Transaction`, et les faire partir ensemble
+    n'apporte rien qu'un risque de contention.
+  */
+  await boss.schedule(JOBS.RELANCE_REMBOURSEMENT, "7,22,37,52 * * * *");
 
   // Et une fois tout de suite : attendre l'heure ronde laisserait
   // l'instance sans constat pendant jusqu'à soixante minutes après un

@@ -48,6 +48,19 @@ export const JOBS = {
    * se lisait dans l'état de service sans être traité.
    */
   REPRISE_QUARANTAINE: "document.reprise",
+
+  /**
+   * Reprise des demandes de remboursement qui ne sont pas parties —
+   * K.C, RG-05.1, branchée le 24/09/2026.
+   *
+   * `RESTE_A_FAIRE.DECIDE` disait « La demande n'est pas partie. Relance
+   * l'envoi », et personne ne la relançait : les deux appelants qui
+   * comptent avalent l'échec d'envoi, à juste titre — une panne du
+   * fournisseur ne doit faire échouer ni une annulation ni une
+   * anonymisation. Rien ne revenait ensuite, et la somme due attendait
+   * qu'un opérateur la voie dans B-04.
+   */
+  RELANCE_REMBOURSEMENT: "paiement.relance",
 } as const;
 
 /**
