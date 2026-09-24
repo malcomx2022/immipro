@@ -9636,6 +9636,15 @@ les sépare :
 - une date calendaire (échéance, délivrance, vérification, publication
   d'un article) reste en UTC, où elle a été posée.
 
+### La période du journal suit l'heure affichée
+
+Le journal d'audit rangeait ses écritures par période sur les dix
+premiers caractères de l'ISO, c'est-à-dire sur le jour UTC. Tant que
+l'heure s'affichait aussi en UTC, les deux se répondaient. Une fois
+l'heure passée à Cotonou, une écriture affichée « 01/10 · 00 h 30 »
+serait restée dans l'export de septembre. Le jour d'une écriture est
+maintenant celui qu'on lit à côté de son heure.
+
 ### Une constante, un garde-fou
 
 `FUSEAU_AFFICHAGE` passe dans `domain/format/fuseau.ts`, avec `jourCivil`.
@@ -9654,5 +9663,13 @@ UTC : le garde-fou les nomme tous les trois.
 ### Ce que ce lot ne touche pas
 
 Les exports CSV gardent leurs horodatages ISO, qui portent leur fuseau.
+
+**Laissé ouvert, et nommé : le « jour courant » en UTC.** Une dizaine de
+routes et de lectures posent « aujourd'hui » par
+`new Date().toISOString().slice(0, 10)` : complétude, échéancier,
+journée de rapprochement, rappels. Entre minuit et une heure du matin à
+Cotonou, ce jour est encore la veille. L'effet dure une heure et reste
+d'un jour ; il touche des calculs, pas un affichage d'heure, et chaque
+site demande de vérifier ce que sa date compare. C'est un lot à part.
 La référence opérateur du reçu (`MP260911.0943`) est celle du prestataire,
 et il n'y a pas à la réécrire.

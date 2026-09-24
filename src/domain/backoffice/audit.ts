@@ -11,6 +11,7 @@
 
 import type { ActeurLisible } from "./acteur";
 import { nomDatable, nombre, texte, vide, type Cellule } from "@/domain/format/csv";
+import { jourCivil } from "@/domain/format/fuseau";
 
 export type CategorieAudit = "PAIEMENT" | "REGLE" | "ACCES_PIECE" | "COMPTE";
 
@@ -62,8 +63,16 @@ export interface Periode {
   au: string;
 }
 
+/**
+ * Le jour d'une écriture est celui du fuseau d'affichage, comme l'heure que
+ * le journal écrit à côté. Pris sur les dix premiers caractères de l'ISO,
+ * c'était le jour UTC : une écriture de 0 h 30 le 16, affichée « 16/09 ·
+ * 00 h 30 », sortait d'une période « du 16 » et tombait dans celle du 15.
+ */
+const jourDe = (e: EcritureAudit) => jourCivil(new Date(e.horodatage));
+
 const dansLaPeriode = (e: EcritureAudit, periode: Periode) =>
-  e.horodatage.slice(0, 10) >= periode.du && e.horodatage.slice(0, 10) <= periode.au;
+  jourDe(e) >= periode.du && jourDe(e) <= periode.au;
 
 export function filtrerAudit(
   ecritures: readonly EcritureAudit[],
@@ -108,7 +117,7 @@ export function diagnostiquerPeriode(
   const categorie = categories[0];
   const libelle = categorie ? ` ${LIBELLE_CATEGORIE[categorie].toLowerCase()}` : "";
   const suivante = [...ecritures]
-    .filter((e) => e.horodatage.slice(0, 10) > periode.au)
+    .filter((e) => jourDe(e) > periode.au)
     .filter((e) => categories.length === 0 || categories.includes(e.categorie))
     .sort((a, b) => a.horodatage.localeCompare(b.horodatage))[0];
 

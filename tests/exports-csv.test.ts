@@ -196,6 +196,22 @@ describe("B-06 — l'export du journal atteste ce qu'il porte", () => {
     expect(rendu).not.toContain("paiement.remboursement");
   });
 
+  /**
+   * Le jour d'une écriture est celui que l'écran affiche à côté de son
+   * heure, à Cotonou. 23 h 30 UTC le 30 septembre est 0 h 30 le 1er octobre :
+   * l'écriture sort de septembre, et celle de 22 h 59 UTC y reste.
+   */
+  it("range une écriture au jour de Cotonou, pas au jour UTC", () => {
+    const ecritures = [
+      ECRITURE({ id: "octobre", horodatage: "2026-09-30T23:30:00.000Z" }),
+      ECRITURE({ id: "septembre", horodatage: "2026-08-31T23:30:00.000Z" }),
+    ];
+    const rendu = fichierCsv(exportDuJournal(ecritures, PERIODE, []));
+    expect(rendu).toContain("Écritures;1");
+    expect(rendu).toContain("2026-08-31T23:30:00.000Z");
+    expect(rendu).not.toContain("2026-09-30T23:30:00.000Z");
+  });
+
   it("nomme le fichier d'après la période", () => {
     expect(nomDeLExport(PERIODE)).toBe(
       "immipro-journal-audit-2026-09-01_2026-09-30.csv",
