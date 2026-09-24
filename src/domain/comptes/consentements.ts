@@ -62,6 +62,15 @@ export const CONSENTEMENTS: readonly Consentement[] = [
     titre: "Alertes de changement de règles",
     description:
       "Email quand une exigence de ta destination change. Ne concerne que tes dossiers ouverts.",
+    /*
+      Le refus coûte quelque chose, et il faut le dire : c'est précisément
+      pour les changements graves que l'email existe — WF-11 met le dossier
+      en pause, et une notification dans l'application n'est pas lue par
+      quelqu'un qui n'ouvre pas l'application. La phrase dit donc aussi où
+      l'information reste, pour qu'un refus n'ait pas l'air d'un renoncement.
+    */
+    siRefuse:
+      "Sans cette autorisation, aucun email ne part, y compris quand un changement met ton dossier en pause. L'alerte reste dans ton dossier, avec la source et sa date : il faut ouvrir l'application pour la voir.",
   },
   {
     // Le même interrupteur couvre le consultant et le partenaire de
@@ -78,6 +87,64 @@ export const CONSENTEMENTS: readonly Consentement[] = [
     description:
       "Statistiques d'usage sans identifiant personnel, pour savoir quels écrans posent problème.",
   },
+];
+
+/**
+ * Ce qui applique chaque autorisation, et ce qui ne l'applique pas.
+ *
+ * ── Trois interrupteurs sur cinq ne commandaient rien ───────────────
+ *
+ * Les cinq autorisations s'affichaient, s'enregistraient, se retiraient —
+ * et trois n'étaient lues par aucun code. « Alertes de changement de
+ * règles : email quand une exigence de ta destination change » était du
+ * nombre : `jobs/divergence` n'ouvrait pas le registre, et l'email partait
+ * pour qui l'avait refusé comme pour qui l'avait accordé. Constaté en
+ * exécution sur une base réelle, avant correction.
+ *
+ * Un interrupteur qui ne commande rien est pire qu'un interrupteur absent :
+ * il fait croire à un choix fait. La table ci-dessous nomme, pour chaque
+ * autorisation, ce qui l'applique — et `null` dit qu'il n'y a rien, avec la
+ * raison, plutôt que de laisser l'absence se découvrir par hasard. Un essai
+ * vérifie que chaque nom cité existe bel et bien dans le dépôt.
+ *
+ * Les deux `null` restants ne se comblent pas d'ici : ce sont des décisions
+ * de produit.
+ *
+ * - **`pieces_financieres`** demanderait de savoir quelles pièces sont
+ *   financières. Le référentiel ne porte aucune catégorie de donnée sur
+ *   `pieces_requises`, et la déduire de l'orthographe du code est
+ *   exactement le piège déjà tombé une fois — `/releve|bancaire|ressources|
+ *   fonds/` décidait d'une durée de validité, et renommer `preuve_fonds`
+ *   faisait disparaître l'échéance. La catégorie se déclare, elle ne se
+ *   devine pas ; l'ajouter au schéma des règles est un arbitrage.
+ * - **`mesure_audience`** ne commande rien parce qu'il n'y a rien à
+ *   commander : aucune mesure d'audience n'existe dans le produit. La
+ *   question est de savoir si l'interrupteur doit attendre la mesure ou
+ *   disparaître jusque-là.
+ */
+export const APPLIQUE_PAR: Record<CodeConsentement, readonly string[] | null> = {
+  pieces_identite: [
+    "src/server/acces/pieces.ts",
+    "src/server/jobs/analyse.ts",
+    "src/server/jobs/balayage.ts",
+  ],
+  alertes_regles: ["src/server/jobs/divergence.ts"],
+  partenaires: ["src/server/lecture/partenaires.ts"],
+  pieces_financieres: null,
+  mesure_audience: null,
+};
+
+/**
+ * Les codes, dans l'ordre d'affichage. La route les lisait dans une copie
+ * littérale : une autorisation ajoutée ici aurait été rendue à l'écran et
+ * refusée à l'enregistrement.
+ *
+ * Le tuple — et non un tableau — parce que `z.enum` en a besoin, et parce
+ * qu'une liste vide n'aurait aucun sens.
+ */
+export const CODES_CONSENTEMENT = CONSENTEMENTS.map((c) => c.code) as unknown as [
+  CodeConsentement,
+  ...CodeConsentement[],
 ];
 
 export type EtatConsentements = Record<CodeConsentement, boolean>;

@@ -17,6 +17,8 @@ import {
   normaliserCode,
 } from "@/domain/comptes/code-verification";
 import {
+  APPLIQUE_PAR,
+  CODES_CONSENTEMENT,
   CONSENTEMENTS,
   CONSENTEMENT_SENSIBLE,
   consentementsActifs,
@@ -105,6 +107,47 @@ describe("consentements — RG-02.1", () => {
     for (const c of CONSENTEMENTS) {
       expect(c.siRefuse ?? "").not.toMatch(/oblig|bloqu|interdit/i);
     }
+  });
+
+  /**
+   * ── La garde qui manquait ─────────────────────────────────────────
+   *
+   * Les essais ci-dessus lisent les textes, l'état initial et le décompte.
+   * Aucun ne demandait si un interrupteur **commande** quelque chose, et
+   * trois sur cinq ne commandaient rien : « Alertes de changement de
+   * règles » du nombre, dont l'email partait pour qui l'avait refusé.
+   *
+   * La garde porte sur la forme : chaque autorisation déclare ce qui
+   * l'applique, et chaque fichier cité lit bien le registre. Un `null` est
+   * une décision écrite, visible dans la diff ; un nom inventé ne passe
+   * pas.
+   */
+  it("chaque autorisation déclare ce qui l'applique, et le fichier cité la lit", () => {
+    expect(Object.keys(APPLIQUE_PAR).sort()).toEqual([...CODES_CONSENTEMENT].sort());
+
+    for (const [code, fichiers] of Object.entries(APPLIQUE_PAR)) {
+      if (fichiers === null) continue;
+      expect(fichiers.length, `« ${code} » déclare une liste vide`).toBeGreaterThan(0);
+      for (const chemin of fichiers) {
+        const source = sansCommentaires(readFileSync(chemin, "utf8"));
+        expect(source, `${chemin} ne lit pas le registre des autorisations`).toMatch(
+          /autorisationAccordee|etatDeLAutorisation/u,
+        );
+        expect(source, `${chemin} ne cite pas « ${code} »`).toContain(`"${code}"`);
+      }
+    }
+  });
+
+  /**
+   * Et la liste affichée est celle que la route accepte : elle était
+   * recopiée à la main dans un `z.enum`, si bien qu'une sixième
+   * autorisation aurait été rendue à l'écran et refusée à
+   * l'enregistrement.
+   */
+  it("la route accepte exactement les codes affichés", () => {
+    const contrat = readFileSync("src/app/api/comptes/consentements/route.ts", "utf8");
+    expect(sansCommentaires(contrat)).toContain("z.enum(CODES_CONSENTEMENT)");
+    expect(CODES_CONSENTEMENT).toEqual(CONSENTEMENTS.map((c) => c.code));
   });
 
   it("accorde le décompte des autorisations actives", () => {
