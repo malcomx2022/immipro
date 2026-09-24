@@ -8,9 +8,12 @@ import {
   POIDS,
   COMPOSANTES_ABSENTES,
   COMPOSANTES_PESEES,
+  MENTION_MONTANTS_NON_PUBLIES,
   perimetreDuClassement,
   type DestinationEvaluable,
 } from "@/domain/simulateur/classement";
+import { versEvaluable } from "@/server/vue/destinations";
+import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
 import type { Reponses } from "@/domain/simulateur/questions";
 import { versXOF, convertible, MENTION_HORS_CLASSEMENT } from "@/domain/format/change";
 import { verdictDeConnexion, aBloquer, libelleEchec, ESSAIS_AVANT_BLOCAGE } from "@/domain/comptes/connexion";
@@ -273,6 +276,7 @@ describe("WF-01 — classement des destinations", () => {
     niveauLangueMin: "B2",
     languesAcceptees: ["en"],
     coutPremiereAnneeXOF: 8_000_000,
+    montantsPublies: true,
     delaiTraitementJours: 90,
     permisEmployeurRequis: true,
     dispositifApresDiplome: "Zoekjaar",
@@ -358,6 +362,62 @@ describe("WF-01 — classement des destinations", () => {
       ((langue! + facilite! + debouches!) / (POIDS.langue + POIDS.facilite + POIDS.debouches)) * 100,
     );
     expect(sansBudget.interne.note).toBe(attendue);
+  });
+
+  /**
+   * Rien de publié n'est pas un coût de zéro — I.C.
+   *
+   * La scolarité et les ressources absentes donnaient `0 + 0 = 0`, et ce
+   * zéro était lu comme un fait : la composante budget était pesée, le
+   * quotient `budget / 0` valait l'infini, la destination obtenait les
+   * vingt points et l'écran l'annonçait en raison favorable. Constaté en
+   * exécution sur la procédure kennismigrant du référentiel, dont
+   * l'autorité ne publie ni l'un ni l'autre :
+   *
+   *     1. Pays-Bas — coût lu 0 · budget pesé 20 sur 20
+   *          + Première année estimée à 0 F, 3 000 000 F de marge sur
+   *            ton budget.
+   *
+   * Le comparateur écrit « Non publié » de la même destination, et la
+   * fiche « Montants non publiés par l'autorité ». Le classement en
+   * faisait la moins chère de toutes.
+   */
+  it("une destination sans montant publié n'est pas la moins chère", () => {
+    const reponses = { objectif: "Étudier", langue: "C1 et plus", budget: "Moins de 4 millions F" };
+    const sansMontant = classer(
+      [{ ...base, coutPremiereAnneeXOF: null, montantsPublies: false }],
+      reponses,
+    ).retenues[0]!;
+
+    expect(sansMontant.interne.detail.budget).toBeNull();
+    expect(sansMontant.causeBudget).toBe("non-publie");
+    // Et la réserve dit la bonne absence : pas un taux de change manquant.
+    expect(sansMontant.reserve).toBe(MENTION_MONTANTS_NON_PUBLIES);
+    expect(sansMontant.reserve).not.toBe(MENTION_HORS_CLASSEMENT);
+    // Aucun motif ne chiffre une première année qui n'a pas été publiée.
+    for (const motif of sansMontant.motifs) {
+      expect(motif.texte).not.toMatch(/Première année estimée/u);
+    }
+  });
+
+  /**
+   * Et l'assemblage depuis le référentiel rend bien `null`, sur la règle
+   * réelle qui a nommé le défaut. Une fixture écrite à la main aurait pu
+   * porter le champ sans que la lecture le pose.
+   */
+  it("le référentiel réel : aucun montant publié rend un coût nul", () => {
+    const kennismigrant = REGLES_DE_REFERENCE.find(
+      (r) => r.visaType === "emploi_kennismigrant",
+    )!;
+    const evaluable = versEvaluable({
+      countryCode: kennismigrant.countryCode,
+      visaType: kennismigrant.visaType,
+      category: kennismigrant.category,
+      rules: kennismigrant.rules,
+    } as never)!;
+
+    expect(evaluable.montantsPublies).toBe(false);
+    expect(evaluable.coutPremiereAnneeXOF).toBeNull();
   });
 
   /**

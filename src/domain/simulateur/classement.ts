@@ -53,6 +53,16 @@ export interface DestinationEvaluable {
    * l'autre.
    */
   coutPremiereAnneeXOF: number | null;
+  /**
+   * L'autorité publie au moins un des deux montants — frais de scolarité
+   * ou ressources à prouver.
+   *
+   * Sans ce champ, `coutPremiereAnneeXOF === null` ne dit pas **pourquoi**
+   * le coût manque, et la réserve affichée au candidat parlait d'un taux
+   * de change absent alors que rien n'avait été publié. Deux absences,
+   * deux phrases : l'une tient à une monnaie, l'autre au référentiel.
+   */
+  montantsPublies: boolean;
   delaiTraitementJours: number | null;
   permisEmployeurRequis: boolean;
   dispositifApresDiplome: string | null;
@@ -151,7 +161,18 @@ export interface Retenue {
  * candidat n'y peut rien, l'autre tient à une question qu'il n'a pas
  * remplie et qu'il peut remplir.
  */
-export type CauseBudgetNonPese = "monnaie" | "non-declare";
+export type CauseBudgetNonPese = "monnaie" | "non-publie" | "non-declare";
+
+/**
+ * Ce que dit la réserve quand l'autorité ne publie aucun des deux montants.
+ *
+ * Elle ne se confond pas avec celle de la monnaie sans parité : là, un
+ * montant existe et n'est pas convertible ; ici, il n'y a pas de montant.
+ * Le comparateur écrit déjà « Non publié » de la même destination, et la
+ * fiche « Montants non publiés par l'autorité » — trois écrans, un fait.
+ */
+export const MENTION_MONTANTS_NON_PUBLIES =
+  "L'autorité ne publie ni frais ni ressources à prouver pour cette procédure : le coût de la première année n'est pas comparé à ton budget, et le budget n'entre pas dans le classement de cette destination.";
 
 export interface Ecartee {
   destination: DestinationEvaluable;
@@ -326,6 +347,9 @@ function causeDuBudgetNonPese(
   d: DestinationEvaluable,
   profil: Profil,
 ): CauseBudgetNonPese | null {
+  // L'absence de montant publié passe d'abord : elle explique le `null`
+  // que la monnaie expliquerait à tort.
+  if (!d.montantsPublies) return "non-publie";
   if (d.coutPremiereAnneeXOF === null) return "monnaie";
   if (profil.budget === 0) return "non-declare";
   return null;
@@ -452,6 +476,7 @@ export const TROIS_MEILLEURES = 3;
  */
 function reserveDuBudget(cause: CauseBudgetNonPese | null, coutXOF: number | null): string | null {
   if (cause === null) return null;
+  if (cause === "non-publie") return MENTION_MONTANTS_NON_PUBLIES;
   if (cause === "monnaie") return MENTION_HORS_CLASSEMENT;
   // « non-declare » implique un coût connu : `causeDuBudgetNonPese` rend
   // « monnaie » dès qu'il manque, et la monnaie passe d'abord. Le type ne le
