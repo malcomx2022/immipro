@@ -8,7 +8,11 @@ import { compteur } from "@/server/acces/quota";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import { trierDossiers } from "@/domain/dossiers/dossier";
 import type { Piece } from "@/domain/dossiers/piece";
-import { estEncoreDemandee, grouperPourCompletude } from "@/domain/dossiers/piece";
+import {
+  delaiDobtentionDepense,
+  estEncoreDemandee,
+  grouperPourCompletude,
+} from "@/domain/dossiers/piece";
 import type { Echeance } from "@/domain/dossiers/echeancier";
 import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
 import type { CalendrierAEvaluer } from "@/domain/dossiers/faisabilite";
@@ -225,6 +229,7 @@ export function calendrierAEvaluer(
         libelle: d.label,
         delaiJours: delaiDe(d.code),
         obligatoire: d.required,
+        dejaEnMain: delaiDobtentionDepense(d.status),
       })),
   };
 }

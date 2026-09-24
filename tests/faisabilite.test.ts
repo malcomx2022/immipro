@@ -12,6 +12,9 @@ import {
   type PieceAObtenir,
 } from "@/domain/dossiers/faisabilite";
 import { calendrierAEvaluer } from "@/server/lecture/dossiers";
+import { delaiDobtentionDepense } from "@/domain/dossiers/piece";
+import type { DocumentState } from "@/domain/completeness/score";
+import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
 import {
   INTERDITS_ECRAN_CANDIDAT,
   verifierTexte,
@@ -31,7 +34,14 @@ const piece = (
   code: string,
   delaiJours: number | null,
   obligatoire = true,
-): PieceAObtenir => ({ code, libelle: `Pièce ${code}`, delaiJours, obligatoire });
+  dejaEnMain = false,
+): PieceAObtenir => ({
+  code,
+  libelle: `Pièce ${code}`,
+  delaiJours,
+  obligatoire,
+  dejaEnMain,
+});
 
 const calendrier = (
   partiel: Partial<CalendrierAEvaluer> = {},
@@ -324,5 +334,127 @@ describe("WF-09.4 — ce que les phrases ne disent pas", () => {
     expect(assemble).not.toMatch(/\d\s?%/u);
     // Une date atteignable ne dit rien de la décision de l'administration.
     expect(assemble).not.toMatch(/obtiendra|accept|refus/iu);
+  });
+});
+
+/**
+ * Une pièce déjà déposée ne se réobtient pas — correctif du 24/09/2026.
+ *
+ * Le calendrier comptait, pour chaque pièce encore demandée, « demandée
+ * aujourd'hui, elle arrive dans N jours ». La phrase le dit mot pour mot.
+ * Pour une pièce déjà déposée, la prémisse est fausse : le fichier est sur
+ * nos serveurs. Constaté en exécution, procédure néerlandaise, départ visé
+ * au 5 janvier 2027, dépôt calculé au 7 octobre 2026 — devant nous :
+ *
+ *     diplôme déposé, en cours de lecture -> INTENABLE, manque 17 j
+ *     diplôme pas encore déposé           -> INTENABLE, manque 17 j
+ *     diplôme accepté (témoin)            -> TENABLE
+ *
+ * Le même verdict, et le même bandeau « Une pièce obligatoire ne peut plus
+ * arriver à temps », pour celui qui a tout envoyé et pour celui qui n'a
+ * rien commencé.
+ */
+describe("une pièce déjà entre les mains du candidat ne se réobtient pas", () => {
+  const REGLE = REGLES_DE_REFERENCE.find(
+    (r) => r.countryCode === "NL" && r.visaType === "etudes_mvv_vvr",
+  )!;
+  const LE_JOUR = new Date("2026-09-24T00:00:00Z");
+  /* Assez loin pour que la date de dépôt soit devant nous : sans cela le
+     verdict serait INTENABLE par `depotPasse`, et ne prouverait rien. */
+  const CIBLE = new Date("2027-01-05T00:00:00Z");
+
+  const verdictPour = (status: DocumentState) =>
+    evaluerLeCalendrier(
+      calendrierAEvaluer(
+        {
+          targetDate: CIBLE,
+          visaRule: REGLE as never,
+          documents: [
+            {
+              code: "diplome",
+              label: "Diplôme le plus élevé",
+              status,
+              remedy: "TELEVERSER",
+              required: true,
+            },
+          ],
+        },
+        LE_JOUR,
+      ),
+    );
+
+  it("la date de dépôt est bien devant nous : le verdict ne vient que du délai", () => {
+    expect(verdictPour("ATTENDUE").depotPasse).toBe(false);
+  });
+
+  /** Le cas du défaut, et son témoin. */
+  it("déposée et en cours de lecture, elle ne « ne peut plus arriver à temps »", () => {
+    expect(verdictPour("ATTENDUE").etat).toBe("INTENABLE");
+    expect(verdictPour("EN_ANALYSE").etat).toBe("TENABLE");
+    expect(verdictPour("EN_ANALYSE").enRetard).toEqual([]);
+    expect(verdictPour("CONFORME").etat).toBe("TENABLE");
+  });
+
+  /** Illisible : un nouveau scan, pas une nouvelle démarche. */
+  it("illisible, le document reste obtenu", () => {
+    expect(verdictPour("ILLISIBLE").etat).toBe("TENABLE");
+  });
+
+  /**
+   * Et la frontière tient de l'autre côté : les états qui demandent
+   * vraiment une nouvelle démarche continuent de compter leur délai. La
+   * fausse alerte se corrige en changeant une date ; la fausse assurance
+   * se découvre au guichet.
+   */
+  it("les états qui demandent une nouvelle démarche comptent toujours", () => {
+    for (const status of ["ATTENDUE", "EXPIREE", "HORS_SUJET", "PURGEE", "A_CORRIGER"] as const) {
+      expect(verdictPour(status).etat, status).toBe("INTENABLE");
+    }
+  });
+
+  /**
+   * Une pièce en main n'est pas non plus une inconnue : ignorer son délai
+   * n'est pas l'ignorer elle, elle est arrivée. La compter en
+   * « indéterminé » rangerait un dossier complet dans « nous ne pouvons
+   * pas conclure ».
+   */
+  it("une pièce en main dont le délai est inconnu ne rend pas le calendrier indéterminé", () => {
+    const verdict = evaluerLeCalendrier(
+      calendrier({ aObtenir: [piece("acte", null, true, true)] }),
+    );
+    expect(verdict.etat).toBe("TENABLE");
+    expect(verdict.inconnues).toEqual([]);
+  });
+
+  /** La replanification ne rallonge pas pour un délai déjà dépensé. */
+  it("la date proposée ne compte pas le délai d'une pièce déjà déposée", () => {
+    const enMain = premiereDateCibleTenable(
+      calendrier({ aObtenir: [piece("diplome", 30, true, true)] }),
+    );
+    const aObtenir = premiereDateCibleTenable(
+      calendrier({ aObtenir: [piece("diplome", 30, true, false)] }),
+    );
+    expect(enAjoutant(enMain.date, 30)).toBe(aObtenir.date);
+    expect(enMain.fondeeSur).toEqual([]);
+  });
+
+  /**
+   * Le `switch` est exhaustif : un état nouveau ne compile pas tant que
+   * personne n'a dit de quel côté il tombe. Cet essai le vérifie sur la
+   * liste réelle des états, et non sur ceux qu'on a pensé à citer.
+   */
+  it("chaque état de pièce est arbitré", () => {
+    const tous: DocumentState[] = [
+      "ATTENDUE", "EN_ANALYSE", "CONFORME", "A_CORRIGER",
+      "ILLISIBLE", "HORS_SUJET", "EXPIREE", "PURGEE",
+    ];
+    for (const etat of tous) {
+      expect(() => delaiDobtentionDepense(etat), etat).not.toThrow();
+    }
+    expect(tous.filter(delaiDobtentionDepense).sort()).toEqual([
+      "CONFORME",
+      "EN_ANALYSE",
+      "ILLISIBLE",
+    ]);
   });
 });

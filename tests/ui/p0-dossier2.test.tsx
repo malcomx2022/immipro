@@ -477,6 +477,7 @@ describe("C-10 — Échéancier", () => {
           libelle: "Passeport biométrique",
           delaiJours: 400,
           obligatoire: true,
+          dejaEnMain: false,
         },
       ],
     };
