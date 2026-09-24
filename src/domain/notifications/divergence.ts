@@ -41,12 +41,43 @@ import {
  * versions, et se tait sur ce qui n'a pas bougé.
  */
 
+/** Un montant du référentiel, dans la monnaie de l'autorité qui l'exige. */
+export interface MontantExige {
+  valeur: number;
+  devise: string;
+}
+
 export interface VersionRegle {
   /** Rang de version du référentiel `visa_rules` (`Application.visaRuleId`). */
   numero: number;
-  /** Montant exigé, dans la devise de la règle. */
-  montant: number;
-  devise: string;
+  /**
+   * Montant exigé, ou `null` quand l'autorité n'en publie aucun.
+   *
+   * ── Pourquoi `null`, et pourquoi c'est le type qui le porte ─────
+   *
+   * Le champ valait `number` et l'appelant écrivait `fonds?.valeur ?? 0`.
+   * Deux des quatre procédures livrées ne publient pas de ressources à
+   * prouver, et l'écran d'arbitrage leur donnait un chiffre. Constaté en
+   * exécution :
+   *
+   *     carte v1 : « 21 000 € » / « à prouver, pour l'année »
+   *     carte v2 : « 0 € »      / « aucune ressource à prouver »
+   *     « Ce que ça change » : … et il te faut -21 000 € de plus.
+   *     option MIGRER : Ta checklist passe à la version 2, avec 0 € à
+   *                     prouver.
+   *
+   * « 0 € à prouver » annonce que l'autorité a supprimé son exigence ;
+   * elle n'en publie simplement pas. Et « -21 000 € de plus » n'est pas
+   * une phrase. C'est la règle que `domain/backoffice/couts` énonce pour
+   * lui-même — « un tiret ne dit rien ; un zéro affirme » — appliquée au
+   * mauvais sens sur l'écran où le candidat choisit la version qui
+   * gouvernera son dossier.
+   *
+   * `null` plutôt qu'un couple de champs facultatifs : la valeur et sa
+   * devise ne s'absentent jamais séparément, et les séparer est ce qui a
+   * permis d'écrire `0` avec une devise vide.
+   */
+  montant: MontantExige | null;
   /** Ce que le montant couvre : « sur compte bloqué ». */
   intitule: string;
   publieeLe: string;
@@ -78,7 +109,7 @@ export const ceQuiSepare = (
   nouvelle: VersionRegle,
   pieces: EvolutionDesPieces = AUCUNE_PIECE,
 ): Ecart => ({
-  montant: ancienne.montant !== nouvelle.montant || ancienne.devise !== nouvelle.devise,
+  montant: !memeMontant(ancienne.montant, nouvelle.montant),
   delai:
     (ancienne.delai?.min ?? null) !== (nouvelle.delai?.min ?? null) ||
     (ancienne.delai?.max ?? null) !== (nouvelle.delai?.max ?? null),
@@ -87,6 +118,19 @@ export const ceQuiSepare = (
     pieces.retirees.length > 0 ||
     pieces.validites.length > 0,
 });
+
+/**
+ * Deux montants exigés sont-ils le même ?
+ *
+ * Une absence n'égale qu'une absence : une version qui ne publie rien et
+ * une version qui exige vingt et un mille diffèrent, et c'est bien un
+ * écart dont le candidat doit être averti — mais pas un écart *chiffré*,
+ * ce que `ecartMontant` tranche à part.
+ */
+const memeMontant = (a: MontantExige | null, b: MontantExige | null): boolean =>
+  a === null || b === null
+    ? a === b
+    : a.valeur === b.valeur && a.devise === b.devise;
 
 export const AUCUNE_PIECE: EvolutionDesPieces = { ajoutees: [], retirees: [], validites: [] };
 
@@ -196,14 +240,43 @@ export const libelleDelaiVersion = (version: VersionRegle): string =>
 
 export type Arbitrage = "MIGRER" | "CONSERVER";
 
-export const ecartMontant = (ancienne: VersionRegle, nouvelle: VersionRegle): number =>
-  nouvelle.montant - ancienne.montant;
+/**
+ * De combien la nouvelle version change l'exigence — ou `null` quand la
+ * question n'a pas de réponse chiffrée.
+ *
+ * Elle n'en a pas dans deux cas, et les confondre avec zéro est ce qui
+ * produisait des phrases fausses :
+ *
+ * - **l'une des deux ne publie rien.** Soustraire un montant d'une
+ *   absence donnait `-21 000`, et l'écran en tirait « il te faut
+ *   -21 000 € de plus » ;
+ * - **les monnaies diffèrent.** Vingt et un mille francs suisses moins
+ *   mille euros ne fait aucun nombre. Le cas est rare — une autorité
+ *   change rarement de monnaie — mais la soustraction ne le dit pas, et
+ *   le produit refuse ailleurs jusqu'aux conversions à parité fixe.
+ *
+ * L'écart garde sa devise avec lui : c'est ce qui empêche l'appelant de
+ * le remettre en forme dans une autre.
+ */
+export const ecartMontant = (
+  ancienne: VersionRegle,
+  nouvelle: VersionRegle,
+): MontantExige | null =>
+  ancienne.montant !== null &&
+  nouvelle.montant !== null &&
+  ancienne.montant.devise === nouvelle.montant.devise
+    ? {
+        valeur: nouvelle.montant.valeur - ancienne.montant.valeur,
+        devise: nouvelle.montant.devise,
+      }
+    : null;
 
 /**
  * Ce que le changement implique, en fonction de la date de dépôt.
  *
  * Le montant supplémentaire arrive déjà mis en forme : la devise est une
- * affaire de présentation, et le domaine ne la met pas en forme.
+ * affaire de présentation, et le domaine ne la met pas en forme. Il arrive
+ * en **valeur absolue**, et le sens se dit ici : voir ci-dessous.
  *
  * Le prototype ajoutait une conversion — « soit environ 456 000 F ». Le taux
  * de 655,957 F a été retiré de P-06 et de $-02 : afficher une conversion
@@ -213,7 +286,11 @@ export const ecartMontant = (ancienne: VersionRegle, nouvelle: VersionRegle): nu
 export function libelleImpact(
   ancienne: VersionRegle,
   nouvelle: VersionRegle,
-  ecartFormate: string,
+  /**
+   * L'écart, **en valeur absolue** et déjà mis en forme, ou `null` quand
+   * il n'y a pas d'écart chiffrable — voir `ecartMontant`.
+   */
+  ecartFormate: string | null,
   /**
    * Date de **dépôt**, jamais la date cible.
    *
@@ -230,13 +307,26 @@ export function libelleImpact(
     : "dès sa publication";
 
   /*
-    Ce que la nouvelle version demande de plus — et rien quand elle ne
-    demande rien de plus. « Il te faut 0 € de plus » est la phrase qu'on
-    lisait quand seul le délai avait changé : elle donne un chiffre pour
-    ne rien dire, et elle éteint la seule qui comptait.
+    Ce que la nouvelle version change à l'exigence — et rien quand elle
+    n'y change rien. « Il te faut 0 € de plus » est la phrase qu'on lisait
+    quand seul le délai avait changé : elle donne un chiffre pour ne rien
+    dire, et elle éteint la seule qui comptait.
+
+    Le sens se dit ici, parce que « de plus » n'était pas vérifié. Une
+    autorité qui **abaisse** son exigence produisait « il te faut -3 000 €
+    de plus » — constaté en exécution sur deux versions entièrement
+    publiées, dans la même monnaie. Et quand l'écart n'est pas chiffrable,
+    la phrase nomme ce qui change sans avancer de nombre : c'est le seul
+    cas où le candidat doit aller lire les deux cartes.
   */
   const ecart = ceQuiSepare(ancienne, nouvelle);
-  const enPlus = ecart.montant ? `, et il te faut ${ecartFormate} de plus` : "";
+  const enPlus = !ecart.montant
+    ? ""
+    : ecartFormate === null
+      ? `, et ce qu'elle demande à prouver n'est pas le même`
+      : ecartMontant(ancienne, nouvelle)!.valeur > 0
+        ? `, et il te faut ${ecartFormate} de plus`
+        : `, et elle demande ${ecartFormate} de moins`;
   const calendrier = ecart.delai
     ? ` Son délai d'instruction est de ${delaiLisible(nouvelle.delai ?? null)} : ton échéancier se recalcule sur ce délai.`
     : "";
@@ -269,8 +359,13 @@ export interface OptionArbitrage {
 export function optionsArbitrage(
   ancienne: VersionRegle,
   nouvelle: VersionRegle,
-  montantAncien: string,
-  montantNouveau: string,
+  /**
+   * Les deux montants, déjà mis en forme, ou `null` quand l'autorité n'en
+   * publie pas. `null` et non une chaîne vide : une chaîne vide se
+   * concatène sans bruit et donnait « , avec  à prouver ».
+   */
+  montantAncien: string | null,
+  montantNouveau: string | null,
   pieces: EvolutionDesPieces = AUCUNE_PIECE,
   /**
    * RG-14.1. Ce qui empêche de migrer, quand quelque chose l'empêche.
@@ -323,15 +418,26 @@ export function optionsArbitrage(
 /**
  * « , avec 13 000 € à prouver et un délai de 60–150 jours » — et rien pour
  * ce qui n'a pas bougé.
+ *
+ * Sans montant publié, la formule nomme l'absence plutôt que de chiffrer :
+ * « avec 0 € à prouver » annonçait que l'autorité avait supprimé son
+ * exigence, là où elle n'en publie simplement aucune. Deux des quatre
+ * procédures livrées sont dans ce cas.
  */
 function etCeQuiChange(
   ecart: Ecart,
-  montant: string,
+  montant: string | null,
   delai: Delai | undefined,
   surLaChecklist: string | null,
 ): string {
   const parts: string[] = [];
-  if (ecart.montant) parts.push(`${montant} à prouver`);
+  if (ecart.montant) {
+    parts.push(
+      montant === null
+        ? "des ressources à prouver que l'autorité ne publie pas"
+        : `${montant} à prouver`,
+    );
+  }
   if (ecart.delai) parts.push(`un délai d'instruction de ${delaiLisible(delai ?? null)}`);
   if (ecart.pieces && surLaChecklist) parts.push(surLaChecklist);
   if (parts.length === 0) return "";
@@ -441,6 +547,17 @@ export function confirmationDArbitrage(
 }
 
 export const MENTION_SANS_ACCORD = "Nous ne modifions rien sans ton accord.";
+
+/**
+ * Ce que la carte d'une version affiche à la place du montant quand
+ * l'autorité n'en publie aucun.
+ *
+ * Elle occupe la ligne du chiffre, en toutes lettres. Laisser la ligne
+ * vide ferait chercher une donnée qui n'a pas été perdue ; « 0 € »
+ * affirmait une exigence nulle. La phrase dit d'où vient le silence —
+ * c'est l'autorité qui ne publie pas, pas la plateforme qui ne sait pas.
+ */
+export const MENTION_SANS_MONTANT = "Aucun montant publié";
 
 export const MENTION_HISTORIQUE =
   "L'ancienne version reste consultable dans l'historique de la fiche.";

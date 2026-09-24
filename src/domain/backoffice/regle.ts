@@ -56,9 +56,15 @@ export interface Regle {
   procedure: string;
   niveauSource: NiveauSource;
   source: string;
-  /** Montant exigé, dans la devise de la règle. */
-  montant: number;
-  devise: string;
+  /**
+   * Montant exigé, ou `null` quand l'autorité n'en publie aucun.
+   *
+   * Même correctif que `VersionRegle` côté candidat, et pour la même
+   * raison : `fonds?.valeur ?? 0` avec une devise vide écrivait « 0 € »
+   * dans le champ de B-02, et la ligne de comparaison N/N+1 annonçait une
+   * exigence passée à zéro là où l'autorité n'en publie simplement pas.
+   */
+  montant: MontantExige | null;
   intituleMontant: string;
   /** Entrée en vigueur, ISO. */
   applicableDepuis: string;
@@ -226,6 +232,30 @@ export interface Difference {
 }
 
 /**
+ * Ce qu'une ligne de B-02 affiche à la place du montant quand l'autorité
+ * n'en publie aucun. Formulée pour un opérateur : elle nomme la source du
+ * silence, parce que c'est ce qu'il doit vérifier avant de publier.
+ */
+export const MENTION_SANS_MONTANT = "Aucun montant publié par l'autorité";
+
+/** Un montant du référentiel, dans la monnaie de l'autorité qui l'exige. */
+export interface MontantExige {
+  valeur: number;
+  devise: string;
+}
+
+/**
+ * Le montant tel qu'une ligne l'affiche. L'absence se dit, elle ne se
+ * chiffre pas : « 0 € » affirme une exigence nulle, une phrase n'affirme
+ * rien de plus que le silence de l'autorité.
+ */
+export const montantLisible = (
+  montant: MontantExige | null,
+  formater: (valeur: number, devise: string) => string,
+  sansMontant: string,
+): string => (montant === null ? sansMontant : formater(montant.valeur, montant.devise));
+
+/**
  * Comparaison N / N+1. Les champs inchangés sont conservés dans la liste,
  * marqués comme tels : une comparaison qui masque ce qui n'a pas bougé
  * laisse croire qu'on ne l'a pas regardé.
@@ -234,13 +264,15 @@ export function comparer(
   enVigueur: Regle,
   brouillon: Regle,
   formaterMontant: (montant: number, devise: string) => string,
+  /** Ce qu'affiche la ligne quand l'autorité ne publie pas de montant. */
+  sansMontant: string,
   formaterJour: (iso: string) => string,
 ): Difference[] {
   return [
     {
       champ: brouillon.intituleMontant,
-      avant: formaterMontant(enVigueur.montant, enVigueur.devise),
-      apres: formaterMontant(brouillon.montant, brouillon.devise),
+      avant: montantLisible(enVigueur.montant, formaterMontant, sansMontant),
+      apres: montantLisible(brouillon.montant, formaterMontant, sansMontant),
     },
     {
       champ: "Applicable aux dépôts à partir du",

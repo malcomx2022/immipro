@@ -394,7 +394,10 @@ describe("T-01 — alertes", () => {
 
 describe("T-02 — divergence réglementaire", () => {
   it("calcule l'écart entre les deux versions", () => {
-    expect(ecartMontant(REGLE_ANCIENNE, REGLE_NOUVELLE)).toBe(696);
+    expect(ecartMontant(REGLE_ANCIENNE, REGLE_NOUVELLE)).toEqual({
+      valeur: 696,
+      devise: "EUR",
+    });
   });
 
   /**

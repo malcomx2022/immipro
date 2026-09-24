@@ -889,8 +889,8 @@ function versRegle(regle: {
     procedure: p.libelle,
     niveauSource: regle.sourceTier as import("@/domain/backoffice/regle").NiveauSource,
     source: hote(regle.sourceUrl),
-    montant: fonds?.valeur ?? 0,
-    devise: fonds?.devise ?? "",
+    // `null` quand l'autorité ne publie rien : voir `Regle.montant`.
+    montant: fonds ? { valeur: fonds.valeur, devise: fonds.devise } : null,
     intituleMontant: fonds
       ? `Ressources à prouver, ${fonds.periodicite === "mensuel" ? "par mois" : "pour l'année"}`
       : "Aucune ressource à prouver",

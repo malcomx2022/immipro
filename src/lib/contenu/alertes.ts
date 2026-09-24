@@ -95,8 +95,7 @@ export const ALERTES: readonly Alerte[] = [
  */
 export const REGLE_ANCIENNE: VersionRegle = {
   numero: 4,
-  montant: 11208,
-  devise: "EUR",
+  montant: { valeur: 11208, devise: "EUR" },
   intitule: "sur compte bloqué",
   publieeLe: "2026-01-12",
   applicableJusquau: "2026-12-31",
@@ -104,8 +103,7 @@ export const REGLE_ANCIENNE: VersionRegle = {
 
 export const REGLE_NOUVELLE: VersionRegle = {
   numero: 5,
-  montant: 11904,
-  devise: "EUR",
+  montant: { valeur: 11904, devise: "EUR" },
   intitule: "sur compte bloqué",
   publieeLe: "2026-09-09",
   applicableDepuis: "2027-01-01",

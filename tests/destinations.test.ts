@@ -96,6 +96,42 @@ describe("formatMontant — copie du prototype", () => {
     expect(normalise(formatMontant(12, "EUR"))).toBe("12 €");
     expect(normalise(formatMontant(1130.77, "EUR"))).toBe("1 130,77 €");
   });
+
+  /**
+   * Le dernier cas rendait l'euro. Pas « par défaut » : **toujours**.
+   * Constaté en exécution sur le référentiel livré :
+   *
+   *     CH/etudes_permis_b : devise réelle = CHF | affiché = « 21 000 € »
+   *
+   * Le produit retire ailleurs jusqu'aux conversions à parité fixe pour ne
+   * pas donner « pour un montant opposable ce qui n'est qu'un ordre de
+   * grandeur ». Afficher une somme dans une monnaie que l'autorité
+   * n'emploie pas est le même défaut, et il ne s'annonce même pas comme
+   * une conversion.
+   */
+  it("écrit toute autre devise avec la sienne, et jamais en euros", () => {
+    expect(normalise(formatMontant(21000, "CHF"))).toBe("21 000 CHF");
+    expect(formatMontant(21000, "CHF")).not.toContain("€");
+    expect(normalise(formatMontant(3000, "AED"))).toBe("3 000 AED");
+    expect(normalise(formatMontant(21000, "USD"))).toBe("21 000 USD");
+  });
+
+  /**
+   * Et la garde qui porte sur le produit livré, non sur des exemples
+   * choisis : chaque procédure du référentiel affiche sa propre monnaie.
+   * C'est cette lecture-là qui a trouvé le défaut.
+   */
+  it("chaque procédure du référentiel s'affiche dans sa monnaie", () => {
+    const montants = REGLES_DE_REFERENCE.map((r) => visaRulesSchema.parse(r.rules).preuve_fonds)
+      .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined);
+    expect(montants.length).toBeGreaterThan(0);
+    for (const f of montants) {
+      const rendu = formatMontant(f.valeur, f.devise);
+      if (f.devise === "XOF") expect(rendu).toContain("F");
+      else if (f.devise === "EUR") expect(rendu).toContain("€");
+      else expect(rendu).toContain(f.devise);
+    }
+  });
 });
 
 /**

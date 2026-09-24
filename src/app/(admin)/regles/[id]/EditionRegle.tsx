@@ -17,7 +17,9 @@ import {
   comparer,
   compterChangements,
   effetDeLaPublication,
+  MENTION_SANS_MONTANT,
   messageDeRefus,
+  montantLisible,
   publiable,
   verifierTextesCandidat,
   visiblePourLeCandidat,
@@ -191,6 +193,7 @@ export function EditionRegle({
     enVigueur,
     { ...brouillon, ...textes },
     formatMontant,
+    MENTION_SANS_MONTANT,
     jourEnFrancais,
   );
   const effet = effetDeLaPublication(dossiersConcernes, dossiersSousLaNouvelleRegle);
@@ -248,8 +251,8 @@ export function EditionRegle({
 
             <Champ
               libelle={brouillon.intituleMontant}
-              valeur={formatMontant(brouillon.montant, brouillon.devise)}
-              note={`Modifié · version ${enVigueur.version} : ${formatMontant(enVigueur.montant, enVigueur.devise)}`}
+              valeur={montantLisible(brouillon.montant, formatMontant, MENTION_SANS_MONTANT)}
+              note={`Modifié · version ${enVigueur.version} : ${montantLisible(enVigueur.montant, formatMontant, MENTION_SANS_MONTANT)}`}
             />
             <Champ
               libelle="Applicable aux dépôts à partir du"

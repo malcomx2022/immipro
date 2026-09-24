@@ -14,6 +14,7 @@ import {
   type VersionRegle,
 } from "@/domain/notifications/divergence";
 import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
+import { formatMontant } from "@/lib/utils";
 
 /**
  * Ce qu'un arbitrage doit montrer — T-02, correctif du 22/09/2026.
@@ -35,8 +36,7 @@ import type { EvolutionDesPieces } from "@/domain/rules/comparaison";
 
 const V1: VersionRegle = {
   numero: 1,
-  montant: 11500,
-  devise: "EUR",
+  montant: { valeur: 11500, devise: "EUR" },
   intitule: "sur compte bloqué",
   publieeLe: "2026-01-01",
   applicableJusquau: "2026-08-31",
@@ -46,7 +46,7 @@ const V1: VersionRegle = {
 const V2: VersionRegle = {
   ...V1,
   numero: 2,
-  montant: 13000,
+  montant: { valeur: 13000, devise: "EUR" },
   publieeLe: "2026-06-01",
   applicableDepuis: "2026-09-01",
   delai: { min: 60, max: 150 },
@@ -55,8 +55,25 @@ const V2: VersionRegle = {
 const sansLeMontant = { ...V2, montant: V1.montant };
 const sansLeDelai = { ...V2, delai: V1.delai };
 
+/**
+ * Le même calcul que l'écran, et non une mise en forme réécrite ici.
+ *
+ * Le montage composait `${ecartMontant(a, b)} €` : il ne passait donc pas
+ * par `formatMontant`, ne voyait pas la devise, et prenait le signe tel
+ * quel. C'est ce qui a rendu « il te faut -3 000 € de plus » invisible
+ * pendant que cet essai restait vert. La valeur absolue et la devise
+ * réelle sont ce que `DivergenceReglementaire` passe.
+ */
+const ecartFormate = (a: VersionRegle, b: VersionRegle): string | null => {
+  const ecart = ecartMontant(a, b);
+  return ecart === null ? null : formatMontant(Math.abs(ecart.valeur), ecart.devise);
+};
+
 const impact = (a: VersionRegle, b: VersionRegle, depot?: string) =>
-  libelleImpact(a, b, `${ecartMontant(a, b)} €`, depot);
+  libelleImpact(a, b, ecartFormate(a, b), depot);
+
+/** `Intl` sépare les milliers par une espace fine insécable. */
+const normalise = (s: string) => s.replace(/\s/gu, " ");
 
 describe("ce qui sépare deux versions", () => {
   it("le montant seul, le délai seul, ou les deux", () => {
@@ -75,7 +92,7 @@ describe("ce qui sépare deux versions", () => {
 
   /** Changer de devise change le montant exigé, même à valeur égale. */
   it("un changement de devise est un changement de montant", () => {
-    expect(ceQuiSepare(V1, { ...V1, devise: "CHF" }).montant).toBe(true);
+    expect(ceQuiSepare(V1, { ...V1, montant: { valeur: 11500, devise: "CHF" } }).montant).toBe(true);
   });
 
   /** Une version sans délai renseigné n'est pas une version sans délai. */
@@ -103,7 +120,7 @@ describe("« ce que ça change pour ton dossier »", () => {
 
   /** Le montant reste dit quand il bouge : rien n'est retiré. */
   it("le montant supplémentaire est toujours annoncé quand il change", () => {
-    expect(impact(V1, V2, DEPOT_SOUS_LA_NOUVELLE)).toContain("1500 € de plus");
+    expect(normalise(impact(V1, V2, DEPOT_SOUS_LA_NOUVELLE))).toContain("1 500 € de plus");
   });
 
   it("et le délai n'est pas cité quand il n'a pas bougé", () => {
@@ -440,5 +457,91 @@ describe("la confirmation d'arbitrage", () => {
         expect(texte).not.toContain("restera ");
       }
     }
+  });
+});
+
+/**
+ * Le montant qu'aucune autorité ne publie, et celui qui baisse — 24/09/2026.
+ *
+ * Quatre phrases fausses tenaient au même défaut : un montant absent était
+ * écrit `0` avec une devise vide, et le signe de l'écart n'était pas
+ * relu. Constaté en exécution avant correction :
+ *
+ *     carte v1 : « 21 000 € » / « à prouver, pour l'année »
+ *     carte v2 : « 0 € »      / « aucune ressource à prouver »
+ *     « Ce que ça change » : … et il te faut -21 000 € de plus.
+ *     option MIGRER : … avec 0 € à prouver.
+ *
+ * et, sur deux versions entièrement publiées dans la même monnaie :
+ *
+ *     24 000 € → 21 000 € : … et il te faut -3 000 € de plus.
+ */
+describe("un montant que l'autorité ne publie pas n'est pas un montant nul", () => {
+  const publie = (numero: number, valeur: number, devise = "EUR"): VersionRegle => ({
+    numero,
+    montant: { valeur, devise },
+    intitule: "à prouver, pour l'année",
+    publieeLe: "2026-01-01",
+    applicableDepuis: "2026-02-01",
+  });
+  const muette = (numero: number): VersionRegle => ({
+    numero,
+    montant: null,
+    intitule: "aucune ressource à prouver",
+    publieeLe: "2026-01-01",
+    applicableDepuis: "2026-02-01",
+  });
+  const DEPOT = "2026-03-01";
+
+  it("l'écart n'est pas chiffrable quand l'une des deux ne publie rien", () => {
+    expect(ecartMontant(publie(1, 21000), muette(2))).toBeNull();
+    expect(ecartMontant(muette(1), publie(2, 21000))).toBeNull();
+    expect(ecartMontant(muette(1), muette(2))).toBeNull();
+  });
+
+  /** Ni quand les monnaies diffèrent : la soustraction ne dirait rien. */
+  it("ni quand les monnaies diffèrent", () => {
+    expect(ecartMontant(publie(1, 21000, "CHF"), publie(2, 21000, "EUR"))).toBeNull();
+  });
+
+  it("mais la différence reste un écart, et la phrase le dit sans chiffre", () => {
+    expect(ceQuiSepare(publie(1, 21000), muette(2)).montant).toBe(true);
+    const texte = impact(publie(1, 21000), muette(2), DEPOT);
+    expect(texte).toContain("ce qu'elle demande à prouver n'est pas le même");
+    expect(texte).not.toContain("de plus");
+    expect(texte).not.toContain("0 €");
+    expect(texte).not.toContain("-");
+  });
+
+  /** Deux absences ne sont pas un écart : il n'y a rien à annoncer. */
+  it("deux versions muettes ne séparent rien sur le montant", () => {
+    expect(ceQuiSepare(muette(1), muette(2)).montant).toBe(false);
+    expect(impact(muette(1), muette(2), DEPOT)).not.toContain("prouver");
+  });
+
+  /**
+   * Le cas qui ne tient à aucune absence : l'autorité **abaisse** son
+   * exigence, et « de plus » devenait « -3 000 € de plus ».
+   */
+  it("une exigence abaissée se dit « de moins », jamais « -X de plus »", () => {
+    const texte = normalise(impact(publie(1, 24000), publie(2, 21000), DEPOT));
+    expect(texte).toContain("3 000 € de moins");
+    expect(texte).not.toContain("de plus");
+    expect(texte).not.toContain("-3 000");
+  });
+
+  /** Et l'option d'arbitrage nomme l'absence plutôt que de chiffrer zéro. */
+  it("l'option de migration n'annonce pas « 0 € à prouver »", () => {
+    const ancienne = publie(1, 21000);
+    const nouvelle = muette(2);
+    const options = optionsArbitrage(
+      ancienne,
+      nouvelle,
+      formatMontant(ancienne.montant!.valeur, ancienne.montant!.devise),
+      null,
+    );
+    const migrer = options.find((o) => o.cle === "MIGRER")!;
+    expect(migrer.detail).toContain("des ressources à prouver que l'autorité ne publie pas");
+    expect(migrer.detail).not.toContain("0 €");
   });
 });

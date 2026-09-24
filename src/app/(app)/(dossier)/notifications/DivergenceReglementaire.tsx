@@ -14,6 +14,7 @@ import {
   AUCUNE_PIECE,
   MENTION_HISTORIQUE,
   MENTION_SANS_ACCORD,
+  MENTION_SANS_MONTANT,
   confirmationDArbitrage,
   ecartMontant,
   libelleDelaiVersion,
@@ -108,7 +109,10 @@ export function DivergenceReglementaire({
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [fait, setFait] = useState<Confirmation | null>(null);
 
-  const montant = (v: VersionRegle) => formatMontant(v.montant, v.devise);
+  /* `null` quand l'autorité ne publie rien : la formule le dira en toutes
+     lettres plutôt que d'afficher « 0 € ». */
+  const montant = (v: VersionRegle) =>
+    v.montant === null ? null : formatMontant(v.montant.valeur, v.montant.devise);
   const options = optionsArbitrage(
     ancienne,
     nouvelle,
@@ -214,7 +218,9 @@ export function DivergenceReglementaire({
           {libelleImpact(
             ancienne,
             nouvelle,
-            formatMontant(ecartMontant(ancienne, nouvelle), nouvelle.devise),
+            /* En valeur absolue : le sens — « de plus », « de moins » —
+               est une affaire de phrase, et `libelleImpact` le tranche. */
+            ecartFormate(ancienne, nouvelle),
             depot,
           )}
         </p>
@@ -282,6 +288,16 @@ export function DivergenceReglementaire({
   );
 }
 
+/**
+ * L'écart mis en forme, en valeur absolue, ou `null` s'il n'est pas
+ * chiffrable. Le signe ne se met pas en forme : « -3 000 € de plus » est
+ * la phrase qu'on lisait quand l'autorité abaissait son exigence.
+ */
+function ecartFormate(ancienne: VersionRegle, nouvelle: VersionRegle): string | null {
+  const ecart = ecartMontant(ancienne, nouvelle);
+  return ecart === null ? null : formatMontant(Math.abs(ecart.valeur), ecart.devise);
+}
+
 function CarteVersion({ version, statut }: { version: VersionRegle; statut: string }) {
   const FORMAT = new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC" });
   const jour = (iso: string) => FORMAT.format(new Date(`${iso}T00:00:00Z`));
@@ -292,7 +308,9 @@ function CarteVersion({ version, statut }: { version: VersionRegle; statut: stri
         Version {version.numero} · {statut}
       </span>
       <span className="text-24 font-semibold text-ink-900">
-        {formatMontant(version.montant, version.devise)}
+        {version.montant === null
+          ? MENTION_SANS_MONTANT
+          : formatMontant(version.montant.valeur, version.montant.devise)}
       </span>
       <span className="text-14 text-ink-700">{version.intitule}</span>
       {/* Le délai décide de la date de dépôt : une carte de version qui
