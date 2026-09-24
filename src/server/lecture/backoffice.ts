@@ -22,6 +22,7 @@ import type { PieceEnEchec } from "@/domain/backoffice/revue";
 import type { ConsultantAdministre } from "@/domain/backoffice/consultants";
 import { aReconcilier } from "@/server/paiement/cycle";
 import { getPack, type Devise } from "@/domain/payments/pricing";
+import { achatDepuisLeCode } from "@/domain/payments/achat";
 import {
   coutMicrosDesJetons,
   partDuQuotaIA,
@@ -620,6 +621,44 @@ export interface LigneDeCout {
   partDuQuota: number | null;
 }
 
+/**
+ * Le pack sous lequel ce dossier a été vendu — B-07.
+ *
+ * ── `transactions[0]` n'est pas le pack ─────────────────────────────
+ *
+ * La lecture prenait la **première transaction confirmée**, quelle que
+ * soit sa catégorie. Un dossier s'ouvre sans rien payer, et T-05 propose
+ * une consultation sur un dossier déjà ouvert : la consultation se règle
+ * donc couramment **avant** le pack. `getPack("consultation")` ne rend
+ * rien, et toute la ligne de coût s'éteignait.
+ *
+ * Constaté en exécution, sur deux dossiers consommant exactement dix fois
+ * le quota de jetons du même pack :
+ *
+ *     pack seul          · pack essentiel · quota 120000 · part du quota 1000 %
+ *     consultation avant · pack null      · quota null   · part du quota null
+ *
+ *     ordre de la liste (le plus alarmant d'abord) :
+ *       1. pack seul
+ *       2. consultation avant
+ *
+ * Le second n'a ni quota, ni part, ni prix — et le tri, qui lit `?? 0`,
+ * le renvoie en bas. C'est exactement ce que le commentaire du tri dit
+ * avoir corrigé pour le tarif manquant : « le dossier à dix fois son
+ * quota pouvait finir en bas de liste ». La même chute, par l'autre
+ * porte.
+ *
+ * ── La catégorie décide, pas la grille ──────────────────────────────
+ *
+ * On choisit sur la **catégorie** de l'achat, et non sur ce que la grille
+ * en dit : un pack retiré de l'offre reste le pack de ce dossier, et sa
+ * ligne doit le nommer avec un quota inconnu plutôt que de désigner une
+ * autre transaction — ou rien.
+ */
+const leurPack = <T extends { packCode: string }>(
+  transactions: readonly T[],
+): T | undefined => transactions.find((t) => achatDepuisLeCode(t.packCode).type === "pack");
+
 export async function coutsParDossier(
   tarif: TarifIA | null = tarifDepuisEnvironnement(process.env),
 ): Promise<LigneDeCout[]> {
@@ -639,7 +678,7 @@ export async function coutsParDossier(
   return usages
     .flatMap((u) => {
       if (!u.applicationId) return [];
-      const achat = dossiers.find((d) => d.id === u.applicationId)?.transactions[0];
+      const achat = leurPack(dossiers.find((d) => d.id === u.applicationId)?.transactions ?? []);
       const pack = achat ? getPack(achat.packCode) : undefined;
       const prix = pack && achat ? pack.prix[achat.currency as Devise] : null;
       const jetonsEntree = u._sum.inputTokens ?? 0;
