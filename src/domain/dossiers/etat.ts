@@ -90,3 +90,39 @@ export function miseEnEtat(
  * rend la main au calcul qui la décide.
  */
 export const REPRISE_APRES_PAUSE: EtatStocke = "ACTIF";
+
+/**
+ * Les états d'un dossier qu'une publication de règle doit prévenir — WF-11,
+ * RG-11.2.
+ *
+ * Trois états, et le troisième manquait.
+ *
+ * `ACTIF` et `PRET` vont de soi : ce sont les dossiers en cours, et
+ * l'alerte leur sert. `SOUMIS` n'y est pas — le dossier est parti chez
+ * l'autorité, sa version est celle du dépôt, et lui proposer de migrer
+ * n'aurait aucun sens. Les états de fin non plus.
+ *
+ * `SUSPENDU`, en revanche, est **l'état que cette passe elle-même écrit**.
+ * Une divergence critique met le dossier en pause « le temps que tu
+ * regardes » ; s'il ne regarde pas, la publication suivante ne le voyait
+ * plus. Le résultat, exécuté :
+ *
+ *     v2 : {"dossiers":1,"alertes":1,"critiques":1}   dossier → SUSPENDU
+ *     v3 : {"dossiers":0,"alertes":0,"critiques":0}
+ *     divergences du dossier : [{"vers":"v2","impact":"CRITIQUE"}]
+ *     à « migrer » : « Une version plus récente est entrée en vigueur
+ *                      depuis : c'est elle qui t'est proposée. »
+ *     dossier → SUSPENDU
+ *
+ * Elle ne lui était pas proposée. Sa seule divergence visait une v2 que v3
+ * venait d'archiver, et migrer vers une version archivée est refusé
+ * (RG-14.1) : il ne lui restait que « conserver », donc figer son dossier
+ * sur une v1 vieille de deux versions, après avoir lu qu'on lui proposait
+ * la plus récente.
+ *
+ * C'est le défaut que la passe disait avoir corrigé pour la **version** —
+ * « un dossier qui n'a pas arbitré la fois d'avant est resté sur v1 […]
+ * sans issue » — et que le filtre d'**état** rouvrait, pour la seule
+ * classe d'impact que la passe met en pause, c'est-à-dire la plus grave.
+ */
+export const ETATS_A_PREVENIR: readonly EtatStocke[] = ["ACTIF", "PRET", "SUSPENDU"];

@@ -1516,6 +1516,123 @@ try {
       "le dossier garde la sienne : publier ne migre personne (INV-3)",
     );
   }
+  console.log("\nWF-11 — le dossier mis en pause est retrouvé par la publication suivante");
+  {
+    /*
+      La passe ne visait que les dossiers `ACTIF` et `PRET`. Or elle écrit
+      `SUSPENDU` elle-même : une divergence critique met le dossier en
+      pause « le temps que tu regardes ». S'il ne regardait pas, la
+      publication suivante ne le voyait plus.
+
+      Exécuté avant correction :
+
+          v2 : {"dossiers":1,"alertes":1,"critiques":1}   dossier → SUSPENDU
+          v3 : {"dossiers":0,"alertes":0,"critiques":0}
+          divergences du dossier : [{"vers":"v2","impact":"CRITIQUE"}]
+          à « migrer » : « une version plus récente est entrée en vigueur
+                           depuis : c'est elle qui t'est proposée »
+          dossier → SUSPENDU
+
+      Elle ne lui était pas proposée. Sa seule divergence visait une v2 que
+      v3 venait d'archiver, et migrer vers une version archivée est refusé
+      (RG-14.1). Il ne lui restait que « conserver », donc figer son
+      dossier sur une v1 vieille de deux versions — après avoir lu le
+      contraire.
+
+      C'est le défaut que le bloc précédent corrige pour la **version**, et
+      que le filtre d'**état** rouvrait pour la seule classe d'impact que
+      la passe met en pause : la plus grave.
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "TN" as const, visaType: "emploi_kennismigrant" as const,
+      category: "EMPLOI" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2029-01-01"), publishedAt: new Date("2026-01-01"),
+    };
+
+    const un = await db.visaRule.create({
+      data: { ...socle, version: 1, rules: avecSeuil(ACTUEL) as never,
+        status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    rang += 1;
+    const enPause = await db.user.create({
+      data: { email: `fumee-pause-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const sonDossier = await db.application.create({
+      data: { userId: enPause.id, visaRuleId: un.id, status: "ACTIF" },
+    });
+
+    // v2 durcit le seuil : impact critique, donc mise en pause.
+    const deux = await db.visaRule.create({
+      data: { ...socle, version: 2, rules: avecSeuil(ACTUEL + 500) as never, status: "PUBLISHED" },
+    });
+    verifier((await propagerLaPublication(deux.id)).critiques === 1, "v2 le met en pause");
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: sonDossier.id } })).status ===
+        "SUSPENDU",
+      "et son dossier est bien suspendu",
+    );
+
+    /* Il ne regarde pas. v3 paraît, et durcit encore. */
+    await db.visaRule.update({
+      where: { id: deux.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-09-01") },
+    });
+    const trois = await db.visaRule.create({
+      data: { ...socle, version: 3, rules: avecSeuil(ACTUEL + 900) as never, status: "PUBLISHED" },
+    });
+    const bilan = await propagerLaPublication(trois.id);
+    verifier(
+      bilan.dossiers === 1 && bilan.alertes === 1,
+      `et v3 le retrouve, en pause (${JSON.stringify(bilan)})`,
+    );
+
+    const vers3 = await db.ruleMigration.findFirst({
+      where: { applicationId: sonDossier.id, toRuleId: trois.id },
+    });
+    verifier(vers3 !== null, "une divergence vers v3 l'attend");
+    verifier(
+      vers3?.fromRuleId === un.id,
+      "et elle part de SA version, pas de celle que v3 remplace",
+    );
+
+    /*
+      Le message du refus devient vrai. « C'est elle qui t'est proposée »
+      désignait, avant, une proposition inexistante.
+    */
+    const vers2 = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: sonDossier.id, toRuleId: deux.id },
+    });
+    const motif = await arbitrerLaDivergence(
+      await db.application.findUniqueOrThrow({ where: { id: sonDossier.id } }),
+      vers2.id,
+      "MIGRER",
+    )
+      .then(() => null)
+      .catch((e: { echec?: { corps?: string } }) => e.echec?.corps ?? "");
+    verifier(
+      motif?.includes("plus récente") === true,
+      `la v2 archivée se refuse, en annonçant la plus récente (${motif?.slice(0, 40)}…)`,
+    );
+
+    verifier(
+      (await divergenceAArbitrer(vers3!.id, enPause.id)).blocage === "AUCUN",
+      "et celle-là, il peut l'arbitrer",
+    );
+    const suite = await arbitrerLaDivergence(
+      await db.application.findUniqueOrThrow({ where: { id: sonDossier.id } }),
+      vers3!.id,
+      "MIGRER",
+    );
+    const repris = await db.application.findUniqueOrThrow({ where: { id: sonDossier.id } });
+    verifier(
+      suite.decision === "MIGRER" && repris.status !== "SUSPENDU" &&
+        repris.visaRuleId === trois.id,
+      `la pause se lève et le dossier passe sur v3 (${repris.status})`,
+    );
+  }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

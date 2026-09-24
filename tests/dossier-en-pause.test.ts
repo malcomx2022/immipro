@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { sansCommentaires } from "@/domain/copy/source";
+import { ETATS_A_PREVENIR, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
 import {
   LIBELLE_STATUT,
   MENTION_EN_PAUSE,
@@ -90,5 +94,57 @@ describe("Ce que la prochaine action annonce", () => {
     expect(MENTION_EN_PAUSE).toMatch(/alertes/u);
     // INV-1 : la pause ne dit rien de l'issue de la démarche.
     expect(MENTION_EN_PAUSE).not.toMatch(/refus|chances|risque|garanti/iu);
+  });
+});
+
+/**
+ * Et la pause se lève — WF-11.
+ *
+ * Un dossier mis en pause par une divergence critique qu'il n'a pas
+ * arbitrée sortait de la liste des dossiers que la publication suivante
+ * prévient. Sa seule divergence visait alors une version que la nouvelle
+ * venait d'archiver, et migrer vers une version archivée est refusé
+ * (RG-14.1) : le candidat lisait « une version plus récente est entrée en
+ * vigueur depuis : c'est elle qui t'est proposée » devant une proposition
+ * qui n'existait pas.
+ *
+ * Le garde-fou est la **réciproque**, et non la liste recopiée : tout état
+ * que la passe écrit est un état qu'elle prévient. Écrire un état dont on
+ * ne ressort pas est le défaut lui-même, et il reviendrait au premier
+ * nouvel état de pause. Recopier `["ACTIF", "PRET", "SUSPENDU"]` ici
+ * n'aurait rien vérifié : les deux listes auraient bougé ensemble.
+ */
+describe("La publication suivante retrouve le dossier qu'elle a mis en pause", () => {
+  const passe = sansCommentaires(
+    readFileSync(join(process.cwd(), "src/server/jobs/divergence.ts"), "utf8"),
+  );
+
+  it("tout état que la passe écrit est un état qu'elle prévient", () => {
+    const ecrits = [...passe.matchAll(/miseEnEtat\(\s*"([A-Z_]+)"/gu)].map((m) => m[1]!);
+    expect(ecrits.length).toBeGreaterThan(0);
+    expect(ecrits.filter((e) => !ETATS_A_PREVENIR.includes(e as never))).toEqual([]);
+  });
+
+  it("et la requête interroge cette liste, sans la redire ni la trier", () => {
+    /*
+      Le filtre est la liste, pas une expression qui en part. Une seconde
+      liste en base de requête cesserait de suivre celle du domaine ; un
+      `.filter()` au passage retirerait un état sans que le raisonnement
+      qui le porte ait changé — et c'est le défaut lui-même, écrit à un
+      endroit où personne ne va le lire.
+    */
+    const filtre = passe.match(/status:\s*\{\s*in:\s*([^}]+?)\s*\}/u)?.[1];
+    expect(filtre).toBe("[...ETATS_A_PREVENIR]");
+  });
+
+  it("un dossier soumis n'est pas prévenu : sa version est celle du dépôt", () => {
+    expect(ETATS_A_PREVENIR).not.toContain("SOUMIS");
+    expect(ETATS_A_PREVENIR).not.toContain("BROUILLON");
+  });
+
+  it("et la reprise après pause vise un état que la passe prévient", () => {
+    // Sans quoi le dossier repris deviendrait invisible à la publication
+    // suivante — le même défaut, déplacé d'un cran.
+    expect(ETATS_A_PREVENIR).toContain(REPRISE_APRES_PAUSE);
   });
 });
