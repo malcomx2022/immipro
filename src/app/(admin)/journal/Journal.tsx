@@ -21,6 +21,7 @@ import {
 } from "@/domain/backoffice/audit";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { cn } from "@/lib/utils";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
 /**
  * B-06 — Journal d'audit. WF-15.
@@ -51,7 +52,7 @@ const FORMAT_HORODATAGE = new Intl.DateTimeFormat("fr-FR", {
   month: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 const horodatage = (iso: string) =>
   FORMAT_HORODATAGE.format(new Date(iso)).replace(" ", " · ").replace(":", " h ");

@@ -9607,3 +9607,52 @@ remis à `"\;"` : un essai.
 
 Les rendez-vous déjà pris aux anciennes heures restent valides : ce sont
 des instants réservés et payés, et la route ne les rejuge pas.
+
+## S.82 — Le reçu datait le paiement en UTC
+
+Le lot I.E avait fait écrire les rendez-vous dans le fuseau d'affichage.
+La constante vivait dans le module des rendez-vous, et aucun autre
+formateur d'heure ne la lisait. Quatre modules et trois écrans écrivaient
+encore l'heure d'un **instant** en UTC, sans le dire :
+
+| Où | Ce qu'on lisait |
+|---|---|
+| Reçu, confirmation de paiement, mention de remboursement | Paiement fait à 10 h 43 à Cotonou : « 9 h 43 » |
+| Alertes (T-01), versions de rédaction (R-03) | « hier à 21 h 04 » pour 22 h 04 |
+| Journal, paiements, veille (back-office) | l'heure UTC, sans mention de fuseau |
+
+Le jour aussi était celui d'UTC. Pour un paiement fait à 0 h 30 à
+Cotonou, il est encore 23 h 30 la veille en UTC : **le reçu portait la
+date d'un jour où le paiement n'avait pas eu lieu**. C'est la pièce qu'on
+lit à voix haute en réclamation.
+
+La note de `moment.ts` justifiait l'UTC par l'échéancier. Mais
+l'échéancier porte des **dates calendaires**, stockées à minuit UTC, et un
+horodatage n'en est pas une. Les deux se traitent différemment, et ce lot
+les sépare :
+
+- un instant (paiement, alerte, version, écriture de journal) se lit dans
+  le fuseau d'affichage, heure et jour ;
+- une date calendaire (échéance, délivrance, vérification, publication
+  d'un article) reste en UTC, où elle a été posée.
+
+### Une constante, un garde-fou
+
+`FUSEAU_AFFICHAGE` passe dans `domain/format/fuseau.ts`, avec `jourCivil`.
+Le module des rendez-vous la réexporte. Un essai lit les sources et
+refuse tout `Intl.DateTimeFormat` qui écrit une heure en UTC. Un témoin
+vérifie qu'il voit bien les formateurs qu'il garde, pour qu'un motif
+devenu aveugle ne passe pas pour du code conforme.
+
+### Vérifié par mutation
+
+L'heure du formateur remise en UTC : six essais tombent. Le jour du reçu
+repris des dix premiers caractères de l'ISO : un essai. La comparaison des
+jours faite en UTC : un essai. Les trois écrans du back-office remis en
+UTC : le garde-fou les nomme tous les trois.
+
+### Ce que ce lot ne touche pas
+
+Les exports CSV gardent leurs horodatages ISO, qui portent leur fuseau.
+La référence opérateur du reçu (`MP260911.0943`) est celle du prestataire,
+et il n'y a pas à la réécrire.

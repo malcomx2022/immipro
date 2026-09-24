@@ -42,7 +42,7 @@ describe("$-06 — le reçu d'un paiement acquis", () => {
   it("porte la référence, la date, le moyen et le total", () => {
     const { container } = render(<Recu recu={PAYE} />);
     expect(screen.getByRole("heading", { name: /IMP-260911-4K7QZA/u })).toBeDefined();
-    expect(container.textContent).toContain("11 septembre 2026, 9 h 43");
+    expect(container.textContent).toContain("11 septembre 2026, 10 h 43");
     expect(container.textContent).toContain("Mobile Money");
     expect(container.textContent).toContain("MP260911.0943");
     expect(container.textContent).toContain("Total payé");
@@ -139,8 +139,8 @@ describe("$-06 — les états où il n'y a pas de reçu", () => {
     const { container } = render(
       <Recu recu={{ ...PAYE, etat: "rembourse", rembourseLe: "2026-09-14T10:12:00.000Z" }} />,
     );
-    expect(container.textContent).toContain("remboursé le 14 septembre 2026, 10 h 12");
+    expect(container.textContent).toContain("remboursé le 14 septembre 2026, 11 h 12");
     // La date du paiement reste celle du paiement : les deux se lisent.
-    expect(container.textContent).toContain("11 septembre 2026, 9 h 43");
+    expect(container.textContent).toContain("11 septembre 2026, 10 h 43");
   });
 });

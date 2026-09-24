@@ -36,6 +36,7 @@ import {
   obstacleALaResolution,
   type IssueEcart,
 } from "@/domain/backoffice/ecart";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
 /**
  * B-04 — Paiements et réconciliation. WF-15, INV-7.
@@ -70,7 +71,7 @@ import {
 const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 const heure = (iso: string) => FORMAT_HEURE.format(new Date(iso)).replace(":", " h ");
 
