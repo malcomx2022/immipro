@@ -9,7 +9,11 @@ import {
   cleDIdempotence,
   defautDIdentifiant,
   etapeDe,
+  suiteDeLaDette,
   suiteDeLaTentative,
+  MOTIF_RELANCES_EPUISEES,
+  REPOS_AVANT_RELANCE_MINUTES,
+  TENTATIVES_AVANT_HUMAIN,
   suiteDuQuota,
   type IssueDeDemande,
 } from "@/domain/paiement/remboursement";
@@ -513,5 +517,94 @@ describe("le candidat est prévenu à la confirmation, et pas avant", () => {
     expect(CONFIRMATION_AU_CANDIDAT).toMatch(/quelques jours/u);
     expect(CONFIRMATION_AU_CANDIDAT).not.toMatch(/sous \d|dans \d|\d+ jours ouvr/u);
     expect(lire("src/server/courrier.ts")).toMatch(/qui ne change pas/u);
+  });
+});
+
+/**
+ * La relance d'une dette dont l'envoi n'est pas parti — 24/09/2026.
+ *
+ * `RESTE_A_FAIRE.DECIDE` disait « La demande n'est pas partie. Relance
+ * l'envoi », et personne ne la relançait. Constaté en exécution sur une
+ * vraie base, après un premier envoi en échec passager, puis **toutes**
+ * les passes que l'ouvrier planifie — réconciliation, péremption, purge,
+ * inactivité, rappels :
+ *
+ *     premier envoi : temporaire
+ *     refundDueAt=true refundRequestedAt=false refundedAt=false
+ *     après toutes les passes :
+ *       tentatives       : 1
+ *       demandes parties : 1
+ *
+ * Une somme due à un candidat, jamais redemandée, jusqu'à ce qu'un
+ * opérateur la remarque dans B-04 et clique dessus.
+ */
+describe("une dette dont l'envoi n'est pas parti se relance", () => {
+  const LE_JOUR = new Date("2026-09-24T12:00:00Z");
+  const ilYA = (minutes: number) => new Date(LE_JOUR.getTime() - minutes * 60_000);
+  const dette = (partiel: Partial<Parameters<typeof suiteDeLaDette>[0]> = {}) =>
+    suiteDeLaDette(
+      {
+        dueAt: new Date("2026-09-20T00:00:00Z"),
+        requestedAt: null,
+        refundedAt: null,
+        tentatives: 1,
+        derniereTentative: ilYA(REPOS_AVANT_RELANCE_MINUTES),
+        ecartOuvert: false,
+        ...partiel,
+      },
+      LE_JOUR,
+    );
+
+  it("le cas du défaut : décidée, jamais demandée, le repos écoulé", () => {
+    expect(dette()).toBe("RELANCER");
+  });
+
+  it("une première tentative jamais faite part tout de suite", () => {
+    expect(dette({ tentatives: 0, derniereTentative: null })).toBe("RELANCER");
+  });
+
+  /** Le repos tient : deux envois à la minute n'aident pas un fournisseur en panne. */
+  it("le repos retient l'envoi suivant", () => {
+    expect(dette({ derniereTentative: ilYA(REPOS_AVANT_RELANCE_MINUTES - 1) })).toBe("ATTENDRE");
+    expect(dette({ derniereTentative: ilYA(REPOS_AVANT_RELANCE_MINUTES) })).toBe("RELANCER");
+  });
+
+  /**
+   * La distinction que tout ce module existe pour tenir : une demande
+   * **acceptée** n'est pas notre affaire. La relancer enverrait une
+   * seconde demande sur une première qui a abouti.
+   */
+  it("une demande déjà acceptée ne se relance pas", () => {
+    expect(dette({ requestedAt: ilYA(600) })).toBe("RIEN");
+  });
+
+  it("une somme rendue ne se redemande pas, quoi que disent les autres colonnes", () => {
+    expect(dette({ refundedAt: ilYA(60), requestedAt: null })).toBe("RIEN");
+  });
+
+  it("sans obligation ouverte, il n'y a rien à envoyer", () => {
+    expect(dette({ dueAt: null })).toBe("RIEN");
+  });
+
+  /** Un humain la regarde déjà : lui en ouvrir un second brouillerait ce qu'il voit. */
+  it("un écart ouvert suspend la relance automatique", () => {
+    expect(dette({ ecartOuvert: true })).toBe("RIEN");
+    expect(dette({ ecartOuvert: true, tentatives: TENTATIVES_AVANT_HUMAIN })).toBe("RIEN");
+  });
+
+  /**
+   * Et elle s'arrête : rejouer sans fin une tâche qui ne peut pas aboutir
+   * masque le problème au lieu de le signaler.
+   */
+  it("au bout de cinq envois, la passe abandonne et appelle quelqu'un", () => {
+    expect(dette({ tentatives: TENTATIVES_AVANT_HUMAIN - 1 })).toBe("RELANCER");
+    expect(dette({ tentatives: TENTATIVES_AVANT_HUMAIN })).toBe("APPELER_UN_HUMAIN");
+  });
+
+  /** Le motif est actionnable : il dit ce qui a été tenté et que la somme reste due. */
+  it("le motif dit le compte et ce qui reste dû", () => {
+    const motif = MOTIF_RELANCES_EPUISEES(5);
+    expect(motif).toContain("5 envois");
+    expect(motif).toContain("reste due");
   });
 });

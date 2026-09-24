@@ -67,6 +67,10 @@ const { initierLeRemboursement, ouvrirUnRemboursement, appliquerLaNotification }
   "../src/server/acces/paiements"
 );
 const { ouvrirDuQuota, debiterUneAnalyse } = await import("../src/server/acces/quota");
+const { relancerLesRemboursements } = await import("../src/server/jobs/relances");
+const { TENTATIVES_AVANT_HUMAIN, REPOS_AVANT_RELANCE_MINUTES } = await import(
+  "../src/domain/paiement/remboursement"
+);
 type Rembourseur = import("../src/server/paiement/rembourseur").Rembourseur;
 type Remboursement = import("../src/server/paiement/rembourseur").Remboursement;
 
@@ -386,7 +390,132 @@ try {
     verifier((await solde(application.id)) === 29, `le solde reste celui qu'il était (29)`);
   }
 
-  // ── 8. L'index reste partiel ────────────────────────────────────────
+  // ── 8. La passe reprend ce que le premier envoi n'a pas emporté ─────
+  console.log("\nLa passe reprend une dette restée décidée");
+  {
+    const { transaction } = await candidatPaye({ analyses: 30 });
+    const rembourseur = rembourseurSimule([TEMPORAIRE, acceptee()]);
+
+    const premier = await initierLeRemboursement(transaction.reference, rembourseur);
+    verifier(premier.issue === "temporaire", `le premier envoi échoue (${premier.issue})`);
+    const apres = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(
+      apres.refundDueAt !== null && apres.refundRequestedAt === null,
+      "la dette reste décidée, et la demande n'est pas partie",
+    );
+
+    /*
+      Les bilans sont globaux — la base porte les dettes des blocs
+      précédents. Ce qui s'affirme ici se lit donc sur **cette
+      transaction-là**, ce qui est de toute façon la bonne unité : une
+      dette est due à quelqu'un.
+
+      Avant ce lot, aucune passe planifiée ne revenait la chercher :
+      constaté en exécution, réconciliation, péremption, purge,
+      inactivité et rappels laissaient `refundAttempts` à 1.
+    */
+    const tropTot = new Date(
+      apres.refundAttemptedAt!.getTime() + (REPOS_AVANT_RELANCE_MINUTES - 1) * 60_000,
+    );
+    await relancerLesRemboursements(tropTot, rembourseur);
+    verifier(
+      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }))
+        .refundAttempts === 1,
+      "le repos retient l'envoi suivant",
+    );
+
+    const alHeure = new Date(
+      apres.refundAttemptedAt!.getTime() + REPOS_AVANT_RELANCE_MINUTES * 60_000,
+    );
+    await relancerLesRemboursements(alHeure, rembourseur);
+    const final = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(final.refundAttempts === 2, `le repos écoulé, la passe relance (${final.refundAttempts})`);
+    verifier(final.refundRequestedAt !== null, "et la demande est déclarée partie");
+    /*
+      Et la passe ne solde rien : seule la notification signée pose
+      `refundedAt` (INV-7). Une passe qui écrirait « remboursé » parce
+      qu'elle a envoyé une demande annoncerait un virement que personne
+      n'a fait.
+    */
+    verifier(final.refundedAt === null, "mais la somme n'est pas déclarée rendue (INV-7)");
+
+    /* Et elle ne repart pas sur une demande acceptée. */
+    await relancerLesRemboursements(
+      new Date(alHeure.getTime() + 600 * 60_000),
+      rembourseur,
+    );
+    verifier(
+      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }))
+        .refundAttempts === 2,
+      "une demande acceptée n'est plus relancée",
+    );
+  }
+
+  // ── 9. Elle s'arrête, et appelle quelqu'un ──────────────────────────
+  console.log("\nAu bout de cinq envois, la passe abandonne");
+  {
+    const { transaction } = await candidatPaye({ analyses: 30 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { refundDueAt: new Date(), refundBasis: "Fumée : dette qui n'aboutit pas." },
+    });
+    const rembourseur = rembourseurSimule(
+      Array.from({ length: TENTATIVES_AVANT_HUMAIN + 4 }, () => TEMPORAIRE),
+    );
+
+    let quand = new Date();
+    for (let i = 0; i < TENTATIVES_AVANT_HUMAIN + 2; i += 1) {
+      await relancerLesRemboursements(quand, rembourseur);
+      quand = new Date(quand.getTime() + REPOS_AVANT_RELANCE_MINUTES * 60_000);
+    }
+
+    const final = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(
+      final.refundAttempts === TENTATIVES_AVANT_HUMAIN,
+      `elle s'arrête à ${TENTATIVES_AVANT_HUMAIN} envois (${final.refundAttempts})`,
+    );
+    verifier(
+      final.discrepancy !== null && final.discrepancy.includes("reste due"),
+      `et ouvre un écart qui dit ce qui reste dû (${final.discrepancy?.slice(0, 52)}…)`,
+    );
+    verifier(final.refundDueAt !== null, "la dette n'est pas éteinte pour autant");
+
+    const apres = await relancerLesRemboursements(
+      new Date(quand.getTime() + REPOS_AVANT_RELANCE_MINUTES * 60_000),
+      rembourseur,
+    );
+    verifier(
+      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }))
+        .refundAttempts === TENTATIVES_AVANT_HUMAIN,
+      "et la passe ne repart pas par-dessus l'humain",
+    );
+    verifier(apres.railMuet === false, "le rail est bien celui qu'on lui donne");
+  }
+
+  // ── 9 bis. Sans rail, elle ne brûle aucune tentative ────────────────
+  console.log("\nSans rail configuré, la passe ne tente rien");
+  {
+    const { transaction } = await candidatPaye({ analyses: 30 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { refundDueAt: new Date(), refundBasis: "Fumée : rail absent." },
+    });
+    /*
+      Sans clés, chaque envoi rendrait `non_configure`, le compteur
+      monterait quand même, et au bout de cinq la passe ouvrirait un
+      écart disant « la demande n'est pas passée après 5 envois » — en
+      accusant le fournisseur d'un silence qui est le nôtre, et en
+      brûlant les cinq tentatives que la dette aura le jour où le rail
+      sera branché.
+    */
+    const bilan = await relancerLesRemboursements(new Date());
+    verifier(bilan.railMuet === true, `la passe le dit (${JSON.stringify(bilan)})`);
+    const final = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(final.refundAttempts === 0, `aucune tentative brûlée (${final.refundAttempts})`);
+    verifier(final.discrepancy === null, "et aucun écart ouvert contre le fournisseur");
+  }
+
+  // ── 10. L'index reste partiel ───────────────────────────────────────
   console.log("\nL'index ne parle que des remboursements");
   {
     const { application, transaction } = await candidatPaye({ analyses: 30 });

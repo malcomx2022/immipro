@@ -239,3 +239,103 @@ export const MOTIF_REVUE_PARTIELLE =
 /** Ce que le candidat lit quand la somme est effectivement revenue. */
 export const CONFIRMATION_AU_CANDIDAT =
   "Ton remboursement est parti. Selon ta banque ou ton opérateur, il peut mettre quelques jours à apparaître sur ton compte.";
+
+/* ── La reprise d'une dette dont l'envoi n'est pas parti ──────────────── */
+
+/**
+ * Ce qui manquait, et que rien ne faisait.
+ *
+ * `RESTE_A_FAIRE.DECIDE` dit, depuis le premier jour : « La demande n'est
+ * pas partie. **Relance l'envoi.** » Personne ne la relançait.
+ * `initierLeRemboursement` a trois appelants — l'annulation d'une
+ * consultation, la suppression d'un compte, et un bouton du back-office —
+ * et les deux premiers avalent l'échec (`.catch(() => null)`), ce qui est
+ * juste sur le moment : une panne du fournisseur ne doit faire échouer ni
+ * une annulation ni une anonymisation. Mais rien ne revenait ensuite.
+ *
+ * Constaté en exécution, après une première tentative en échec passager,
+ * puis **toutes** les passes que l'ouvrier planifie :
+ *
+ *     premier envoi : temporaire
+ *     refundDueAt=true refundRequestedAt=false refundedAt=false
+ *     après réconciliation, péremption, purge, inactivité, rappels :
+ *       tentatives       : 1
+ *       demandes parties : 1
+ *
+ * Une somme due à un candidat, jamais redemandée, jusqu'à ce qu'un
+ * opérateur la remarque dans B-04 et clique. Tout le reste était là : la
+ * clé d'idempotence « faite pour ça », le compteur de tentatives, la date
+ * de la dernière — dont le schéma dit « il faut savoir depuis quand on
+ * essaie » — et jusqu'à l'index `(refundDueAt, refundedAt)`. Il manquait
+ * la passe.
+ */
+
+/** Le repos entre deux envois. Assez pour laisser passer une panne. */
+export const REPOS_AVANT_RELANCE_MINUTES = 30;
+
+/**
+ * Au-delà, on arrête et on appelle quelqu'un.
+ *
+ * Une relance qui ne passe jamais ne se corrigera pas en insistant : au
+ * bout de cinq, la cause n'est plus passagère même si chaque réponse
+ * disait le contraire. Même forme que `TENTATIVES_AVANT_REVUE` pour la
+ * lecture d'une pièce, et pour la même raison — rejouer sans fin une
+ * tâche qui ne peut pas aboutir masque le problème au lieu de le
+ * signaler.
+ */
+export const TENTATIVES_AVANT_HUMAIN = 5;
+
+export type SuiteDeLaDette =
+  /** L'envoi repart maintenant. */
+  | "RELANCER"
+  /** Il repartira : le repos n'est pas écoulé. */
+  | "ATTENDRE"
+  /** Cinq envois n'ont pas abouti. La passe s'arrête et ouvre un écart. */
+  | "APPELER_UN_HUMAIN"
+  /** Rien à faire : soldée, déjà demandée, ou déjà entre les mains d'un humain. */
+  | "RIEN";
+
+export interface DetteARelancer {
+  dueAt: Date | null;
+  requestedAt: Date | null;
+  refundedAt: Date | null;
+  /** Nombre d'envois déjà tentés, réussis ou non. */
+  tentatives: number;
+  derniereTentative: Date | null;
+  /** Un écart est ouvert sur cette transaction : quelqu'un s'en occupe. */
+  ecartOuvert: boolean;
+}
+
+/**
+ * Que faire de cette dette aujourd'hui ?
+ *
+ * L'ordre des questions n'est pas neutre. `refundedAt` d'abord : une somme
+ * rendue ne se redemande pas, quoi que disent les autres colonnes. Puis
+ * `requestedAt` — **une demande acceptée n'est pas notre affaire** : elle
+ * attend la notification signée du fournisseur, et la relancer enverrait
+ * une seconde demande sur une première qui a abouti. C'est la distinction
+ * que ce module existe pour tenir. La requête de la passe la filtre déjà,
+ * et la règle est ici aussi : deux gardes valent mieux qu'une sur une
+ * question d'argent, et la seconde survivra à une requête réécrite.
+ *
+ * L'écart ouvert passe avant le compteur : une dette qu'un humain regarde
+ * déjà n'a pas besoin qu'on lui en ouvre un second, et la relancer
+ * pendant qu'il l'examine brouillerait ce qu'il voit.
+ */
+export function suiteDeLaDette(dette: DetteARelancer, maintenant: Date): SuiteDeLaDette {
+  if (dette.refundedAt !== null) return "RIEN";
+  if (dette.requestedAt !== null) return "RIEN";
+  if (dette.dueAt === null) return "RIEN";
+  if (dette.ecartOuvert) return "RIEN";
+  if (dette.tentatives >= TENTATIVES_AVANT_HUMAIN) return "APPELER_UN_HUMAIN";
+  if (dette.derniereTentative === null) return "RELANCER";
+  const repos = maintenant.getTime() - dette.derniereTentative.getTime();
+  return repos >= REPOS_AVANT_RELANCE_MINUTES * 60_000 ? "RELANCER" : "ATTENDRE";
+}
+
+/**
+ * Ce que l'opérateur lit quand la passe abandonne. Actionnable : il dit ce
+ * qui a été tenté, combien de fois, et que la somme reste due.
+ */
+export const MOTIF_RELANCES_EPUISEES = (tentatives: number): string =>
+  `La demande de remboursement n'est pas passée après ${tentatives} envois. La somme reste due et la relance automatique s'arrête : à reprendre à la main auprès du fournisseur.`;
