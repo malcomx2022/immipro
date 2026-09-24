@@ -1,8 +1,10 @@
 /**
- * Le brouillon qu'on laisse de côté — RG-04.2.
+ * Le dossier qu'on laisse de côté — RG-04.2, étendue par l'arbitrage S.78.
  *
  * « Un dossier `BROUILLON` inactif depuis 90 jours déclenche une relance,
- * puis passe en `ABANDONNE` à 12 mois. »
+ * puis passe en `ABANDONNE` à 12 mois. » L'arbitrage étend la règle aux
+ * dossiers payés, `ACTIF` et `PRET` : le paiement ne constitue pas un
+ * motif de conservation supplémentaire (`domain/dossiers/conservation`).
  *
  * ── Ce que le code affirmait sans le faire ──────────────────────────
  *
@@ -231,18 +233,28 @@ export function relanceDeBrouillon(
   destination: string,
   derniereActivite: Date,
   piecesDeposees: number,
+  pret = false,
 ): Relance {
   const echeance = DATE_LISIBLE.format(jourDeLAbandon(derniereActivite));
   const acquis =
     piecesDeposees > 0
       ? `Les ${piecesDeposees} pièces que tu as déjà déposées sont toujours là.`
       : "Tu n'as encore déposé aucune pièce.";
+  /*
+    Un dossier prêt n'a plus de pièce à déposer : lui dire « déposer une
+    pièce suffit » lui demanderait un geste sans objet. Ce qui le garde,
+    c'est de déclarer son dépôt s'il l'a fait — il passe alors sous la
+    conservation des dossiers soumis, qui court pendant l'instruction.
+  */
+  const remede = pret
+    ? "Si tu as déposé ta demande, déclare-le dans ton dossier : ses pièces seront alors conservées pendant l'instruction."
+    : "Déposer une pièce suffit à le garder ouvert.";
   return {
     titre: `Ton dossier ${destination} est en attente`,
     objet: `Ton dossier ${destination} sera clos le ${echeance}`,
     corps: `Tu n'as rien ajouté à ton dossier ${destination} depuis trois mois. ${acquis}
 
-Sans reprise de ta part, il sera clos le ${echeance} et ses pièces supprimées. Déposer une pièce suffit à le garder ouvert.
+Sans reprise de ta part, il sera clos le ${echeance} et ses pièces supprimées. ${remede}
 
 Si ton projet est reporté, tu peux le laisser : rien ne se perd avant cette date.`,
   };

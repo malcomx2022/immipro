@@ -24,6 +24,10 @@ import {
   doitRejouer as doitRejouerLInactivite,
 } from "./inactivite";
 import {
+  traiterLaConservation,
+  doitRejouer as doitRejouerLaConservation,
+} from "./conservation";
+import {
   relancerLesRemboursements,
   doitRejouer as doitRejouerLesRelances,
 } from "./relances";
@@ -178,6 +182,16 @@ async function main() {
     }
   });
 
+  await boss.work(JOBS.CONSERVATION_PIECES, async () => {
+    const bilan = await traiterLaConservation();
+    console.info("[conservation]", bilan);
+    // Même conduite que l'inactivité : rien n'est écrit tant que l'annonce
+    // n'est pas partie, donc rejouer ne double aucun avis.
+    if (doitRejouerLaConservation(bilan)) {
+      throw new Error(`Conservation non traitée : ${bilan.incidents.join(" | ")}`);
+    }
+  });
+
   // Cadences de DOC-11 : quinze minutes pour la réconciliation (RG-05.4),
   // une fois par jour pour la veille (WF-14) et la purge (INV-5).
   //
@@ -220,6 +234,16 @@ async function main() {
     en retard, sur une échéance que le courrier donne au jour près.
   */
   await boss.schedule(JOBS.BROUILLONS_INACTIFS, "0 8 * * *");
+
+  /*
+    Les dossiers soumis et suspendus, une fois par jour — arbitrage S.78.
+
+    Après l'inactivité, pour la même raison qu'elle vient après les
+    rappels : ce que le candidat peut faire aujourd'hui passe avant ce qui
+    arrivera à ses pièces. Quotidienne, parce que l'échéance se tient au
+    jour près et que le préavis en dépend.
+  */
+  await boss.schedule(JOBS.CONSERVATION_PIECES, "15 8 * * *");
 
   /*
     La resonde, toutes les heures — I.C, 22/09/2026.

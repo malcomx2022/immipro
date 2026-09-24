@@ -827,9 +827,23 @@ try {
     });
 
     const bilan = await traiterLesBrouillonsInactifs(MAINTENANT);
+    /*
+      Le compte se fait sur les dossiers de ce bloc, et non sur le bilan.
+      Depuis l'arbitrage S.78, la passe regarde aussi les dossiers payés :
+      ceux que les blocs précédents ont ouverts aujourd'hui sont, vus
+      depuis juin 2027, inactifs eux aussi — et la passe a raison de les
+      relancer. Le bilan global mêlerait leur compte à celui-ci.
+    */
+    const duBloc = [loin, toutFait, sonDossier, jeune, aRelancer, injoignable, aClore, actif, entretien];
+    const closDuBloc = (
+      await db.application.findMany({ where: { id: { in: duBloc }, status: "ABANDONNE" } })
+    ).length;
+    const avis = await db.notification.count({
+      where: { applicationId: { in: duBloc }, kind: "INACTIVITE" },
+    });
     verifier(
-      bilan.relances === 1 && bilan.abandons === 2 && bilan.incidents.length === 0,
-      `un relancé, deux clos, rien d'autre (${JSON.stringify(bilan)})`,
+      avis - closDuBloc === 1 && closDuBloc === 2 && bilan.incidents.length === 0,
+      `un relancé, deux clos, rien d'autre (${avis - closDuBloc} relance(s), ${closDuBloc} clôture(s))`,
     );
     verifier(
       bilan.courriersRetenus === 1,

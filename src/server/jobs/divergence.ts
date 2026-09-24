@@ -279,7 +279,21 @@ export async function propagerLaPublication(
           ? [
               db.application.update({
                 where: { id: dossier.id },
-                data: miseEnEtat("SUSPENDU", dossier.readyAt, maintenant),
+                data: {
+                  /*
+                    Arbitrage S.78 : la date de la pause décide de la purge
+                    de ses pièces, et l'état qu'elle interrompt reste
+                    conservé. Une seconde divergence critique sur un
+                    dossier déjà suspendu ne renouvelle ni l'une ni
+                    l'autre : la pause court depuis le premier jour, et
+                    l'état interrompu n'est pas « SUSPENDU ».
+                  */
+                  ...miseEnEtat("SUSPENDU", dossier, maintenant),
+                  statusBeforeSuspension:
+                    dossier.status === "SUSPENDU"
+                      ? dossier.statusBeforeSuspension
+                      : dossier.status,
+                },
               }),
             ]
           : []),

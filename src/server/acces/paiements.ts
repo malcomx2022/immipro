@@ -986,13 +986,13 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
       */
       const dossier = await db.application.findUnique({
         where: { id: transaction.applicationId },
-        select: { status: true, readyAt: true },
+        select: { status: true, readyAt: true, suspendedAt: true },
       });
       await db.application.update({
         where: { id: transaction.applicationId },
         data: miseEnEtat(
           dossier?.status === "BROUILLON" || dossier === null ? "ACTIF" : dossier.status,
-          dossier?.readyAt ?? null,
+          dossier ?? { readyAt: null, suspendedAt: null },
         ),
       });
       /*

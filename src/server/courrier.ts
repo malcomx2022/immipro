@@ -370,6 +370,28 @@ export const envoyerRelanceDeBrouillon = (
     corps: `${corps}${SIGNATURE}`,
   });
 
+/**
+ * Conservation des pièces — arbitrage S.78 : invitation à confirmer
+ * l'instruction d'un dossier soumis, préavis de purge, avertissement d'un
+ * dossier suspendu.
+ *
+ * Par courrier pour la même raison que la relance d'inactivité : ces
+ * messages visent quelqu'un qui peut ne pas ouvrir l'application pendant
+ * des mois — il attend l'autorité, ou la plateforme. Une purge annoncée
+ * dans la seule application ne serait pas annoncée.
+ */
+export const envoyerAvisDeConservation = (
+  destinataire: string,
+  objet: string,
+  corps: string,
+) =>
+  expedier({
+    destinataire,
+    genre: "conservation",
+    objet,
+    corps: `${corps}${SIGNATURE}`,
+  });
+
 export interface ConfirmationEntretien {
   destinataire: string;
   reference: string;

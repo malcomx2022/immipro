@@ -36,6 +36,8 @@ export const JOBS = {
    * et n'avait reçu aucune relance.
    */
   BROUILLONS_INACTIFS: "dossier.inactivite",
+  /** Arbitrage S.78 — dossiers soumis et suspendus : annonce, puis échéance. */
+  CONSERVATION_PIECES: "dossier.conservation",
 
   /**
    * Reprise des contrôles restés sans verdict — I.D, branchée le

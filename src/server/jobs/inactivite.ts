@@ -3,6 +3,7 @@ import { envoyerRelanceDeBrouillon } from "@/server/courrier";
 import { suiteDeLEnvoi } from "@/domain/courrier/transport";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
+import { ETATS_SOUMIS_A_L_INACTIVITE } from "@/domain/dossiers/conservation";
 import {
   abandonDeBrouillon,
   debutDeLInactivite,
@@ -16,7 +17,8 @@ import { editorialDe } from "@/lib/contenu/destinations";
 import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 
 /**
- * Les brouillons laissés de côté — RG-04.2.
+ * Les dossiers laissés de côté — RG-04.2, étendue aux dossiers payés par
+ * l'arbitrage S.78.
  *
  * « Un dossier `BROUILLON` inactif depuis 90 jours déclenche une relance,
  * puis passe en `ABANDONNE` à 12 mois. » Rien ne l'appliquait : `ABANDONNE`
@@ -56,13 +58,13 @@ import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
  * Clore sans programmer la purge aurait ouvert un trou d'INV-5 à l'endroit
  * même où on ferme un dossier.
  *
- * Le statut passe par `miseEnEtat`, comme les sept autres écritures : un
- * brouillon n'est jamais `PRET`, mais la règle ne souffre pas d'exception
- * locale — c'est ainsi qu'elle avait disparu six fois sur sept.
+ * Le statut passe par `miseEnEtat`, comme les sept autres écritures. Depuis
+ * l'arbitrage S.78, un dossier `PRET` peut être abandonné : sans elle, son
+ * `readyAt` survivrait à l'abandon et la base refuserait l'écriture.
  */
 
 export interface BilanDInactivite {
-  /** Brouillons examinés — inactifs au-delà du seuil de relance. */
+  /** Dossiers examinés — inactifs au-delà du seuil de relance. */
   examines: number;
   relances: number;
   abandons: number;
@@ -96,9 +98,13 @@ export async function traiterLesBrouillonsInactifs(
   );
 
   /*
-    La requête part des brouillons seuls : RG-04.2 ne vise qu'eux. Un
-    dossier actif dont le candidat a cessé de s'occuper a des échéances,
-    et c'est le rappel d'échéance qui le réveille — pas une clôture.
+    Brouillons, dossiers actifs et dossiers prêts — arbitrage S.78. La
+    requête ne partait que des brouillons, et un dossier payé dont le
+    candidat ne revenait jamais gardait ses pièces d'identité sans terme :
+    le rappel d'échéance le réveillait, rien ne le clôturait. Le paiement
+    n'est pas un motif de conservation. `SOUMIS` et `SUSPENDU` ont leurs
+    propres règles (`jobs/conservation`) : l'un attend un tiers, l'autre
+    la plateforme, et l'inactivité ne dit rien d'eux.
 
     `createdAt <= seuil` écarte d'emblée ceux qui sont trop jeunes pour
     être inactifs, quoi qu'ils portent. Le dernier dépôt, lui, se lit sur
@@ -106,7 +112,7 @@ export async function traiterLesBrouillonsInactifs(
   */
   const brouillons = await db.application.findMany({
     where: {
-      status: "BROUILLON",
+      status: { in: [...ETATS_SOUMIS_A_L_INACTIVITE] },
       purgedAt: null,
       createdAt: { lte: seuil },
       /*
@@ -121,7 +127,9 @@ export async function traiterLesBrouillonsInactifs(
       id: true,
       userId: true,
       createdAt: true,
+      status: true,
       readyAt: true,
+      suspendedAt: true,
       visaRule: { select: { countryCode: true, visaType: true } },
       user: { select: { email: true } },
       /*
@@ -224,7 +232,7 @@ export async function traiterLesBrouillonsInactifs(
           db.application.update({
             where: { id: dossier.id },
             data: {
-              ...miseEnEtat("ABANDONNE", dossier.readyAt, maintenant),
+              ...miseEnEtat("ABANDONNE", dossier, maintenant),
               /*
                 INV-5. `ABANDONNE` est terminal : si la purge n'est pas
                 programmée ici, elle ne le sera jamais, et les pièces
@@ -240,7 +248,12 @@ export async function traiterLesBrouillonsInactifs(
         continue;
       }
 
-      const texte = relanceDeBrouillon(destination, debut, depots.length);
+      const texte = relanceDeBrouillon(
+        destination,
+        debut,
+        depots.length,
+        dossier.status === "PRET",
+      );
 
       /*
         Le courrier part **avant** la notification, comme pour les rappels

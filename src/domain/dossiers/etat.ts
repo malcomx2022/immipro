@@ -52,10 +52,18 @@ export type EtatStocke =
   | "ABANDONNE"
   | "ARCHIVE";
 
-/** Le couple que toute écriture d'état doit poser, jamais l'un sans l'autre. */
+/** Ce que toute écriture d'état doit poser, jamais l'un sans l'autre. */
 export interface MiseEnEtat {
   status: EtatStocke;
   readyAt: Date | null;
+  /**
+   * La date de la mise en pause — arbitrage S.78. La base exige qu'un
+   * dossier `SUSPENDU` la porte, et qu'aucun autre ne la porte : c'est la
+   * même forme de garde que `readyAt`, et pour la même raison. La durée
+   * d'une suspension décide de la purge de ses pièces, et une date qui
+   * survivrait à la reprise ferait purger un dossier qui ne l'est plus.
+   */
+  suspendedAt: Date | null;
 }
 
 /**
@@ -68,12 +76,25 @@ export interface MiseEnEtat {
  */
 export function miseEnEtat(
   vise: EtatStocke,
-  readyAtActuelle: Date | null,
+  /**
+   * Les dates **actuelles** du dossier, les deux ensemble. La date de
+   * pause était un quatrième paramètre facultatif, et quatre écritures sur
+   * cinq l'omettaient : la purge, le recalcul de complétude, l'activation
+   * d'un pack et l'arbitrage réécrivaient `SUSPENDU` sur un dossier déjà
+   * suspendu, et chacune remettait sa pause à zéro — la fumée l'a vu sur
+   * la purge, et une analyse de pièce l'aurait fait chaque jour, reculant
+   * sans fin la purge de ses pièces. Obligatoire, elle ne s'oublie plus.
+   */
+  actuel: Pick<MiseEnEtat, "readyAt" | "suspendedAt">,
   maintenant: Date = new Date(),
 ): MiseEnEtat {
-  return vise === "PRET"
-    ? { status: vise, readyAt: readyAtActuelle ?? maintenant }
-    : { status: vise, readyAt: null };
+  return {
+    status: vise,
+    readyAt: vise === "PRET" ? (actuel.readyAt ?? maintenant) : null,
+    // Même règle que `readyAt` : une suspension qui se confirme ne se
+    // renouvelle pas, sa durée court depuis le premier jour.
+    suspendedAt: vise === "SUSPENDU" ? (actuel.suspendedAt ?? maintenant) : null,
+  };
 }
 
 /**

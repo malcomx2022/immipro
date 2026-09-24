@@ -9445,6 +9445,8 @@ sur la date du dernier dépôt, plus fine. Elle suffit pour lever la main.
 | `SOUMIS` | L'administration n'a pas répondu. Aucune durée d'inactivité ne devrait suffire seule ; faut-il une relance, une date de décision attendue ? |
 | `SUSPENDU` | Le dossier attend **notre** arbitrage de divergence. Le fermer serait nous faire oublier une dette. |
 
+**Tranché le 24/09/2026**, mis en œuvre en S.84.
+
 ## S.79 — Le garde-fou d'INV-4 promettait plus que sa portée, et s'est accusé lui-même
 
 Ce point était consigné comme « à arbitrer » au lot S.76 : je l'avais différé
@@ -9736,3 +9738,95 @@ nommer ce fichier au garde-fou.
 revendique. Sur un seuil de douze mois, une heure de décalage ne change
 rien qu'on puisse observer. La réaligner sans raison mesurable serait
 changer un calcul de purge (INV-5) pour la symétrie seule.
+
+## S.84 — S.78 tranché : chaque état a sa règle de conservation, et aucune purge n'efface un dossier
+
+L'arbitrage de S.78, dans ses termes : la conservation des **octets** est
+dissociée de celle du dossier. Une purge de pièces ne supprime ni le
+dossier, ni son historique, ni ses verdicts, ni ses traces d'audit.
+
+| État | Règle |
+|---|---|
+| `ACTIF`, `PRET` | RG-04.2 comme pour un brouillon : relance à 90 jours, `ABANDONNE` à 12 mois, pièces purgées sous 30 jours. Le paiement n'est pas un motif de conservation. |
+| `SOUMIS` | Pièces conservées 12 mois après le dépôt déclaré. Invitation à confirmer 60 jours avant ; une confirmation prolonge de 6 mois, renouvelable. Sans réponse, un préavis de 30 jours précède la purge. Le dossier reste `SOUMIS`. |
+| `SUSPENDU` | Aucune inactivité ne le clôt. Avertissement à 11 mois de pause, purge à 12. Le dossier, sa date de pause et son état antérieur restent ; les pièces encore nécessaires sont redemandées à la reprise. |
+
+La politique vit dans `domain/dossiers/conservation.ts`, l'annonce dans
+`jobs/conservation.ts` : il annonce et pose l'échéance. La purge reste
+celle qui existait, avec sa conduite face à un stockage qui résiste.
+
+### Ce que la purge faisait d'un dossier
+
+Elle faisait passer en `ARCHIVE` tout dossier purgé en entier. C'était
+juste tant que seuls une clôture et un abandon la programmaient. Avec
+l'arbitrage, c'était effacer ce que la décision garde : un dossier soumis
+attend toujours l'autorité, un dossier suspendu attend toujours la
+plateforme. `etatApresPurge` archive la clôture, l'abandon et la
+suppression de compte. Il laisse les deux autres dans leur état.
+
+### Aucune purge sans annonce, même en retard
+
+Une passe mise en service sur un stock ancien trouve des dossiers soumis
+depuis deux ans. Leur échéance théorique est passée, et les purger le jour
+même serait une purge non annoncée. L'échéance posée n'est donc jamais
+plus proche que trente jours (`echeanceAnnoncee`).
+
+L'annonce part avant l'échéance. Un courrier que le relais refuse ne
+programme rien : la fumée le vérifie avec un vrai serveur qui répond 451.
+
+### La confirmation ne s'empile pas
+
+Ouverte en permanence, la confirmation aurait fait de six mois une unité
+qu'on empile : dix clics le jour du dépôt vaudraient cinq ans. Elle
+s'ouvre avec l'invitation. Avant, l'écran dit la date à laquelle elle
+s'ouvrira.
+
+### Le défaut que la fumée a trouvé, et qui était partout
+
+Une garde SQL lie désormais `SUSPENDU` à sa date de pause, comme `PRET` à
+sa `readyAt`. La date passait par `miseEnEtat`, en quatrième paramètre
+facultatif. La fumée a montré qu'une purge qui garde un dossier suspendu
+**remettait sa pause à zéro**. Le relevé a trouvé quatre écritures sur
+cinq qui réécrivent `SUSPENDU` sans la date : la purge, le recalcul de
+complétude, l'activation d'un pack, et l'arbitrage. La deuxième tourne à
+chaque analyse de pièce. Un dossier suspendu dont le candidat déposait
+une pièce par mois n'aurait jamais atteint ses onze mois.
+
+Le paramètre est désormais le couple actuel `{ readyAt, suspendedAt }`, et
+il est obligatoire. On ne peut plus l'oublier.
+
+### Pièces redéposées pendant la pause
+
+Une pause n'empêche pas de déposer. Un dossier purgé qui reçoit une pièce
+ressort donc tant qu'il porte des pièces vivantes, et il est averti à
+nouveau, avec son préavis. La levée de la pause annule une purge annoncée,
+et le dossier ne se dit plus purgé : les pièces `PURGEE` comptent déjà
+comme manquantes et sont redemandées.
+
+### La dette se voit
+
+`/api/health` compte les dossiers en pause, l'âge de la plus ancienne et
+ceux dont la purge est annoncée. Le compte `sansEcheance` de S.78 reste :
+chaque état ayant désormais sa règle, un chiffre non nul veut dire qu'une
+passe n'a pas tourné.
+
+### Vérifié
+
+- Essais du domaine : calendrier des dossiers soumis, prolongation,
+  fenêtre de confirmation, suspension, état après purge, textes soumis au
+  vocabulaire interdit.
+- Fumée `smoke:conservation` sur Postgres, ajoutée à la CI : les trois
+  parcours, la garde SQL, le relais qui refuse.
+- Mutations : inactivité ramenée aux brouillons, pause renouvelée,
+  confirmation toujours ouverte, purge qui archive tout, préavis sans
+  plancher. Chacune fait tomber son essai.
+
+### Ce que ce lot ne fait pas
+
+- Aucun écran ne déclare encore le dépôt : la route existe depuis WF-10,
+  l'écran non. Le bloc de conservation s'affiche sur la checklist d'un
+  dossier soumis.
+- La portabilité (RG-10.4) n'exporte pas encore l'échéance de conservation
+  ni la date de pause.
+- `statusBeforeSuspension` des pauses antérieures à la migration est resté
+  vide plutôt que deviné.

@@ -5,6 +5,14 @@ import { miseEnEtat } from "@/domain/dossiers/etat";
 import { PURGE_JOURS, type IssueDemarche } from "@/domain/dossiers/cloture";
 import { MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDePurge } from "@/server/acces/dossiers";
+import {
+  confirmationOuverte,
+  debutDeLInvitation,
+  echeanceProlongee,
+} from "@/domain/dossiers/conservation";
+import { echeanceDuDepot, echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
+import { jourCivil } from "@/domain/format/fuseau";
+import { jourEnFrancais } from "@/domain/format/moment";
 
 /**
  * Les deux passages déclarés d'un dossier — WF-10.
@@ -68,10 +76,63 @@ export async function declarerLeDepot(
   return db.application.update({
     where: { id: dossier.id },
     data: {
-      ...miseEnEtat("SOUMIS", dossier.readyAt, maintenant),
+      ...miseEnEtat("SOUMIS", dossier, maintenant),
       submittedAt: maintenant,
+      /*
+        Arbitrage S.78 : les pièces d'un dossier soumis sont conservées
+        douze mois après le dépôt déclaré. L'inactivité ne vaut plus
+        abandon — le candidat attend un tiers —, et c'est cette échéance
+        qui borne la conservation à sa place.
+      */
+      retentionUntil: echeanceDuDepot(maintenant),
     },
   });
+}
+
+export interface ConservationProlongee {
+  dossier: Application;
+  /** La nouvelle fin de conservation. */
+  jusquAu: Date;
+}
+
+/**
+ * « L'instruction continue » — arbitrage S.78.
+ *
+ * Une confirmation explicite prolonge la conservation des pièces de six
+ * mois, et se renouvelle. Elle annule une purge déjà annoncée : le préavis
+ * sert à laisser le temps de répondre, et répondre doit suffire.
+ *
+ * Rien n'est demandé de plus que le geste. Le candidat n'a pas à prouver
+ * que l'autorité instruit : la plateforme ne le sait pas mieux que lui,
+ * et exiger une preuve ferait purger le dossier de quelqu'un qui attend.
+ */
+export async function confirmerLInstruction(
+  dossier: Application,
+  maintenant: Date = new Date(),
+): Promise<ConservationProlongee> {
+  if (dossier.status !== "SOUMIS") {
+    throw echec("etat_incompatible", {
+      corps:
+        "Seul un dossier déposé attend une instruction. Tant que tu n'as pas déclaré ton dépôt, tes pièces suivent la règle d'un dossier en cours.",
+    });
+  }
+  if (dossier.purgedAt) {
+    throw echec("etat_incompatible", {
+      corps: `Tes pièces ont déjà été supprimées, le ${jourEnFrancais(jourCivil(dossier.purgedAt))} : il n'y a plus rien à conserver. Ton dossier reste consultable.`,
+    });
+  }
+  const echeance = echeanceDuDossierSoumis(dossier);
+  if (!confirmationOuverte(echeance, maintenant)) {
+    throw echec("etat_incompatible", {
+      corps: `Tes pièces sont conservées jusqu'au ${jourEnFrancais(jourCivil(echeance))}. Tu pourras confirmer que l'instruction continue à partir du ${jourEnFrancais(jourCivil(debutDeLInvitation(echeance)))} : nous t'écrirons à ce moment-là.`,
+    });
+  }
+  const jusquAu = echeanceProlongee(echeance, maintenant);
+  const maj = await db.application.update({
+    where: { id: dossier.id },
+    data: { retentionUntil: jusquAu, purgeDueAt: null },
+  });
+  return { dossier: maj, jusquAu };
 }
 
 export interface ClotureEnregistree {
@@ -105,7 +166,7 @@ export async function cloturerLeDossier(
   const maj = await db.application.update({
     where: { id: dossier.id },
     data: {
-      ...miseEnEtat("ISSUE_DECLAREE", dossier.readyAt, maintenant),
+      ...miseEnEtat("ISSUE_DECLAREE", dossier, maintenant),
       issue,
       issueReason: detail,
       purgeDueAt: purgeLe,

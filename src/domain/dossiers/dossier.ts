@@ -99,6 +99,20 @@ export const attendUneSuite = (dossier: Dossier): boolean =>
 /** Ce que dit le résumé quand plus rien n'attend le candidat. */
 export const AUCUNE_SUITE_ATTENDUE = "Aucun dossier n'attend une action de ta part.";
 
+/** Ce qu'un dossier déposé sait de la conservation de ses pièces. */
+export interface ConservationDuDepot {
+  /** Fin de conservation en cours. */
+  jusquAu: string;
+  /** Purge annoncée, si le préavis est parti. */
+  purgeLe: string | null;
+  /** Purge faite : il n'y a plus rien à conserver. */
+  purgeeLe: string | null;
+  /** Premier jour où « l'instruction continue » se confirme. */
+  confirmableLe: string;
+  /** La confirmation est-elle ouverte aujourd'hui ? */
+  confirmable: boolean;
+}
+
 export interface Dossier {
   id: string;
   destination: FicheDestination;
@@ -135,6 +149,11 @@ export interface Dossier {
    * liste tout ce qu'il reste ne dit pas par où commencer.
    */
   prochaineAction: string;
+  /**
+   * `SOUMIS` seul — la conservation de ses pièces (arbitrage S.78). Dates
+   * `AAAA-MM-JJ`, au jour de Cotonou.
+   */
+  conservation?: ConservationDuDepot;
   /**
    * Situation déclarée par le candidat qui dépasse ce que la plateforme sait
    * faire (WF-13, écran T-03). Elle vit sur le dossier et non sur le profil :

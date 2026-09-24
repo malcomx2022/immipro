@@ -17,7 +17,9 @@ import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 /**
  * Les genres de `NotificationKind`, repris tels quels — un test les tient
  * alignés. `INACTIVITE` est arrivée avec RG-04.2 : un brouillon qu'on
- * laisse de côté est relancé, puis clos.
+ * laisse de côté est relancé, puis clos. `CONSERVATION` avec l'arbitrage
+ * S.78 : l'invitation à confirmer l'instruction d'un dossier soumis, le
+ * préavis de purge, l'avertissement d'un dossier suspendu.
  */
 export type GenreAlerte =
   | "REGLEMENTATION"
@@ -25,7 +27,8 @@ export type GenreAlerte =
   | "ANALYSE"
   | "PAIEMENT"
   | "VEILLE"
-  | "INACTIVITE";
+  | "INACTIVITE"
+  | "CONSERVATION";
 
 export interface Alerte {
   id: string;

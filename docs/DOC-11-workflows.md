@@ -198,7 +198,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 **Règles de gestion**
 
 - RG-04.1 : un candidat peut ouvrir plusieurs dossiers ; un seul pack est consommé par dossier.
-- RG-04.2 : un dossier `BROUILLON` inactif depuis 90 jours déclenche une relance, puis passe en `ABANDONNE` à 12 mois.
+- RG-04.2 : un dossier `BROUILLON`, `ACTIF` ou `PRET` inactif depuis 90 jours déclenche une relance, puis passe en `ABANDONNE` à 12 mois ; ses pièces sont purgées sous 30 jours. Le paiement ne constitue pas un motif de conservation (arbitrage S.78).
 - RG-04.3 : l'étape « reconnaissance / équivalence de diplôme » est insérée automatiquement dans la checklist pour les destinations qui l'exigent, avec son délai propre (souvent 2 à 4 mois) — c'est le poste qui fait rater les échéances.
 
 ---
@@ -374,6 +374,10 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-10.2 : la purge est annoncée à l'avance et présentée comme une garantie, pas subie comme une perte.
 - RG-10.3 : les motifs de refus déclarés alimentent **l'amélioration des checklists**, jamais un modèle prédictif (INV-1).
 - RG-10.4 : une demande de suppression de compte purge immédiatement les pièces et anonymise les métadonnées, sans attendre l'échéance. Les écritures strictement nécessaires à la comptabilité et au traitement d'un remboursement en cours sont conservées ou anonymisées, jamais supprimées (K.C).
+- RG-10.5 : la conservation des octets est dissociée de celle du dossier. Une purge de pièces ne supprime ni le dossier, ni son historique, ni ses verdicts, ni ses traces d'audit ; un dossier `SOUMIS` ou `SUSPENDU` garde son état après la purge (arbitrage S.78).
+- RG-10.6 : `SOUMIS` — l'inactivité seule ne vaut pas abandon. Les pièces sont conservées 12 mois après le dépôt déclaré. Soixante jours avant l'échéance, le candidat est invité à confirmer que l'instruction continue ; une confirmation explicite prolonge la conservation de 6 mois, renouvelable. Sans réponse, un préavis de 30 jours précède la purge.
+- RG-10.7 : `SUSPENDU` — aucune inactivité ne clôt un dossier suspendu par la plateforme ; la suspension est une dette opérationnelle suivie par la sonde de santé. Avertissement après 11 mois de suspension, purge à 12 mois si elle n'est pas levée. Le dossier, le motif, la date et le statut antérieur restent ; les pièces encore nécessaires sont redemandées à la reprise.
+- Toute purge est annoncée au moins 30 jours avant d'avoir lieu, y compris lorsque l'échéance théorique est déjà passée.
 
 ---
 

@@ -24,26 +24,44 @@ describe("La date de mise en état suit l'état", () => {
   ];
   const jadis = new Date("2026-09-01T08:00:00Z");
   const maintenant = new Date("2026-09-22T10:00:00Z");
+  const VIERGE = { readyAt: null, suspendedAt: null };
+  const DATES = { readyAt: jadis, suspendedAt: jadis };
 
   it("pose la date en passant à PRET", () => {
-    expect(miseEnEtat("PRET", null, maintenant)).toEqual({
+    expect(miseEnEtat("PRET", VIERGE, maintenant)).toEqual({
       status: "PRET",
       readyAt: maintenant,
+      suspendedAt: null,
     });
   });
 
   it("conserve la date d'un dossier déjà prêt", () => {
     // Elle dit depuis quand il est prêt. La repousser à chaque recalcul
     // ferait vieillir le dossier à l'envers.
-    expect(miseEnEtat("PRET", jadis, maintenant).readyAt).toBe(jadis);
+    expect(miseEnEtat("PRET", { readyAt: jadis, suspendedAt: null }, maintenant).readyAt).toBe(
+      jadis,
+    );
   });
 
   it("retire la date dans tous les autres états", () => {
     for (const etat of AUTRES) {
-      expect(miseEnEtat(etat, jadis, maintenant), etat).toEqual({
-        status: etat,
-        readyAt: null,
-      });
+      expect(miseEnEtat(etat, DATES, maintenant).readyAt, etat).toBeNull();
+    }
+  });
+
+  /**
+   * Arbitrage S.78 : la date de suspension suit la même règle que `readyAt`.
+   * La base exige qu'un dossier suspendu la porte, et qu'aucun autre ne la
+   * garde — sa durée décide de la purge des pièces, et une date qui
+   * survivrait à la reprise ferait purger un dossier qui ne l'est plus.
+   */
+  it("pose la date de suspension, la garde, et la retire à la reprise", () => {
+    expect(miseEnEtat("SUSPENDU", VIERGE, maintenant).suspendedAt).toBe(maintenant);
+    // La purge, une analyse, un paiement réécrivent `SUSPENDU` sur un
+    // dossier déjà suspendu : la pause ne repart pas pour autant.
+    expect(miseEnEtat("SUSPENDU", DATES, maintenant).suspendedAt).toBe(jadis);
+    for (const etat of ["BROUILLON", "ACTIF", "PRET", "SOUMIS", "ARCHIVE"] as const) {
+      expect(miseEnEtat(etat, DATES, maintenant).suspendedAt, etat).toBeNull();
     }
   });
 
@@ -60,7 +78,7 @@ describe("La date de mise en état suit l'état", () => {
     expect(sql).toContain(`CHECK (("status" = 'PRET') = ("readyAt" IS NOT NULL))`);
 
     for (const etat of [...AUTRES, "PRET" as const]) {
-      const { status, readyAt } = miseEnEtat(etat, jadis, maintenant);
+      const { status, readyAt } = miseEnEtat(etat, DATES, maintenant);
       expect(status === "PRET", `${etat} : le couple contredit la garde`).toBe(
         readyAt !== null,
       );
@@ -71,6 +89,6 @@ describe("La date de mise en état suit l'état", () => {
     // « Ton dossier est mis en pause le temps que tu regardes » : la reprise
     // le rouvre, elle ne le déclare pas complet.
     expect(REPRISE_APRES_PAUSE).toBe("ACTIF");
-    expect(miseEnEtat(REPRISE_APRES_PAUSE, jadis, maintenant).readyAt).toBeNull();
+    expect(miseEnEtat(REPRISE_APRES_PAUSE, DATES, maintenant).readyAt).toBeNull();
   });
 });

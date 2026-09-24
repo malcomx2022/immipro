@@ -110,6 +110,23 @@ export const MENTION_REMPLACEE =
 export const MENTION_VERSION_RETIREE =
   "Cette version n'est plus celle en vigueur : nos veilleurs la revérifient. Ton dossier garde la sienne et rien n'est perdu. Tu peux conserver ta version dès maintenant ; si une nouvelle est mise en vigueur, elle te sera proposée.";
 
+/**
+ * Ce que la levée d'une pause défait — arbitrage S.78.
+ *
+ * Un dossier suspendu depuis onze mois a reçu l'annonce de la purge de ses
+ * pièces ; à douze, elles sont parties. Lever la pause annule une purge
+ * annoncée et pas encore faite. Après une purge faite, le dossier ne se dit
+ * plus purgé : les pièces encore nécessaires sont redemandées — une pièce
+ * `PURGEE` compte déjà comme manquante — et celles qu'il déposera suivront
+ * les règles d'un dossier en cours, ce qu'un `purgedAt` resté posé
+ * empêcherait, puisque la purge ne regarde que les dossiers non purgés.
+ *
+ * Rien d'autre : la date de la pause s'efface par `miseEnEtat`, l'état
+ * interrompu reste noté, l'historique et les verdicts ne bougent pas.
+ */
+const leveeDeLaPause = (dossier: Application) =>
+  dossier.status === "SUSPENDU" ? { purgeDueAt: null, purgedAt: null } : {};
+
 export async function arbitrerLaDivergence(
   dossier: Application,
   migrationId: string,
@@ -139,7 +156,7 @@ export async function arbitrerLaDivergence(
     await db.$transaction([
       db.application.update({
         where: { id: dossier.id },
-        data: miseEnEtat(repris, dossier.readyAt, maintenant),
+        data: { ...miseEnEtat(repris, dossier, maintenant), ...leveeDeLaPause(dossier) },
       }),
       db.ruleMigration.update({
         where: { id: migration.id },
@@ -234,7 +251,8 @@ export async function arbitrerLaDivergence(
         visaRuleId: migration.toRuleId,
         // Une pièce vient peut-être d'être ajoutée à l'état « attendue » :
         // le dossier n'est plus prêt tant que le calcul n'a pas conclu.
-        ...miseEnEtat(REPRISE_APRES_PAUSE, dossier.readyAt, maintenant),
+        ...miseEnEtat(REPRISE_APRES_PAUSE, dossier, maintenant),
+        ...leveeDeLaPause(dossier),
       },
     }),
     db.ruleMigration.update({
