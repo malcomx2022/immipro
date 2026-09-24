@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { reserveDeLAcceptation } from "@/domain/comptes/acceptation";
+import { obstacleAuPaiement } from "@/domain/paiement/commande";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -65,6 +66,9 @@ export function Recapitulatif({ tunnel, achat, tarif, deviseInitiale }: Recapitu
   // limites) : elle se choisit sur $-01 et se lit ici, elle ne bascule plus.
   const devise = deviseInitiale;
 
+  // La raison vient du domaine, comme sur $-01 : une phrase de refus écrite
+  // deux fois est une phrase dont une copie se périme en silence.
+  const obstacle = obstacleAuPaiement(conditions);
   const montant = formatMontant(tarif.prix[devise], devise);
   const autreDevise: Devise = devise === "XOF" ? "EUR" : "XOF";
 
@@ -210,10 +214,8 @@ export function Recapitulatif({ tunnel, achat, tarif, deviseInitiale }: Recapitu
           pleineLargeur
           className="min-h-action"
           chargement={envoi}
-          disabled={!conditions}
-          raisonDesactivation={
-            conditions ? undefined : "Accepte les conditions d'utilisation pour payer."
-          }
+          disabled={obstacle !== null}
+          raisonDesactivation={obstacle ?? undefined}
           onClick={() => void payer()}
         >
           Payer {montant}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   attenteExpiree,
   DELAI_REESSAI_SECONDES,
@@ -13,13 +14,14 @@ import {
 } from "@/domain/paiement/attente";
 import { echecPourMotif, masquerNumero } from "@/domain/paiement/echec";
 import {
-  commandeInitiale,
-  commandePayable,
+  paiementPossible,
   obstacleAuPaiement,
   obstacleAuRecapitulatif,
 } from "@/domain/paiement/commande";
 import { PACKS } from "@/domain/payments/pricing";
 import { INTERDITS_ECRAN_CANDIDAT, verifierTexte } from "@/domain/copy/vocabulaire-interdit";
+
+const lire = (f: string) => readFileSync(f, "utf8");
 
 describe("attente Mobile Money — $-03", () => {
   it("laisse cinq minutes, relève toutes les trois secondes", () => {
@@ -101,29 +103,69 @@ describe("échec de paiement — $-05", () => {
   });
 });
 
+/**
+ * ── Un modèle que personne ne construisait ──────────────────────────
+ *
+ * Ce module portait un type `Commande` dont l'en-tête annonçait « deux
+ * règles tenues par le type » : aucun pack présélectionné, aucune case
+ * pré-cochée. Le type ne tenait rien — aucun fichier de `src/` ne le
+ * construisait ni ne le lisait. Le tunnel est déjà modélisé par `Achat` et
+ * `Tunnel`, que les écrans emploient pour de bon.
+ *
+ * Les deux phrases de refus, elles, existaient en double : une fois dans le
+ * domaine, où ces tests les tenaient, une fois en dur dans l'écran, où le
+ * candidat les lisait. La copie tenue était la morte.
+ */
 describe("commande — $-01 et $-02", () => {
-  it("ne présélectionne aucun pack", () => {
-    const commande = commandeInitiale("XOF", "97000042");
-    expect(commande.pack).toBeNull();
-    expect(obstacleAuRecapitulatif(commande)).toBe("Choisis un pack pour continuer.");
+  it("sans pack retenu, $-01 dit lequel choisir", () => {
+    expect(obstacleAuRecapitulatif(null)).toBe("Choisis un pack pour continuer.");
+    expect(obstacleAuRecapitulatif(PACKS[0] ?? null)).toBeNull();
   });
 
-  it("ne pré-coche pas les conditions", () => {
-    expect(commandeInitiale("XOF", "97000042").conditionsAcceptees).toBe(false);
-  });
-
-  it("ne rend la commande payable qu'avec un pack et les conditions acceptées", () => {
-    const base = commandeInitiale("XOF", "97000042");
-    const pack = PACKS[0];
-    expect(commandePayable(base)).toBe(false);
-
-    const avecPack = { ...base, pack: pack ?? null };
-    expect(obstacleAuPaiement(avecPack)).toBe(
+  it("sans conditions acceptées, $-02 ne paie pas et dit pourquoi", () => {
+    expect(obstacleAuPaiement(false)).toBe(
       "Accepte les conditions d'utilisation pour payer.",
     );
+    expect(paiementPossible(false)).toBe(false);
+    expect(obstacleAuPaiement(true)).toBeNull();
+    expect(paiementPossible(true)).toBe(true);
+  });
 
-    const prete = { ...avecPack, conditionsAcceptees: true };
-    expect(obstacleAuPaiement(prete)).toBeNull();
-    expect(commandePayable(prete)).toBe(true);
+  /**
+   * L'ancienne version exigeait un pack pour payer. Une recharge et une
+   * consultation n'en ont pas : la règle aurait refusé de les payer si un
+   * écran l'avait employée — ce qu'aucun ne faisait.
+   */
+  it("le pack n'entre pas dans la condition de paiement", () => {
+    expect(obstacleAuPaiement(true)).toBeNull();
+  });
+
+  /**
+   * Les deux défauts vivent dans l'état des écrans, et c'est là qu'on les
+   * lit — une fabrique que personne n'appelle ne tient rien.
+   */
+  it("les deux écrans partent au bon défaut", () => {
+    const pack = lire("src/app/(app)/paiement/pack/ChoixDuPack.tsx");
+    expect(pack).toMatch(/useState<string \| null>\(null\)/u);
+    const recapitulatif = lire(
+      "src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx",
+    );
+    expect(recapitulatif).toMatch(/const \[conditions, setConditions\] = useState\(false\)/u);
+  });
+
+  /**
+   * Une phrase, un endroit. Si un écran la réécrit, ce test tombe — c'est
+   * exactement par là que la divergence était entrée.
+   */
+  it("aucun écran ne réécrit la phrase de refus", () => {
+    for (const fichier of [
+      "src/app/(app)/paiement/pack/ChoixDuPack.tsx",
+      "src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx",
+    ]) {
+      const source = lire(fichier);
+      expect(source, fichier).not.toContain("Choisis un pack pour continuer.");
+      expect(source, fichier).not.toContain("Accepte les conditions d'utilisation pour payer.");
+      expect(source, fichier).toMatch(/from "@\/domain\/paiement\/commande"/u);
+    }
   });
 });
