@@ -6,7 +6,11 @@ import {
   issueDeLAnnulation,
   type IssueAnnulation,
 } from "@/domain/consultants/annulation";
-import { libelleLimite, libelleRendezVous } from "@/domain/consultants/rendez-vous";
+import {
+  creneauxProposes,
+  libelleLimite,
+  libelleRendezVous,
+} from "@/domain/consultants/rendez-vous";
 import { echec } from "@/server/http/echecs";
 import type { ConsultantHabilite } from "@/domain/consultants/annuaire";
 import type { Creneau } from "@/domain/consultants/rendez-vous";
@@ -66,9 +70,6 @@ export const consultantParId = async (id: string): Promise<ConsultantHabilite | 
  * de la table : un créneau déjà réservé chez ce consultant sort indisponible
  * plutôt que d'échouer à la réservation.
  */
-export const JOURS_PROPOSES = 3;
-export const HEURES_PROPOSEES = [9, 11, 15, 17] as const;
-
 export async function creneaux(consultantId: string, aujourdhui = new Date()): Promise<Creneau[]> {
   const consultant = await db.consultant.findFirst({
     where: { id: consultantId, active: true },
@@ -76,18 +77,9 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
   });
   if (!consultant) throw echec("introuvable");
 
-  const debut = new Date(
-    Date.UTC(aujourdhui.getUTCFullYear(), aujourdhui.getUTCMonth(), aujourdhui.getUTCDate()),
-  );
-  const proposes: Date[] = [];
-  for (let jour = 1; jour <= JOURS_PROPOSES; jour += 1) {
-    for (const heure of HEURES_PROPOSEES) {
-      const quand = new Date(debut);
-      quand.setUTCDate(quand.getUTCDate() + jour);
-      quand.setUTCHours(heure, 0, 0, 0);
-      proposes.push(quand);
-    }
-  }
+  // Les horaires et leur fuseau viennent du domaine, que la route de
+  // réservation relit : l'offre et l'acceptation ne peuvent plus diverger.
+  const proposes = creneauxProposes(aujourdhui);
 
   /*
     Un créneau **tenu** est pris, tant que sa tenue court. L'afficher

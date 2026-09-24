@@ -3,7 +3,11 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { dossierAvecSaRegle } from "@/server/acces/dossiers";
-import { referenceRendezVous, limiteAnnulation } from "@/domain/consultants/rendez-vous";
+import {
+  estUnCreneauPropose,
+  limiteAnnulation,
+  referenceRendezVous,
+} from "@/domain/consultants/rendez-vous";
 import { versFiche } from "@/server/acces/regles";
 import { CONSULTATION_DUREE_MINUTES } from "@/domain/payments/pricing";
 import { rattacherLePaiement, tenirLeCreneau } from "@/server/acces/consultations";
@@ -62,9 +66,19 @@ export const POST = route({
     if (!consultant || consultant.accreditations.length === 0) throw echec("introuvable");
 
     const debut = new Date(corps.creneau);
-    if (debut.getTime() <= Date.now()) {
+    const maintenant = new Date();
+    if (debut.getTime() <= maintenant.getTime()) {
       throw echec("etat_incompatible", {
         corps: "Ce créneau est passé. Choisis-en un autre dans la liste.",
+      });
+    }
+    // Seul un horaire de l'offre se tient : l'unicité (consultant, créneau)
+    // ne protège que des instants identiques, pas d'entretiens qui se
+    // chevauchent à une minute près.
+    if (!estUnCreneauPropose(debut, maintenant)) {
+      throw echec("etat_incompatible", {
+        corps:
+          "Cet horaire ne fait pas partie des créneaux proposés par ce consultant. Choisis-en un dans la liste.",
       });
     }
 

@@ -34,6 +34,111 @@ import {
  */
 export const FUSEAU_AFFICHAGE = "Africa/Porto-Novo";
 
+/**
+ * Les horaires proposés, en heures **du fuseau d'affichage**.
+ *
+ * Ils étaient posés par `setUTCHours` dans la lecture serveur, pendant que
+ * l'écran les rendait dans le fuseau d'affichage : la constante disait
+ * 9, 11, 15 et 17 h, le candidat lisait 10, 12, 16 et 18 h. Le lot I.E avait
+ * corrigé les formateurs sans corriger la source, et l'écart s'était
+ * simplement déplacé : l'heure affichée était enfin vraie, mais ce n'était
+ * plus celle que quelqu'un avait choisie.
+ *
+ * Ils vivent ici, et non plus dans la lecture, parce que la route de
+ * réservation doit les relire : un horaire que l'écran ne propose pas ne se
+ * réserve pas.
+ */
+export const JOURS_PROPOSES = 3;
+export const HEURES_PROPOSEES = [9, 11, 15, 17] as const;
+
+const FORMAT_PARTIES = new Intl.DateTimeFormat("en-US", {
+  timeZone: FUSEAU_AFFICHAGE,
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+/** Avance du fuseau d'affichage sur UTC à cet instant, en millisecondes. */
+function avanceDuFuseau(instant: number): number {
+  const seconde = Math.floor(instant / 1000) * 1000;
+  const parties = Object.fromEntries(
+    FORMAT_PARTIES.formatToParts(new Date(seconde)).map((p) => [p.type, p.value]),
+  );
+  const lu = Date.UTC(
+    Number(parties.year),
+    Number(parties.month) - 1,
+    Number(parties.day),
+    Number(parties.hour),
+    Number(parties.minute),
+    Number(parties.second),
+  );
+  return lu - seconde;
+}
+
+/**
+ * L'instant où il est `heure` h le jour `jour` (`AAAA-MM-JJ`) dans le fuseau
+ * d'affichage. Le décalage est lu au fuseau plutôt que supposé à + 1 h : la
+ * constante changera le jour où le fuseau suivra le candidat, et un fuseau à
+ * heure d'été donne deux avances dans l'année. La seconde passe rattrape le
+ * cas où l'heure visée et l'heure naïve tombent de part et d'autre d'un
+ * changement d'heure.
+ */
+export function instantDuFuseau(jour: string, heure: number, minute = 0): Date {
+  const [annee, mois, quantieme] = jour.split("-").map(Number);
+  const naif = Date.UTC(annee!, mois! - 1, quantieme!, heure, minute);
+  const premier = naif - avanceDuFuseau(naif);
+  return new Date(naif - avanceDuFuseau(premier));
+}
+
+/** `AAAA-MM-JJ` décalé de `n` jours, au calendrier et non en heures. */
+const jourPlus = (jour: string, n: number): string => {
+  const [annee, mois, quantieme] = jour.split("-").map(Number);
+  return new Date(Date.UTC(annee!, mois! - 1, quantieme! + n)).toISOString().slice(0, 10);
+};
+
+/**
+ * Les créneaux offerts de `depuis` à `jusqua` jours après aujourd'hui.
+ * « Aujourd'hui » est le jour du fuseau d'affichage : entre minuit à
+ * Cotonou et une heure du matin, le jour UTC est encore la veille, et
+ * « demain » aurait désigné le jour même.
+ */
+function creneauxEntre(maintenant: Date, depuis: number, jusqua: number): Date[] {
+  const aujourdhui = jourAffiche(maintenant.toISOString());
+  const proposes: Date[] = [];
+  for (let n = depuis; n <= jusqua; n += 1) {
+    const jour = jourPlus(aujourdhui, n);
+    for (const heure of HEURES_PROPOSEES) proposes.push(instantDuFuseau(jour, heure));
+  }
+  return proposes;
+}
+
+/** Ce que l'écran de prise de rendez-vous propose, à partir de demain. */
+export const creneauxProposes = (maintenant: Date): Date[] =>
+  creneauxEntre(maintenant, 1, JOURS_PROPOSES);
+
+/**
+ * Un horaire se réserve s'il est à venir et fait partie de l'offre.
+ *
+ * La route acceptait toute date future : 9 h 01 échappait à l'unicité
+ * `(consultant, créneau)` posée sur 9 h 00, et le même consultant se
+ * retrouvait réservé deux fois sur des entretiens qui se chevauchent.
+ *
+ * Le jour même est admis : une page ouverte avant minuit et validée après
+ * propose des horaires qui, entre-temps, sont devenus ceux d'aujourd'hui.
+ * Les refuser ferait échouer une réservation que l'écran venait d'offrir ;
+ * la condition « à venir » suffit à écarter ceux qui sont passés.
+ */
+export function estUnCreneauPropose(debut: Date, maintenant: Date): boolean {
+  if (debut.getTime() <= maintenant.getTime()) return false;
+  return creneauxEntre(maintenant, 0, JOURS_PROPOSES).some(
+    (propose) => propose.getTime() === debut.getTime(),
+  );
+}
+
 export interface Creneau {
   /** Début du rendez-vous, ISO avec fuseau. */
   debut: string;

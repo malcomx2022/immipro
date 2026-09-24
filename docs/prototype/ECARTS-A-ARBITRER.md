@@ -9565,3 +9565,63 @@ Dossier, ce n'est pas la page qu'il faut corriger mais la route, qui ne
 vérifie aucun pack. Et si un comparateur **de dossiers** est prévu — ce que
 WF-03 laisse entendre —, la ligne pourra revenir quand il existera. Ce lot
 fait dire à la page ce que le code fait aujourd'hui, rien de plus.
+
+## S.81 — Les créneaux gagnaient une heure, et la route réservait n'importe quelle minute
+
+Troisième balayage d'arithmétique de dates après RG-06.6, sur les
+rendez-vous cette fois. Trois défauts, dont un seul se voyait à l'écran.
+
+### Une heure de plus que celle qui avait été choisie
+
+`HEURES_PROPOSEES = [9, 11, 15, 17]` était posé par `setUTCHours` dans la
+lecture serveur. Le lot I.E avait fait écrire les formateurs dans le
+fuseau d'affichage, et c'était juste : un créneau de 14 h 30 UTC se lit
+15 h 30 à Cotonou. Mais la source n'avait pas suivi. La constante disait
+9 h, le candidat lisait 10 h. L'écart ne s'était pas refermé, il avait
+changé de côté : l'heure affichée était enfin vraie, mais ce n'était plus
+l'heure que quelqu'un avait décidé d'offrir.
+
+Les heures s'entendent désormais dans le fuseau d'affichage, et le
+décalage est lu au fuseau au lieu d'être supposé : la constante changera
+le jour où le fuseau suivra le candidat, et un fuseau à heure d'été
+donne deux avances dans l'année.
+
+Au passage, « aujourd'hui » devient le jour de Cotonou. Entre minuit et
+une heure du matin, le jour UTC est encore la veille, et « demain »
+désignait alors le jour même.
+
+### Toute minute future se réservait
+
+La route acceptait n'importe quelle date à venir. L'unicité
+`(consultant, créneau)` refuse deux réservations **au même instant**, pas
+deux entretiens de quarante-cinq minutes décalés d'une minute : 9 h 01
+passait à côté de 9 h 00, et le consultant était réservé deux fois.
+
+L'offre et l'acceptation lisent maintenant la même fonction du domaine
+(`creneauxProposes`, `estUnCreneauPropose`). Le jour même est admis à la
+réservation : une page ouverte à 23 h 58 et validée à 0 h 02 offrait pour
+« demain » un créneau qui est devenu celui d'aujourd'hui. La condition
+« à venir » suffit à écarter ceux qui sont passés.
+
+### Le point-virgule de l'agenda, et le test qui partageait la faute
+
+`echapper` écrivait `"\;"`. En JavaScript, c'est un échappement inutile
+qui vaut `";"` : le point-virgule d'un intitulé sortait tel quel dans le
+fichier `.ics`, où il sépare des valeurs. Le test écrivait
+`"Pays-Bas \; études"`, avec la même faute, et comparait donc `;` à `;`.
+Il vérifie maintenant, sur le texte déplié, qu'aucun point-virgule ne
+reste sans sa barre.
+
+### Vérifié par mutation
+
+Heures posées en UTC : deux essais tombent. Jour pris en UTC : un essai.
+Validation qui accepte tout : un essai. Jour même refusé : un essai.
+Échappement remis à `"\;"` : un essai.
+
+### Ce que ce lot ne touche pas
+
+Les rendez-vous déjà pris aux anciennes heures restent valides : ce sont
+des instants réservés et payés, et la route ne les rejuge pas.
+Les créneaux de démonstration (`lib/contenu/consultants.ts`) ne servent
+qu'aux tests d'écran, qui fixent leurs libellés. Ils gardent leur
+convention.
