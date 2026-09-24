@@ -63,6 +63,8 @@ const { db } = await import("../src/lib/db");
 const { reconcilierLesPaiements } = await import("../src/server/jobs/reconciliation");
 const { appliquerLaNotification } = await import("../src/server/acces/paiements");
 const { cleDEvenementDeReconciliation } = await import("../src/domain/paiement/ouverture");
+const { solde } = await import("../src/server/acces/quota");
+const { appliquerLaCouverture } = await import("../src/server/acces/couverture");
 
 type Consultant = import("../src/server/paiement/consultation").Consultant;
 type EtatConsulte = import("../src/server/paiement/consultation").EtatConsulte;
@@ -347,6 +349,71 @@ try {
       apres.failureCause === "DELAI_DEPASSE",
       "avec le seul motif que la plateforme peut prononcer",
     );
+  }
+  /*
+    ── Le crédit interrompu ────────────────────────────────────────────
+
+    `crediterLAchat` court hors de la transaction qui pose `CONFIRMEE` :
+    un arrêt entre les deux laisse un paiement encaissé et rien d'ouvert.
+    Le rejeu du webhook rend « rejeu » — juste pour l'état, faux pour la
+    contrepartie — et cette passe ne lisait que `INITIEE | EN_ATTENTE`.
+  */
+  console.log("\nUn paiement confirmé sans contrepartie est achevé, une fois");
+  {
+    const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 5 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date(), packCode: "essentiel" },
+    });
+
+    verifier(await solde(applicationId) === 0, "le paiement est encaissé et rien n'est ouvert");
+
+    const rejeu = await appliquerLaNotification({
+      providerEventId: `evt-rejeu-${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "CONFIRMEE",
+    });
+    verifier(rejeu.issue === "rejeu", `le rejeu du webhook n'y change rien (${rejeu.issue})`);
+    verifier(await solde(applicationId) === 0, "et n'ouvre toujours rien");
+
+    const premiere = await reconcilierLesPaiements(new Date(), () => null);
+    verifier(premiere.creditsAcheves === 1, `la passe l'achève (${premiere.creditsAcheves})`);
+    const ouvert = await solde(applicationId);
+    verifier(ouvert > 0, `la contrepartie est ouverte (${ouvert} analyses)`);
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: applicationId } })).status === "ACTIF",
+      "et le dossier s'ouvre, comme il l'aurait fait au paiement",
+    );
+
+    const seconde = await reconcilierLesPaiements(new Date(), () => null);
+    verifier(seconde.creditsAcheves === 0, `une seconde passe n'achève rien (${seconde.creditsAcheves})`);
+    verifier(await solde(applicationId) === ouvert, "et ne crédite pas deux fois");
+  }
+
+  /* Une couverture partielle est un état normal : elle n'est pas reprise. */
+  console.log("\nUne couverture partielle n'est pas un crédit manquant");
+  {
+    const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 5 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date(), packCode: "pro" },
+    });
+    // Un Pro couvre trois destinations ; un seul dossier existe, donc une
+    // seule est servie. C'est ce que le paiement a réellement produit.
+    await appliquerLaCouverture(transaction.userId, {
+      applicationId,
+      transactionId: transaction.id,
+    });
+    const servi = await solde(applicationId);
+    verifier(servi > 0, `une destination est servie (${servi} analyses)`);
+
+    const passe = await reconcilierLesPaiements(new Date(), () => null);
+    verifier(
+      passe.creditsAcheves === 0,
+      `la passe n'y touche pas (${passe.creditsAcheves}) : il manque des destinations, pas un crédit`,
+    );
+    verifier(await solde(applicationId) === servi, "et le quota ne bouge pas");
   }
 } finally {
   await db.$disconnect().catch(() => {});

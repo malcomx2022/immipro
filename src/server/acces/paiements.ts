@@ -409,8 +409,79 @@ export async function appliquerLaNotification(
 
   if (!effet.crediteLePack) return { issue: "appliquee", transaction: maj };
 
-  await crediterLAchat(maj);
+  await acheverLeCredit(maj);
   return { issue: "creditee", transaction: maj };
+}
+
+/**
+ * La contrepartie d'un paiement a-t-elle été ouverte ?
+ *
+ * **Aucune**, et non « toute » : c'est la distinction qui rend la reprise
+ * sûre. Un Pro couvre trois destinations et n'en sert qu'une le jour de
+ * l'achat, faute de second dossier — c'est un état normal, que la
+ * couverture complète plus tard. Une transaction qui n'a *rien* ouvert,
+ * elle, n'a pas été créditée du tout.
+ */
+async function contrepartieOuverte(transaction: Transaction): Promise<boolean> {
+  // Rien à ouvrir : ni dossier visé, ni achat que le domaine reconnaisse.
+  if (!transaction.applicationId) return true;
+  const achat = achatDepuisLeCode(transaction.packCode);
+  if (!achat) return true;
+
+  if (achat.type === "consultation") {
+    /*
+      La contrepartie d'une consultation est un créneau qui cesse d'être
+      seulement tenu. Un créneau absent n'est pas une contrepartie en
+      attente : il n'y a rien à confirmer, et le signaler à chaque passe
+      ferait du bruit sans fin.
+    */
+    const tenus = await db.appointment.count({
+      where: { transactionId: transaction.id, status: "TENU" },
+    });
+    return tenus === 0;
+  }
+
+  const ouverts = await db.analysisCredit.count({ where: { transactionId: transaction.id } });
+  return ouverts > 0;
+}
+
+/**
+ * Ouvre la contrepartie d'un paiement confirmé, une fois — RG-05.4, INV-7.
+ *
+ * ── Un crédit qui n'aboutit pas n'était rattrapé par rien ───────────
+ *
+ * `crediterLAchat` court **hors** de la transaction qui pose `CONFIRMEE` :
+ * l'état est commité, puis le quota s'ouvre. Entre les deux, un arrêt du
+ * processus laisse un paiement encaissé et rien d'ouvert — et les trois
+ * filets passaient à côté. Exécuté sur PostgreSQL :
+ *
+ *     transaction        CONFIRMEE, confirmedAt posé
+ *     quota ouvert       0 analyses · dossier BROUILLON
+ *     webhook rejoué  →  { issue: "rejeu" }         quota : 0
+ *     réconciliation  →  { examinees: 0 }           quota : 0
+ *
+ * Le rejeu s'arrête à `effetDeLaNotification(CONFIRMEE, CONFIRMEE)`, qui
+ * rend « rejeu » avant d'atteindre le crédit — et c'est juste pour l'état,
+ * faux pour la contrepartie. La réconciliation, elle, ne lit que
+ * `INITIEE | EN_ATTENTE` : une transaction aboutie lui est invisible.
+ *
+ * Son en-tête annonce pourtant « le filet du pire défaut possible de ce
+ * produit : un candidat débité qui ne voit rien arriver ». Le filet
+ * couvrait le webhook perdu, pas le crédit interrompu.
+ *
+ * ── Ce que cette fonction garantit ──────────────────────────────────
+ *
+ * Elle est idempotente, et c'est ce qui permet de la rappeler : le
+ * chemin des packs l'était déjà par `destinationsServies`, celui des
+ * consultations par l'état du créneau ; la recharge ne l'était pas, et un
+ * second appel aurait crédité deux fois. La garde est commune aux trois.
+ *
+ * Rend `true` quand elle a ouvert quelque chose.
+ */
+export async function acheverLeCredit(transaction: Transaction): Promise<boolean> {
+  if (await contrepartieOuverte(transaction)) return false;
+  await crediterLAchat(transaction);
+  return true;
 }
 
 /**
