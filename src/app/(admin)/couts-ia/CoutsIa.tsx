@@ -4,6 +4,8 @@ import {
   COMMENT_SE_REMPLIT,
   COMMENT_TARIFER,
   GARDE_FOUS,
+  MENTION_GARDE_FOU_NON_TENU,
+  libelleDesGardeFous,
   MENTION_AUCUN_DEPASSEMENT,
   MENTION_DEPASSEMENTS_NON_CALCULABLES,
   MENTION_QUOTA_SANS_TARIF,
@@ -166,16 +168,36 @@ export function CoutsIa({ metriques, serie, candidats, tarife }: CoutsIaProps) {
         </section>
 
         <section className="flex flex-col gap-3 rounded-lg border border-ink-300 bg-white p-5">
-          <h2 className="text-16 font-semibold text-ink-900">Garde-fous</h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-16 font-semibold text-ink-900">Garde-fous</h2>
+            {/* Le décompte se lit avant la liste : un superviseur doit savoir
+                combien de ces seuils freinent réellement quelque chose avant
+                d'en lire les conséquences, pas après. */}
+            <p className="text-13 text-ink-500">{libelleDesGardeFous()}</p>
+          </div>
           <dl className="flex flex-col">
             {GARDE_FOUS.map((g) => (
               <div
                 key={g.libelle}
                 className="flex items-baseline justify-between gap-6 border-t border-ink-300 py-2.5"
               >
-                <dt className="flex flex-col">
+                <dt className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-14 text-ink-900">{g.libelle}</span>
                   <span className="text-pretty text-13 text-ink-500">{g.consequence}</span>
+                  {/* Un seuil écrit et non appliqué le dit, et dit ce qui lui
+                      manque : le retirer ferait disparaître le besoin avec la
+                      ligne, le taire ferait croire à un frein qui n'existe
+                      pas. */}
+                  {g.tenu ? null : (
+                    <>
+                      <span className="text-pretty text-13 font-medium text-warning">
+                        {MENTION_GARDE_FOU_NON_TENU}
+                      </span>
+                      <span className="text-pretty text-13 text-ink-500">
+                        Il manque {g.manque}.
+                      </span>
+                    </>
+                  )}
                 </dt>
                 <dd className="whitespace-nowrap text-14 font-medium text-ink-900">
                   {g.seuil}

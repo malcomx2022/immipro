@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
   CHAMPS_CANDIDAT,
   aChange,
@@ -62,6 +64,8 @@ import {
   serieVide,
   tarifDepuisEnvironnement,
   aucuneMesure,
+  gardeFousTenus,
+  libelleDesGardeFous,
   medianeQuotidienne,
   plafondQuotidien,
 } from "@/domain/backoffice/couts";
@@ -82,6 +86,19 @@ import {
 } from "@/lib/contenu/backoffice";
 import { formatMontant } from "@/lib/utils";
 import { jourEnFrancais } from "@/domain/format/moment";
+
+const lire = (f: string) => readFileSync(f, "utf8");
+
+/** Tous les fichiers TypeScript d'une arborescence, chemins en barres obliques. */
+function fichiersDe(dir: string, filtre: RegExp, acc: string[] = []): string[] {
+  for (const nom of readdirSync(dir)) {
+    const chemin = join(dir, nom);
+    if (statSync(chemin).isDirectory()) fichiersDe(chemin, filtre, acc);
+    else if (filtre.test(nom)) acc.push(chemin.replace(/\\/gu, "/"));
+  }
+  return acc;
+}
+
 
 const AUJOURDHUI = "2026-09-18";
 
@@ -478,6 +495,58 @@ describe("B-07 — coûts IA, livré vide", () => {
       expect(g.consequence.length).toBeGreaterThan(10);
     }
     expect(GARDE_FOUS[0]!.seuil).toMatch(/15\s?%/);
+  });
+
+  /**
+   * ── Deux des trois ne gardaient rien ────────────────────────────────
+   *
+   * Le module dit lui-même : « un seuil sans conséquence n'est pas un
+   * garde-fou ». Deux de ses trois seuils annonçaient pourtant une
+   * conséquence que rien ne produit — `plafondQuotidien` est écrit, testé et
+   * lu par personne ; la seule bascule en revue humaine se déclenche sur
+   * trois tentatives d'analyse en échec ; aucun budget de référence n'existe.
+   */
+  it("un seuil non appliqué dit ce qui lui manque, et lui seul", () => {
+    for (const g of GARDE_FOUS) {
+      if (g.tenu) {
+        expect(g.manque, g.libelle).toBeUndefined();
+      } else {
+        // Nommer le manque, sinon le retirer ferait disparaître le besoin
+        // avec la ligne.
+        expect(g.manque, g.libelle).toBeTruthy();
+        expect(g.manque!.length, g.libelle).toBeGreaterThan(20);
+        // Et ne pas promettre de date : le registre dit ce qui manque, pas
+        // quand il arrivera.
+        expect(g.manque, g.libelle).not.toMatch(/bientôt|prochainement|\d{4}/u);
+      }
+    }
+    expect(gardeFousTenus()).toHaveLength(1);
+    expect(libelleDesGardeFous()).toBe("1 seuil appliqué sur 3");
+  });
+
+  /**
+   * Le seul seuil déclaré appliqué l'est parce que sa conséquence existe :
+   * `depassements` alimente la liste que l'écran affiche. Les deux autres
+   * s'appuieraient sur `plafondQuotidien`, que rien en production ne lit —
+   * et c'est cela que `tenu: false` dit.
+   */
+  it("« appliqué » se vérifie : le calcul du plafond n'a aucun lecteur en production", () => {
+    const sources = fichiersDe("src", /\.tsx?$/u)
+      .filter((f) => f !== "src/domain/backoffice/couts.ts")
+      .map((f) => lire(f))
+      .join("\n");
+    // Le jour où un ouvrier lit le plafond, ce test tombe et oblige à
+    // repasser `tenu` à vrai — c'est là qu'on relit la conséquence.
+    expect(sources).not.toMatch(/plafondQuotidien\(/u);
+    expect(sources).not.toMatch(/medianeQuotidienne\(/u);
+    // Celui qui garde, lui, est bien branché.
+    expect(sources).toMatch(/depassements\(/u);
+  });
+
+  it("la seule bascule en revue humaine se déclenche sur des échecs, pas sur un coût", () => {
+    const analyse = lire("src/server/jobs/analyse.ts");
+    expect(analyse).toMatch(/tentatives < TENTATIVES_AVANT_REVUE/u);
+    expect(analyse).not.toMatch(/plafond|mediane|coutMicros/u);
   });
 
   it("prend la médiane et non la moyenne, pour résister à une journée exceptionnelle", () => {
