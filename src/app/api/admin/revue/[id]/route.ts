@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { db } from "@/lib/db";
-import { echec } from "@/server/http/echecs";
-import { journaliser } from "@/server/acces/journal";
-import { rendreUneAnalyse } from "@/server/acces/quota";
-import { recalculerCompletude } from "@/server/acces/dossiers";
-import { refusDuMessage, recrediteLeQuota, type Decision } from "@/domain/backoffice/revue";
+import { trancherLaRevue } from "@/server/revue/decision";
+import type { Decision } from "@/domain/backoffice/revue";
 
 /**
  * Décision de revue — B-05.
@@ -14,6 +10,12 @@ import { refusDuMessage, recrediteLeQuota, type Decision } from "@/domain/backof
  * un constat nu — « non conforme » — est refusé, et une promesse aussi. RG-06.3
  * s'applique à un humain comme à la machine, et c'est même ici qu'il compte
  * le plus : le candidat lit ce message comme la parole d'une personne.
+ *
+ * Encore faut-il qu'il le reçoive. Il était validé, écrit en base et recopié
+ * sur la pièce, et aucun avis n'en partait — alors que les trois verdicts de
+ * la machine en produisent un chacun. La décision, l'avis et le recrédit
+ * vivent désormais dans `server/revue/decision.ts`, hors de `next/headers`,
+ * là où une fumée peut les exécuter et compter ce qui a été écrit.
  *
  * Une analyse rendue recrédite le quota (INV-6) : la lecture automatique n'a
  * rien rendu, elle n'a donc rien à coûter. Le recrédit est idempotent, une
@@ -28,62 +30,14 @@ export const POST = route({
     message: z.string().trim().min(1),
     motif: z.string().trim().min(3).max(500),
   }),
-  async traiter({ corps, params, acteur }) {
-    const revue = await db.manualReview.findUnique({
-      where: { id: params.id },
-      include: {
-        analysis: { include: { version: { include: { document: true } } } },
+  traiter: ({ corps, params, acteur }) =>
+    trancherLaRevue(
+      params.id!,
+      { id: acteur!.id },
+      {
+        decision: corps.decision as Decision,
+        message: corps.message,
+        motif: corps.motif,
       },
-    });
-    if (!revue) throw echec("introuvable");
-    if (revue.decidedAt) {
-      throw echec("etat_incompatible", { corps: "Cette pièce a déjà été tranchée." });
-    }
-
-    const refus = refusDuMessage(corps.message, corps.decision as Decision);
-    if (refus) {
-      throw echec("champs_invalides", {
-        corps: `${refus.raison} ${refus.consigne}`,
-        champs: { message: refus.consigne },
-      });
-    }
-
-    const document = revue.analysis.version.document;
-
-    await journaliser({
-      acteurId: acteur!.id,
-      action: "revue.decision",
-      cible: `document:${document.id}`,
-      motif: corps.motif,
-      details: { decision: corps.decision },
-    });
-
-    await db.$transaction([
-      db.manualReview.update({
-        where: { id: revue.id },
-        data: {
-          reviewerId: acteur!.id,
-          decision: corps.decision,
-          message: corps.message,
-          creditRefunded: recrediteLeQuota(corps.decision as Decision),
-          decidedAt: new Date(),
-        },
-      }),
-      db.document.update({
-        where: { id: document.id },
-        data: { status: corps.decision, feedback: corps.message, analyzedAt: new Date() },
-      }),
-    ]);
-
-    if (recrediteLeQuota(corps.decision as Decision)) {
-      await rendreUneAnalyse(
-        document.applicationId,
-        revue.analysisId,
-        "Analyse rendue après revue manuelle",
-      );
-    }
-
-    await recalculerCompletude(document.applicationId);
-    return { decidee: true, quotaRendu: recrediteLeQuota(corps.decision as Decision) };
-  },
+    ),
 });

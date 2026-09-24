@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { TITRE_DE_LA_DECISION } from "@/domain/backoffice/revue";
+import {
+  INTERDITS_ECRAN_CANDIDAT,
+  verifierTexte,
+} from "@/domain/copy/vocabulaire-interdit";
 import {
   GESTE_SANS_DATE_CIBLE,
   OBSTACLES_DU_MODELE,
@@ -299,5 +305,90 @@ describe("la suite d'une lecture qui n'aboutit pas", () => {
     expect(typeLisible("image/png")).toBe(true);
     expect(typeLisible("image/webp")).toBe(false);
     expect(typeLisible(null)).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Un verdict qui ne se dit pas — S.91
+ * ------------------------------------------------------------------ */
+
+/**
+ * Le chemin le plus lent du produit était le seul muet.
+ *
+ * Trois verdicts sur quatre produisaient un avis : le verdict de
+ * conditions et la pièce hors sujet dans `jobs/analyse.ts`, la pièce
+ * refusée au contrôle dans `jobs/balayage.ts`. Les deux qui n'en
+ * produisaient aucun sont ceux de la revue humaine — la pièce qui y
+ * entre, et la décision qui en sort.
+ *
+ * Or c'est la seule attente du produit qui dépend d'une personne : le
+ * candidat ne sait pas quand elle finit. `CLAUDE.md` compte pourtant
+ * « B-05 pour le message **envoyé** après une revue manuelle » parmi les
+ * quatre points d'application du vocabulaire interdit, et l'en-tête de
+ * `refusDuMessage` s'intitule « validation du message envoyé au
+ * candidat ». Il était validé, rangé en base, recopié sur la pièce, et
+ * envoyé à personne.
+ *
+ * Ces assertions tiennent la structure ; c'est `smoke:extraction` qui
+ * exécute les deux chemins contre PostgreSQL et compte les lignes
+ * écrites — la leçon de S.83, où six assertions de lecture de source
+ * passaient devant un garde-fou rendu muet.
+ */
+describe("tout verdict de pièce se dit au candidat", () => {
+  const VERDICTS = ["ILLISIBLE", "HORS_SUJET", "A_CORRIGER", "CONFORME"] as const;
+
+  /** Les fichiers qui posent un verdict sur une pièce, et eux seuls. */
+  const ECRIVAINS = [
+    "src/server/jobs/analyse.ts",
+    "src/server/jobs/balayage.ts",
+    "src/server/revue/decision.ts",
+  ];
+
+  it("chaque écrivain de verdict écrit aussi un avis", () => {
+    for (const fichier of ECRIVAINS) {
+      const source = readFileSync(fichier, "utf8");
+      const poseUnVerdict =
+        VERDICTS.some((v) => source.includes(`status: "${v}"`)) ||
+        /status: (?:verdict\.verdict|tranche\.decision)/u.test(source);
+      expect(poseUnVerdict, fichier).toBe(true);
+      expect(source, fichier).toContain("db.notification.create");
+    }
+  });
+
+  /**
+   * Et la revue en écrit un par décision prise, pas un pour la forme :
+   * le corps est le message de l'opérateur, le titre vient du domaine.
+   */
+  it("la décision de revue porte le message de l'opérateur", () => {
+    const source = readFileSync("src/server/revue/decision.ts", "utf8");
+    expect(source).toMatch(/body: tranche\.message/u);
+    expect(source).toMatch(/title: TITRE_DE_LA_DECISION\[tranche\.decision\]/u);
+    // Le destinataire est le candidat, pas l'opérateur qui tranche.
+    expect(source).toMatch(/userId: document\.application\.userId/u);
+  });
+
+  /**
+   * Les quatre titres disent qu'une personne a relu, et ne reprennent
+   * aucun titre de la lecture automatique : le même mot pour deux faits
+   * différents ferait croire à une seconde passe de la machine.
+   */
+  it("les titres de décision sont distincts de ceux de WF-06", () => {
+    const titres = Object.values(TITRE_DE_LA_DECISION);
+    expect(titres).toHaveLength(4);
+    expect(new Set(titres).size).toBe(4);
+    const automatiques = readFileSync("src/server/jobs/analyse.ts", "utf8");
+    for (const titre of titres) {
+      expect(titre.length, titre).toBeGreaterThan(20);
+      expect(automatiques, titre).not.toContain(titre);
+      expect(verifierTexte(titre, INTERDITS_ECRAN_CANDIDAT), titre).toEqual([]);
+    }
+  });
+
+  /** La décision ne vit plus derrière `next/headers` : une fumée l'exécute. */
+  it("la route ne décide plus rien elle-même", () => {
+    const route = readFileSync("src/app/api/admin/revue/[id]/route.ts", "utf8");
+    expect(route).toContain("trancherLaRevue(");
+    expect(route).not.toMatch(/db\.(manualReview|document|notification)\./u);
+    expect(readFileSync("scripts/fumee-extraction.mts", "utf8")).toContain("trancherLaRevue");
   });
 });

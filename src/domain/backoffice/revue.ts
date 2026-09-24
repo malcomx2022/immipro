@@ -150,6 +150,36 @@ export const messageValide = (message: string, decision: Decision): boolean =>
   refusDuMessage(message, decision) === null;
 
 /**
+ * Le titre de l'avis qui porte la décision au candidat.
+ *
+ * ── « envoyé », et il ne l'était pas ────────────────────────────────
+ *
+ * `CLAUDE.md` compte quatre points d'application du vocabulaire interdit,
+ * dont « B-05 pour le message **envoyé** après une revue manuelle », et
+ * l'en-tête de `refusDuMessage` dit « validation du message envoyé au
+ * candidat ». Le message était écrit, refusé s'il le fallait, rangé dans
+ * `ManualReview.message` et recopié dans `Document.feedback` — et aucun
+ * avis n'en partait. Les trois verdicts automatiques en produisent un
+ * chacun ; celui qu'une personne rédige, non. Le candidat pouvait le
+ * découvrir en rouvrant sa checklist, ou pas.
+ *
+ * ── Pourquoi un titre par décision ──────────────────────────────────
+ *
+ * Le corps de l'avis est le message de l'opérateur, tel quel : c'est lui
+ * que le candidat doit lire, et le résumer le trahirait. Le titre, lui,
+ * dit ce qui vient de se passer, et une relecture humaine n'est pas un
+ * verdict de machine — il dit donc qu'une personne a regardé. C'est aussi
+ * pourquoi il ne reprend pas les titres de WF-06 : le même mot pour deux
+ * faits différents ferait croire à une seconde passe automatique.
+ */
+export const TITRE_DE_LA_DECISION: Record<Decision, string> = {
+  CONFORME: "Ta pièce a été acceptée après relecture",
+  A_CORRIGER: "Ta pièce demande une correction",
+  ILLISIBLE: "Ta pièce n'a pas pu être lue, même en relecture",
+  HORS_SUJET: "Ce fichier n'est pas la pièce attendue",
+};
+
+/**
  * Une analyse rendue recrédite le quota du candidat. La règle est ici, et
  * non dans l'écran, pour que le compteur et le message soient toujours
  * d'accord.
