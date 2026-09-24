@@ -100,7 +100,7 @@ export default async function PageConfirme({
     d'un ternaire ici : les deux écrans du bout du tunnel avaient déjà
     divergé sur le même achat — $-03 disait « pack », $-04 « dossier ».
   */
-  const achat = achatDepuisLeCode(recu.achatCode) ?? { type: "pack" as const, code: recu.achatCode };
+  const achat = achatDepuisLeCode(recu.achatCode);
   /*
     Après une consultation, la suite utile est le rendez-vous, pas la
     checklist : le candidat vient de payer un horaire, et c'est lui qu'il

@@ -7,7 +7,11 @@ import { echecPourMotif, motifDeLEchec, type MotifEchec } from "@/domain/paiemen
 import type { PaiementEnCours } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 import { actionVersLAutreGrille, mentionDeLAutreGrille, railDe } from "@/domain/payments/rail";
-import { achatDepuisLeCode, ouvrableDepuisLeRecapitulatif } from "@/domain/payments/achat";
+import {
+  achatDepuisLeCode,
+  ouvrableDepuisLeRecapitulatif,
+  tarifDe,
+} from "@/domain/payments/achat";
 import { corpsDeLEtat } from "@/domain/consultants/tenue";
 
 /**
@@ -84,12 +88,23 @@ export function Echec({
 
   const dossier = paiement.dossierId;
   const achat = achatDepuisLeCode(paiement.achatCode);
+  /*
+    Deux conditions, et elles ne disaient pas la même chose. La catégorie
+    d'un achat enregistré est toujours connue — c'est nous qui avons écrit
+    ce code. Ce qui peut manquer, c'est son **prix** : un pack retiré de
+    l'offre ne se rachète plus, et proposer d'y revenir mènerait à un
+    récapitulatif sans montant.
+
+    L'écran lisait les deux dans une seule réponse nullable : un pack
+    retiré s'y déclarait de catégorie inconnue, et le candidat perdait le
+    lien qui le ramène au paiement — sur l'écran où il en a le plus besoin.
+  */
   const reessai =
-    dossier && achat && ouvrableDepuisLeRecapitulatif(achat)
+    dossier && ouvrableDepuisLeRecapitulatif(achat) && tarifDe(achat) !== null
       ? `/paiement/recapitulatif?dossier=${dossier}&achat=${paiement.achatCode}&devise=${paiement.devise}`
       : null;
   const autreDevise = paiement.devise === "XOF" ? "EUR" : "XOF";
-  const estUnPack = achat?.type === "pack";
+  const estUnPack = achat.type === "pack";
   /*
     Le créneau a été libéré avec l'échec — c'est ce que fait
     `libererLaTenue`. La phrase vient du domaine de la tenue, celui-là

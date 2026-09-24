@@ -98,8 +98,53 @@ describe("le paramètre d'adresse et le code enregistré", () => {
     expect(codeEnregistre({ type: "consultation" })).toBe("consultation");
   });
 
-  it("un code que la grille ne connaît plus ne devient pas un pack", () => {
-    expect(achatDepuisLeCode("pack-retire-de-la-grille")).toBeNull();
+  /**
+   * ── L'essai qui tenait le défaut ──────────────────────────────────
+   *
+   * Il affirmait qu'un code retiré de la grille « ne devient pas un
+   * pack », et `achatDepuisLeCode` rendait donc `null`. La règle est juste
+   * pour un **paramètre d'adresse**, qu'un visiteur fabrique — c'est ce
+   * que garde `achatDuParametre` juste en dessous. Appliquée à un code que
+   * `codeEnregistre` a nous-mêmes écrit, elle dit d'une transaction
+   * réelle que sa catégorie est inconnue, et ses quatre lecteurs se sont
+   * mis à compenser chacun à sa façon — deux par un `?? { type: "pack" }`,
+   * un par rien du tout, un par la liste complémentaire écrite à la main.
+   *
+   * Deux questions distinctes, donc : de quelle catégorie est cet achat
+   * (toujours connue) et peut-on encore le racheter (`tarifDe`).
+   */
+  it("un code retiré de la grille reste un pack, et n'a plus de tarif", () => {
+    const retire = "pack-retire-de-la-grille";
+    expect(achatDepuisLeCode(retire)).toEqual({ type: "pack", code: retire });
+    expect(tarifDe(achatDepuisLeCode(retire))).toBeNull();
+    // La règle du paramètre d'adresse, elle, ne bouge pas : une adresse
+    // fabriquée n'ouvre toujours rien.
+    expect(achatDuParametre(retire)).toBeNull();
+  });
+
+  /**
+   * La garde porte sur la forme : aucun lecteur ne redevine la catégorie
+   * d'un achat enregistré, ni par un repli vers « pack », ni par la liste
+   * complémentaire écrite à la main.
+   */
+  it("aucun lecteur ne redevine la catégorie d'un achat enregistré", () => {
+    const lus = [
+      "src/app/(app)/paiement/attente/Attente.tsx",
+      "src/app/(app)/paiement/confirme/page.tsx",
+      "src/app/(app)/paiement/echec/Echec.tsx",
+      "src/server/lecture/paiements.ts",
+    ];
+    for (const chemin of lus) {
+      // Les commentaires citent le défaut corrigé : les lire ferait
+      // échouer la garde sur sa propre explication.
+      const source = sansCommentaires(readFileSync(chemin, "utf8"));
+      expect(source, `${chemin} replie un code inconnu sur « pack »`).not.toMatch(
+        /\?\?\s*\{\s*type:\s*"pack"/u,
+      );
+      expect(source, `${chemin} écrit la liste des codes hors pack`).not.toMatch(
+        /notIn:\s*\["recharge"/u,
+      );
+    }
   });
 });
 

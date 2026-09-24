@@ -5,7 +5,7 @@ import { etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/pa
 import { deviseParDefaut, estDevise, getPack, type Devise } from "@/domain/payments/pricing";
 import { destinationsServies } from "@/server/acces/couverture";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
-import { achatDepuisLeCode } from "@/domain/payments/achat";
+import { CODES_HORS_PACK, achatDepuisLeCode } from "@/domain/payments/achat";
 
 /**
  * Lecture d'un reçu — $-04 et $-06.
@@ -178,11 +178,19 @@ export async function tunnelDuPaiement(dossierId: string, userId: string): Promi
 
   const [compte, packPaye] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { countryCode: true, phone: true } }),
+    /*
+      Un pack, et la question se pose au domaine plutôt qu'en écrivant la
+      liste complémentaire à la main. `notIn: ["recharge", "consultation"]`
+      disait « tout le reste est un pack » : une quatrième catégorie
+      d'achat y serait tombée sans que rien ne s'en aperçoive, alors que
+      `domain/payments/achat` existe précisément pour qu'elle ne se
+      compile pas tant qu'on n'a pas dit ce qu'elle est.
+    */
     db.transaction.findFirst({
       where: {
         applicationId: dossier.id,
         status: "CONFIRMEE",
-        packCode: { notIn: ["recharge", "consultation"] },
+        packCode: { notIn: [...CODES_HORS_PACK] },
       },
       select: { id: true },
     }),

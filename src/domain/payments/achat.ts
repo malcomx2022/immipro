@@ -152,14 +152,58 @@ export function codeEnregistre(achat: Achat): string {
 }
 
 /**
+ * Les catégories dont le code est le nom, et qui ne sont donc pas des
+ * packs. Elles vivent ici parce que `codeEnregistre` juste au-dessus les
+ * écrit, et qu'une requête qui cherche « tout ce qui n'est pas un pack »
+ * doit lire cette liste plutôt qu'en tenir une seconde.
+ */
+const SANS_CODE_PROPRE = {
+  recharge: { type: "recharge" },
+  consultation: { type: "consultation" },
+} as const satisfies Record<string, Achat>;
+
+export const CODES_HORS_PACK: readonly string[] = Object.keys(SANS_CODE_PROPRE);
+
+/**
  * La relecture de `Transaction.packCode`.
  *
- * Un code inconnu rend `null` : une transaction dont l'achat ne se
- * reconnaît plus ne devient pas un pack par défaut. Même règle
- * qu'`estDevise`, qui ne fait pas passer une monnaie inconnue pour l'euro.
+ * ── Une catégorie relue comme si un inconnu l'avait fournie ─────────
+ *
+ * Cette fonction déléguait à `achatDuParametre`, qui lit **un paramètre
+ * d'adresse** : une chaîne qu'un visiteur peut fabriquer, et dont un code
+ * de pack absent de la grille ne doit rien ouvrir. Appliquée à un code
+ * que `codeEnregistre` a écrit, la même règle rend `null` pour un pack
+ * simplement **retiré de l'offre** — et les lecteurs se sont mis à
+ * compenser, chacun à sa façon :
+ *
+ *     achatDepuisLeCode("essentiel_2025") = null
+ *       Attente.tsx   : « pack »     (par un `?? { type: "pack" }`)
+ *       confirme/page : « pack »     (le même `??`)
+ *       Echec.tsx     : « inconnue » (pas de repli — et donc aucun lien
+ *                                     de reprise proposé)
+ *     tunnelDuPaiement : « pack »    (par `notIn: ["recharge",
+ *                                     "consultation"]`, la liste
+ *                                     complémentaire écrite à la main)
+ *
+ * Quatre lecteurs du même code, trois réponses. C'est le défaut que ce
+ * module a été écrit pour clore — « le récapitulatif la redevinait au
+ * moment d'envoyer, sur le code » — réapparu de l'autre côté de la base.
+ *
+ * ── Deux questions, et une seule était posée ────────────────────────
+ *
+ * **De quelle catégorie est cet achat ?** La réponse est toujours
+ * connue : c'est `codeEnregistre` qui a écrit ce code, et il n'écrit que
+ * trois formes. Un pack retiré reste un pack.
+ *
+ * **Peut-on le racheter ?** Non, s'il n'est plus à la grille — mais cela
+ * se demande à `tarifDe`, qui rend `null` pour un pack sans prix, et non
+ * à la catégorie.
+ *
+ * Les confondre faisait perdre au candidat le bouton qui le ramène au
+ * paiement, sur l'écran où il en a le plus besoin.
  */
-export function achatDepuisLeCode(code: string): Achat | null {
-  return achatDuParametre(code);
+export function achatDepuisLeCode(code: string): Achat {
+  return SANS_CODE_PROPRE[code as keyof typeof SANS_CODE_PROPRE] ?? { type: "pack", code };
 }
 
 /**

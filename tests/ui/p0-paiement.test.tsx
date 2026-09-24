@@ -543,6 +543,35 @@ describe("$-03 — Attente Mobile Money", () => {
 });
 
 describe("$-05 — Échec", () => {
+  /**
+   * ── Un pack retiré de l'offre perdait le chemin du retour ─────────
+   *
+   * `achatDepuisLeCode` rendait `null` pour un code absent de la grille —
+   * la règle du paramètre d'adresse, appliquée à un code que nous avions
+   * nous-mêmes écrit. Cet écran n'avait pas de repli, là où la page
+   * d'attente et celle de confirmation en avaient un : le candidat dont
+   * le paiement échouait sur un pack entre-temps retiré lisait un écran
+   * d'échec sans un seul lien pour y revenir.
+   *
+   * La catégorie est désormais toujours connue ; ce qui peut manquer,
+   * c'est le tarif — et c'est lui qui décide de la reprise.
+   */
+  it("nomme encore le pack quand son code a quitté la grille, sans proposer de le racheter", () => {
+    render(
+      <Echec
+        paiement={{ ...EN_COURS, achatCode: "essentiel_2025", etat: "sans_suite", statut: "EXPIREE" }}
+        motif={null}
+      />,
+    );
+    // Aucune reprise : le récapitulatif n'aurait pas de montant à afficher.
+    expect(
+      screen.queryByRole("link", { name: /Reprendre le paiement|Réessayer/u }),
+    ).toBeNull();
+    // Et pas davantage la phrase réservée à une consultation, que ce
+    // paiement n'est pas.
+    expect(screen.queryByText(/créneau/u)).toBeNull();
+  });
+
   it("part du délai dépassé, le cas le moins accusateur", () => {
     render(
       <Echec
