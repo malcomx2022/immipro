@@ -73,6 +73,33 @@ export type ResultatConnexion =
  * Le calcul d'empreinte a lieu même quand l'adresse est inconnue. Sans cela,
  * une adresse sans compte répondrait en une milliseconde et une adresse avec
  * compte en cent : le temps de réponse dirait ce que le message tait.
+ *
+ * ── Et le compte bloqué sortait sans passer par là ──────────────────
+ *
+ * Le blocage rendait sa réponse **avant** l'empreinte. Mesuré, médiane de
+ * cinq appels avec un mauvais mot de passe :
+ *
+ *     adresse inconnue        196 ms
+ *     adresse connue          241 ms
+ *     adresse connue, bloquée   1 ms
+ *
+ * Deux cents fois plus vite, et c'est un oracle que l'attaquant déclenche
+ * lui-même : cinq essais faux sur n'importe quelle adresse, puis un
+ * sixième. S'il revient en une milliseconde, l'adresse existe — une
+ * adresse sans compte ne se bloque jamais, donc elle met toujours les deux
+ * cents millisecondes. La liste de clients que le message refuse de dire,
+ * le chronomètre la dictait.
+ *
+ * L'empreinte est donc calculée avant toute branche. Elle coûte, et ce
+ * coût est borné par ailleurs : `limite: "sensible"` plafonne à dix appels
+ * par minute, exactement comme pour une adresse inconnue, qui paie déjà le
+ * leurre.
+ *
+ * Il reste un écart d'une quarantaine de millisecondes entre adresse
+ * connue et inconnue — l'écriture du compteur d'échecs, qu'une adresse
+ * sans compte n'a pas à faire. Le combler demanderait de tenir un délai
+ * constant, ce qu'un runtime ne promet pas, et cette décision n'est pas
+ * prise ici.
  */
 export async function connecter(
   emailSaisi: string,
@@ -82,6 +109,14 @@ export async function connecter(
   const email = normaliserEmail(emailSaisi);
   const user = await db.user.findUnique({ where: { email } });
 
+  /*
+    Avant toute branche, y compris celle du blocage : c'est la seule
+    position où le temps de réponse ne distingue pas les trois cas.
+  */
+  const juste = user?.passwordHash
+    ? await correspond(motDePasse, user.passwordHash)
+    : await correspond(motDePasse, LEURRE);
+
   const verdictAvant = verdictDeConnexion(
     user?.failedLogins ?? 0,
     user?.lockedUntil ?? null,
@@ -90,10 +125,6 @@ export async function connecter(
   if (verdictAvant.bloque) {
     return { ouverte: false, verdict: verdictAvant, message: libelleEchec(verdictAvant) };
   }
-
-  const juste = user?.passwordHash
-    ? await correspond(motDePasse, user.passwordHash)
-    : await correspond(motDePasse, LEURRE);
 
   if (!user || !juste || user.suspendedAt) {
     if (user) {

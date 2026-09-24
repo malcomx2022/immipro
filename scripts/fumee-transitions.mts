@@ -133,6 +133,11 @@ const { recalculerCompletude, ouvrirDossier, checklistDepuis } = await import(
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
 type Ouvreur = Parameters<typeof ouvrirLeTunnel>[3];
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
+const { connecter } = await import("../src/server/acces/comptes");
+const { empreinte } = await import("../src/server/securite/secret");
+const { ESSAIS_AVANT_BLOCAGE, finDuBlocage } = await import(
+  "../src/domain/comptes/connexion"
+);
 
 /* Le référentiel livré, pour que les pièces et les conditions soient celles
    du produit et non une fixture qui s'arrangerait. */
@@ -820,6 +825,91 @@ try {
       "et le candidat n'a reçu qu'une alerte",
     );
   }
+  // ── Le temps de réponse d'un refus de connexion ─────────────────────
+  console.log("\nUn refus de connexion met le même temps, quoi qu'il refuse");
+  {
+    /*
+      `domain/comptes/connexion` pose la règle : « le serveur doit rendre le
+      même message dans les deux cas, et **mettre le même temps à le
+      rendre** ». `connecter` la tenait pour l'adresse inconnue — elle
+      compare à un leurre — et le compte bloqué sortait **avant**
+      l'empreinte. Mesuré avant correction, médiane de cinq appels :
+
+          adresse inconnue        196 ms
+          adresse connue          241 ms
+          adresse connue, bloquée   1 ms
+
+      Deux cents fois plus vite, et c'est un oracle que l'attaquant
+      déclenche lui-même : cinq essais faux sur n'importe quelle adresse,
+      puis un sixième. S'il revient en une milliseconde, l'adresse existe —
+      une adresse sans compte ne se bloque jamais.
+
+      La borne est **large** et c'est voulu : le défaut valait deux cents
+      fois, et les trois chemins sont désormais dominés par le même appel à
+      scrypt. Une borne serrée mesurerait la charge de la machine, pas la
+      correction.
+    */
+    const rang = `${process.pid}`;
+    await db.user.create({
+      data: {
+        email: `temps-connu-${rang}@exemple.test`,
+        role: "CANDIDAT",
+        passwordHash: await empreinte("motdepassejuste"),
+      },
+    });
+    await db.user.create({
+      data: {
+        email: `temps-bloque-${rang}@exemple.test`,
+        role: "CANDIDAT",
+        passwordHash: await empreinte("motdepassejuste"),
+        failedLogins: ESSAIS_AVANT_BLOCAGE,
+        lockedUntil: finDuBlocage(new Date()),
+      },
+    });
+
+    const mesurer = async (email: string): Promise<number> => {
+      const temps: number[] = [];
+      for (let i = 0; i < 5; i += 1) {
+        const depart = process.hrtime.bigint();
+        await connecter(email, "mauvaismotdepasse");
+        temps.push(Number(process.hrtime.bigint() - depart) / 1e6);
+      }
+      // La médiane, non la moyenne : un ramasse-miettes au mauvais moment
+      // ne doit pas décider d'une vérification.
+      return temps.sort((a, b) => a - b)[2]!;
+    };
+
+    const inconnue = await mesurer(`temps-inconnu-${rang}@exemple.test`);
+    const connue = await mesurer(`temps-connu-${rang}@exemple.test`);
+    const bloquee = await mesurer(`temps-bloque-${rang}@exemple.test`);
+
+    const rapport = Math.max(inconnue, connue, bloquee) / Math.min(inconnue, connue, bloquee);
+    verifier(
+      rapport < 10,
+      `les trois refus tiennent dans un facteur 10 (${inconnue.toFixed(0)} / ${connue.toFixed(
+        0,
+      )} / ${bloquee.toFixed(0)} ms, rapport ${rapport.toFixed(1)})`,
+    );
+    verifier(
+      bloquee > inconnue / 10,
+      `un compte bloqué ne se reconnaît pas au chronomètre (${bloquee.toFixed(0)} ms)`,
+    );
+
+    /*
+      Le **message**, lui, distingue encore les deux, et ce lot ne le
+      corrige pas : mesuré au premier essai, une adresse inconnue rend
+      « il te reste 5 essais » et une adresse connue « il te reste 4 ».
+      Un seul essai suffit donc à savoir si une adresse a un compte.
+
+      La raison du décompte est écrite dans le domaine — « une personne qui
+      se trompe de mot de passe a besoin de le savoir avant d'être dehors,
+      pas après » — et la parité textuelle demanderait de compter les
+      échecs d'adresses qui n'ont pas de compte. Deux biens s'y opposent, et
+      trancher appartient au produit : la question est posée dans
+      `domain/comptes/connexion`, à côté de la règle qu'elle met en tension.
+    */
+  }
+
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");
