@@ -217,6 +217,81 @@ describe("INV-4 — le filtrage est dans la requête", () => {
   });
 });
 
+/**
+ * RG-10.4 — la plateforme n'écrit plus à un compte qui a demandé l'oubli.
+ *
+ * `server/acces/suppression.ts` énonce la règle et nomme ses coupables :
+ * « **Les deux** passes de nuit ne regardaient que `deletedAt` […] on
+ * invite à revenir quelqu'un qui vient de demander à partir. » Il y en
+ * avait trois. La péremption des pièces écrivait sans filtre — constaté
+ * en exécution, compte dont la suppression était demandée depuis deux
+ * jours :
+ *
+ *     SONDE RG-10.4 : notifications reçues = 1
+ *       [ECHEANCE] Passeport : la validité est dépassée
+ *       « … Téléverse une version à jour pour la remplacer. »
+ *
+ * ── Pourquoi un garde-fou de texte, et pas un essai de plus ─────────
+ *
+ * Parce que le défaut n'est pas dans une règle, il est dans une **omission**.
+ * Les trois passes sont trois fichiers, et la quatrième sera un
+ * quatrième : elle recopiera celui de ses voisins que son auteur aura
+ * ouvert, et rien ne dira qu'elle a ouvert le mauvais. Un essai de
+ * comportement par passe garde les trois qui existent ; celui-ci garde
+ * celles qui n'existent pas encore.
+ *
+ * Même forme que la liste des lecteurs du référentiel ci-dessus, et pour
+ * la même raison : toutes les écritures ne sont pas fautives, les
+ * interdire toutes casserait le produit, et chaque dispense se nomme avec
+ * son motif. C'est ce qui oblige à justifier une entrée nouvelle plutôt
+ * qu'à l'ajouter.
+ */
+describe("RG-10.4 — aucune passe n'écrit à un compte qui a demandé l'oubli", () => {
+  /**
+   * Les écritures déclenchées par le geste du candidat lui-même.
+   *
+   * Elles ne l'invitent pas à revenir : elles répondent à ce qu'il vient
+   * de faire. Un verdict d'analyse sur une pièce qu'il a déposée la
+   * minute d'avant n'est pas une relance, et la demande de suppression
+   * ferme déjà ses sessions — la purge emportera la ligne. Ce qui les
+   * distingue est vérifiable : la file ne les planifie pas, elle les
+   * reçoit.
+   */
+  const REACTIVES: Readonly<Record<string, string>> = {
+    "src/server/jobs/analyse.ts":
+      "postée par le balayage d'une pièce que le candidat vient de déposer — un verdict n'est pas une relance",
+    "src/server/jobs/balayage.ts":
+      "postée par le dépôt lui-même, et par la reprise de quarantaine du même dépôt",
+  };
+
+  const ECRIVAINS = fichiers("src/server/jobs").filter((f) =>
+    /db\.notification\.create(Many)?\s*\(/u.test(sansCommentaires(lire(f))),
+  );
+
+  it("il y a des passes à vérifier", () => {
+    expect(ECRIVAINS.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("toute passe qui écrit au candidat filtre le compte, ou se nomme réactive", () => {
+    const sansFiltre = ECRIVAINS.filter(
+      (f) => !/COMPTE_JOIGNABLE|deletionRequestedAt/u.test(sansCommentaires(lire(f))),
+    );
+    expect(sansFiltre.filter((f) => !(f in REACTIVES))).toEqual([]);
+  });
+
+  /*
+    L'autre moitié : une dispense qui s'est mise à filtrer, ou dont le
+    fichier a disparu, n'a plus de raison d'être là. Sans elle, la liste
+    enfle d'anciens noms et cesse de dire quoi que ce soit.
+  */
+  it("la liste des réactives ne garde aucun nom mort", () => {
+    const mortes = Object.keys(REACTIVES).filter(
+      (f) => !existsSync(f) || !ECRIVAINS.includes(f),
+    );
+    expect(mortes).toEqual([]);
+  });
+});
+
 describe("RG-06.1 et RG-06.3 — vérifications déterministes", () => {
   const passeport = [
     {
