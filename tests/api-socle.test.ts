@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { HORS_LIGNE, echecSansCorps } from "@/lib/api";
 import {
   CONSERVE_DU_CANDIDAT,
   ECHECS,
@@ -318,3 +320,106 @@ describe("le public d'une réponse est le plus bas des deux", () => {
     expect(ECHECS.introuvable.action).not.toContain("mes dossiers");
   });
 });
+
+/**
+ * Une réponse arrivée n'est jamais une coupure — 24/09/2026.
+ *
+ * `appeler` faisait `reponse.ok ? ILLISIBLE : HORS_LIGNE` : toute réponse
+ * d'erreur sans corps JSON devenait « hors ligne ». Exécuté :
+ *
+ *     405 de Next, corps vide (mauvaise méthode)  → « Tu es hors ligne »
+ *     502 d'un relais, page HTML                  → « Tu es hors ligne »
+ *     413 sans corps JSON                         → « Tu es hors ligne »
+ *
+ * Or `HORS_LIGNE` affirme trois choses — « La demande n'est pas partie.
+ * Rien n'a été envoyé, rien n'a changé. » — et les trois sont fausses
+ * quand le serveur a répondu. La dernière est la plus coûteuse : dire
+ * « rien n'a été envoyé » après un délai dépassé sur un paiement est la
+ * phrase qui fait recommencer un règlement.
+ *
+ * `methode_refusee` était déclaré pour le 405 depuis le début — statut,
+ * titre, corps, action, ton — et **personne ne le levait** : c'est Next
+ * qui répond 405, sans corps. Le client le lève désormais depuis le
+ * statut, ce qui est le seul endroit où il est connu.
+ */
+describe("ce que le client dit d'une réponse illisible", () => {
+  const CAS: readonly [number, CodeEchec][] = [
+    [405, "methode_refusee"],
+    [429, "trop_de_requetes"],
+    [500, "service_indisponible"],
+    [502, "service_indisponible"],
+    [503, "service_indisponible"],
+    [504, "service_indisponible"],
+  ];
+
+  it("chaque statut connu reprend le contrat du serveur, mot pour mot", () => {
+    // Le texte vient d'`ECHECS` et non d'une copie : deux formulations
+    // pour un même échec finiraient par diverger.
+    for (const [statut, code] of CAS) {
+      expect(echecSansCorps(statut).titre, `${statut}`).toBe(ECHECS[code].titre);
+      expect(echecSansCorps(statut).ton, `${statut}`).toBe(ECHECS[code].ton);
+    }
+  });
+
+  it("et le statut annoncé par le contrat est bien celui qu'on lui associe", () => {
+    // Sans cela, la table du client et le contrat du serveur pourraient
+    // désigner deux statuts différents pour le même échec.
+    expect(ECHECS.methode_refusee.statut).toBe(405);
+    expect(ECHECS.trop_de_requetes.statut).toBe(429);
+    expect(ECHECS.service_indisponible.statut).toBe(503);
+  });
+
+  it("aucun de ces messages n'affirme que rien n'est parti", () => {
+    /*
+      C'est tout le défaut : le serveur a répondu, donc la demande est
+      partie, et une écriture a pu aboutir avant le 502. Promettre
+      l'inverse fait recommencer un geste déjà fait.
+    */
+    for (const [statut] of CAS) {
+      const dit = JSON.stringify(echecSansCorps(statut));
+      expect(dit, `${statut}`).not.toMatch(/n'est pas partie|rien n'a été envoyé/iu);
+    }
+  });
+
+  it("un statut sans sens arrêté ne promet rien de l'état du serveur", () => {
+    const illisible = echecSansCorps(413);
+    expect(illisible.titre).toMatch(/n'a pas pu être lue/u);
+    expect(JSON.stringify(illisible)).not.toMatch(/rien n'a changé/iu);
+  });
+
+  it("et la coupure réelle reste une coupure", () => {
+    // `HORS_LIGNE` garde son emploi : celui où aucune réponse n'arrive.
+    expect(HORS_LIGNE.titre).toMatch(/hors ligne/u);
+    expect(HORS_LIGNE.ton).toBe("attente");
+    for (const [statut] of CAS) {
+      expect(echecSansCorps(statut).titre, `${statut}`).not.toBe(HORS_LIGNE.titre);
+    }
+  });
+
+  /**
+   * La réciproque, et elle vaut au-delà de ce lot : un code déclaré que
+   * personne ne lève est un contrat écrit pour rien. `methode_refusee` a
+   * vécu ainsi — complet, argumenté, jamais atteint.
+   */
+  it("aucun code du contrat n'est déclaré sans être levé quelque part", () => {
+    const corpus = sources("src")
+      .filter((f) => f !== "src/server/http/echecs.ts")
+      .map((f) => readFileSync(f, "utf8"))
+      .join("\n");
+    const jamaisLeves = (Object.keys(ECHECS) as CodeEchec[]).filter(
+      (c) => !new RegExp(`"${c}"`, "u").test(corpus),
+    );
+    expect(jamaisLeves).toEqual([]);
+  });
+});
+
+/** Tous les fichiers de code sous une racine, essais exclus. */
+function sources(racine: string): string[] {
+  const sortie: string[] = [];
+  for (const entree of readdirSync(racine)) {
+    const chemin = join(racine, entree);
+    if (statSync(chemin).isDirectory()) sortie.push(...sources(chemin));
+    else if (/\.tsx?$/u.test(chemin) && !chemin.includes(".test.")) sortie.push(chemin);
+  }
+  return sortie;
+}
