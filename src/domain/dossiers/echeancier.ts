@@ -11,6 +11,8 @@
  * fuseau du navigateur.
  */
 
+import { decalerDeMois } from "@/domain/format/mois";
+
 export interface Echeance {
   id: string;
   /** Date de l'échéance, ISO `AAAA-MM-JJ`. */
@@ -141,7 +143,31 @@ export function resumeEcheancier(
  * la calculer.
  */
 export function dateAuPlusTot(depot: string, validiteMois: number): string {
+  /*
+    La vraie question n'est pas « le dépôt moins trois mois », c'est « à
+    partir de quand une pièce demandée vaut-elle **encore** le jour du
+    dépôt ». Les deux ne coïncident pas quand le quantième n'existe pas
+    dans le mois d'arrivée, et c'est là que la réponse compte.
+
+    Un dépôt visé au 31 mai : reculer de trois mois donne le 28 février,
+    et une pièce du 28 février périme le 28 mai — trois jours avant le
+    dépôt. La réponse est le 1er mars. Avant ce lot, le débordement de
+    `Date.UTC` rendait le 3 mars et se trouvait sauver la mise par
+    accident ; l'accident ne se garde pas, il se remplace par la règle.
+
+    La péremption est croissante avec la date de départ : on part du
+    quantième reculé et on avance d'un jour tant que la pièce ne tient pas
+    le dépôt. Trois tours au plus, puisque c'est l'écart maximal entre
+    deux longueurs de mois.
+  */
   const [a, m, j] = depot.slice(0, 10).split("-").map(Number);
-  const d = new Date(Date.UTC(a!, m! - 1 - validiteMois, j!));
-  return d.toISOString().slice(0, 10);
+  const vise = Date.UTC(a!, m! - 1, j!);
+  const candidat = decalerDeMois(new Date(vise), -validiteMois);
+  for (let jours = 0; jours <= 3; jours += 1) {
+    const essai = new Date(candidat.getTime() + jours * 86_400_000);
+    if (decalerDeMois(essai, validiteMois).getTime() >= vise) {
+      return essai.toISOString().slice(0, 10);
+    }
+  }
+  return candidat.toISOString().slice(0, 10);
 }

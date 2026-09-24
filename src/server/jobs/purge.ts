@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { decalerDeMois } from "@/domain/format/mois";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { removeObject } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
@@ -302,9 +303,13 @@ export interface BilanConservation {
 
 /** Le point de coupure d'une durée exprimée en mois. */
 export function echeanceEnMois(mois: number, maintenant: Date): Date {
-  const limite = new Date(maintenant);
-  limite.setUTCMonth(limite.getUTCMonth() - mois);
-  return limite;
+  /*
+    Le même décalage que la péremption, sans débordement : `setUTCMonth`
+    reculait un 31 mars d'un mois sur le 3 mars, et la coupure tombait
+    deux jours trop tôt — une pièce purgée avant la durée annoncée au
+    candidat (RG-10.2).
+  */
+  return decalerDeMois(maintenant, -mois);
 }
 
 /**

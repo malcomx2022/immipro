@@ -1,5 +1,6 @@
 import type { Document, DocumentVersion } from "@prisma/client";
 import { db } from "@/lib/db";
+import { decalerDeMois } from "@/domain/format/mois";
 import { echec } from "@/server/http/echecs";
 import { autorisationAccordee } from "@/server/acces/consentements";
 import { presignedGet, presignedPut, TTL_PRESIGNE_SECONDES } from "@/lib/storage";
@@ -202,7 +203,11 @@ export async function enregistrerLaVersion(
  */
 export function dateDePeremption(validiteMois: number | null, depose: Date): Date | null {
   if (validiteMois === null) return null;
-  const echeance = new Date(depose);
-  echeance.setUTCMonth(echeance.getUTCMonth() + validiteMois);
-  return echeance;
+  /*
+    Le décalage passe par `decalerDeMois`, qui ne déborde pas : `setUTCMonth`
+    visait le 30 février d'un dépôt du 30 novembre et reportait sur le
+    2 mars, deux jours de validité que la règle n'accorde pas — et dans le
+    sens qui rassure.
+  */
+  return decalerDeMois(depose, validiteMois);
 }
