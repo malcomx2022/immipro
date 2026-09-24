@@ -48,20 +48,20 @@ const version = (rang: number, texte: string): Version => ({
 describe("les trois états d'une pièce, que R-03 réduisait à un seul", () => {
   it("distingue l'entretien trop court, la mise en forme à demander et le service absent", () => {
     const base = { versions: [] as Version[] };
-    expect(etatDeLaPiece({ ...base, reponses: 1, redactionDisponible: true })).toBe(
+    expect(etatDeLaPiece({ ...base, reponses: 1, redactionDisponible: true, redactionAssistee: true })).toBe(
       "ENTRETIEN_INSUFFISANT",
     );
     expect(
-      etatDeLaPiece({ ...base, reponses: REPONSES_MINIMUM, redactionDisponible: true }),
+      etatDeLaPiece({ ...base, reponses: REPONSES_MINIMUM, redactionDisponible: true, redactionAssistee: true }),
     ).toBe("A_METTRE_EN_FORME");
     expect(
-      etatDeLaPiece({ ...base, reponses: REPONSES_MINIMUM, redactionDisponible: false }),
+      etatDeLaPiece({ ...base, reponses: REPONSES_MINIMUM, redactionDisponible: false, redactionAssistee: true }),
     ).toBe("MISE_EN_FORME_INDISPONIBLE");
     expect(
       etatDeLaPiece({
         versions: [version(1, "Un texte.")],
         reponses: 0,
-        redactionDisponible: false,
+        redactionDisponible: false, redactionAssistee: true,
       }),
     ).toBe("REDIGEE");
   });
@@ -168,7 +168,7 @@ describe("R-04 rendait un avis favorable sans avoir lu", () => {
    * et c'était la phrase rassurante.
    */
   it("ne dit pas « rien à reprendre » quand rien n'a été lu", () => {
-    const jamais = etatDeLaRelecture({ remarques: null, texteExistant: true });
+    const jamais = etatDeLaRelecture({ remarques: null, texteExistant: true, redactionAssistee: true });
     expect(jamais).toBe("ANALYSE_INDISPONIBLE");
     expect(resumeSelonLEtat(jamais, null)).toBe(RESUME_ANALYSE_INDISPONIBLE);
     expect(resumeSelonLEtat(jamais, null)).not.toContain("Rien à reprendre");
@@ -176,20 +176,20 @@ describe("R-04 rendait un avis favorable sans avoir lu", () => {
   });
 
   it("le dit quand la version a bien été lue sans remarque", () => {
-    const relue = etatDeLaRelecture({ remarques: [], texteExistant: true });
+    const relue = etatDeLaRelecture({ remarques: [], texteExistant: true, redactionAssistee: true });
     expect(relue).toBe("RELUE_SANS_REMARQUE");
     expect(resumeSelonLEtat(relue, [])).toBe(resumeRelecture([]));
     expect(resumeSelonLEtat(relue, [])).toContain("Rien à reprendre");
   });
 
   it("distingue encore l'absence de texte", () => {
-    const sansTexte = etatDeLaRelecture({ remarques: null, texteExistant: false });
+    const sansTexte = etatDeLaRelecture({ remarques: null, texteExistant: false, redactionAssistee: true });
     expect(sansTexte).toBe("SANS_TEXTE");
     expect(resumeSelonLEtat(sansTexte, null)).toBe(RESUME_SANS_TEXTE);
   });
 
   it("garde son compte de remarques quand il y en a", () => {
-    const etat = etatDeLaRelecture({ remarques: [remarque], texteExistant: true });
+    const etat = etatDeLaRelecture({ remarques: [remarque], texteExistant: true, redactionAssistee: true });
     expect(etat).toBe("RELUE");
     expect(resumeSelonLEtat(etat, [remarque])).toContain("1 point à traiter");
   });
@@ -210,6 +210,7 @@ describe("R-04 rendait un avis favorable sans avoir lu", () => {
       remarques: null,
       texteExistant: true,
       analysePossible: true,
+      redactionAssistee: true,
     });
     expect(etat).toBe("A_ANALYSER");
     expect(resumeSelonLEtat(etat, null)).not.toContain("Rien à reprendre");
@@ -228,6 +229,7 @@ describe("R-04 rendait un avis favorable sans avoir lu", () => {
       remarques: [],
       texteExistant: true,
       analysePossible: true,
+      redactionAssistee: true,
     });
     expect(etat).toBe("RELUE_SANS_REMARQUE");
     expect(resumeSelonLEtat(etat, [])).toContain("Rien à reprendre");

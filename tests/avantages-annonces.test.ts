@@ -58,21 +58,36 @@ describe("les avantages annoncés tiennent ce que le code donne", () => {
   });
 
   /*
-    La rédaction ne vérifie aucun pack. Elle est donc annoncée là où elle
-    devient disponible — au premier pack payant — et les paliers suivants
-    la portent par leur « tout le pack précédent ».
+    Arbitrage S.80 : la rédaction assistée est un droit des packs que la
+    grille marque `redactionAssistee`, et les routes qui appellent le
+    service le vérifient sur la couverture du dossier — jamais sur un code
+    de pack lu à part. Elle s'annonce donc là où elle s'ouvre, et nulle
+    part ailleurs.
   */
-  it("la rédaction est annoncée au palier où elle s'ouvre, pas plus haut", () => {
-    const route = readFileSync(
-      "src/app/api/dossiers/[id]/redaction/[type]/version/route.ts",
-      "utf8",
-    );
-    expect(route).not.toMatch(/packCode/u);
-
-    expect(AVANTAGES.essentiel?.some((l) => /rédaction/iu.test(l))).toBe(true);
-    for (const code of ["dossier", "pro"]) {
-      expect(AVANTAGES[code]?.some((l) => /rédaction/iu.test(l)), code).toBe(false);
+  it("la rédaction assistée est annoncée là où la grille l'ouvre, et seulement là", () => {
+    for (const chemin of ["version", "relecture"]) {
+      const route = readFileSync(
+        `src/app/api/dossiers/[id]/redaction/[type]/${chemin}/route.ts`,
+        "utf8",
+      );
+      expect(route, chemin).toContain("exigerRedactionAssistee(params.id!)");
+      expect(route, chemin).not.toMatch(/packCode/u);
     }
+    for (const pack of PACKS) {
+      const annonce = AVANTAGES[pack.code]?.some((l) => /rédaction assistée/iu.test(l));
+      expect(annonce, pack.code).toBe(pack.redactionAssistee);
+    }
+    expect(PACKS.find((p) => p.code === "essentiel")?.redactionAssistee).toBe(false);
+  });
+
+  /*
+    Le comparateur de dossiers n'est pas en V1 (arbitrage S.80) : ni le
+    badge ni les avantages ne l'annoncent, sous aucun nom.
+  */
+  it("Pro ne s'annonce pas par un comparateur, ni par une comparaison", () => {
+    const pro = PACKS.find((p) => p.code === "pro")!;
+    expect(pro.justification).not.toMatch(/compar/iu);
+    for (const l of AVANTAGES.pro ?? []) expect(l).not.toMatch(/compar/iu);
   });
 
   /** Tout pack de la grille est décrit, et rien n'est décrit qui n'existe pas. */

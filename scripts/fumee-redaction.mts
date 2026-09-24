@@ -260,12 +260,15 @@ async function piece(options: { avecTexte?: boolean } = {}) {
  */
 async function ceQueLEcranDit(dossier: { id: string; userId: string }, documentId: string) {
   const faits = await faitsDuDossier(dossier.id, dossier.userId);
-  const vue = await vueDeLaRelecture(documentId, faits, redactionConfiguree());
+  // La fumée éprouve le parcours d'un dossier couvert : la garde des
+  // droits est éprouvée à part, dans `fumee-redaction` plus bas.
+  const vue = await vueDeLaRelecture(documentId, faits, redactionConfiguree(), true);
   const etat = etatDeLaRelecture({
     remarques: vue.remarques,
     texteExistant: vue.texteExistant,
     recoupementsEffectues: vue.recoupements.effectues.length > 0,
     analysePossible: vue.analysePossible,
+    redactionAssistee: vue.redactionAssistee,
   });
   return { etat, resume: resumeSelonLEtat(etat, vue.remarques), remarques: vue.remarques };
 }
@@ -525,6 +528,111 @@ try {
     verifier(
       !/(?<!\p{L})NL(?!\p{L})/u.test(consigne) && !consigne.includes("lettre-motivation"),
       "sans code ISO ni segment de route",
+    );
+  }
+
+  console.log("\nArbitrage S.80 — la rédaction assistée se lit sur la couverture du dossier");
+  {
+    const { appliquerLaCouverture } = await import("../src/server/acces/couverture");
+    const { redactionAssisteeDuDossier, exigerRedactionAssistee } = await import(
+      "../src/server/acces/droits"
+    );
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-droits-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const regle = (await db.visaRule.findFirst({ where: { status: "PUBLISHED" } }))!;
+    const ouvrir = () =>
+      db.application.create({
+        data: { userId: candidat.id, visaRuleId: regle.id, status: "ACTIF" },
+      });
+    let n = 0;
+    const payer = async (packCode: string, applicationId: string) => {
+      n += 1;
+      return db.transaction.create({
+        data: {
+          reference: `IMP-DROITS-${n}-${process.pid}`,
+          userId: candidat.id,
+          applicationId,
+          packCode,
+          amount: 29,
+          currency: "EUR",
+          provider: "STRIPE",
+          providerTxId: `stripe:droits_${n}_${process.pid}`,
+          status: "CONFIRMEE",
+          confirmedAt: new Date(),
+        },
+      });
+    };
+
+    const essentiel = await ouvrir();
+    const tx = await payer("essentiel", essentiel.id);
+    await appliquerLaCouverture(candidat.id, { applicationId: essentiel.id, transactionId: tx.id });
+    verifier(!(await redactionAssisteeDuDossier(essentiel.id)), "un dossier Essentiel n'ouvre pas l'assistance");
+
+    // Une recharge n'est pas une couverture.
+    const recharge = await payer("recharge-10", essentiel.id);
+    await db.analysisCredit.create({
+      data: { applicationId: essentiel.id, delta: 10, reason: "RECHARGE", transactionId: recharge.id },
+    });
+    verifier(!(await redactionAssisteeDuDossier(essentiel.id)), "une recharge ne l'ouvre pas non plus");
+
+    // Le compte achète ensuite un Dossier pour un autre dossier : le droit
+    // suit la couverture, pas le dernier achat du compte.
+    const couvert = await ouvrir();
+    const txDossier = await payer("dossier", couvert.id);
+    await appliquerLaCouverture(candidat.id, { applicationId: couvert.id, transactionId: txDossier.id });
+    verifier(await redactionAssisteeDuDossier(couvert.id), "le dossier couvert par Dossier l'ouvre");
+    verifier(
+      !(await redactionAssisteeDuDossier(essentiel.id)),
+      "et le dossier Essentiel ne l'hérite pas du dernier achat du compte",
+    );
+
+    const refus = await exigerRedactionAssistee(essentiel.id).then(
+      () => "accepté",
+      (e: { echec?: { code?: string } }) => e.echec?.code ?? String(e),
+    );
+    verifier(refus === "redaction_non_couverte", `la garde refuse avec son code (${refus})`);
+
+    // Un remboursement engagé retire le droit avec les analyses.
+    await db.transaction.update({
+      where: { id: txDossier.id },
+      data: { refundDueAt: new Date(), refundBasis: "fumée" },
+    });
+    verifier(!(await redactionAssisteeDuDossier(couvert.id)), "un remboursement engagé le retire");
+
+    // Pro : trois couvertures Dossier, chacune ouvre l'assistance ; un
+    // quatrième dossier n'hérite de rien.
+    rang += 1;
+    const pro = await db.user.create({
+      data: { email: `fumee-pro-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const ouvrirPro = () =>
+      db.application.create({ data: { userId: pro.id, visaRuleId: regle.id, status: "ACTIF" } });
+    const [p1, p2, p3] = [await ouvrirPro(), await ouvrirPro(), await ouvrirPro()];
+    n += 1;
+    const txPro = await db.transaction.create({
+      data: {
+        reference: `IMP-DROITS-${n}-${process.pid}`,
+        userId: pro.id,
+        applicationId: p1.id,
+        packCode: "pro",
+        amount: 59,
+        currency: "EUR",
+        provider: "STRIPE",
+        providerTxId: `stripe:droits_${n}_${process.pid}`,
+        status: "CONFIRMEE",
+        confirmedAt: new Date(),
+      },
+    });
+    await appliquerLaCouverture(pro.id, { applicationId: p1.id, transactionId: txPro.id });
+    const ouverts = await Promise.all([p1, p2, p3].map((d) => redactionAssisteeDuDossier(d.id)));
+    verifier(ouverts.every(Boolean), `les trois destinations Pro l'ouvrent (${ouverts.join(", ")})`);
+    const quatrieme = await ouvrirPro();
+    await appliquerLaCouverture(pro.id);
+    verifier(
+      !(await redactionAssisteeDuDossier(quatrieme.id)),
+      "un quatrième dossier, que Pro ne couvre plus, ne l'ouvre pas",
     );
   }
 } finally {

@@ -5,6 +5,7 @@ import { vueDuDossier } from "@/server/lecture/dossiers";
 import { faitsDuDossier, pieceARediger, vueDeLaRelecture } from "@/server/lecture/redaction";
 import { exigerCandidat } from "@/server/securite/page";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
+import { redactionAssisteeDuDossier } from "@/server/acces/droits";
 
 /**
  * R-04 — Analyse critique. WF-08.
@@ -62,7 +63,13 @@ export default async function PageRelecture({
     chemin que personne n'emprunte, et une mutation l'a prouvé en
     laissant la fumée verte alors que la page redevenait fautive.
   */
-  const vueRelecture = await vueDeLaRelecture(piece.documentId, faits, redactionConfiguree());
+  const vueRelecture = await vueDeLaRelecture(
+    piece.documentId,
+    faits,
+    redactionConfiguree(),
+    // Lu après `vueDuDossier`, qui a vérifié que le dossier est à lui.
+    await redactionAssisteeDuDossier(id),
+  );
 
   return (
     <Relecture dossier={vue.dossier} type={type} {...vueRelecture} />

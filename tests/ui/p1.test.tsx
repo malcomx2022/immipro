@@ -129,6 +129,7 @@ describe("R-02 — Entretien guidé", () => {
         reponsesEnregistrees={{}}
         versions={[]}
         redactionDisponible={false}
+        redactionAssistee
         maintenant={MAINTENANT}
       />,
     );
@@ -205,6 +206,7 @@ describe("R-02 — les réponses partent au serveur", () => {
         reponsesEnregistrees={deja}
         versions={[]}
         redactionDisponible={false}
+        redactionAssistee
         maintenant={MAINTENANT}
       />,
     );
@@ -298,6 +300,7 @@ describe("R-03 — Éditeur et versions", () => {
         versions={VERSIONS_MOTIVATION}
         suggestion={SUGGESTION_EN_ATTENTE}
         redactionDisponible={false}
+        redactionAssistee
         maintenant={MAINTENANT}
       />,
     );
@@ -356,6 +359,7 @@ describe("R-03 — les versions s'écrivent", () => {
         reponsesEnregistrees={{ 0: "Une.", 1: "Deux.", 2: "Trois.", 3: "Quatre." }}
         versions={versions}
         redactionDisponible={disponible}
+        redactionAssistee
         maintenant={MAINTENANT}
       />,
     );
@@ -495,6 +499,7 @@ describe("R-04 — un vide ne vaut pas un avis", () => {
         recoupements={props.recoupements ?? AUCUN_RECOUPEMENT}
         texteExistant={props.texteExistant ?? true}
         analysePossible={props.analysePossible ?? false}
+        redactionAssistee
         relectureLe="2026-09-11"
       />,
     );
@@ -591,6 +596,7 @@ describe("R-04 — Analyse critique", () => {
       recoupements={AUCUN_RECOUPEMENT}
       texteExistant
       analysePossible
+      redactionAssistee
       relectureLe="2026-09-11"
     />
   );
@@ -1277,5 +1283,53 @@ describe("T-06 — Services partenaires", () => {
     expect(
       screen.getByRole("link", { name: "Autoriser depuis mes consentements" }).getAttribute("href"),
     ).toBe("/consentements");
+  });
+});
+
+/**
+ * Arbitrage S.80 — sans la couverture, le candidat écrit toujours.
+ *
+ * Le champ n'apparaissait qu'après une première mise en forme par le
+ * service : sans elle, aucune pièce ne s'écrivait dans l'application.
+ */
+describe("R-03 et R-04 — la rédaction assistée réservée à Dossier et Pro", () => {
+  it("l'éditeur garde le champ, ne propose aucune mise en forme, et mène aux packs", () => {
+    render(
+      <Redaction
+        dossier={DOSSIER}
+        piece={MOTIVATION}
+        reponsesEnregistrees={{ 0: "Une.", 1: "Deux.", 2: "Trois.", 3: "Quatre." }}
+        versions={[]}
+        redactionDisponible
+        redactionAssistee={false}
+        maintenant={MAINTENANT}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Écrire directement dans l'éditeur" }));
+    expect(screen.queryByRole("button", { name: "Proposer un premier texte" })).toBeNull();
+    expect(screen.getByLabelText("Ton texte")).toBeDefined();
+    expect(screen.getByRole("link", { name: "Voir les packs" }).getAttribute("href")).toBe(
+      "/tarifs",
+    );
+    expect(screen.getByText(/restent à toi/)).toBeDefined();
+  });
+
+  it("la relecture ne lance rien, dit ce qui a été recoupé, et mène aux packs", () => {
+    const { container } = render(
+      <Relecture
+        dossier={DOSSIER}
+        type="lettre-motivation"
+        remarques={null}
+        recoupements={AUCUN_RECOUPEMENT}
+        texteExistant
+        analysePossible
+        redactionAssistee={false}
+        relectureLe="2026-09-20"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Lancer l'analyse" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Voir les packs" })).toBeDefined();
+    expect(container.textContent).toContain("Dossier et Dossier Pro");
+    expect(container.textContent).not.toContain("Rien à reprendre");
   });
 });

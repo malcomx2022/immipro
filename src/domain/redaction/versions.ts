@@ -1,3 +1,4 @@
+import { packsDeLaRedactionAssistee } from "@/domain/payments/droits";
 import { momentRelatif } from "@/domain/format/moment";
 import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
@@ -107,6 +108,11 @@ export type EtatDeLaPiece =
   | "ENTRETIEN_INSUFFISANT"
   | "A_METTRE_EN_FORME"
   | "MISE_EN_FORME_INDISPONIBLE"
+  /**
+   * La couverture du dossier n'ouvre pas la rédaction assistée —
+   * arbitrage S.80. Le candidat écrit lui-même : l'éditeur lui est ouvert.
+   */
+  | "MISE_EN_FORME_RESERVEE"
   | "REDIGEE";
 
 /**
@@ -124,8 +130,19 @@ export function etatDeLaPiece(options: {
   reponses: number;
   /** Le service de mise en forme est branché. */
   redactionDisponible: boolean;
+  /**
+   * La couverture du dossier ouvre la rédaction assistée (arbitrage S.80).
+   * Obligatoire : un droit qu'on oublie de passer ne doit pas s'ouvrir.
+   */
+  redactionAssistee: boolean;
 }): EtatDeLaPiece {
   if (options.versions.length > 0) return "REDIGEE";
+  /*
+    Avant le compte des réponses : « il t'en faut trois pour la mise en
+    forme » annoncerait un geste que ce dossier n'a pas. Ce qui lui reste
+    — écrire lui-même — ne demande aucun minimum.
+  */
+  if (!options.redactionAssistee) return "MISE_EN_FORME_RESERVEE";
   if (options.reponses < REPONSES_MINIMUM) return "ENTRETIEN_INSUFFISANT";
   return options.redactionDisponible ? "A_METTRE_EN_FORME" : "MISE_EN_FORME_INDISPONIBLE";
 }
@@ -165,6 +182,18 @@ export function messageDEtat(
     };
   }
 
+  if (etat === "MISE_EN_FORME_RESERVEE") {
+    const acquis =
+      reponses > 0
+        ? `Tes ${reponses} réponses sont enregistrées et restent à toi.`
+        : "L'entretien guidé t'aide à rassembler la matière, question par question.";
+    return {
+      titre: "Écris ta pièce, avec ou sans l'entretien",
+      corps: `${acquis} Tu peux écrire ta pièce toi-même ci-dessous : chaque enregistrement crée une version que tu peux restaurer et exporter. La proposition de texte et l'analyse critique s'ouvrent avec les packs ${packsDeLaRedactionAssistee()}.`,
+      action: "Voir les packs",
+    };
+  }
+
   return {
     titre: "La mise en forme n'est pas disponible",
     corps: `Tes ${reponses} réponses sont enregistrées et rien n'est perdu. Le service qui écrit le texte n'est pas encore branché, et nous ne proposons pas un texte que personne n'a écrit. Tu peux rédiger ta pièce de ton côté et la joindre au dossier.`,
@@ -199,6 +228,10 @@ export function obstacleALEnregistrement(
   courante: Version | undefined,
 ): string | null {
   if (compterMotsTexte(texte) === 0) {
+    // Sans version, il n'y a rien à effacer : la phrase dit quoi écrire.
+    if (!courante) {
+      return "Le texte est vide. Écris ta pièce ici, ou reprends l'entretien pour en rassembler la matière.";
+    }
     return "Le texte est vide. Enregistrer effacerait ce que la version précédente contient — réécris d'abord, ou reviens en arrière depuis les versions.";
   }
   if (courante && texte.trim() === texteDeLaVersion(courante).trim()) {

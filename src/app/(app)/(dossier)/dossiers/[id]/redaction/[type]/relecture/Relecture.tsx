@@ -78,6 +78,8 @@ export interface RelectureProps {
    * à proposer plutôt qu'une absence à expliquer.
    */
   analysePossible: boolean;
+  /** La couverture du dossier ouvre l'analyse critique (arbitrage S.80). */
+  redactionAssistee: boolean;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
   relectureLe: string;
 }
@@ -89,6 +91,7 @@ export function Relecture({
   recoupements,
   texteExistant,
   analysePossible,
+  redactionAssistee,
   relectureLe,
 }: RelectureProps) {
   const id = dossier.id;
@@ -104,6 +107,7 @@ export function Relecture({
     texteExistant,
     recoupementsEffectues: recoupements.effectues.length > 0,
     analysePossible,
+    redactionAssistee,
   });
   const remarques = trierRemarques(toutes);
   const premiere = remarques[0];
@@ -126,7 +130,7 @@ export function Relecture({
           Relecture de ta lettre
         </h1>
         <p className="max-w-[80ch] text-pretty text-16 text-ink-700">
-          {resumeSelonLEtat(etat, toutes)}
+          {resumeSelonLEtat(etat, toutes, recoupements.effectues.length > 0)}
         </p>
       </div>
 
@@ -196,6 +200,16 @@ export function Relecture({
         */}
         {etat === "A_ANALYSER" ? (
           <LancerLAnalyse dossierId={id} type={type} />
+        ) : etat === "RESERVEE_AU_PACK" && !premiere ? (
+          // Arbitrage S.80 : ni un bouton qui lancerait une analyse refusée,
+          // ni un silence — le chemin vers ce qui l'ouvre.
+          <LienBouton
+            href="/tarifs"
+            pleineLargeur
+            className="min-h-action md:w-auto"
+          >
+            {ACTION_RELECTURE[etat]}
+          </LienBouton>
         ) : (
           <LienBouton
             href={`/dossiers/${id}/redaction/${type}`}

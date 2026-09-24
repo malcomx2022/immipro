@@ -9560,6 +9560,8 @@ Trois mutations le tiennent : le comparateur remis dans Pro, un nombre
 recopié à la main, la rédaction remontée au seul Dossier — chacune ne fait
 tomber que son assertion.
 
+**Tranché le 24/09/2026**, mis en œuvre en S.86.
+
 ### Ce que ce lot ne tranche pas
 
 Le positionnement. Si l'intention commerciale est que la rédaction distingue
@@ -9878,3 +9880,87 @@ semaines de conservation. Demander la date réelle ajouterait un champ et
 une validation (pas dans le futur, pas avant l'ouverture). C'est une
 question de produit : la spécification dit « le candidat déclare avoir
 déposé », sans date.
+
+## S.86 — S.80 tranché : la rédaction assistée est un droit de Dossier et de Dossier Pro
+
+La frontière porte sur l'intervention du service d'IA, pas sur le droit du
+candidat à écrire son propre document.
+
+| Tous les packs | Dossier et Dossier Pro ajoutent |
+|---|---|
+| Entretien guidé et conservation des réponses | Proposition de texte à partir des réponses |
+| Écriture et réécriture manuelles | Reformulation assistée |
+| Versions et restauration | Analyse critique assistée |
+| Exports PDF et DOCX | Recoupements qui exigent la lecture automatique des pièces |
+| Recoupements déterministes | |
+
+### Le droit se lit sur le dossier, pas sur le compte
+
+Il se déduit du grand livre des analyses : ce sont les octrois
+`ACHAT_PACK` du dossier, et le pack de la transaction qui les porte.
+`destinationsServies` fait déjà la même lecture pour la couverture. Il
+n'y a donc rien à stocker, et rien qui puisse diverger. Trois cas
+tiennent sur une vraie base (fumée de rédaction) :
+
+- un compte qui achète un Dossier pour un second dossier ne l'ouvre pas
+  sur le premier, couvert par Essentiel ;
+- les trois destinations d'un Pro l'ouvrent, mais pas un quatrième
+  dossier ;
+- une recharge ne l'ouvre pas, et un remboursement engagé le retire.
+
+### Ce qui est gardé
+
+Les deux gestes qui appellent le service aujourd'hui : la mise en forme
+(proposition de texte) et l'analyse critique. La garde passe avant le
+débit et avant l'appel : un refus ne coûte rien, n'écrit rien, et ne
+touche ni aux réponses, ni au texte, ni aux versions. La reformulation
+et les recoupements par lecture des pièces n'existent pas encore ; ils
+passeront par la même garde (`exigerRedactionAssistee`).
+
+Un test lit les deux routes et exige la garde. Une mutation qui la retire
+le fait tomber.
+
+### Le défaut que l'arbitrage a mis au jour : on ne pouvait pas écrire sans le service
+
+L'éditeur n'affichait son champ qu'une fois une première version
+produite, c'est-à-dire après une mise en forme par le service. Aucune
+pièce ne pouvait donc s'écrire à la main dans l'application. Ce n'était
+pas visible, puisque tout le monde avait l'assistance. Avec l'arbitrage,
+un acheteur d'Essentiel aurait perdu le droit d'écrire que la décision
+lui garantit.
+
+Le champ est désormais toujours là. La première version se crée par
+l'enregistrement, et l'entretien a un accès direct à l'éditeur au lieu
+de huit questions à passer une à une.
+
+### Les écrans
+
+- **Éditeur :** état `MISE_EN_FORME_RESERVEE`. Il ne demande aucun
+  minimum de réponses : « il t'en faut trois pour la mise en forme »
+  annoncerait un geste que ce dossier n'a pas.
+- **Relecture :** état `RESERVEE_AU_PACK`. Il dit ce que les recoupements
+  ont comparé, et que le fond n'est pas jugé. Il ne prétend pas que le
+  service n'est « pas branché ». Une analyse déjà faite reste affichée.
+- **Refus serveur :** code `redaction_non_couverte`, qui dit d'abord ce
+  qui reste au candidat.
+
+### La grille
+
+Essentiel annonce ce qu'il garde. Dossier annonce la rédaction assistée.
+Pro s'annonce pour ce qu'il donne : trois couvertures Dossier, trente
+analyses par destination, la rédaction assistée sur chacune. Son badge
+disait « Trois destinations comparées en parallèle » : il annonçait un
+comparateur. Le comparateur de dossiers n'est pas en V1 et ne s'annonce
+pas ; celui des destinations est ouvert à tous.
+
+### Ce que ce lot ne tranche pas
+
+**Le passage d'Essentiel à Dossier sur un même dossier.** Le serveur
+accepte un second pack sur un dossier : `appliquerLaCouverture` honore
+toujours le dossier désigné. La page des packs, elle, renvoie au dossier
+tout candidat qui en a déjà payé un. En faire une montée en gamme
+suppose de fixer un prix : le prix plein, ou la différence avec ce qui a
+été payé. C'est une décision tarifaire.
+
+En attendant, le lien « Voir les packs » mène à la page Tarifs, qui dit
+ce que chaque pack ouvre, plutôt qu'à une page qui renverrait au dossier.

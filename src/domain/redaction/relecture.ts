@@ -12,6 +12,8 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import { packsDeLaRedactionAssistee } from "@/domain/payments/droits";
+
 /**
  * `INCOHERENCE_DOSSIER` n'existe pas dans l'énumération Prisma, et c'est
  * voulu : les recoupements déterministes de RG-08.3 se recalculent à
@@ -181,6 +183,12 @@ export type EtatRelecture =
   | "A_ANALYSER"
   /** Ni analysée ni recoupable : rien n'a été lu, et rien n'était comparable. */
   | "ANALYSE_INDISPONIBLE"
+  /**
+   * La couverture du dossier n'ouvre pas l'analyse critique — arbitrage
+   * S.80. Les recoupements déterministes, eux, sont faits : ils ne
+   * demandent aucun service.
+   */
+  | "RESERVEE_AU_PACK"
   /** Il n'y a pas encore de texte à analyser. */
   | "SANS_TEXTE";
 
@@ -203,9 +211,21 @@ export function etatDeLaRelecture(options: {
    * proposer plutôt qu'une absence à expliquer.
    */
   analysePossible?: boolean;
+  /**
+   * La couverture du dossier ouvre l'analyse critique (arbitrage S.80).
+   * Obligatoire : un droit qu'on oublie de passer ne doit pas s'ouvrir.
+   */
+  redactionAssistee: boolean;
 }): EtatRelecture {
   if (!options.texteExistant) return "SANS_TEXTE";
   if (options.remarques === null) {
+    /*
+      Avant la disponibilité du service : « le service n'est pas branché »
+      serait une fausse raison sur une instance où il l'est. Une analyse
+      déjà faite, elle, reste affichée — un droit retiré ne reprend pas ce
+      qui a été lu.
+    */
+    if (!options.redactionAssistee) return "RESERVEE_AU_PACK";
     if (options.analysePossible) return "A_ANALYSER";
     return options.recoupementsEffectues ? "RECOUPEE_SEULEMENT" : "ANALYSE_INDISPONIBLE";
   }
@@ -259,14 +279,33 @@ export function resumeRecoupement(remarques: readonly Remarque[]): string {
  * remarques, et c'est juste. Ce qui manquait, c'est qu'on l'appelait avec
  * une liste vide dans un cas où il n'y avait pas de liste du tout.
  */
+/**
+ * Le résumé de l'état `RESERVEE_AU_PACK`. Il dit ce qui a été fait — les
+ * recoupements, qui sont à tous —, puis ce qui ne l'a pas été et pourquoi.
+ * La seconde moitié garde la règle de toute la relecture : on ne dit pas
+ * qu'un texte est bon sans l'avoir lu.
+ */
+export function resumeReservee(remarques: readonly Remarque[], recoupee: boolean): string {
+  const fond = `L'analyse critique du fond s'ouvre avec les packs ${packsDeLaRedactionAssistee()} : sans elle, nous ne te disons pas que ton texte est bon.`;
+  if (!recoupee) return `Cette version n'a pas été analysée. ${fond}`;
+  if (remarques.length === 0) {
+    return `Nous avons recoupé ta lettre avec ce que ton dossier sait déjà : rien ne diverge. ${fond}`;
+  }
+  const n = remarques.length;
+  return `${n} ${n > 1 ? "écarts relevés" : "écart relevé"} en recoupant ta lettre avec les informations de ton dossier. ${fond}`;
+}
+
 export function resumeSelonLEtat(
   etat: EtatRelecture,
   remarques: readonly Remarque[] | null,
+  /** Au moins un recoupement a été fait — ne sert qu'à `RESERVEE_AU_PACK`. */
+  recoupee = false,
 ): string {
   if (etat === "SANS_TEXTE") return RESUME_SANS_TEXTE;
   if (etat === "A_ANALYSER") return RESUME_A_ANALYSER;
   if (etat === "ANALYSE_INDISPONIBLE") return RESUME_ANALYSE_INDISPONIBLE;
   if (etat === "RECOUPEE_SEULEMENT") return resumeRecoupement(remarques ?? []);
+  if (etat === "RESERVEE_AU_PACK") return resumeReservee(remarques ?? [], recoupee);
   return resumeRelecture(remarques ?? []);
 }
 
@@ -284,5 +323,7 @@ export const ACTION_RELECTURE: Record<EtatRelecture, string | null> = {
   /** Le seul état où le bouton déclenche quelque chose. */
   A_ANALYSER: "Lancer l'analyse",
   ANALYSE_INDISPONIBLE: null,
+  /** Un lien vers les packs, pas un bouton qui lancerait une analyse refusée. */
+  RESERVEE_AU_PACK: "Voir les packs",
   SANS_TEXTE: null,
 };

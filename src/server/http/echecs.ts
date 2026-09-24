@@ -53,6 +53,7 @@ export type CodeEchec =
   // Consentement et quota
   | "consentement_manquant"
   | "quota_epuise"
+  | "redaction_non_couverte"
   // Dossier
   | "dossiers_au_maximum"
   | "regle_indisponible"
@@ -171,6 +172,21 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
       "Tu peux toujours téléverser et conserver tes pièces, sans vérification automatique.",
     conserve: "Les pièces déjà déposées et leurs vérifications restent en place.",
     action: "Recharger des analyses",
+    ton: "limite",
+  },
+  /*
+    Arbitrage S.80 : la rédaction assistée est un droit des packs Dossier
+    et Dossier Pro, lu sur la couverture du dossier. Le refus dit d'abord
+    ce qui reste au candidat — tout ce qu'il a écrit —, puis le geste qui
+    ouvre l'assistance.
+  */
+  redaction_non_couverte: {
+    statut: 403,
+    titre: "La rédaction assistée n'est pas ouverte sur ce dossier",
+    corps:
+      "La proposition de texte et l'analyse critique s'ouvrent avec les packs Dossier et Dossier Pro. Tu peux écrire et réécrire ta pièce toi-même.",
+    conserve: "Tes réponses, ton texte et les versions de ta pièce restent en place.",
+    action: "Voir les packs",
     ton: "limite",
   },
   dossiers_au_maximum: {
@@ -445,6 +461,7 @@ export const CONSERVE_DU_CANDIDAT: readonly CodeEchec[] = [
   "authentification_requise",
   "consentement_manquant",
   "quota_epuise",
+  "redaction_non_couverte",
   "dossiers_au_maximum",
   "regle_indisponible",
   "etat_incompatible",
@@ -495,6 +512,7 @@ export const INTERROMPENT_UNE_SAISIE: readonly CodeEchec[] = [
   "trop_de_requetes",
   "consentement_manquant",
   "quota_epuise",
+  "redaction_non_couverte",
   "dossiers_au_maximum",
   "regle_indisponible",
   "dossier_fige",
