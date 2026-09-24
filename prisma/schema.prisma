@@ -129,6 +129,19 @@ model User {
   deletionRequestedAt DateTime?
   deletedAt           DateTime?
 
+  /// Préférences de rappel d'échéance — S.87, RG-09.4.
+  ///
+  /// Sur le compte et non sur le dossier : un candidat qui coupe ses
+  /// rappels les coupe tous, et il n'a pas à le refaire pour chaque
+  /// destination. Le délai est gardé par la base (3, 7 ou 14 jours) ; le
+  /// fuseau, un identifiant IANA, est relu avec repli par le domaine.
+  /// L'email n'est qu'un souhait : l'envoi réel dépend aussi du transport,
+  /// et l'écran ne l'annonce que s'il est opérationnel.
+  remindersEnabled Boolean @default(true)
+  reminderEmail    Boolean @default(true)
+  reminderTimeZone String  @default("Africa/Porto-Novo")
+  reminderLeadDays Int     @default(7)
+
   profile       Profile?
   consents      Consent[]
   applications  Application[]
@@ -991,8 +1004,31 @@ model Notification {
   readAt        DateTime?
   createdAt     DateTime         @default(now())
 
+  /// Clé d'idempotence d'un rappel d'échéance — `echeance:<dossier>:<jour
+  /// local>` (S.87). Unique : une seconde passe le même jour bute dessus et
+  /// n'envoie rien. Nulle pour les autres genres.
+  dedupKey       String?                  @unique
+  /// État du courrier qui double la notification. Nul quand aucun courrier
+  /// n'a été demandé (canal email coupé, ou genre sans courrier). Un
+  /// courrier `EN_ATTENTE` est repris par la passe suivante ; il ne devient
+  /// jamais `ENVOYE` sans que le serveur l'ait accepté.
+  emailStatus    NotificationEmailStatus?
+  emailAttempts  Int                      @default(0)
+  /// Début de la dernière tentative. Tant qu'elle est récente, le courrier
+  /// est « en vol » : une autre passe ne le reprend pas (S.87).
+  emailAttemptAt DateTime?
+  emailSentAt    DateTime?
+
   @@index([userId, readAt, createdAt])
   @@index([createdAt])
+  @@index([emailStatus])
+}
+
+/// Le courrier d'une notification — S.87.
+enum NotificationEmailStatus {
+  EN_ATTENTE
+  ENVOYE
+  NON_ENVOYE
 }
 
 enum RuleImpact {

@@ -7,6 +7,8 @@ import {
   premiereDateCibleTenable,
 } from "@/domain/dossiers/faisabilite";
 import { exigerCandidat } from "@/server/securite/page";
+import { etatDesRappels } from "@/server/comptes/rappels";
+import { phraseDesRappels } from "@/domain/dossiers/preferences-rappels";
 
 /**
  * C-10 — Échéancier. WF-09.
@@ -54,6 +56,8 @@ export default async function PageEcheancier({
   const proposition =
     verdict.etat === "INTENABLE" ? premiereDateCibleTenable(calendrier) : null;
 
+  const rappels = await etatDesRappels(acteur.id);
+
   return (
     <Echeancier
       dossier={vue.dossier}
@@ -61,6 +65,7 @@ export default async function PageEcheancier({
       aujourdhui={calendrier.aujourdhui}
       verdict={verdict}
       proposition={proposition}
+      rappels={phraseDesRappels(rappels.preferences, rappels.canal)}
     />
   );
 }

@@ -206,19 +206,24 @@ async function main() {
   await boss.schedule(JOBS.PURGE_RETENTION, "30 3 * * *");
 
   /*
-    Les rappels d'échéance, une fois par jour — WF-09 étape 3.
+    Les rappels d'échéance, toutes les heures — WF-09 étape 3, S.87.
 
-    À sept heures et non à trois : un courrier reçu la nuit est lu le
-    matin, mêlé à ceux de la nuit. La cadence hebdomadaire de RG-09.2
-    est tenue par le job, pas par le planificateur — une urgence à
-    quatre jours ne peut pas attendre lundi, et c'est la passe
-    quotidienne qui la voit.
+    Une fois par jour à sept heures UTC, le rappel partait à huit heures à
+    Cotonou et à deux heures du matin à Montréal. La passe tourne
+    maintenant chaque heure, et n'envoie à un candidat qu'à partir de huit
+    heures **dans son fuseau**. Elle rattrape aussi : une passe manquée à
+    huit heures est faite à neuf, et un courrier resté en attente sur une
+    coupure est repris l'heure suivante.
 
-    Après la péremption : elle déclasse des pièces et refait des
-    barèmes, et un rappel envoyé avant elle citerait un état de la
-    veille.
+    Tourner vingt-quatre fois par jour ne multiplie rien : la clé
+    `echeance:<dossier>:<jour local>` est unique en base, et une passe qui
+    trouve le rappel du jour déjà réservé n'envoie rien.
+
+    À la cinquième minute : après la sonde des services, qui rafraîchit le
+    constat de messagerie à l'heure pile. L'écran ne promet l'email que sur
+    ce constat.
   */
-  await boss.schedule(JOBS.RAPPEL_ECHEANCIER, "0 7 * * *");
+  await boss.schedule(JOBS.RAPPEL_ECHEANCIER, "5 * * * *");
 
   /*
     Les brouillons laissés de côté, une fois par jour — RG-04.2.

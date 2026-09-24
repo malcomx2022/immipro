@@ -352,6 +352,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-09.1 : les délais utilisés proviennent de `rules.delai_traitement_jours` et `pieces_requises[].delai_obtention_jours`, jamais d'estimations codées en dur.
 - RG-09.2 : les rappels sont regroupés — un email hebdomadaire, sauf urgence à moins de 7 jours.
 - RG-09.3 : un délai réglementaire modifié déclenche un recalcul intégral de l'échéancier et une notification explicite.
+- RG-09.4 : les rappels se règlent sur le compte — activation globale, email en plus de l'alerte dans l'application, fuseau horaire (liste de villes, Cotonou par défaut), délai d'alerte de 3, 7 ou 14 jours (7 par défaut, RG-09.2). Un rappel part au plus une fois par dossier et par jour local du candidat, à partir de 8 h dans son fuseau ; la clé `echeance:<dossier>:<jour>` est unique en base. L'email n'est annoncé que si le transport est constaté opérationnel ; un courrier non accepté par le serveur n'est jamais présenté comme envoyé, il reste en attente et est repris dans la journée, puis abandonné — la notification demeure. Aucun rappel pour une échéance faite, une pièce déjà déposée, un dossier déposé, clos, abandonné ou suspendu, un compte en suppression, des rappels coupés. Aucun SMS n'est proposé tant qu'aucun fournisseur n'est branché (arbitrage S.87).
 
 ---
 

@@ -136,3 +136,60 @@ export const bornesDesJoursCivils = (du: string, au: string): { gte: Date; lt: D
   gte: debutDuJourCivil(du),
   lt: debutDuJourCivil(jourCivilPlus(au, 1)),
 });
+
+/**
+ * Le jour civil et l'heure d'un instant **dans un fuseau donné** — rappels
+ * d'échéance, S.87.
+ *
+ * Les fonctions ci-dessus lisent toutes le fuseau d'affichage. Le rappel,
+ * lui, part à huit heures chez le candidat : un candidat à Montréal
+ * recevait à deux heures du matin un courrier réglé pour Cotonou. Le
+ * fuseau est donc un paramètre ici, et seulement ici — l'affichage suit
+ * toujours `FUSEAU_AFFICHAGE`, et l'écran de préférences dit lequel est
+ * retenu pour les rappels.
+ *
+ * Les formateurs sont gardés par fuseau : un `Intl.DateTimeFormat` coûte
+ * cher à construire, et une passe en lit un par dossier.
+ */
+const FORMATS_PAR_FUSEAU = new Map<string, Intl.DateTimeFormat>();
+
+const formatDe = (fuseau: string): Intl.DateTimeFormat => {
+  let format = FORMATS_PAR_FUSEAU.get(fuseau);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-CA", {
+      timeZone: fuseau,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+    });
+    FORMATS_PAR_FUSEAU.set(fuseau, format);
+  }
+  return format;
+};
+
+/** Un identifiant IANA que le moteur sait lire. Un nom inconnu lèverait au formatage. */
+export const fuseauReconnu = (fuseau: string): boolean => {
+  try {
+    formatDe(fuseau);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const momentDans = (
+  instant: Date,
+  fuseau: string,
+): { jour: string; heure: number } => {
+  const parties = formatDe(fuseau).formatToParts(instant);
+  const lu = (type: Intl.DateTimeFormatPartTypes) =>
+    parties.find((p) => p.type === type)?.value ?? "00";
+  return {
+    jour: `${lu("year")}-${lu("month")}-${lu("day")}`,
+    // `h23` : minuit s'écrit 00, jamais 24 — certains moteurs rendaient
+    // « 24 » avec `hour12: false`, et minuit passait pour la fin du jour.
+    heure: Number(lu("hour")) % 24,
+  };
+};

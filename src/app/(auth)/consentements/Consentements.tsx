@@ -165,6 +165,12 @@ export function Consentements() {
 
         <div className="flex flex-col gap-2">
           <Link
+            href="/compte/rappels"
+            className="flex min-h-touch items-center text-14 text-accent-600"
+          >
+            Régler mes rappels d&apos;échéance
+          </Link>
+          <Link
             href="/compte/mes-donnees"
             className="flex min-h-touch items-center text-14 text-accent-600"
           >

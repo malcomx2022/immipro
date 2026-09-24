@@ -9964,3 +9964,118 @@ suppose de fixer un prix : le prix plein, ou la différence avec ce qui a
 
 En attendant, le lien « Voir les packs » mène à la page Tarifs, qui dit
 ce que chaque pack ouvre, plutôt qu'à une page qui renverrait au dossier.
+
+## S.87 — Les rappels d'échéance se règlent, partent à l'heure du candidat, et une seule fois
+
+Les rappels partaient depuis le 22/09, mais sans réglage. Le candidat ne
+pouvait pas les couper. Ils partaient à 7 h UTC, soit 2 h du matin à
+Montréal. Un courrier en échec ne laissait aucune trace. Deux passes
+simultanées envoyaient chacune le leur. L'échéancier avait perdu son lien
+« modifier », faute de réglage vers lequel pointer.
+
+### Les préférences minimales (RG-09.4)
+
+| Réglage | Valeurs | Défaut |
+|---|---|---|
+| Activation | oui / non — coupe l'email **et** l'alerte | oui |
+| Email | en plus de l'alerte dans l'application, toujours écrite | oui |
+| Fuseau | onze villes (Cotonou, Lomé, Abidjan, Dakar, Ouagadougou, Douala, Kinshasa, Paris, Bruxelles, Amsterdam, Montréal) | Cotonou, Porto-Novo |
+| Délai d'alerte | 3, 7 ou 14 jours | 7 (RG-09.2) |
+
+Les préférences sont portées par le compte et valent pour tous les
+dossiers. La base garde le délai par une contrainte `CHECK`. La route
+n'accepte que les fuseaux de la liste. Les valeurs par défaut reprennent
+exactement l'ancien comportement : aucun candidat ne voit son rappel
+changer tant qu'il n'a rien réglé.
+
+**Pas de SMS.** DOC-11 le prévoit ; aucun fournisseur n'est branché.
+L'écran le dit, et ne le propose pas.
+
+### Le canal email ne s'annonce que s'il est prouvé
+
+`canalEmail()` lit le même constat que l'état de service : un envoi ou
+une vérification réels, datant de moins de trois heures. La sonde horaire
+le rafraîchit. Si le constat est absent, périmé ou en échec, l'échéancier
+et l'écran de préférences disent « dans tes alertes » et non « par
+email ». Le choix du candidat est gardé pour le moment où l'envoi
+reprendra.
+
+### Une passe horaire, huit heures chez le candidat
+
+Le job `echeancier.rappel` passe de `0 7 * * *` à `5 * * * *`, cinq
+minutes après la sonde. Il n'envoie à un candidat qu'à partir de 8 h
+**dans son fuseau**. Une passe manquée est rattrapée l'heure suivante.
+Une journée manquée n'efface pas une urgence : le domaine la voit le
+lendemain.
+
+Le jour du candidat sert partout : pour la clé, pour « aujourd'hui »
+dans le courrier et pour la cadence. À 23 h 30 à Montréal, le serveur
+est déjà au lendemain. Il lisait l'échéance du jour comme « dépassée
+d'un jour ».
+
+### Réserver d'abord, envoyer ensuite
+
+L'ordre « envoyer, puis marquer » convenait à une passe quotidienne
+unique. Il ne pouvait rien contre deux passes concurrentes : les deux
+envoyaient, puis les deux marquaient. Le rappel est maintenant réservé
+dans une seule transaction, qui regroupe trois écritures :
+
+- la notification, avec `dedupKey = echeance:<dossier>:<jour local>`,
+  unique en base ;
+- la marque des échéances ;
+- la marque du dossier.
+
+Une seconde passe bute sur la clé, et sa transaction ne marque rien.
+
+Le courrier suit, avec son état :
+
+| État | Sens |
+|---|---|
+| `EN_ATTENTE` | pas encore accepté ; repris l'heure suivante, **le même jour** seulement, six fois au plus. Son texte dit « dans 4 jours » : parti le lendemain, il serait faux. |
+| `ENVOYE` | accepté par le serveur. Une contrainte exige `emailSentAt`, et réciproquement. |
+| `NON_ENVOYE` | refus, transport absent, reprises épuisées, ou le candidat a coupé l'email ou ses rappels entre-temps |
+| nul | aucun courrier demandé |
+
+La notification reste dans tous les cas. L'écran de préférences dit ce
+qu'est devenu le courrier du dernier rappel, et ne dit « parti » que pour
+`ENVOYE`.
+
+**Le défaut trouvé par la fumée.** La prise d'une tentative était un
+`updateMany` conditionné par `emailAttempts`. Une passe concurrente
+voyait un courrier en cours d'envoi comme un courrier en attente, en
+prenait la tentative suivante, et l'envoyait une seconde fois. Le cas
+s'est produit à un lancement sur trois. Le bail `emailAttemptAt` (dix
+minutes) le ferme : quatre lancements consécutifs sont verts. Si un
+worker tombe pendant l'envoi, le courrier n'est bloqué que dix minutes.
+
+### Ce qui ne reçoit rien
+
+Le filtre se fait dans la requête, pas à l'envoi (même principe
+qu'INV-4). Rien ne part pour :
+
+- une échéance faite ;
+- une pièce déjà déposée (`EN_ANALYSE`, `CONFORME`) : son échéance
+  « À demander » est derrière le candidat, qu'il l'ait cochée ou non ;
+- un dossier déposé, clos, abandonné ou suspendu ;
+- un compte dont la suppression est demandée ;
+- des rappels coupés.
+
+Si l'email seul est coupé, l'alerte part sans courrier.
+
+### Ce que le courrier dit de plus
+
+- **La destination de la règle figée** (« Ton dossier Pays-Bas »), et non
+  ses codes (« NL — etudes_mvv_vvr »).
+- **Une dernière ligne sur l'origine du rappel et le moyen de le
+  couper.** Un rappel qu'on ne sait pas couper se fait classer en
+  indésirable, et le filtre emporte ensuite les courriers qui comptaient.
+
+### Ce que ce lot ne tranche pas
+
+**La langue du courrier.** Elle reste le français ; `User.locale` n'est
+lu nulle part.
+
+**Le fuseau d'affichage des écrans.** Il reste Cotonou. Seuls les
+rappels suivent le fuseau choisi, et l'écran de préférences le dit
+(« à l'heure de cette ville »). Faire suivre tout l'affichage
+demanderait de reprendre chaque formateur d'heure.
