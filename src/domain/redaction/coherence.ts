@@ -79,6 +79,34 @@ export const DESTINATIONS_NOMMEES: readonly DestinationNommee[] = [
 export const destinationNommee = (code: string): DestinationNommee | undefined =>
   DESTINATIONS_NOMMEES.find((d) => d.code === code);
 
+/**
+ * La destination, nommée — pour ce qui se lit, et pour ce qui écrit.
+ *
+ * ── « Destination du dossier : NL » ─────────────────────────────────
+ *
+ * La matière donnée au modèle portait le **code ISO** de la règle figée,
+ * et les deux instructions le recopiaient tel quel :
+ *
+ *     Destination du dossier : NL. Les attendus d'une administration à
+ *     l'autre diffèrent — écris pour celle-là.
+ *     Tu relis une pièce d'un dossier d'immigration : lettre-motivation,
+ *     pour une demande vers NL.
+ *
+ * Ce que ces lignes existent pour dire — écris pour **cette**
+ * administration-là — tient au nom, pas à deux lettres. Et le nom était
+ * là, dans ce module même, à quelques lignes de l'appel.
+ *
+ * ── Le repli, et pourquoi il ne sert jamais ─────────────────────────
+ *
+ * Un code absent du lexique rend le code. Refuser d'écrire ferait payer
+ * au candidat une lacune qu'il ne peut pas combler, et un message
+ * d'échec doit être actionnable par qui le lit. Un essai compare le
+ * lexique aux destinations du référentiel : le repli ne peut donc pas
+ * servir pour une destination que le produit ouvre.
+ */
+export const nomDeLaDestination = (code: string): string =>
+  destinationNommee(code)?.nom ?? code;
+
 /** Minuscules, sans accent : « Émirats » et « emirats » sont le même mot. */
 export const normaliser = (texte: string): string =>
   texte

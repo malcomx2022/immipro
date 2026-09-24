@@ -6,6 +6,7 @@ import type { Remarque, GenreRemarque, Ecart } from "@/domain/redaction/relectur
 import {
   AUCUN_RECOUPEMENT,
   destinationNommee,
+  nomDeLaDestination,
   recoupements,
   type FaitsDuDossier,
   type Recoupements,
@@ -79,7 +80,9 @@ export async function piecesARediger(
         libelle: d.label,
         exigence: d.required ? "Exigée par la destination" : "Recommandée",
         documentId: d.id,
-        pays: d.application.visaRule?.countryCode ?? null,
+        pays: d.application.visaRule
+          ? nomDeLaDestination(d.application.visaRule.countryCode)
+          : null,
         reponsesEnregistrees: d._count.interview,
         dernierRang: d.versions[0]?.rank ?? null,
       },

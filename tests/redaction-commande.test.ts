@@ -12,6 +12,8 @@ import {
   type MatiereDeLaPiece,
 } from "@/domain/redaction/commande";
 import { CAUSES_DAPPEL, MOTIF_DAPPEL, appelSeReprend } from "@/domain/ia/appel";
+import { destinationNommee, nomDeLaDestination } from "@/domain/redaction/coherence";
+import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
 
 /**
  * Le branchement de WF-08 — mise en forme et analyse critique.
@@ -31,9 +33,15 @@ import { CAUSES_DAPPEL, MOTIF_DAPPEL, appelSeReprend } from "@/domain/ia/appel";
  */
 
 const MATIERE: MatiereDeLaPiece = {
-  type: "lettre-motivation",
+  /*
+    Nommées, l'une et l'autre. La matière portait le segment de route
+    (`lettre-motivation`) et le code ISO (`NL`), et les deux instructions
+    les recopiaient au modèle — « une pièce : lettre-motivation, pour une
+    demande vers NL ». Ce que ces lignes existent pour dire tient au nom.
+  */
+  piece: "Lettre de motivation",
   objet: "Motiver la candidature auprès de l'établissement",
-  pays: "NL",
+  pays: "les Pays-Bas",
   reponses: { 0: "J'ai terminé une licence d'informatique à Cotonou.", 1: "   ", 2: "Mon oncle finance mes études." },
   questions: [
     { rang: 0, section: "PARCOURS", intitule: "Quel est ton parcours ?" },
@@ -60,8 +68,13 @@ describe("ce qu'on donne au modèle vient des réponses, et de rien d'autre", ()
     expect(texte).toMatch(/plus court plutôt que de le combler/u);
     // INV-2 — aucune promesse de résultat, nulle part.
     expect(texte).toMatch(/Ne promets aucun résultat/u);
-    // Et la destination y est : les attendus diffèrent fortement (étape 1).
-    expect(texte).toContain("NL");
+    /*
+      Et la destination y est, **nommée** : les attendus diffèrent
+      fortement d'une administration à l'autre (étape 1), et cet essai
+      demandait seulement que « NL » y figure — ce qui passait pendant que
+      l'instruction disait « Destination du dossier : NL ».
+    */
+    expect(texte).toContain("Destination du dossier : les Pays-Bas.");
   });
 
   /**
@@ -193,5 +206,50 @@ describe("le vocabulaire partagé des appels au modèle", () => {
       expect(motif, cause).not.toMatch(/\b(reprends|redépose|remplace|réessaie)\b/iu);
       expect(motif, cause).not.toMatch(/sk-|http|ANTHROPIC/u);
     }
+  });
+});
+
+
+/**
+ * ── « Destination du dossier : NL » ─────────────────────────────────
+ *
+ * La matière portait le code ISO de la règle figée et le segment de route
+ * de la pièce, et les deux instructions les recopiaient au modèle. Ce que
+ * ces lignes existent pour dire — écris pour **cette** administration-là
+ * (WF-08 étape 1) — tient au nom, pas à deux lettres.
+ *
+ * Les gardes portent sur la forme : le lexique couvre toute destination
+ * que le référentiel ouvre, et les instructions nomment ce qu'elles
+ * désignent.
+ */
+describe("ce qu'on donne au modèle est nommé, jamais codé", () => {
+  it("les deux instructions nomment la pièce et la destination", () => {
+    const redaction = instructionsDeRedaction(MATIERE);
+    const critique = instructionsDeCritique("Un texte à relire.", MATIERE);
+
+    expect(redaction).toContain("Destination du dossier : les Pays-Bas.");
+    expect(critique).toContain("Lettre de motivation, pour une demande vers les Pays-Bas");
+
+    // Ni le code ISO seul, ni le segment de route.
+    for (const texte of [redaction, critique]) {
+      expect(texte).not.toMatch(/(?<![\p{L}])NL(?![\p{L}])/u);
+      expect(texte).not.toContain("lettre-motivation");
+    }
+  });
+
+  /**
+   * Le repli de `nomDeLaDestination` rend le code quand le lexique ne
+   * connaît pas la destination — refuser d'écrire ferait payer au candidat
+   * une lacune qu'il ne peut pas combler. Cette garde le rend inatteignable
+   * pour une destination que le produit ouvre.
+   */
+  it("le lexique nomme toute destination que le référentiel ouvre", () => {
+    const codes = new Set(REGLES_DE_REFERENCE.map((r) => r.countryCode));
+    for (const code of codes) {
+      expect(destinationNommee(code), `« ${code} » n'a pas de nom au lexique`).toBeDefined();
+    }
+    expect(nomDeLaDestination("NL")).toBe("les Pays-Bas");
+    // Et le repli reste ce qu'il est, pour un code hors référentiel.
+    expect(nomDeLaDestination("ZZ")).toBe("ZZ");
   });
 });

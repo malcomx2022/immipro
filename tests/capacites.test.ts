@@ -326,9 +326,9 @@ describe("un `.env` complet devant des points de branchement vides", () => {
       ),
     ).toMatchObject({ etat: "NON_LUE", cause: "non_configure" });
     const matiere = {
-      type: "LETTRE_MOTIVATION",
+      piece: "Lettre de motivation",
       objet: "Expliquer le projet d'études",
-      pays: "NL",
+      pays: "les Pays-Bas",
       reponses: {},
       questions: [],
     };

@@ -85,7 +85,9 @@ export const POST = route({
 
     const reponses = await reponsesDeLEntretien(piece.documentId);
     const avis = await laCritique()(derniere.body, {
-      type: piece.type,
+      // La pièce et la destination sont nommées : ce qui écrit pour le
+      // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
+      piece: piece.libelle,
       objet: piece.objet,
       // La règle figée à l'ouverture (INV-3), jamais celle publiée
       // aujourd'hui : on relit au regard de la procédure sur laquelle le
