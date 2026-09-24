@@ -6,19 +6,27 @@
  * qu'il était ; « hier à 21 h 04 » la donne. Au-delà d'hier, le relatif perd
  * toute précision et la date absolue reprend la main.
  *
- * Les jours sont comparés en UTC, comme l'échéancier : un horodatage ne doit
- * pas changer de jour selon le fuseau qui l'affiche.
+ * Un horodatage est un **instant** : son heure et son jour se lisent dans le
+ * fuseau d'affichage, comme les rendez-vous depuis le lot I.E. Ils se
+ * lisaient en UTC, avec une note qui le justifiait par l'échéancier — mais
+ * l'échéancier porte des dates calendaires, stockées à minuit UTC, et un
+ * horodatage n'en est pas une. Un paiement fait à 10 h 43 à Cotonou
+ * s'écrivait « 9 h 43 » sur son reçu ; fait à 0 h 30, il portait la date de
+ * la veille.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import { FUSEAU_AFFICHAGE, jourCivil } from "./fuseau";
+
 const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 
-const jourUTC = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+/** Le jour civil d'un instant, comparable par soustraction. */
+const jourLocal = (d: Date) => Date.parse(`${jourCivil(d)}T00:00:00Z`);
 
 export interface OptionsMoment {
   /** Format de la date absolue, au-delà d'hier. */
@@ -33,7 +41,7 @@ export function momentRelatif(
   { formatAbsolu, capitale = false }: OptionsMoment,
 ): string {
   const quand = new Date(iso);
-  const jours = Math.round((jourUTC(maintenant) - jourUTC(quand)) / 86_400_000);
+  const jours = Math.round((jourLocal(maintenant) - jourLocal(quand)) / 86_400_000);
   const maj = (texte: string) =>
     capitale ? texte.charAt(0).toUpperCase() + texte.slice(1) : texte;
 
@@ -85,5 +93,7 @@ export function jourEnFrancais(iso: string): string {
 export function momentEnFrancais(iso: string): string {
   const quand = new Date(iso);
   const heure = FORMAT_HEURE.format(quand).replace(":", " h ").replace(/^0/u, "");
-  return `${jourEnFrancais(iso)}, ${heure}`;
+  // Le jour de l'instant à Cotonou, et non les dix premiers caractères de
+  // l'ISO, qui sont le jour UTC.
+  return `${jourEnFrancais(jourCivil(quand))}, ${heure}`;
 }

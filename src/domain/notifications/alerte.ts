@@ -1,6 +1,7 @@
 import type { CompletenessPublic } from "@/domain/completeness/score";
 import { momentRelatif } from "@/domain/format/moment";
 import { libelleDelai } from "@/domain/dossiers/echeancier";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
 /**
  * Alertes — T-01, WF-11.
@@ -127,7 +128,7 @@ export const MENTION_PORTEE =
 const FORMAT_JOUR = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
   month: "long",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 
 /** « Il y a 2 heures », « Hier à 8 h 00 », « 9 septembre ». */

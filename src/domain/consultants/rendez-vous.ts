@@ -1,5 +1,7 @@
 import { TENUE_MINUTES } from "./tenue";
 
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
+
 import {
   CONSULTATION_ANNULATION_HEURES,
   CONSULTATION_DUREE_MINUTES,
@@ -17,22 +19,9 @@ import {
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-/**
- * Le fuseau dans lequel les horaires sont écrits — I.E.
- *
- * Tous les formateurs de ce module écrivaient en UTC pendant que l'écran
- * annonçait « les horaires sont donnés dans ton fuseau, Cotonou ». Un
- * créneau de 16 h 30 s'affichait donc « 15 h 30 » sous une phrase qui
- * promettait l'heure locale : une heure d'écart sur un rendez-vous payé de
- * quarante-cinq minutes. Le défaut ne se voyait pas à la lecture du code —
- * chaque `timeZone: "UTC"` était correct en soi — mais seulement en
- * rapprochant les formateurs de la phrase.
- *
- * Une seule constante, parce qu'il faut qu'un seul endroit change le jour
- * où le fuseau suivra le candidat. Elle vaut pour le Bénin ; la plateforme
- * s'adresse à plus large, et c'est le point laissé ouvert.
- */
-export const FUSEAU_AFFICHAGE = "Africa/Porto-Novo";
+// Le fuseau vit avec les autres formateurs (`domain/format/fuseau`) ; il
+// reste exporté d'ici, où les écrans de rendez-vous le cherchent.
+export { FUSEAU_AFFICHAGE };
 
 /**
  * Le décalage du fuseau d'affichage à un instant donné, en minutes.

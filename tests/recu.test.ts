@@ -83,8 +83,12 @@ describe("ce que le reçu nomme", () => {
   it("porte l'heure autant que le jour", () => {
     // Deux paiements du même jour ne se distinguent que par elle, et c'est
     // ce qu'on lit à voix haute en réclamation.
-    expect(momentEnFrancais("2026-09-11T09:43:00.000Z")).toBe("11 septembre 2026, 9 h 43");
-    expect(momentEnFrancais("2026-09-01T14:05:00.000Z")).toBe("1er septembre 2026, 14 h 05");
+    expect(momentEnFrancais("2026-09-11T09:43:00.000Z")).toBe("11 septembre 2026, 10 h 43");
+    // L'heure est celle de Cotonou, et le jour aussi : un paiement fait à
+    // 0 h 30 n'est pas daté de la veille parce qu'il est 23 h 30 en UTC.
+    expect(momentEnFrancais("2026-09-11T23:30:00.000Z")).toBe("12 septembre 2026, 0 h 30");
+    expect(momentEnFrancais("2026-09-30T23:15:00.000Z")).toBe("1er octobre 2026, 0 h 15");
+    expect(momentEnFrancais("2026-09-01T14:05:00.000Z")).toBe("1er septembre 2026, 15 h 05");
   });
 });
 

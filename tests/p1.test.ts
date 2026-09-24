@@ -150,7 +150,7 @@ describe("R-03 — versions", () => {
   it("date en relatif tant que c'est lisible, en absolu au-delà", () => {
     expect(libelleAnciennete("2026-09-18T09:37:00Z", maintenant)).toBe("il y a 4 minutes");
     expect(libelleAnciennete("2026-09-18T07:41:00Z", maintenant)).toBe("il y a 2 heures");
-    expect(libelleAnciennete("2026-09-17T21:04:00Z", maintenant)).toBe("hier à 21 h 04");
+    expect(libelleAnciennete("2026-09-17T21:04:00Z", maintenant)).toBe("hier à 22 h 04");
     expect(libelleAnciennete("2026-09-09T10:12:00Z", maintenant)).toBe("9 septembre 2026");
   });
 
@@ -246,7 +246,7 @@ describe("T-01 — alertes", () => {
    */
   it("date en relatif, puis la provenance complète", () => {
     expect(libelleMoment("2026-09-18T11:05:00Z", maintenant)).toBe("Il y a 2 heures");
-    expect(libelleMoment("2026-09-17T08:00:00Z", maintenant)).toBe("Hier à 08 h 00");
+    expect(libelleMoment("2026-09-17T08:00:00Z", maintenant)).toBe("Hier à 09 h 00");
 
     const reglementaire = ALERTES.find((a) => a.id === "de-compte-bloque")!;
     expect(libelleContexte(reglementaire, maintenant)).toBe(
@@ -254,7 +254,7 @@ describe("T-01 — alertes", () => {
     );
 
     const echeance = ALERTES.find((a) => a.id === "passeport-echeance")!;
-    expect(libelleContexte(echeance, maintenant)).toBe("Hier à 08 h 00 · dossier Pays-Bas");
+    expect(libelleContexte(echeance, maintenant)).toBe("Hier à 09 h 00 · dossier Pays-Bas");
   });
 
   /*
@@ -487,12 +487,25 @@ describe("datation relative — seuil au jour civil", () => {
     expect(libelleAnciennete("2026-09-18T07:41:00Z", maintenant)).toBe("il y a 2 heures");
     // 12 heures plus tôt, mais la veille : « hier à 21 h 04 » dit quand,
     // « il y a 12 heures » oblige à le calculer.
-    expect(libelleAnciennete("2026-09-17T21:04:00Z", maintenant)).toBe("hier à 21 h 04");
-    expect(libelleAnciennete("2026-09-16T23:59:00Z", maintenant)).toBe("16 septembre 2026");
+    expect(libelleAnciennete("2026-09-17T21:04:00Z", maintenant)).toBe("hier à 22 h 04");
+    expect(libelleAnciennete("2026-09-16T22:59:00Z", maintenant)).toBe("16 septembre 2026");
+  });
+
+  /**
+   * L'heure et le jour d'un horodatage sont ceux de Cotonou. Ils se
+   * lisaient en UTC : 23 h 30 UTC le 16 est 0 h 30 le 17 à Cotonou, et
+   * s'écrivait « 16 septembre » quand le candidat l'avait fait la veille
+   * du jour affiché.
+   */
+  it("lit l'heure et le jour dans le fuseau d'affichage", () => {
+    expect(libelleAnciennete("2026-09-16T23:30:00Z", maintenant)).toBe("hier à 00 h 30");
+    // 23 h 30 UTC le 18 : déjà le 19 à Cotonou, et la veille est le 18.
+    const apresMinuit = new Date("2026-09-18T23:30:00Z");
+    expect(libelleAnciennete("2026-09-18T22:30:00Z", apresMinuit)).toBe("hier à 23 h 30");
   });
 
   it("met la majuscule quand la ligne commence par le moment", () => {
-    expect(libelleMoment("2026-09-17T08:00:00Z", maintenant)).toBe("Hier à 08 h 00");
+    expect(libelleMoment("2026-09-17T08:00:00Z", maintenant)).toBe("Hier à 09 h 00");
     expect(libelleMoment("2026-09-18T07:41:00Z", maintenant)).toBe("Il y a 2 heures");
   });
 });

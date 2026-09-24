@@ -43,6 +43,7 @@ import {
 } from "@/domain/backoffice/regle";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { cn } from "@/lib/utils";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
 /**
  * B-01 — File de veille réglementaire. WF-14.
@@ -58,7 +59,7 @@ const FORMAT_MOMENT = new Intl.DateTimeFormat("fr-FR", {
   month: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 const moment = (iso: string) =>
   `le ${FORMAT_MOMENT.format(new Date(iso)).replace(" ", " à ").replace(":", " h ")}`;

@@ -1,4 +1,5 @@
 import { momentRelatif } from "@/domain/format/moment";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
 /**
  * Versions d'une pièce rédigée — R-03, WF-08.
@@ -60,7 +61,7 @@ const FORMAT_JOUR = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
   month: "long",
   year: "numeric",
-  timeZone: "UTC",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 
 export const libelleAnciennete = (iso: string, maintenant: Date): string =>
