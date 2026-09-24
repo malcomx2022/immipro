@@ -625,6 +625,101 @@ try {
     const s4 = await solde(quatre.id);
     verifier(s4 === 0, `le quatrième dossier n'est pas servi (${s4})`);
   }
+
+  // ── B-07 : la ligne de coût lit le pack, pas le premier paiement ────
+  /*
+    `coutsParDossier` prenait `transactions[0]` — la première transaction
+    confirmée, quelle que soit sa catégorie. Un dossier s'ouvre sans rien
+    payer et T-05 propose une consultation sur un dossier déjà ouvert : la
+    consultation se règle donc couramment **avant** le pack.
+    `getPack("consultation")` ne rend rien, et toute la ligne s'éteignait —
+    quota, part du quota, prix, part du prix.
+
+    Le tri lit `?? 0` : le dossier sans quota tombe en bas de la liste
+    censée montrer d'abord le plus alarmant. C'est la chute que le
+    commentaire du tri dit avoir corrigée pour le tarif manquant, par
+    l'autre porte.
+
+    Une fumée, parce que le défaut est dans l'assemblage en base : les
+    essais du domaine partent de lignes écrites à la main et restaient
+    verts.
+  */
+  console.log("\nB-07 — la ligne de coût lit le pack du dossier, pas son premier paiement");
+  {
+    const { coutsParDossier } = await import("../src/server/lecture/backoffice");
+    const pack = getPack("essentiel")!;
+
+    /** Un dossier, son pack, et la part de quota qu'il consomme. */
+    async function dossierQuiConsomme(consultationDabord: boolean, partDuQuota: number) {
+      const { userId, applicationId } = await candidat();
+      const base = Date.parse("2026-09-01T08:00:00Z");
+      let rang = 0;
+      if (consultationDabord) {
+        await db.transaction.create({
+          data: {
+            userId, applicationId,
+            reference: `IMP-C-${applicationId.slice(0, 8)}`,
+            packCode: "consultation", amount: 35, currency: "EUR", provider: "STRIPE",
+            status: "CONFIRMEE", confirmedAt: new Date(base + rang++ * 3_600_000),
+          },
+        });
+      }
+      await db.transaction.create({
+        data: {
+          userId, applicationId,
+          reference: `IMP-P-${applicationId.slice(0, 8)}`,
+          packCode: pack.code, amount: pack.prix.EUR, currency: "EUR", provider: "STRIPE",
+          status: "CONFIRMEE", confirmedAt: new Date(base + rang++ * 3_600_000),
+        },
+      });
+      await db.aiUsage.create({
+        data: {
+          userId, applicationId, operation: "redaction",
+          inputTokens: Math.round(pack.tokensIA * partDuQuota * 0.6),
+          outputTokens: Math.round(pack.tokensIA * partDuQuota * 0.4),
+          costMicros: 0,
+        },
+      });
+      return applicationId;
+    }
+
+    const packSeul = await dossierQuiConsomme(false, 10);
+    const consultationAvant = await dossierQuiConsomme(true, 10);
+    // Un troisième, sage, pour que le rang ait un sens : sans lui, deux
+    // lignes se partagent les deux premières places quoi qu'il arrive.
+    const sage = await dossierQuiConsomme(false, 0.1);
+
+    const lignes = await coutsParDossier(null);
+    const ligneDe = (id: string) => lignes.find((l) => l.dossierId === id);
+
+    for (const [nom, id] of [
+      ["pack seul", packSeul],
+      ["consultation payée avant le pack", consultationAvant],
+    ] as const) {
+      const ligne = ligneDe(id);
+      verifier(ligne?.pack === pack.code, `${nom} : le pack est nommé (${String(ligne?.pack)})`);
+      verifier(
+        ligne?.quotaJetons === pack.tokensIA,
+        `${nom} : le quota du pack est lu (${String(ligne?.quotaJetons)})`,
+      );
+      verifier(
+        Math.round((ligne?.partDuQuota ?? 0) * 100) === 1000,
+        `${nom} : dix fois le quota (${Math.round((ligne?.partDuQuota ?? 0) * 100)} %)`,
+      );
+    }
+
+    /*
+      Et le tri les remonte tous les deux. Il lit `?? 0` : le dossier dont
+      le quota n'était pas trouvé passait derrière un dossier sage, dans la
+      liste qui montre d'abord le plus alarmant.
+    */
+    const rang = (id: string) => lignes.findIndex((l) => l.dossierId === id);
+    verifier(
+      rang(consultationAvant) < rang(sage),
+      `le dossier à dix fois son quota passe avant le dossier sage (${rang(consultationAvant)} contre ${rang(sage)})`,
+    );
+    verifier(rang(packSeul) < rang(sage), "et l'autre aussi");
+  }
 } finally {
   await db.$disconnect().catch(() => {});
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
