@@ -416,6 +416,15 @@ export async function appliquerLaNotification(
   let maj: Transaction;
   try {
     maj = await db.$transaction(async (tx) => {
+      /*
+        Un seul instant pour toutes les dates que cette notification pose :
+        deux appels séparés de quelques millisecondes donneraient deux
+        horodatages différents pour un seul événement, et un reçu qui ne
+        porte pas la même seconde que le rapprochement de sa ligne se
+        discute en réclamation.
+      */
+      const quand = new Date();
+
       await tx.paymentEvent.create({
         data: {
           providerEventId: notification.providerEventId,
@@ -434,10 +443,35 @@ export async function appliquerLaNotification(
           // la session : le réécrire changerait la référence qu'un reçu déjà
           // imprimé porte.
           ...(transaction.providerTxId ? {} : { providerTxId: notification.providerTxId }),
-          ...(effet.crediteLePack ? { confirmedAt: new Date() } : {}),
+          /**
+           * La confirmation et le rapprochement s'écrivent ensemble — INV-7.
+           *
+           * `reconciledAt` n'était posé par aucun code de production. Trois
+           * lectures l'attendaient pourtant : B-04 affichait « En attente de
+           * rapprochement » sur chaque paiement confirmé, pour toujours ;
+           * `etatOperateur()` rendait `null` quoi qu'il arrive, si bien que
+           * le total du jour n'était jamais publiable ; et `encaisse`, qui
+           * ne compte que les lignes rapprochées, restait vide un jour où la
+           * caisse avait tourné. Trois états qu'aucune exécution ne pouvait
+           * produire — constaté en menant un paiement jusqu'au bout sur une
+           * base réelle.
+           *
+           * INV-7 nomme le mécanisme : « Tout paiement est idempotent et
+           * **réconcilié par webhook signé**. » La parole du fournisseur
+           * arrive par une notification dont la signature est vérifiée, et
+           * la consultation du job de réconciliation repasse par cette même
+           * fonction. Les deux sont le fournisseur ; il n'y a pas de
+           * troisième source à confronter.
+           *
+           * Ce que la note du schéma protège reste vrai : un silence de
+           * l'opérateur n'écrit rien du tout. Il laisse `reconciledAt` nul
+           * sans faire basculer `status`, et aucun paiement n'est accusé sur
+           * l'absence de réponse d'un tiers.
+           */
+          ...(effet.crediteLePack ? { confirmedAt: quand, reconciledAt: quand } : {}),
           // Un reçu est une pièce comptable : l'état ne va pas sans la date,
           // et la base refuse l'un sans l'autre.
-          ...(effet.vers === "REMBOURSEE" ? { refundedAt: new Date() } : {}),
+          ...(effet.vers === "REMBOURSEE" ? { refundedAt: quand } : {}),
           /**
            * Le motif n'est écrit que sur un échec, et jamais deviné — N.B.
            *
@@ -450,7 +484,7 @@ export async function appliquerLaNotification(
           ...(effet.vers === "ECHOUEE" && notification.cause && notification.cause !== "DELAI_DEPASSE"
             // La date accompagne le motif — O.B. C'est depuis elle que court
             // la conservation, et la base refuse l'un sans l'autre.
-            ? { failureCause: notification.cause, failureCauseAt: new Date() }
+            ? { failureCause: notification.cause, failureCauseAt: quand }
             : {}),
         },
       });

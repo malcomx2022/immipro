@@ -261,6 +261,33 @@ try {
       (await db.analysisCredit.count({ where: { applicationId } })) === 0,
       "et rien n'est crédité",
     );
+    // Et surtout : aucune date de rapprochement. C'est cette date que B-04
+    // lit pour dire si l'opérateur répond ; l'écrire ici ferait passer un
+    // appel en erreur pour une réponse.
+    verifier(apres.reconciledAt === null, "et le rapprochement n'est pas daté");
+  }
+
+  // ── 4 bis. Elle répond, et ne change rien ───────────────────────────
+  /*
+    Le cas le plus fréquent du job : un panier abandonné que le fournisseur
+    annonce toujours en attente. Rien ne bouge — et c'est pourtant la seule
+    preuve que la plateforme ait que l'opérateur répond. B-04 s'en sert
+    pour ne pas déclarer une panne sur une heure sans achat.
+  */
+  console.log("\nElle répond, et ne change rien");
+  {
+    const { transaction } = await transactionEnAttente({ ilYAMinutes: 15 });
+    await reconcilierLesPaiements(new Date(), () =>
+      consultantSimule(transaction.reference, {
+        issue: "connu",
+        statut: "EN_ATTENTE",
+        providerTxId: transaction.providerTxId!,
+      }),
+    );
+    const apres = await relire(transaction.id);
+    verifier(apres.status === "EN_ATTENTE", `l'état ne bouge pas (${apres.status})`);
+    verifier(apres.confirmedAt === null, "rien n'est confirmé");
+    verifier(apres.reconciledAt !== null, "et pourtant la ligne vient d'être rapprochée");
   }
 
   // ── 5. Le webhook arrive en même temps ──────────────────────────────

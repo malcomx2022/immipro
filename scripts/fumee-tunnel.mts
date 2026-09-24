@@ -720,6 +720,96 @@ try {
     );
     verifier(rang(packSeul) < rang(sage), "et l'autre aussi");
   }
+
+  // ── 12. Le rapprochement que personne n'écrivait ────────────────────
+  /*
+    B-04 lit `reconciledAt` trois fois — l'état d'une ligne, l'état de
+    l'opérateur, la caisse du jour — et aucun code de production ne
+    l'écrivait. Les trois lectures rendaient donc toujours la même chose :
+    « En attente de rapprochement » sur un paiement confirmé, `null` pour
+    l'opérateur, une caisse vide un jour où elle avait tourné.
+
+    Une fumée, parce que le défaut est dans l'assemblage : le paiement doit
+    traverser le tunnel et la notification signée pour que la colonne soit
+    écrite. Un essai partant d'une ligne posée à la main l'aurait déclarée
+    rapprochée sans rien prouver.
+  */
+  console.log("\nB-04 — une confirmation date le rapprochement, et la caisse se remplit");
+  {
+    const { paiements, etatOperateur } = await import("../src/server/lecture/backoffice");
+    const { agreger, totalPubliable, messageIncidentOperateur } = await import(
+      "../src/domain/backoffice/reconciliation"
+    );
+    const { momentEnFrancais } = await import("../src/domain/format/moment");
+
+    const { userId, applicationId } = await candidat();
+    const ouvert = await ouvrirLeTunnel(userId, ACHAT(applicationId), "EUR", ouvreurSimule());
+    const identifiant = (await db.transaction.findFirstOrThrow({ where: { userId } }))
+      .providerTxId!;
+    const issue = await appliquerLaNotification({
+      providerEventId: "stripe:evt_rapprochement",
+      providerTxId: identifiant,
+      reference: ouvert.reference,
+      statut: "CONFIRMEE",
+    });
+    verifier(issue.issue === "creditee", `la notification crédite (${issue.issue})`);
+
+    const ligne = await db.transaction.findFirstOrThrow({ where: { userId } });
+    verifier(ligne.reconciledAt !== null, "la confirmation date le rapprochement en base");
+    verifier(
+      ligne.confirmedAt?.getTime() === ligne.reconciledAt?.getTime(),
+      "un seul instant pour le reçu et pour le rapprochement",
+    );
+
+    const jour = ligne.createdAt.toISOString().slice(0, 10);
+    const lignes = await paiements(jour);
+    const lue = lignes.find((l) => l.reference === ouvert.reference);
+    verifier(lue?.etat === "RAPPROCHE", `la ligne se lit rapprochée (${String(lue?.etat)})`);
+
+    const etat = await etatOperateur();
+    verifier(etat !== null, "l'état de l'opérateur cesse d'être introuvable");
+    verifier(etat?.disponible === true, "et il répond");
+    verifier(etat ? totalPubliable(etat) : false, "le total du jour est publiable");
+    const encaisse = agreger(lignes).encaisse;
+    verifier((encaisse.EUR ?? 0) > 0, `la caisse du jour n'est plus vide (${JSON.stringify(encaisse)})`);
+
+    /*
+      Et le symétrique : trois heures sans le moindre achat ne font pas une
+      panne d'opérateur. La règle d'avant — « rien depuis une heure ⇒
+      indisponible » — accusait un tiers sur un silence qui était le nôtre,
+      tous les matins, et retenait au passage le total de la journée.
+
+      Les transactions restées en attente sont d'abord expirées, comme le
+      job le fait au bout d'une heure : sans cela, ce sont elles qui
+      attendraient l'opérateur, et la question posée ne serait pas celle-là.
+    */
+    await db.transaction.updateMany({
+      where: { status: { in: ["INITIEE", "EN_ATTENTE"] } },
+      data: { status: "EXPIREE", failureCause: "DELAI_DEPASSE", failureCauseAt: new Date() },
+    });
+    const troisHeuresPlusTard = new Date(Date.now() + 3 * 3_600_000);
+    const calme = await etatOperateur(troisHeuresPlusTard);
+    verifier(calme?.disponible === true, "trois heures sans achat ne déclarent pas l'opérateur muet");
+    verifier(
+      calme ? messageIncidentOperateur(calme, momentEnFrancais) === null : false,
+      "aucun encadré d'incident sur une journée calme",
+    );
+    verifier(calme ? totalPubliable(calme) : false, "et le total de la journée reste publiable");
+
+    /*
+      En revanche, un paiement que l'opérateur laisse sans réponse au-delà
+      du délai de rattrapage : là, le silence est bien le sien.
+    */
+    const enAttente = await candidat();
+    await ouvrirLeTunnel(enAttente.userId, ACHAT(enAttente.applicationId), "EUR", ouvreurSimule());
+    const muet = await etatOperateur(troisHeuresPlusTard);
+    verifier(muet?.disponible === false, "une ligne laissée sans réponse, et l'incident s'affiche");
+    verifier(
+      muet ? messageIncidentOperateur(muet, momentEnFrancais) !== null : false,
+      "avec son encadré",
+    );
+    verifier(muet ? !totalPubliable(muet) : false, "et le total du jour n'est plus publiable");
+  }
 } finally {
   await db.$disconnect().catch(() => {});
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
