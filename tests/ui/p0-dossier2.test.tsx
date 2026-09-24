@@ -11,6 +11,8 @@ import {
 } from "@/domain/dossiers/faisabilite";
 import { PieceDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier";
 import { Cloture } from "@/app/(app)/(dossier)/dossiers/[id]/cloture/Cloture";
+import { Depot } from "@/app/(app)/(dossier)/dossiers/[id]/depot/Depot";
+import { CONSERVATION_SOUMIS_MOIS } from "@/domain/dossiers/conservation";
 import {
   ANALYSE_RESSOURCES,
   PIECES_NL,
@@ -584,5 +586,56 @@ describe("C-11 — Clôture", () => {
     ).toBeDefined();
     fireEvent.click(screen.getByRole("radio", { name: /J'ai obtenu mon visa/ }));
     expect(container.textContent).toContain("Tes pièces seront supprimées sous 30 jours");
+  });
+});
+
+/**
+ * C-11a — Déclaration de dépôt, WF-10 étape 1.
+ *
+ * La route existait, aucun écran ne l'appelait : aucun dossier ne pouvait
+ * devenir « Déposé » par l'interface, et la conservation de l'arbitrage
+ * S.78 restait hors du parcours.
+ */
+describe("C-11a — Déclaration de dépôt", () => {
+  const PRET = { ...DOSSIER, statut: "PRET" as const };
+
+  it("ne pré-coche pas la déclaration, et dit pourquoi le bouton attend", () => {
+    render(<Depot dossier={PRET} />);
+    const bouton = screen.getByRole("button", { name: "Déclarer mon dépôt" });
+    expect(bouton).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Coche d'abord la case/)).toBeDefined();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: "Déclarer mon dépôt" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+  });
+
+  it("dit ce que la déclaration fige, ce qu'elle conserve, et que rien n'est transmis (INV-1)", () => {
+    const { container } = render(<Depot dossier={PRET} />);
+    const texte = container.textContent ?? "";
+    expect(texte).toContain(`conservées ${CONSERVATION_SOUMIS_MOIS} mois`);
+    expect(texte).toContain("ImmiPro ne transmet aucune demande");
+    expect(texte).toContain("ne s'annule pas");
+  });
+
+  it("n'offre aucun bouton à un dossier qui n'est pas prêt, et dit pourquoi", () => {
+    for (const statut of ["ACTIF", "EN_PAUSE", "SOUMIS", "CLOTURE"] as const) {
+      const { container, unmount } = render(<Depot dossier={{ ...DOSSIER, statut }} />);
+      expect(screen.queryByRole("button", { name: "Déclarer mon dépôt" }), statut).toBeNull();
+      expect(screen.getByRole("link", { name: "Revenir à la checklist" }), statut).toBeDefined();
+      expect((container.textContent ?? "").length, statut).toBeGreaterThan(80);
+      unmount();
+    }
+  });
+
+  it("la checklist d'un dossier prêt y mène, et seulement elle", () => {
+    const { unmount } = render(<Checklist dossier={PRET} pieces={PIECES_NL} />);
+    expect(screen.getByRole("link", { name: "Déclarer mon dépôt" }).getAttribute("href")).toBe(
+      `/dossiers/${DOSSIER.id}/depot`,
+    );
+    unmount();
+    render(<Checklist dossier={{ ...DOSSIER, statut: "ACTIF" }} pieces={PIECES_NL} />);
+    expect(screen.queryByRole("link", { name: "Déclarer mon dépôt" })).toBeNull();
   });
 });

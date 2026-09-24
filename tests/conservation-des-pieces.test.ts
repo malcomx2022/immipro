@@ -233,3 +233,32 @@ describe("ce qu'on écrit", () => {
     }
   });
 });
+
+describe("C-11a — ce que la déclaration de dépôt dit", () => {
+  it("seul un dossier prêt se déclare, les autres lisent leur raison", async () => {
+    const { etatDuDepot } = await import("@/domain/dossiers/depot");
+    expect(etatDuDepot("PRET").declarable).toBe(true);
+    for (const statut of ["BROUILLON", "ACTIF", "EN_PAUSE", "SOUMIS", "CLOTURE"] as const) {
+      const etat = etatDuDepot(statut);
+      expect(etat.declarable, statut).toBe(false);
+      expect(etat.corps.length, statut).toBeGreaterThan(40);
+    }
+  });
+
+  it("annonce la conservation depuis les mêmes constantes, sans rien promettre", async () => {
+    const { EFFETS_DEPOT, MENTION_DECLARATION, etatDuDepot } = await import("@/domain/dossiers/depot");
+    expect(EFFETS_DEPOT.join(" ")).toContain(`${CONSERVATION_SOUMIS_MOIS} mois`);
+    expect(EFFETS_DEPOT.join(" ")).toContain(`${PROLONGATION_MOIS} mois de plus`);
+    const textes = [
+      ...EFFETS_DEPOT,
+      MENTION_DECLARATION,
+      ...(["PRET", "ACTIF", "EN_PAUSE", "SOUMIS", "CLOTURE"] as const).map(
+        (s) => `${etatDuDepot(s).titre} ${etatDuDepot(s).corps}`,
+      ),
+    ];
+    for (const texte of textes) {
+      expect(verifierTexte(texte, INTERDITS_PARTOUT)).toEqual([]);
+      expect(verifierTexte(texte, INTERDITS_INTERFACE_CANDIDAT)).toEqual([]);
+    }
+  });
+});

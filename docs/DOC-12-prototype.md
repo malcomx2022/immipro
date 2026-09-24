@@ -170,6 +170,7 @@ theme: {
 | C-08 | Pièce — résultat d'analyse | WF-06 | Message actionnable, jamais « non conforme » |
 | C-09 | Score de complétude | WF-07 | Libellé « complétude », jamais « chances » |
 | C-10 | Échéancier | WF-09 | Calendrier à rebours |
+| C-11a | Déclaration de dépôt | WF-10 | Déclaré, jamais transmis ; conservation annoncée (S.78) |
 | C-11 | Clôture et déclaration d'issue | WF-10 | Purge annoncée comme une garantie |
 
 ### 3.4 Rédaction assistée (P1)

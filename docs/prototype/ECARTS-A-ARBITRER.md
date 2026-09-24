@@ -9830,3 +9830,51 @@ passe n'a pas tourné.
   ni la date de pause.
 - `statusBeforeSuspension` des pauses antérieures à la migration est resté
   vide plutôt que deviné.
+
+## S.85 — Aucun dossier ne pouvait devenir « Déposé » par l'interface
+
+La déclaration de dépôt (WF-10, étape 1) avait sa décision
+(`declarerLeDepot`), sa route (`POST /api/dossiers/:id/depot`) et sa fumée.
+Aucun écran ne l'appelait. L'état `SOUMIS` était donc inatteignable depuis
+le parcours, et avec lui tout ce qui s'y rattache :
+
+- la conservation de douze mois que S.84 vient de poser ;
+- le bloc « L'instruction continue » ;
+- la phrase de la checklist qui renvoie à « Clôturer » une fois
+  l'autorité revenue.
+
+Un candidat au dossier complet lisait « Rien ne bloque un dépôt », et
+n'avait aucun moyen de dire qu'il l'avait fait.
+
+### L'écran C-11a
+
+- **Entrée :** depuis la checklist d'un dossier prêt, et d'aucun autre.
+- **Case non pré-cochée :** « J'ai déposé ma demande auprès de l'autorité
+  ou de son prestataire ». La déclaration fige le dossier, et seul le
+  candidat sait que la demande est partie. Le bouton désactivé dit
+  pourquoi.
+- **Ce que la déclaration fige et conserve :** les durées viennent des
+  constantes de conservation (`domain/dossiers/depot.ts`), comme dans la
+  réponse de la route.
+- **Aucune transmission (INV-1) :** la même phrase que la route,
+  « C'est ta déclaration qui est enregistrée ». Aucune phrase ne parle
+  de la suite de l'instruction.
+- **Un dossier qui n'est pas prêt** — en pause, déjà déposé, clôturé,
+  incomplet — ne tombe pas sur un bouton désactivé : il lit sa raison, et
+  un lien le ramène à la checklist.
+
+### Vérifié
+
+Essais d'écran : case non pré-cochée, raison du bouton, effets annoncés,
+états non déclarables, lien réservé au dossier prêt. Essais du domaine :
+un état par cas, vocabulaire interdit. Deux mutations — lien affiché
+partout, déclaration ouverte à tous les états — font tomber leurs essais.
+
+### Ce que ce lot ne tranche pas
+
+La date déclarée est celle de la déclaration, pas celle du dépôt réel.
+Un candidat qui déclare trois semaines après avoir déposé gagne trois
+semaines de conservation. Demander la date réelle ajouterait un champ et
+une validation (pas dans le futur, pas avant l'ouverture). C'est une
+question de produit : la spécification dit « le candidat déclare avoir
+déposé », sans date.
