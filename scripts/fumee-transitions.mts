@@ -137,6 +137,7 @@ const { connecter } = await import("../src/server/acces/comptes");
 const { empreinte } = await import("../src/server/securite/secret");
 const { enregistrerLeProfil } = await import("../src/server/acces/profil");
 const { corpsDuProfil, CHAMPS_PROFIL } = await import("../src/domain/comptes/profil");
+const { enregistrerLAutorisation } = await import("../src/server/acces/consentements");
 const { ESSAIS_AVANT_BLOCAGE, finDuBlocage } = await import(
   "../src/domain/comptes/connexion"
 );
@@ -208,6 +209,13 @@ async function dossierPret(regleId: string) {
   const application = await db.application.create({
     data: { userId: user.id, visaRuleId: regleId, status: "ACTIF" },
   });
+  /*
+    Le candidat ordinaire a accepté les alertes de règles : c'est cette
+    autorisation que RG-11.3 suppose quand il demande un email nominatif.
+    Elle était absente de la fixture, et le job ne la lisait pas non plus —
+    les deux se sont tus ensemble, et l'email partait pour tout le monde.
+  */
+  await enregistrerLAutorisation(user.id, "alertes_regles", true);
   /*
     La checklist vient de `checklistDepuis`, comme celle qu'écrit une vraie
     ouverture. La construire à la main omettait `remedy` et
@@ -348,6 +356,42 @@ try {
       where: { applicationId: trois[0]!.application.id, kind: "REGLEMENTATION" },
     });
     verifier(total === 1, `et il n'a toujours qu'une notification (${total})`);
+  }
+
+
+  paysCourant = nouveauScenario();
+  /*
+    A-05 — « Alertes de changement de règles : email quand une exigence
+    de ta destination change. » L'interrupteur ne commandait rien : le
+    job n'a jamais lu le registre des autorisations, et l'email partait
+    pour qui l'avait refusé comme pour qui l'avait accordé.
+  */
+  console.log("\nA-05 — l'interrupteur « alertes de règles » commande bien l'email");
+  {
+    const v1 = await regle(brute.rules);
+    const bloquante = CONDITIONS.find((c) => c.bloquant)!;
+    const refus = await dossierPret(v1.id);
+    // Un retrait, et non une absence : la ligne accordée existe, celle-ci
+    // la révoque. C'est le geste réel de l'écran des autorisations.
+    await enregistrerLAutorisation(refus.user.id, "alertes_regles", false);
+
+    const v2 = await regle({
+      ...(brute.rules as object),
+      conditions: CONDITIONS.filter((c) => c.code !== bloquante.code),
+    });
+    await propagerLaPublication(v2.id);
+
+    const apres = await etat(refus.application.id);
+    const notifications = await db.notification.count({
+      where: { applicationId: refus.application.id, kind: "REGLEMENTATION" },
+    });
+    const courriers = recus.filter((r) => r.vers.includes(refus.user.email)).length;
+    verifier(courriers === 0, `aucun email pour qui a refusé (${courriers})`);
+    // Le refus porte sur le courrier, pas sur le dossier : l'alerte reste
+    // dans l'application, et la mise en pause a lieu. Un consentement de
+    // communication ne décide pas de l'état d'un dossier.
+    verifier(notifications >= 1, `l'alerte reste dans l'application (${notifications})`);
+    verifier(apres.status === "SUSPENDU", `et le dossier est mis en pause (${apres.status})`);
   }
 
   console.log("\nWF-11 — un relais saturé ne fait perdre l'alerte de personne");

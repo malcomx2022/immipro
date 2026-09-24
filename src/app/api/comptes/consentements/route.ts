@@ -6,7 +6,7 @@ import {
   VERSION_TEXTES,
   enregistrerLAutorisation,
 } from "@/server/acces/consentements";
-import { CONSENTEMENTS } from "@/domain/comptes/consentements";
+import { CODES_CONSENTEMENT, CONSENTEMENTS } from "@/domain/comptes/consentements";
 
 /**
  * Consentements — A-05, RG-02.1.
@@ -50,13 +50,12 @@ export const PUT = route({
   acces: "candidat",
   limite: "sensible",
   corps: z.object({
-    code: z.enum([
-      "pieces_identite",
-      "pieces_financieres",
-      "alertes_regles",
-      "partenaires",
-      "mesure_audience",
-    ]),
+    /*
+      Les codes viennent de la liste affichée, et non d'une seconde copie :
+      une sixième autorisation ajoutée au domaine aurait été rendue à
+      l'écran et refusée ici, sans que rien ne relie les deux listes.
+    */
+    code: z.enum(CODES_CONSENTEMENT),
     accorde: z.boolean(),
     /** Version du texte accepté. Elle date la preuve. */
     version: z.string().min(1).max(20).optional(),

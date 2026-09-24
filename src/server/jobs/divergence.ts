@@ -13,6 +13,7 @@ import { suiteDeLEnvoi } from "@/domain/courrier/transport";
 import { ETATS_A_PREVENIR, miseEnEtat } from "@/domain/dossiers/etat";
 import { editorialDe } from "@/lib/contenu/destinations";
 import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
+import { autorisationAccordee } from "@/server/acces/consentements";
 
 /**
  * Divergence réglementaire — WF-11.
@@ -28,6 +29,26 @@ import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
  * — critique : le dossier passe en `SUSPENDU` et un email nominatif part
  *   (RG-11.3), parce qu'une notification dans l'application n'est pas lue
  *   par quelqu'un qui n'ouvre pas l'application.
+ *
+ * ── L'email suit l'autorisation, et il ne la suivait pas ────────────
+ *
+ * A-05 propose « Alertes de changement de règles — **email** quand une
+ * exigence de ta destination change ». Ce job n'a jamais lu le registre
+ * des autorisations : l'email partait pour qui l'avait refusé comme pour
+ * qui l'avait accordé, et l'interrupteur ne commandait rien. Constaté en
+ * exécution : un candidat dont la ligne `ALERTES_REGLES` valait
+ * `granted: false` recevait l'alerte critique.
+ *
+ * Le refus porte sur le **courrier**, et sur lui seul : la notification
+ * dans l'application, la ligne d'arbitrage et la mise en pause ont lieu
+ * de toute façon. Un consentement de communication ne décide pas de
+ * l'état d'un dossier — l'exigence a changé, que le candidat ait voulu
+ * l'apprendre par email ou non.
+ *
+ * Une autorisation jamais donnée ne vaut pas accord, comme partout
+ * ailleurs dans le produit (`offresDuDossier` applique la même règle) :
+ * A-05 dit qu'aucune autorisation n'est active par défaut. Ce que le
+ * refus coûte est écrit sur l'écran, à côté de l'interrupteur.
  */
 export type { Impact, Changement } from "@/domain/rules/comparaison";
 
@@ -212,13 +233,22 @@ export async function propagerLaPublication(
         demande un email nominatif, et « l'email n'est pas parti » écrit
         sur la sortie d'erreur n'est pas un traitement.
       */
-      const envoi =
-        impact === "CRITIQUE"
-          ? await envoyerAlerteCritique(dossier.user.email, destination).catch(() => null)
-          : null;
+      /*
+        Deux conditions, et la seconde manquait. Sans elle, un refus
+        d'autorisation n'empêchait rien ; avec elle placée ailleurs — sur
+        le `suite` plutôt qu'ici —, un dossier sans courrier à envoyer
+        aurait été compté « à reprendre » et la passe suivante l'aurait
+        repris sans fin, sans jamais rien envoyer.
+      */
+      const parCourrier =
+        impact === "CRITIQUE" &&
+        (await autorisationAccordee(dossier.userId, "alertes_regles"));
+      const envoi = parCourrier
+        ? await envoyerAlerteCritique(dossier.user.email, destination).catch(() => null)
+        : null;
       const suite = envoi
         ? suiteDeLEnvoi(envoi.issue)
-        : impact === "CRITIQUE"
+        : parCourrier
           ? { parti: false, renvoyable: true }
           : { parti: true, renvoyable: false };
       if (!suite.parti && suite.renvoyable) {
