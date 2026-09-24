@@ -17,6 +17,8 @@ function fichiers(racine: string): string[] {
 import { ficheParSlug, libellePieces, rangAffiche } from "@/domain/destinations/fiche";
 import { CLASSEMENT, FICHES } from "@/lib/contenu/destinations";
 import { formatMontant } from "@/lib/utils";
+import { visaRulesSchema } from "@/domain/rules/schema";
+import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
 
 describe("fiches destination", () => {
   it("retrouve une fiche par son slug, et rien sinon", () => {
@@ -149,6 +151,66 @@ describe("Un montant en francs dit d'où il vient", () => {
     // Et la parité une seule fois : la répéter noierait ce qui compte.
     expect(rendu.match(/655,957/gu)).toHaveLength(1);
     expect(rendu.match(new RegExp(SOURCE_PARITE, "gu"))).toHaveLength(1);
+  });
+
+  /**
+   * Un montant **converti** est un montant dont la parité est sûre, et non
+   * un montant qui n'est pas déjà en francs.
+   *
+   * Le franc suisse et le dirham n'ont pas de taux dans ce module — c'est
+   * sa décision même —, et la phrase de provenance les annonçait pourtant
+   * convertis, au taux d'une monnaie qui n'a rien à voir. Constaté en
+   * exécution sur le référentiel livré :
+   *
+   *     CH/etudes_permis_b
+   *       montants : CHF → non convertible, CHF → non convertible
+   *       affiché  : « … Les montants sont convertis au taux fixe de
+   *                    655,957 F pour 1 EUR — Parité fixe XOF/EUR… »
+   */
+  it("ne parle pas de conversion là où il n'y en a pas", () => {
+    expect(
+      provenanceDesMontants([
+        { valeur: 1000, devise: "CHF", periodicite: "annuel" },
+        { valeur: 21_000, devise: "CHF", periodicite: "annuel" },
+      ]),
+    ).toBeNull();
+    expect(
+      provenanceDesMontants([{ valeur: 10_000, devise: "AED", periodicite: "annuel" }]),
+    ).toBeNull();
+  });
+
+  /* Mais l'annualisation, elle, a bien lieu — et se dit sans parler de change. */
+  it("dit l'annualisation d'un montant que personne ne convertit", () => {
+    const rendu = lisible(
+      provenanceDesMontants([{ valeur: 900, devise: "CHF", periodicite: "mensuel" }]),
+    );
+    expect(rendu).toContain("900 CHF par mois, ramené à l'année");
+    expect(rendu).not.toContain("655,957");
+    expect(rendu).not.toContain("converti");
+  });
+
+  /**
+   * Et sur le référentiel réel : une destination dont aucun montant n'est
+   * convertible ne raconte aucune conversion. Une fixture écrite à la main
+   * dirait la règle ; celle-ci dit que le produit livré la tient.
+   */
+  it("le référentiel livré ne cite le taux que là où il s'applique", () => {
+    for (const regle of REGLES_DE_REFERENCE) {
+      const p = visaRulesSchema.parse(regle.rules);
+      const montants = [
+        p.frais_scolarite
+          ? {
+              valeur: p.frais_scolarite.min,
+              devise: p.frais_scolarite.devise,
+              periodicite: p.frais_scolarite.periodicite,
+            }
+          : null,
+        p.preuve_fonds,
+      ];
+      const rendu = provenanceDesMontants(montants);
+      const converti = montants.some((m) => m != null && m.devise === "EUR");
+      expect(Boolean(rendu?.includes("655,957")), `${regle.visaType}`).toBe(converti);
+    }
   });
 
   it("se tait quand rien n'a été transformé", () => {

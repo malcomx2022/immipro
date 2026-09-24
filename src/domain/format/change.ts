@@ -71,6 +71,16 @@ export function versXOF(valeur: number, devise: DeviseSource): number | null {
 export const convertible = (devise: DeviseSource): boolean =>
   versXOF(1, devise) !== null;
 
+/**
+ * La même question posée sur une chaîne quelconque — celle que porte un
+ * montant du référentiel, dont le type ne garantit rien.
+ *
+ * Une devise inconnue tombe sur le refus de `versXOF`, comme il se doit :
+ * ce qui n'a pas de parité sûre n'est pas converti.
+ */
+export const paritSure = (devise: string): boolean =>
+  versXOF(1, devise as DeviseSource) !== null;
+
 /** Ce qu'un écran écrit quand la comparaison n'est pas possible. */
 export const MENTION_NON_COMPARABLE =
   "Montant publié dans une autre monnaie : il n'est pas comparé à ton budget faute de taux de change vérifié.";
@@ -122,9 +132,35 @@ export interface MontantPublie {
 export function provenanceDesMontants(
   montants: readonly (MontantPublie | null | undefined)[],
 ): string | null {
+  /*
+    Un montant **converti** est un montant dont la parité est sûre, et non
+    un montant qui n'est pas déjà en francs.
+
+    La différence se voyait sur deux destinations du référentiel. Le franc
+    suisse et le dirham n'ont pas de taux ici — c'est la décision même de
+    ce module —, et la phrase de provenance les annonçait pourtant
+    convertis. Constaté en exécution :
+
+        CH/etudes_permis_b
+          montants : CHF → non convertible, CHF → non convertible
+          affiché  : « L'autorité publie 1 000 CHF par an et 21 000 CHF
+                       par an. Les montants sont convertis au taux fixe de
+                       655,957 F pour 1 EUR — Parité fixe XOF/EUR… »
+
+    Rien n'avait été converti, et le taux cité est celui d'une monnaie
+    qui n'a rien à voir. C'est exactement ce que ce module refuse deux
+    paragraphes plus haut : un nombre plausible qui ne vient de nulle
+    part. La fiche suisse n'a donc plus de provenance à raconter — ses
+    montants sont publiés tels quels, et le coût porte déjà
+    `MENTION_NON_COMPARABLE`.
+
+    Un montant mensuel dans une monnaie sans parité reste transformé, lui :
+    il est ramené à l'année, et la phrase le dit sans parler de change.
+  */
+  const estConverti = (m: MontantPublie) => m.devise !== "XOF" && paritSure(m.devise);
   const transformes = montants
     .filter((m): m is MontantPublie => m != null)
-    .filter((m) => m.periodicite === "mensuel" || m.devise !== "XOF");
+    .filter((m) => m.periodicite === "mensuel" || estConverti(m));
   if (transformes.length === 0) return null;
 
   /*
@@ -141,7 +177,7 @@ export function provenanceDesMontants(
       : `${somme} par an`;
   });
 
-  const converti = transformes.some((m) => m.devise !== "XOF");
+  const converti = transformes.some(estConverti);
   const conversion = converti
     ? ` ${transformes.length > 1 ? "Les montants sont convertis" : "Le montant est converti"} au taux fixe de ${new Intl.NumberFormat(
         "fr-FR",
