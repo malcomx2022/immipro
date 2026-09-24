@@ -1,9 +1,18 @@
 import type { Transaction } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { echeanceDeTenue, tenueEchue } from "@/domain/consultants/tenue";
+import {
+  TITRE_ETAT,
+  corpsDeLEtat,
+  echeanceDeTenue,
+  tenueEchue,
+} from "@/domain/consultants/tenue";
 import { ACCORD_DUREE_JOURS } from "@/domain/consultants/access";
 import { ETATS_VIVANTS } from "@/domain/consultants/annulation";
+import { libelleRendezVous } from "@/domain/consultants/rendez-vous";
+import { jourEnFrancais } from "@/domain/format/moment";
+import { versFiche } from "@/server/acces/regles";
+import { envoyerConfirmationEntretien } from "@/server/courrier";
 
 /**
  * La tenue d'un créneau, et sa confirmation — T-05, WF-12, RG-12.2.
@@ -204,6 +213,39 @@ export async function rattacherLePaiement(
  * Idempotente : la transition est conditionnée à l'état `TENU`, si bien
  * qu'une seconde notification ne recrée ni le rendez-vous ni l'accès.
  * L'accès consultant est cherché avant d'être créé, pour la même raison.
+ *
+ * ── Le candidat ne recevait rien du tout ────────────────────────────
+ *
+ * `envoyerConfirmationEntretien` existe dans `server/courrier`, avec six
+ * essais sur son contenu et cet en-tête : « Aucun courrier ne partait : le
+ * candidat réservait quarante-cinq minutes payantes et ne recevait rien,
+ * alors que l'écran lui annonçait le contraire. » Le défaut y est écrit au
+ * passé, et **aucun appelant de production ne l'appelait** — seuls les
+ * essais. La route de T-05 dit pourtant « la confirmation par courriel
+ * part à la confirmation, plus ici ».
+ *
+ * Aucune notification en base non plus. Exécuté, avant correction :
+ *
+ *     rendez-vous : RESERVE
+ *     courriels partis : 0 []
+ *     notifications en base : 0
+ *
+ * Les trois verdicts de la machine notifient, la décision d'une revue
+ * manuelle notifie, une divergence notifie et écrit. Le seul acte que le
+ * candidat **paie** ne produisait rien.
+ *
+ * ── Deux canaux, et l'ordre compte ──────────────────────────────────
+ *
+ * La notification est écrite **dans la transaction** : elle est le canal
+ * durable, et un rendez-vous confirmé sans elle laisserait le candidat
+ * sans trace si le courrier échoue.
+ *
+ * Le courrier part **après**, et son échec ne défait rien : le paiement
+ * est encaissé et le créneau réservé, c'est la notification signée qui en
+ * décide. L'inverse — envoyer avant d'écrire, comme le fait la passe de
+ * divergence — n'a de sens que là où une passe rejoue ; ici, rien ne
+ * rejoue, et un courrier annonçant un rendez-vous que la transaction
+ * n'aurait pas retenu serait pire qu'un courrier manquant.
  */
 export async function confirmerLaConsultation(
   transaction: Transaction,
@@ -211,6 +253,12 @@ export async function confirmerLaConsultation(
 ): Promise<{ confirme: boolean; reference?: string }> {
   const rendezVous = await db.appointment.findFirst({
     where: { transactionId: transaction.id },
+    include: {
+      consultant: { select: { name: true } },
+      application: {
+        select: { userId: true, user: { select: { email: true } }, visaRule: true },
+      },
+    },
   });
   if (!rendezVous) return { confirme: false };
   if (rendezVous.status === "RESERVE") {
@@ -222,6 +270,12 @@ export async function confirmerLaConsultation(
   const expire = new Date(
     rendezVous.startsAt.getTime() + ACCORD_DUREE_JOURS * 24 * 60 * 60 * 1000,
   );
+
+  const creneau = { debut: rendezVous.startsAt.toISOString(), disponible: false };
+  const fiche = rendezVous.application.visaRule
+    ? versFiche(rendezVous.application.visaRule)
+    : null;
+  const dossier = fiche ? `${fiche.pays} — ${fiche.intitule}` : null;
 
   const confirme = await db.$transaction(async (tx) => {
     const { count } = await tx.appointment.updateMany({
@@ -254,8 +308,43 @@ export async function confirmerLaConsultation(
         },
       });
     }
+
+    /*
+      Le canal durable, dans la transaction. Le corps porte ce qui ne
+      bougera plus — le créneau, le consultant, la référence — et renvoie
+      au dossier pour ce qui change : relue trois semaines plus tard, une
+      liste de pièces ferait préparer les mauvaises.
+    */
+    await tx.notification.create({
+      data: {
+        userId: rendezVous.application.userId,
+        applicationId: rendezVous.applicationId,
+        kind: "PAIEMENT",
+        title: TITRE_ETAT.CONFIRME,
+        body: `${corpsDeLEtat("CONFIRME")} ${libelleRendezVous(creneau)} avec ${
+          rendezVous.consultant.name
+        }, référence ${rendezVous.reference}.`,
+      },
+    });
     return true;
   });
+
+  /*
+    Et le courrier, hors de la transaction et après elle. Un relais
+    injoignable ne défait pas un rendez-vous payé : la notification
+    ci-dessus reste, et `expedier` note le fait au constat de service —
+    ce n'est donc pas un silence.
+  */
+  if (confirme) {
+    await envoyerConfirmationEntretien({
+      destinataire: rendezVous.application.user.email,
+      reference: rendezVous.reference,
+      creneau,
+      consultant: rendezVous.consultant.name,
+      dossier,
+      partageExpireLe: jourEnFrancais(expire.toISOString()),
+    }).catch(() => undefined);
+  }
 
   return { confirme, reference: rendezVous.reference };
 }

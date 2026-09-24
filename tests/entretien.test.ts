@@ -1,3 +1,18 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { sansCommentaires } from "@/domain/copy/source";
+
+/** Tous les fichiers de code sous une racine, essais exclus. */
+function sources(racine: string): string[] {
+  const sortie: string[] = [];
+  for (const entree of readdirSync(racine)) {
+    const chemin = join(racine, entree);
+    if (statSync(chemin).isDirectory()) sortie.push(...sources(chemin));
+    else if (/\.tsx?$/u.test(chemin) && !chemin.includes(".test.")) sortie.push(chemin);
+  }
+  return sortie;
+}
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fichierAgenda,
@@ -174,5 +189,95 @@ describe("le courriel de confirmation — il n'existait pas", () => {
     const erreur = vi.fn();
     await envoyer().catch(erreur);
     expect(erreur).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Le garde-fou qui manquait : un expéditeur écrit doit être appelé.
+ *
+ * `envoyerConfirmationEntretien` portait six essais sur son contenu et cet
+ * en-tête : « Aucun courrier ne partait : le candidat réservait
+ * quarante-cinq minutes payantes et ne recevait rien, alors que l'écran lui
+ * annonçait le contraire. » Le défaut y était écrit au passé, et **aucun
+ * appelant de production ne l'appelait** — seuls ces essais-ci. Aucune
+ * notification en base non plus. Exécuté avant correction :
+ *
+ *     rendez-vous : RESERVE
+ *     courriels partis : 0 []
+ *     notifications en base : 0
+ *
+ * Six essais sur le contenu d'un courrier ne disent rien de son départ, et
+ * c'est ce qu'ils ont laissé passer : ils l'appelaient eux-mêmes. Le
+ * garde-fou ne porte donc pas sur ce lot mais sur la **forme** du défaut —
+ * `RAPPEL_ECHEANCIER` a vécu la même chose, déclarée sans écrivain.
+ */
+describe("tout expéditeur écrit part de quelque part", () => {
+  const COURRIER = "src/server/courrier.ts";
+
+  /*
+    Un **expéditeur** est ce qui appelle `expedier` : c'est le critère du
+    code, pas une liste de noms. Une liste se contourne en y ajoutant le
+    nom du jour, et le transport, son accesseur et les remises à zéro
+    d'essai y auraient figuré pour de bonnes raisons — laissant la place
+    pour une mauvaise.
+  */
+  const expediteurs = (source: string): string[] => {
+    const noms: string[] = [];
+    for (const m of source.matchAll(/^export (?:async function|const) (\w+)/gmu)) {
+      const suite = source.slice(m.index, source.indexOf("\nexport ", m.index! + 1));
+      // `expedier` s'exclut : elle **est** l'envoi, elle ne l'appelle pas.
+      if (m[1] !== "expedier" && /\bexpedier\(/u.test(suite)) noms.push(m[1]!);
+    }
+    return noms;
+  };
+
+  it("chaque fonction d'envoi a un appelant hors des essais", () => {
+    const source = sansCommentaires(readFileSync(COURRIER, "utf8"));
+    const envoyeurs = expediteurs(source);
+    expect(envoyeurs.length).toBeGreaterThan(3);
+    // Celui du lot en fait partie : sans cela l'essai passerait à vide.
+    expect(envoyeurs).toContain("envoyerConfirmationEntretien");
+
+    const production = sources("src").filter((f) => f !== COURRIER);
+    const orphelins = envoyeurs.filter(
+      (n) =>
+        !production.some((f) =>
+          new RegExp(`\\b${n}\\b`, "u").test(sansCommentaires(readFileSync(f, "utf8"))),
+        ),
+    );
+    expect(orphelins).toEqual([]);
+  });
+
+  it("et la confirmation part de la confirmation, pas d'ailleurs", () => {
+    /*
+      Elle ne peut partir que là où la notification signée confirme : ni le
+      retour du navigateur, ni une relève de statut, ni un geste
+      d'opérateur n'y mènent (RG-05.1, INV-7).
+    */
+    const appelants = sources("src").filter(
+      (f) =>
+        f !== COURRIER &&
+        /\benvoyerConfirmationEntretien\b/u.test(sansCommentaires(readFileSync(f, "utf8"))),
+    );
+    expect(appelants).toEqual(["src/server/acces/consultations.ts"]);
+  });
+
+  it("le canal durable est écrit dans la transaction, le courrier après", () => {
+    /*
+      Un rendez-vous confirmé sans notification laisserait le candidat sans
+      trace si le relais est muet. Et l'inverse de la passe de divergence,
+      qui envoie avant de marquer : là-bas une passe rejoue, ici rien ne
+      rejoue, et annoncer un rendez-vous que la transaction n'aurait pas
+      retenu serait pire qu'un courrier manquant.
+    */
+    const vue = sansCommentaires(readFileSync("src/server/acces/consultations.ts", "utf8"));
+    const confirmation = vue.slice(vue.indexOf("export async function confirmerLaConsultation"));
+    const avis = confirmation.indexOf("tx.notification.create");
+    const courrier = confirmation.indexOf("envoyerConfirmationEntretien");
+    const finTransaction = confirmation.indexOf("const confirme = await db.$transaction");
+    expect(avis).toBeGreaterThan(finTransaction);
+    expect(courrier).toBeGreaterThan(avis);
+    // Et son échec ne défait rien.
+    expect(confirmation).toMatch(/envoyerConfirmationEntretien\([\s\S]*?\)\.catch\(/u);
   });
 });

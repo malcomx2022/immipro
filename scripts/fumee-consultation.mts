@@ -71,6 +71,7 @@ const { TENUE_MINUTES } = await import("../src/domain/consultants/tenue");
 const { consultationDuPaiement } = await import("../src/server/lecture/paiements");
 const { annulerLeRendezVous } = await import("../src/server/consultations/annulation");
 const { rendezVousDuCandidat } = await import("../src/server/lecture/consultants");
+const { brancherTransport } = await import("../src/server/courrier");
 
 let rang = 0;
 const JOUR = 86_400_000;
@@ -103,7 +104,7 @@ async function candidat() {
   const application = await db.application.create({
     data: { userId: user.id, visaRuleId: regle.id },
   });
-  return { userId: user.id, applicationId: application.id };
+  return { userId: user.id, applicationId: application.id, courriel: user.email };
 }
 
 async function leConsultant() {
@@ -661,6 +662,124 @@ try {
       .catch((e: unknown) => codeDe(e));
     verifier(repris === "repris", `et le créneau est bien libre (${repris})`);
   }
+
+  // ── Ce que reçoit un candidat qui vient de payer ────────────────────
+  console.log("\nLe candidat qui vient de payer reçoit sa confirmation");
+  {
+    /*
+      `envoyerConfirmationEntretien` existe dans `server/courrier`, avec six
+      essais sur son contenu et cet en-tête : « Aucun courrier ne partait :
+      le candidat réservait quarante-cinq minutes payantes et ne recevait
+      rien, alors que l'écran lui annonçait le contraire. » Le défaut y
+      était écrit au passé, et **aucun appelant de production ne
+      l'appelait** — seuls les essais. Aucune notification en base non
+      plus. Exécuté avant correction :
+
+          rendez-vous : RESERVE
+          courriels partis : 0 []
+          notifications en base : 0
+    */
+    const courriers: { objet: string; destinataire: string; corps: string }[] = [];
+    brancherTransport(async (c: { objet: string; destinataire: string; corps: string }) => {
+      courriers.push({ objet: c.objet, destinataire: c.destinataire, corps: c.corps });
+      return { issue: "envoye" as const };
+    });
+
+    const c = await candidat();
+    const consultant = await leConsultant();
+    const debut = new Date(Date.now() + 17 * JOUR);
+    const tenue = await tenir(c.applicationId, consultant.id, debut, `RDV-Z-${process.pid}`);
+    const transaction = await transactionDeConsultation(c.userId, c.applicationId);
+    await rattacherLePaiement(tenue.reference, transaction.id);
+
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_conf_${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "CONFIRMEE",
+    });
+
+    verifier(courriers.length === 1, `un courrier part (${courriers.length})`);
+    verifier(
+      courriers[0]?.destinataire === c.courriel,
+      "à l'adresse du candidat, lue sur le dossier",
+    );
+    verifier(
+      courriers[0]?.corps.includes(tenue.reference) === true,
+      "et il porte la référence du rendez-vous",
+    );
+    verifier(
+      courriers[0]?.corps.includes("autorisations") === true,
+      "et l'endroit où l'annulation se prend",
+    );
+
+    // Le canal durable : il survit à un relais muet.
+    const avis = await db.notification.findMany({ where: { applicationId: c.applicationId } });
+    verifier(avis.length === 1, `une notification est écrite (${avis.length})`);
+    verifier(avis[0]?.kind === "PAIEMENT", `du genre PAIEMENT (${avis[0]?.kind})`);
+    verifier(
+      avis[0]?.body.includes(tenue.reference) === true,
+      "et elle porte la référence, pas seulement un titre",
+    );
+
+    // Rejeu de la notification signée : rien ne se double.
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_conf_bis_${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "CONFIRMEE",
+    });
+    verifier(courriers.length === 1, `un rejeu ne renvoie rien (${courriers.length})`);
+    verifier(
+      (await db.notification.count({ where: { applicationId: c.applicationId } })) === 1,
+      "et n'écrit pas un second avis",
+    );
+
+    brancherTransport(null);
+  }
+
+  console.log("\nUn relais muet ne défait pas un rendez-vous payé");
+  {
+    /*
+      L'inverse de la passe de divergence, et pour une raison : là-bas le
+      courrier part avant la marque parce qu'une passe rejoue. Ici rien ne
+      rejoue, et un courrier annonçant un rendez-vous que la transaction
+      n'aurait pas retenu serait pire qu'un courrier manquant.
+    */
+    brancherTransport(async () => {
+      throw new Error("SMTP injoignable");
+    });
+
+    const c = await candidat();
+    const consultant = await leConsultant();
+    const debut = new Date(Date.now() + 19 * JOUR);
+    const tenue = await tenir(c.applicationId, consultant.id, debut, `RDV-M-${process.pid}`);
+    const transaction = await transactionDeConsultation(c.userId, c.applicationId);
+    await rattacherLePaiement(tenue.reference, transaction.id);
+
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_muet_${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "CONFIRMEE",
+    });
+
+    const rdv = await db.appointment.findUniqueOrThrow({ where: { reference: tenue.reference } });
+    verifier(rdv.status === "RESERVE", `le rendez-vous est confirmé quand même (${rdv.status})`);
+    verifier(
+      (await db.consultantAccess.count({
+        where: { applicationId: c.applicationId, revokedAt: null },
+      })) === 1,
+      "l'accès du consultant est ouvert",
+    );
+    verifier(
+      (await db.notification.count({ where: { applicationId: c.applicationId } })) === 1,
+      "et le candidat a son avis : le canal durable ne dépend pas du relais",
+    );
+
+    brancherTransport(null);
+  }
+
 } finally {
   await db.$disconnect().catch(() => {});
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
