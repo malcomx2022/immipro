@@ -2,6 +2,7 @@ import type { ReviewReason } from "@prisma/client";
 import { db } from "@/lib/db";
 import { noterLesJetons } from "@/server/ia/appel";
 import { payload } from "@/server/acces/regles";
+import { consommeUneAnalyse, type VerdictAnalyse } from "@/domain/dossiers/analyse";
 import {
   debiterUneAnalyse,
   rendreUneAnalyse,
@@ -114,6 +115,43 @@ function motifDeRevue(cause: CauseDeNonLecture): ReviewReason {
 }
 
 
+/**
+ * Le verdict rendu sur la version précédente de cette pièce, ou `null`
+ * quand c'est le premier dépôt.
+ *
+ * Sur la version d'avant, et non sur `document.status` : le dépôt d'une
+ * nouvelle version remet la pièce en analyse, si bien que l'état de la
+ * pièce a déjà oublié pourquoi le candidat revient. Et sur le **rang**,
+ * qui est ce que la version a de stable — une date d'analyse peut
+ * manquer, une reprise peut être rejouée.
+ */
+async function verdictPrecedent(
+  documentId: string,
+  rang: number,
+): Promise<VerdictAnalyse | null> {
+  const precedente = await db.documentVersion.findFirst({
+    where: { documentId, rank: { lt: rang } },
+    orderBy: { rank: "desc" },
+    select: {
+      analyses: {
+        orderBy: { analyzedAt: "desc" },
+        take: 1,
+        select: { verdict: true },
+      },
+    },
+  });
+  const verdict = precedente?.analyses[0]?.verdict ?? null;
+  /*
+    `HORS_SUJET` n'est pas dans les verdicts du domaine : il est écrit par
+    le chemin de reclassement, qui ne débite pas non plus. Une reprise
+    après lui est donc payante — le candidat a déposé le mauvais fichier,
+    la lecture a bien eu lieu et elle a bien rendu quelque chose.
+  */
+  return verdict === "CONFORME" || verdict === "A_CORRIGER" || verdict === "ILLISIBLE"
+    ? verdict
+    : null;
+}
+
 export async function analyserUnePiece(
   tache: Tache,
   extraire: Extracteur = lExtracteur(),
@@ -174,10 +212,37 @@ export async function analyserUnePiece(
     return "TERMINEE";
   }
 
+  /*
+    La reprise après un verdict illisible ne se paie pas — WF-06, cas
+    limites.
+
+    La règle était écrite en trois endroits et appliquée nulle part :
+    `consommeUneAnalyse` dans le domaine, sans appelant ; le pied de C-08,
+    qui affiche « Cette reprise ne consomme pas d'analyse » ; et le schéma
+    lui-même, sur `creditConsumed` — « une reprise après ILLISIBLE ne
+    débite rien ». Le débit, lui, était inconditionnel. Constaté en
+    exécution sur une vraie base :
+
+        verdict : ILLISIBLE · solde : 5
+        l'écran affiche : « Cette reprise ne consomme pas d'analyse »
+        après la reprise : verdict CONFORME · solde 4
+        la reprise a coûté : 1 analyse(s)
+
+    Le candidat achète ses analyses. On lui promettait la gratuité d'un
+    geste qu'on lui facturait — et le geste en question lui est imposé par
+    une lecture que *nous* n'avons pas su faire.
+
+    Le verdict précédent se lit sur la version d'avant, et non sur
+    `document.status` : le dépôt d'une nouvelle version remet la pièce en
+    analyse, si bien que l'état de la pièce a déjà oublié pourquoi le
+    candidat revient.
+  */
+  const consomme = consommeUneAnalyse(await verdictPrecedent(document.id, version.rank));
+
   // INV-6 — le débit précède l'appel. Débiter après laisserait une analyse
   // gratuite à chaque interruption, et l'invariant dit « jamais de
   // dépassement silencieux », pas « le plus souvent ».
-  await debiterUneAnalyse(tache.applicationId);
+  if (consomme) await debiterUneAnalyse(tache.applicationId);
 
   const lu = await extraire(
     { objectKey: version.objectKey, mimeType: version.mimeType },
@@ -206,10 +271,18 @@ export async function analyserUnePiece(
         where: { id: version.id },
         data: { analysisAttempts: tentatives, analysisLastAttemptAt: new Date() },
       });
-      await rendreUneTentative(
-        tache.applicationId,
-        `Lecture non aboutie (${lu.cause}), tentative ${tentatives} — reprise en attente`,
-      );
+      /*
+        Le rendu suit le débit. Rendre ce qu'on n'a pas pris offrirait une
+        analyse à chaque reprise gratuite, et le solde monterait à chaque
+        photo floue — le défaut inverse de celui qu'on corrige, et plus
+        difficile à voir parce qu'il arrange le candidat.
+      */
+      if (consomme) {
+        await rendreUneTentative(
+          tache.applicationId,
+          `Lecture non aboutie (${lu.cause}), tentative ${tentatives} — reprise en attente`,
+        );
+      }
       return "A_REPRENDRE";
     }
 
@@ -225,6 +298,8 @@ export async function analyserUnePiece(
         engineLog: `${MOTIF_DE_NON_LECTURE[lu.cause]} — ${lu.detail}`,
         inputTokens: lu.jetonsEntree,
         outputTokens: lu.jetonsSortie,
+        // Rien n'a été pris sur ce chemin : ni par le débit quand la
+        // reprise est gratuite, ni après le rendu ci-dessous.
         creditConsumed: false,
       },
     });
@@ -236,7 +311,13 @@ export async function analyserUnePiece(
       data: { status: "ILLISIBLE", feedback: analyse.body, analyzedAt: new Date() },
     });
     await solderLesTentatives(version.id, version.analysisAttempts);
-    await rendreUneAnalyse(tache.applicationId, analyse.id, "Lecture automatique sans résultat");
+    if (consomme) {
+      await rendreUneAnalyse(
+        tache.applicationId,
+        analyse.id,
+        "Lecture automatique sans résultat",
+      );
+    }
     /*
       Et le candidat l'apprend — comme pour les trois autres verdicts.
 
@@ -293,6 +374,14 @@ export async function analyserUnePiece(
     data: {
       versionId: version.id,
       verdict: verdict.verdict,
+      /*
+        Ce que cette analyse a réellement coûté, et non ce que son verdict
+        laisse deviner : le schéma le dit — « recalculer la règle à la
+        lecture la ferait diverger du grand livre de crédits ». La colonne
+        portait sa valeur par défaut sur ce chemin, c'est-à-dire `true`,
+        y compris pour une reprise gratuite.
+      */
+      creditConsumed: consomme,
       // Les **faits bruts**, et non les mesures : la date lue reste utile
       // le jour où la date cible est renseignée, et c'est elle qu'un
       // opérateur relit. Une durée calculée ne se relit pas sur la pièce.
