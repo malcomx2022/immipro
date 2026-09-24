@@ -1022,6 +1022,114 @@ try {
       `le passeport de cette procédure ne porte aucun seuil (${(sans.analyse?.exigences ?? []).length})`,
     );
   }
+
+  /*
+    T-06 — une pièce acceptée ne se voit plus proposer de prestataire.
+
+    La lecture des offres ne lisait pas l'état des pièces : elle prenait
+    `code` et `label`, et rattachait une offre à toute pièce dont le code
+    correspond à un genre de partenaire. Un dossier dont l'assurance
+    maladie était déposée, lue et acceptée s'en voyait donc proposer une,
+    sous « ton dossier demande une pièce » — et une ligne de suivi était
+    écrite avec, si bien que l'affiliation se mesurait sur une offre qui
+    n'avait pas lieu d'être. C'est l'annuaire publicitaire que l'en-tête
+    de ce chemin refuse.
+
+    Une fumée : la lecture écrit en base, et c'est cette écriture-là qui
+    compte autant que ce qui s'affiche.
+  */
+  console.log("\nT-06 — une pièce déjà acceptée ne se voit plus proposer de prestataire");
+  {
+    const { offresDuDossier } = await import("../src/server/lecture/partenaires");
+    const { COMMISSION_BPS_ANNONCEE } = await import("../src/domain/partenaires/affiliation");
+    const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
+
+    const suisse = REGLES_DE_REFERENCE.find((r) => r.countryCode === "CH")!;
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-offres-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const regleCH = await db.visaRule.create({
+      data: {
+        countryCode: suisse.countryCode,
+        visaType: suisse.visaType,
+        category: suisse.category as never,
+        version: rang,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: suisse.rules as never,
+        sourceUrl: suisse.sourceUrl,
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-08-01"),
+        verifiedBy: "fumée",
+        nextReviewAt: new Date("2027-01-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const dossier = await db.application.create({
+      data: { userId: candidat.id, visaRuleId: regleCH.id, status: "ACTIF" },
+    });
+    await db.document.createMany({
+      data: [
+        {
+          applicationId: dossier.id,
+          code: "assurance_maladie",
+          label: "Assurance maladie",
+          required: true,
+          status: "CONFORME",
+        },
+        {
+          applicationId: dossier.id,
+          code: "logement",
+          label: "Attestation de logement",
+          required: true,
+          status: "ATTENDUE",
+        },
+      ],
+    });
+    for (const [nom, genre] of [
+      ["Assurances du Léman", "ASSURANCE_SANTE"],
+      ["Logis Genève", "LOGEMENT"],
+    ] as const) {
+      const partenaire = await db.partner.create({
+        data: {
+          name: nom,
+          kind: genre,
+          url: "https://exemple.test",
+          commissionBps: COMMISSION_BPS_ANNONCEE,
+          active: true,
+        },
+      });
+      await db.partnerActivation.create({
+        data: {
+          partnerId: partenaire.id,
+          countryCode: "CH",
+          basis: "rétro-commission licite, vérifiée",
+          verifiedAt: new Date("2026-01-01"),
+          verifiedBy: "fumée",
+        },
+      });
+    }
+    await enregistrerLAutorisation(candidat.id, "partenaires", true);
+
+    const lu = await offresDuDossier(dossier.id, candidat.id);
+    const etapes = lu.offres.map((o) => o.etape);
+    verifier(
+      !etapes.includes("assurance_maladie"),
+      `la pièce acceptée n'est plus proposée (${etapes.join(", ") || "aucune offre"})`,
+    );
+    verifier(etapes.includes("logement"), "celle qui manque l'est toujours");
+    /*
+      Et rien n'est écrit pour l'offre qui n'a pas eu lieu : « redirection
+      tracée » se mesure rapportée aux offres montrées, et une ligne de
+      trop fausse le rapport dans le sens qui arrange.
+    */
+    const suivies = await db.partnerReferral.findMany({ where: { applicationId: dossier.id } });
+    verifier(
+      suivies.length === 1 && suivies[0]!.step === "logement",
+      `une seule ligne de suivi, celle de l'offre montrée (${suivies.map((r) => r.step).join(", ")})`,
+    );
+  }
 } finally {
   await db.$disconnect().catch(() => undefined);
   service.close();

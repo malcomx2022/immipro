@@ -41,6 +41,36 @@ describe("un partenaire sans activation n'existe pour personne", () => {
   });
 
   /**
+   * Et l'offre se rattache à une pièce que le dossier demande **encore**.
+   *
+   * La lecture ne lisait pas l'état des pièces : elle prenait `code` et
+   * `label`, et proposait un prestataire payant pour une assurance maladie
+   * déjà déposée, lue et acceptée — sous « ton dossier demande une pièce ».
+   * Une ligne de suivi était écrite avec, si bien que « redirection
+   * tracée » se mesurait sur une offre qui n'avait pas lieu d'être.
+   *
+   * L'en-tête de ce module l'énonce pourtant : « chaque offre se rattache à
+   * une pièce que le dossier demande, et le dit. Une liste sans motif
+   * serait un annuaire publicitaire. »
+   */
+  it("l'état de la pièce est lu, et la question n'a qu'une définition", () => {
+    expect(lecture).toMatch(/documents: \{ select: \{[^}]*status: true/u);
+    expect(lecture).toContain("estEncoreDemandee(piece.status)");
+  });
+
+  /**
+   * Les trois lectures serveur qui posent « cette pièce est-elle encore
+   * demandée ? » passent par la même fonction. Écrite trois fois, elle
+   * finirait par répondre trois choses — c'est le défaut que le
+   * rattachement des conditions a déjà coûté deux fois au produit.
+   */
+  it("aucune lecture ne recompare l'état à la main", () => {
+    for (const fichier of ["src/server/lecture/partenaires.ts", "src/server/lecture/dossiers.ts"]) {
+      expect(lire(fichier), fichier).not.toMatch(/status\s*!==\s*"CONFORME"/u);
+    }
+  });
+
+  /**
    * Et la maille est le pays, pas le partenaire : un accord signé pour les
    * Pays-Bas n'autorise rien en Suisse. Une activation révoquée ne compte
    * plus, ce qui est la sortie prévue quand un contrat s'arrête.
