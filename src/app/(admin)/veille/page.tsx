@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { FileDeVeille } from "./FileDeVeille";
 import { collecte, fichesSuivies } from "@/server/lecture/backoffice";
 import { exigerVeilleur } from "@/server/securite/page";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * B-01 — File de veille réglementaire. WF-14.
@@ -27,7 +28,7 @@ export default async function PageVeille() {
     <FileDeVeille
       fiches={fiches}
       collecte={etatCollecte}
-      aujourdhui={new Date().toISOString().slice(0, 10)}
+      aujourdhui={jourCivil(new Date())}
     />
   );
 }

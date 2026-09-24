@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
 import { etatOperateur, paiements } from "@/server/lecture/backoffice";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Paiements — B-04, WF-15.
@@ -27,7 +28,7 @@ export const GET = route({
       .optional(),
   }),
   async traiter({ requete }) {
-    const jour = requete.jour ?? new Date().toISOString().slice(0, 10);
+    const jour = requete.jour ?? jourCivil(new Date());
     return { paiements: await paiements(jour), operateur: await etatOperateur() };
   },
 });

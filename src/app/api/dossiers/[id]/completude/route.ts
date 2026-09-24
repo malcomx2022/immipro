@@ -3,6 +3,7 @@ import { dossierAvecPieces } from "@/server/acces/dossiers";
 import { versPiece } from "@/server/vue/dossier";
 import { completudeDesPieces, libelleBlocage } from "@/domain/dossiers/piece";
 import { codesConformes } from "@/domain/completeness/conditions";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Complétude — C-09, WF-07.
@@ -23,7 +24,7 @@ export const GET = route({
       directement à `map` lui donnerait l'index du tableau comme date, et
       la deuxième pièce serait jugée au 1er janvier 1970.
     */
-    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const aujourdhui = jourCivil(new Date());
     const pieces = dossier.documents.map((d) => versPiece(d, aujourdhui));
     /*
       La règle **figée** entre dans le calcul : ses conditions déterministes

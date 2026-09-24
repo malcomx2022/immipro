@@ -9,6 +9,7 @@ import {
   nomDuGrandLivre,
   totauxDeLExport,
 } from "@/domain/backoffice/reconciliation";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Export du grand livre — B-04, WF-15, INV-7.
@@ -39,7 +40,7 @@ export const GET = route({
       .optional(),
   }),
   async traiter({ requete, acteur }) {
-    const jour = requete.jour ?? new Date().toISOString().slice(0, 10);
+    const jour = requete.jour ?? jourCivil(new Date());
     /*
       Le jour borne enfin ce qu'il exporte — 24/09/2026. Il nommait le
       fichier et la ligne de journal (`grand-livre:<jour>`) en appelant un

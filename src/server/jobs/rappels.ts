@@ -8,6 +8,7 @@ import {
   rappelDuJour,
   type DossierARappeler,
 } from "@/domain/dossiers/rappels";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * L'envoi des rappels d'échéance — WF-09 étape 3, RG-09.2.
@@ -60,7 +61,13 @@ const iso = (d: Date): string => d.toISOString().slice(0, 10);
 export async function envoyerLesRappels(
   maintenant = new Date(),
 ): Promise<BilanDesRappels> {
-  const aujourdhui = iso(maintenant);
+  /*
+    Aujourd'hui, et le jour d'un rappel déjà envoyé, sont des jours de
+    Cotonou : un rappel parti à 0 h 30 est du jour même, pas de la veille
+    UTC. Les échéances (`dueAt`) sont des dates calendaires et restent
+    lues telles qu'elles sont posées.
+  */
+  const aujourdhui = jourCivil(maintenant);
 
   /*
     La fenêtre lue est celle que le domaine peut retenir : de trente jours
@@ -110,13 +117,13 @@ export async function envoyerLesRappels(
   for (const dossier of dossiers) {
     const matiere: DossierARappeler = {
       intitule: intitule(dossier.visaRule),
-      dernierRappelLe: dossier.lastReminderAt ? iso(dossier.lastReminderAt) : null,
+      dernierRappelLe: dossier.lastReminderAt ? jourCivil(dossier.lastReminderAt) : null,
       echeances: dossier.deadlines.map((e) => ({
         code: e.code,
         libelle: e.label,
         date: iso(e.dueAt),
         faite: e.doneAt !== null,
-        rappeleeLe: e.remindedAt ? iso(e.remindedAt) : null,
+        rappeleeLe: e.remindedAt ? jourCivil(e.remindedAt) : null,
       })),
     };
 

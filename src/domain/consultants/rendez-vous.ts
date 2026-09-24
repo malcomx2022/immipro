@@ -1,6 +1,10 @@
 import { TENUE_MINUTES } from "./tenue";
 
-import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
+import {
+  FUSEAU_AFFICHAGE,
+  instantDeLHeureLocale,
+  jourDuFuseau,
+} from "@/domain/format/fuseau";
 
 import {
   CONSULTATION_ANNULATION_HEURES,
@@ -23,74 +27,10 @@ import {
 // reste exporté d'ici, où les écrans de rendez-vous le cherchent.
 export { FUSEAU_AFFICHAGE };
 
-/**
- * Le décalage du fuseau d'affichage à un instant donné, en minutes.
- *
- * Lu à l'instant visé et non posé en dur : un `+1` écrit ici serait juste
- * pour le Bénin et faux le jour où le fuseau suit le candidat — ce que la
- * note ci-dessus laisse explicitement ouvert.
- */
-const FORMAT_DECALAGE = new Intl.DateTimeFormat("en-US", {
-  timeZone: FUSEAU_AFFICHAGE,
-  timeZoneName: "longOffset",
-});
-
-const decalageMinutes = (instant: Date): number => {
-  const nomme = FORMAT_DECALAGE.formatToParts(instant).find(
-    (p) => p.type === "timeZoneName",
-  )?.value;
-  const lu = /GMT([+-])(\d{2}):(\d{2})/u.exec(nomme ?? "");
-  if (!lu) return 0;
-  return (lu[1] === "-" ? -1 : 1) * (Number(lu[2]) * 60 + Number(lu[3]));
-};
-
-/** Le quantième du jour dans le fuseau d'affichage, et non en UTC. */
-const FORMAT_PARTIES = new Intl.DateTimeFormat("en-CA", {
-  timeZone: FUSEAU_AFFICHAGE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-export const jourDuFuseau = (
-  instant: Date,
-): { annee: number; mois: number; jour: number } => {
-  const [annee, mois, jour] = FORMAT_PARTIES.format(instant).split("-").map(Number);
-  return { annee: annee!, mois: mois!, jour: jour! };
-};
-
-/**
- * L'instant d'une heure **locale** — I.E., seconde moitié.
- *
- * Les créneaux étaient posés par `setUTCHours(9 | 11 | 15 | 17)`, c'est-à-dire
- * en UTC, pendant que les formateurs de ce module les rendent dans le fuseau
- * d'affichage. Le tableau se lit comme des heures de bureau ; le candidat
- * se voyait proposer autre chose. Constaté en exécution :
- *
- *     écrit 09:00 UTC → affiché « 10 h 00 »
- *     écrit 11:00 UTC → affiché « 12 h 00 »
- *     écrit 15:00 UTC → affiché « 16 h 00 »
- *     écrit 17:00 UTC → affiché « 18 h 00 »
- *
- * Jamais de créneau à neuf heures, un créneau en plein midi, et un à
- * dix-huit heures — après la journée d'un consultant du même fuseau. C'est
- * la même faute que celle que la note ci-dessus raconte, prise par l'autre
- * bout : les formateurs ont été corrigés, la génération est restée en UTC.
- *
- * Deux passes, parce que le décalage se lit à l'instant visé et non à
- * l'instant approché : sous un fuseau à heure d'été, la première passe peut
- * tomber du mauvais côté de la bascule.
- */
-export function instantDeLHeureLocale(
-  annee: number,
-  mois: number,
-  jour: number,
-  heure: number,
-): Date {
-  const vise = Date.UTC(annee, mois - 1, jour, heure, 0, 0, 0);
-  const premier = vise - decalageMinutes(new Date(vise)) * 60_000;
-  return new Date(vise - decalageMinutes(new Date(premier)) * 60_000);
-}
+// Le décalage, le quantième local et l'instant d'une heure locale vivent
+// avec le fuseau (`domain/format/fuseau`) : le back-office borne ses
+// journées avec les mêmes fonctions que la grille des créneaux.
+export { instantDeLHeureLocale, jourDuFuseau };
 
 /**
  * Les horaires proposés, en heures **du fuseau d'affichage**
