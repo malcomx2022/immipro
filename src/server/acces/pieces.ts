@@ -2,7 +2,7 @@ import type { Document, DocumentVersion } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { autorisationAccordee } from "@/server/acces/consentements";
-import { presignedGet, presignedPut } from "@/lib/storage";
+import { presignedGet, presignedPut, TTL_PRESIGNE_SECONDES } from "@/lib/storage";
 import { cleObjet } from "@/server/securite/secret";
 import { refusDuFichier, TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
 import { consultable, mentionApercu } from "@/domain/dossiers/quarantaine";
@@ -27,7 +27,13 @@ import {
  * cinq minutes où l'URL est valable.
  */
 
-export const TTL_PRESIGNE_SECONDES = 300;
+/**
+ * La durée annoncée au client est **celle qui est signée**, relue depuis
+ * `lib/storage` où elle est appliquée. Elle valait 300 ici pendant que le
+ * stockage lisait `MINIO_PRESIGNED_TTL_SECONDS` : deux nombres pour une
+ * seule durée, et l'un d'eux mentait dès que l'autre bougeait.
+ */
+export { TTL_PRESIGNE_SECONDES };
 
 export async function pieceDuDossier(
   pieceId: string,
