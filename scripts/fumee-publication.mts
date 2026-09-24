@@ -88,7 +88,10 @@ const { MENTION_EN_PAUSE } = await import("../src/domain/dossiers/dossier");
 const { editorialDe } = await import("../src/lib/contenu/destinations");
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
 const { enregistrerLesTextes } = await import("../src/server/regles/edition");
-const { editionDeLaRegle } = await import("../src/server/lecture/backoffice");
+const { editionDeLaRegle, collecte, fichesSuivies } = await import(
+  "../src/server/lecture/backoffice"
+);
+const { consignerLeReleve } = await import("../src/server/veille/releve");
 
 const brute = REGLES_DE_REFERENCE.find(
   (r) => r.countryCode === "NL" && r.visaType === "emploi_kennismigrant",
@@ -1633,6 +1636,103 @@ try {
       `la pause se lève et le dossier passe sur v3 (${repris.status})`,
     );
   }
+  console.log("\nWF-14 — le relevé du veilleur s'écrit, et seul « à jour » vérifie");
+  {
+    /*
+      `SourceCheck` porte `checkedAt`, `reachable`, `attempts` et
+      `difference` ; `collecte()` les lit et l'écran les affiche. **Seule
+      la graine de démonstration en écrivait.** En production la table
+      restait vide, et trois phrases promettaient un collecteur :
+
+          « le relevé automatique des sources n'a pas encore tourné »
+          « Les 14 sources ont répondu ce matin et aucune ne diverge »
+          « La prochaine collecte est programmée demain »
+    */
+    rang += 10;
+    const socle = {
+      countryCode: "SN" as const, visaType: "etudes_mvv_vvr" as const,
+      category: "ETUDES" as const, effectiveFrom: new Date("2026-01-01"),
+      sourceUrl: "https://veille.exemple.test/regle-sn", sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date("2026-01-01"), verifiedBy: REDACTEUR.email,
+      nextReviewAt: new Date("2026-02-01"), publishedAt: new Date("2026-01-01"),
+    };
+    const fiche = await db.visaRule.create({
+      data: { ...socle, version: 1, rules: brute.rules as never, status: "PUBLISHED" },
+    });
+    const veilleur = { id: REDACTEUR.id, email: REDACTEUR.email };
+
+    verifier((await collecte()) === null, "aucun relevé au départ : la lecture rend l'absence");
+
+    /* Un écart vu : consigné, mais la fiche n'est pas vérifiée pour autant. */
+    const ecart = await consignerLeReleve(
+      fiche.id, "A_ARBITRER", "Le seuil passe de 4 357 à 4 500 EUR au 1er janvier.", veilleur,
+      new Date("2026-09-20T08:00:00Z"),
+    );
+    verifier(ecart.relueLe === null, `un écart ne vaut pas vérification (${ecart.relueLe})`);
+    const apresEcart = await db.visaRule.findUniqueOrThrow({ where: { id: fiche.id } });
+    verifier(
+      apresEcart.verifiedAt.getTime() === socle.verifiedAt.getTime() &&
+        apresEcart.nextReviewAt.getTime() === socle.nextReviewAt.getTime(),
+      "et les dates de relecture ne bougent pas — RG-14.4",
+    );
+    const vue = (await fichesSuivies()).find((f) => f.id === fiche.id);
+    verifier(
+      vue?.ecart?.includes("4 500") === true,
+      `la file affiche l'écart consigné (${vue?.ecart?.slice(0, 32)}…)`,
+    );
+
+    /*
+      Une source muette : les tentatives se comptent. Les instants sont
+      passés, et distincts — trois écritures dans la même milliseconde
+      rendraient l'ordre des relevés indécidable, ce qui n'arrive pas
+      quand ils viennent de trois requêtes.
+    */
+    const t0 = new Date("2026-09-20T08:00:00Z");
+    await consignerLeReleve(
+      fiche.id, "PERIME", "Le site répond 503 depuis ce matin.", veilleur,
+      new Date(t0.getTime() + 60_000),
+    );
+    const secondSilence = await consignerLeReleve(
+      fiche.id, "PERIME", "Toujours 503.", veilleur, new Date(t0.getTime() + 120_000),
+    );
+    verifier(secondSilence.relueLe === null, "un silence ne vaut pas vérification non plus");
+    const releve = await collecte();
+    verifier(
+      releve?.injoignable?.tentatives === 2,
+      `les silences qui se suivent se comptent (${releve?.injoignable?.tentatives})`,
+    );
+    verifier(
+      releve?.injoignable?.derniereReussite !== "jamais",
+      "et la dernière réussite est celle du relevé d'écart, qui, lui, a joint la source",
+    );
+
+    /* Et « à jour », qui seule vérifie. */
+    const ajour = await consignerLeReleve(
+      fiche.id, "A_JOUR", undefined, veilleur, new Date(t0.getTime() + 180_000),
+    );
+    verifier(ajour.relueLe !== null, `« à jour » vérifie (${ajour.relueLe})`);
+    const apres = await db.visaRule.findUniqueOrThrow({ where: { id: fiche.id } });
+    verifier(
+      apres.verifiedBy === REDACTEUR.email && apres.nextReviewAt > socle.nextReviewAt,
+      "la preuve de diligence est posée et l'échéance repoussée",
+    );
+    const final = await collecte();
+    verifier(
+      final !== null && final.injoignable === undefined,
+      "la source répond de nouveau : plus d'incident",
+    );
+    verifier(
+      (await fichesSuivies()).find((f) => f.id === fiche.id) === undefined,
+      "et la fiche sort de la file, sa relecture étant faite",
+    );
+
+    /* Sans note, une conclusion qui en demande une est refusée. */
+    const nu = await consignerLeReleve(fiche.id, "A_ARBITRER", "   ", veilleur)
+      .then(() => "acceptée")
+      .catch((e: { echec?: { code?: string } }) => e.echec?.code ?? "?");
+    verifier(nu === "champs_invalides", `un écart sans texte est refusé (${nu})`);
+  }
+
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

@@ -108,25 +108,45 @@ const hote = (url: string) => {
 };
 
 /**
- * État de la collecte — B-01.
+ * État des relevés de sources — B-01.
  *
  * Une source muette ne vaut pas un changement de règle : l'échec est
  * enregistré et rien n'est dépublié (RG-14.3). C'est ce qui permet
  * d'annoncer « 13 sources sur 14 » avec un compte exact plutôt qu'une
  * « collecte partielle » invérifiable.
+ *
+ * ── Le compte portait sur les lignes, pas sur les sources ───────────
+ *
+ * Il retenait tous les relevés du **jour du dernier**, et comptait
+ * `duJour.length` comme un nombre de sources. Trois relevés sur une même
+ * adresse se lisaient donc « 3 sources relevées ». Et la source muette
+ * était *n'importe quelle* ligne en échec de cette journée, même si un
+ * relevé plus récent avait joint la source depuis : l'écran gardait son
+ * bandeau d'incident après la réparation.
+ *
+ * Rien ne le montrait tant que seule la graine de démonstration écrivait —
+ * une ligne par source, toutes au même instant. Le premier relevé réel l'a
+ * dit, et c'est la fumée de publication qui l'a trouvé.
+ *
+ * **Le dernier relevé de chaque source décide.** La fenêtre du jour est
+ * partie avec : un relevé est le geste du veilleur, et il ne relit pas
+ * quatorze sources dans la même journée — les fermer à minuit aurait
+ * annoncé « 1 source relevée » le lendemain d'un relevé unique.
  */
 export async function collecte(): Promise<Collecte | null> {
-  const derniere = await db.sourceCheck.findFirst({ orderBy: { checkedAt: "desc" } });
+  /*
+    `distinct` avec l'ordre décroissant rend la ligne la plus récente de
+    chaque adresse, et rien de plus : borné par le nombre de sources, et
+    non par le nombre de relevés jamais écrits.
+  */
+  const etats = await db.sourceCheck.findMany({
+    distinct: ["sourceUrl"],
+    orderBy: { checkedAt: "desc" },
+  });
+  const derniere = etats[0];
   if (!derniere) return null;
 
-  const debutDuJour = new Date(derniere.checkedAt);
-  debutDuJour.setUTCHours(0, 0, 0, 0);
-
-  const duJour = await db.sourceCheck.findMany({ where: { checkedAt: { gte: debutDuJour } } });
-  const muette = duJour.find((s) => !s.reachable);
-
-  const prochaine = new Date(derniere.checkedAt);
-  prochaine.setUTCDate(prochaine.getUTCDate() + 1);
+  const muette = etats.find((s) => !s.reachable);
 
   let injoignable: Collecte["injoignable"];
   if (muette) {
@@ -142,10 +162,9 @@ export async function collecte(): Promise<Collecte | null> {
   }
 
   return {
-    sources: duJour.length,
-    relevees: duJour.filter((s) => s.reachable).length,
+    sources: etats.length,
+    relevees: etats.filter((s) => s.reachable).length,
     faiteLe: derniere.checkedAt.toISOString(),
-    prochaineLe: prochaine.toISOString(),
     ...(injoignable ? { injoignable } : {}),
   };
 }

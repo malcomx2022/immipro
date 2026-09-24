@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { Button } from "@/components/ui/Button";
+import { CHAMP_CONTROLE, Champ } from "@/components/ui/champ";
+import { RadioGroup } from "@/components/ui/RadioGroup";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
 import { Filtres } from "@/components/admin/Filtres";
@@ -15,7 +17,10 @@ import {
   LIBELLE_FILTRE_VEILLE,
   LIBELLE_STATUT_FICHE,
   MENTION_DEPUBLICATION_A_LECHEANCE,
+  AUCUN_RELEVE,
+  LIBELLE_ETAT_SOURCE,
   MENTION_FILE_VIDE,
+  SUITE_DE_LA_CONCLUSION,
   MENTION_SOURCE_MUETTE_SANS_EFFET,
   SANS_INDEX_DES_REGLES,
   enRetard,
@@ -24,8 +29,10 @@ import {
   libelleRelecture,
   messageSourceInjoignable,
   resumeCollecte,
+  resumeFileVide,
   resumeVeille,
   type Collecte,
+  type EtatSource,
   type FicheSuivie,
   type FiltreVeille,
 } from "@/domain/backoffice/veille";
@@ -83,25 +90,38 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
   const [selection, setSelection] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [conclusion, setConclusion] = useState<EtatSource>("A_JOUR");
+  const [note, setNote] = useState("");
+  const idNote = useId();
 
   /**
-   * WF-14 étape 2, branche « inchangé ». Une fiche relue et trouvée
-   * identique restait en retard tant que ce bouton n'écrivait rien, et le
-   * cron de trois heures finissait par la dépublier : le travail était
-   * fait, et le produit se comportait comme s'il ne l'avait pas été.
+   * WF-14 étape 2 — les trois conclusions du veilleur.
+   *
+   * « Inchangé » était la seule offerte, et c'est l'issue la plus
+   * fréquente : une fiche relue et trouvée identique restait en retard
+   * tant que ce bouton n'écrivait rien, et le cron de trois heures
+   * finissait par la dépublier.
+   *
+   * Les deux autres n'écrivaient nulle part. « J'ai vu un écart » se
+   * perdait jusqu'à ce qu'une version soit rédigée, et « la source n'a pas
+   * répondu » ne se disait à personne — alors que l'écran lit `SourceCheck`
+   * pour afficher l'un et l'autre, et que seule la graine de démonstration
+   * en écrivait.
    */
-  async function relire(id: string) {
+  async function relire(id: string, conclusion: EtatSource, note?: string) {
     setEnvoi(true);
     setEchec(null);
-    const resultat = await appeler<{ prochaineLe: string; republiee: boolean }>(
+    const resultat = await appeler<{ conclusion: EtatSource; republiee: boolean }>(
       "/api/admin/veille",
-      { methode: "PUT", corps: { id } },
+      { methode: "PUT", corps: { id, conclusion, ...(note ? { note } : {}) } },
     );
     setEnvoi(false);
     if (!resultat.ok) {
       setEchec(resultat.echec);
       return;
     }
+    setNote("");
+    setConclusion("A_JOUR");
     router.refresh();
   }
 
@@ -120,7 +140,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
         <p className="text-13 text-ink-500">
           {collecte
             ? resumeCollecte(collecte, moment)
-            : "Aucune collecte enregistrée : le relevé automatique des sources n'a pas encore tourné."}
+            : AUCUN_RELEVE}
         </p>
 
         {incident ? (
@@ -234,20 +254,74 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
                   Ouvrir en édition
                 </LienBouton>
                 {echec ? <BlocEchec echec={echec} annonce /> : null}
+                {/*
+                  Les trois conclusions, dans l'ordre de fréquence. Un seul
+                  bouton n'en portait qu'une, et les deux autres ne
+                  s'écrivaient nulle part — alors que l'écran les lit pour
+                  afficher l'écart d'une fiche et le silence d'une source.
+
+                  Chaque option porte sa suite en description : ce que la
+                  conclusion écrit, et ce qu'elle ne touche pas. Choisir
+                  « périmé » sans savoir que les dates ne bougent pas
+                  reviendrait à croire la fiche relue.
+                */}
+                <RadioGroup
+                  libelle="Ce que tu as trouvé sur la source"
+                  valeur={conclusion}
+                  onChangement={(v) => setConclusion(v as EtatSource)}
+                  options={(["A_JOUR", "A_ARBITRER", "PERIME"] as const).map((valeur) => ({
+                    valeur,
+                    libelle: LIBELLE_ETAT_SOURCE[valeur],
+                    description:
+                      valeur === "A_JOUR" && enRetard(retenue, aujourdhui)
+                        ? "La fiche repart pour 90 jours et redevient publiée : le retrait ne disait que « personne n'a relu »."
+                        : SUITE_DE_LA_CONCLUSION[valeur],
+                  }))}
+                />
+
+                {/*
+                  La note est obligatoire dès que la conclusion n'est pas
+                  « à jour » : « injoignable » seul ne se relit pas dans six
+                  mois, et un écart sans texte ne dit rien à qui écrira la
+                  version suivante. Le serveur la refuse aussi — deux
+                  contrôles, parce que celui-ci explique et celui-là tient.
+                */}
+                {conclusion === "A_JOUR" ? null : (
+                  <Champ
+                    id={idNote}
+                    idDescription={`${idNote}-aide`}
+                    libelle={
+                      conclusion === "A_ARBITRER"
+                        ? "Ce qui a changé sur la source"
+                        : "Ce que la source a répondu"
+                    }
+                    aide="Le relevé se relit dans six mois : écris ce qu'on aura besoin de savoir."
+                  >
+                    <textarea
+                      id={idNote}
+                      aria-describedby={`${idNote}-aide`}
+                      rows={3}
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      className={CHAMP_CONTROLE}
+                    />
+                  </Champ>
+                )}
+
                 <Button
                   variante="secondaire"
                   pleineLargeur
-                  disabled={envoi}
-                  raisonDesactivation="Enregistrement en cours."
-                  onClick={() => relire(retenue.id)}
+                  disabled={envoi || (conclusion !== "A_JOUR" && note.trim().length === 0)}
+                  raisonDesactivation={
+                    envoi
+                      ? "Enregistrement en cours."
+                      : "Écris ce que tu as trouvé : le relevé se relit dans six mois."
+                  }
+                  onClick={() => relire(retenue.id, conclusion, note)}
                 >
-                  {envoi ? "Enregistrement…" : "Marquer comme relue sans changement"}
+                  {envoi ? "Enregistrement…" : "Consigner ce relevé"}
                 </Button>
-                <p className="text-pretty text-13 text-ink-500">
-                  {enRetard(retenue, aujourdhui)
-                    ? "La fiche repart pour 90 jours et redevient publiée : le retrait ne disait que « personne n'a relu »."
-                    : "La fiche repart pour 90 jours. Aucune version n'est créée."}
-                </p>
+
               </div>
 
               <p className="text-pretty text-13 text-ink-500">{MENTION_VERSIONNEMENT}</p>
@@ -270,10 +344,15 @@ function FileVide({ collecte }: { collecte: Collecte }) {
   return (
     <div className="flex flex-col items-start gap-2 p-6">
       <h2 className="text-19 font-semibold text-ink-900">Aucun écart à arbitrer</h2>
+      {/*
+        La phrase disait « les 14 sources ont répondu » et « la prochaine
+        collecte est programmée demain » : trois assertions sur un
+        collecteur qui n'existe pas, sur l'état où une instance saine se
+        trouve la plupart du temps. Le relevé est le geste du veilleur
+        (WF-14 étape 2), et la phrase dit maintenant ce qu'il a relevé.
+      */}
       <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
-        Les {collecte.sources} sources ont répondu {moment(collecte.faiteLe)} et aucune ne
-        diverge des règles publiées. La prochaine collecte est programmée{" "}
-        {moment(collecte.prochaineLe)}.
+        {resumeFileVide(collecte, moment)}
       </p>
       {/* Aucun lien : le back-office n'a pas d'index des règles, et l'état
           vide est le seul écran où le veilleur n'a rien d'autre à cliquer.

@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { db } from "@/lib/db";
-import { echec } from "@/server/http/echecs";
 import { collecte, fichesSuivies } from "@/server/lecture/backoffice";
-import { journaliser } from "@/server/acces/journal";
-import { prochaineRelecture } from "@/domain/backoffice/veille";
+import { consignerLeReleve } from "@/server/veille/releve";
 
 /**
  * File de veille — B-01, WF-14 étape 1.
@@ -65,69 +62,19 @@ export const PUT = route({
   nom: "admin.veille.relecture",
   acces: "veilleur",
   limite: "sensible",
-  corps: z.object({ id: z.string().uuid() }),
-  async traiter({ corps, acteur }) {
-    const fiche = await db.visaRule.findUnique({ where: { id: corps.id } });
-    if (!fiche) throw echec("introuvable");
-    if (fiche.status === "ARCHIVED") {
-      throw echec("etat_incompatible", {
-        corps: "Une version archivée ne se relit plus. Repars de la version en vigueur.",
-      });
-    }
-
-    const maintenant = new Date();
-    const jour = new Date(
-      Date.UTC(
-        maintenant.getUTCFullYear(),
-        maintenant.getUTCMonth(),
-        maintenant.getUTCDate(),
-      ),
-    );
-
+  corps: z.object({
+    id: z.string().uuid(),
     /**
-     * Aucune colonne ne porte la date de révision connue d'une source.
-     * La seconde moitié de RG-14.3 — « ramenée à 30 jours avant une date
-     * connue de révision » — est donc écrite dans la fonction pure et
-     * inatteignable depuis ici. Passer `null` est la lecture honnête :
-     * inventer une colonne au passage ferait décider à cette route ce
-     * qu'un veilleur doit saisir.
+     * Ce que le veilleur a trouvé — WF-14 étape 2.
+     *
+     * Absent vaut `A_JOUR` : c'est l'issue la plus fréquente, c'est celle
+     * que le bouton d'origine portait, et les appels déjà écrits la
+     * gardent.
      */
-    const echeance = prochaineRelecture(jour, null);
-
-    // Le retour en brouillon par échéance est réversible : c'est ce que
-    // la relecture vient de lever. Un brouillon en préparation, non.
-    const republier = fiche.status === "DRAFT" && fiche.nextReviewAt < jour;
-
-    const maj = await db.visaRule.update({
-      where: { id: fiche.id },
-      data: {
-        verifiedAt: jour,
-        verifiedBy: acteur!.email,
-        nextReviewAt: echeance,
-        ...(republier ? { status: "PUBLISHED" as const } : {}),
-      },
-    });
-
-    if (republier) {
-      await journaliser({
-        acteurId: acteur!.id,
-        action: "regle.republication",
-        cible: `visaRule:${fiche.id}`,
-        motif: `Remise en ligne après relecture : l'échéance du ${fiche.nextReviewAt
-          .toISOString()
-          .slice(0, 10)} l'avait dépubliée (RG-14.1)`,
-        details: {
-          pays: fiche.countryCode,
-          type: fiche.visaType,
-          version: fiche.version,
-        },
-      });
-    }
-
-    return {
-      relueLe: maj.verifiedAt.toISOString().slice(0, 10),
-      prochaineLe: maj.nextReviewAt.toISOString().slice(0, 10),
-      republiee: republier,
-    };
-  },
+    conclusion: z.enum(["A_JOUR", "A_ARBITRER", "PERIME"]).optional(),
+    /** L'écart constaté, ou le motif du silence. */
+    note: z.string().max(500).optional(),
+  }),
+  traiter: ({ corps, acteur }) =>
+    consignerLeReleve(corps.id, corps.conclusion ?? "A_JOUR", corps.note, acteur!),
 });

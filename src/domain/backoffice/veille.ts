@@ -139,9 +139,34 @@ export function resumeVeille(
 }
 
 /**
- * État d'une source à la dernière collecte. `PERIME` ne veut pas dire que la
- * règle a changé : il dit qu'on ne sait plus, et la règle publiée reste
- * publiée (RG-14.3).
+ * Ce que le veilleur a trouvé en consultant la source — WF-14 étape 2.
+ *
+ * ── Le relevé n'était écrit par personne ────────────────────────────
+ *
+ * `SourceCheck` porte `checkedAt`, `reachable`, `attempts` et
+ * `difference` ; `collecte()` les lit ; l'écran les affiche ; **seule la
+ * graine de démonstration en écrivait**. En production, aucune ligne
+ * n'existait jamais, et trois phrases promettaient pourtant un mécanisme :
+ *
+ *     « le relevé automatique des sources n'a pas encore tourné »
+ *     « Les 14 sources ont répondu ce matin et aucune ne diverge »
+ *     « La prochaine collecte est programmée demain »
+ *
+ * Aucune n'était vraie : rien n'interrogeait, rien ne comparait, rien
+ * n'était programmé. La colonne « écart » de la file et le compte
+ * « N écarts détectés » du résumé lisaient la même table vide.
+ *
+ * ── Ce que le relevé est, et ce qu'il n'est pas ─────────────────────
+ *
+ * WF-14 étape 2 le dit : « **le veilleur** consulte la source officielle,
+ * compare, et conclut ». Le relevé est donc le sien, et ces trois
+ * conclusions sont les siennes. Un collecteur automatique — quelles
+ * adresses, à quelle cadence, sous quelle identité, et si le silence
+ * momentané d'un site public mérite d'alerter — est une décision qui
+ * touche des tiers, et elle n'appartient pas à ce lot.
+ *
+ * Ce type portait déjà les trois mots et **rien ne l'importait** : le
+ * vocabulaire existait avant la conclusion qu'il devait servir.
  */
 export type EtatSource = "A_JOUR" | "A_ARBITRER" | "PERIME";
 
@@ -151,14 +176,47 @@ export const LIBELLE_ETAT_SOURCE: Record<EtatSource, string> = {
   PERIME: "Périmé",
 };
 
+/**
+ * Ce que chaque conclusion écrit au relevé, et ce qu'elle ne touche pas.
+ *
+ * **Seule `A_JOUR` avance les dates.** RG-14.4 fait de `verifiedAt` la
+ * preuve de diligence : l'avancer sur « je n'ai pas pu joindre la source »
+ * ou sur « j'ai vu un écart que je n'ai pas encore versionné » dirait que
+ * la règle a été vérifiée alors qu'elle ne l'a pas été — et la fiche
+ * sortirait de la file de veille, qui est justement l'endroit où elle doit
+ * rester.
+ */
+export const RELEVE_VAUT_VERIFICATION: Record<EtatSource, boolean> = {
+  A_JOUR: true,
+  A_ARBITRER: false,
+  PERIME: false,
+};
+
+/** Ce que le veilleur lit sous chaque conclusion, avant de la choisir. */
+export const SUITE_DE_LA_CONCLUSION: Record<EtatSource, string> = {
+  A_JOUR:
+    "La fiche repart pour 90 jours et sort de la file. Aucune version n'est créée.",
+  A_ARBITRER:
+    "L'écart est consigné et la fiche reste dans la file : c'est l'édition qui crée la version suivante. Les dates de relecture ne bougent pas — rien n'a encore été vérifié.",
+  PERIME:
+    "Le relevé note que la source n'a pas répondu. Les dates ne bougent pas, et la règle publiée reste publiée : un silence de la source ne vaut pas un changement de règle.",
+};
+
+/**
+ * Ce que les relevés de sources disent, à la lecture.
+ *
+ * `prochaineLe` en est sorti. Il valait « dernier relevé + un jour » et
+ * l'écran l'annonçait — « la prochaine collecte est programmée demain » —
+ * alors que rien ne programme rien : le relevé est le geste du veilleur
+ * (WF-14 étape 2). Un champ calculé pour tenir une promesse que personne
+ * ne tient vaut mieux supprimé qu'expliqué.
+ */
 export interface Collecte {
-  /** Sources interrogées et sources qui ont répondu. */
+  /** Sources consultées, et celles qui ont répondu. */
   sources: number;
   relevees: number;
-  /** Horodatage de la collecte, ISO. */
+  /** Horodatage du dernier relevé, ISO. */
   faiteLe: string;
-  /** Prochaine collecte programmée, ISO. */
-  prochaineLe: string;
   /** Source muette, le cas échéant, et sa dernière collecte réussie. */
   injoignable?: { source: string; derniereReussite: string; tentatives: number };
 }
@@ -167,14 +225,47 @@ export const collecteComplete = (collecte: Collecte): boolean =>
   collecte.relevees === collecte.sources;
 
 /**
+ * L'état vide de la file, et ce qu'il disait de trop.
+ *
+ * Il annonçait : « Les 14 sources **ont répondu** ce matin et aucune ne
+ * diverge des règles publiées. **La prochaine collecte est programmée**
+ * demain. » Trois assertions sur un collecteur qui n'existe pas — et
+ * c'est l'état où une instance saine se trouve la plupart du temps.
+ *
+ * Elle dit désormais ce que le relevé est : les sources que le veilleur a
+ * consultées, et la date du dernier relevé. Rien n'est programmé, parce
+ * que rien ne l'est.
+ */
+export function resumeFileVide(
+  collecte: Collecte,
+  formaterMoment: (iso: string) => string,
+): string {
+  return `${collecte.relevees} ${
+    collecte.relevees > 1 ? "sources relevées" : "source relevée"
+  } au dernier passage, ${formaterMoment(
+    collecte.faiteLe,
+  )}, et aucun écart consigné. Une fiche revient dans la file à l'approche de sa relecture.`;
+}
+
+/**
+ * Et ce que l'écran dit quand aucun relevé n'existe.
+ *
+ * Il disait « le relevé automatique des sources n'a pas encore tourné ».
+ * « Pas encore » annonçait une passe qui n'existe pas : le relevé est le
+ * geste du veilleur (WF-14 étape 2), et il n'y en a simplement eu aucun.
+ */
+export const AUCUN_RELEVE =
+  "Aucun relevé de source enregistré. Un relevé s'écrit quand tu consultes la source d'une fiche et conclus, depuis cette file.";
+
+/**
  * Ce que l'écran annonce en tête. Une collecte partielle le dit avec le
  * compte exact : « 13 sources sur 14 » se vérifie, « collecte partielle »
  * non.
  */
 export function resumeCollecte(collecte: Collecte, formaterMoment: (iso: string) => string): string {
   return collecteComplete(collecte)
-    ? `${collecte.sources} sources suivies · dernière collecte ${formaterMoment(collecte.faiteLe)}`
-    : `${collecte.relevees} sources sur ${collecte.sources} relevées ${formaterMoment(collecte.faiteLe)}`;
+    ? `${collecte.sources} ${collecte.sources > 1 ? "sources relevées" : "source relevée"} · dernier relevé ${formaterMoment(collecte.faiteLe)}`
+    : `${collecte.relevees} sources sur ${collecte.sources} relevées · dernier relevé ${formaterMoment(collecte.faiteLe)}`;
 }
 
 /**
@@ -188,11 +279,11 @@ export function messageSourceInjoignable(
 ): string | null {
   if (!collecte.injoignable) return null;
   const { source, derniereReussite, tentatives } = collecte.injoignable;
-  return `${source} n'a pas répondu, après ${tentatives} tentatives. Les règles affichées datent de la dernière collecte réussie, ${formaterMoment(derniereReussite)}. Elles restent publiées et les candidats continuent de les voir : une source muette ne vaut pas un changement de règle.`;
+  return `${source} n'a pas répondu, après ${tentatives} tentatives. Les règles affichées datent du dernier relevé réussi, ${formaterMoment(derniereReussite)}. Elles restent publiées et les candidats continuent de les voir : une source muette ne vaut pas un changement de règle.`;
 }
 
 export const MENTION_FILE_VIDE =
-  "Une file vide est un état normal, pas une panne de collecte : la date du dernier relevé le prouve.";
+  "Une file vide est un état normal : la date du dernier relevé dit jusqu'où la veille est à jour.";
 
 /**
  * Horizon de la file — la fenêtre que la requête de DOC-11 retient.
@@ -236,7 +327,7 @@ export const MENTION_DEPUBLICATION_A_LECHEANCE =
 
 /** Et ce qui, lui, ne dépublie rien : une source qui ne répond pas. */
 export const MENTION_SOURCE_MUETTE_SANS_EFFET =
-  "Une source injoignable ne dépublie rien. Les règles affichées restent celles de la dernière collecte réussie : un silence de la source ne vaut pas un changement de règle.";
+  "Une source injoignable ne dépublie rien. Les règles affichées restent celles du dernier relevé réussi : un silence de la source ne vaut pas un changement de règle.";
 
 // ── La relecture sans changement ─────────────────────────────────────────
 

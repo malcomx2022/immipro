@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  AUCUN_RELEVE,
   HORIZON_VEILLE_JOURS,
   MENTION_DEPUBLICATION_A_LECHEANCE,
   MENTION_SOURCE_MUETTE_SANS_EFFET,
   PERIODICITE_AVANT_REVISION_JOURS,
   PERIODICITE_RELECTURE_JOURS,
+  RELEVE_VAUT_VERIFICATION,
   SANS_INDEX_DES_REGLES,
+  SUITE_DE_LA_CONCLUSION,
+  MENTION_FILE_VIDE,
   prochaineRelecture,
+  resumeCollecte,
+  resumeFileVide,
+  type EtatSource,
 } from "@/domain/backoffice/veille";
 import { sansCommentaires } from "@/domain/copy/source";
 
@@ -34,7 +41,7 @@ const court = (d: Date) => d.toISOString().slice(0, 10);
 describe("les deux cas ne se confondent plus", () => {
   it("une source muette ne dépublie rien", () => {
     expect(MENTION_SOURCE_MUETTE_SANS_EFFET).toMatch(/ne dépublie rien/u);
-    expect(MENTION_SOURCE_MUETTE_SANS_EFFET).toMatch(/dernière collecte réussie/u);
+    expect(MENTION_SOURCE_MUETTE_SANS_EFFET).toMatch(/dernier relevé réussi/u);
   });
 
   it("une relecture en retard dépublie, et la mention le dit", () => {
@@ -117,13 +124,21 @@ describe("la prochaine relecture se compte depuis la relecture", () => {
 });
 
 describe("la route de relecture écrit ce que WF-14 demande", () => {
-  const route = lire("src/app/api/admin/veille/route.ts");
+  /*
+    Le corps est passé dans `server/veille/releve.ts` — la même raison que
+    `server/regles/publication`, `server/regles/edition` et
+    `server/revue/decision` : dans sa route, la décision était derrière
+    `next/headers`, donc hors de portée de toute fumée. Elle écrit deux
+    tables et compte des tentatives, ce qu'on ne vérifie qu'en l'exécutant.
+    Ces essais lisent donc le module, et la fumée de publication l'exécute.
+  */
+  const route = lire("src/server/veille/releve.ts");
 
   it("elle met à jour la preuve de diligence, sans créer de version", () => {
-    const put = route.slice(route.indexOf("export const PUT"));
+    const put = route.slice(route.indexOf("export async function consignerLeReleve"));
     // RG-14.4 : sourceUrl, verifiedAt et verifiedBy sont la preuve.
     expect(put).toMatch(/verifiedAt: jour/u);
-    expect(put).toMatch(/verifiedBy: acteur!\.email/u);
+    expect(put).toMatch(/verifiedBy: veilleur\.email/u);
     expect(put).toMatch(/nextReviewAt: echeance/u);
     // « pas de nouvelle version » : WF-14 étape 2, branche inchangé.
     expect(put).not.toMatch(/visaRule\.create/u);
@@ -143,7 +158,7 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
    * rentre à l'affichage sans trace est ce qu'un contrôle vient chercher.
    */
   it("la relecture reste le champ, la remise en ligne laisse une ligne", () => {
-    const put = route.slice(route.indexOf("export const PUT"));
+    const put = route.slice(route.indexOf("export async function consignerLeReleve"));
     expect(route).toMatch(/RG-14\.4/u);
     // Une seule ligne, et seulement quand la visibilité change.
     expect([...put.matchAll(/journaliser\(/gu)]).toHaveLength(1);
@@ -158,7 +173,7 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
    * pour autant.
    */
   it("seule une fiche dépubliée par l'échéance est republiée", () => {
-    const put = route.slice(route.indexOf("export const PUT"));
+    const put = route.slice(route.indexOf("export async function consignerLeReleve"));
     expect(put).toMatch(
       /const republier =\s*fiche\.status === "DRAFT" && fiche\.nextReviewAt < jour/u,
     );
@@ -218,5 +233,101 @@ describe("l'état vide dit par où une fiche revient", () => {
   it("elle dit qu'il n'y a pas d'index, au lieu d'en promettre un", () => {
     expect(SANS_INDEX_DES_REGLES).toMatch(/pas d'autre index des règles/u);
     expect(SANS_INDEX_DES_REGLES).toMatch(/depuis cette file/u);
+  });
+});
+
+/**
+ * Le relevé du veilleur — WF-14 étape 2, 24/09/2026.
+ *
+ * `SourceCheck` porte `checkedAt`, `reachable`, `attempts` et
+ * `difference` ; `collecte()` les lit ; l'écran les affiche ; **seule la
+ * graine de démonstration en écrivait**. En production la table restait
+ * vide pour toujours, et trois phrases promettaient un collecteur :
+ *
+ *     « le relevé automatique des sources n'a pas encore tourné »
+ *     « Les 14 sources ont répondu ce matin et aucune ne diverge »
+ *     « La prochaine collecte est programmée demain »
+ *
+ * Le registre des tables sans écrivain nommait bien `SourceCheck`, avec
+ * cette justification : « la collecte automatique des sources n'existe
+ * pas, et B-01 le dit ». Il couvrait une phrase et pas les deux autres.
+ */
+describe("le relevé dit ce qu'il a trouvé, et rien de plus", () => {
+  it("seule la conclusion « à jour » vaut vérification", () => {
+    /*
+      RG-14.4 fait de `verifiedAt` la preuve de diligence. L'avancer sur
+      « je n'ai pas pu joindre la source » dirait que la règle a été
+      vérifiée alors qu'elle ne l'a pas été — et la fiche sortirait de la
+      file de veille, qui est précisément l'endroit où elle doit rester.
+    */
+    expect(RELEVE_VAUT_VERIFICATION.A_JOUR).toBe(true);
+    const sansVerification = (Object.keys(RELEVE_VAUT_VERIFICATION) as EtatSource[]).filter(
+      (c) => !RELEVE_VAUT_VERIFICATION[c],
+    );
+    expect(sansVerification.sort()).toEqual(["A_ARBITRER", "PERIME"]);
+  });
+
+  it("et chaque conclusion dit ce qu'elle ne touche pas", () => {
+    // La réciproque : une conclusion qui ne vérifie pas doit l'annoncer.
+    // Sans cela, le veilleur croirait la fiche relue.
+    for (const conclusion of Object.keys(RELEVE_VAUT_VERIFICATION) as EtatSource[]) {
+      const suite = SUITE_DE_LA_CONCLUSION[conclusion];
+      expect(suite, conclusion).toBeTruthy();
+      if (!RELEVE_VAUT_VERIFICATION[conclusion]) {
+        expect(suite, conclusion).toMatch(/dates (de relecture )?ne bougent pas/u);
+      }
+    }
+    // Et celle qui vérifie dit la durée que la fiche repart chercher.
+    expect(SUITE_DE_LA_CONCLUSION.A_JOUR).toMatch(
+      new RegExp(`${PERIODICITE_RELECTURE_JOURS} jours`, "u"),
+    );
+  });
+
+  it("aucune phrase de l'écran n'annonce un relevé que personne ne fait", () => {
+    /*
+      Les trois phrases se lisent ici directement : celle de l'absence de
+      relevé et celle de l'état vide ne s'affichent que dans des branches
+      que le rendu d'essai ne traverse pas toutes, et c'est ainsi que
+      deux d'entre elles ont survécu au registre.
+    */
+    const phrases = [
+      AUCUN_RELEVE,
+      resumeFileVide({ sources: 14, relevees: 14, faiteLe: "2026-09-20T08:00:00Z" }, (i) => i),
+      resumeCollecte({ sources: 14, relevees: 14, faiteLe: "2026-09-20T08:00:00Z" }, (i) => i),
+      MENTION_FILE_VIDE,
+      MENTION_SOURCE_MUETTE_SANS_EFFET,
+    ];
+    for (const phrase of phrases) {
+      expect(phrase, phrase).not.toMatch(/automatique/u);
+      expect(phrase, phrase).not.toMatch(/prochaine collecte|pas encore/iu);
+      expect(phrase, phrase).not.toMatch(/ont répondu/u);
+    }
+    // Et celle de l'absence dit par où un relevé s'écrit.
+    expect(AUCUN_RELEVE).toMatch(/consultes la source/u);
+  });
+
+  it("rien ne promet une prochaine collecte, faute de collecteur", () => {
+    // Le champ valait « dernier relevé + un jour » et l'écran l'annonçait.
+    // Un champ calculé pour tenir une promesse que personne ne tient vaut
+    // mieux supprimé qu'expliqué.
+    expect(lire("src/domain/backoffice/veille.ts")).not.toMatch(/prochaineLe: string/u);
+    expect(sansCommentaires(lire("src/server/lecture/backoffice.ts"))).not.toMatch(
+      /prochaineLe:/u,
+    );
+  });
+
+  it("le dernier relevé de chaque source décide, pas le nombre de lignes", () => {
+    /*
+      `sources: duJour.length` comptait les **relevés** du jour : trois
+      relevés sur une même adresse se lisaient « 3 sources relevées ». Et
+      la source muette était n'importe quelle ligne en échec de la
+      journée, même si un relevé plus récent avait joint la source — le
+      bandeau d'incident survivait à la réparation.
+    */
+    const lecture = sansCommentaires(lire("src/server/lecture/backoffice.ts"));
+    const bloc = lecture.slice(lecture.indexOf("export async function collecte"));
+    expect(bloc).toMatch(/distinct: \["sourceUrl"\]/u);
+    expect(bloc).not.toMatch(/duJour/u);
+    expect(bloc).toMatch(/sources: etats\.length/u);
   });
 });

@@ -135,7 +135,6 @@ export const COLLECTE: Collecte = {
   sources: 14,
   relevees: 14,
   faiteLe: "2026-09-18T06:00:00Z",
-  prochaineLe: "2026-09-18T18:00:00Z",
 };
 
 /** Variante d'incident, pour l'état « source injoignable » de B-01. */
@@ -143,7 +142,6 @@ export const COLLECTE_PARTIELLE: Collecte = {
   sources: 14,
   relevees: 13,
   faiteLe: "2026-09-18T06:00:00Z",
-  prochaineLe: "2026-09-18T18:00:00Z",
   injoignable: {
     source: "ind.nl",
     derniereReussite: "2026-09-17T18:00:00Z",

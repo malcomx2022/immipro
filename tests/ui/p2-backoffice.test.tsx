@@ -213,22 +213,28 @@ describe("B-01 — File de veille", () => {
   });
 
   /**
-   * WF-14 étape 2, branche « inchangé » — et ces tests cliquent, parce
-   * que lire le source ne suffit pas (leçon de S.1).
+   * WF-14 étape 2 — et ces tests cliquent, parce que lire le source ne
+   * suffit pas (leçon de S.1).
    *
    * Tant que ce bouton n'écrivait rien, une fiche relue et trouvée
    * identique restait en retard, et le cron de trois heures finissait par
    * la dépublier : le travail était fait, et le produit se comportait
    * comme s'il ne l'avait pas été.
+   *
+   * Et il ne portait qu'**une** des trois conclusions. « J'ai vu un
+   * écart » et « la source n'a pas répondu » ne s'écrivaient nulle part,
+   * alors que l'écran lit `SourceCheck` pour afficher l'un et l'autre :
+   * seule la graine de démonstration en écrivait.
    */
-  it("marquer relue part au serveur", async () => {
+  const consigner = () =>
+    fireEvent.click(screen.getByRole("button", { name: /Consigner ce relevé/u }));
+
+  it("consigner un relevé part au serveur, avec sa conclusion", async () => {
     appels.length = 0;
     rafraichir.mockClear();
     reponse = { ok: true };
     rendre();
-    fireEvent.click(
-      screen.getByRole("button", { name: /Marquer comme relue sans changement/u }),
-    );
+    consigner();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -237,21 +243,69 @@ describe("B-01 — File de veille", () => {
     expect(appels[0]!.methode).toBe("PUT");
     expect(appels[0]!.url).toBe("/api/admin/veille");
     expect(appels[0]!.corps).toHaveProperty("id");
+    // La conclusion voyage : sans elle, le serveur ne saurait pas ce que
+    // le veilleur a trouvé, et le relevé redirait « à jour » pour tout.
+    expect(appels[0]!.corps).toMatchObject({ conclusion: "A_JOUR" });
     expect(rafraichir).toHaveBeenCalled();
+  });
+
+  it("les trois conclusions sont offertes, avec ce que chacune écrit", () => {
+    const { container } = rendre();
+    for (const libelle of ["À jour", "À arbitrer", "Périmé"]) {
+      expect(screen.getByRole("radio", { name: new RegExp(libelle, "u") })).toBeDefined();
+    }
+    // Chacune dit ce qu'elle ne touche pas : choisir « périmé » sans
+    // savoir que les dates ne bougent pas ferait croire la fiche relue.
+    expect(container.textContent).toContain("Les dates ne bougent pas");
+    expect(container.textContent).toContain("reste dans la file");
+  });
+
+  it("un écart ne se consigne pas sans le dire", async () => {
+    appels.length = 0;
+    reponse = { ok: true };
+    rendre();
+    fireEvent.click(screen.getByRole("radio", { name: /À arbitrer/u }));
+    // Le bouton est fermé tant que la note est vide, et il dit pourquoi :
+    // « injoignable » seul ne se relit pas dans six mois.
+    const bouton = screen.getByRole("button", { name: /Consigner ce relevé/u });
+    expect(bouton).toBeDisabled();
+    expect(bouton).toHaveAccessibleDescription(/se relit dans six mois/u);
+    expect(appels).toHaveLength(0);
+
+    fireEvent.change(screen.getByRole("textbox", { name: /Ce qui a changé sur la source/u }), {
+      target: { value: "Le seuil passe de 4 357 à 4 500 EUR au 1er janvier." },
+    });
+    consigner();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(appels[0]!.corps).toMatchObject({ conclusion: "A_ARBITRER" });
+    expect(String((appels[0]!.corps as { note?: string }).note)).toContain("4 500");
   });
 
   it("un refus s'affiche plutôt que de se perdre", async () => {
     appels.length = 0;
     reponse = { ok: false };
     rendre();
-    fireEvent.click(
-      screen.getByRole("button", { name: /Marquer comme relue sans changement/u }),
-    );
+    consigner();
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
     expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+  });
+
+  /**
+   * Trois phrases promettaient un collecteur automatique, et l'état vide
+   * en portait deux — c'est l'état où une instance saine se trouve la
+   * plupart du temps.
+   */
+  it("n'annonce plus une collecte que personne ne fait", () => {
+    const { container } = rendre();
+    expect(container.textContent).not.toMatch(/relevé automatique/u);
+    expect(container.textContent).not.toMatch(/prochaine collecte/iu);
+    expect(container.textContent).not.toMatch(/ont répondu .* et aucune ne diverge/u);
   });
 
   /** Les quatre boutons sans route sont partis, comme en B-03. */
