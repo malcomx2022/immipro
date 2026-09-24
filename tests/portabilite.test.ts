@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { sansCommentaires } from "@/domain/copy/source";
 import {
   A_PROPOS,
   CE_QUE_CONTIENT,
@@ -116,6 +117,47 @@ describe("archive d'un dossier", () => {
     expect(composant).toMatch(/pas-a-imprimer[^"]*"\s*$|pas-a-imprimer/u);
     expect(MENTION_LIEN_COURT).toMatch(/cinq minutes/u);
     expect(TTL_PRESIGNE_SECONDES).toBe(300);
+  });
+
+  /**
+   * ── La durée annoncée est celle qui est signée ──────────────────────
+   *
+   * Elle ne l'était pas. `lib/storage` remettait à MinIO
+   * `Number(process.env.MINIO_PRESIGNED_TTL_SECONDS ?? 300)`, pendant que
+   * l'accès aux pièces déclarait `300` de son côté, que l'API rendait ce
+   * 300 au client sous `expireDansSecondes`, et que le candidat lisait
+   * « un lien valable cinq minutes ». Une valeur dans l'environnement
+   * suffisait à les séparer — exécuté sur l'expression même :
+   *
+   *     MINIO_PRESIGNED_TTL_SECONDS=60    → signé   60 s, annoncé 300 s
+   *     MINIO_PRESIGNED_TTL_SECONDS=3600  → signé 3600 s, annoncé 300 s
+   *
+   * Plus court, le lien meurt avant le délai annoncé ; plus long, la
+   * plateforme distribue des adresses de pièces d'identité pendant une
+   * heure en affirmant cinq minutes, contre la règle d'architecture 4.
+   */
+  it("la durée signée, celle annoncée et celle écrite sont la même", () => {
+    // Commentaires ôtés : celui de `storage.ts` cite le nom de la variable
+    // pour raconter le défaut, et un garde-fou qui lit les commentaires
+    // s'accuse de ce qu'il vient de corriger.
+    const stockage = sansCommentaires(lire("src/lib/storage.ts"));
+    // Les deux signatures emploient la constante, et rien d'autre.
+    expect(stockage).toMatch(
+      /presignedGetObject\(confiance\(\), key, TTL_PRESIGNE_SECONDES\)/u,
+    );
+    expect(stockage).toMatch(
+      /presignedPutObject\(quarantaine\(\), key, TTL_PRESIGNE_SECONDES\)/u,
+    );
+    // Et la durée n'est plus un réglage : c'est une règle avec un nombre.
+    expect(stockage).not.toMatch(/MINIO_PRESIGNED_TTL_SECONDS/u);
+    expect(lire(".env.example")).not.toMatch(/MINIO_PRESIGNED_TTL_SECONDS/u);
+    // L'accès aux pièces relit celle du stockage plutôt que d'en poser une.
+    const pieces = sansCommentaires(lire("src/server/acces/pieces.ts"));
+    expect(pieces).toMatch(/TTL_PRESIGNE_SECONDES.*from "@\/lib\/storage"/u);
+    expect(pieces).not.toMatch(/const TTL_PRESIGNE_SECONDES\s*=/u);
+    // Cinq minutes, dans les trois : la constante, l'API, la phrase.
+    expect(TTL_PRESIGNE_SECONDES).toBe(5 * 60);
+    expect(MENTION_LIEN_COURT).toMatch(/cinq minutes/u);
   });
 
   /**

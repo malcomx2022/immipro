@@ -45,14 +45,38 @@ function connexion(): Client {
  */
 const confiance = () => process.env.MINIO_BUCKET_DOCUMENTS!;
 const quarantaine = () => process.env.MINIO_BUCKET_QUARANTAINE!;
-const ttl = () => Number(process.env.MINIO_PRESIGNED_TTL_SECONDS ?? 300);
+/**
+ * La durée de validité d'une URL présignée — la règle d'architecture 4,
+ * « URLs présignées de 5 minutes, générées à la demande ».
+ *
+ * ── Elle était réglable, et trois surfaces la disaient fixe ─────────
+ *
+ * Elle se lisait `Number(process.env.MINIO_PRESIGNED_TTL_SECONDS ?? 300)`,
+ * tandis que `TTL_PRESIGNE_SECONDES` valait 300 dans l'accès aux pièces,
+ * que l'API rendait ce 300 au client sous le nom `expireDansSecondes`, et
+ * que le candidat lisait « un lien valable cinq minutes ». Une valeur dans
+ * l'environnement suffisait à les mettre en désaccord :
+ *
+ *     MINIO_PRESIGNED_TTL_SECONDS=60    → signé 60 s, annoncé 300 s
+ *     MINIO_PRESIGNED_TTL_SECONDS=3600  → signé 3600 s, annoncé 300 s
+ *
+ * Les deux sens coûtent. Plus court, le lien meurt avant le délai annoncé,
+ * sur une pièce que le candidat vient de demander. Plus long, la plateforme
+ * distribue des adresses de pièces d'identité pendant une heure en
+ * affirmant cinq minutes — et la règle d'architecture 4 est fausse sans que
+ * rien ne le dise.
+ *
+ * Ce n'est donc pas un réglage : c'est une règle, avec un nombre dedans.
+ * Elle vit ici, où elle est appliquée, et l'accès aux pièces la relit.
+ */
+export const TTL_PRESIGNE_SECONDES = 5 * 60;
 
 export const presignedGet = (key: string) =>
-  connexion().presignedGetObject(confiance(), key, ttl());
+  connexion().presignedGetObject(confiance(), key, TTL_PRESIGNE_SECONDES);
 
 /** Le dépôt du navigateur, toujours en quarantaine (I.D). */
 export const presignedPut = (key: string) =>
-  connexion().presignedPutObject(quarantaine(), key, ttl());
+  connexion().presignedPutObject(quarantaine(), key, TTL_PRESIGNE_SECONDES);
 
 /** Le flux lu par le balayeur. Seul appelant légitime de la quarantaine. */
 export const lireEnQuarantaine = (key: string) => connexion().getObject(quarantaine(), key);
