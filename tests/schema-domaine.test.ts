@@ -159,6 +159,10 @@ describe("le schéma et le domaine nomment les mêmes choses", () => {
       // en disant si ce dossier a déjà été relancé depuis sa dernière
       // activité.
       "INACTIVITE",
+      // Arbitrage S.78 : l'invitation à confirmer une instruction, le
+      // préavis de purge, l'avertissement d'une suspension. Même rôle
+      // d'idempotence que le précédent.
+      "CONSERVATION",
     ];
     expect(valeursDeLEnum("NotificationKind")).toEqual(trie(genres));
   });

@@ -122,7 +122,9 @@ describe("RG-10.4 — anonymisation à la suppression de compte", () => {
     */
     const purge = lire("src/server/jobs/purge.ts");
     expect(purge).toMatch(/dossier\.visaRuleId/u);
-    expect(purge).toMatch(/miseEnEtat\("ARCHIVE"/u);
+    // L'état d'arrivée passe par `etatApresPurge` depuis l'arbitrage S.78 :
+    // la suppression de compte archive, un dossier soumis garde son état.
+    expect(purge).toMatch(/miseEnEtat\(\s*etatApresPurge\(dossier\.status, userId !== undefined\)/u);
     expect(purge).not.toMatch(/status: "ARCHIVE"/u);
   });
 

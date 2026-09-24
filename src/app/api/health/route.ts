@@ -165,11 +165,12 @@ async function sonderLaPurge(): Promise<EtatDeLaPurge> {
         select: { purgeDueAt: true },
       }),
       /*
-        Le compte qui manquait. `traiterLesBrouillonsInactifs` ne regarde
-        que les brouillons — son nom le dit —, et rien d'autre ne pose
-        `purgeDueAt` en dehors d'une clôture déclarée. Un dossier actif,
-        prêt, soumis ou suspendu dont le candidat ne revient jamais garde
-        donc ses pièces d'identité sans terme.
+        Le filet. Jusqu'à l'arbitrage S.78, seuls les brouillons et les
+        clôtures recevaient une échéance, et ce compte mesurait le trou.
+        Chaque état a désormais sa règle — inactivité pour les dossiers en
+        cours, dépôt pour les soumis, durée de pause pour les suspendus :
+        un compte non nul dit qu'une passe n'a pas tourné, ou qu'un état
+        nouveau est arrivé sans la sienne.
 
         `updatedAt` est une approximation : le job mesure l'inactivité sur
         la date du dernier dépôt, plus fine. Elle suffit ici — cette sonde
@@ -198,6 +199,58 @@ async function sonderLaPurge(): Promise<EtatDeLaPurge> {
   }
 }
 
+/** Les dossiers en pause — la dette opérationnelle de l'arbitrage S.78. */
+interface EtatDesSuspensions {
+  lisible: boolean;
+  enCours: number;
+  /** L'ancienneté de la plus ancienne pause, en jours. */
+  plusAncienneJours: number;
+  /** Pauses assez anciennes pour que la purge de leurs pièces soit annoncée. */
+  averties: number;
+}
+
+/**
+ * La dette opérationnelle — arbitrage S.78.
+ *
+ * Aucune inactivité ne clôt un dossier suspendu par la plateforme, et
+ * c'est voulu. Le revers est qu'une pause peut durer sans que personne ne
+ * la regarde : le candidat attend, ses pièces finissent par partir, et
+ * rien dans l'exploitation ne l'aurait dit. Ce compte le dit, avec l'âge
+ * de la plus ancienne, sans rien décider.
+ */
+async function sonderLesSuspensions(): Promise<EtatDesSuspensions> {
+  try {
+    const [enCours, plusAncienne, averties] = await Promise.all([
+      db.application.count({ where: { status: "SUSPENDU" } }),
+      db.application.findFirst({
+        where: { status: "SUSPENDU" },
+        orderBy: { suspendedAt: "asc" },
+        select: { suspendedAt: true },
+      }),
+      db.application.count({ where: { status: "SUSPENDU", purgeDueAt: { not: null } } }),
+    ]);
+    const depuis = plusAncienne?.suspendedAt;
+    return {
+      lisible: true,
+      enCours,
+      plusAncienneJours: depuis
+        ? Math.floor((Date.now() - depuis.getTime()) / (24 * 3_600_000))
+        : 0,
+      averties,
+    };
+  } catch {
+    return { lisible: false, enCours: 0, plusAncienneJours: 0, averties: 0 };
+  }
+}
+
+function messageDesSuspensions(s: EtatDesSuspensions): string {
+  if (!s.lisible) return "Les dossiers en pause n'ont pas pu être lus.";
+  if (s.enCours === 0) return "Aucun dossier en pause.";
+  const averties =
+    s.averties === 0 ? "" : ` ${s.averties} ont reçu l'annonce de la purge de leurs pièces.`;
+  return `${s.enCours} dossier(s) en pause, le plus ancien depuis ${s.plusAncienneJours} jours.${averties}`;
+}
+
 /**
  * Ce que la sonde de rétention annonce — INV-5.
  *
@@ -217,11 +270,12 @@ function messageDeLaPurge(purge: EtatDeLaPurge): string {
 }
 
 export async function GET() {
-  const [base, file, quarantaine, purge, faits] = await Promise.all([
+  const [base, file, quarantaine, purge, suspensions, faits] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
     sonderLaPurge(),
+    sonderLesSuspensions(),
     /*
       Les constats de service, lus en base — 22/09/2026.
 
@@ -307,6 +361,13 @@ export async function GET() {
         message: !purge.lisible
           ? "Les échéances de rétention n'ont pas pu être lues."
           : messageDeLaPurge(purge),
+      },
+      suspensions: {
+        lisible: suspensions.lisible,
+        enCours: suspensions.enCours,
+        plusAncienneJours: suspensions.plusAncienneJours,
+        averties: suspensions.averties,
+        message: messageDesSuspensions(suspensions),
       },
       revue: {
         lisible: file.lisible,

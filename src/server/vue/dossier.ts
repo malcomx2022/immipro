@@ -3,7 +3,7 @@ import type { Piece } from "@/domain/dossiers/piece";
 import { completudeDesPieces, premiereATraiter, libelleAction } from "@/domain/dossiers/piece";
 import type { CompletenessPublic } from "@/domain/completeness/score";
 import { codesConformes } from "@/domain/completeness/conditions";
-import type { Dossier, StatutDossier } from "@/domain/dossiers/dossier";
+import type { ConservationDuDepot, Dossier, StatutDossier } from "@/domain/dossiers/dossier";
 import { MENTION_CLOTURE, MENTION_DEPOSE, MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDeDepot } from "@/domain/dossiers/faisabilite";
 import { estEchue } from "@/domain/dossiers/peremption";
@@ -12,6 +12,8 @@ import { estEchue } from "@/domain/dossiers/peremption";
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 import type { FicheDestination } from "@/domain/destinations/fiche";
 import { jourCivil } from "@/domain/format/fuseau";
+import { confirmationOuverte, debutDeLInvitation } from "@/domain/dossiers/conservation";
+import { echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
 
 /**
  * Vue candidat d'un dossier.
@@ -162,6 +164,7 @@ export function versDossier(
       : {}),
     completude,
     prochaineAction: prochaineAction(pieces, versStatut(dossier.status), completude),
+    ...(dossier.status === "SOUMIS" ? { conservation: conservationDuDepot(dossier) } : {}),
   };
 }
 
@@ -237,3 +240,24 @@ export function prochaineAction(
 
 const majuscule = (texte: string) => texte.charAt(0).toUpperCase() + texte.slice(1);
 const minuscule = (texte: string) => texte.charAt(0).toLowerCase() + texte.slice(1);
+
+/**
+ * La conservation d'un dossier déposé, telle que l'écran la dit — arbitrage
+ * S.78. L'échéance vient du même calcul que celle du job.
+ */
+export function conservationDuDepot(
+  dossier: Pick<
+    Application,
+    "retentionUntil" | "submittedAt" | "updatedAt" | "purgeDueAt" | "purgedAt"
+  >,
+  maintenant: Date = new Date(),
+): ConservationDuDepot {
+  const echeance = echeanceDuDossierSoumis(dossier);
+  return {
+    jusquAu: jourCivil(echeance),
+    purgeLe: dossier.purgeDueAt ? jourCivil(dossier.purgeDueAt) : null,
+    purgeeLe: dossier.purgedAt ? jourCivil(dossier.purgedAt) : null,
+    confirmableLe: jourCivil(debutDeLInvitation(echeance)),
+    confirmable: dossier.purgedAt === null && confirmationOuverte(echeance, maintenant),
+  };
+}

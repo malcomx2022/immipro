@@ -20,6 +20,7 @@ import {
 import { jourEnFrancais } from "@/domain/format/moment";
 import type { AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { EnteteDossier } from "./EnteteDossier";
+import { ConservationDuDepot } from "./ConservationDuDepot";
 
 /**
  * C-06 — Dossier, checklist. WF-06.
@@ -72,6 +73,12 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
       <p className="text-pretty rounded-md bg-ink-100 p-3.5 text-14 text-ink-700">
         Prochaine action : {dossier.prochaineAction}
       </p>
+
+      {/* Arbitrage S.78 : un dossier déposé garde ses pièces douze mois,
+          et c'est ici que le candidat confirme que l'instruction continue. */}
+      {dossier.conservation ? (
+        <ConservationDuDepot dossierId={id} conservation={dossier.conservation} />
+      ) : null}
 
       {/* Un brouillon n'a pas de pack : c'est ici que le tunnel de paiement
           s'ouvre, et c'était le seul endroit d'où personne n'y accédait.

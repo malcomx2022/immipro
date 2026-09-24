@@ -1,6 +1,7 @@
 import { route } from "@/server/http/route";
 import { dossierDuCandidat } from "@/server/acces/dossiers";
 import { declarerLeDepot } from "@/server/dossiers/parcours";
+import { CONSERVATION_SOUMIS_MOIS } from "@/domain/dossiers/conservation";
 
 /**
  * Déclaration de dépôt — WF-10, étape 1.
@@ -19,8 +20,8 @@ export const POST = route({
     return {
       statut: maj.status,
       deposeLe: maj.submittedAt?.toISOString() ?? null,
-      mention:
-        "C'est ta déclaration qui est enregistrée. ImmiPro ne transmet aucune demande à une autorité.",
+      piecesConserveesJusquAu: maj.retentionUntil?.toISOString() ?? null,
+      mention: `C'est ta déclaration qui est enregistrée. ImmiPro ne transmet aucune demande à une autorité. Tes pièces sont conservées ${CONSERVATION_SOUMIS_MOIS} mois après ce dépôt ; nous t'écrirons avant cette échéance.`,
     };
   },
 });

@@ -32,6 +32,7 @@
     "smoke:transitions": "tsx scripts/fumee-transitions.mts",
     "smoke:publication": "tsx scripts/fumee-publication.mts",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
+    "smoke:conservation": "tsx scripts/fumee-conservation.mts",
     "sandbox:paiement": "tsx scripts/sandbox-paiement.mts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

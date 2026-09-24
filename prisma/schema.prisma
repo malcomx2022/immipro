@@ -298,9 +298,20 @@ model Application {
   submittedAt DateTime?
   issue       Issue?
   issueReason String?
-  /// Échéance de purge annoncée au candidat à la clôture (INV-5, RG-10.2).
+  /// Échéance de purge **annoncée** au candidat (INV-5, RG-10.2) : à la
+  /// clôture, à l'abandon, au préavis d'un dossier soumis, à
+  /// l'avertissement d'un dossier suspendu. Jamais posée sans annonce.
   purgeDueAt  DateTime?
   purgedAt    DateTime?
+  /// `SOUMIS` — fin de conservation des pièces (arbitrage S.78) : douze
+  /// mois après le dépôt déclaré, prolongée de six mois par chaque
+  /// confirmation explicite que l'instruction continue.
+  retentionUntil DateTime?
+  /// `SUSPENDU` — date de la mise en pause, et l'état qu'elle a
+  /// interrompu (arbitrage S.78). Ils restent après la purge des pièces :
+  /// la dette opérationnelle se mesure sur eux.
+  suspendedAt            DateTime?
+  statusBeforeSuspension ApplicationStatus?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -938,6 +949,9 @@ enum NotificationKind {
   /// Brouillon laissé de côté — RG-04.2. Le genre rend la passe
   /// idempotente : une relance par période d'inactivité, pas une par nuit.
   INACTIVITE
+  /// Conservation des pièces — arbitrage S.78 : invitation à confirmer
+  /// l'instruction, préavis de purge, avertissement de suspension.
+  CONSERVATION
 }
 
 /// Alerte adressée à un candidat (T-01, WF-11).

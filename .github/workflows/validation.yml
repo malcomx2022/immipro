@@ -109,6 +109,14 @@ jobs:
         run: npm run smoke:consultation
       - run: echo "- **Parcours consultant** — tenue, concurrence sur un créneau et confirmation payée" >> "$GITHUB_STEP_SUMMARY"
 
+      # La conservation des pièces selon l'état du dossier (arbitrage S.78) :
+      # la garde qui lie une pause à sa date, une purge qui laisse un dossier
+      # soumis ou suspendu dans son état, et aucune échéance posée sans que
+      # l'annonce soit partie.
+      - name: Conservation des pièces
+        run: npm run smoke:conservation
+      - run: echo "- **Conservation des pièces** — dossiers payés, soumis et suspendus : annonce, puis purge, et le dossier reste" >> "$GITHUB_STEP_SUMMARY"
+
       # La demande de remboursement : deux reprises à la même
       # milliseconde, le retrait de droits qui n'a lieu qu'une fois, et la
       # dette qui survit à une réponse 200 du fournisseur.

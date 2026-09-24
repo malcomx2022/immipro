@@ -299,7 +299,7 @@ export async function recalculerCompletude(applicationId: string): Promise<void>
     where: { id: applicationId },
     data: {
       internalScore: resultat.interne.score,
-      ...miseEnEtat(statutApres, dossier.readyAt),
+      ...miseEnEtat(statutApres, dossier),
     },
   });
 }

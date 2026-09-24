@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { decalerDeMois } from "@/domain/format/mois";
 import { miseEnEtat } from "@/domain/dossiers/etat";
+import { etatApresPurge } from "@/domain/dossiers/conservation";
 import { removeObject } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
 import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
@@ -236,8 +237,19 @@ export async function purgerLesPiecesEchues(
                   base les croyant présents, `purgedAt` jamais posée, et la
                   passe du lendemain rejouant le même échec sans fin.
                 */
+                /*
+                  Arbitrage S.78 : la purge efface des octets, pas un
+                  dossier. Un dossier soumis ou suspendu garde son état —
+                  il attend toujours un tiers, ou la plateforme. Seuls une
+                  clôture, un abandon, et la suppression de compte
+                  archivent.
+                */
                 ...(dossier.visaRuleId
-                  ? miseEnEtat("ARCHIVE", dossier.readyAt, maintenant)
+                  ? miseEnEtat(
+                      etatApresPurge(dossier.status, userId !== undefined),
+                      dossier,
+                      maintenant,
+                    )
                   : {}),
               },
             }),
