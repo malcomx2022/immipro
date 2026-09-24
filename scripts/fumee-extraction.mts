@@ -590,6 +590,120 @@ try {
     );
   }
 
+  console.log("\nLa reprise après un verdict illisible ne se paie pas");
+  {
+    /*
+      La règle était écrite en trois endroits et appliquée nulle part :
+      `consommeUneAnalyse` dans le domaine, sans appelant ; le pied de
+      C-08, qui affiche « Cette reprise ne consomme pas d'analyse » ; et
+      le schéma, sur `creditConsumed` — « une reprise après ILLISIBLE ne
+      débite rien ». Le débit, lui, était inconditionnel. Constaté en
+      exécution avant correction :
+
+          verdict : ILLISIBLE · solde : 5
+          l'écran affiche : « Cette reprise ne consomme pas d'analyse »
+          après la reprise : verdict CONFORME · solde 4
+          la reprise a coûté : 1 analyse(s)
+
+      C'est ici que le cas se tient, et pas dans un essai d'unité : le
+      défaut était la **succession** de deux dépôts sur une même pièce, et
+      il faut deux versions, deux analyses et le grand livre pour la voir.
+    */
+    const { mentionSuite } = await import("../src/domain/dossiers/analyse");
+    const illisible = () =>
+      reponseDeLecture(
+        { piece_identifiee: null, obstacle: "scan_illisible", champs: { passeport_validite_min: null } },
+        3100, 40,
+      );
+    const nette = () =>
+      reponseDeLecture({
+        piece_identifiee: "passeport", obstacle: null,
+        champs: { passeport_validite_min: "2029-01-01" },
+      });
+    const deposer = async (p: Awaited<ReturnType<typeof piece>>, rang: number) => {
+      const cle = `dossiers/${p.application.id}/reprise-${rang}.pdf`;
+      const octets = Buffer.from(`%PDF-1.4 reprise ${rang}`);
+      seau(SEAU_CONFIANCE).set(cle, octets);
+      const v = await db.documentVersion.create({
+        data: {
+          documentId: p.document.id, rank: rang, objectKey: cle,
+          checksum: `somme-r${rang}-${process.pid}`, mimeType: "application/pdf",
+          sizeBytes: octets.length, scanState: "SAINE", scannedAt: new Date(),
+        },
+      });
+      await analyserUnePiece(
+        { applicationId: p.application.id, documentId: p.document.id, versionId: v.id },
+        lExtracteur(),
+      );
+      return v;
+    };
+
+    /* Le témoin : une première lecture qui aboutit coûte bien une analyse. */
+    reponseDuService = nette();
+    const temoin = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(temoin.tache, lExtracteur());
+    verifier(
+      (await solde(temoin.application.id)) === 4,
+      `témoin : une lecture qui aboutit coûte une analyse (${await solde(temoin.application.id)})`,
+    );
+
+    reponseDuService = illisible();
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+    const s1 = await solde(p.application.id);
+    verifier(s1 === 5, `l'illisible est rendu : la lecture n'a rien rendu (${s1})`);
+    verifier(
+      mentionSuite("ILLISIBLE", { restantes: s1, total: 5 }) ===
+        "Cette reprise ne consomme pas d'analyse",
+      "et l'écran promet au candidat que la reprise est gratuite",
+    );
+
+    /* Le cas du défaut : la reprise promise gratuite, et qui aboutit. */
+    reponseDuService = nette();
+    const v2 = await deposer(p, 2);
+    const s2 = await solde(p.application.id);
+    verifier((await relireDocument(p.document.id)).status === "CONFORME", "la reprise aboutit");
+    verifier(s2 === s1, `et elle ne coûte rien, comme promis (${s1} -> ${s2})`);
+    verifier(
+      (await analyseDe(v2.id))?.creditConsumed === false,
+      "le grand livre le dit aussi : cette analyse n'a rien consommé",
+    );
+
+    /*
+      Et la suivante se paie : une reprise gratuite ne rend pas la pièce
+      gratuite pour toujours. Le verdict précédent est CONFORME.
+    */
+    reponseDuService = illisible();
+    const v3 = await deposer(p, 3);
+    const s3 = await solde(p.application.id);
+    verifier(s3 === s2, `un illisible payant puis rendu laisse le solde (${s2} -> ${s3})`);
+    verifier(
+      (await analyseDe(v3.id))?.creditConsumed === false,
+      "et le grand livre porte le rendu",
+    );
+
+    /*
+      Le défaut inverse, plus difficile à voir parce qu'il arrange le
+      candidat : rendre ce qu'on n'a pas pris. Un illisible **après** un
+      illisible n'est pas débité — il ne doit donc pas être rendu, sans
+      quoi le solde monterait à chaque photo floue.
+    */
+    reponseDuService = illisible();
+    await deposer(p, 4);
+    const s4 = await solde(p.application.id);
+    verifier(s4 === s3, `un illisible gratuit ne crédite rien non plus (${s3} -> ${s4})`);
+    const rendus = await db.analysisCredit.count({
+      where: { applicationId: p.application.id, delta: { gt: 0 }, reason: "ANALYSE_RENDUE" },
+    });
+    const debits = await db.analysisCredit.count({
+      where: { applicationId: p.application.id, delta: { lt: 0 } },
+    });
+    verifier(
+      rendus === debits,
+      `autant de rendus que de débits sur ce dossier (${rendus} / ${debits})`,
+    );
+  }
+
   console.log("\nUne saturation du service se rejoue, elle n'accuse pas le fichier");
   {
     reponseDuService = { statut: 429, corps: '{"type":"error","error":{"type":"rate_limit_error"}}' };
