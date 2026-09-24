@@ -3,6 +3,9 @@ import { db } from "@/lib/db";
 import { checklistDepuis } from "@/server/acces/dossiers";
 import { dateDePeremption } from "@/server/acces/pieces";
 import type { VisaRulesPayload } from "@/domain/rules/schema";
+import { conditionsDeLaPiece, evaluerConditions } from "@/domain/dossiers/verification";
+import { mesurer } from "@/domain/dossiers/extraction";
+import type { ChampsExtraits } from "@/domain/dossiers/verification";
 
 /**
  * Réalignement de la checklist d'un dossier sur sa nouvelle version —
@@ -199,3 +202,138 @@ const exigenceChangee = (connue: Exigence, attendue: Exigence): boolean =>
   connue.required !== attendue.required ||
   connue.remedy !== attendue.remedy ||
   (connue.validityMonths ?? null) !== (attendue.validityMonths ?? null);
+
+/**
+ * Re-jugement des pièces déjà lues, sur les conditions de la nouvelle
+ * version — WF-11, RG-11.1.
+ *
+ * ── Un seuil relevé laissait une pièce conforme ─────────────────────
+ *
+ * Le réalignement ci-dessus rend à la checklist les **propriétés** de la
+ * nouvelle version. Il ne touche pas au verdict des pièces, et l'en-tête
+ * de ce module l'assumait : « une pièce conforme reste conforme ». La
+ * phrase visait le cas où migrer renverrait redéposer un fichier qui n'a
+ * rien — une punition pour avoir accepté la nouvelle règle.
+ *
+ * Elle laissait passer le cas inverse, qui est celui même de WF-11 : une
+ * version qui **relève** un seuil. Exécuté avant correction, sur un
+ * dossier dont le passeport court sept mois après la rentrée visée, quand
+ * l'IND porte l'exigence de six à douze mois :
+ *
+ *     avant            : PRET
+ *     publication      : SUSPENDU, le candidat est prévenu
+ *     il migre
+ *     passeport        : CONFORME · lu 2028-04-01
+ *     dossier          : PRET · ce qui manque []
+ *
+ * La plateforme déclare prêt à déposer un dossier que l'autorité
+ * refuserait. C'est mot pour mot ce que le bloc « la date de péremption
+ * suit la durée » plus haut a corrigé pour la durée de validité : les
+ * conditions en sont l'autre moitié.
+ *
+ * ── Ce que le re-jugement demande au candidat : rien ─────────────────
+ *
+ * Les faits bruts lus sur la pièce sont en base (`Document.extracted`),
+ * la date cible aussi, et le jugement est une fonction pure. Le
+ * re-jugement rejoue donc `mesurer` puis `evaluerConditions` — les deux
+ * mêmes que le job d'analyse, pour qu'il n'y ait qu'une définition du
+ * verdict — sans appel au service de lecture, sans quota débité (INV-6)
+ * et sans redemander un fichier. Ce qui change est ce que la plateforme
+ * **dit** de la pièce, pas ce que le candidat a fourni.
+ *
+ * Le mouvement inverse compte autant : une version qui assouplit un seuil
+ * relève une pièce déclassée. Migrer accepte la nouvelle version en
+ * entier, dans les deux sens.
+ *
+ * ── Une exigence nouvelle n'est pas un défaut ────────────────────────
+ *
+ * Une condition que la nouvelle version ajoute porte sur un champ que la
+ * lecture n'a jamais cherché : sa clé est absente de `extracted`, et non
+ * présente à `null`. La juger rendrait « aucune valeur lisible, 12 mois
+ * exigés » sur une pièce qui n'a rien — le défaut que la mise en réserve
+ * a été construite pour éviter. Elle passe donc en réserve, avec le geste
+ * qui la lèvera.
+ */
+export async function rejugementDesPieces(
+  applicationId: string,
+  p: VisaRulesPayload,
+  dateCible: Date | null,
+): Promise<{
+  operations: Prisma.PrismaPromise<unknown>[];
+  declassees: string[];
+  relevees: string[];
+}> {
+  const analysees = await db.document.findMany({
+    where: { applicationId, analyzedAt: { not: null } },
+    select: { code: true, label: true, status: true, extracted: true },
+  });
+  const repere = dateCible ? dateCible.toISOString().slice(0, 10) : null;
+  const remedeAttendu = new Map(
+    checklistDepuis(p).map((piece) => [piece.code as string, piece.remedy]),
+  );
+
+  const operations: Prisma.PrismaPromise<unknown>[] = [];
+  const declassees: string[] = [];
+  const relevees: string[] = [];
+
+  for (const piece of analysees) {
+    const lues = piece.extracted;
+    if (typeof lues !== "object" || lues === null || Array.isArray(lues)) continue;
+    const champs = lues as ChampsExtraits;
+
+    const conditions = conditionsDeLaPiece(p.conditions, piece.code);
+    if (conditions.length === 0) continue;
+
+    /*
+      Les conditions que la lecture n'a jamais cherchées : leur clé est
+      absente, et non présente à `null`. C'est la distinction qui sépare
+      « pas trouvé sur la pièce » de « jamais demandé », et l'extraction
+      la rend fidèlement — elle écrit une clé par champ demandé.
+    */
+    const jamaisCherchees = conditions
+      .filter((condition) => !(condition.code in champs))
+      .map((condition) => ({
+        code: condition.code,
+        manque: "une lecture de ta pièce sur ce point",
+        action: GESTE_EXIGENCE_NOUVELLE,
+      }));
+
+    const mesures = mesurer(conditions, champs, repere);
+    const verdict = evaluerConditions(conditions, mesures.champs, [
+      ...mesures.reserves,
+      ...jamaisCherchees,
+    ]);
+    if (verdict.verdict === piece.status) continue;
+
+    if (verdict.verdict === "CONFORME") relevees.push(piece.label);
+    else declassees.push(piece.label);
+
+    operations.push(
+      db.document.update({
+        where: { applicationId_code: { applicationId, code: piece.code } },
+        data: {
+          status: verdict.verdict,
+          feedback: verdict.corps,
+          finding: verdict.constat ?? null,
+          /*
+            Le remède suit l'état réel, comme après une analyse : une pièce
+            déjà déposée se **remplace**. Il se lit sur la nouvelle version
+            et non sur la ligne d'avant — le réalignement vient de la
+            réécrire, et ces opérations passent après lui.
+          */
+          ...(verdict.verdict === "A_CORRIGER" &&
+          verdict.echecs.length > 0 &&
+          remedeAttendu.get(piece.code) === "TELEVERSER"
+            ? { remedy: "REMPLACER" as const }
+            : {}),
+        },
+      }),
+    );
+  }
+
+  return { operations, declassees, relevees };
+}
+
+/** Le geste qui lève une exigence que la lecture n'a jamais cherchée. */
+export const GESTE_EXIGENCE_NOUVELLE =
+  "Cette exigence est nouvelle : elle n'a pas été cherchée dans ta pièce. Téléverse-la de nouveau pour qu'elle soit relue sur ce point.";
