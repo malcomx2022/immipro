@@ -54,6 +54,51 @@ export const LIBELLE_STATUT: Record<StatutDossier, string> = {
 export const MENTION_EN_PAUSE =
   "Une exigence de ta destination a changé. Ton dossier est en pause le temps que tu regardes : rien n'est supprimé, et ta checklist reste celle de la version figée à l'ouverture. Ouvre tes alertes pour comparer les deux versions et décider.";
 
+/**
+ * Ce qu'un dossier **déposé** attend — WF-10.
+ *
+ * La prochaine action se déduisait de la checklist quel que soit l'état, et
+ * la pause était le seul cas intercepté. Un dossier déposé dont une pièce
+ * périssable arrive à échéance — ce qui finit toujours par arriver, la date
+ * étant écrite au dépôt et relue chaque jour — affichait donc « Remplacer
+ * ton relevé bancaire » sur un dossier parti à l'autorité, que le candidat
+ * ne peut plus toucher.
+ *
+ * La phrase nomme l'état, puis le seul geste qui reste et où il se fait.
+ */
+export const MENTION_DEPOSE =
+  "Ton dossier est déposé : il n'y a plus de pièce à corriger ici. Quand l'autorité aura répondu, viens déclarer l'issue depuis « Clôturer » — c'est elle qui sert à corriger les checklists.";
+
+/**
+ * Ce qu'un dossier **clôturé** attend, c'est-à-dire rien.
+ *
+ * Il affichait « Rien ne bloque un dépôt » quand ses pièces étaient
+ * complètes, et « Ajouter ton passeport » quand elles ne l'étaient pas —
+ * sur une démarche abandonnée ou dont l'issue est déjà déclarée.
+ */
+export const MENTION_CLOTURE =
+  "Ce dossier est clôturé. Son archive reste consultable, et ses pièces seront supprimées à la date annoncée lors de la clôture.";
+
+/**
+ * Les états où le dossier attend encore quelque chose **du candidat**.
+ *
+ * Un dossier déposé attend l'autorité, un dossier clôturé n'attend rien :
+ * ni l'un ni l'autre ne se compte parmi les dossiers « ouverts », et leurs
+ * pièces ne sont pas « à réunir ».
+ */
+export const ATTEND_UNE_SUITE: readonly StatutDossier[] = [
+  "BROUILLON",
+  "ACTIF",
+  "PRET",
+  "EN_PAUSE",
+];
+
+export const attendUneSuite = (dossier: Dossier): boolean =>
+  ATTEND_UNE_SUITE.includes(dossier.statut);
+
+/** Ce que dit le résumé quand plus rien n'attend le candidat. */
+export const AUCUNE_SUITE_ATTENDUE = "Aucun dossier n'attend une action de ta part.";
+
 export interface Dossier {
   id: string;
   destination: FicheDestination;
@@ -131,8 +176,18 @@ export const trierDossiers = (dossiers: readonly Dossier[]): Dossier[] =>
  * quoi le résumé décourage en annonçant un travail de correction qui n'existe
  * pas.
  */
-export function resumeDuJour(dossiers: readonly Dossier[]): string {
-  if (dossiers.length === 0) return "";
+export function resumeDuJour(tous: readonly Dossier[]): string {
+  if (tous.length === 0) return "";
+  /*
+    Les dossiers qui attendent encore quelque chose du candidat, et eux
+    seuls. Le résumé comptait tout : un dossier déposé et un dossier
+    abandonné entraient dans « dossiers ouverts », et leurs pièces
+    manquantes dans « à réunir ». Constaté en exécution — trois dossiers
+    dont aucun n'est ouvert : « 3 dossiers ouverts, 3 pièces obligatoires à
+    réunir ». Le mot suit la donnée, et ces deux-là ne la suivaient plus.
+  */
+  const dossiers = tous.filter(attendUneSuite);
+  if (dossiers.length === 0) return AUCUNE_SUITE_ATTENDUE;
   const ouverts =
     dossiers.length > 1 ? `${dossiers.length} dossiers ouverts` : "1 dossier ouvert";
   const aReunir = dossiers.reduce(

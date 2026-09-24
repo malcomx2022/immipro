@@ -250,6 +250,25 @@ try {
     verifier(maj.status === "SOUMIS", `le dossier passe à SOUMIS (${maj.status})`);
     verifier(maj.submittedAt !== null, "et la date de dépôt est posée");
     verifier(maj.readyAt === null, "la date de mise en état est retirée avec l'état");
+
+    /*
+      Et le tableau de bord cesse de lui parler de checklist. La prochaine
+      action se déduisait des pièces quel que soit l'état : un dossier
+      parti à l'autorité dont une pièce périssable arrive à échéance —
+      la date est écrite au dépôt et relue chaque jour — affichait
+      « Remplacer ton relevé bancaire » sur ce qu'il ne peut plus toucher.
+    */
+    const { tableauDeBord } = await import("../src/server/lecture/dossiers");
+    const { MENTION_DEPOSE } = await import("../src/domain/dossiers/dossier");
+    await db.document.updateMany({
+      where: { applicationId: application.id },
+      data: { expiresAt: new Date("2026-01-01") },
+    });
+    const vue = (await tableauDeBord(application.userId)).find((d) => d.id === application.id);
+    verifier(
+      vue?.prochaineAction === MENTION_DEPOSE,
+      `le tableau de bord nomme l'état du dossier déposé (« ${vue?.prochaineAction} »)`,
+    );
   }
 
   console.log("\nWF-10 — la clôture d'un dossier prêt, par quelqu'un qui renonce avant de déposer");
