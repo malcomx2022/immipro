@@ -1799,6 +1799,159 @@ try {
   }
 
   /*
+    WF-11 — un seuil relevé déclasse la pièce qui ne le tient plus.
+
+    Le réalignement rendait à la checklist les propriétés de la nouvelle
+    version et laissait le verdict des pièces intact. Sur une version qui
+    **relève** un seuil — le cas même de WF-11 — le dossier restait donc
+    prêt sur une pièce que l'autorité refuserait. Constaté en exécution
+    avant correction, passeport courant sept mois après la rentrée visée,
+    exigence portée de six à douze :
+
+        avant       PRET
+        publication SUSPENDU, le candidat est prévenu
+        il migre
+        passeport   CONFORME · dossier PRET · ce qui manque []
+
+    Une fumée : le re-jugement lit ce qui est en base et s'écrit dans la
+    transaction de l'arbitrage. Rien de cela n'existe hors d'une base.
+  */
+  console.log("\nWF-11 — migrer re-juge les pièces déjà lues sur les nouveaux seuils");
+  {
+    /*
+      Ce bloc ouvre sa propre procédure : la condition qui bouge doit être
+      seule à décider. Les seuils de salaire kennismigrant forment un
+      groupe d'alternatives — en relever un laisse le groupe satisfait par
+      un autre, ce qui est juste et ne prouve rien ici. La validité du
+      passeport néerlandais, elle, se juge seule.
+    */
+    const { checklistDepuis } = await import("../src/server/acces/dossiers");
+    const etudesNL = REGLES_DE_REFERENCE.find((r) => r.visaType === "etudes_mvv_vvr")!;
+    const socle = etudesNL.rules as unknown as {
+      conditions: { code: string; valeur: unknown }[];
+    };
+    const avecValidite = (mois: number) => ({
+      ...(etudesNL.rules as object),
+      conditions: socle.conditions.map((c) =>
+        c.code === "passeport_validite_min" ? { ...c, valeur: mois } : c,
+      ),
+    });
+
+    let numero = 800;
+    const version = async (mois: number) => {
+      numero += 1;
+      // Comme une vraie mise en vigueur : la précédente est archivée.
+      await db.visaRule.updateMany({
+        where: { countryCode: "NL", visaType: "etudes_mvv_vvr", status: "PUBLISHED" },
+        data: { status: "ARCHIVED", effectiveTo: new Date("2026-09-01") },
+      });
+      return db.visaRule.create({
+        data: {
+          countryCode: "NL", visaType: "etudes_mvv_vvr", category: "ETUDES", version: numero,
+          effectiveFrom: new Date("2026-01-01"), rules: avecValidite(mois) as never,
+          sourceUrl: etudesNL.sourceUrl, sourceTier: "OFFICIEL",
+          verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+          nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+          publishedAt: new Date("2026-01-01"),
+        },
+      });
+    };
+    const lire = (id: string) => db.application.findUniqueOrThrow({ where: { id } });
+
+    const v1 = await version(6);
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-rejuge-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const dossier = await db.application.create({
+      data: {
+        userId: candidat.id,
+        visaRuleId: v1.id,
+        status: "ACTIF",
+        // La rentrée visée : c'est le repère des durées.
+        targetDate: new Date("2027-09-01"),
+        documents: { create: checklistDepuis(etudesNL.rules as never) },
+      },
+    });
+    await db.document.updateMany({
+      where: { applicationId: dossier.id },
+      data: { status: "CONFORME" },
+    });
+    /*
+      Le passeport a été lu : la date brute est en base, sous le code de la
+      condition. Valable jusqu'au 1er avril 2028, soit sept mois après la
+      rentrée visée — au-dessus de six, en dessous de douze.
+    */
+    await db.document.update({
+      where: { applicationId_code: { applicationId: dossier.id, code: "passeport" } },
+      data: {
+        analyzedAt: new Date("2026-09-01"),
+        extracted: { passeport_validite_min: "2028-04-01" } as never,
+      },
+    });
+    await recalculerCompletude(dossier.id);
+    verifier(
+      (await lire(dossier.id)).status === "PRET",
+      `le dossier est prêt sur la version d'avant (${(await lire(dossier.id)).status})`,
+    );
+
+    // L'IND porte l'exigence de six à douze mois.
+    const v2 = await version(12);
+    await propagerLaPublication(v2.id);
+    verifier(
+      (await lire(dossier.id)).status === "SUSPENDU",
+      "le dossier est mis en pause par la publication",
+    );
+
+    const divergence = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: dossier.id, decision: null },
+    });
+    await arbitrerLaDivergence(await lire(dossier.id), divergence.id, "MIGRER");
+
+    const passeport = await db.document.findFirstOrThrow({
+      where: { applicationId: dossier.id, code: "passeport" },
+    });
+    verifier(
+      passeport.status === "A_CORRIGER",
+      `la pièce qui ne tient plus le seuil est déclassée (${passeport.status})`,
+    );
+    verifier(
+      (passeport.feedback ?? "").includes("12 mois"),
+      `et le message porte le seuil neuf (« ${passeport.feedback} »)`,
+    );
+    verifier(passeport.remedy === "REMPLACER", `le remède suit l'état réel (${passeport.remedy})`);
+    const apres = await lire(dossier.id);
+    verifier(
+      apres.status !== "PRET" && apres.readyAt === null,
+      `et le dossier n'est plus prêt à déposer (${apres.status})`,
+    );
+
+    /*
+      Et le mouvement inverse : une version qui redescend l'exigence relève
+      la pièce. Migrer accepte la nouvelle version en entier, dans les deux
+      sens — sans rien redemander au candidat.
+    */
+    const v3 = await version(3);
+    await propagerLaPublication(v3.id);
+    const retour = await db.ruleMigration.findFirstOrThrow({
+      where: { applicationId: dossier.id, decision: null },
+    });
+    await arbitrerLaDivergence(await lire(dossier.id), retour.id, "MIGRER");
+    verifier(
+      (
+        await db.document.findFirstOrThrow({
+          where: { applicationId: dossier.id, code: "passeport" },
+        })
+      ).status === "CONFORME",
+      "une exigence redescendue relève la pièce sans rien redemander",
+    );
+    verifier(
+      (await db.aiUsage.count({ where: { applicationId: dossier.id } })) === 0,
+      "et aucun jeton n'a été consommé par les deux re-jugements (INV-6)",
+    );
+  }
+
+  /*
     P-01 — la demande d'une destination survit à la republication de sa règle.
 
     Le classement de la page d'accueil rapprochait les dossiers de la règle

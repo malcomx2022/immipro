@@ -4,7 +4,7 @@ import { echec } from "@/server/http/echecs";
 import { miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
-import { realignementDeLaChecklist } from "@/server/dossiers/checklist";
+import { realignementDeLaChecklist, rejugementDesPieces } from "@/server/dossiers/checklist";
 import { filtrePourCandidat, payload, reglePubliee } from "@/server/acces/regles";
 
 /**
@@ -205,10 +205,29 @@ export async function arbitrerLaDivergence(
     dossier.targetDate,
   );
 
+  /*
+    Et les pièces déjà lues sont re-jugées sur les conditions de la
+    nouvelle version, depuis ce qui est déjà en base : un seuil relevé
+    laissait sinon une pièce conforme, et le dossier pouvait être déclaré
+    prêt sur une pièce que l'autorité refuserait. Rien n'est redemandé au
+    candidat, et aucune analyse n'est débitée (INV-6).
+  */
+  const rejugement = await rejugementDesPieces(
+    dossier.id,
+    payload(migration.toRule),
+    dossier.targetDate,
+  );
+
   await db.$transaction([
     // RG-11.1 — on ajoute et on réaligne, on ne retire pas.
     ...checklist.operations,
     ...echeancier,
+    /*
+      Après le réalignement, et non avant : celui-ci réécrit le remède
+      depuis le référentiel, et le re-jugement le repose sur « remplacer »
+      quand la pièce est à corriger.
+    */
+    ...rejugement.operations,
     db.application.update({
       where: { id: dossier.id },
       data: {
@@ -234,7 +253,12 @@ export async function arbitrerLaDivergence(
   */
   return {
     decision: "MIGRER",
-    piecesAjoutees: [...checklist.ajoutees, ...checklist.realignees],
+    /*
+      Une pièce déclassée par le re-jugement compte parmi celles que le
+      candidat doit regarder : sa ligne existait et son fichier est là,
+      mais ce qu'on en dit a changé, et c'est ce qui change son travail.
+    */
+    piecesAjoutees: [...checklist.ajoutees, ...checklist.realignees, ...rejugement.declassees],
     piecesLiberees: checklist.liberees,
     mention: MENTION_MIGREE,
   };
