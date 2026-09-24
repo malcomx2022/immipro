@@ -113,10 +113,53 @@ export const echeanceUrgente = (echeance: EcheanceARappeler, aujourdhui: string)
  */
 export const HORIZON_HEBDOMADAIRE_JOURS = 30;
 
-const dejaRappeleeAujourdhui = (
-  echeance: EcheanceARappeler,
-  aujourdhui: string,
-): boolean => echeance.rappeleeLe === aujourdhui;
+/**
+ * L'urgence de cette échéance a-t-elle déjà été annoncée ?
+ *
+ * ── Le défaut que cette fonction ferme ──────────────────────────────
+ *
+ * La condition était `rappeleeLe === null` : une échéance qu'un courrier
+ * avait touchée une fois n'entrait plus jamais dans une urgence. Or la
+ * passe hebdomadaire marque `remindedAt` sur **toutes** les échéances
+ * qu'elle porte, et son horizon est de trente jours quand l'urgence
+ * commence à sept : toute échéance est donc portée par une passe
+ * hebdomadaire des semaines avant de devenir urgente. Le chemin
+ * d'urgence n'était atteignable que par une échéance née à moins de sept
+ * jours de sa date. Constaté en exécution, échéance au 20 octobre :
+ *
+ *     25/09  passe hebdomadaire   -> hebdomadaire, remindedAt = 25/09
+ *     13/10  (J-7, urgente)       -> hebdomadaire
+ *     15/10  (J-5, urgente)       -> hebdomadaire
+ *     19/10  (J-1, urgente)       -> hebdomadaire
+ *     21/10  (dépassée)           -> hebdomadaire
+ *
+ * Et quand la cadence n'était pas écoulée, plus rien du tout :
+ *
+ *     12/10  passe hebdomadaire
+ *     13/10 (J-3) .. 17/10 (J+1)  -> AUCUN COURRIER
+ *
+ * « L'urgence échappe à la cadence » était écrit en tête du module et ne
+ * se produisait pas. Un rendez-vous consulaire à trois jours pouvait
+ * n'être annoncé que par la passe du lundi suivant, c'est-à-dire après.
+ *
+ * ── Ce que la date du dernier rappel dit réellement ─────────────────
+ *
+ * `rappeleeLe` ne dit pas « l'urgence a été annoncée », il dit « un
+ * courrier portait cette échéance ce jour-là ». La question se répond en
+ * regardant **à quelle distance** de la date ce courrier est parti : un
+ * rappel envoyé alors qu'il restait vingt-cinq jours n'a pas annoncé une
+ * urgence, il a listé une échéance à venir. Aucune donnée nouvelle n'est
+ * nécessaire — la distance se lit entre les deux dates déjà en base.
+ *
+ * L'envoi unique que le module promet est conservé : une fois l'urgence
+ * annoncée, `rappeleeLe` tombe dans la fenêtre et l'échéance ne repart
+ * pas le lendemain. Elle continue de figurer dans la passe hebdomadaire,
+ * qui porte tout ce qui vient dans le mois.
+ */
+export function urgenceJamaisAnnoncee(echeance: EcheanceARappeler): boolean {
+  if (echeance.rappeleeLe === null) return true;
+  return joursEntre(echeance.rappeleeLe, echeance.date) > JOURS_URGENCE;
+}
 
 /**
  * Ce qu'il faut envoyer à ce dossier aujourd'hui, ou rien.
@@ -141,17 +184,17 @@ export function rappelDuJour(
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date));
 
-  const urgentes = vivantes(JOURS_URGENCE).filter(
-    (e) => echeanceUrgente(e, aujourdhui) && !dejaRappeleeAujourdhui(e, aujourdhui),
-  );
+  const urgentes = vivantes(JOURS_URGENCE).filter((e) => echeanceUrgente(e, aujourdhui));
 
   /*
-    Une urgence déjà rappelée ne repart pas. La comparaison porte sur la
+    Une urgence déjà annoncée ne repart pas. La comparaison porte sur la
     date du dernier rappel **de cette échéance-là** : sans elle, la
     passe quotidienne renverrait le même courrier tous les jours jusqu'à
-    l'échéance, et le candidat apprendrait à ne plus l'ouvrir.
+    l'échéance, et le candidat apprendrait à ne plus l'ouvrir. Et elle
+    porte sur la distance à la date, non sur la seule présence d'un
+    rappel — un courrier parti un mois avant n'a annoncé aucune urgence.
   */
-  const nouvelles = urgentes.filter((e) => e.rappeleeLe === null);
+  const nouvelles = urgentes.filter(urgenceJamaisAnnoncee);
   if (nouvelles.length > 0) {
     const portees = vivantes(JOURS_URGENCE);
     return {

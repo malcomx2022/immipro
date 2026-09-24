@@ -8,6 +8,7 @@ import {
   echeanceVivante,
   enClair,
   rappelDuJour,
+  urgenceJamaisAnnoncee,
   type DossierARappeler,
   type EcheanceARappeler,
 } from "@/domain/dossiers/rappels";
@@ -103,6 +104,85 @@ describe("la cadence, et l'exception qui lui échappe", () => {
   it("une urgence déjà rappelée ne repart pas le lendemain", () => {
     const deja = echeance("rdv", 3, { rappeleeLe: dans(-1) });
     expect(rappelDuJour(dossier([deja], dans(-1)), AUJOURDHUI)).toBeNull();
+  });
+
+  /**
+   * Le point qui décide de tout, l'autre moitié : une urgence qu'aucun
+   * courrier n'a **annoncée comme telle** part, même si un courrier
+   * antérieur portait déjà la ligne.
+   *
+   * L'essai ne pose pas `rappeleeLe` à la main : il rejoue ce que fait la
+   * passe — `deadline.updateMany({ ..., data: { remindedAt } })` sur
+   * toutes les échéances portées. C'est ce couplage-là qui rendait le
+   * chemin d'urgence inatteignable, et un montage qui poserait la date
+   * lui-même le laisserait repasser.
+   */
+  it("une échéance portée par une passe lointaine reçoit quand même son urgence", () => {
+    /** La passe marque toutes les échéances qu'elle porte, comme l'ouvrier. */
+    const apresEnvoi = (
+      etat: DossierARappeler,
+      jour: string,
+      rappel: NonNullable<ReturnType<typeof rappelDuJour>>,
+    ): DossierARappeler => {
+      const portees = new Set(rappel.echeances.map((e) => e.code));
+      return {
+        ...etat,
+        dernierRappelLe: jour,
+        echeances: etat.echeances.map((e) =>
+          portees.has(e.code) ? { ...e, rappeleeLe: jour } : e,
+        ),
+      };
+    };
+
+    // Une échéance à vingt-cinq jours : la passe hebdomadaire la porte.
+    let etat = dossier([echeance("rdv", 25)], null);
+    const premier = rappelDuJour(etat, AUJOURDHUI);
+    expect(premier?.motif).toBe("hebdomadaire");
+    etat = apresEnvoi(etat, AUJOURDHUI, premier!);
+    expect(etat.echeances[0]!.rappeleeLe).toBe(AUJOURDHUI);
+
+    // Dix-huit jours plus tard elle est à sept jours : c'est une urgence.
+    const urgent = rappelDuJour(etat, dans(18));
+    expect(urgent?.motif).toBe("urgence");
+
+    // Et elle n'est annoncée qu'une fois.
+    const apres = apresEnvoi(etat, dans(18), urgent!);
+    expect(rappelDuJour(apres, dans(19))).toBeNull();
+    expect(rappelDuJour(apres, dans(24))).toBeNull();
+  });
+
+  /**
+   * Le jour où l'échéance entre dans la fenêtre, la cadence ne l'étouffe
+   * pas. Hier le courrier hebdomadaire est parti et la portait à huit
+   * jours — trop loin pour annoncer une urgence ; aujourd'hui elle est à
+   * sept, et la cadence interdirait tout envoi pendant six jours encore.
+   *
+   * L'inverse tient aussi : portée hier alors qu'elle était déjà dans la
+   * fenêtre, elle a été annoncée, et rien ne repart.
+   */
+  it("l'entrée dans la fenêtre d'urgence n'attend pas la passe suivante", () => {
+    const veille = dans(-1);
+    const entrante = dossier([echeance("rdv", JOURS_URGENCE, { rappeleeLe: veille })], veille);
+    expect(rappelDuJour(entrante, AUJOURDHUI)?.motif).toBe("urgence");
+
+    const dejaDedans = dossier(
+      [echeance("rdv", JOURS_URGENCE - 2, { rappeleeLe: veille })],
+      veille,
+    );
+    expect(rappelDuJour(dejaDedans, AUJOURDHUI)).toBeNull();
+  });
+
+  /**
+   * `urgenceJamaisAnnoncee` lit la distance entre le rappel et la date,
+   * et non la seule existence du rappel. La frontière est celle de
+   * l'urgence : un rappel parti à sept jours l'annonçait.
+   */
+  it("la frontière est la fenêtre d'urgence, pas la présence d'un rappel", () => {
+    const aLaDate = (jours: number) =>
+      urgenceJamaisAnnoncee(echeance("rdv", 0, { rappeleeLe: dans(-jours) }));
+    expect(aLaDate(JOURS_URGENCE)).toBe(false);
+    expect(aLaDate(JOURS_URGENCE + 1)).toBe(true);
+    expect(urgenceJamaisAnnoncee(echeance("rdv", 0))).toBe(true);
   });
 
   it("hors urgence, rien ne part avant une semaine", () => {
