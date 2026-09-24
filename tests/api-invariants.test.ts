@@ -169,6 +169,8 @@ describe("INV-4 — le filtrage est dans la requête", () => {
       "le back-office voit tout, y compris les sources secondaires : c'est son travail",
     "src/server/regles/publication.ts":
       "la publication cherche le prédécesseur d'une version, publiée ou non",
+    "src/server/regles/edition.ts":
+      "l'enregistrement de B-02 lit toutes les versions d'une procédure pour savoir laquelle écrire, et n'en sert aucune à un candidat",
     "src/server/jobs/divergence.ts":
       "la propagation doit voir la règle qu'elle vient de publier",
     "src/server/dossiers/migration.ts":

@@ -87,6 +87,8 @@ const { payload } = await import("../src/server/acces/regles");
 const { MENTION_EN_PAUSE } = await import("../src/domain/dossiers/dossier");
 const { editorialDe } = await import("../src/lib/contenu/destinations");
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
+const { enregistrerLesTextes } = await import("../src/server/regles/edition");
+const { editionDeLaRegle } = await import("../src/server/lecture/backoffice");
 
 const brute = REGLES_DE_REFERENCE.find(
   (r) => r.countryCode === "NL" && r.visaType === "emploi_kennismigrant",
@@ -1417,6 +1419,101 @@ try {
     verifier(
       bilan.pieces === 1 && final.status === "EXPIREE" && final.remedy === "REMPLACER",
       `la passe du jour la déclasse et dit quoi faire (${final.status}/${final.remedy}, ${JSON.stringify(bilan)})`,
+    );
+  }
+
+  /*
+    ── B-02 n'écrit jamais dans la version qu'un dossier a figée ────────
+
+    `editionDeLaRegle` rendait `versions.find(DRAFT) ?? cible`, et rien
+    dans `src/` ne créait de version : sur une procédure publiée sans
+    brouillon, l'écran ouvrait la ligne en vigueur, l'appelait
+    « brouillon », et l'enregistrement la réécrivait. C'est la ligne que
+    `Application.visaRuleId` fige — INV-3.
+  */
+  console.log("\nB-02 ouvre la version suivante au lieu de réécrire celle en vigueur");
+  {
+    /*
+      Sa propre procédure : les cas précédents ont laissé des versions —
+      dont des brouillons — sur `NL/emploi_kennismigrant`, et ce cas-ci
+      décrit précisément une procédure qui n'en a aucun.
+    */
+    const enVigueur = await db.visaRule.create({
+      data: {
+        countryCode: "NL",
+        visaType: "etudes_sans_brouillon",
+        category: "ETUDES",
+        version: 1,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: RULES as never,
+        sourceUrl: brute.sourceUrl,
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"),
+        verifiedBy: REDACTEUR.email,
+        nextReviewAt: new Date("2029-01-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const { application } = await dossierPret(enVigueur.id);
+    const libelleGele = payload(enVigueur).libelle;
+
+    const vueAvant = (await editionDeLaRegle(enVigueur.id))!;
+    verifier(!vueAvant.brouillonExistant, "aucun brouillon n'existe, et la vue le dit");
+    verifier(
+      vueAvant.versionAEcrire === 2,
+      `elle annonce la version qui s'ouvrira (${vueAvant.versionAEcrire})`,
+    );
+
+    const ecrit = await enregistrerLesTextes(
+      enVigueur.id,
+      {
+        champ: "textes",
+        libelleCandidat: "Permis de travail hautement qualifié (2027)",
+        reserveCandidat: "Une réserve reformulée",
+      },
+      { email: REDACTEUR.email },
+    );
+    verifier(ecrit.versionOuverte, "l'enregistrement ouvre la version suivante");
+    verifier(ecrit.id !== enVigueur.id, "il n'écrit pas dans la ligne en vigueur");
+    verifier(ecrit.statut === "DRAFT", `la nouvelle naît en brouillon (${ecrit.statut})`);
+
+    const relue = await db.visaRule.findUniqueOrThrow({ where: { id: enVigueur.id } });
+    verifier(
+      payload(relue).libelle === libelleGele,
+      "la version que le dossier a figée n'a pas bougé — INV-3",
+    );
+    verifier(relue.status === "PUBLISHED", "et elle reste en vigueur");
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: application.id } })).visaRuleId ===
+        enVigueur.id,
+      "le dossier lit toujours la même version",
+    );
+
+    /* Le second enregistrement continue le brouillon, il n'en ouvre pas un autre. */
+    const encore = await enregistrerLesTextes(
+      enVigueur.id,
+      { champ: "textes", libelleCandidat: "Permis de travail (2027)", reserveCandidat: "" },
+      { email: REDACTEUR.email },
+    );
+    verifier(!encore.versionOuverte, "le second enregistrement continue le brouillon");
+    verifier(encore.id === ecrit.id, "et écrit dans la même ligne");
+
+    const vueApres = (await editionDeLaRegle(enVigueur.id))!;
+    verifier(vueApres.brouillonExistant, "la vue voit désormais un brouillon");
+    verifier(
+      vueApres.brouillon.version === ecrit.version,
+      `et montre celui qui vient d'être ouvert (v${vueApres.brouillon.version})`,
+    );
+
+    /* Et la publication met en vigueur la nouvelle, en archivant l'ancienne. */
+    const publiee = await publierLaRegle(ecrit.id, AUTRE, "Relevé de la source du jour");
+    verifier(publiee.publiee === ecrit.id, "la publication met en vigueur le brouillon");
+    verifier(publiee.archivee === enVigueur.id, "et archive celle qui l'était");
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: application.id } })).visaRuleId ===
+        enVigueur.id,
+      "le dossier garde la sienne : publier ne migre personne (INV-3)",
     );
   }
 } catch (erreur) {

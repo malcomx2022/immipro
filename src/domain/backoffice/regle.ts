@@ -142,6 +142,80 @@ export const publiable = (regle: Pick<Regle, ChampCandidat>): boolean =>
  * C'est la distinction que J.C a posée pour B-08, mot pour mot : pas
  * « enregistrer ou publier », mais « le public le verra-t-il ».
  */
+/* ── Où va l'enregistrement de B-02 ──────────────────────────────────── */
+
+export type StatutDeVersion = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+export interface VersionDeRegle {
+  id: string;
+  version: number;
+  statut: StatutDeVersion;
+}
+
+/**
+ * La ligne qu'un enregistrement écrit — ou celle qu'il faut ouvrir.
+ *
+ * ── L'écran appelait « brouillon » la version en vigueur ────────────
+ *
+ * `editionDeLaRegle` rendait `versions.find(DRAFT) ?? cible`, et **rien
+ * dans `src/` ne créait de version**. Sur les trois procédures publiées du
+ * référentiel livré, aucune n'a de brouillon : l'écran ouvrait donc la
+ * ligne en vigueur, l'intitulait « Brouillon version 1 · version 1 en
+ * vigueur », et « Enregistrer le brouillon » la réécrivait — sans nouvelle
+ * version, sans passage en publication, et sans ligne au journal.
+ *
+ * Or `Application.visaRuleId` fige cette ligne-là. INV-3 dit : « Un
+ * dossier fige la version de règle utilisée. Une évolution réglementaire
+ * ne casse jamais une checklist en cours. » La réécrire change la
+ * checklist de tous les dossiers ouverts dessus, d'un coup, par la
+ * commande d'un écran qui annonce le contraire.
+ *
+ * ── Ce que la décision tranche ──────────────────────────────────────
+ *
+ * **Le veilleur ouvre la version suivante en enregistrant.** C'est la
+ * seule lecture compatible avec ce que le dépôt porte déjà :
+ *
+ * - RG-14.2 sépare qui rédige de qui publie, et le `PUT` est ouvert au
+ *   veilleur quand le `POST` est réservé à l'administrateur : l'écriture
+ *   est le geste du veilleur, la mise en vigueur celui de l'autre ;
+ * - `publierLaRegle` archive le prédécesseur et met la nouvelle en
+ *   vigueur — il est écrit pour un monde à deux lignes ;
+ * - l'écran dit déjà « Brouillon version N · version M en vigueur » et
+ *   « Publier la version N ».
+ *
+ * Il ne manquait que la création. Rien ici n'est inventé : la décision
+ * remet à leur place des pièces qui s'attendaient.
+ *
+ * `null` quand il n'y a aucune version — un identifiant qui ne désigne
+ * rien, que l'appelant refuse plus tôt.
+ */
+export type Destination =
+  /** Un brouillon existe : c'est lui qu'on écrit. */
+  | { quoi: "brouillon"; id: string; version: number }
+  /** Aucun : la suivante s'ouvre à partir de celle-ci. */
+  | { quoi: "a_ouvrir"; depuis: string; version: number };
+
+export function destinationDeLEnregistrement(
+  versions: readonly VersionDeRegle[],
+): Destination | null {
+  const brouillon = versions.find((v) => v.statut === "DRAFT");
+  if (brouillon) return { quoi: "brouillon", id: brouillon.id, version: brouillon.version };
+
+  /*
+    On part de la version **en vigueur** et non de la plus haute : une
+    version archivée peut porter un numéro supérieur — elle a été mise en
+    vigueur puis remplacée —, et repartir d'elle ressusciterait un texte
+    que la publication a retiré.
+  */
+  const source = versions.find((v) => v.statut === "PUBLISHED") ?? versions[0];
+  if (!source) return null;
+
+  // Le rang, lui, suit le plus haut numéro : deux versions ne peuvent pas
+  // porter le même, et la base le refuse.
+  const rang = Math.max(...versions.map((v) => v.version));
+  return { quoi: "a_ouvrir", depuis: source.id, version: rang + 1 };
+}
+
 export const SUITE_DU_REFUS_EN_VIGUEUR =
   "Cette version est en vigueur : l'enregistrer la republie, et le candidat la lit aussitôt. Reformule ce passage, puis enregistre.";
 

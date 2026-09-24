@@ -19,7 +19,6 @@ import {
   type Journee,
 } from "@/domain/backoffice/couts";
 import { SANS_INDEX_DES_REGLES } from "@/domain/backoffice/veille";
-import { SUITE_DU_REFUS_EN_VIGUEUR } from "@/domain/backoffice/regle";
 import {
   COLLECTE,
   COLLECTE_PARTIELLE,
@@ -55,7 +54,7 @@ vi.mock("@/lib/api", () => ({
     appels.push({ url, corps: options.corps, methode: options.methode });
     return Promise.resolve(
       reponse.ok
-        ? { ok: true, donnees: {} }
+        ? { ok: true, donnees: { id: "brouillon-de-test", version: 5 } }
         : {
             ok: false,
             echec: {
@@ -108,14 +107,15 @@ const AUJOURDHUI = "2026-09-18";
 const MAINTENANT = "2026-09-18T09:41:00Z";
 const espaces = (t: string) => t.replace(/[\s  ]/gu, " ");
 
-const editerRegle = ({ peutPublier = true, enregistrementEnLigne = false } = {}) =>
+const editerRegle = ({ peutPublier = true, brouillonExistant = true } = {}) =>
   render(
     <EditionRegle
       id="regle-de-test"
       peutPublier={peutPublier}
-      // Par défaut un brouillon : c'est ce que la commande annonce, et
-      // `CLAUDE.md` veut qu'il s'enregistre sans être refusé.
-      enregistrementEnLigne={enregistrementEnLigne}
+      // Par défaut un brouillon existe : c'est le cas que les tests de
+      // publication décrivent. Sans lui, l'enregistrement ouvre la suivante.
+      brouillonExistant={brouillonExistant}
+      versionAEcrire={brouillonExistant ? REGLE_BROUILLON.version : REGLE_EN_VIGUEUR.version + 1}
       enVigueur={REGLE_EN_VIGUEUR}
       brouillon={REGLE_BROUILLON}
       dossiersConcernes={DOSSIERS_EN_VERSION_4}
@@ -429,26 +429,30 @@ describe("B-02 — un administrateur ne peut pas publier une promesse", () => {
   });
 
   /**
-   * Sur la version en vigueur, l'enregistrement **est** une publication : le
-   * candidat lit le texte à la seconde. L'écran l'annonce avant le clic avec
-   * la phrase même que le serveur opposerait.
+   * Sans brouillon, la commande n'en promet pas un : elle dit qu'elle va
+   * ouvrir la version suivante. L'écran appelait « Brouillon version 1 » la
+   * ligne en vigueur, et son bouton proposait de l'« enregistrer » — deux
+   * fois le même mot pour la ligne que les dossiers ont figée.
    */
-  it("mais pas sur la version en vigueur, où enregistrer publie", () => {
-    editerRegle({ enregistrementEnLigne: true });
+  it("sans brouillon, la commande annonce la version qu'elle ouvrira", () => {
+    editerRegle({ brouillonExistant: false });
+    const ouvrir = screen.getByRole("button", { name: /Ouvrir la version 5/u });
+    expect(ouvrir).toHaveProperty("disabled", false);
+    expect(screen.queryByRole("button", { name: /Enregistrer le brouillon/u })).toBeNull();
+    expect(screen.getByText(/enregistrer ouvrira la version 5/u)).toBeDefined();
+  });
+
+  /** Et une faute ne l'empêche pas davantage : elle n'écrit pas en ligne. */
+  it("elle n'est pas empêchée par une formulation refusée", () => {
+    editerRegle({ brouillonExistant: false });
     fireEvent.change(screen.getByLabelText("Libellé affiché au candidat"), {
       target: { value: "95 % de réussite sur cette procédure." },
     });
-    const enregistrer = screen.getByRole("button", { name: /Enregistrer le brouillon/u });
-    expect(enregistrer).toBeDisabled();
-    expect(enregistrer).toHaveAccessibleDescription(SUITE_DU_REFUS_EN_VIGUEUR);
-  });
-
-  /** Et sans faute, elle s'enregistre comme le reste. */
-  it("une version en vigueur sans faute s'enregistre", () => {
-    editerRegle({ enregistrementEnLigne: true });
-    expect(
-      screen.getByRole("button", { name: /Enregistrer le brouillon/u }),
-    ).toHaveProperty("disabled", false);
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(screen.getByRole("button", { name: /Ouvrir la version 5/u })).toHaveProperty(
+      "disabled",
+      false,
+    );
   });
 
   it("laisse écrire la phrase qui protège", () => {
