@@ -211,6 +211,44 @@ try {
     verifier(courriersVers(p.user.email).length === 1, "rien avant une semaine");
     await envoyerLesRappels(jour(CADENCE_JOURS));
     verifier(courriersVers(p.user.email).length === 2, "la semaine suivante, oui");
+
+    /*
+      Et l'urgence lui échappe pour de bon, ce que ce bloc annonçait dans
+      son titre sans le vérifier.
+
+      C'est ici, et non dans un essai d'unité, que le couplage se joue :
+      la passe hebdomadaire écrit `remindedAt` sur **toutes** les
+      échéances qu'elle porte, et c'est cette écriture-là qui rendait le
+      chemin d'urgence inatteignable — une échéance portée à vingt-cinq
+      jours n'entrait plus jamais dans une urgence, parce que le domaine
+      lisait la seule présence d'un rappel. Un montage qui poserait la
+      date à la main laisserait la régression repasser.
+    */
+    const marquee = await db.deadline.findFirstOrThrow({
+      where: { applicationId: p.application.id, code: "depot" },
+    });
+    verifier(marquee.remindedAt !== null, "la passe a marqué l'échéance lointaine");
+
+    const avant = courriersVers(p.user.email).length;
+    // Dix-huit jours plus tard, l'échéance à vingt-cinq jours en est à sept.
+    const bilan = await envoyerLesRappels(jour(18));
+    verifier(
+      courriersVers(p.user.email).length === avant + 1,
+      `un courrier part le jour de l'entrée dans la fenêtre (${JSON.stringify(bilan)})`,
+    );
+    /*
+      Et c'est bien une urgence, pas une passe hebdomadaire arrivée à
+      échéance de cadence : l'objet voyage encodé dans le corps MIME, et
+      le bilan de l'ouvrier est la lecture qui ne se discute pas.
+    */
+    verifier(bilan.urgences === 1, `le motif est l'urgence (${bilan.urgences})`);
+
+    // Une seule fois : le lendemain, la cadence reprend seule.
+    await envoyerLesRappels(jour(19));
+    verifier(
+      courriersVers(p.user.email).length === avant + 1,
+      "le lendemain, l'urgence ne repart pas",
+    );
   }
 
   console.log("\nUn dossier déposé ou clôturé ne reçoit rien");
