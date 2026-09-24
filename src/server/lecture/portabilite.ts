@@ -70,6 +70,19 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
           deadlines: { orderBy: { dueAt: "asc" } },
           credits: { orderBy: { createdAt: "asc" } },
           appointments: { orderBy: { startsAt: "asc" }, include: { consultant: true } },
+          /*
+            Les deux décisions que le candidat a prises lui-même, et que
+            l'export ne rendait pas : son arbitrage sur une divergence
+            réglementaire (T-02) et sa réponse à une proposition de
+            partenaire (T-03). Ce sont ses actes, montrés sur ses écrans,
+            et l'en-tête de ce module dit que l'export « couvre le compte
+            entier ».
+          */
+          migrations: {
+            orderBy: { createdAt: "asc" },
+            include: { fromRule: true, toRule: true },
+          },
+          referrals: { orderBy: { proposedAt: "asc" }, include: { partner: true } },
           documents: {
             orderBy: [{ family: "asc" }, { createdAt: "asc" }],
             include: {
@@ -250,6 +263,43 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
           dureeMinutes: r.durationMin,
           statut: r.status,
         })),
+        /*
+          Les arbitrages que le candidat a rendus — T-02. Une divergence
+          réglementaire lui est présentée, il décide de garder sa version
+          ou de migrer, et cette décision commande sa checklist (INV-3).
+          C'est son acte, il le lit sur son écran, et l'export ne le
+          rendait pas.
+
+          Les deux versions sont nommées par leur numéro et leur source,
+          comme la règle appliquée plus haut : une décision sans ce sur
+          quoi elle portait ne se relit pas dans six mois.
+        */
+        arbitrages: a.migrations.map((m) => ({
+          impact: m.impact,
+          de: { version: m.fromRule.version, verifieeLe: jour(m.fromRule.verifiedAt) },
+          vers: { version: m.toRule.version, verifieeLe: jour(m.toRule.verifiedAt) },
+          source: m.toRule.sourceUrl,
+          signaleeLe: iso(m.alertedAt),
+          decision: m.decision,
+          decideeLe: iso(m.decidedAt),
+        })),
+        /*
+          Les propositions de partenaire, et sa réponse — T-03. Là encore
+          son acte : « voir les créneaux », « continuer seul », « ne plus
+          me proposer ». Le taux de commission y est, parce qu'il lui a
+          été annoncé (RG-13.3) et qu'un export qui tait ce qui se gagne
+          sur une mise en relation en dit moins que l'écran.
+        */
+        propositions: a.referrals.map((r) => ({
+          partenaire: r.partner.name,
+          genre: r.partner.kind,
+          etape: r.step,
+          motif: r.motive,
+          commissionPourMille: r.commissionBps,
+          suite: r.status,
+          proposeeLe: iso(r.proposedAt),
+          redirigeLe: iso(r.redirectedAt),
+        })),
       };
     }),
     paiements: compte.transactions.map((t) => ({
@@ -271,10 +321,30 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
       recueLe: iso(n.createdAt),
       lueLe: iso(n.readAt),
     })),
-    // Les rendez-vous sont rattachés à leur dossier ci-dessus ; ce champ
-    // reste pour qu'un lecteur qui cherche « rendezVous » à la racine
-    // trouve où regarder plutôt que de conclure qu'il n'y en a pas.
-    rendezVous: [],
+    /*
+      Les rendez-vous, à plat.
+
+      Ce champ valait `[]`, avec pour commentaire qu'il « reste pour qu'un
+      lecteur qui cherche rendezVous à la racine trouve où regarder plutôt
+      que de conclure qu'il n'y en a pas ». Une liste vide ne dit pas cela :
+      elle dit qu'il n'y en a aucun, et c'est ce que lit un service qui
+      reprend le fichier. Constaté en exécution sur un compte qui en avait.
+
+      Ils sont donc à plat ici et rattachés à leur dossier plus haut : un
+      export est un document, et les deux lectures sont légitimes. Chacun
+      nomme son dossier, pour que la duplication ne perde pas le lien.
+    */
+    rendezVous: compte.applications.flatMap((a) =>
+      a.appointments.map((r) => ({
+        dossier: a.visaRule ? versFiche(a.visaRule)?.pays ?? a.visaRule.countryCode : null,
+        reference: r.reference,
+        consultant: r.consultant.name,
+        cabinet: r.consultant.firm,
+        debut: iso(r.startsAt),
+        dureeMinutes: r.durationMin,
+        statut: r.status,
+      })),
+    ),
   };
 }
 

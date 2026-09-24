@@ -4,6 +4,7 @@ import { sansCommentaires } from "@/domain/copy/source";
 import {
   A_PROPOS,
   CE_QUE_CONTIENT,
+  EXPORTE,
   CE_QUE_NE_CONTIENT_PAS,
   MENTION_LIEN_COURT,
   MENTION_PIECE_PURGEE,
@@ -83,6 +84,56 @@ describe("export des données du compte", () => {
       ecran.indexOf("Télécharger mes données"),
     );
     expect(CE_QUE_CONTIENT.length).toBeGreaterThan(3);
+  });
+
+  /**
+   * ── La garde qui manquait ─────────────────────────────────────────
+   *
+   * L'essai ci-dessus compte les lignes de l'écran ; aucun ne demandait si
+   * le **fichier** porte ce que le compte porte. Deux tables y échappaient :
+   * `RuleMigration`, l'arbitrage rendu quand une règle change (T-02), et
+   * `PartnerReferral`, la réponse à une proposition de partenaire (T-03) —
+   * les décisions du candidat, prises sur ses écrans.
+   *
+   * Un oubli d'export ne se voit pas : le fichier est bien formé, il lui
+   * manque seulement une clé que personne ne cherche. La garde le rend
+   * visible — toute relation du compte ou du dossier est exportée, ou
+   * déclarée non exportée avec sa raison.
+   */
+  it("toute relation du compte et du dossier est exportée, ou déclarée avec sa raison", () => {
+    const schema = lire("prisma/schema.prisma");
+    // Une relation, et non un scalaire : son type est un modèle du schéma.
+    // `passwordHash String?` a la même forme et n'en est pas une.
+    const modeles = new Set(
+      [...schema.matchAll(/^model (\w+) \{/gmu)].map((m) => m[1]!),
+    );
+    const relationsDe = (modele: string): string[] => {
+      const corps = schema.slice(schema.indexOf(`model ${modele} {`));
+      return [...corps.slice(0, corps.indexOf("\n}")).matchAll(/^\s{2}(\w+)\s+(\w+)(\[\]|\?)\s*$/gmu)]
+        .filter((m) => modeles.has(m[2]!))
+        .map((m) => m[1]!)
+        // Les relations inverses ne portent aucune donnée de plus : le
+        // compte et le dossier sont l'objet de l'export, pas son contenu.
+        .filter((nom) => nom !== "user" && nom !== "application");
+    };
+    const attendues = [...relationsDe("User"), ...relationsDe("Application")];
+
+    for (const relation of attendues) {
+      expect(EXPORTE[relation], `« ${relation} » n'est ni exportée ni déclarée`).toBeDefined();
+    }
+    // Et l'inverse : une décision qui ne porte sur rien se remarque aussi.
+    for (const declaree of Object.keys(EXPORTE)) {
+      expect(attendues, `« ${declaree} » n'est une relation d'aucun des deux`).toContain(declaree);
+    }
+
+    // La lecture lit bien ce qu'elle déclare exporter.
+    const lecture = lire("src/server/lecture/portabilite.ts");
+    for (const [relation, decision] of Object.entries(EXPORTE)) {
+      if (decision !== true) continue;
+      expect(lecture, `« ${relation} » est déclarée exportée sans être lue`).toMatch(
+        new RegExp(`^\\s*${relation}:`, "mu"),
+      );
+    }
   });
 });
 
