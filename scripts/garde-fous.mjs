@@ -44,9 +44,17 @@ const compter = (motif) => (sortie.match(motif) ?? []).length;
 const refuses = compter(/^\s*refusé\s+·/gmu);
 const acceptes = compter(/^\s*ACCEPTÉ\s+·/gmu);
 const erreurs = compter(/^\s*ERREUR\s+·/gmu);
+/*
+  Les écritures qu'aucune contrainte ne doit refuser — `passe()` dans le
+  fichier SQL. Une unicité trop large se voit à ce qu'elle bloque de trop,
+  jamais à ce qu'elle laisse passer : sans ce compte, l'unicité totale du
+  créneau serait revenue sans qu'une seule ligne rougisse.
+*/
+const poses = compter(/^\s*posé\s+·/gmu);
+const bloques = compter(/^\s*BLOQUÉ\s+·/gmu);
 
 console.log(
-  `\n${refuses} écriture(s) refusée(s), ${acceptes} acceptée(s), ${erreurs} en erreur.`,
+  `\n${refuses} écriture(s) refusée(s), ${poses} posée(s), ${acceptes} acceptée(s) à tort, ${erreurs} en erreur, ${bloques} bloquée(s) à tort.`,
 );
 
 if (resultat.status !== 0) {
@@ -59,8 +67,12 @@ if (refuses === 0) {
   console.error("Aucune écriture refusée : le fichier n'a pas été appliqué à une base migrée.");
   process.exit(1);
 }
-if (acceptes > 0 || erreurs > 0) {
-  console.error("Un garde-fou manque ou ne se prononce pas — voir les lignes ci-dessus.");
+if (poses === 0) {
+  console.error("Aucune écriture posée : les essais qui doivent passer n'ont pas tourné.");
+  process.exit(1);
+}
+if (acceptes > 0 || erreurs > 0 || bloques > 0) {
+  console.error("Un garde-fou manque, bloque de trop, ou ne se prononce pas — voir ci-dessus.");
   process.exit(1);
 }
 console.log("Tous les garde-fous tiennent.");

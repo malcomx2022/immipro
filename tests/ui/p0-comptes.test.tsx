@@ -6,6 +6,7 @@ import { Verification } from "@/app/(auth)/verification/Verification";
 import { MotDePasse } from "@/app/(auth)/mot-de-passe/MotDePasse";
 import { Consentements } from "@/app/(auth)/consentements/Consentements";
 import { CONSENTEMENTS, ETAT_INITIAL } from "@/domain/comptes/consentements";
+import { RENDEZ_VOUS_VIDES } from "@/domain/consultants/annulation";
 
 const parametres = new URLSearchParams();
 vi.mock("next/navigation", () => ({
@@ -37,14 +38,31 @@ const PARTAGES = [
 ];
 
 /**
- * A-05 lit désormais deux choses : les autorisations générales et les
- * accords de partage. Le double appel se distingue par l'adresse — servir
- * la même réponse aux deux rendrait l'état des interrupteurs indéfini.
+ * A-05 lit désormais trois choses : les autorisations générales, les
+ * accords de partage et les rendez-vous à venir. Les appels se
+ * distinguent par l'adresse — servir la même réponse à tous rendrait
+ * l'état des interrupteurs indéfini, et une liste sans son champ n'est
+ * pas une liste vide.
+ *
+ * Les annulations sont comptées : le geste doit atteindre le serveur, et
+ * un écran qui retirerait la ligne sans appeler passerait l'essai.
  */
-const repondrePartages = (partages: unknown[] = []) => {
+const annulations: string[] = [];
+
+const repondrePartages = (
+  partages: unknown[] = [],
+  rendezVous: unknown[] = [],
+  suite = "Ton rendez-vous est annulé.",
+) => {
+  annulations.length = 0;
   global.fetch = vi.fn().mockImplementation(
-    (url: string) =>
-      new Promise<Response>((resoudre) =>
+    (url: string, options?: { method?: string }) =>
+      new Promise<Response>((resoudre) => {
+        const adresse = String(url);
+        if (adresse.includes("/annulation")) {
+          annulations.push(adresse);
+          void options;
+        }
         setTimeout(
           () =>
             resoudre({
@@ -52,16 +70,34 @@ const repondrePartages = (partages: unknown[] = []) => {
               status: 200,
               json: () =>
                 Promise.resolve(
-                  String(url).includes("/partages")
-                    ? { partages }
-                    : { consentements: CONSENTEMENTS, etat: { ...ETAT_INITIAL } },
+                  adresse.includes("/annulation")
+                    ? { mention: suite }
+                    : adresse.includes("/rendez-vous")
+                      ? { rendezVous }
+                      : adresse.includes("/partages")
+                        ? { partages }
+                        : { consentements: CONSENTEMENTS, etat: { ...ETAT_INITIAL } },
                 ),
             } as Response),
           25,
-        ),
-      ),
+        );
+      }),
   );
 };
+
+const RENDEZ_VOUS = [
+  {
+    reference: "RV-AB12CD",
+    consultant: "Sofie Vermeulen",
+    cabinet: "Vermeulen Immigration",
+    dossier: "Pays-Bas — Séjour pour études",
+    quand: "vendredi 9 octobre à 15 h 30",
+    limite: "jeudi 8 octobre à 15 h 30",
+    issue: "REMBOURSABLE" as const,
+    avertissement:
+      "Ton rendez-vous du vendredi 9 octobre à 15 h 30 sera annulé et la consultation remboursée.",
+  },
+];
 
 beforeEach(() => {
   for (const cle of [...parametres.keys()]) parametres.delete(cle);
@@ -279,6 +315,84 @@ describe("A-05 — Consentements", () => {
    * mention nomme cet écran-ci, qui ne parlait que des autorisations
    * générales : il n'existait aucun endroit pour retirer l'accès.
    */
+  /**
+   * T-05, RG-12.5 — trois surfaces promettaient « annulation ou report sans
+   * frais jusqu'au […] », et aucune n'annulait : `issueDeLAnnulation`
+   * n'avait que deux appelants, une lecture d'écran et la suppression de
+   * compte. Le seul moyen d'annuler une consultation était d'effacer son
+   * dossier.
+   */
+  it("liste les rendez-vous à venir, avec leur limite d'annulation", async () => {
+    repondrePartages([], RENDEZ_VOUS);
+    render(<Consentements />);
+
+    expect(await screen.findByText(/vendredi 9 octobre à 15 h 30/)).toBeDefined();
+    expect(screen.getByText(/Sofie Vermeulen · Vermeulen Immigration/)).toBeDefined();
+    // La limite est celle stockée avec le rendez-vous, pas la grille du jour.
+    expect(screen.getByText(/jeudi 8 octobre à 15 h 30/)).toBeDefined();
+  });
+
+  it("dit ce que l'annulation coûte avant de la confirmer, jamais après", async () => {
+    repondrePartages([], RENDEZ_VOUS);
+    render(<Consentements />);
+
+    const annuler = await screen.findByRole("button", { name: "Annuler ce rendez-vous" });
+    // Rien n'est encore parti : l'avertissement n'est pas un compte rendu.
+    expect(annulations).toEqual([]);
+    fireEvent.click(annuler);
+
+    expect(screen.getByText(RENDEZ_VOUS[0]!.avertissement)).toBeDefined();
+    expect(annulations).toEqual([]);
+    // Et le geste de garder existe : une confirmation sans issue n'en est pas une.
+    expect(screen.getByRole("button", { name: "Garder ce rendez-vous" })).toBeDefined();
+  });
+
+  it("annule au serveur, et dit la suite que le serveur donne", async () => {
+    repondrePartages([], RENDEZ_VOUS, "Ton rendez-vous est annulé et le remboursement est parti.");
+    render(<Consentements />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Annuler ce rendez-vous" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmer l'annulation" }));
+
+    /*
+      La suite vient du serveur : lui seul sait si un remboursement a été
+      ouvert. L'écrire à l'écran en doublerait la décision, et les deux
+      finiraient par diverger.
+    */
+    expect(
+      await screen.findByText(/le remboursement est parti/),
+    ).toBeDefined();
+    expect(annulations).toHaveLength(1);
+    expect(annulations[0]).toContain("RV-AB12CD");
+  });
+
+  it("une lecture qui échoue ne se lit pas « aucun rendez-vous »", async () => {
+    // Afficher l'état vide sur une lecture ratée ferait croire qu'il n'y a
+    // rien à annuler, sur l'écran même où l'on vient annuler.
+    global.fetch = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve(
+            String(url).includes("/rendez-vous")
+              ? {}
+              : { consentements: CONSENTEMENTS, etat: { ...ETAT_INITIAL }, partages: [] },
+          ),
+      } as Response),
+    );
+    render(<Consentements />);
+
+    expect(await screen.findByText(/n'ont pas pu être lus/)).toBeDefined();
+    expect(screen.queryByText(RENDEZ_VOUS_VIDES)).toBeNull();
+  });
+
+  it("aucun rendez-vous : l'écran dit où l'on en prend un", async () => {
+    repondrePartages([], []);
+    render(<Consentements />);
+    expect(await screen.findByText(RENDEZ_VOUS_VIDES)).toBeDefined();
+  });
+
   it("liste les dossiers ouverts à un consultant", async () => {
     repondrePartages(PARTAGES);
     render(<Consentements />);

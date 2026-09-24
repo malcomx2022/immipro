@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { sansCommentaires } from "@/domain/copy/source";
 import {
-  avertissementSuppression,
-  issueDeLAnnulation,
+  MENTION_DECALAGE,
   MENTION_DELAI_REMBOURSEMENT,
   MOTIF_REMBOURSEMENT_SUPPRESSION,
+  RENDEZ_VOUS_VIDES,
+  avertissementAnnulation,
+  avertissementSuppression,
+  issueDeLAnnulation,
+  refusDeLAnnulation,
+  suiteDeLAnnulation,
 } from "@/domain/consultants/annulation";
 import { CONSULTATION_ANNULATION_HEURES } from "@/domain/payments/pricing";
 import {
@@ -242,5 +248,136 @@ describe("le candidat lit la conséquence avant le bouton", () => {
     expect(ecran).toContain("Tes rendez-vous à venir");
     expect(ecran).toContain("MENTION_DELAI_REMBOURSEMENT");
     expect(MOTIF_REMBOURSEMENT_SUPPRESSION).toMatch(/Suppression de compte/u);
+  });
+});
+
+/**
+ * Le geste que trois surfaces promettaient — T-05, WF-12, RG-12.5.
+ *
+ * `conditions()` sous les créneaux, l'écran de confirmation de paiement et
+ * le courrier de confirmation annonçaient tous « **annulation ou report
+ * sans frais** jusqu'au […] ». `issueDeLAnnulation` n'avait que deux
+ * appelants — une lecture d'écran, et `acheverLaSuppression` : le seul
+ * moyen d'annuler une consultation était de **supprimer son compte**.
+ *
+ * Le garde-fou central est la réciproque de la promesse : une surface qui
+ * annonce une annulation doit nommer l'endroit où on l'exerce, et cet
+ * endroit doit exister. Le mot « report », lui, ne doit plus figurer :
+ * déplacer un rendez-vous demande trois arbitrages que WF-12 ne porte pas,
+ * et une promesse sans mécanisme est ce que ce lot corrige.
+ */
+describe("l'annulation par le candidat", () => {
+  const CRENEAU = new Date("2026-10-09T13:30:00.000Z");
+  const AVANT = new Date("2026-10-01T09:00:00.000Z");
+
+  it("un rendez-vous réservé et à venir s'annule", () => {
+    expect(refusDeLAnnulation({ etat: "RESERVE", debut: CRENEAU }, AVANT)).toBeNull();
+    expect(refusDeLAnnulation({ etat: "REPORTE", debut: CRENEAU }, AVANT)).toBeNull();
+  });
+
+  it("un créneau seulement tenu n'a rien à annuler", () => {
+    // Rien n'est payé, rien n'est promis, et la tenue expire d'elle-même.
+    expect(refusDeLAnnulation({ etat: "TENU", debut: CRENEAU }, AVANT)).toBe("sans_objet");
+    expect(refusDeLAnnulation({ etat: "ANNULE", debut: CRENEAU }, AVANT)).toBe("sans_objet");
+  });
+
+  it("un créneau passé ne s'annule plus, même dans la limite", () => {
+    // Le seul cas où l'annulation n'a plus de sens : la consultation a eu
+    // lieu, ou elle n'a pas été honorée, et ni l'un ni l'autre ne se défait.
+    const apres = new Date(CRENEAU.getTime() + 60_000);
+    expect(refusDeLAnnulation({ etat: "RESERVE", debut: CRENEAU }, apres)).toBe("passe");
+  });
+
+  it("la limite dépassée retient les frais, elle n'interdit pas d'annuler", () => {
+    /*
+      `FRAIS_DUS` dit « les frais restent dus », pas « c'est trop tard » :
+      le créneau se libère quand même, parce qu'un consultant qui attend
+      quelqu'un qui ne viendra pas perd son heure.
+    */
+    const tard = new Date(CRENEAU.getTime() - 3_600_000);
+    expect(refusDeLAnnulation({ etat: "RESERVE", debut: CRENEAU }, tard)).toBeNull();
+    expect(issueDeLAnnulation(new Date(CRENEAU.getTime() - 24 * 3_600_000).toISOString(), tard))
+      .toBe("FRAIS_DUS");
+  });
+
+  it("l'avertissement dit ce qu'on perd, et le cas qui coûte ne s'ouvre pas bien", () => {
+    const rendu = avertissementAnnulation({ quand: "vendredi 9 octobre", issue: "REMBOURSABLE" });
+    expect(rendu).toMatch(/remboursée/u);
+    expect(rendu).toMatch(/redevient libre/u);
+
+    const du = avertissementAnnulation({ quand: "vendredi 9 octobre", issue: "FRAIS_DUS" });
+    // La phrase chère commence par ce qu'elle coûte : quelqu'un qui
+    // s'arrête à la première ligne doit s'arrêter sur celle-là.
+    expect(du.startsWith("La consultation")).toBe(true);
+    expect(du).toMatch(new RegExp(`${CONSULTATION_ANNULATION_HEURES} h`, "u"));
+    expect(du).toMatch(/ne sera pas rendue/u);
+  });
+
+  it("la suite dit si le remboursement est parti, sans promettre de date", () => {
+    expect(suiteDeLAnnulation("REMBOURSABLE")).toContain(MENTION_DELAI_REMBOURSEMENT);
+    expect(suiteDeLAnnulation("REMBOURSABLE")).not.toMatch(/\d+\s*(heures?|jours?)/u);
+    expect(suiteDeLAnnulation("FRAIS_DUS")).toMatch(/reste due/u);
+  });
+
+  /**
+   * Le garde-fou : une surface qui promet une annulation nomme l'endroit,
+   * et cet endroit existe. Les trois phrases se lisent dans leur source
+   * plutôt que recopiées ici — les deux bougeraient sinon séparément.
+   */
+  it("les trois surfaces qui annoncent l'annulation nomment où elle se prend", () => {
+    const SURFACES = [
+      "src/domain/consultants/rendez-vous.ts",
+      "src/server/courrier.ts",
+      "src/app/(app)/paiement/confirme/page.tsx",
+    ];
+    for (const f of SURFACES) {
+      /*
+        Les commentaires sont écartés : ceux qui expliquent la correction
+        citent la phrase d'avant, et un garde-fou qui punit sa propre
+        justification finit contourné.
+
+        Le repère est « Annulation sans frais », la promesse elle-même, et
+        non un identifiant qui contiendrait le mot. L'endroit se cherche
+        dans les quatre cents caractères qui suivent : à l'écran, la phrase
+        traverse un lien et des entités JSX.
+      */
+      const texte = sansCommentaires(lire(f));
+      const promesses = [...texte.matchAll(/Annulation sans frais/gu)].map((m) =>
+        texte.slice(m.index, m.index + 400),
+      );
+      expect(promesses.length).toBeGreaterThan(0);
+      for (const phrase of promesses) expect(phrase).toMatch(/autorisations/u);
+    }
+  });
+
+  it("et le mot que rien ne tenait a disparu de l'interface", () => {
+    /*
+      « Report » figurait dans les trois phrases sans qu'aucun mécanisme ne
+      déplace un rendez-vous. Déplacer demande de savoir si le consultant y
+      consent, si l'ancien créneau se libère avant que le nouveau soit tenu,
+      et ce qu'il advient du paiement entre les deux : trois arbitrages que
+      WF-12 ne porte pas.
+    */
+    const partout = [
+      "src/domain/consultants/rendez-vous.ts",
+      "src/server/courrier.ts",
+      "src/app/(app)/paiement/confirme/page.tsx",
+      "src/domain/consultants/annulation.ts",
+    ].map((f) => sansCommentaires(lire(f)));
+    for (const texte of partout) expect(texte).not.toMatch(/report sans frais/iu);
+  });
+
+  it("et cet endroit est une route, pas une intention", () => {
+    // Une promesse dont le geste n'a pas de route est exactement le défaut
+    // corrigé : trois surfaces l'annonçaient, aucune ne l'offrait.
+    expect(existsSync("src/app/api/comptes/rendez-vous/route.ts")).toBe(true);
+    expect(
+      existsSync("src/app/api/comptes/rendez-vous/[reference]/annulation/route.ts"),
+    ).toBe(true);
+  });
+
+  it("l'état vide de la liste dit où l'on prend un rendez-vous", () => {
+    expect(RENDEZ_VOUS_VIDES).toMatch(/annuaire des consultants/u);
+    expect(MENTION_DECALAGE).toMatch(/annule-le avant sa limite/u);
   });
 });

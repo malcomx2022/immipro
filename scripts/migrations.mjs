@@ -112,10 +112,12 @@ try {
   const gardes = spawnSync("node", ["scripts/garde-fous.mjs", cible.toString()], {
     encoding: "utf8",
   });
-  const compte = `${gardes.stdout ?? ""}`.match(/^(\d+) écriture\(s\) refusée\(s\)/mu);
+  const compte = `${gardes.stdout ?? ""}`.match(
+    /^(\d+) écriture\(s\) refusée\(s\), (\d+) posée\(s\)/mu,
+  );
   verifier(
     gardes.status === 0,
-    `les garde-fous tiennent sur la base reconstruite (${compte?.[1] ?? "0"} écriture(s) refusée(s))`,
+    `les garde-fous tiennent sur la base reconstruite (${compte?.[1] ?? "0"} refusée(s), ${compte?.[2] ?? "0"} posée(s))`,
   );
   if (gardes.status !== 0) {
     console.log(`\n${`${gardes.stdout ?? ""}${gardes.stderr ?? ""}`.trim()}\n`);

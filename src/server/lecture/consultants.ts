@@ -1,6 +1,11 @@
 import { db } from "@/lib/db";
-import { issueDeLAnnulation, type IssueAnnulation } from "@/domain/consultants/annulation";
-import { libelleLimite } from "@/domain/consultants/rendez-vous";
+import {
+  ETATS_ANNULABLES,
+  avertissementAnnulation,
+  issueDeLAnnulation,
+  type IssueAnnulation,
+} from "@/domain/consultants/annulation";
+import { libelleLimite, libelleRendezVous } from "@/domain/consultants/rendez-vous";
 import { echec } from "@/server/http/echecs";
 import type { ConsultantHabilite } from "@/domain/consultants/annuaire";
 import type { Creneau } from "@/domain/consultants/rendez-vous";
@@ -238,4 +243,83 @@ export async function rendezVousQueLaSuppressionAnnule(
     quand: libelleLimite(r.startsAt.toISOString()),
     issue: issueDeLAnnulation(r.freeUntil.toISOString(), maintenant),
   }));
+}
+
+/* ------------------------------------------------------------------ *
+ * Les rendez-vous d'un candidat — la surface qui manquait.
+ * ------------------------------------------------------------------ */
+
+export interface RendezVousDuCandidat {
+  reference: string;
+  consultant: string;
+  cabinet: string;
+  /** « Pays-Bas — Séjour pour études », ou le pays seul faute de règle figée. */
+  dossier: string;
+  /** « vendredi 19 septembre à 15 h 30 ». */
+  quand: string;
+  /** « vendredi 18 septembre à 15 h 30 » — la limite stockée, pas recalculée. */
+  limite: string;
+  issue: IssueAnnulation;
+  /** L'avertissement à lire avant de confirmer. Une phrase, celle du cas. */
+  avertissement: string;
+}
+
+/**
+ * Les rendez-vous à venir d'un candidat — T-05, WF-12, RG-12.5.
+ *
+ * ── Aucune surface ne les montrait ──────────────────────────────────
+ *
+ * L'écran de confirmation de paiement les affiche une fois, puis on le
+ * quitte. `/consultants/[id]/rendez-vous` ne lit aucun rendez-vous
+ * existant : un candidat qui y revient repart de l'accord de partage, et
+ * n'apprend qu'il en a déjà un qu'en rechoisissant exactement le même
+ * créneau. Le courrier de confirmation portait la référence, et c'était
+ * le seul endroit où le rendez-vous survivait.
+ *
+ * Trois surfaces lui promettaient pourtant « annulation ou report sans
+ * frais jusqu'au […] ». Une promesse sans écran où l'exercer n'en est pas
+ * une.
+ *
+ * ── Ce que la liste ne montre pas ───────────────────────────────────
+ *
+ * Les créneaux seulement **tenus** : rien n'est payé, rien n'est promis,
+ * et la tenue expire d'elle-même. Les afficher parmi les rendez-vous
+ * ferait lire comme acquis un créneau que le paiement n'a pas confirmé —
+ * c'est exactement la confusion que l'échelonnement de T-05 a corrigée.
+ *
+ * Les rendez-vous passés non plus : ils ne s'annulent pas, et la liste
+ * sert à agir. L'historique se lit dans les reçus.
+ */
+export async function rendezVousDuCandidat(
+  userId: string,
+  maintenant = new Date(),
+): Promise<RendezVousDuCandidat[]> {
+  const rendezVous = await db.appointment.findMany({
+    where: {
+      application: { userId },
+      startsAt: { gt: maintenant },
+      status: { in: [...ETATS_ANNULABLES] },
+    },
+    orderBy: { startsAt: "asc" },
+    include: {
+      consultant: true,
+      application: { include: { visaRule: true } },
+    },
+  });
+
+  return rendezVous.map((r) => {
+    const fiche = r.application.visaRule ? versFiche(r.application.visaRule) : null;
+    const quand = libelleRendezVous({ debut: r.startsAt.toISOString(), disponible: false });
+    const issue = issueDeLAnnulation(r.freeUntil.toISOString(), maintenant);
+    return {
+      reference: r.reference,
+      consultant: r.consultant.name,
+      cabinet: r.consultant.firm,
+      dossier: fiche ? `${fiche.pays} — ${fiche.intitule}` : "Dossier sans destination figée",
+      quand,
+      limite: libelleLimite(r.freeUntil.toISOString()),
+      issue,
+      avertissement: avertissementAnnulation({ quand, issue }),
+    };
+  });
 }
