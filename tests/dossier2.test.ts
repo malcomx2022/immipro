@@ -236,7 +236,9 @@ describe("C-08 — résultat d'analyse", () => {
         .replace(",", "."),
     );
     const exige = Number(
-      ANALYSE_RESSOURCES.exigence.valeur!.split("·")[0]!.replace(/[^\d,]/g, "").replace(",", "."),
+      ANALYSE_RESSOURCES.exigences[0]!.exigences[0]!.valeur.split("·")[0]!
+        .replace(/[^\d,]/g, "")
+        .replace(",", "."),
     );
     // Intl sépare les milliers par une espace fine insécable selon la
     // version d'ICU : la comparaison porte sur les chiffres, pas sur l'espace.

@@ -40,6 +40,8 @@ import {
   titreQuotaEpuise,
 } from "@/domain/dossiers/televersement";
 import { cn } from "@/lib/utils";
+import { MENTION_AU_CHOIX, SANS_EXIGENCE_CHIFFREE } from "@/domain/dossiers/verification";
+import { SourceNote } from "@/components/ui/SourceNote";
 import { EnteteDossier } from "../../EnteteDossier";
 
 /**
@@ -428,7 +430,15 @@ function Analyse({
   quota: Quota;
   onRemplacer: () => void;
 }) {
-  const lignes = [...analyse.champs, analyse.exigence];
+  /*
+    Les champs lus, et eux seuls. L'exigence de la règle était ajoutée
+    ici, à la suite : elle s'affichait donc sous « Ce que nous avons lu »,
+    c'est-à-dire parmi ce qui a été lu **dans le fichier du candidat**.
+    Elle n'en vient pas — elle vient du référentiel — et quand elle
+    manquait, `valeurAffichee` la rendait « non lue », le mot qui dit à
+    quelqu'un que sa pièce était illisible.
+  */
+  const lignes = analyse.champs;
 
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -497,6 +507,41 @@ function Analyse({
             Voir l&apos;historique des versions
           </Link>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-16 font-semibold text-ink-900">Ce que la règle demande</h2>
+        {analyse.exigences.length === 0 ? (
+          <p className="text-pretty text-14 text-ink-700">{SANS_EXIGENCE_CHIFFREE}</p>
+        ) : (
+          <dl className="flex flex-col">
+            {analyse.exigences.map((bloc) => (
+              <div
+                key={bloc.exigences.map((e) => e.intitule).join("|")}
+                className="flex flex-col gap-0.5 border-t border-ink-300 py-2.5"
+              >
+                {bloc.exigences.map((exigence) => (
+                  <div
+                    key={exigence.intitule}
+                    className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3"
+                  >
+                    <dt className="text-14 text-ink-500">{exigence.intitule}</dt>
+                    <dd className="text-14 font-medium text-ink-900 sm:text-right">
+                      {exigence.valeur}
+                    </dd>
+                  </div>
+                ))}
+                {/* Quatre seuils de salaire ne sont pas quatre exigences à
+                    tenir ensemble : la phrase l'accompagne, sinon la liste
+                    seule dit le contraire de ce que la règle prévoit. */}
+                {bloc.auChoix ? (
+                  <p className="text-pretty text-13 text-ink-500">{MENTION_AU_CHOIX}</p>
+                ) : null}
+              </div>
+            ))}
+          </dl>
+        )}
+        {analyse.mention ? <SourceNote {...analyse.mention} /> : null}
       </section>
 
       <p className="text-pretty text-13 text-ink-500">{PORTEE_ANALYSE}</p>

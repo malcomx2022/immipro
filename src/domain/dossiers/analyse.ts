@@ -1,4 +1,6 @@
 import type { DocumentState } from "@/domain/completeness/score";
+import type { BlocDExigences } from "@/domain/dossiers/verification";
+import type { Mention } from "@/domain/destinations/fiche";
 
 /**
  * Résultat d'analyse d'une pièce — C-08, WF-06.
@@ -39,8 +41,26 @@ export interface ResultatAnalyse {
   /** Constat puis action, en une à trois phrases. */
   corps: string;
   champs: readonly ChampLu[];
-  /** Exigence de la règle, affichée en regard de la lecture. */
-  exigence: ChampLu;
+  /**
+   * Ce que la règle demande de cette pièce — et non ce qu'on a lu dedans.
+   *
+   * C'était un `ChampLu` de plus, ajouté à la suite de `champs` par
+   * l'écran, donc affiché sous « Ce que nous avons lu » : une exigence
+   * n'est pas une lecture, et une exigence absente s'y rendait « non lue »
+   * — le mot qui, partout ailleurs, dit que la pièce du candidat était
+   * illisible sur ce point.
+   *
+   * Vide quand la règle n'attache aucun seuil à la pièce. C'est un état
+   * normal, que `SANS_EXIGENCE_CHIFFREE` nomme.
+   */
+  exigences: readonly BlocDExigences[];
+  /**
+   * Source et date de vérification de la règle citée — INV-8.
+   *
+   * Nulle quand la règle figée ne se relit plus : rien n'est alors cité,
+   * donc rien n'a de source à porter.
+   */
+  mention: Mention | null;
 }
 
 /** Valeur affichée d'un champ non lu. Jamais une case vide : le vide se lit comme zéro. */

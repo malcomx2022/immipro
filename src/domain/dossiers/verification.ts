@@ -51,6 +51,121 @@ export const conditionsDeLaPiece = (
 ): readonly Condition[] => conditions.filter((c) => c.piece === codePiece);
 
 /**
+ * Les membres d'un groupe d'alternatives, séparés de ceux qui se jugent
+ * seuls. Une seule implémentation, parce que deux endroits en ont besoin :
+ * le jugement d'une pièce et l'affichage de ce que la règle demande.
+ */
+function grouperParAlternative(conditions: readonly Condition[]): {
+  seules: Condition[];
+  groupes: Map<string, Condition[]>;
+} {
+  const groupes = new Map<string, Condition[]>();
+  const seules: Condition[] = [];
+  for (const condition of conditions) {
+    if (condition.alternative === undefined) {
+      seules.push(condition);
+      continue;
+    }
+    const groupe = groupes.get(condition.alternative);
+    if (groupe) groupe.push(condition);
+    else groupes.set(condition.alternative, [condition]);
+  }
+  return { seules, groupes };
+}
+
+/** Une exigence, telle qu'elle s'affiche en regard de la lecture. */
+export interface ExigenceAffichee {
+  /** Le code de la condition, rendu lisible : « salaire min 30 ans et plus ». */
+  intitule: string;
+  /** Le seuil, mis en forme comme le constat d'un échec l'est. */
+  valeur: string;
+  /** Une condition non bloquante se recommande, elle n'arrête pas un dossier. */
+  bloquante: boolean;
+}
+
+/**
+ * Un bloc d'exigences : une condition seule, ou un groupe d'alternatives.
+ *
+ * Le groupe reste groupé jusqu'à l'écran. Aplatir les quatre seuils de
+ * salaire kennismigrant en quatre lignes ferait lire quatre exigences
+ * cumulées là où une seule s'applique — c'est la faute que
+ * `evaluerConditions` refuse déjà de commettre en les jugeant.
+ */
+export interface BlocDExigences {
+  /** Vrai quand en satisfaire une suffit. */
+  auChoix: boolean;
+  exigences: readonly ExigenceAffichee[];
+}
+
+/**
+ * Ce que la règle demande d'une pièce — C-08.
+ *
+ * ── La troisième devinette par préfixe ──────────────────────────────
+ *
+ * `conditionsDeLaPiece` existe parce que deux implémentations comparaient
+ * des préfixes de codes. Une troisième restait, dans la lecture qui
+ * alimente l'écran d'analyse : elle appariait `condition.code` et le code
+ * de la pièce par `startsWith`, dans les deux sens.
+ *
+ * Sur le référentiel réel, dix-neuf pièces, sept portent une exigence
+ * déclarée, et la devinette en trouvait quatre — par coïncidence de
+ * graphie. Les trois perdues :
+ *
+ *     NL emploi_kennismigrant  contrat_travail  5 conditions, aucune affichée
+ *     AE etudes                admission        parrainage_universite
+ *     AE etudes                diplome          golden_visa_gpa
+ *
+ * L'écran rendait alors « Exigence : non lue » — qui dit que la pièce du
+ * candidat était illisible sur ce point, alors que rien n'avait été
+ * cherché au bon endroit.
+ */
+export function exigencesDeLaPiece(
+  conditions: readonly Condition[],
+  codePiece: string,
+): BlocDExigences[] {
+  const { seules, groupes } = grouperParAlternative(conditionsDeLaPiece(conditions, codePiece));
+  /*
+    L'intitulé est le code de la condition, sans ses tirets bas — la même
+    transformation que l'écran applique déjà aux champs lus, juste
+    au-dessus. Le référentiel ne porte pas de libellé court pour une
+    condition : il porte `message_echec`, qui est une phrase d'échec et ne
+    se lit pas en tête de colonne. En inventer un ici remettrait de la
+    connaissance réglementaire dans la mise en forme, ce que ce module
+    refuse ; un libellé propre se décide dans le référentiel.
+  */
+  const affichee = (c: Condition): ExigenceAffichee => ({
+    intitule: c.code.replace(/_/gu, " "),
+    valeur: mettreEnForme(Array.isArray(c.valeur) ? c.valeur.join(", ") : c.valeur, c.unite),
+    bloquante: c.bloquant,
+  });
+  return [
+    ...seules.map((c) => ({ auChoix: false, exigences: [affichee(c)] })),
+    ...[...groupes.values()].map((membres) => ({
+      auChoix: true,
+      exigences: membres.map(affichee),
+    })),
+  ];
+}
+
+/**
+ * La phrase qui accompagne un groupe d'alternatives. Elle dit que le seuil
+ * applicable dépend d'un fait que le dossier ne porte pas — sans quoi
+ * quatre seuils se lisent comme quatre exigences à tenir ensemble.
+ */
+export const MENTION_AU_CHOIX =
+  "Un seul de ces seuils s'applique, et lequel dépend de ta situation.";
+
+/**
+ * Ce que l'écran dit quand la règle n'attache aucune condition à la pièce.
+ *
+ * C'est un état normal — un justificatif d'admission se fournit pour
+ * lui-même, sans valeur à atteindre — et il ne se confond pas avec une
+ * lecture qui a échoué.
+ */
+export const SANS_EXIGENCE_CHIFFREE =
+  "La règle figée pour ce dossier n'attache aucun seuil à cette pièce : elle est demandée pour elle-même.";
+
+/**
  * Les conditions qu'aucune pièce n'établit.
  *
  * Elles existent pour de bon : une carence de travail après l'arrivée, une
@@ -183,17 +298,7 @@ export function evaluerConditions(
     applicable, et c'est le plus bas qu'on cite — celui que le candidat
     n'atteint même pas.
   */
-  const groupes = new Map<string, Condition[]>();
-  const seules: Condition[] = [];
-  for (const condition of jugeables) {
-    if (condition.alternative === undefined) {
-      seules.push(condition);
-      continue;
-    }
-    const groupe = groupes.get(condition.alternative);
-    if (groupe) groupe.push(condition);
-    else groupes.set(condition.alternative, [condition]);
-  }
+  const { seules, groupes } = grouperParAlternative(jugeables);
 
   for (const condition of seules) {
     if (!satisfaite(condition, valeurLue(condition))) echecs.push(echecDe(condition));
