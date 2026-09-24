@@ -48,6 +48,33 @@ export async function reglesPubliees(aujourdhui = new Date()): Promise<VisaRule[
   });
 }
 
+/**
+ * Toutes les versions des couples pays / procédure donnés, quel que soit
+ * leur état — identifiants seulement.
+ *
+ * ── Pourquoi cette lecture n'est pas une brèche dans INV-4 ───────────
+ *
+ * L'invariant porte sur ce qui est **visible** : une règle de source
+ * secondaire ne s'affiche pas, et le filtrage se fait dans la requête.
+ * Ici rien ne s'affiche. La fonction rend des identifiants, qui servent à
+ * compter des dossiers ; le contenu des règles n'est pas lu, et les
+ * couples interrogés sont ceux que `filtrePourCandidat` a déjà retenus.
+ *
+ * Elle est dans ce module et non chez son appelant parce que c'est la
+ * règle que ce fichier énonce en tête : il est le seul du serveur à
+ * interroger `VisaRule` pour un candidat, et un essai le vérifie fichier
+ * par fichier.
+ */
+export async function versionsDesDestinations(
+  couples: readonly { countryCode: string; visaType: string }[],
+): Promise<{ id: string; countryCode: string; visaType: string }[]> {
+  if (couples.length === 0) return [];
+  return db.visaRule.findMany({
+    where: { OR: couples.map((c) => ({ countryCode: c.countryCode, visaType: c.visaType })) },
+    select: { id: true, countryCode: true, visaType: true },
+  });
+}
+
 /** Une règle par identifiant, sous le même filtre. Rien d'autre n'y accède. */
 export async function reglePubliee(id: string, aujourdhui = new Date()): Promise<VisaRule | null> {
   return db.visaRule.findFirst({ where: { id, ...filtrePourCandidat(aujourdhui) } });
