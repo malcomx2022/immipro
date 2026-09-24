@@ -75,6 +75,16 @@ export const DELAI_RECONCILIATION_MINUTES = 10;
  */
 export const DELAI_EXPIRATION_MINUTES = 60;
 
+/**
+ * Bail d'ouverture de la contrepartie — INV-7.
+ *
+ * Le temps qu'on accorde à un appelant pour ouvrir ce qu'un paiement a
+ * acheté. Il est large devant le travail réel — quelques écritures — et
+ * court devant la cadence du filet de réconciliation : un processus arrêté
+ * en plein crédit est repris à la passe suivante, pas dans une heure.
+ */
+export const BAIL_DE_CREDIT_MINUTES = 5;
+
 export const aExpirer = (creeeLe: Date, maintenant: Date): boolean =>
   maintenant.getTime() - creeeLe.getTime() > DELAI_EXPIRATION_MINUTES * 60 * 1000;
 

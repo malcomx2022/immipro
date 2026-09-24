@@ -493,6 +493,25 @@ model Transaction {
   /// l'opérateur laisse `reconciledAt` nul sans faire basculer `status` en
   /// échec — aucun paiement n'est accusé sur l'absence de réponse d'un tiers.
   reconciledAt DateTime?
+
+  /// Bail d'ouverture de la contrepartie — INV-7.
+  ///
+  /// `acheverLeCredit` lisait la contrepartie puis l'ouvrait, sans que la
+  /// base arbitre entre deux appelants. Deux achèvements simultanés du même
+  /// paiement — la notification signée qui vient de confirmer, et la passe
+  /// de réconciliation qui balaie les paiements confirmés — lisaient tous
+  /// les deux « rien d'ouvert » et ouvraient tous les deux. Constaté en
+  /// exécution : un pack payé une fois, deux fois crédité.
+  ///
+  /// La colonne est **prise** par une mise à jour conditionnée à ce qu'on
+  /// vient de lire, comme la tenue d'un créneau et la transition d'une
+  /// transaction : le second appelant bute et repart sans rien ouvrir.
+  ///
+  /// C'est un bail, et non une marque définitive : un arrêt du processus
+  /// entre la prise et le crédit le laisserait pris pour toujours, et le
+  /// filet qui rattrape un crédit interrompu ne reviendrait jamais. Passé
+  /// le délai, la ligne se reprend.
+  creditingAt DateTime?
   /// Écart constaté, conservé **y compris après** sa résolution (B-04).
   ///
   /// Il ne s'efface pas : l'historique doit dire qu'un désaccord a existé

@@ -27,7 +27,7 @@ import {
   tarifDe,
   type Achat as AchatDuDomaine,
 } from "@/domain/payments/achat";
-import { effetDeLaNotification } from "@/server/paiement/cycle";
+import { BAIL_DE_CREDIT_MINUTES, effetDeLaNotification } from "@/server/paiement/cycle";
 import { ouvrirDuQuota } from "./quota";
 import { confirmerLaConsultation, libererLaTenue } from "./consultations";
 import { suiteDictable } from "@/server/securite/secret";
@@ -582,7 +582,56 @@ async function contrepartieOuverte(transaction: Transaction): Promise<boolean> {
  */
 export async function acheverLeCredit(transaction: Transaction): Promise<boolean> {
   if (await contrepartieOuverte(transaction)) return false;
-  await crediterLAchat(transaction);
+
+  /*
+    Et la base arbitre entre deux appelants — INV-7.
+
+    La lecture ci-dessus rend l'appel rejouable ; elle ne le rend pas sûr à
+    deux. La notification signée qui vient de confirmer appelle cette
+    fonction juste après avoir commité `CONFIRMEE` ; la passe de
+    réconciliation, elle, balaie les paiements confirmés et appelle la
+    même. Entre le commit et le crédit il y a quelques dizaines de
+    millisecondes, et les deux y lisaient « rien d'ouvert ».
+
+    Constaté en exécution sur PostgreSQL, deux achèvements simultanés du
+    même paiement :
+
+        recharge  retours [true, false]  →  1 ligne de crédit, solde 10
+        pack      retours [true, true]   →  2 lignes de crédit, solde 20
+
+    Un pack payé une fois, deux fois crédité : le quota double, INV-6
+    compte un plafond qui n'a pas été acheté, et la ligne de coût de B-07
+    hérite du même écart.
+
+    Le bail se prend par une mise à jour conditionnée à ce qu'on vient de
+    lire — la mécanique de la tenue d'un créneau et de la transition d'une
+    transaction. Le second appelant attend le verrou de ligne, relit, et
+    repart sans rien ouvrir.
+  */
+  const perime = new Date(Date.now() - BAIL_DE_CREDIT_MINUTES * 60_000);
+  const { count } = await db.transaction.updateMany({
+    where: {
+      id: transaction.id,
+      // Libre, ou tenu par un appelant qui n'est jamais revenu.
+      OR: [{ creditingAt: null }, { creditingAt: { lt: perime } }],
+    },
+    data: { creditingAt: new Date() },
+  });
+  if (count !== 1) return false;
+
+  try {
+    await crediterLAchat(transaction);
+  } catch (erreur) {
+    /*
+      Le bail se rend tout de suite. L'attendre ferait patienter le filet
+      cinq minutes pour une erreur déjà connue — et ce filet existe pour
+      qu'un candidat débité ne reste pas devant un dossier vide.
+    */
+    await db.transaction
+      .updateMany({ where: { id: transaction.id }, data: { creditingAt: null } })
+      .catch(() => undefined);
+    throw erreur;
+  }
   return true;
 }
 
