@@ -67,6 +67,7 @@ export type CodeEchec =
   | "devise_figee"
   | "creneau_indisponible"
   | "paiement_indisponible"
+  | "ouverture_impossible"
   | "ouverture_refusee"
   | "signature_invalide"
   | "paiement_introuvable"
@@ -263,6 +264,30 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     action: "Réessayer",
     ton: "attente",
   },
+  /**
+   * L'ouverture n'a pas abouti, et une nouvelle tentative n'y changera
+   * rien : aucun adaptateur n'est branché, le fournisseur a refusé la
+   * demande elle-même, ou sa réponse est hors du contrat qu'on lit.
+   *
+   * Elle s'est longtemps servie sous `paiement_indisponible`, dont le
+   * corps dit « notre prestataire n'a pas répondu » et l'action
+   * « Réessayer ». Les deux étaient faux ici : le fournisseur a répondu,
+   * ou n'a pas été appelé, et le même essai rendra le même résultat.
+   *
+   * L'action s'adresse donc à ce que le candidat peut réellement faire —
+   * changer de grille, donc de rail (N.A) — plutôt qu'à une patience
+   * qui ne sera pas récompensée. Le diagnostic, lui, nomme le service et
+   * ce qu'il a répondu, pour celui qui peut y revenir.
+   */
+  ouverture_impossible: {
+    statut: 502,
+    titre: "Le paiement n'a pas pu être ouvert",
+    corps:
+      "Notre prestataire n'a pas accepté la demande de paiement. Recommencer donnerait le même résultat : c'est de notre côté que cela se répare.",
+    conserve: "Rien n'a été débité et ton panier reste tel quel.",
+    action: "Essayer l'autre grille de prix",
+    ton: "echec",
+  },
   ouverture_refusee: {
     statut: 409,
     titre: "Ce paiement n'a pas été ouvert",
@@ -428,6 +453,7 @@ export const CONSERVE_DU_CANDIDAT: readonly CodeEchec[] = [
   "televersement_indisponible",
   "creneau_indisponible",
   "paiement_indisponible",
+  "ouverture_impossible",
   "ouverture_refusee",
   "paiement_introuvable",
   "recu_indisponible",

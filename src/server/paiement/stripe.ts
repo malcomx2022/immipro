@@ -23,6 +23,7 @@ import {
   verifierLUrlHebergee,
   versSousUnite,
 } from "@/domain/paiement/ouverture";
+import { SANS_REPONSE } from "./ouvreur";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
 import type { Consultant } from "./consultation";
 import type { DemandeDeRemboursement, Remboursement, Rembourseur } from "./rembourseur";
@@ -143,11 +144,17 @@ export const adaptateurStripe = (cle: string, retourAbsolu: (chemin: string) => 
       }),
     });
 
-    if (!reponse) return { issue: "injoignable" };
-    if (reponse.statut >= 500) return { issue: "injoignable" };
+    if (!reponse) return { issue: "injoignable", detail: SANS_REPONSE };
+    if (reponse.statut >= 500) {
+      return { issue: "injoignable", statut: reponse.statut, detail: "le fournisseur est en panne" };
+    }
     if (reponse.statut >= 400) {
       const erreur = schemaErreur.safeParse(reponse.charge);
-      return { issue: "refusee", detail: erreur.success ? (erreur.data.error?.type ?? "refus") : "refus" };
+      return {
+        issue: "refusee",
+        statut: reponse.statut,
+        detail: erreur.success ? (erreur.data.error?.type ?? "refus") : "refus",
+      };
     }
     return lireLaSession(reponse.charge, demande.reference);
   },
@@ -157,9 +164,13 @@ export const adaptateurStripe = (cle: string, retourAbsolu: (chemin: string) => 
     // une session, et le repli du contrat n'a donc jamais à servir ici.
     const identifiant = providerTxId.replace(/^stripe:/u, "");
     const reponse = await appeler(cle, `/checkout/sessions/${encodeURIComponent(identifiant)}`, {});
-    if (!reponse) return { issue: "injoignable" };
-    if (reponse.statut >= 500) return { issue: "injoignable" };
-    if (reponse.statut >= 400) return { issue: "refusee", detail: "session introuvable chez Stripe" };
+    if (!reponse) return { issue: "injoignable", detail: SANS_REPONSE };
+    if (reponse.statut >= 500) {
+      return { issue: "injoignable", statut: reponse.statut, detail: "le fournisseur est en panne" };
+    }
+    if (reponse.statut >= 400) {
+      return { issue: "refusee", statut: reponse.statut, detail: "session introuvable chez Stripe" };
+    }
     return lireLaSession(reponse.charge, reference);
   },
 });

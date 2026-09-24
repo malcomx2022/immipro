@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cheminDeRetour,
@@ -12,6 +13,13 @@ import { cleDIdempotence } from "@/domain/paiement/remboursement";
 import { adaptateurStripe } from "@/server/paiement/stripe";
 import { adaptateurFedaPay, baseDe } from "@/server/paiement/fedapay";
 import { lOuvreur } from "@/server/paiement/ouvreurs";
+import { SANS_REPONSE, type IssueDEchec } from "@/server/paiement/ouvreur";
+import {
+  NATURE_DE_LA_CAUSE,
+  ouvertureReessayable,
+  traceDeLOuverture,
+  type CauseDEchecDOuverture,
+} from "@/domain/paiement/ouverture";
 import { lireFedaPay, lireStripe } from "@/server/paiement/notifications";
 
 /**
@@ -230,20 +238,31 @@ describe("adaptateur Stripe", () => {
     expect(relue?.providerTxId).toBe("stripe:cs_test_123");
   });
 
-  it("un fournisseur injoignable ne rend pas d'URL", async () => {
+  it("un fournisseur injoignable ne rend pas d'URL, et dit qu'il s'est tu", async () => {
     simuler(new Error("ECONNREFUSED"));
     expect(await adaptateurStripe("sk_essai", RETOUR).creer(DEMANDE)).toEqual({
       issue: "injoignable",
+      detail: SANS_REPONSE,
     });
   });
 
-  it("une panne du fournisseur est injoignable, un refus est un refus", async () => {
+  /**
+   * Une panne annoncée n'est pas un silence : le statut rendu par le
+   * fournisseur distingue les deux, et c'est lui qui remplira
+   * `Diagnostic.statutAmont`. L'adaptateur le savait déjà et le jetait.
+   */
+  it("une panne du fournisseur est injoignable avec son statut, un refus est un refus", async () => {
     simuler(reponse(503, {}));
-    expect((await adaptateurStripe("sk_essai", RETOUR).creer(DEMANDE)).issue).toBe("injoignable");
+    expect(await adaptateurStripe("sk_essai", RETOUR).creer(DEMANDE)).toEqual({
+      issue: "injoignable",
+      statut: 503,
+      detail: "le fournisseur est en panne",
+    });
 
     simuler(reponse(402, { error: { type: "card_error" } }));
     expect(await adaptateurStripe("sk_essai", RETOUR).creer(DEMANDE)).toEqual({
       issue: "refusee",
+      statut: 402,
       detail: "card_error",
     });
   });
@@ -354,7 +373,7 @@ describe("adaptateur FedaPay", () => {
     expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
       issue: "creee_sans_url",
       providerTxId: "fedapay:42",
-      detail: "jeton injoignable",
+      detail: `jeton : ${SANS_REPONSE}`,
     });
   });
 
@@ -564,5 +583,73 @@ describe("le fournisseur suit la devise, et le client ne le choisit pas", () => 
     );
     const vu = await lOuvreur("EUR", AVEC)!.creer(DEMANDE);
     expect(JSON.stringify(vu)).not.toContain("sk_stripe");
+  });
+});
+
+/**
+ * La cause d'une ouverture échouée — 24/09/2026.
+ *
+ * Elle était calculée par l'adaptateur, typée par le contrat, et jetée par
+ * son unique lecteur : cinq issues distinctes rendaient
+ * `paiement_indisponible` au caractère près, sans diagnostic et sans ligne
+ * de journal — `route.ts` ne journalise que ce qui n'est **pas** un échec
+ * du catalogue.
+ */
+describe("l'ouverture échouée dit ce qui l'a empêchée", () => {
+  /**
+   * La garde porte sur la forme, pas sur l'instance : ce n'est pas « les
+   * cinq causes d'aujourd'hui sont là », c'est « la liste du domaine **est**
+   * celle du contrat ». Une sixième issue ajoutée au contrat sans nature
+   * déclarée ne compile plus, au lieu de retomber dans une branche par
+   * défaut — le défaut que ce lot corrige.
+   */
+  it("le domaine nomme exactement les issues d'échec du contrat, plus l'absence d'adaptateur", () => {
+    type Identiques<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+    const memeListe: Identiques<
+      CauseDEchecDOuverture,
+      IssueDEchec | "aucun_adaptateur"
+    > = true;
+    expect(memeListe).toBe(true);
+    expect(Object.keys(NATURE_DE_LA_CAUSE).sort()).toEqual(
+      ["aucun_adaptateur", "creee_sans_url", "injoignable", "refusee", "reponse_inattendue"].sort(),
+    );
+  });
+
+  /**
+   * La nature décide de ce qu'on propose, et la proposition doit être
+   * tenable : « Réessayer » sur une clé expirée fait perdre son temps au
+   * candidat à la place du nôtre.
+   */
+  it("seule une panne qu'un second essai peut lever est réessayable", () => {
+    expect(ouvertureReessayable("injoignable")).toBe(true);
+    expect(ouvertureReessayable("creee_sans_url")).toBe(true);
+    expect(ouvertureReessayable("aucun_adaptateur")).toBe(false);
+    expect(ouvertureReessayable("refusee")).toBe(false);
+    expect(ouvertureReessayable("reponse_inattendue")).toBe(false);
+  });
+
+  it("la trace commence par la référence, qui est ce par quoi on retrouve la transaction", () => {
+    expect(traceDeLOuverture("IMP-2026-000123", "refusee", "api_key_expired")).toBe(
+      "IMP-2026-000123 · refusee : api_key_expired",
+    );
+    expect(traceDeLOuverture("IMP-2026-000123", "injoignable")).toBe(
+      "IMP-2026-000123 · injoignable",
+    );
+  });
+
+  /**
+   * Le constat ne sort jamais vers le candidat — `pourCandidat` ne
+   * sérialise pas le diagnostic. C'est ce qui permet d'y écrire ce qui est
+   * utile plutôt que ce qui est présentable ; encore faut-il que rien n'y
+   * recopie la réponse du fournisseur.
+   */
+  it("aucune issue d'échec ne se construit sans dire ce qui a été constaté", async () => {
+    const source = await readFile("src/server/paiement/ouvreur.ts", "utf8");
+    // `detail` est obligatoire sur `Constat`, et les quatre issues d'échec
+    // l'étendent : c'est le compilateur qui tient la règle, pas une revue.
+    expect(source).toMatch(/export interface Constat \{\n\s*statut\?: number;\n\s*detail: string;/u);
+    for (const issue of ["injoignable", "reponse_inattendue", "refusee", "creee_sans_url"]) {
+      expect(source).toMatch(new RegExp(`issue: "${issue}"[^}]*\\} & Constat`, "u"));
+    }
   });
 });
