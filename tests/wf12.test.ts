@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { sansCommentaires } from "@/domain/copy/source";
+import { ETATS_VIVANTS } from "@/domain/consultants/annulation";
 import {
   TENUE_MINUTES,
   echeanceDeTenue,
@@ -296,5 +299,78 @@ describe("T-05 — ce qu'il reste à préparer, sans pourcentage", () => {
     expect(libelleAPreparer(une, completudeDesPieces(une).compteurs)).toBe(
       "1 pièce obligatoire reste à traiter : passeport.",
     );
+  });
+});
+
+/**
+ * ── « Une seule règle, à deux endroits qui ne peuvent plus diverger » ──
+ *
+ * C'est ce que dit l'en-tête d'`ETATS_VIVANTS`, écrit après le défaut qui
+ * a coûté à un candidat l'accord de partage rempli pour rien : `creneaux()`
+ * affichait libre un créneau que l'unicité refusait ensuite.
+ *
+ * La phrase n'était pas encore vraie de `creneaux()` elle-même, ni des
+ * trois autres requêtes qui recopiaient `["RESERVE", "REPORTE"]` à côté
+ * d'`ETATS_ANNULABLES`. Aucune ne divergeait — elles portaient les mêmes
+ * valeurs —, et rien n'aurait dit laquelle mettre à jour le jour où un
+ * état s'ajoute.
+ *
+ * La garde est donc sur la forme : hors du module qui les définit, ces
+ * deux listes ne s'écrivent pas, elles se lisent.
+ */
+describe("les états d'un rendez-vous s'écrivent à un seul endroit", () => {
+  it("aucune requête ne recopie la liste des états", () => {
+    const fichiers = [
+      "src/server/lecture/consultants.ts",
+      "src/server/acces/consultations.ts",
+      "src/server/acces/suppression.ts",
+      "src/server/consultations/annulation.ts",
+    ];
+    for (const chemin of fichiers) {
+      const source = sansCommentaires(readFileSync(chemin, "utf8"));
+      expect(source, `${chemin} recopie les états annulables`).not.toMatch(
+        /\[\s*"RESERVE"\s*,\s*"REPORTE"\s*\]/u,
+      );
+      expect(source, `${chemin} recopie les états vivants`).not.toMatch(
+        /\[\s*"TENU"\s*,\s*"RESERVE"\s*,\s*"REPORTE"\s*\]/u,
+      );
+    }
+  });
+
+  /**
+   * Et la liste des états vivants est celle de l'unicité partielle de la
+   * base : c'est la contrainte qui décide, l'affichage ne fait que la
+   * refléter. Les voir se contredire est ce qui a produit le défaut.
+   */
+  it("les états vivants sont ceux de l'unicité partielle en base", () => {
+    const migration = readFileSync(
+      "prisma/migrations/20260924100000_creneau_vivant/migration.sql",
+      "utf8",
+    );
+    const clause = migration.match(/WHERE status IN \(([^)]*)\)/u)?.[1] ?? "";
+    const enBase = clause
+      .split(",")
+      .map((e) => e.trim().replace(/'/gu, ""))
+      .sort();
+    expect(enBase).toEqual([...ETATS_VIVANTS].sort());
+  });
+
+  /**
+   * L'horloge de l'appelant, et elle seule. `creneaux()` en reçoit une pour
+   * dater les créneaux proposés, et comparait les tenues à `new Date()` :
+   * deux instants dans une fonction qui n'en connaît qu'un.
+   */
+  it("les créneaux ne lisent pas une seconde horloge", () => {
+    const source = sansCommentaires(
+      readFileSync("src/server/lecture/consultants.ts", "utf8"),
+    );
+    // Le corps seul : la signature porte `aujourdhui = new Date()`, qui est
+    // l'horloge par défaut de l'appelant et non une seconde lecture.
+    const signature = source.indexOf("export async function creneaux(");
+    const corps = source.slice(
+      source.indexOf("\n", signature),
+      source.indexOf("export interface Partage"),
+    );
+    expect(corps).not.toContain("new Date()");
   });
 });
