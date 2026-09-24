@@ -182,6 +182,32 @@ export interface Silence {
   lien: string;
 }
 
+/**
+ * Ce que T-06 dit quand l'autorisation est accordée et qu'aucun partenaire
+ * n'est activé sur la destination — RG-13.4.
+ *
+ * C'est l'autre vide de cet écran, et il n'a rien à voir avec le premier :
+ * celui-là tient au registre d'activation, que rien dans le produit ne sait
+ * remplir, et non à un choix du candidat. Il vivait en dur dans l'écran,
+ * pendant que le registre des habilitations prétendait le citer — et citait
+ * en fait la phrase du consentement, qui parle d'« autorisation ».
+ *
+ * La confusion n'était pas visible parce que la branche du consentement
+ * passe avant : aucune autorisation n'étant active au premier passage, le
+ * vide de l'activation était inatteignable. Le registre annonçait donc que
+ * son manque était dit à l'écran, en désignant une phrase que personne dans
+ * ce cas ne voyait.
+ *
+ * Elle vit ici pour que le registre la cite par référence. Une phrase
+ * recopiée dans un registre se périme sans bruit ; celle-ci ne peut plus
+ * diverger de l'écran.
+ */
+export const AUCUN_PARTENAIRE_ACTIVE = {
+  titre: (pays: string) => `Aucun partenaire n'est référencé pour ${pays}`,
+  explication:
+    "Un partenaire n'est proposé qu'après vérification destination par destination. Tant que cette vérification n'a pas eu lieu, cette page reste vide — et c'est l'état normal, pas une panne.",
+} as const;
+
 export const SILENCE: Record<"retiree" | "jamais_donnee", Silence> = {
   jamais_donnee: {
     titre: "Tu n'as pas encore autorisé les propositions de partenaire",

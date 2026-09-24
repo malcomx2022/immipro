@@ -8,6 +8,7 @@ import type { Dossier } from "@/domain/dossiers/dossier";
 import type { Offre } from "@/server/lecture/partenaires";
 import { ENGAGEMENTS, MENTION_INDEPENDANCE } from "@/domain/consultants/proposition";
 import {
+  AUCUN_PARTENAIRE_ACTIVE,
   FENETRE_BLOQUEE,
   FORMULATION,
   SILENCE,
@@ -78,13 +79,16 @@ export function Services({ dossier, offres, autorisation }: ServicesProps) {
         <SansAutorisation autorisation={autorisation} />
       ) : offres.length === 0 ? (
         <Card>
+          {/* L'autre vide de cet écran, et il ne tient pas à un choix du
+              candidat : le registre d'activation est vide, et rien dans le
+              produit ne sait le remplir (RG-13.4). La phrase vit dans le
+              domaine pour que le registre des habilitations la cite par
+              référence — il en recopiait une autre, celle du consentement. */}
           <h2 className="text-16 font-semibold text-ink-900">
-            Aucun partenaire n&apos;est référencé pour {dossier.destination.pays}
+            {AUCUN_PARTENAIRE_ACTIVE.titre(dossier.destination.pays)}
           </h2>
           <p className="text-pretty text-14 text-ink-700">
-            Un partenaire n&apos;est proposé qu&apos;après vérification destination par
-            destination. Tant que cette vérification n&apos;a pas eu lieu, cette page
-            reste vide — et c&apos;est l&apos;état normal, pas une panne.
+            {AUCUN_PARTENAIRE_ACTIVE.explication}
           </p>
         </Card>
       ) : (
