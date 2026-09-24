@@ -156,7 +156,7 @@ export function Attente({ attente, consultation = null }: AttenteProps) {
     grille ne reconnaît plus retombe sur le pack : c'est le cas de tous
     les paiements antérieurs à la recharge, et l'étape reste juste.
   */
-  const achat = achatDepuisLeCode(attente.achatCode) ?? { type: "pack" as const, code: attente.achatCode };
+  const achat = achatDepuisLeCode(attente.achatCode);
   const estUneConsultation = achat.type === "consultation";
   // La devise décide du rail, et le rail de la voix de l'écran : le même
   // fil d'étapes se lit différemment selon qu'un opérateur ou une banque
