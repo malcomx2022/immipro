@@ -70,7 +70,9 @@ describe("l'entrée d'agenda — « Ajouter à mon agenda » ne faisait rien", (
    */
   it("échappe les virgules et les points-virgules d'une phrase française", () => {
     const ics = fichierAgenda({ ...entree, dossier: "Pays-Bas ; études, master" });
-    expect(ics).toContain("Pays-Bas \; études\\, master");
+    expect(ics).toContain("Pays-Bas \\; études\\, master");
+    // Déplié d'abord : un pli peut tomber entre la barre et le point-virgule.
+    expect(ics.replace(/\r\n /gu, "")).not.toMatch(/[^\\];/u);
   });
 
   it("plie les lignes à 75 octets, sans couper un caractère accentué", () => {

@@ -103,6 +103,65 @@ export function instantDeLHeureLocale(
   return new Date(vise - decalageMinutes(new Date(premier)) * 60_000);
 }
 
+/**
+ * Les horaires proposés, en heures **du fuseau d'affichage**
+ * (voir `instantDeLHeureLocale`).
+ *
+ * Ils vivent ici, et non plus dans la lecture, parce que la route de
+ * réservation doit les relire : un horaire que l'écran ne propose pas ne se
+ * réserve pas.
+ */
+export const JOURS_PROPOSES = 3;
+export const HEURES_PROPOSEES = [9, 11, 15, 17] as const;
+
+/**
+ * Les créneaux offerts de `depuis` à `jusqua` jours après aujourd'hui, au
+ * calendrier du fuseau d'affichage.
+ */
+function creneauxEntre(maintenant: Date, depuis: number, jusqua: number): Date[] {
+  const cejour = jourDuFuseau(maintenant);
+  const proposes: Date[] = [];
+  for (let n = depuis; n <= jusqua; n += 1) {
+    // Le quantième d'abord, l'instant ensuite : un jour de calendrier ne
+    // dure pas toujours vingt-quatre heures là où l'heure d'été existe.
+    const cible = new Date(Date.UTC(cejour.annee, cejour.mois - 1, cejour.jour + n));
+    for (const heure of HEURES_PROPOSEES) {
+      proposes.push(
+        instantDeLHeureLocale(
+          cible.getUTCFullYear(),
+          cible.getUTCMonth() + 1,
+          cible.getUTCDate(),
+          heure,
+        ),
+      );
+    }
+  }
+  return proposes;
+}
+
+/** Ce que l'écran de prise de rendez-vous propose, à partir de demain. */
+export const creneauxProposes = (maintenant: Date): Date[] =>
+  creneauxEntre(maintenant, 1, JOURS_PROPOSES);
+
+/**
+ * Un horaire se réserve s'il est à venir et fait partie de l'offre.
+ *
+ * La route acceptait toute date future : 9 h 01 échappait à l'unicité
+ * `(consultant, créneau)` posée sur 9 h 00, et le même consultant se
+ * retrouvait réservé deux fois sur des entretiens qui se chevauchent.
+ *
+ * Le jour même est admis : une page ouverte avant minuit et validée après
+ * propose des horaires qui, entre-temps, sont devenus ceux d'aujourd'hui.
+ * Les refuser ferait échouer une réservation que l'écran venait d'offrir ;
+ * la condition « à venir » suffit à écarter ceux qui sont passés.
+ */
+export function estUnCreneauPropose(debut: Date, maintenant: Date): boolean {
+  if (debut.getTime() <= maintenant.getTime()) return false;
+  return creneauxEntre(maintenant, 0, JOURS_PROPOSES).some(
+    (propose) => propose.getTime() === debut.getTime(),
+  );
+}
+
 export interface Creneau {
   /** Début du rendez-vous, ISO avec fuseau. */
   debut: string;

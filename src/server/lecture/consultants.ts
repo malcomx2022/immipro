@@ -7,8 +7,7 @@ import {
   type IssueAnnulation,
 } from "@/domain/consultants/annulation";
 import {
-  instantDeLHeureLocale,
-  jourDuFuseau,
+  creneauxProposes,
   libelleLimite,
   libelleRendezVous,
 } from "@/domain/consultants/rendez-vous";
@@ -62,6 +61,9 @@ export const consultantParId = async (id: string): Promise<ConsultantHabilite | 
   (await annuaire()).find((c) => c.id === id) ?? null;
 
 
+// La grille vit dans le domaine ; la fumée la relit ici.
+export { HEURES_PROPOSEES, JOURS_PROPOSES } from "@/domain/consultants/rendez-vous";
+
 /**
  * Créneaux proposés — T-05.
  *
@@ -71,9 +73,6 @@ export const consultantParId = async (id: string): Promise<ConsultantHabilite | 
  * de la table : un créneau déjà réservé chez ce consultant sort indisponible
  * plutôt que d'échouer à la réservation.
  */
-export const JOURS_PROPOSES = 3;
-export const HEURES_PROPOSEES = [9, 11, 15, 17] as const;
-
 export async function creneaux(consultantId: string, aujourdhui = new Date()): Promise<Creneau[]> {
   const consultant = await db.consultant.findFirst({
     where: { id: consultantId, active: true },
@@ -82,39 +81,11 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
   if (!consultant) throw echec("introuvable");
 
   /*
-    Les heures proposées sont **locales** — I.E.
-
-    Elles étaient posées par `setUTCHours`, pendant que les formateurs de
-    T-05 les rendent dans le fuseau d'affichage. Le tableau se lit comme
-    des heures de bureau ; le candidat se voyait proposer dix heures,
-    midi, seize heures et dix-huit heures — jamais neuf, et un rendez-vous
-    après la journée d'un consultant du même fuseau.
-
-    Le jour est celui du fuseau lui aussi : « les trois prochains jours »
-    est une phrase de calendrier local, et entre vingt-trois heures et
-    minuit UTC les deux ne désignent pas le même jour.
+    Les heures proposées sont **locales** — I.E., et le jour est celui du
+    fuseau. La grille vient du domaine, que la route de réservation relit :
+    l'offre et l'acceptation ne peuvent plus diverger.
   */
-  const cejour = jourDuFuseau(aujourdhui);
-  const proposes: Date[] = [];
-  for (let jour = 1; jour <= JOURS_PROPOSES; jour += 1) {
-    /*
-      Le quantième d'abord, l'instant ensuite — et non l'inverse. Ajouter
-      vingt-quatre heures à un instant déjà calculé rejouerait la même
-      faute d'un cran : un jour de calendrier ne dure pas toujours
-      vingt-quatre heures là où l'heure d'été existe.
-    */
-    const cible = new Date(Date.UTC(cejour.annee, cejour.mois - 1, cejour.jour + jour));
-    for (const heure of HEURES_PROPOSEES) {
-      proposes.push(
-        instantDeLHeureLocale(
-          cible.getUTCFullYear(),
-          cible.getUTCMonth() + 1,
-          cible.getUTCDate(),
-          heure,
-        ),
-      );
-    }
-  }
+  const proposes = creneauxProposes(aujourdhui);
 
   /*
     Un créneau **tenu** est pris, tant que sa tenue court. L'afficher

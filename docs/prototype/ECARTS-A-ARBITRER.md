@@ -9565,3 +9565,45 @@ Dossier, ce n'est pas la page qu'il faut corriger mais la route, qui ne
 vérifie aucun pack. Et si un comparateur **de dossiers** est prévu — ce que
 WF-03 laisse entendre —, la ligne pourra revenir quand il existera. Ce lot
 fait dire à la page ce que le code fait aujourd'hui, rien de plus.
+
+## S.81 — La route réservait n'importe quelle minute, et l'agenda ne séparait rien
+
+Lot mené en même temps que le correctif des heures proposées (PR #148),
+qui a posé la grille en heure locale. Il en reprend les fonctions
+(`instantDeLHeureLocale`, `jourDuFuseau`) et traite ce que ce correctif
+laissait ouvert.
+
+### Toute minute future se réservait
+
+La route acceptait n'importe quelle date à venir. L'unicité
+`(consultant, créneau)` refuse deux réservations **au même instant**, pas
+deux entretiens de quarante-cinq minutes décalés d'une minute : 9 h 01
+passait à côté de 9 h 00, et le consultant était réservé deux fois.
+
+La grille quitte la lecture serveur pour le domaine
+(`creneauxProposes`, `estUnCreneauPropose`) : l'offre et l'acceptation
+lisent la même fonction. Le jour même est admis à la réservation, parce
+qu'une page ouverte à 23 h 58 et validée à 0 h 02 offrait pour « demain »
+un créneau qui est devenu celui d'aujourd'hui. La condition « à venir »
+suffit à écarter ceux qui sont passés.
+
+### Le point-virgule de l'agenda, et le test qui partageait la faute
+
+`echapper` écrivait `"\;"`. En JavaScript, c'est un échappement inutile
+qui vaut `";"` : le point-virgule d'un intitulé sortait tel quel dans le
+fichier `.ics`, où il sépare des valeurs. Le test écrivait
+`"Pays-Bas \; études"`, avec la même faute, et comparait donc `;` à `;`.
+Il vérifie maintenant, sur le texte déplié, qu'aucun point-virgule ne
+reste sans sa barre.
+
+### Vérifié par mutation
+
+Les essais balaient deux années de dates, à six heures de la journée.
+Validation qui accepte tout : un essai tombe. Jour même refusé : un essai.
+Grille posée en UTC : deux essais. Jour pris en UTC : un essai. Échappement
+remis à `"\;"` : un essai.
+
+### Ce que ce lot ne touche pas
+
+Les rendez-vous déjà pris aux anciennes heures restent valides : ce sont
+des instants réservés et payés, et la route ne les rejuge pas.

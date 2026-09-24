@@ -46,7 +46,10 @@ const horodatage = (iso: string): string =>
 const echapper = (texte: string): string =>
   texte
     .replace(/\\/gu, "\\\\")
-    .replace(/;/gu, "\;")
+    // « \\; » et non « \; » : en JavaScript, « \; » est un échappement
+    // inutile qui vaut « ; ». Le point-virgule sortait tel quel, et le test
+    // qui le gardait portait la même faute — il comparait « ; » à « ; ».
+    .replace(/;/gu, "\\;")
     .replace(/,/gu, "\\,")
     .replace(/\n/gu, "\\n");
 
