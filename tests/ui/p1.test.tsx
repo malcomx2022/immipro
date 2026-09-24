@@ -28,6 +28,7 @@ import {
   REGLE_NOUVELLE,
 } from "@/lib/contenu/alertes";
 import { tauxCommissionFormate } from "@/domain/payments/pricing";
+import { FENETRE_BLOQUEE, SITE_NON_OUVERT } from "@/domain/partenaires/affiliation";
 
 /**
  * L'appel réseau, remplacé — R-02.
@@ -1085,6 +1086,87 @@ describe("T-06 — Services partenaires", () => {
     expect(container.textContent).toContain(
       "ImmiPro n'est pas un cabinet de conseil en immigration",
     );
+  });
+
+  /**
+   * ── Le lien s'ouvrait même quand rien n'était enregistré ────────────
+   *
+   * L'écran appelait la route puis ouvrait la fenêtre sans lire la réponse.
+   * Son commentaire promettait l'inverse — « la fenêtre s'ouvre après
+   * l'enregistrement », « faire patienter une seconde est le prix d'un lien
+   * qu'on sait avoir enregistré ». L'attente était payée, la garantie non :
+   * sur un refus du serveur, la fenêtre s'ouvrait quand même, le candidat
+   * partait chez le partenaire sans ligne de suivi, et l'écran ne lui disait
+   * rien. Une redirection non tracée est exactement ce que WF-13 étape 2
+   * existe pour empêcher.
+   *
+   * Les deux assertions se tiennent ensemble : ne pas ouvrir sans le dire
+   * serait un bouton qui ne fait rien.
+   */
+  describe("le départ vers le partenaire", () => {
+    const avecFenetre = async (
+      ok: boolean,
+      ouverture: unknown,
+    ): Promise<{ ouvertures: number; texte: string }> => {
+      reponse = { ok };
+      const ouvre = vi.fn(() => ouverture);
+      const origine = window.open;
+      Object.defineProperty(window, "open", { value: ouvre, writable: true });
+      try {
+        const { container } = rendre();
+        await act(async () => {
+          screen.getByRole("link", { name: "Ouvrir le site du partenaire" }).click();
+        });
+        return { ouvertures: ouvre.mock.calls.length, texte: container.textContent ?? "" };
+      } finally {
+        Object.defineProperty(window, "open", { value: origine, writable: true });
+        reponse = { ok: true };
+      }
+    };
+
+    it("trace la redirection avant d'ouvrir", async () => {
+      appels.length = 0;
+      const { ouvertures } = await avecFenetre(true, {});
+      expect(appels.map((a) => a.corps)).toEqual([{ suite: "CRENEAUX" }]);
+      expect(ouvertures).toBe(1);
+    });
+
+    it("n'ouvre rien quand la trace n'a pas été écrite", async () => {
+      const { ouvertures } = await avecFenetre(false, {});
+      expect(ouvertures).toBe(0);
+    });
+
+    it("et le dit, avec le motif du serveur et ce que l'écran en a fait", async () => {
+      const { texte } = await avecFenetre(false, {});
+      // Le motif vient du serveur : lui en substituer un ferait perdre la
+      // raison réelle du refus.
+      expect(texte).toContain("Le serveur a refusé");
+      expect(texte).toContain("Réessayer");
+      // Et la conséquence propre à cet écran, que le serveur ne peut pas
+      // connaître.
+      expect(texte).toContain(SITE_NON_OUVERT);
+    });
+
+    /**
+     * L'autre façon de ne pas arriver. L'ouverture suit une attente réseau,
+     * donc le geste de la personne a été consommé : un bloqueur la refuse.
+     * La trace est écrite — ce n'est pas une panne, et l'écrire comme telle
+     * ferait croire à un défaut du produit (DOC-12 §16 règle 7).
+     */
+    it("une fenêtre bloquée se dit sans se faire passer pour une panne", async () => {
+      const { texte } = await avecFenetre(true, null);
+      expect(texte).toContain(FENETRE_BLOQUEE.titre);
+      expect(FENETRE_BLOQUEE.ton).toBe("limite");
+      // La trace existe : le message ne doit pas envoyer recommencer.
+      expect(texte).not.toContain(SITE_NON_OUVERT);
+      expect(texte).toContain("La redirection est enregistrée");
+    });
+
+    it("un départ réussi ne laisse aucun message d'échec", async () => {
+      const { texte } = await avecFenetre(true, {});
+      expect(texte).not.toContain(SITE_NON_OUVERT);
+      expect(texte).not.toContain(FENETRE_BLOQUEE.titre);
+    });
   });
 
   it("dit pourquoi la page est vide, plutôt que de ne rien dire", () => {

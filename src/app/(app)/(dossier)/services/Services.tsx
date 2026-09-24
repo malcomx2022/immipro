@@ -7,7 +7,15 @@ import { Card } from "@/components/ui/Card";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { Offre } from "@/server/lecture/partenaires";
 import { ENGAGEMENTS, MENTION_INDEPENDANCE } from "@/domain/consultants/proposition";
-import { FORMULATION, SILENCE } from "@/domain/partenaires/affiliation";
+import {
+  FENETRE_BLOQUEE,
+  FORMULATION,
+  SILENCE,
+  SITE_NON_OUVERT,
+} from "@/domain/partenaires/affiliation";
+import { Button } from "@/components/ui/Button";
+import { BlocEchec } from "@/components/ui/BlocEchec";
+import type { EchecCandidat } from "@/server/http/echecs";
 import type { EtatAutorisation } from "@/domain/comptes/consentements";
 import { appeler } from "@/lib/api";
 import { EnteteDossier } from "../dossiers/[id]/EnteteDossier";
@@ -133,25 +141,53 @@ function SansAutorisation({ autorisation }: { autorisation: "retiree" | "jamais_
 }
 
 /**
+ * Ce que l'écran a à dire quand le départ ne s'est pas fait. Deux façons de
+ * ne pas arriver, et elles ne se disent pas de la même manière : l'une est un
+ * refus du serveur, l'autre un refus du navigateur sur une trace pourtant
+ * écrite.
+ */
+type Empechement =
+  | { quoi: "refus"; echec: EchecCandidat }
+  | { quoi: "fenetre_bloquee" };
+
+/**
  * Une offre. La redirection est tracée avant le départ (WF-13, étape 2), et
  * l'écran attend la réponse : ici, contrairement à un refus, faire patienter
  * une seconde est le prix d'un lien qu'on sait avoir enregistré.
+ *
+ * Il attendait, et n'en lisait rien. La réponse était jetée, si bien que la
+ * fenêtre s'ouvrait aussi sur un échec : le candidat partait chez le
+ * partenaire sans ligne de suivi, et l'écran ne lui disait rien. La phrase
+ * au-dessus était donc vraie de l'ordre des opérations et fausse de leur
+ * résultat — l'attente était payée, la garantie non.
  */
 function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string }) {
   const [enCours, setEnCours] = useState(false);
+  const [empechement, setEmpechement] = useState<Empechement | null>(null);
   const mots = FORMULATION[offre.genre];
 
-  async function ouvrir(evenement: React.MouseEvent<HTMLAnchorElement>) {
-    evenement.preventDefault();
+  async function partir() {
     setEnCours(true);
-    await appeler(`/api/dossiers/${dossierId}/partenaires/${offre.id}`, {
+    setEmpechement(null);
+    const resultat = await appeler(`/api/dossiers/${dossierId}/partenaires/${offre.id}`, {
       corps: { suite: "CRENEAUX" },
     });
     setEnCours(false);
-    // La fenêtre s'ouvre après l'enregistrement : une redirection non
-    // tracée est une commission qu'on ne saurait pas rattacher, et le
-    // partenaire n'a aucune raison de nous croire sur parole.
-    window.open(offre.url, "_blank", "noopener,noreferrer");
+
+    // La fenêtre s'ouvre après l'enregistrement, et seulement s'il a eu
+    // lieu : une redirection non tracée est une commission qu'on ne saurait
+    // pas rattacher, et le partenaire n'a aucune raison de nous croire sur
+    // parole.
+    if (!resultat.ok) {
+      setEmpechement({ quoi: "refus", echec: resultat.echec });
+      return;
+    }
+
+    // `null` quand le navigateur a bloqué l'ouverture : l'attente réseau a
+    // consommé le geste de la personne. La trace est écrite, il ne reste
+    // qu'à le dire.
+    const fenetre = window.open(offre.url, "_blank", "noopener,noreferrer");
+    if (!fenetre) setEmpechement({ quoi: "fenetre_bloquee" });
   }
 
   return (
@@ -187,10 +223,32 @@ function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string
         target="_blank"
         rel="noopener noreferrer nofollow sponsored"
         aria-busy={enCours}
-        onClick={ouvrir}
+        onClick={(evenement) => {
+          evenement.preventDefault();
+          void partir();
+        }}
       >
         {mots.action}
       </LienBouton>
+
+      {empechement?.quoi === "refus" ? (
+        <div className="flex flex-col gap-2">
+          <BlocEchec echec={empechement.echec}>
+            {/* Le même départ, repris depuis le début : l'enregistrement
+                d'abord, l'ouverture ensuite. */}
+            <Button onClick={() => void partir()} aria-busy={enCours}>
+              {empechement.echec.action}
+            </Button>
+          </BlocEchec>
+          {/* Ce que le message du serveur ne peut pas savoir : ce que cet
+              écran-là a fait de son refus. */}
+          <p className="text-pretty text-13 text-ink-500">{SITE_NON_OUVERT}</p>
+        </div>
+      ) : null}
+
+      {empechement?.quoi === "fenetre_bloquee" ? (
+        <BlocEchec echec={FENETRE_BLOQUEE} />
+      ) : null}
     </Card>
   );
 }
