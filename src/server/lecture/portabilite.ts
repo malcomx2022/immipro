@@ -11,6 +11,7 @@ import { A_PROPOS, VERSION_EXPORT } from "@/domain/comptes/portabilite";
 import { CONSENTEMENTS } from "@/domain/comptes/consentements";
 import { GENRE_DU_CONSENTEMENT } from "@/server/acces/consentements";
 import type { Piece } from "@/domain/dossiers/piece";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Portabilité et archive — A-05, C-11, WF-15.
@@ -55,7 +56,7 @@ export interface ExportCompte {
 export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
   // Un seul jour pour tout l'export : deux dossiers ne se jugent pas à
   // deux dates parce que la requête a duré.
-  const aujourdhui = iso(new Date())!;
+  const aujourdhui = jourCivil(new Date());
   const compte = await db.user.findUnique({
     where: { id: userId },
     include: {

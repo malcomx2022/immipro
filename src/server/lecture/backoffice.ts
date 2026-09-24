@@ -31,6 +31,7 @@ import {
   type TarifIA,
 } from "@/domain/backoffice/couts";
 import { moyenDe } from "@/domain/paiement/recu";
+import { bornesDesJoursCivils, jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Lecture du back-office — B-01 à B-07, WF-14 à WF-16.
@@ -266,10 +267,10 @@ export async function paiements(
     ce tableau doit prévenir, et une journée est bornée par l'activité
     plutôt que par une constante choisie ici.
   */
-  const debut = new Date(`${jourIso}T00:00:00.000Z`);
-  const fin = new Date(debut.getTime() + 24 * 60 * 60 * 1000);
+  // Minuit à Cotonou, et non minuit UTC : la journée affichée est celle
+  // du fuseau d'affichage, comme l'heure de chaque ligne (S.82).
   const transactions = await db.transaction.findMany({
-    where: { createdAt: { gte: debut, lt: fin } },
+    where: { createdAt: bornesDesJoursCivils(jourIso, jourIso) },
     orderBy: { createdAt: "desc" },
     include: { user: { select: { email: true } } },
   });
@@ -510,10 +511,10 @@ export async function journalDeLaPeriode(periode: {
   au: string;
 }): Promise<EcritureAudit[]> {
   return lireLeJournal("aucun", {
-    createdAt: {
-      gte: new Date(`${periode.du}T00:00:00.000Z`),
-      lt: new Date(new Date(`${periode.au}T00:00:00.000Z`).getTime() + 86_400_000),
-    },
+    // Les bornes sont les minuits de Cotonou : `filtrerAudit` range chaque
+    // écriture au jour qu'on lit à côté de son heure, et la requête doit
+    // lire ce qu'il rangera.
+    createdAt: bornesDesJoursCivils(periode.du, periode.au),
   });
 }
 
@@ -770,7 +771,7 @@ export async function consommationParJour(depuis: Date): Promise<Journee[]> {
 
   const parJour = new Map<string, Journee>();
   for (const u of usages) {
-    const jour = iso(u.createdAt);
+    const jour = jourCivil(u.createdAt);
     const cumul = parJour.get(jour) ?? { jour, jetons: 0, appels: 0 };
     cumul.jetons += u.inputTokens + u.outputTokens;
     cumul.appels += 1;

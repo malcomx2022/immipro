@@ -3,6 +3,7 @@ import { Paiements } from "./Paiements";
 import { etatOperateur, paiements } from "@/server/lecture/backoffice";
 import { exigerAdmin } from "@/server/securite/page";
 import { jourEnFrancais } from "@/domain/format/moment";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /** B-04 — Paiements et réconciliation. WF-15, INV-7. */
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 
 export default async function PagePaiements() {
   await exigerAdmin("/paiements");
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const aujourdhui = jourCivil(new Date());
   const [lignes, operateur] = await Promise.all([paiements(aujourdhui), etatOperateur()]);
 
   return (

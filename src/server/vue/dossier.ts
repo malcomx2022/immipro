@@ -11,6 +11,7 @@ import { estEchue } from "@/domain/dossiers/peremption";
 /** Un jour ISO, en UTC — même convention que l'échéancier. */
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 import type { FicheDestination } from "@/domain/destinations/fiche";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Vue candidat d'un dossier.
@@ -31,7 +32,7 @@ import type { FicheDestination } from "@/domain/destinations/fiche";
  * `aujourdhui` est passé, jamais lu ici : la vue doit se tester sans
  * dépendre du jour où le test tourne, comme l'échéancier.
  */
-export function versPiece(document: Document, aujourdhui = iso(new Date())): Piece {
+export function versPiece(document: Document, aujourdhui = jourCivil(new Date())): Piece {
   /*
     Une pièce conforme dont la validité est dépassée n'est plus conforme —
     et l'écran ne doit pas attendre que le travail de fond passe pour le
@@ -124,7 +125,7 @@ export function versDossier(
   destination: FicheDestination,
   /** Règle **figée** du dossier (INV-3), d'où vient le délai d'instruction. */
   regle: Pick<VisaRule, "rules"> | null,
-  aujourdhui = iso(new Date()),
+  aujourdhui = jourCivil(new Date()),
 ): Dossier {
   const pieces = documents.map((d) => versPiece(d, aujourdhui));
   /* La règle figée entre dans le calcul : sans elle, les conditions

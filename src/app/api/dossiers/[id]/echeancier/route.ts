@@ -7,6 +7,7 @@ import { dossierAvecSaRegle, exigerModifiable } from "@/server/acces/dossiers";
 import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
 import { payload } from "@/server/acces/regles";
 import { joursEntre } from "@/domain/dossiers/echeancier";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Échéancier — C-10, WF-09.
@@ -62,7 +63,7 @@ export const PUT = route({
     dateCible: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/u, "Format attendu : AAAA-MM-JJ.")
-      .refine((v) => joursEntre(new Date().toISOString().slice(0, 10), v) > 0, {
+      .refine((v) => joursEntre(jourCivil(new Date()), v) > 0, {
         message:
           "Choisis une date à venir : calculé à rebours d'une date passée, l'échéancier place toutes ses étapes derrière nous.",
       }),

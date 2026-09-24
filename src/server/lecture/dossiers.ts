@@ -20,6 +20,7 @@ import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers
 import { exigencesDeLaPiece } from "@/domain/dossiers/verification";
 import type { Quota } from "@/domain/dossiers/televersement";
 import { getPack } from "@/domain/payments/pricing";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Lecture des dossiers, partagée par les pages serveur et les routes.
@@ -88,7 +89,7 @@ export async function vueDuDossier(id: string, userId: string): Promise<VueDossi
   if (!fiche) throw echec("regle_indisponible");
 
   // Un seul jour pour toute la lecture — et jamais l'index du tableau.
-  const aujourdhui = iso(new Date());
+  const aujourdhui = jourCivil(new Date());
   const pieces = brut.documents.map((d) => versPiece(d, aujourdhui));
   return {
     dossier: versDossier(brut, brut.documents, fiche, brut.visaRule),
@@ -250,7 +251,7 @@ export function calendrierAEvaluer(
     p?.pieces_requises.find((r) => r.code === code)?.delai_obtention_jours ?? null;
 
   return {
-    aujourdhui: aujourdhui.toISOString().slice(0, 10),
+    aujourdhui: jourCivil(aujourdhui),
     dateCible: dossier.targetDate ? iso(dossier.targetDate) : null,
     delaiInstructionJours: p?.delai_traitement_jours?.max ?? null,
     aObtenir: dossier.documents

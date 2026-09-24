@@ -471,7 +471,21 @@ describe("le jour borne ce qu'il nomme", () => {
 
   it("le lecteur filtre sur la journée demandée", () => {
     expect(bloc).toMatch(/jourIso: string/u);
-    expect(bloc).toMatch(/createdAt: \{ gte: debut, lt: fin \}/u);
+    // Les bornes sont les minuits de Cotonou, pas ceux d'UTC : la journée
+    // affichée est celle qu'on lit à côté de l'heure de chaque ligne.
+    expect(bloc).toMatch(/createdAt: bornesDesJoursCivils\(jourIso, jourIso\)/u);
+  });
+
+  /**
+   * Régression de S.82 : `filtrerAudit` rangeait déjà au jour de Cotonou,
+   * pendant que la requête lisait entre deux minuits UTC. L'écriture de
+   * 0 h 30 le 1er n'était jamais lue, et l'export se disait complet.
+   */
+  it("la période du journal se lit entre les minuits qu'elle range", () => {
+    const periode = lecture.slice(lecture.indexOf("export async function journalDeLaPeriode"));
+    expect(periode.slice(0, periode.indexOf("\n}\n"))).toMatch(
+      /createdAt: bornesDesJoursCivils\(periode\.du, periode\.au\)/u,
+    );
   });
 
   it("et ne tronque pas : un livre incomplet en silence est le défaut", () => {

@@ -10,6 +10,7 @@ import {
 } from "@/domain/backoffice/couts";
 import { consommationParJour, coutsParDossier } from "@/server/lecture/backoffice";
 import { exigerAdmin } from "@/server/securite/page";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * B-07 — Supervision des coûts IA. WF-16.
@@ -49,7 +50,7 @@ export default async function PageCoutsIa() {
   return (
     <CoutsIa
       metriques={metriquesMesurees(mesureDepuisLesLignes(lignes, tarif?.devise ?? null))}
-      serie={serieQuotidienne(relevees, aujourdhui.toISOString().slice(0, 10), FENETRE_JOURS)}
+      serie={serieQuotidienne(relevees, jourCivil(aujourdhui), FENETRE_JOURS)}
       candidats={candidatsAuDepassement(lignes)}
       tarife={tarif !== null}
     />

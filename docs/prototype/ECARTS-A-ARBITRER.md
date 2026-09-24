@@ -9673,3 +9673,66 @@ d'un jour ; il touche des calculs, pas un affichage d'heure, et chaque
 site demande de vérifier ce que sa date compare. C'est un lot à part.
 La référence opérateur du reçu (`MP260911.0943`) est celle du prestataire,
 et il n'y a pas à la réécrire.
+
+## S.83 — « Aujourd'hui » était la veille entre minuit et une heure, et S.82 avait ouvert un trou dans l'export du journal
+
+### La régression d'abord
+
+S.82 a fait ranger chaque écriture du journal au jour de Cotonou
+(`filtrerAudit`). La requête qui alimente l'export, elle, lisait toujours
+entre deux minuits **UTC**. Pour un export « du 1er au 30 septembre » :
+
+- l'écriture de 0 h 30 le 1er septembre à Cotonou (23 h 30 UTC le 31
+  août) n'était **jamais lue** ;
+- celle de 0 h 30 le 1er octobre était lue, puis écartée au filtre.
+
+L'export perdait donc la première heure de sa période, sans rien qui le
+dise, alors que c'est un document qui atteste être complet. Le test de
+S.82 exerçait le filtre sur des écritures déjà en mémoire, et ne voyait
+pas la requête. C'est la même faute qu'en S.79, à l'envers : un
+garde-fou juste sur ce qu'il regarde, et muet sur ce qu'il ne regarde
+pas.
+
+Les bornes de la requête sont désormais les minuits de Cotonou
+(`bornesDesJoursCivils`). Un balayage sur deux années vérifie que les
+bornes lisent exactement ce que `jourCivil` range, à la milliseconde
+près des deux bords.
+
+### Le jour courant, et les bornes de journée
+
+Même défaut, pris par l'autre bout. Dix-huit sites posaient « aujourd'hui »
+ou une journée en UTC :
+
+| Où | Effet entre 0 h et 1 h à Cotonou |
+|---|---|
+| Journée des paiements (écran, route, export) | la journée affichée est la veille, et ses bornes aussi |
+| Période du journal par défaut | le jour courant manque à la période |
+| Histogramme des coûts IA | les appels de 0 h à 1 h comptés la veille |
+| Complétude, échéancier, fiche, portabilité | une pièce jugée sur la date d'hier |
+| Rappels | un rappel parti à 0 h 30 daté de la veille, et un second le même jour |
+| Relecture de la veille, nom du fichier de données | la date d'hier |
+
+Tous lisent maintenant `jourCivil`. Les **échéances** (`dueAt`) et les
+autres dates calendaires restent lues telles qu'elles sont posées.
+
+`instantDeLHeureLocale` et `jourDuFuseau` quittent le module des
+rendez-vous pour `domain/format/fuseau.ts` : le back-office borne ses
+journées avec la fonction même qui pose les créneaux.
+
+### Garde-fous
+
+- Aucune source n'écrit plus `new Date().toISOString().slice(0, 10)`.
+- La journée des paiements et la période du journal sont bornées par
+  `bornesDesJoursCivils`. Le test lit la source, comme celui qu'il
+  remplace.
+
+Vérifié par mutation : les bornes du journal remises en UTC font tomber
+un essai, et un « aujourd'hui » en UTC réintroduit dans un écran fait
+nommer ce fichier au garde-fou.
+
+### Ce que ce lot ne touche pas
+
+`joursDInactivite` compte encore les jours en UTC, et son commentaire le
+revendique. Sur un seuil de douze mois, une heure de décalage ne change
+rien qu'on puisse observer. La réaligner sans raison mesurable serait
+changer un calcul de purge (INV-5) pour la symétrie seule.

@@ -12,6 +12,7 @@ import {
   MENTION_FORMAT,
   nomDuFichier,
 } from "@/domain/comptes/portabilite";
+import { jourCivil } from "@/domain/format/fuseau";
 
 /**
  * Mes données — A-05, WF-15.
@@ -51,7 +52,7 @@ export function MesDonnees({ dossiers }: MesDonneesProps) {
     setEchec(null);
     const resultat = await telechargerFichier(
       "/api/comptes/donnees",
-      nomDuFichier(new Date().toISOString().slice(0, 10)),
+      nomDuFichier(jourCivil(new Date())),
       REFUS_SANS_DETAIL,
     );
     setEnvoi(false);
