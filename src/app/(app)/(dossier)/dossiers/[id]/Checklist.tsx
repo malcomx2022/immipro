@@ -74,6 +74,28 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
         Prochaine action : {dossier.prochaineAction}
       </p>
 
+      {/* WF-10 étape 1 : un dossier prêt se déclare déposé. Le geste
+          n'avait aucun écran — la route existait, rien ne l'appelait, et
+          aucun dossier ne pouvait devenir « Déposé » par l'interface. */}
+      {dossier.statut === "PRET" ? (
+        <section className="flex flex-col gap-3 rounded-lg border border-ink-300 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-16 font-semibold text-ink-900">Ton dossier est prêt</h2>
+            <p className="text-pretty text-14 text-ink-700">
+              Le dépôt se fait auprès de l&apos;autorité ou de son prestataire :
+              ImmiPro ne dépose rien. Quand tu l&apos;as fait, déclare-le ici.
+            </p>
+          </div>
+          <LienBouton
+            href={`/dossiers/${id}/depot`}
+            pleineLargeur
+            className="md:w-auto md:self-start"
+          >
+            Déclarer mon dépôt
+          </LienBouton>
+        </section>
+      ) : null}
+
       {/* Arbitrage S.78 : un dossier déposé garde ses pièces douze mois,
           et c'est ici que le candidat confirme que l'instruction continue. */}
       {dossier.conservation ? (
