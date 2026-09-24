@@ -4,6 +4,7 @@ import { visaRulesSchema, type VisaRulesPayload } from "@/domain/rules/schema";
 import type { FicheDestination, Mention, Repere } from "@/domain/destinations/fiche";
 import { echec } from "@/server/http/echecs";
 import { EDITORIAL, editorialDe } from "@/lib/contenu/destinations";
+import { provenanceDesMontants } from "@/domain/format/change";
 
 /**
  * Lecture du référentiel réglementaire.
@@ -98,10 +99,23 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
  * mois et jamais reprogrammée.
  */
 export function mentionDe(regle: VisaRule): Mention {
+  /*
+    La provenance du montant en francs se calcule ici plutôt que chez
+    chaque appelant : tous les écrans qui affichent un montant converti
+    portent déjà cette mention, et c'est elle qui tient INV-8. La poser
+    ailleurs aurait laissé, comme avant, des écrans qui citent une source
+    pour un chiffre qu'elle ne contient pas.
+  */
+  const p = payload(regle);
+  const conversion = provenanceDesMontants([p.frais_scolarite
+    ? { valeur: p.frais_scolarite.min, devise: p.frais_scolarite.devise, periodicite: p.frais_scolarite.periodicite }
+    : null, p.preuve_fonds]);
+
   return {
     source: new URL(regle.sourceUrl).hostname.replace(/^www\./u, ""),
     verifieeLe: iso(regle.verifiedAt),
     relectureLe: iso(regle.nextReviewAt),
+    ...(conversion ? { conversion } : {}),
     ...(editorialDe(regle.countryCode, regle.visaType)?.autorite
       ? { autorite: editorialDe(regle.countryCode, regle.visaType)!.autorite }
       : {}),

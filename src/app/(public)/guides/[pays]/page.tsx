@@ -85,7 +85,7 @@ export default async function PageGuide({
           <LienBouton href={guide.corps.appel.href}>{guide.corps.appel.action}</LienBouton>
         </section>
 
-        <SourceNote source={guide.mention.source} verifieeLe={guide.mention.verifieeLe}>
+        <SourceNote {...guide.mention}>
           {guide.mentionSuite}
         </SourceNote>
       </article>

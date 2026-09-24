@@ -75,7 +75,7 @@ export default async function PageArticle({
         <LienBouton href={article.corps.appel.href}>{article.corps.appel.action}</LienBouton>
       </section>
 
-      <SourceNote source={article.mention.source} verifieeLe={article.mention.verifieeLe}>
+      <SourceNote {...article.mention}>
         {article.mentionSuite}
       </SourceNote>
     </article>

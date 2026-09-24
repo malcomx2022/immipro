@@ -177,9 +177,16 @@ describe("archive d'un dossier", () => {
       "src/app/(app)/(dossier)/dossiers/[id]/archive/ArchiveDuDossier.tsx",
     );
     // Le composant partagé, et non une mention réécrite : c'est lui qui
-    // tient la forme de l'engagement sur les six écrans qui le portent.
+    // tient la forme de l'engagement sur les écrans qui le portent.
     expect(composant).toMatch(/<SourceNote/u);
-    expect(composant).toMatch(/verifieeLe=\{regle\.verifieeLe\}/u);
+    /*
+      La mention est **répandue**, non recopiée champ par champ. Recopier
+      `source` et `verifieeLe` un par un est ce qui a laissé la provenance
+      d'un montant converti inaffichée sur quatorze écrans : la mention
+      la portait, et aucun ne la lisait. Répandue, un écran porte tout ce
+      qu'elle sait, y compris ce qu'on y ajoutera.
+    */
+    expect(composant).toMatch(/<SourceNote \{\.\.\.regle\}/u);
   });
 
   it("la source est le domaine, pas l'adresse entière", () => {

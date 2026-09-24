@@ -233,7 +233,7 @@ export function Resultats() {
           la limite de l'exercice (INV-1).
         */}
         {mention ? (
-          <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+          <SourceNote {...mention}>
             Il ne prédit aucune décision de l&apos;administration.
           </SourceNote>
         ) : null}

@@ -117,7 +117,7 @@ export function Echeancier({
         </section>
       ))}
 
-      <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+      <SourceNote {...mention}>
         Les délais administratifs béninois sont des moyennes observées, non
         garanties.
       </SourceNote>

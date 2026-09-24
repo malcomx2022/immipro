@@ -209,7 +209,7 @@ export function ArchiveDuDossier({ archive }: { archive: Archive }) {
           l'archive dit ce qu'il fallait réunir sans dire d'après qui. */}
       {regle ? (
         <footer className="border-t border-ink-300 pt-4">
-          <SourceNote source={regle.source} verifieeLe={regle.verifieeLe}>
+          <SourceNote {...regle}>
             Exigences de la version {regle.version} du référentiel. ImmiPro
             contrôle la complétude du dossier, pas la décision de
             l&apos;administration.

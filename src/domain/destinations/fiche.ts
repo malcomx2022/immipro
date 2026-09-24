@@ -21,6 +21,16 @@ export interface Mention {
   relectureLe?: string;
   /** Intitulé complet de l'autorité, affiché en tête de fiche sur P-04. */
   autorite?: string;
+  /**
+   * D'où vient le montant en francs, quand il n'est pas celui que
+   * l'autorité publie — INV-8.
+   *
+   * La source seule ne suffisait pas. `ind.nl` publie « 1 130,77 € par
+   * mois » et le candidat lisait « 8 900 838 F » : ni l'annualisation ni
+   * la conversion ne se lisaient, et la source était citée pour un chiffre
+   * qu'elle ne porte pas. Absente quand rien n'a été transformé.
+   */
+  conversion?: string;
 }
 
 /** Une ligne « intitulé / valeur » des tableaux de P-03 et P-04. */

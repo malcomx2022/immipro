@@ -94,7 +94,7 @@ export default async function PageDestinations() {
       )}
 
       {mention ? (
-        <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+        <SourceNote {...mention}>
           ImmiPro compare des exigences publiées. La décision appartient à
           l&apos;administration du pays de destination.
         </SourceNote>

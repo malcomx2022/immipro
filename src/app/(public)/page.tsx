@@ -101,7 +101,7 @@ export default async function Accueil() {
             ))}
           </div>
           {mention ? (
-            <SourceNote source={mention.source} verifieeLe={mention.verifieeLe} />
+            <SourceNote {...mention} />
           ) : null}
         </section>
       ) : (
