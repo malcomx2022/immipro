@@ -1141,7 +1141,18 @@ model Appointment {
   consentAt     DateTime?
   createdAt     DateTime          @default(now())
 
-  @@unique([consultantId, startsAt])
+  /// Un créneau n'est pris que par un rendez-vous **vivant**.
+  ///
+  /// L'unicité était totale — `@@unique([consultantId, startsAt])` — et
+  /// disait « un rendez-vous par consultant et par créneau ». La règle est
+  /// « un rendez-vous vivant », et RG-12.5 promet qu'une annulation libère
+  /// le créneau immédiatement : la ligne annulée le gelait pour toujours.
+  ///
+  /// Elle vit donc en index partiel, `appointment_creneau_vivant`, que
+  /// Prisma ne sait pas déclarer : voir `20260924100000_creneau_vivant`.
+  /// L'index ci-dessous ne contraint rien, il sert la lecture des
+  /// disponibilités.
+  @@index([consultantId, startsAt])
   @@index([applicationId, startsAt])
 }
 

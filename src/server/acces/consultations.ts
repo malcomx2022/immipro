@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { echeanceDeTenue, tenueEchue } from "@/domain/consultants/tenue";
 import { ACCORD_DUREE_JOURS } from "@/domain/consultants/access";
+import { ETATS_VIVANTS } from "@/domain/consultants/annulation";
 
 /**
  * La tenue d'un créneau, et sa confirmation — T-05, WF-12, RG-12.2.
@@ -71,9 +72,18 @@ export async function tenirLeCreneau(options: {
   const maintenant = options.maintenant ?? new Date();
   const jusqua = echeanceDeTenue(maintenant);
 
-  const existant = await db.appointment.findUnique({
+  /*
+    Le rendez-vous **vivant** de ce créneau, s'il y en a un. Pas « la ligne
+    de ce créneau » : une annulation garde sa ligne — c'est elle que la
+    ligne de remboursement cite — et elle n'occupe plus rien. L'unicité le
+    dit maintenant aussi (`appointment_creneau_vivant`), et les deux
+    lectures ne peuvent plus se contredire.
+  */
+  const existant = await db.appointment.findFirst({
     where: {
-      consultantId_startsAt: { consultantId: options.consultantId, startsAt: options.debut },
+      consultantId: options.consultantId,
+      startsAt: options.debut,
+      status: { in: [...ETATS_VIVANTS] },
     },
   });
 

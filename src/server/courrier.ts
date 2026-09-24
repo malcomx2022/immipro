@@ -422,7 +422,7 @@ export const envoyerConfirmationEntretien = ({
 ${libelleRendezVous(creneau)} · ${libelleFormat()}
 ${dossier ? `Dossier : ${dossier}\n` : ""}Référence : ${reference}
 
-Annulation ou report sans frais jusqu'au ${libelleLimiteAnnulation(creneau)}. Passé ce délai, la consultation est due.
+Annulation sans frais jusqu'au ${libelleLimiteAnnulation(creneau)}, depuis tes autorisations sur ImmiPro. Passé ce délai, la consultation est due.
 
 ${consultant} accède à ton dossier jusqu'au ${partageExpireLe}, et tu peux retirer cet accord à tout moment.
 

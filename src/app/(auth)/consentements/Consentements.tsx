@@ -17,7 +17,11 @@ import {
   MENTION_RETRAIT,
   PARTAGES_VIDES,
 } from "@/domain/consultants/access";
-import type { Partage } from "@/server/lecture/consultants";
+import {
+  MENTION_DECALAGE,
+  RENDEZ_VOUS_VIDES,
+} from "@/domain/consultants/annulation";
+import type { Partage, RendezVousDuCandidat } from "@/server/lecture/consultants";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 
@@ -155,6 +159,8 @@ export function Consentements() {
           })}
         </ul>
 
+        <RendezVous />
+
         <Partages />
 
         <div className="flex flex-col gap-2">
@@ -286,6 +292,159 @@ function Partages() {
             ))}
           </ul>
           <p className="text-pretty text-13 text-ink-500">{MENTION_RETRAIT}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Les rendez-vous à venir, et le geste que trois surfaces promettaient.
+ *
+ * `conditions()` sous les créneaux, l'écran de confirmation de paiement et
+ * le courrier de confirmation disaient tous « annulation ou report sans
+ * frais jusqu'au […] ». Rien n'annulait : le seul chemin qui annulait un
+ * rendez-vous était la suppression du compte. Un candidat qui voulait
+ * décaler une heure devait effacer son dossier.
+ *
+ * Ils sont ici, avec les accords de partage, parce que c'est le même
+ * écran : ce que le candidat a donné, et ce qu'il peut reprendre.
+ *
+ * **L'avertissement se lit avant, jamais après.** Découvrir après coup
+ * qu'une consultation a été retenue, c'est avoir été trompé — même quand
+ * la retenue est légitime. Il vient du domaine, cas par cas, et le cas qui
+ * coûte ne s'ouvre pas sur une bonne nouvelle.
+ */
+function RendezVous() {
+  const [liste, setListe] = useState<RendezVousDuCandidat[] | null>(null);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [aConfirmer, setAConfirmer] = useState<string | null>(null);
+  const [enCours, setEnCours] = useState<string | null>(null);
+  const [suite, setSuite] = useState<string | null>(null);
+  const [illisible, setIllisible] = useState(false);
+
+  const lire = useCallback(async () => {
+    const r = await appeler<{ rendezVous: RendezVousDuCandidat[] }>(
+      "/api/comptes/rendez-vous",
+    );
+    if (!r.ok) {
+      setEchec(r.echec);
+      setIllisible(true);
+      return;
+    }
+    /*
+      Une réponse sans la liste n'est pas une liste vide. Afficher « aucun
+      rendez-vous » sur une lecture qui a échoué ferait croire qu'il n'y a
+      rien à annuler, sur l'écran même où l'on vient annuler.
+    */
+    if (!Array.isArray(r.donnees.rendezVous)) {
+      setIllisible(true);
+      return;
+    }
+    setIllisible(false);
+    setListe(r.donnees.rendezVous);
+  }, []);
+
+  useEffect(() => {
+    void lire();
+  }, [lire]);
+
+  async function annuler(reference: string) {
+    setEnCours(reference);
+    setEchec(null);
+    const r = await appeler<{ mention: string }>(
+      `/api/comptes/rendez-vous/${encodeURIComponent(reference)}/annulation`,
+      { corps: {} },
+    );
+    setEnCours(null);
+    if (!r.ok) {
+      setEchec(r.echec);
+      return;
+    }
+    // La suite vient du serveur : c'est lui qui sait si un remboursement a
+    // été ouvert, et l'écrire ici en doublerait la décision.
+    setSuite(r.donnees.mention);
+    setAConfirmer(null);
+    await lire();
+  }
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-19 font-semibold text-ink-900">Rendez-vous à venir</h2>
+
+      {echec ? <BlocEchec echec={echec} /> : null}
+
+      {suite ? (
+        <p role="status" className="text-pretty text-14 text-ink-700">
+          {suite}
+        </p>
+      ) : null}
+
+      {illisible ? (
+        <p role="status" className="text-pretty text-14 text-ink-700">
+          Tes rendez-vous n&apos;ont pas pu être lus. Réessaie dans un instant : rien
+          n&apos;est perdu, et aucun rendez-vous n&apos;a été annulé.
+        </p>
+      ) : liste === null ? (
+        <p role="status" className="text-14 text-ink-700">
+          Lecture de tes rendez-vous en cours.
+        </p>
+      ) : liste.length === 0 ? (
+        <p className="text-pretty text-14 text-ink-700">{RENDEZ_VOUS_VIDES}</p>
+      ) : (
+        <>
+          <ul className="flex flex-col border-b border-ink-300">
+            {liste.map((rdv) => (
+              <li
+                key={rdv.reference}
+                className="flex flex-col gap-2 border-t border-ink-300 py-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="text-16 font-semibold text-ink-900">{rdv.quand}</span>
+                    <span className="text-pretty text-14 text-ink-700">
+                      {rdv.consultant} · {rdv.cabinet} · {rdv.dossier}
+                    </span>
+                    <span className="text-13 text-ink-500">
+                      Référence {rdv.reference} · annulation sans frais jusqu&apos;au{" "}
+                      {rdv.limite}
+                    </span>
+                  </div>
+                  {aConfirmer === rdv.reference ? null : (
+                    <Button
+                      variante="secondaire"
+                      onClick={() => {
+                        setSuite(null);
+                        setAConfirmer(rdv.reference);
+                      }}
+                    >
+                      Annuler ce rendez-vous
+                    </Button>
+                  )}
+                </div>
+
+                {/* La confirmation porte l'avertissement du cas, et non un
+                    « es-tu sûr ? » qui ne dit rien de ce qu'on perd. */}
+                {aConfirmer === rdv.reference ? (
+                  <div className="flex flex-col gap-3 rounded-lg bg-ink-100 p-4">
+                    <p className="text-pretty text-14 text-ink-900">{rdv.avertissement}</p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        chargement={enCours === rdv.reference}
+                        onClick={() => void annuler(rdv.reference)}
+                      >
+                        Confirmer l&apos;annulation
+                      </Button>
+                      <Button variante="secondaire" onClick={() => setAConfirmer(null)}>
+                        Garder ce rendez-vous
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <p className="text-pretty text-13 text-ink-500">{MENTION_DECALAGE}</p>
         </>
       )}
     </section>

@@ -163,10 +163,13 @@ export default async function PageConfirme({
             {consultation.consultant}
           </p>
           <p className="text-pretty text-14 text-ink-700">
-            Référence {consultation.reference}. Annulation ou report sans frais
-            jusqu&apos;au{" "}
-            {libelleLimiteAnnulation({ debut: consultation.debut, disponible: false })}.
-            Passé ce délai, la consultation est due.
+            Référence {consultation.reference}. Annulation sans frais jusqu&apos;au{" "}
+            {libelleLimiteAnnulation({ debut: consultation.debut, disponible: false })},
+            depuis{" "}
+            <Link href="/consentements" className="text-accent-600 underline">
+              tes autorisations
+            </Link>
+            . Passé ce délai, la consultation est due.
           </p>
           <p className="text-pretty text-13 text-ink-500">{MENTION_REVOCATION}</p>
         </section>

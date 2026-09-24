@@ -130,8 +130,22 @@ export const limiteAnnulation = (creneau: Creneau): string =>
  * Conditions affichées sous les créneaux. Le montant arrive mis en forme :
  * le domaine ne met pas une devise en forme.
  */
+/**
+ * « Report » a disparu de cette phrase, et c'est une correction.
+ *
+ * Elle l'annonçait — comme l'écran de confirmation et le courrier — sans
+ * qu'aucun mécanisme ne déplace un rendez-vous, et sans qu'aucun
+ * n'annule : `issueDeLAnnulation` n'avait que deux appelants, une lecture
+ * d'écran et la suppression de compte. Le seul moyen d'annuler une
+ * consultation était donc d'effacer son dossier.
+ *
+ * L'annulation existe désormais, et le décalage se fait en deux gestes
+ * nommés — annuler avant la limite, reprendre un créneau — qui sont dits
+ * là où on les exerce. La phrase promet ce qu'on tient : une annulation
+ * sans frais, et l'endroit où elle se prend.
+ */
 export const conditions = (prixFormate: string): string =>
-  `${prixFormate}, réglés à ImmiPro. Annulation ou report sans frais jusqu'à ${CONSULTATION_ANNULATION_HEURES} h avant le créneau ; passé ce délai, la consultation est due.`;
+  `${prixFormate}, réglés à ImmiPro. Annulation sans frais jusqu'à ${CONSULTATION_ANNULATION_HEURES} h avant le créneau, depuis tes autorisations ; passé ce délai, la consultation est due.`;
 
 export const libelleFormat = (): string =>
   `${CONSULTATION_DUREE_MINUTES} minutes en visioconférence`;

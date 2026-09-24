@@ -69,6 +69,8 @@ const { demanderLaSuppression, acheverLaSuppression } = await import(
 );
 const { TENUE_MINUTES } = await import("../src/domain/consultants/tenue");
 const { consultationDuPaiement } = await import("../src/server/lecture/paiements");
+const { annulerLeRendezVous } = await import("../src/server/consultations/annulation");
+const { rendezVousDuCandidat } = await import("../src/server/lecture/consultants");
 
 let rang = 0;
 const JOUR = 86_400_000;
@@ -455,6 +457,209 @@ try {
       (await consultationDuPaiement(transaction.reference, autre.userId)) === null,
       "et un autre candidat ne lit pas le rendez-vous de celui-ci",
     );
+  }
+
+  // ── Le candidat annule lui-même ─────────────────────────────────────
+  console.log("\nLe candidat annule son rendez-vous, et la limite décide");
+  {
+    /*
+      Trois surfaces promettaient « annulation ou report sans frais jusqu'au
+      […] » : les conditions sous les créneaux, l'écran de confirmation, le
+      courrier. `issueDeLAnnulation` n'avait que deux appelants — une lecture
+      d'écran et `acheverLaSuppression` —, si bien que le seul moyen
+      d'annuler une consultation était de supprimer son compte.
+    */
+    const c = await candidat();
+    const consultant = await leConsultant();
+    const debut = new Date(Date.now() + 9 * JOUR);
+    const tenue = await tenir(c.applicationId, consultant.id, debut, `RDV-X-${process.pid}`);
+    const transaction = await transactionDeConsultation(c.userId, c.applicationId);
+    await rattacherLePaiement(tenue.reference, transaction.id);
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date() },
+    });
+    await confirmerLaConsultation(
+      await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }),
+    );
+
+    // La surface qui manquait : le rendez-vous se lit ailleurs que dans le
+    // courrier de confirmation.
+    const liste = await rendezVousDuCandidat(c.userId);
+    verifier(liste.length === 1, `son rendez-vous se lit (${liste.length})`);
+    verifier(
+      liste[0]!.reference === tenue.reference && liste[0]!.issue === "REMBOURSABLE",
+      `avec sa référence et son issue (${liste[0]?.issue})`,
+    );
+    verifier(
+      liste[0]!.avertissement.includes("remboursée"),
+      "et l'avertissement à lire avant de confirmer",
+    );
+
+    const fait = await annulerLeRendezVous(tenue.reference, c.userId);
+    verifier(fait.issue === "REMBOURSABLE", `annulé dans la limite (${fait.issue})`);
+    verifier(fait.remboursementOuvert, "et le remboursement est ouvert");
+
+    const apres = await db.appointment.findUniqueOrThrow({
+      where: { reference: tenue.reference },
+    });
+    verifier(apres.status === "ANNULE", `le rendez-vous est annulé (${apres.status})`);
+
+    // Le créneau est libre : un autre candidat le prend.
+    const autre = await candidat();
+    const repris = await tenir(
+      autre.applicationId,
+      consultant.id,
+      debut,
+      `RDV-X2-${process.pid}`,
+    ).catch(() => null);
+    verifier(repris !== null, "et le créneau est repris par quelqu'un d'autre");
+
+    // L'accès du consultant ne survit pas au dernier rendez-vous (RG-12.2).
+    verifier(
+      (await db.consultantAccess.count({
+        where: {
+          applicationId: c.applicationId,
+          consultantId: consultant.id,
+          revokedAt: null,
+        },
+      })) === 0,
+      "l'accès du consultant est retiré",
+    );
+
+    const dette = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(
+      dette.refundDueAt !== null && dette.refundedAt === null,
+      "la dette est ouverte et non réglée : la notification signée fera foi",
+    );
+    verifier(
+      (await db.auditLog.count({
+        where: { action: "paiement.remboursement", target: `transaction:${transaction.id}` },
+      })) === 1,
+      "et le mouvement d'argent porte sa ligne au journal",
+    );
+
+    // Second appui : rien ne s'ouvre deux fois.
+    const second = await annulerLeRendezVous(tenue.reference, c.userId)
+      .then(() => "acceptée")
+      .catch((e: unknown) => codeDe(e));
+    verifier(second === "etat_incompatible", `un second appui est refusé (${second})`);
+    verifier(
+      (await db.auditLog.count({
+        where: { action: "paiement.remboursement", target: `transaction:${transaction.id}` },
+      })) === 1,
+      "et n'ouvre pas un second remboursement",
+    );
+
+    verifier(
+      (await rendezVousDuCandidat(c.userId)).length === 0,
+      "la liste ne montre plus ce rendez-vous",
+    );
+  }
+
+  console.log("\nPassé la limite, le créneau se libère et la somme reste due");
+  {
+    const c = await candidat();
+    const consultant = await leConsultant();
+    // Dans les vingt-quatre heures : la limite stockée est déjà passée.
+    const debut = new Date(Date.now() + 3 * 3_600_000);
+    const tenue = await tenir(c.applicationId, consultant.id, debut, `RDV-D-${process.pid}`);
+    const transaction = await transactionDeConsultation(c.userId, c.applicationId);
+    await rattacherLePaiement(tenue.reference, transaction.id);
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date() },
+    });
+    await confirmerLaConsultation(
+      await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }),
+    );
+
+    const fait = await annulerLeRendezVous(tenue.reference, c.userId);
+    verifier(fait.issue === "FRAIS_DUS", `les frais restent dus (${fait.issue})`);
+    verifier(!fait.remboursementOuvert, "et aucun remboursement n'est ouvert");
+    verifier(
+      (await db.appointment.findUniqueOrThrow({ where: { reference: tenue.reference } }))
+        .status === "ANNULE",
+      "le créneau se libère quand même : un consultant qui attend perd son heure",
+    );
+    verifier(
+      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }))
+        .refundDueAt === null,
+      "et la somme n'est pas rendue",
+    );
+
+    // Et deux repreneurs simultanés du créneau libéré : un seul passe.
+    const [x, y] = [await candidat(), await candidat()];
+    const course = await Promise.allSettled([
+      tenir(x.applicationId, consultant.id, debut, `RDV-D1-${process.pid}`),
+      tenir(y.applicationId, consultant.id, debut, `RDV-D2-${process.pid}`),
+    ]);
+    const gagnants = course.filter((r) => r.status === "fulfilled").length;
+    verifier(
+      gagnants === 1,
+      `un seul reprend le créneau libéré, malgré la simultanéité (${gagnants})`,
+    );
+
+    // Le rendez-vous de quelqu'un d'autre ne s'annule pas.
+    const tiers = await candidat();
+    const vole = await annulerLeRendezVous(tenue.reference, tiers.userId)
+      .then(() => "acceptée")
+      .catch((e: unknown) => codeDe(e));
+    verifier(vole === "introuvable", `ni celui d'un autre candidat (${vole})`);
+  }
+
+  console.log("\nLa suppression de compte libère le créneau, pour de bon");
+  {
+    /*
+      RG-12.5, K.C : « une suppression de compte annule les rendez-vous à
+      venir et **libère les créneaux immédiatement** ».
+      `acheverLaSuppression` écrit `ANNULE` en le croyant, mais l'unicité
+      ne connaissait pas les états : la ligne annulée gelait le créneau
+      pour toujours. `creneaux()` l'affichait libre — elle lit `RESERVE`,
+      `REPORTE` et les tenues en cours —, et `tenirLeCreneau` butait.
+      Le candidat remplissait l'accord de partage pour lire un refus.
+    */
+    const partant = await candidat();
+    const consultant = await leConsultant();
+    const debut = new Date(Date.now() + 13 * JOUR);
+    const tenue = await tenir(
+      partant.applicationId,
+      consultant.id,
+      debut,
+      `RDV-S-${process.pid}`,
+    );
+    const transaction = await transactionDeConsultation(
+      partant.userId,
+      partant.applicationId,
+    );
+    await rattacherLePaiement(tenue.reference, transaction.id);
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date() },
+    });
+    await confirmerLaConsultation(
+      await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }),
+    );
+
+    await demanderLaSuppression(partant.userId);
+    await acheverLaSuppression(partant.userId);
+
+    verifier(
+      (await db.appointment.findUniqueOrThrow({ where: { reference: tenue.reference } }))
+        .status === "ANNULE",
+      "le rendez-vous est annulé, et sa ligne reste",
+    );
+
+    const suivant = await candidat();
+    const repris = await tenir(
+      suivant.applicationId,
+      consultant.id,
+      debut,
+      `RDV-S2-${process.pid}`,
+    )
+      .then(() => "repris")
+      .catch((e: unknown) => codeDe(e));
+    verifier(repris === "repris", `et le créneau est bien libre (${repris})`);
   }
 } finally {
   await db.$disconnect().catch(() => {});

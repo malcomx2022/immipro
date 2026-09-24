@@ -118,3 +118,132 @@ const liste = (r: readonly RendezVousConcerne[]) => r.map((x) => x.quand).join("
  */
 export const MENTION_DELAI_REMBOURSEMENT =
   "Le remboursement part vers le moyen de paiement utilisé. Il reste visible dans tes reçus, qui survivent à la suppression.";
+
+/* ------------------------------------------------------------------ *
+ * L'annulation par le candidat lui-même.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Le geste que trois surfaces promettaient, et qu'aucune n'offrait.
+ *
+ * `conditions()` s'affiche sous les créneaux, avant le paiement ; l'écran
+ * de confirmation le répète ; le courrier de confirmation le répète
+ * encore : « **Annulation ou report sans frais** jusqu'au [date]. Passé ce
+ * délai, la consultation est due. »
+ *
+ * Aucune route n'annulait. `issueDeLAnnulation` avait deux appelants —
+ * une lecture d'écran, et `acheverLaSuppression` — si bien que le seul
+ * moyen d'annuler une consultation était de **supprimer son compte**. Un
+ * candidat qui voulait décaler une heure devait effacer son dossier.
+ *
+ * Ce qui manquait n'était pas la règle : RG-12.5 la fixe déjà, et le
+ * traitement existe en entier — la limite stockée, la libération du
+ * créneau, l'ouverture du remboursement. Il manquait le geste.
+ *
+ * **Le report n'est pas ici**, et c'est volontaire. Déplacer un rendez-vous
+ * demande de savoir si le consultant y consent, si son ancien créneau se
+ * libère avant que le nouveau soit tenu, et ce qu'il advient du paiement
+ * entre les deux : trois arbitrages que WF-12 ne porte pas. Annuler avant
+ * la limite est remboursé et reprendre un créneau est libre : la phrase le
+ * dit ainsi désormais, en deux gestes nommés plutôt qu'en un mot qui
+ * n'existait pas.
+ */
+export const ETATS_ANNULABLES = ["RESERVE", "REPORTE"] as const;
+
+export type RefusDAnnulation =
+  /** Déjà annulé, ou jamais confirmé : il n'y a rien à annuler. */
+  | "sans_objet"
+  /** Le créneau est passé. On n'annule pas ce qui a eu lieu. */
+  | "passe";
+
+/**
+ * Peut-on encore annuler ? Deux refus, et ils n'ont pas le même remède.
+ *
+ * Le créneau passé est le seul cas où l'annulation n'a plus de sens : la
+ * consultation a eu lieu, ou elle n'a pas été honorée, et ni l'un ni
+ * l'autre ne se défait. C'est aussi le cas que la limite ne couvre pas —
+ * `FRAIS_DUS` dit « les frais restent dus », pas « c'est trop tard ».
+ */
+export function refusDeLAnnulation(
+  rendezVous: { etat: string; debut: Date },
+  maintenant: Date,
+): RefusDAnnulation | null {
+  if (!(ETATS_ANNULABLES as readonly string[]).includes(rendezVous.etat)) return "sans_objet";
+  if (rendezVous.debut.getTime() <= maintenant.getTime()) return "passe";
+  return null;
+}
+
+/**
+ * Ce que le candidat lit **avant** de confirmer son annulation.
+ *
+ * Même règle que l'avertissement de suppression : découvrir après coup
+ * qu'une consultation a été retenue, c'est avoir été trompé — même quand
+ * la retenue est légitime. Le cas qui coûte se lit en entier, et il ne
+ * s'ouvre pas sur une bonne nouvelle.
+ */
+export function avertissementAnnulation(rendezVous: RendezVousConcerne): string {
+  return rendezVous.issue === "REMBOURSABLE"
+    ? `Ton rendez-vous du ${rendezVous.quand} sera annulé et la consultation remboursée. Le créneau redevient libre immédiatement, et tu peux en reprendre un autre.`
+    : `La consultation du ${rendezVous.quand} reste due : la limite de ${CONSULTATION_ANNULATION_HEURES} h acceptée à la réservation est passée. Le créneau sera libéré, et la somme ne sera pas rendue.`;
+}
+
+/** Ce que le candidat lit une fois l'annulation faite. */
+export function suiteDeLAnnulation(issue: IssueAnnulation): string {
+  return issue === "REMBOURSABLE"
+    ? `Ton rendez-vous est annulé et le remboursement est parti. ${MENTION_DELAI_REMBOURSEMENT}`
+    : "Ton rendez-vous est annulé et le créneau est libéré. La consultation reste due : la limite acceptée à la réservation était passée.";
+}
+
+export const MOTIF_REMBOURSEMENT_ANNULATION =
+  "Annulation par le candidat avant la limite d'annulation (RG-12.5)";
+
+/**
+ * L'état vide de la liste des rendez-vous.
+ *
+ * Il dit où l'on prend un rendez-vous, parce qu'une liste vide sans issue
+ * laisse chercher : c'est la règle des états vides du projet.
+ */
+export const RENDEZ_VOUS_VIDES =
+  "Tu n'as aucun rendez-vous à venir. Un rendez-vous se prend depuis l'annuaire des consultants, dossier par dossier.";
+
+/**
+ * Ce que la liste dit sous elle, et que la promesse taisait.
+ *
+ * « Report » figurait dans les trois phrases qui annoncent les conditions,
+ * sans qu'aucun mécanisme ne déplace un rendez-vous. Décaler se fait en
+ * deux gestes nommés — annuler avant la limite, reprendre un créneau —, et
+ * les nommer vaut mieux qu'un mot qui n'existait pas.
+ */
+export const MENTION_DECALAGE =
+  "Pour décaler un rendez-vous, annule-le avant sa limite et reprends le créneau qui te convient : l'annulation est alors remboursée et les créneaux libres se choisissent comme la première fois.";
+
+/**
+ * Les états dans lesquels un rendez-vous **occupe** son créneau — RG-12.5.
+ *
+ * L'unicité de la base était totale : une ligne par consultant et par
+ * créneau, quel que soit son état. Elle disait donc qu'un rendez-vous
+ * annulé garde son horaire, et RG-12.5 promet l'inverse — « une
+ * suppression de compte annule les rendez-vous à venir et libère les
+ * créneaux immédiatement ».
+ *
+ * Les deux surfaces se contredisaient sans que rien ne les confronte :
+ * `creneaux()` lisait les horaires occupés depuis `RESERVE`, `REPORTE` et
+ * les tenues en cours, donc affichait le créneau **libre** ;
+ * `tenirLeCreneau` butait sur l'unicité, donc répondait « ce créneau vient
+ * d'être pris ». Le candidat remplissait l'accord de partage pour lire un
+ * refus. Établi par exécution, avant correction :
+ *
+ *     ✓ le rendez-vous est annulé (ANNULE)
+ *     ✗ et le créneau est repris par quelqu'un d'autre
+ *
+ * `libererLaTenue` avait diagnostiqué la cause sans que personne n'en
+ * tire la conséquence : « une ligne annulée occuperait le créneau au
+ * regard de l'unicité, qui ne connaît pas les états. »
+ *
+ * Trois états, et la liste est celle de l'unicité partielle de la base
+ * (`appointment_creneau_vivant`) : une seule règle, à deux endroits qui ne
+ * peuvent plus diverger. `TENU` y figure quelle que soit son échéance —
+ * une tenue échue est reprise par une mise à jour, pas par une seconde
+ * ligne.
+ */
+export const ETATS_VIVANTS = ["TENU", "RESERVE", "REPORTE"] as const;

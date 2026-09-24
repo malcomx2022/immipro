@@ -25,6 +25,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Le miroir de `refuse` : ce qu'une contrainte ne doit **pas** bloquer.
+-- Une unicité trop large se voit à ce qu'elle refuse de trop, et un fichier
+-- qui ne sait dire que « refusé » ne l'attraperait jamais.
+CREATE OR REPLACE FUNCTION passe(intitule text, ecriture text) RETURNS text AS $$
+BEGIN
+  BEGIN
+    EXECUTE ecriture;
+  EXCEPTION WHEN others THEN
+    RETURN '  BLOQUÉ   · ' || intitule || ' → ' || SQLERRM;
+  END;
+  RETURN '  posé     · ' || intitule;
+END;
+$$ LANGUAGE plpgsql;
+
 BEGIN;
 
 SELECT refuse(
@@ -587,6 +601,40 @@ SELECT refuse(
        'TENU', now() + interval '3 days'
        FROM "Application" a, "Consultant" c LIMIT 1$q$);
 
+-- Un créneau n'est pris que par un rendez-vous vivant — RG-12.5.
+--
+-- L'unicité était totale : une ligne annulée gardait son horaire, et
+-- RG-12.5 promet l'inverse. Les deux essais qui suivent tiennent les deux
+-- moitiés de la règle : deux rendez-vous vivants ne partagent pas un
+-- créneau, et un rendez-vous mort n'en occupe aucun.
+
+INSERT INTO "Appointment" (id, reference, "applicationId", "consultantId",
+    "startsAt", "durationMin", status, "freeUntil", "heldUntil")
+  SELECT 'rv10', 'RV-ESSAI-10', a.id, c.id, now() + interval '9 days', 45,
+    'TENU', now() + interval '8 days', now() + interval '10 minutes'
+    FROM "Application" a, "Consultant" c LIMIT 1;
+
+SELECT refuse(
+  'T-05 · un second rendez-vous vivant sur un créneau déjà tenu',
+  $q$INSERT INTO "Appointment" (id, reference, "applicationId", "consultantId",
+       "startsAt", "durationMin", status, "freeUntil", "heldUntil")
+     SELECT 'rv11', 'RV-ESSAI-11', a.id, c.id, now() + interval '9 days', 45,
+       'TENU', now() + interval '8 days', now() + interval '10 minutes'
+       FROM "Application" a, "Consultant" c LIMIT 1$q$);
+
+-- Et l'inverse, qui doit passer : le créneau annulé se reprend. Une
+-- unicité partielle qui refuserait aussi celle-ci gèlerait le créneau tout
+-- autant, et c'est le défaut qu'elle corrige.
+UPDATE "Appointment" SET status = 'ANNULE', "heldUntil" = NULL WHERE id = 'rv10';
+
+SELECT passe(
+  'T-05 · le créneau d''un rendez-vous annulé se reprend',
+  $q$INSERT INTO "Appointment" (id, reference, "applicationId", "consultantId",
+       "startsAt", "durationMin", status, "freeUntil", "heldUntil")
+     SELECT 'rv12', 'RV-ESSAI-12', a.id, c.id, now() + interval '9 days', 45,
+       'TENU', now() + interval '8 days', now() + interval '10 minutes'
+       FROM "Application" a, "Consultant" c LIMIT 1$q$);
+
 -- ── Le remboursement sortant — arbitrage du 22/09/2026 ─────────────────
 
 -- Une transaction confirmée dont le remboursement est décidé, et le
@@ -616,3 +664,4 @@ SELECT refuse(
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);
+DROP FUNCTION IF EXISTS passe(text, text);
