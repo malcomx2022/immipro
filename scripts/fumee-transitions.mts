@@ -324,11 +324,18 @@ try {
       la requête les re-sélectionne — ils sont de nouveau `PRET` — et c'est
       `alertedAt` qui les écarte. Sans elle, arbitrer une divergence
       exposait à la recevoir une seconde fois.
+
+      Celui qui n'a rien arbitré est re-sélectionné aussi : il est
+      `SUSPENDU`, et cet état est de ceux que la passe prévient depuis
+      qu'elle a cessé de perdre le dossier qu'elle met elle-même en pause.
+      C'est `alertedAt` qui l'écarte, lui aussi — la marque, et non le
+      filtre d'état. La règle se dit donc ainsi, et non par un compte :
+      aucun dossier re-sélectionné n'est réalerté.
     */
     const reprise = await propagerLaPublication(v2.id);
     verifier(
-      reprise.alertes === 0 && reprise.dejaAlertes === 1,
-      `la reprise ne réalerte pas le dossier qui a arbitré (${JSON.stringify(reprise)})`,
+      reprise.alertes === 0 && reprise.dejaAlertes === reprise.dossiers,
+      `la reprise ne réalerte aucun dossier déjà prévenu (${JSON.stringify(reprise)})`,
     );
     const total = await db.notification.count({
       where: { applicationId: trois[0]!.application.id, kind: "REGLEMENTATION" },

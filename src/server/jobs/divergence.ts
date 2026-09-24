@@ -10,7 +10,7 @@ import {
 } from "@/domain/rules/comparaison";
 import { envoyerAlerteCritique } from "@/server/courrier";
 import { suiteDeLEnvoi } from "@/domain/courrier/transport";
-import { miseEnEtat } from "@/domain/dossiers/etat";
+import { ETATS_A_PREVENIR, miseEnEtat } from "@/domain/dossiers/etat";
 import { editorialDe } from "@/lib/contenu/destinations";
 import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 
@@ -145,7 +145,16 @@ export async function propagerLaPublication(
   */
   const dossiers = await db.application.findMany({
     where: {
-      status: { in: ["ACTIF", "PRET"] },
+      /*
+        Trois états, et le dernier est celui que cette passe écrit
+        elle-même : un dossier mis en pause par une divergence critique
+        qu'il n'a pas encore arbitrée. Il en sortait de la liste, et la
+        publication suivante ne le voyait plus — sa seule divergence
+        visant une version que celle-ci venait d'archiver, il restait sans
+        issue. La liste des états vit dans le domaine, avec le
+        raisonnement.
+      */
+      status: { in: [...ETATS_A_PREVENIR] },
       user: COMPTE_JOIGNABLE,
       visaRule: {
         countryCode: nouvelle.countryCode,
