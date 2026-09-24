@@ -47,6 +47,16 @@ export const CE_QUE_CONTIENT: readonly string[] = [
   "Les textes que tu as rédigés ici, dans toutes leurs versions.",
   "Tes reçus de paiement, tes analyses consommées et tes autorisations.",
   "Pour chaque dossier : le palier de complétude, les manques dans l'ordre où ils te sont présentés, et ce qui a pesé pour l'établir.",
+  /*
+    Les décisions que le candidat a prises lui-même, et que l'export ne
+    rendait pas : son arbitrage quand une règle change (T-02), sa réponse
+    à une proposition de partenaire (T-03). L'en-tête de la lecture dit
+    que l'export « couvre le compte entier », et `CE_QUE_NE_CONTIENT_PAS`
+    existe pour annoncer les manques avant le bouton — ces deux-là
+    n'étaient ni dans l'un ni dans l'autre.
+  */
+  "Tes décisions : ce que tu as choisi quand une règle a changé sur un dossier, et ta réponse à chaque proposition de partenaire.",
+  "Tes rendez-vous avec un consultant : date, durée, cabinet et suite donnée.",
 ];
 
 /**
@@ -61,6 +71,57 @@ export const CE_QUE_NE_CONTIENT_PAS: readonly string[] = [
   // sur l'écran qui propose de le produire.
   "La pondération interne des facteurs de complétude. L'export dit ce qui a pesé et dans quel ordre, pas avec quels coefficients.",
 ];
+
+/**
+ * Ce que l'export rend, table par table — et ce qu'il ne rend pas.
+ *
+ * ── Deux décisions du candidat n'y étaient pas ──────────────────────
+ *
+ * L'en-tête de la lecture dit que l'export « couvre le compte entier », et
+ * `CE_QUE_NE_CONTIENT_PAS` existe pour annoncer les manques **avant** le
+ * bouton. Deux tables échappaient aux deux : `RuleMigration`, qui porte
+ * l'arbitrage rendu quand une règle change (T-02), et `PartnerReferral`,
+ * qui porte la réponse à une proposition de partenaire (T-03). Ce sont ses
+ * décisions, prises sur ses écrans, et le fichier n'en disait rien.
+ * Constaté en exécution sur un compte qui avait les deux.
+ *
+ * Le champ `rendezVous` de la racine, lui, valait `[]` sur un compte qui
+ * en avait : une liste vide ne renvoie pas vers les dossiers, elle dit
+ * qu'il n'y en a aucun.
+ *
+ * ── Pourquoi une table plutôt qu'une relecture ──────────────────────
+ *
+ * Un oubli d'export ne se voit pas : le fichier produit est bien formé, il
+ * lui manque seulement une clé que personne ne cherche. La table ci-dessous
+ * oblige à décider, relation par relation, et un essai la compare au schéma
+ * Prisma — une relation ajoutée au compte ou au dossier sans décision ne
+ * passe plus.
+ *
+ * `false` est une décision écrite, pas un oubli : elle dit pourquoi.
+ */
+export const EXPORTE: Record<string, true | string> = {
+  // Sur le compte
+  profile: true,
+  consents: true,
+  applications: true,
+  transactions: true,
+  notifications: true,
+  aiUsage:
+    "Comptage de jetons par opération (INV-6). C'est une mesure de notre consommation, pas une donnée fournie par la personne ; son équivalent lisible — les analyses consommées — est exporté depuis `AnalysisCredit`.",
+  sessions:
+    "Empreintes de session et dates de connexion. Les exporter rendrait un fichier qui, volé, dit où et quand se connecter ; la liste des appareils se consulte à l'écran, où elle se révoque.",
+  secrets:
+    "Empreintes de mot de passe et secrets d'authentification. Rien de ce qui protège le compte ne sort du serveur.",
+  // Sur un dossier
+  documents: true,
+  deadlines: true,
+  credits: true,
+  migrations: true,
+  appointments: true,
+  referrals: true,
+  accesses:
+    "Accords de partage avec un consultant. Ils se lisent et se révoquent à l'écran ; leur export reste à trancher, comme le journal d'audit des accès administrateurs à une pièce (RG-15.1).",
+};
 
 export const MENTION_FORMAT =
   "Le fichier est au format JSON. Il s'ouvre dans un éditeur de texte, et se relit par un autre service.";

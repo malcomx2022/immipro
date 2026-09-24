@@ -143,6 +143,7 @@ process.env.MINIO_BUCKET_QUARANTAINE = SEAU_QUARANTAINE;
 
 const { db } = await import("../src/lib/db");
 const { purgerLesPiecesEchues, ANALYSE_PURGEE_CORPS } = await import("../src/server/jobs/purge");
+const { donneesDuCompte } = await import("../src/server/lecture/portabilite");
 const { demanderLaSuppression, acheverLesSuppressionsEnAttente } = await import(
   "../src/server/acces/suppression"
 );
@@ -208,6 +209,134 @@ async function dossierEchu(nombreDePieces = 1) {
   }
 
   return { user, application, cles };
+}
+
+/**
+ * Un compte qui a **un de chaque**, pour que la garde sur l'export ait
+ * quelque chose à mesurer : une liste vide y est alors un champ qui ne se
+ * remplit jamais, et non un compte qui n'a rien fait.
+ */
+async function unCompteComplet() {
+  const { user, application } = await dossierEchu(1);
+  const regleA = await db.visaRule.create({
+    data: {
+      countryCode: "NL", visaType: "ETUDES", category: "ETUDES", version: 1,
+      effectiveFrom: new Date("2026-01-01"), rules: {},
+      sourceUrl: "https://ind.nl/regle", sourceTier: "OFFICIEL",
+      verifiedAt: new Date("2026-01-01"), verifiedBy: "fumée",
+      nextReviewAt: new Date("2027-01-01"), status: "PUBLISHED",
+    },
+  });
+  const regleB = await db.visaRule.create({
+    data: {
+      countryCode: "NL", visaType: "ETUDES", category: "ETUDES", version: 2,
+      effectiveFrom: new Date("2026-06-01"), rules: {},
+      sourceUrl: "https://ind.nl/regle", sourceTier: "OFFICIEL",
+      verifiedAt: new Date("2026-06-01"), verifiedBy: "fumée",
+      nextReviewAt: new Date("2027-06-01"), status: "PUBLISHED",
+    },
+  });
+  await db.application.update({
+    where: { id: application.id },
+    data: { visaRuleId: regleA.id, targetDate: new Date("2027-09-01") },
+  });
+
+  /*
+    Une pièce qui manque, pour que `completude.manques` ait de quoi se
+    remplir : un compte « qui a un de chaque » doit aussi avoir un manque,
+    sans quoi la garde ne saurait pas distinguer une liste vide parce que
+    rien ne l'écrit d'une liste vide parce qu'il n'y a rien à dire.
+  */
+  await db.document.create({
+    data: {
+      applicationId: application.id, code: "RELEVE", label: "Relevé bancaire",
+      status: "ATTENDUE", required: true, remedy: "TELEVERSER",
+    },
+  });
+
+  await db.profile.create({
+    data: { userId: user.id, objectif: "Étudier", highestDegree: "Licence" },
+  });
+  await db.consent.create({
+    data: { userId: user.id, kind: "PIECES_IDENTITE", granted: true, version: "1.0" },
+  });
+  await db.transaction.create({
+    data: {
+      userId: user.id, applicationId: application.id,
+      reference: `IMP-EXP-${process.pid}`, packCode: "dossier",
+      amount: 29, currency: "EUR", provider: "STRIPE", status: "CONFIRMEE",
+      confirmedAt: new Date(),
+    },
+  });
+  await db.notification.create({
+    data: {
+      userId: user.id, applicationId: application.id, kind: "REGLEMENTATION",
+      title: "Une exigence a changé", body: "Le montant à prouver augmente.",
+    },
+  });
+  await db.deadline.create({
+    data: {
+      applicationId: application.id, code: "depot", label: "Dépôt du dossier",
+      dueAt: new Date("2027-06-01"),
+    },
+  });
+  await db.analysisCredit.create({
+    data: { applicationId: application.id, delta: 30, reason: "ACHAT_PACK" },
+  });
+  await db.documentVersion.updateMany({
+    where: { document: { applicationId: application.id } },
+    data: { body: "Lettre de motivation." },
+  });
+  const version = await db.documentVersion.findFirstOrThrow({
+    where: { document: { applicationId: application.id } },
+  });
+  await db.critiqueFinding.create({
+    data: {
+      versionId: version.id, kind: "INCOHERENCE", title: "Une date diverge",
+      body: "La date de naissance du passeport et celle du diplôme diffèrent.",
+      gaps: [{ champ: "naissance" }] as never,
+    },
+  });
+
+  // Les deux décisions du candidat, qui n'étaient pas dans l'export.
+  await db.ruleMigration.create({
+    data: {
+      applicationId: application.id, fromRuleId: regleA.id, toRuleId: regleB.id,
+      impact: "MAJEUR", diff: [] as never, alertedAt: new Date(),
+      decision: "CONSERVER", decidedAt: new Date(),
+    },
+  });
+  const partenaire = await db.partner.create({
+    data: {
+      name: "Agence de logement", kind: "LOGEMENT", url: "https://exemple.test",
+      commissionBps: 1000, active: true,
+    },
+  });
+  await db.partnerReferral.create({
+    data: {
+      partnerId: partenaire.id, applicationId: application.id,
+      step: "PIECE_0", motive: "logement à l'arrivée",
+      commissionBps: 1000, status: "DECLINEE",
+    },
+  });
+
+  const consultant = await db.consultant.create({
+    data: {
+      name: "Mme Koffi", firm: "Cabinet Koffi", city: "Cotonou",
+      qualification: "Conseil en mobilité", responseHours: 24,
+      languages: ["fr"], active: true,
+    },
+  });
+  await db.appointment.create({
+    data: {
+      reference: `RDV-EXP-${process.pid}`, applicationId: application.id,
+      consultantId: consultant.id, startsAt: new Date("2026-10-01T09:00:00Z"),
+      durationMin: 45, freeUntil: new Date("2026-09-29T09:00:00Z"),
+      heldUntil: new Date("2026-09-25T09:00:00Z"), status: "TENU",
+    },
+  });
+
+  return { userId: user.id, applicationId: application.id };
 }
 
 const enStockage = (cle: string) => seau(SEAU_CONFIANCE).has(cle);
@@ -544,6 +673,57 @@ try {
       },
     });
     verifier(sansEcheance >= 1, `mais la sonde de rétention le compte (${sansEcheance})`);
+  }
+
+  // ── C-10 : l'export rend ce que le compte porte ────────────────────
+  /*
+    Le champ `rendezVous` de la racine valait `[]`, avec pour commentaire
+    qu'il « reste pour qu'un lecteur qui cherche rendezVous à la racine
+    trouve où regarder plutôt que de conclure qu'il n'y en a pas ». Une
+    liste vide ne dit pas cela : elle dit qu'il n'y en a aucun. Et deux
+    décisions du candidat — son arbitrage quand une règle change (T-02),
+    sa réponse à une proposition de partenaire (T-03) — n'étaient dans
+    aucune des deux listes de l'écran, ni dans le fichier.
+
+    La garde porte sur la forme : **sur un compte qui a un de chaque,
+    aucune liste de l'export n'est vide.** Une liste constamment vide est
+    un champ qui ne se remplit jamais, et c'est exactement ce qu'était
+    `rendezVous`.
+  */
+  console.log("\nC-10 — sur un compte qui a un de chaque, aucune liste de l'export n'est vide");
+  {
+    const compte = await unCompteComplet();
+    const exporte = await donneesDuCompte(compte.userId);
+
+    /*
+      Deux niveaux, et deux seulement : les listes de la racine et celles
+      d'un dossier. Ce sont celles que l'export produit toujours, et dont
+      une constamment vide est un champ que rien ne remplit — ce qu'était
+      `rendezVous`.
+
+      Plus bas, le vide est légitime et fréquent : une pièce jamais
+      déposée n'a ni version ni entretien, et l'exiger ferait décrire à
+      cette garde un compte que le produit ne sait pas produire.
+    */
+    const vides: string[] = [];
+    const listesVides = (objet: object, chemin: string): void => {
+      for (const [cle, valeur] of Object.entries(objet)) {
+        if (Array.isArray(valeur) && valeur.length === 0) vides.push(`${chemin}.${cle}`);
+      }
+    };
+    listesVides(exporte, "export");
+    for (const [i, dossier] of (exporte.dossiers as object[]).entries()) {
+      listesVides(dossier, `export.dossiers[${i}]`);
+    }
+    verifier(vides.length === 0, `aucune liste vide (${vides.join(", ") || "—"})`);
+
+    const texte = JSON.stringify(exporte);
+    verifier(texte.includes("CONSERVER"), "l'arbitrage rendu par le candidat y est (T-02)");
+    verifier(texte.includes("DECLINEE"), "sa réponse à une proposition de partenaire y est (T-03)");
+    verifier(
+      (exporte.rendezVous as unknown[]).length === 1,
+      `et la racine porte ses rendez-vous (${(exporte.rendezVous as unknown[]).length})`,
+    );
   }
 
 } finally {
