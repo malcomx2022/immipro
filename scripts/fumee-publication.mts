@@ -1798,6 +1798,111 @@ try {
     );
   }
 
+  /*
+    P-01 — la demande d'une destination survit à la republication de sa règle.
+
+    Le classement de la page d'accueil rapprochait les dossiers de la règle
+    **publiée** du jour, par identifiant. Un dossier fige sa version (INV-3)
+    et une publication archive la précédente : le lendemain d'une
+    republication, tous les dossiers d'une destination cessaient de compter
+    pour elle. RG-14.1 impose une relecture régulière — cela arrive donc
+    tout le temps.
+
+    Ce bloc est le dernier, et il repart d'une base de dossiers vide : le
+    classement se mesure sur une population, et celle des blocs précédents
+    la rendrait illisible. Il publie par le vrai chemin, `publierLaRegle`,
+    parce que c'est lui qui archive la version d'avant — une ligne
+    `ARCHIVED` écrite à la main décrirait l'état sans prouver qu'on y arrive.
+  */
+  console.log("\nP-01 — republier une règle n'efface pas la demande de sa destination");
+  {
+    const { destinationsEnVedette, DOSSIERS_POUR_CLASSER } = await import(
+      "../src/server/lecture/destinations"
+    );
+    await db.application.deleteMany({});
+
+    /** Un dossier de plus sur cette version. */
+    async function dossiersSur(regleId: string, combien: number) {
+      for (let i = 0; i < combien; i += 1) {
+        rang += 1;
+        const candidat = await db.user.create({
+          data: { email: `fumee-vedette-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+        });
+        await db.application.create({ data: { userId: candidat.id, visaRuleId: regleId } });
+      }
+    }
+
+    // La destination néerlandaise, republiée : l'essentiel de ses dossiers
+    // reste figé sur la version d'avant.
+    const nlV1 = await version(avecSeuil(ACTUEL), "PUBLISHED", AUTRE.email);
+    await dossiersSur(nlV1.id, DOSSIERS_POUR_CLASSER - 5);
+
+    /*
+      Ce que fait une publication à la version d'avant, et que les blocs
+      plus haut de ce fichier éprouvent sur `publierLaRegle` lui-même :
+      elle l'archive. Ici on part de cet état, parce que ce qui est en
+      cause est la lecture — un dossier figé sur une version archivée
+      compte-t-il encore pour sa destination ?
+    */
+    await db.visaRule.update({
+      where: { id: nlV1.id },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    const nlV2 = await version(avecSeuil(ACTUEL), "PUBLISHED", AUTRE.email);
+    await dossiersSur(nlV2.id, 1);
+
+    // Une seconde destination, jamais republiée, avec moins de dossiers.
+    const ch = REGLES_DE_REFERENCE.find((r) => r.countryCode === "CH")!;
+    rang += 1;
+    const suisse = await db.visaRule.create({
+      data: {
+        countryCode: ch.countryCode,
+        visaType: ch.visaType,
+        category: ch.category as never,
+        version: 900 + rang,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: ch.rules as never,
+        sourceUrl: ch.sourceUrl,
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date(),
+        verifiedBy: AUTRE.email,
+        nextReviewAt: new Date("2027-01-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    await dossiersSur(suisse.id, 10);
+
+    const vedettes = await destinationsEnVedette();
+    const ordre = vedettes.destinations.map((d) => d.fiche.pays);
+    verifier(
+      vedettes.intitule === "Destinations les plus demandées",
+      `le classement a de quoi se dire classement (« ${vedettes.intitule} »)`,
+    );
+    verifier(
+      ordre.indexOf("Pays-Bas") < ordre.indexOf("Suisse"),
+      `la destination republiée garde sa demande (${ordre.join(" > ")})`,
+    );
+
+    /*
+      Et le seuil porte sur les dossiers qui nourrissent le classement. Il
+      se comptait sur tous ceux de la base : trente dossiers sur une
+      destination retirée ouvraient un classement que deux alimentaient.
+    */
+    await db.application.deleteMany({});
+    await db.visaRule.updateMany({
+      where: { countryCode: "NL", visaType: "emploi_kennismigrant", status: "PUBLISHED" },
+      data: { status: "ARCHIVED", effectiveTo: new Date("2026-06-01") },
+    });
+    await dossiersSur(nlV1.id, DOSSIERS_POUR_CLASSER);
+    await dossiersSur(suisse.id, 2);
+    const maigre = await destinationsEnVedette();
+    verifier(
+      maigre.intitule === "Destinations couvertes",
+      `un classement que deux dossiers alimentent ne s'annonce pas (« ${maigre.intitule} »)`,
+    );
+  }
+
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

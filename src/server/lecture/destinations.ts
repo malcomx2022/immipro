@@ -1,6 +1,13 @@
 import type { VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
-import { mentionDe, payload, reglePubliieParSlug, reglesPubliees, versFiche } from "@/server/acces/regles";
+import {
+  mentionDe,
+  payload,
+  reglePubliieParSlug,
+  reglesPubliees,
+  versFiche,
+  versionsDesDestinations,
+} from "@/server/acces/regles";
 import type { FicheDestination, Mention } from "@/domain/destinations/fiche";
 import { versXOF, MENTION_NON_COMPARABLE, type DeviseSource } from "@/domain/format/change";
 
@@ -76,39 +83,104 @@ export interface Vedettes {
  */
 export const DOSSIERS_POUR_CLASSER = 30;
 
+/**
+ * La demande d'une destination, toutes versions de sa règle confondues.
+ *
+ * ── Le classement ne comptait qu'une version sur n ─────────────────────
+ *
+ * Il rapprochait les dossiers de la règle **publiée** du jour, par
+ * identifiant. Or un dossier fige la version sur laquelle il a été ouvert
+ * (INV-3), et une publication archive la précédente : le lendemain d'une
+ * republication, tous les dossiers d'une destination cessent de compter
+ * pour elle. RG-14.1 impose une relecture régulière — cela arrive donc
+ * tout le temps, et non par accident.
+ *
+ * Constaté en exécution, Pays-Bas republié une fois, vingt dossiers restés
+ * sur la version d'avant et deux sur la nouvelle, Suisse jamais republiée
+ * avec dix :
+ *
+ *     intitulé  : Destinations les plus demandées
+ *     ordre     : Suisse > Pays-Bas
+ *     demande réelle : Pays-Bas 22 · Suisse 10
+ *
+ * La destination est le couple pays / procédure, pas une de ses versions.
+ * La demande se compte donc sur toutes les règles de ce couple, quel que
+ * soit leur état : ce qui est publié décide de ce qui s'affiche, pas de ce
+ * qui s'est demandé.
+ */
+async function demandeParSlug(
+  publiees: readonly VisaRule[],
+): Promise<Map<string, number>> {
+  const couples = publiees.map((r) => ({ countryCode: r.countryCode, visaType: r.visaType }));
+  if (couples.length === 0) return new Map();
+
+  // Toutes les versions des couples affichés — archivées comprises. La
+  // lecture passe par le module d'accès, seul du serveur à interroger le
+  // référentiel pour un candidat (INV-4) ; elle n'en rend que des
+  // identifiants, et rien de ce qui est compté ne s'affiche.
+  const versions = await versionsDesDestinations(couples);
+  const slugParVersion = new Map<string, string>();
+  for (const publiee of publiees) {
+    const fiche = versFiche(publiee);
+    if (!fiche) continue;
+    for (const version of versions) {
+      if (version.countryCode === publiee.countryCode && version.visaType === publiee.visaType) {
+        slugParVersion.set(version.id, fiche.slug);
+      }
+    }
+  }
+
+  const ouverts = await db.application.groupBy({
+    by: ["visaRuleId"],
+    where: { visaRuleId: { in: [...slugParVersion.keys()] } },
+    _count: { _all: true },
+  });
+
+  const demande = new Map<string, number>();
+  for (const publiee of publiees) {
+    const slug = versFiche(publiee)?.slug;
+    if (slug) demande.set(slug, demande.get(slug) ?? 0);
+  }
+  for (const ouvert of ouverts) {
+    const slug = ouvert.visaRuleId ? slugParVersion.get(ouvert.visaRuleId) : undefined;
+    if (slug) demande.set(slug, (demande.get(slug) ?? 0) + ouvert._count._all);
+  }
+  return demande;
+}
+
 export async function destinationsEnVedette(combien = 3): Promise<Vedettes> {
   const { fiches } = await fichesPubliees();
   if (fiches.length === 0) return { destinations: [], intitule: "Destinations couvertes", mention: null };
 
-  const ouverts = await db.application.groupBy({
-    by: ["visaRuleId"],
-    where: { visaRuleId: { not: null } },
-    _count: { _all: true },
-  });
-  const total = ouverts.reduce((n, o) => n + o._count._all, 0);
-
   const regles = await reglesPubliees();
-  const demandeParSlug = new Map<string, number>();
+  const demande = await demandeParSlug(regles);
+  const reglePar = new Map<string, VisaRule>();
   for (const regle of regles) {
     const fiche = versFiche(regle);
-    if (!fiche) continue;
-    const compte = ouverts.find((o) => o.visaRuleId === regle.id)?._count._all ?? 0;
-    demandeParSlug.set(fiche.slug, (demandeParSlug.get(fiche.slug) ?? 0) + compte);
+    if (fiche && !reglePar.has(fiche.slug)) reglePar.set(fiche.slug, regle);
   }
 
+  /*
+    Le seuil porte sur les dossiers qui **nourrissent** le classement, et
+    non sur tous ceux de la base. Il se comptait sur l'ensemble des
+    dossiers portant une règle, destinations retirées comprises : trente
+    dossiers pouvaient donc ouvrir un classement que deux d'entre eux
+    alimentaient. « Trente dossiers ouverts, c'est peu pour trancher entre
+    trois pays » ne dit rien d'autre — encore faut-il que ce soient les
+    trente de ces pays-là.
+  */
+  const total = [...demande.values()].reduce((n, compte) => n + compte, 0);
   const classable = total >= DOSSIERS_POUR_CLASSER;
   const ordonnees = classable
-    ? [...fiches].sort(
-        (a, b) => (demandeParSlug.get(b.slug) ?? 0) - (demandeParSlug.get(a.slug) ?? 0),
-      )
+    ? [...fiches].sort((a, b) => (demande.get(b.slug) ?? 0) - (demande.get(a.slug) ?? 0))
     : fiches;
 
   const retenues = ordonnees.slice(0, combien);
   return {
     destinations: retenues.map((fiche) => ({
       fiche,
-      cout: libelleCout(regles.find((r) => versFiche(r)?.slug === fiche.slug)),
-      fenetre: libelleFenetre(regles.find((r) => versFiche(r)?.slug === fiche.slug)),
+      cout: libelleCout(reglePar.get(fiche.slug)),
+      fenetre: libelleFenetre(reglePar.get(fiche.slug)),
     })),
     intitule: classable ? "Destinations les plus demandées" : "Destinations couvertes",
     mention: mentionLaPlusAncienne(retenues),
