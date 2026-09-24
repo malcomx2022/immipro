@@ -13,6 +13,7 @@ import { PieceDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/pieces/[piec
 import { Cloture } from "@/app/(app)/(dossier)/dossiers/[id]/cloture/Cloture";
 import { Depot } from "@/app/(app)/(dossier)/dossiers/[id]/depot/Depot";
 import { CONSERVATION_SOUMIS_MOIS } from "@/domain/dossiers/conservation";
+import { PREFERENCES_PAR_DEFAUT, phraseDesRappels } from "@/domain/dossiers/preferences-rappels";
 import {
   ANALYSE_RESSOURCES,
   PIECES_NL,
@@ -39,6 +40,8 @@ const DOSSIER = dossierParId("nl-4471")!;
  * autre chose que la lecture.
  */
 const AUJOURDHUI = "2026-09-18";
+/** Les réglages d'origine, sur un transport qui a prouvé qu'il envoie. */
+const RAPPELS = phraseDesRappels(PREFERENCES_PAR_DEFAUT, "OPERATIONNEL");
 
 const attestation = PIECES_NL.find((p) => p.id === "attestation-de-ressources")!;
 const motivation = PIECES_NL.find((p) => p.id === "lettre-motivation")!;
@@ -442,7 +445,7 @@ describe("C-10 — Échéancier", () => {
   };
   const VERDICT = evaluerLeCalendrier(CALENDRIER);
   it("groupe les échéances par mois et dit ce que chaque date implique", async () => {
-    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />);
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} rappels={RAPPELS} />);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Échéancier");
     expect(screen.getByRole("heading", { name: "Octobre 2026" })).toBeDefined();
     expect(container.textContent).toContain(
@@ -451,12 +454,12 @@ describe("C-10 — Échéancier", () => {
   });
 
   it("marque la pièce périssable comme une date au plus tôt", async () => {
-    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />);
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} rappels={RAPPELS} />);
     expect(container.textContent).toContain("Pièce périssable — date au plus tôt");
   });
 
   it("ne garantit pas les délais administratifs", async () => {
-    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />);
+    const { container } = render(<Echeancier dossier={DOSSIER} echeances={ECHEANCES_NL} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} rappels={RAPPELS} />);
     expect(container.textContent).toContain(
       "des moyennes observées, non garanties",
     );
@@ -490,6 +493,7 @@ describe("C-10 — Échéancier", () => {
         aujourdhui={AUJOURDHUI}
         verdict={evaluerLeCalendrier(mort)}
         proposition={premiereDateCibleTenable(mort)}
+        rappels={RAPPELS}
       />,
     );
     expect(container.textContent).toContain("ne peut plus arriver à temps");
@@ -521,6 +525,7 @@ describe("C-10 — Échéancier", () => {
         aujourdhui={AUJOURDHUI}
         verdict={VERDICT}
         proposition={null}
+        rappels={RAPPELS}
       />,
     );
     const texte = container.textContent ?? "";
@@ -534,6 +539,29 @@ describe("C-10 — Échéancier", () => {
     expect(texte).toMatch(/Rien n'est\s+envoyé par SMS/u);
   });
 
+  /**
+   * S.87 — le lien « modifier » revient, parce que l'écran existe. Et la
+   * phrase suit le transport : indisponible, elle ne promet plus l'email.
+   */
+  it("remet le lien vers le réglage, et ne promet pas un email qui ne part pas", () => {
+    const { container } = render(
+      <Echeancier
+        dossier={DOSSIER}
+        echeances={ECHEANCES_NL}
+        aujourdhui={AUJOURDHUI}
+        verdict={VERDICT}
+        proposition={null}
+        rappels={phraseDesRappels(PREFERENCES_PAR_DEFAUT, "INDISPONIBLE")}
+      />,
+    );
+    const texte = container.textContent ?? "";
+    expect(texte).not.toContain("rappel par email");
+    expect(texte).toContain("dans tes alertes");
+    expect(texte).toContain("indisponible");
+    const lien = screen.getByRole("link", { name: "Modifier mes rappels" });
+    expect(lien.getAttribute("href")).toMatch(/^\/compte\/rappels\?retour=/u);
+  });
+
   /** « Changer la date de dépôt » menait à un écran qui ne la change pas. */
   it("remplace le lien inerte par le champ qui écrit vraiment", () => {
     render(
@@ -543,6 +571,7 @@ describe("C-10 — Échéancier", () => {
         aujourdhui={AUJOURDHUI}
         verdict={VERDICT}
         proposition={null}
+        rappels={RAPPELS}
       />,
     );
     expect(screen.queryByRole("link", { name: "Changer la date de dépôt" })).toBeNull();
@@ -552,7 +581,7 @@ describe("C-10 — Échéancier", () => {
   it("dit ce qu'il manque au brouillon plutôt que d'afficher un calendrier vide", () => {
     const brouillon = dossierParId("de-8820")!;
     const { container } = render(
-      <Echeancier dossier={brouillon} echeances={[]} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} />,
+      <Echeancier dossier={brouillon} echeances={[]} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} rappels={RAPPELS} />,
     );
     expect(container.textContent).toContain("L'échéancier attend ta date de départ");
   });

@@ -8,9 +8,15 @@
  * - qu'un courrier parte réellement, et une seule fois ;
  * - qu'une urgence déjà rappelée ne reparte pas le lendemain — la marque
  *   est en base, et c'est elle qui tient la promesse ;
- * - qu'un dossier déposé ou clôturé ne reçoive rien ;
- * - qu'une coupure du serveur ne marque rien, pour que la passe du
- *   lendemain reprenne le rappel au lieu de le perdre.
+ * - que deux passes simultanées n'envoient qu'un courrier : la clé
+ *   `echeance:<dossier>:<jour local>` est unique en base (S.87) ;
+ * - qu'un dossier déposé ou clôturé, un compte en suppression, des
+ *   rappels coupés, une pièce déjà déposée ne reçoivent rien ;
+ * - que l'email coupé laisse la notification, sans courrier ;
+ * - que le rappel attende huit heures dans le fuseau du candidat ;
+ * - qu'une coupure du serveur laisse le courrier **en attente**, jamais
+ *   « envoyé », et que l'heure suivante le reprenne ;
+ * - qu'un transport absent ne se dise pas parti.
  *
  * Le serveur SMTP est local, sur un port éphémère de la boucle locale.
  * **Aucun message ne quitte la machine.**
@@ -96,14 +102,23 @@ process.env.SMTP_FROM = "ne-pas-repondre@immipro.test";
 
 const { db } = await import("../src/lib/db");
 const { envoyerLesRappels } = await import("../src/server/jobs/rappels");
+const { brancherTransport, TRANSPORT_JOURNAL } = await import("../src/server/courrier");
 const { CADENCE_JOURS } = await import("../src/domain/dossiers/rappels");
 
 let rang = 0;
-const jour = (n: number, depuis = new Date()) => {
+/*
+  Toutes les passes partent d'un instant fixe : midi UTC, treize heures à
+  Cotonou. Depuis S.87 un rappel attend huit heures chez le candidat, et
+  une fumée lancée à minuit ne doit pas conclure à une panne.
+*/
+const BASE = new Date();
+BASE.setUTCHours(12, 0, 0, 0);
+const jour = (n: number, depuis = BASE) => {
   const d = new Date(depuis);
   d.setUTCDate(d.getUTCDate() + n);
   return d;
 };
+const heures = (n: number, depuis = BASE) => new Date(depuis.getTime() + n * 3_600_000);
 
 /** Un candidat, son dossier, et les échéances qu'on lui donne. */
 async function dossierAvec(
@@ -113,6 +128,14 @@ async function dossierAvec(
     dernierRappel?: Date | null;
     /** Compte dont la suppression est demandée mais pas encore achevée. */
     suppressionDemandee?: boolean;
+    preferences?: {
+      remindersEnabled?: boolean;
+      reminderEmail?: boolean;
+      reminderTimeZone?: string;
+      reminderLeadDays?: number;
+    };
+    /** Pièces déjà déposées, par code. */
+    piecesDeposees?: string[];
   } = {},
 ) {
   rang += 1;
@@ -121,6 +144,7 @@ async function dossierAvec(
       email: `fumee-rap-${rang}-${process.pid}@exemple.test`,
       role: "CANDIDAT",
       ...(options.suppressionDemandee ? { deletionRequestedAt: jour(-2) } : {}),
+      ...(options.preferences ?? {}),
     },
   });
   const regle = await db.visaRule.create({
@@ -155,15 +179,20 @@ async function dossierAvec(
       code: e.code,
       label: `Faire ${e.code}`,
       dueAt: jour(e.jours),
-      ...(e.faite ? { doneAt: new Date() } : {}),
+      ...(e.faite ? { doneAt: jour(-1) } : {}),
     })),
   });
+  for (const code of options.piecesDeposees ?? []) {
+    await db.document.create({
+      data: { applicationId: application.id, code, label: code, status: "EN_ANALYSE" },
+    });
+  }
   return { user, application };
 }
 
 const courriersVers = (email: string) => recus.filter((r) => r.vers.includes(email));
-const notifications = (userId: string) =>
-  db.notification.count({ where: { userId, kind: "ECHEANCE" } });
+const notificationsDe = (userId: string) =>
+  db.notification.findMany({ where: { userId, kind: "ECHEANCE" }, orderBy: { createdAt: "asc" } });
 
 try {
   console.log("\nUne échéance dépassée part tout de suite, et une seule fois");
@@ -171,184 +200,202 @@ try {
     recus.length = 0;
     const p = await dossierAvec([{ code: "test_langue", jours: -3 }]);
 
-    const premier = await envoyerLesRappels();
+    const premier = await envoyerLesRappels(BASE);
     verifier(premier.urgences === 1, `un rappel d'urgence part (${JSON.stringify(premier)})`);
     verifier(courriersVers(p.user.email).length === 1, "un courrier, et un seul, atteint le candidat");
-    verifier((await notifications(p.user.id)) === 1, "et une notification l'attend à l'écran");
+    const [n] = await notificationsDe(p.user.id);
+    verifier(n?.emailStatus === "ENVOYE" && n.emailSentAt !== null, "la notification dit le courrier parti, avec sa date");
+    verifier(/^echeance:.+:\d{4}-\d{2}-\d{2}$/u.test(n?.dedupKey ?? ""), `et porte sa clé du jour (${n?.dedupKey})`);
 
     const contenu = courriersVers(p.user.email)[0]?.contenu ?? "";
     verifier(/d=C3=A9pass|dépass/u.test(contenu), "le courrier dit que l'échéance est dépassée");
-    /*
-      INV-1 et INV-2 : un rappel informe d'une date. Il ne dit pas ce
-      qu'une date manquée coûterait — c'est précisément ce qu'un courrier
-      d'échéance est tenté de faire pour obtenir une réaction.
-    */
-    verifier(
-      !/refus|rejet|chances|risque/iu.test(contenu),
-      "et ne dit rien de l'issue de la démarche",
-    );
+    verifier(!/refus|rejet|chances|risque/iu.test(contenu), "et ne dit rien de l'issue de la démarche");
+    verifier(/Pays-Bas/u.test(contenu), "il nomme la destination de la règle figée, pas ses codes");
 
-    // Le lendemain : la marque est en base, rien ne repart.
+    // Une heure plus tard, puis le lendemain : rien ne repart.
+    await envoyerLesRappels(heures(1));
     const second = await envoyerLesRappels(jour(1));
     verifier(second.urgences === 0, `le lendemain, rien ne repart (${second.urgences})`);
     verifier(courriersVers(p.user.email).length === 1, "toujours un seul courrier");
+  }
+
+  console.log("\nDeux passes le même jour : un courrier, une notification");
+  {
+    recus.length = 0;
+    const p = await dossierAvec([{ code: "rdv", jours: 3 }]);
+    /*
+      Simultanées : selon l'ordre où elles lisent, la seconde voit le
+      dossier déjà marqué ou bute sur la clé. Dans les deux cas, un seul
+      rappel. Le courrier peut rester en attente si le serveur a été
+      pris de court : la passe suivante le reprend, sans le doubler.
+    */
+    await Promise.all([envoyerLesRappels(BASE), envoyerLesRappels(BASE)]);
+    verifier(courriersVers(p.user.email).length <= 1, "jamais deux courriers");
+    verifier((await notificationsDe(p.user.id)).length === 1, "une seule notification est écrite");
+    await envoyerLesRappels(heures(1));
+    verifier(courriersVers(p.user.email).length === 1, "une passe suivante complète sans doubler");
+
+    /*
+      La collision, rendue certaine : une seconde passe qui aurait lu le
+      dossier **avant** que la première écrive. On efface les marques pour
+      la placer dans cet état ; seule la clé peut alors l'arrêter.
+    */
+    await db.application.update({ where: { id: p.application.id }, data: { lastReminderAt: null } });
+    await db.deadline.updateMany({ where: { applicationId: p.application.id }, data: { remindedAt: null } });
+    const rejouee = await envoyerLesRappels(heures(2));
+    verifier(rejouee.doublons === 1, `la passe rejouée bute sur la clé (${rejouee.doublons})`);
+    verifier(courriersVers(p.user.email).length === 1, "et n'envoie rien");
+    verifier((await notificationsDe(p.user.id)).length === 1, "ni n'écrit de seconde alerte");
+    const relu = await db.application.findUniqueOrThrow({ where: { id: p.application.id } });
+    verifier(relu.lastReminderAt === null, "la transaction refusée n'a rien marqué");
   }
 
   console.log("\nLa cadence hebdomadaire tient, et l'urgence lui échappe");
   {
     recus.length = 0;
     const p = await dossierAvec([{ code: "depot", jours: 25 }]);
-
-    /*
-      Les bilans sont globaux — la base porte les dossiers des blocs
-      précédents. Ce qui s'affirme ici se compte donc sur **ce
-      candidat-là**, ce qui est de toute façon la bonne unité : la
-      cadence est une promesse faite à une personne.
-    */
-    await envoyerLesRappels();
+    await envoyerLesRappels(BASE);
     verifier(courriersVers(p.user.email).length === 1, "la première passe part");
     await envoyerLesRappels(jour(CADENCE_JOURS - 1));
     verifier(courriersVers(p.user.email).length === 1, "rien avant une semaine");
     await envoyerLesRappels(jour(CADENCE_JOURS));
     verifier(courriersVers(p.user.email).length === 2, "la semaine suivante, oui");
 
-    /*
-      Et l'urgence lui échappe pour de bon, ce que ce bloc annonçait dans
-      son titre sans le vérifier.
-
-      C'est ici, et non dans un essai d'unité, que le couplage se joue :
-      la passe hebdomadaire écrit `remindedAt` sur **toutes** les
-      échéances qu'elle porte, et c'est cette écriture-là qui rendait le
-      chemin d'urgence inatteignable — une échéance portée à vingt-cinq
-      jours n'entrait plus jamais dans une urgence, parce que le domaine
-      lisait la seule présence d'un rappel. Un montage qui poserait la
-      date à la main laisserait la régression repasser.
-    */
     const marquee = await db.deadline.findFirstOrThrow({
       where: { applicationId: p.application.id, code: "depot" },
     });
     verifier(marquee.remindedAt !== null, "la passe a marqué l'échéance lointaine");
 
     const avant = courriersVers(p.user.email).length;
-    // Dix-huit jours plus tard, l'échéance à vingt-cinq jours en est à sept.
     const bilan = await envoyerLesRappels(jour(18));
-    verifier(
-      courriersVers(p.user.email).length === avant + 1,
-      `un courrier part le jour de l'entrée dans la fenêtre (${JSON.stringify(bilan)})`,
-    );
-    /*
-      Et c'est bien une urgence, pas une passe hebdomadaire arrivée à
-      échéance de cadence : l'objet voyage encodé dans le corps MIME, et
-      le bilan de l'ouvrier est la lecture qui ne se discute pas.
-    */
+    verifier(courriersVers(p.user.email).length === avant + 1, `un courrier part à l'entrée dans la fenêtre (${JSON.stringify(bilan)})`);
     verifier(bilan.urgences === 1, `le motif est l'urgence (${bilan.urgences})`);
-
-    // Une seule fois : le lendemain, la cadence reprend seule.
     await envoyerLesRappels(jour(19));
-    verifier(
-      courriersVers(p.user.email).length === avant + 1,
-      "le lendemain, l'urgence ne repart pas",
-    );
+    verifier(courriersVers(p.user.email).length === avant + 1, "le lendemain, l'urgence ne repart pas");
   }
 
-  console.log("\nUn dossier déposé ou clôturé ne reçoit rien");
+  console.log("\nHuit heures chez le candidat, pas chez le serveur");
+  {
+    recus.length = 0;
+    const p = await dossierAvec([{ code: "rdv", jours: 3 }], {
+      preferences: { reminderTimeZone: "America/Toronto" },
+    });
+    // Onze heures UTC : sept heures à Montréal (heure d'été) ou six (hiver).
+    const tot = await envoyerLesRappels(heures(-1));
+    verifier(courriersVers(p.user.email).length === 0, `rien avant huit heures à Montréal (${tot.avantLHeure} en attente d'heure)`);
+    // Quatorze heures UTC : huit ou neuf heures à Montréal — la passe rattrape.
+    await envoyerLesRappels(heures(2));
+    verifier(courriersVers(p.user.email).length === 1, "la passe suivante rattrape le rappel");
+  }
+
+  console.log("\nCe qui ne reçoit rien");
   {
     recus.length = 0;
     const soumis = await dossierAvec([{ code: "depot", jours: -2 }], { statut: "SOUMIS" });
     const archive = await dossierAvec([{ code: "depot", jours: -2 }], { statut: "ARCHIVE" });
-    await envoyerLesRappels();
-    verifier(
-      courriersVers(soumis.user.email).length === 0 &&
-        courriersVers(archive.user.email).length === 0,
-      "aucun courrier ne part vers eux",
-    );
-    /*
-      Et rien n'est marqué : un dossier hors du périmètre n'est pas
-      « déjà rappelé », il est hors du périmètre. La nuance compte le
-      jour où il y rentre — un dossier repassé de SUSPENDU à ACTIF doit
-      recevoir sa passe, pas attendre une semaine de plus.
-    */
-    for (const d of [soumis, archive]) {
+    const coupe = await dossierAvec([{ code: "depot", jours: -2 }], {
+      preferences: { remindersEnabled: false },
+    });
+    const faite = await dossierAvec([{ code: "depot", jours: -2, faite: true }]);
+    const deposee = await dossierAvec([{ code: "casier", jours: 2 }], { piecesDeposees: ["casier"] });
+    const partant = await dossierAvec([{ code: "depot", jours: -5 }], { suppressionDemandee: true });
+    await envoyerLesRappels(BASE);
+    for (const [nom, d] of Object.entries({ soumis, archive, coupe, faite, deposee, partant })) {
+      verifier(
+        courriersVers(d.user.email).length === 0 && (await notificationsDe(d.user.id)).length === 0,
+        `${nom} : ni courrier ni alerte`,
+      );
+    }
+    for (const d of [soumis, archive, coupe]) {
       const relu = await db.application.findUniqueOrThrow({ where: { id: d.application.id } });
       verifier(relu.lastReminderAt === null, `${relu.status} : rien n'est marqué`);
     }
   }
 
-  console.log("\nUne échéance faite ne se rappelle pas");
+  console.log("\nL'email coupé : l'alerte reste, aucun courrier");
   {
     recus.length = 0;
-    const p = await dossierAvec([{ code: "depot", jours: -2, faite: true }]);
-    const bilan = await envoyerLesRappels();
-    verifier(bilan.urgences === 0 && bilan.hebdomadaires === 0, "rien ne part");
-    verifier(courriersVers(p.user.email).length === 0, "et le candidat n'est pas dérangé");
+    const p = await dossierAvec([{ code: "rdv", jours: 2 }], { preferences: { reminderEmail: false } });
+    const bilan = await envoyerLesRappels(BASE);
+    const [n] = await notificationsDe(p.user.id);
+    verifier(courriersVers(p.user.email).length === 0, "aucun courrier ne part");
+    verifier(n !== undefined && n.emailStatus === null, "la notification est écrite, sans état de courrier");
+    verifier(bilan.alertesSeules >= 1, `le bilan le compte à part (${bilan.alertesSeules})`);
   }
 
-  console.log("\nUne coupure du serveur ne marque rien : la passe du lendemain reprend");
+  console.log("\nUne coupure du serveur : en attente, jamais « envoyé », reprise l'heure suivante");
   {
     recus.length = 0;
     const p = await dossierAvec([{ code: "rdv", jours: 4 }]);
 
     refuser = true;
-    const rate = await envoyerLesRappels();
+    const rate = await envoyerLesRappels(BASE);
     refuser = false;
-    verifier(rate.aReprendre === 1, `l'envoi est compté à reprendre (${JSON.stringify(rate)})`);
+    verifier(rate.aReprendre >= 1, `le courrier est compté à reprendre (${JSON.stringify(rate)})`);
     verifier(courriersVers(p.user.email).length === 0, "aucun courrier n'est parti");
-    /*
-      La marque n'est pas posée : marquer d'abord ferait d'une panne de
-      messagerie un rappel définitivement perdu, et c'est la panne la
-      plus banale de la chaîne.
-    */
-    const dossier = await db.application.findUniqueOrThrow({ where: { id: p.application.id } });
-    verifier(dossier.lastReminderAt === null, "et rien n'est marqué en base");
-    verifier((await notifications(p.user.id)) === 0, "aucune notification non plus");
+    let [n] = await notificationsDe(p.user.id);
+    verifier(n?.emailStatus === "EN_ATTENTE" && n.emailSentAt === null, "la notification est là, son courrier en attente");
 
-    const repris = await envoyerLesRappels(jour(1));
-    verifier(repris.urgences === 1, `le lendemain, le rappel repart (${repris.urgences})`);
-    verifier(courriersVers(p.user.email).length === 1, "et le courrier atteint le candidat");
+    const repris = await envoyerLesRappels(heures(1));
+    [n] = await notificationsDe(p.user.id);
+    verifier(repris.envoyes >= 1, `l'heure suivante, le courrier repart (${JSON.stringify(repris)})`);
+    verifier(courriersVers(p.user.email).length === 1, "et atteint le candidat, une fois");
+    verifier(n?.emailStatus === "ENVOYE" && n.emailAttempts === 2, `deux tentatives, la seconde acceptée (${n?.emailAttempts})`);
+    verifier((await notificationsDe(p.user.id)).length === 1, "toujours une seule notification");
   }
 
-  console.log("\nLa base refuse un rappel postérieur à l'accomplissement");
-  console.log("  (l'erreur Prisma qui suit est la garde qui se déclenche — c'est l'attendu)");
+  console.log("\nUne coupure qui dure : le lendemain, le courrier n'est plus repris");
+  {
+    recus.length = 0;
+    const p = await dossierAvec([{ code: "rdv", jours: 4 }]);
+    refuser = true;
+    await envoyerLesRappels(BASE);
+    refuser = false;
+    // Le lendemain à 7 h 30 à Cotonou : avant l'heure du nouveau rappel,
+    // mais le jour du courrier en attente est passé.
+    await envoyerLesRappels(new Date(jour(1).getTime() - 5.5 * 3_600_000));
+    const [n] = await notificationsDe(p.user.id);
+    verifier(n?.emailStatus === "NON_ENVOYE", `le courrier d'hier est abandonné (${n?.emailStatus})`);
+    verifier(courriersVers(p.user.email).length === 0, "et son texte d'hier ne part pas aujourd'hui");
+  }
+
+  console.log("\nUn transport absent ne se dit pas parti");
+  {
+    recus.length = 0;
+    const p = await dossierAvec([{ code: "rdv", jours: 2 }]);
+    brancherTransport(TRANSPORT_JOURNAL);
+    const bilan = await envoyerLesRappels(BASE);
+    brancherTransport(null);
+    const [n] = await notificationsDe(p.user.id);
+    verifier(n?.emailStatus === "NON_ENVOYE", `le courrier est « non envoyé » (${n?.emailStatus})`);
+    verifier(bilan.envoyes === 0 && bilan.sansCourrier >= 1, `le bilan ne compte aucun envoi (${JSON.stringify(bilan)})`);
+  }
+
+  console.log("\nLa base refuse ce qui contredirait l'état");
+  console.log("  (les erreurs Prisma qui suivent sont les gardes qui se déclenchent — c'est l'attendu)");
   {
     const p = await dossierAvec([{ code: "depot", jours: 10 }]);
-    const echeance = await db.deadline.findFirstOrThrow({
-      where: { applicationId: p.application.id },
-    });
-    await db.deadline.update({
-      where: { id: echeance.id },
-      data: { doneAt: jour(-5) },
-    });
+    const echeance = await db.deadline.findFirstOrThrow({ where: { applicationId: p.application.id } });
+    await db.deadline.update({ where: { id: echeance.id }, data: { doneAt: jour(-5) } });
     const refusee = await db.deadline
       .update({ where: { id: echeance.id }, data: { remindedAt: new Date() } })
       .then(() => false)
       .catch(() => true);
     verifier(refusee, "rappeler une échéance déjà faite est refusé par la base");
-  }
-  console.log("\nRG-10.4 — on n'écrit pas à qui a demandé l'oubli");
-  {
-    /*
-      Entre la demande de suppression et l'anonymisation, le compte existe
-      encore et `deletedAt` est nul — c'est l'état qu'ouvre une panne du
-      stockage objet, et il dure jusqu'à la reprise du lendemain. La passe
-      ne regardait que `deletedAt` : elle relançait donc quelqu'un qui
-      venait de demander à partir.
-    */
-    const partant = await dossierAvec([{ code: "depot", jours: -5 }], {
-      suppressionDemandee: true,
-    });
-    const bilan = await envoyerLesRappels();
-    verifier(
-      bilan.urgences === 0,
-      `aucun rappel ne part pour lui (${JSON.stringify(bilan)})`,
-    );
-    verifier(
-      courriersVers(partant.user.email).length === 0,
-      "aucun courrier ne l'atteint",
-    );
-    verifier(
-      (await notifications(partant.user.id)) === 0,
-      "et aucune alerte ne l'attend à l'écran",
-    );
+
+    const sansDate = await db.notification
+      .create({
+        data: { userId: p.user.id, kind: "ECHEANCE", title: "t", body: "b", emailStatus: "ENVOYE" },
+      })
+      .then(() => false)
+      .catch(() => true);
+    verifier(sansDate, "un courrier « envoyé » sans date d'envoi est refusé");
+
+    const delai = await db.user
+      .update({ where: { id: p.user.id }, data: { reminderLeadDays: 5 } })
+      .then(() => false)
+      .catch(() => true);
+    verifier(delai, "un délai d'alerte hors de trois, sept, quatorze est refusé");
   }
 } finally {
   await db.$disconnect().catch(() => undefined);
@@ -360,4 +407,4 @@ if (echecs.length > 0) {
   console.error(`\n${echecs.length} vérification(s) en échec.`);
   process.exit(1);
 }
-console.log("\nLes rappels partent quand il faut, et une seule fois.");
+console.log("\nLes rappels partent quand il faut, une seule fois, et ne se disent partis que s'ils le sont.");

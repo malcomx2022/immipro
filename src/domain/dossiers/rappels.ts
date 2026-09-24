@@ -100,9 +100,17 @@ export function echeanceVivante(
   return jours <= horizonJours;
 }
 
-/** Urgente : à moins de sept jours, ou déjà dépassée. */
-export const echeanceUrgente = (echeance: EcheanceARappeler, aujourdhui: string): boolean =>
-  joursEntre(aujourdhui, echeance.date) <= JOURS_URGENCE;
+/**
+ * Urgente : à moins de `joursUrgence` jours, ou déjà dépassée.
+ *
+ * Sept par défaut, comme le dit RG-09.2 ; le candidat peut choisir trois
+ * ou quatorze depuis ses préférences (S.87, `DELAIS_D_ALERTE`).
+ */
+export const echeanceUrgente = (
+  echeance: EcheanceARappeler,
+  aujourdhui: string,
+  joursUrgence: number = JOURS_URGENCE,
+): boolean => joursEntre(aujourdhui, echeance.date) <= joursUrgence;
 
 /**
  * L'horizon d'un rappel hebdomadaire.
@@ -156,9 +164,12 @@ export const HORIZON_HEBDOMADAIRE_JOURS = 30;
  * pas le lendemain. Elle continue de figurer dans la passe hebdomadaire,
  * qui porte tout ce qui vient dans le mois.
  */
-export function urgenceJamaisAnnoncee(echeance: EcheanceARappeler): boolean {
+export function urgenceJamaisAnnoncee(
+  echeance: EcheanceARappeler,
+  joursUrgence: number = JOURS_URGENCE,
+): boolean {
   if (echeance.rappeleeLe === null) return true;
-  return joursEntre(echeance.rappeleeLe, echeance.date) > JOURS_URGENCE;
+  return joursEntre(echeance.rappeleeLe, echeance.date) > joursUrgence;
 }
 
 /**
@@ -177,6 +188,8 @@ export function urgenceJamaisAnnoncee(echeance: EcheanceARappeler): boolean {
 export function rappelDuJour(
   dossier: DossierARappeler,
   aujourdhui: string,
+  /** Le délai d'alerte choisi par le candidat — RG-09.2 par défaut. */
+  joursUrgence: number = JOURS_URGENCE,
 ): Rappel | null {
   const vivantes = (horizon: number) =>
     dossier.echeances
@@ -184,7 +197,9 @@ export function rappelDuJour(
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date));
 
-  const urgentes = vivantes(JOURS_URGENCE).filter((e) => echeanceUrgente(e, aujourdhui));
+  const urgentes = vivantes(joursUrgence).filter((e) =>
+    echeanceUrgente(e, aujourdhui, joursUrgence),
+  );
 
   /*
     Une urgence déjà annoncée ne repart pas. La comparaison porte sur la
@@ -194,9 +209,9 @@ export function rappelDuJour(
     porte sur la distance à la date, non sur la seule présence d'un
     rappel — un courrier parti un mois avant n'a annoncé aucune urgence.
   */
-  const nouvelles = urgentes.filter(urgenceJamaisAnnoncee);
+  const nouvelles = urgentes.filter((e) => urgenceJamaisAnnoncee(e, joursUrgence));
   if (nouvelles.length > 0) {
-    const portees = vivantes(JOURS_URGENCE);
+    const portees = vivantes(joursUrgence);
     return {
       motif: "urgence",
       echeances: portees,
@@ -259,8 +274,18 @@ function corps(
     ...lignes,
     "",
     "Ouvre ton échéancier pour voir le détail de chaque date et ce qu'elle demande.",
+    /*
+      Le courrier dit d'où il vient et comment l'arrêter. Un rappel qu'on
+      ne sait pas couper se fait classer en indésirable, et le filtre
+      emporte ensuite les courriers qui comptaient.
+    */
+    MENTION_REGLAGE,
   ].join("\n");
 }
+
+/** La dernière ligne de chaque rappel : d'où il vient, et où il se règle. */
+export const MENTION_REGLAGE =
+  "Tu reçois ce rappel parce que tes rappels d'échéance sont activés. Tu peux les régler ou les couper depuis ton compte, rubrique « Rappels ».";
 
 /** « dans 4 jours », « aujourd'hui », « dépassée de 3 jours ». */
 export function delai(aujourdhui: string, date: string): string {

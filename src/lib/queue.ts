@@ -17,7 +17,8 @@ export const JOBS = {
    * la messagerie ». Le transport SMTP a été branché le matin même, et
    * la phrase est devenue fausse sans que rien ne bouge — un candidat
    * dont une échéance était dépassée depuis trois jours ne recevait
-   * toujours rien. Le worker la planifie désormais chaque jour.
+   * toujours rien. Le worker la planifie désormais toutes les heures (S.87) :
+   * chaque candidat reçoit son rappel à huit heures dans son fuseau.
    */
   RAPPEL_ECHEANCIER: "echeancier.rappel",
   /**

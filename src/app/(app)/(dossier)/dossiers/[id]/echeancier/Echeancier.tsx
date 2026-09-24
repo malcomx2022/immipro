@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
@@ -41,6 +42,11 @@ export interface EcheancierProps {
   verdict: Verdict;
   /** La date de repli, seulement quand le calendrier ne tient plus. */
   proposition: DateProposee | null;
+  /**
+   * Ce que les rappels feront, dit par `phraseDesRappels` depuis les
+   * préférences du candidat **et** l'état réel du transport (S.87).
+   */
+  rappels: string;
 }
 
 export function Echeancier({
@@ -49,6 +55,7 @@ export function Echeancier({
   aujourdhui,
   verdict,
   proposition,
+  rappels,
 }: EcheancierProps) {
   const id = dossier.id;
   const mention = dossier.destination.mention;
@@ -126,23 +133,24 @@ export function Echeancier({
         {/*
           La ligne disait « Rappels par email activés — les modifier ». Deux
           affirmations, fausses toutes les deux : rien n'envoyait de rappel,
-          et le profil ne porte aucun réglage à modifier.
+          et le profil ne portait aucun réglage à modifier.
 
-          Elle a ensuite dit qu'aucun rappel ne partait, ce qui était vrai
-          tant que rien ne lisait l'échéancier. Les rappels par email
-          partent depuis le 22/09/2026 (WF-09 étape 3) : la phrase dit donc
-          ce qui part, à quelle cadence, et ce qui ne part pas.
-
-          Le SMS reste annoncé nulle part comme actif. DOC-11 §346 le
-          prévoit pour les échéances critiques, aucun fournisseur n'est
-          branché, et un candidat qui croirait recevoir un SMS ne
-          regarderait pas ses emails.
+          Depuis S.87 le réglage existe (`/compte/rappels`), et le lien
+          revient. La phrase n'est plus écrite ici : elle vient des
+          préférences du candidat et de l'état constaté du transport. Elle
+          ne dit « par email » que si le candidat le veut et que l'envoi a
+          été prouvé, et elle dit toujours que rien ne part par SMS —
+          DOC-11 §346 le prévoit, aucun fournisseur n'est branché.
         */}
-        <p className="max-w-[60ch] text-pretty text-14 text-ink-700">
-          Un rappel par email te résume ces échéances chaque semaine, et tout
-          de suite si l&apos;une arrive à moins de sept jours. Rien n&apos;est
-          envoyé par SMS.
-        </p>
+        <div className="flex max-w-[60ch] flex-col gap-1">
+          <p className="text-pretty text-14 text-ink-700">{rappels}</p>
+          <Link
+            href={`/compte/rappels?retour=${encodeURIComponent(`/dossiers/${id}/echeancier`)}`}
+            className="flex min-h-touch items-center text-14 font-medium text-accent-600"
+          >
+            Modifier mes rappels
+          </Link>
+        </div>
         <LienBouton
           href={`/dossiers/${id}`}
           variante="secondaire"
