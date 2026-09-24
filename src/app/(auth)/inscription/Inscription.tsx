@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { reserveDeLAcceptation } from "@/domain/comptes/acceptation";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -11,6 +12,12 @@ import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { JaugeMotDePasse } from "../JaugeMotDePasse";
+
+/**
+ * Dérivée une fois, au module : le registre des pages publiques est un
+ * littéral, il ne change pas d'un rendu à l'autre.
+ */
+const RESERVE_INSCRIPTION = reserveDeLAcceptation(["conditions", "donnees"]);
 
 /**
  * A-01 — Inscription.
@@ -121,11 +128,21 @@ export function Inscription() {
           </div>
         </div>
 
-        <Checkbox
-          libelle="J'accepte les conditions d'utilisation et la politique de confidentialité."
-          checked={conditions}
-          onChangement={setConditions}
-        />
+        <div className="flex flex-col gap-1.5">
+          {/* La case nomme deux pages que le registre déclare absentes, et
+              vers lesquelles rien ne mène : le pied de page a retiré ses
+              liens pour cette raison, l'acceptation ne l'avait pas suivi.
+              La phrase se déduit du registre et disparaîtra avec lui — et
+              elle se lit avant la case, comme sur l'écran de paiement. */}
+          {RESERVE_INSCRIPTION ? (
+            <p className="text-pretty text-13 text-ink-500">{RESERVE_INSCRIPTION}</p>
+          ) : null}
+          <Checkbox
+            libelle="J'accepte les conditions d'utilisation et la politique de confidentialité."
+            checked={conditions}
+            onChangement={setConditions}
+          />
+        </div>
 
         {echec ? <BlocEchec echec={echec} /> : null}
 

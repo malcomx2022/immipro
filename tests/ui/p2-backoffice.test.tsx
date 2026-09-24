@@ -9,7 +9,10 @@ import { Paiements } from "@/app/(admin)/paiements/Paiements";
 import { Journal } from "@/app/(admin)/journal/Journal";
 import { CoutsIa } from "@/app/(admin)/couts-ia/CoutsIa";
 import {
+  GARDE_FOUS,
+  MENTION_GARDE_FOU_NON_TENU,
   METRIQUES,
+  libelleDesGardeFous,
   metriquesMesurees,
   serieQuotidienne,
   type Depassement,
@@ -910,9 +913,42 @@ describe("B-07 — Coûts IA", () => {
   it("exprime les garde-fous en ratio, avec leur conséquence", () => {
     const { container } = coutsIa();
     expect(espaces(container.textContent ?? "")).toContain("15 % du prix du pack");
-    expect(container.textContent).toContain("le pack est vendu trop bas");
+    expect(container.textContent).toContain("liste des dépassements");
     expect(container.textContent).toContain("3 × la médiane des 7 derniers jours");
-    expect(container.textContent).toContain("la file passe en revue humaine");
+  });
+
+  /**
+   * ── Deux des trois garde-fous ne gardaient rien ─────────────────────
+   *
+   * L'écran listait les trois avec leur conséquence : « au-delà, la file
+   * passe en revue humaine », « email à l'équipe produit ». Aucune des deux
+   * n'existe. `plafondQuotidien` et `medianeQuotidienne` sont écrits, testés
+   * et lus par personne ; la seule bascule en revue humaine du produit se
+   * déclenche sur trois tentatives d'analyse en échec, pas sur un coût ; et
+   * aucun budget de référence n'existe côté serveur.
+   *
+   * Un superviseur lisait donc, sur l'écran fait pour le protéger d'une
+   * dérive de coût, qu'un frein automatique existait. Le module condamne
+   * lui-même la chose : « un seuil sans conséquence n'est pas un garde-fou ».
+   */
+  it("dit lesquels de ses seuils sont appliqués, et ce qui manque aux autres", () => {
+    const { container } = coutsIa();
+    const texte = container.textContent ?? "";
+
+    // Le décompte, avant la liste.
+    expect(texte).toContain(libelleDesGardeFous());
+    expect(libelleDesGardeFous()).toBe("1 seuil appliqué sur 3");
+
+    // Chaque seuil non appliqué le dit, et dit ce qui lui manque.
+    const nonTenus = GARDE_FOUS.filter((g) => !g.tenu);
+    expect(nonTenus).toHaveLength(2);
+    for (const g of nonTenus) expect(texte).toContain(g.manque);
+    expect(texte).toContain(MENTION_GARDE_FOU_NON_TENU);
+
+    // Et la conséquence n'est plus affirmée au présent de l'indicatif : ni
+    // « la file passe », ni « email à l'équipe produit » tout court.
+    expect(texte).not.toContain("la file passe en revue humaine");
+    expect(texte).toContain("la file devrait passer en revue humaine");
   });
 
   it("ne montre aucune donnée de candidat", () => {

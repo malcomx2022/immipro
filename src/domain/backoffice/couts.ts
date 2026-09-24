@@ -206,6 +206,34 @@ export interface GardeFou {
   seuil: string;
   /** Ce qui se passe au-delà. Un seuil sans conséquence n'est pas un garde-fou. */
   consequence: string;
+  /**
+   * Vrai quand du code applique réellement la conséquence — 24/09/2026.
+   *
+   * ── Deux des trois garde-fous ne gardaient rien ─────────────────────
+   *
+   * L'écran les listait tous les trois avec leur conséquence : « au-delà,
+   * la file passe en revue humaine », « email à l'équipe produit ». Aucune
+   * des deux n'existe. `plafondQuotidien` et `medianeQuotidienne` sont
+   * écrits, testés, et **lus par personne** ; la seule bascule en revue
+   * humaine du produit se déclenche sur trois tentatives d'analyse en
+   * échec, pas sur un coût ; et le mot « budget » n'apparaît nulle part
+   * côté serveur, sinon dans le profil du candidat.
+   *
+   * Un superviseur lisait donc, sur l'écran fait pour le protéger d'une
+   * dérive de coût, qu'un frein automatique existait. Ce fichier condamne
+   * lui-même la chose deux lignes plus haut : « un seuil sans conséquence
+   * n'est pas un garde-fou ».
+   *
+   * Le champ dit lequel garde et lequel attend. Même registre que
+   * `COMMANDES_ATTENDUES`, vingt lignes plus bas : les retirer sans les
+   * nommer ferait disparaître le besoin avec la ligne.
+   */
+  tenu: boolean;
+  /**
+   * Ce qui manque pour que la conséquence arrive. Toujours renseigné quand
+   * `tenu` est faux, et jamais quand il est vrai — un test le vérifie.
+   */
+  manque?: string;
 }
 
 /** Plafond quotidien : au-delà, la file bascule en revue humaine (WF-16). */
@@ -223,19 +251,52 @@ export const GARDE_FOUS: readonly GardeFou[] = [
   {
     libelle: "Coût IA par dossier",
     seuil: `${enPourcent(SEUIL_MARGE_IA)} du prix du pack`,
-    consequence: "au-delà, le pack est vendu trop bas (RG-16.1)",
+    consequence: "au-delà, le dossier entre dans la liste des dépassements (RG-16.1)",
+    // Celui-là garde : `depassements` alimente la liste que l'écran affiche,
+    // et la mesure de quota la remplit même sans tarif configuré.
+    tenu: true,
   },
   {
     libelle: "Plafond quotidien",
     seuil: `${FACTEUR_PLAFOND_QUOTIDIEN} × la médiane des ${JOURS_MEDIANE} derniers jours`,
-    consequence: "au-delà, la file passe en revue humaine",
+    consequence: "au-delà, la file devrait passer en revue humaine",
+    tenu: false,
+    manque:
+      "un ouvrier qui compare la dépense du jour au plafond, et une bascule de file : la seule qui existe se déclenche sur trois tentatives d'analyse en échec, pas sur un coût",
   },
   {
     libelle: "Alerte de dépassement",
     seuil: `${enPourcent(SEUIL_ALERTE_BUDGET)} du budget`,
-    consequence: "email à l'équipe produit",
+    consequence: "un email devrait partir à l'équipe produit",
+    tenu: false,
+    manque:
+      "un budget : aucun montant de référence n'existe dans le produit, et en poser un ici serait écrire une spécification depuis un écran",
   },
 ];
+
+/**
+ * Ce que l'écran écrit à côté d'un garde-fou qui n'en est pas encore un.
+ *
+ * Il ne dit pas « bientôt » : le registre nomme ce qui manque, pas une date.
+ */
+export const MENTION_GARDE_FOU_NON_TENU =
+  "Ce seuil est écrit, il n'est pas appliqué : rien dans le produit ne déclenche encore sa conséquence.";
+
+/** Les garde-fous qui gardent réellement. */
+export const gardeFousTenus = (
+  gardeFous: readonly GardeFou[] = GARDE_FOUS,
+): readonly GardeFou[] => gardeFous.filter((g) => g.tenu);
+
+/**
+ * « un garde-fou sur trois est appliqué ». Dit en tête de section, pour
+ * qu'un superviseur le sache avant de lire la liste et non après.
+ */
+export function libelleDesGardeFous(gardeFous: readonly GardeFou[] = GARDE_FOUS): string {
+  const tenus = gardeFousTenus(gardeFous).length;
+  const total = gardeFous.length;
+  if (tenus === total) return `${total} seuils, tous appliqués`;
+  return `${tenus} seuil${tenus > 1 ? "s" : ""} appliqué${tenus > 1 ? "s" : ""} sur ${total}`;
+}
 
 /**
  * Médiane des sept derniers jours, base du plafond quotidien. Elle résiste à
