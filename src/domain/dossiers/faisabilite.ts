@@ -48,6 +48,16 @@ export interface PieceAObtenir {
   delaiJours: number | null;
   /** Obligatoire au sens de la règle figée. */
   obligatoire: boolean;
+  /**
+   * Le délai d'obtention a déjà été dépensé : le document est entre les
+   * mains du candidat, ou déjà sur nos serveurs.
+   *
+   * Obligatoire, et non facultatif avec une valeur par défaut : c'est le
+   * champ dont l'absence a produit le défaut, et un défaut de valeur le
+   * reproduirait en silence sur le prochain appelant. `delaiDobtentionDepense`
+   * le tranche depuis l'état de la pièce.
+   */
+  dejaEnMain: boolean;
 }
 
 export interface CalendrierAEvaluer {
@@ -130,6 +140,14 @@ export function evaluerLeCalendrier(calendrier: CalendrierAEvaluer): Verdict {
   let margeLaPlusCourte: Verdict["margeLaPlusCourte"] = null;
 
   for (const piece of obligatoires) {
+    /*
+      Le document est là : son délai d'obtention a été dépensé avant
+      l'envoi, et le recompter depuis aujourd'hui annonçait qu'une pièce
+      déjà fournie « ne peut plus arriver à temps ». Elle ne compte ni
+      comme retard, ni comme inconnue — ignorer son délai n'est pas
+      l'ignorer elle : elle est arrivée.
+    */
+    if (piece.dejaEnMain) continue;
     if (piece.delaiJours === null) {
       inconnues.push(piece);
       continue;
@@ -189,7 +207,10 @@ export interface DateProposee {
 export function premiereDateCibleTenable(
   calendrier: CalendrierAEvaluer,
 ): DateProposee {
-  const obligatoires = calendrier.aObtenir.filter((p) => p.obligatoire);
+  /* Même frontière que le verdict : un délai déjà dépensé ne repousse pas
+     la date qu'on propose, sans quoi la replanification ajouterait des
+     semaines pour des pièces déjà déposées. */
+  const obligatoires = calendrier.aObtenir.filter((p) => p.obligatoire && !p.dejaEnMain);
   const connues = obligatoires.filter(
     (p): p is PieceAObtenir & { delaiJours: number } => p.delaiJours !== null,
   );

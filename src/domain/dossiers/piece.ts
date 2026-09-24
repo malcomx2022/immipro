@@ -91,6 +91,88 @@ export const estConforme = (piece: Piece): boolean => piece.etat === "CONFORME";
 export const estEncoreDemandee = (etat: DocumentState): boolean => etat !== "CONFORME";
 
 /**
+ * Le délai d'obtention de cette pièce a-t-il déjà été dépensé ?
+ *
+ * ── La question que le calendrier ne posait pas ─────────────────────
+ *
+ * `evaluerLeCalendrier` compte, pour chaque pièce encore demandée,
+ * « demandée aujourd'hui, elle arrive dans N jours ». La phrase qu'il
+ * compose le dit mot pour mot. Pour une pièce **déjà déposée**, cette
+ * prémisse est fausse : le fichier est sur nos serveurs, et les trente
+ * jours d'obtention ont été dépensés avant l'envoi.
+ *
+ * Constaté en exécution, procédure néerlandaise, départ visé au 5 janvier
+ * 2027, dépôt calculé au 7 octobre 2026 — donc **devant nous** :
+ *
+ *     diplôme déposé, en cours de lecture (EN_ANALYSE)
+ *       verdict : INTENABLE — diplome manque 17 j
+ *     diplôme pas encore déposé (ATTENDUE)
+ *       verdict : INTENABLE — diplome manque 17 j
+ *     diplôme accepté (témoin, CONFORME)
+ *       verdict : TENABLE
+ *
+ * Le même verdict pour celui qui a tout envoyé et pour celui qui n'a rien
+ * commencé, avec le bandeau d'alerte « Une pièce obligatoire ne peut plus
+ * arriver à temps » et le conseil de reculer son départ — à cause d'un
+ * document déjà fourni.
+ *
+ * ── Où passe la frontière, et de quel côté on se trompe ─────────────
+ *
+ * Les deux erreurs ne se valent pas. Compter un délai déjà dépensé donne
+ * une **fausse alerte** ; ne pas compter un délai encore à courir donne
+ * une **fausse assurance**, et c'est celle que ce produit refuse partout
+ * ailleurs. La frontière est donc placée au plus prudent : seuls les
+ * états où le candidat tient certainement le document, et où rien ne
+ * l'oblige à retourner devant l'autorité, cessent de compter.
+ *
+ * `switch` exhaustif, comme `seReprendSeule` pour les causes de
+ * balayage : un état nouveau ne compilera pas tant que personne n'aura
+ * dit de quel côté il tombe.
+ */
+export function delaiDobtentionDepense(etat: DocumentState): boolean {
+  switch (etat) {
+    /* Le fichier est sur nos serveurs et on le lit. Le candidat a fait
+       tout ce qu'il pouvait faire. */
+    case "EN_ANALYSE":
+    /* Obtenu, mais illisible : il faut un nouveau scan, pas une nouvelle
+       démarche. Le document est entre ses mains. */
+    case "ILLISIBLE":
+    /* Acceptée : elle ne figure déjà plus dans les pièces à obtenir. Le
+       cas est ici pour que le `switch` reste exhaustif. */
+    case "CONFORME":
+      return true;
+
+    /* Rien n'a été déposé. */
+    case "ATTENDUE":
+    /* Un autre document a été envoyé : le bon reste à obtenir. */
+    case "HORS_SUJET":
+    /* La validité est dépassée : il en faut un nouveau, de l'autorité. */
+    case "EXPIREE":
+    /* La rétention a effacé le fichier. Le candidat détient peut-être
+       encore l'original, et peut-être pas — compter le délai est la
+       réponse prudente. */
+    case "PURGEE":
+    /*
+      `A_CORRIGER` reste compté, et c'est un choix. Le remède distingue
+      deux situations que l'état confond : « ton passeport expire quatre
+      mois après ton retour, il en faut six » demande une nouvelle
+      démarche, « ton scan est coupé » n'en demande aucune. Les séparer
+      suppose de lire le remède pièce par pièce, ce qui est un arbitrage
+      et non une correction — voir la PR. En attendant, on compte : la
+      fausse alerte se corrige en changeant une date, la fausse assurance
+      se découvre au guichet.
+    */
+    case "A_CORRIGER":
+      return false;
+
+    default: {
+      const jamais: never = etat;
+      throw new Error(`État de pièce non arbitré : ${JSON.stringify(jamais)}`);
+    }
+  }
+}
+
+/**
  * Déposée, conservée, jamais analysée — RG-06.5.
  *
  * L'état se dérive sans champ nouveau, et la dérivation est exacte :
