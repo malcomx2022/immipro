@@ -71,7 +71,7 @@ export type CodeEchec =
   | "signature_invalide"
   | "paiement_introuvable"
   | "recu_indisponible"
-  // Contenu éditorial
+  // Contenu éditorial et textes d'une règle
   | "publication_refusee"
   // Infrastructure
   | "service_indisponible";
@@ -297,11 +297,18 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     // ferait chercher un défaut là où il n'y en a pas.
     ton: "limite",
   },
+  /*
+    Il sert à deux surfaces — un guide ou un article (B-08), les textes
+    d'une règle en vigueur (B-02) —, et sa prose ne nomme donc ni l'un ni
+    l'autre : « le document » laissait un veilleur de B-02 chercher quel
+    document il venait de refuser.
+  */
   publication_refusee: {
     statut: 409,
     titre: "Cette publication est refusée",
-    corps: "Un ou plusieurs textes de ce document ne peuvent pas s'afficher chez le candidat.",
-    conserve: "Le document reste enregistré tel quel : rien de ce que tu as écrit n'est perdu.",
+    corps: "Un ou plusieurs textes ne peuvent pas s'afficher chez le candidat.",
+    conserve:
+      "Rien n'est écrit : la version enregistrée reste celle d'avant, et rien de ce que tu as écrit n'est perdu.",
     action: "Corriger les passages signalés",
     ton: "echec",
   },

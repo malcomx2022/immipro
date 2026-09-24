@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { aExpirer, aReconcilier } from "@/server/paiement/cycle";
 import { journaliser } from "@/server/acces/journal";
-import { appliquerLaNotification } from "@/server/acces/paiements";
+import { acheverLeCredit, appliquerLaNotification } from "@/server/acces/paiements";
 import { cleDEvenementDeReconciliation } from "@/domain/paiement/ouverture";
 import { leConsultant, type Consultant } from "@/server/paiement/consultation";
 import { libererLesTenuesEchues } from "@/server/acces/consultations";
@@ -47,6 +47,11 @@ export interface Bilan {
   rattrapees: number;
   expirees: number;
   ecartsOuverts: number;
+  /**
+   * Paiements confirmés dont la contrepartie n'avait jamais été ouverte,
+   * et qui viennent de l'être.
+   */
+  creditsAcheves: number;
 }
 
 /** Le consultant du fournisseur d'une transaction, mis en cache par passe. */
@@ -73,6 +78,7 @@ export async function reconcilierLesPaiements(
     rattrapees: 0,
     expirees: 0,
     ecartsOuverts: 0,
+    creditsAcheves: await acheverLesCreditsEnSouffrance(),
     tenuesLiberees: await libererLesTenuesEchues(maintenant),
   };
 
@@ -187,4 +193,50 @@ export async function reconcilierLesPaiements(
   }
 
   return bilan;
+}
+
+/**
+ * Le crédit interrompu — la troisième façon de ne rien recevoir après
+ * avoir payé, et celle qu'aucun filet ne couvrait.
+ *
+ * `crediterLAchat` court hors de la transaction qui pose `CONFIRMEE` :
+ * l'état est commité, puis la contrepartie s'ouvre. Un arrêt entre les
+ * deux laisse un paiement encaissé et rien d'ouvert. Le rejeu du webhook
+ * ne le rattrape pas — `effetDeLaNotification(CONFIRMEE, CONFIRMEE)` rend
+ * « rejeu », ce qui est juste pour l'état et faux pour la contrepartie —
+ * et cette passe-ci ne lisait que `INITIEE | EN_ATTENTE`, où la
+ * transaction n'est plus.
+ *
+ * `acheverLeCredit` est idempotent et ne se déclenche que sur une
+ * contrepartie **entièrement** absente : une couverture partielle est un
+ * état normal, qu'un Pro acheté avant le second dossier produit tous les
+ * jours.
+ *
+ * La passe n'attend pas le délai de rattrapage. Ce délai existe parce
+ * qu'un webhook peut arriver en retard ; ici rien n'est attendu de
+ * personne — le paiement est confirmé, et ce qui manque ne viendra pas
+ * tout seul.
+ */
+async function acheverLesCreditsEnSouffrance(): Promise<number> {
+  const confirmees = await db.transaction.findMany({
+    where: { status: "CONFIRMEE" },
+    orderBy: { confirmedAt: "asc" },
+    take: 200,
+  });
+
+  let acheves = 0;
+  for (const transaction of confirmees) {
+    // Un achat ne doit pas en empêcher un autre : le job en a cent
+    // quatre-vingt-dix-neuf à reprendre.
+    const fait = await acheverLeCredit(transaction).catch(() => false);
+    if (!fait) continue;
+    acheves += 1;
+    await journaliser({
+      acteurId: "systeme:reconciliation",
+      action: "paiement.reconciliation",
+      cible: `transaction:${transaction.reference}`,
+      motif: "Contrepartie ouverte après coup : le paiement était confirmé sans crédit (RG-05.4)",
+    }).catch(() => undefined);
+  }
+  return acheves;
 }

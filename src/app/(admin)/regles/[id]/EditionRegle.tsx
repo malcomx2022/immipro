@@ -13,6 +13,7 @@ import {
   CHAMPS_CANDIDAT,
   LIBELLE_NIVEAU,
   MENTION_SANS_MIGRATION,
+  SUITE_DU_REFUS_EN_VIGUEUR,
   aChange,
   comparer,
   compterChangements,
@@ -41,6 +42,19 @@ import { CHAMP_CONTROLE } from "@/components/ui/champ";
  * maintenant validés à la saisie, avec la même liste et la même
  * reconnaissance de la négation, et la publication est bloquée tant qu'une
  * formulation est refusée.
+ *
+ * **Enregistrer, non.** L'écran désactivait aussi « Enregistrer le
+ * brouillon » — « corrige-le avant d'enregistrer » — quand `CLAUDE.md` dit
+ * le contraire : un texte en cours d'écriture doit pouvoir être sauvé, sans
+ * quoi on le rédige ailleurs pour le coller à la fin, hors du garde-fou.
+ * Le refus ne concerne que l'enregistrement d'une version **en vigueur**,
+ * qui est une publication : le candidat la lit à la seconde. C'est le
+ * serveur qui le dit (`server/regles/edition.ts`), et l'écran lit le même
+ * fait pour l'annoncer avant le clic plutôt qu'après.
+ *
+ * Les fautes restent signalées champ par champ dans les deux cas : les
+ * montrer sans interdire d'enregistrer est précisément ce que la règle
+ * demande.
  *
  * INV-3 reste tenu : publier n'migre aucun dossier. L'effet est montré avant,
  * avec le nombre de dossiers alertés, le nombre mis en arbitrage, et zéro
@@ -79,6 +93,12 @@ export interface EditionRegleProps {
    * de laisser un veilleur enregistrer puis buter sur un refus d'accès.
    */
   peutPublier: boolean;
+  /**
+   * La version ouverte est-elle celle que le candidat lit ? L'enregistrer
+   * est alors une publication, et le vocabulaire y est refusé. Sur un
+   * brouillon, l'enregistrement passe.
+   */
+  enregistrementEnLigne: boolean;
 }
 
 export function EditionRegle({
@@ -89,6 +109,7 @@ export function EditionRegle({
   dossiersSousLaNouvelleRegle,
   historique,
   peutPublier: habiliteAPublier,
+  enregistrementEnLigne,
 }: EditionRegleProps) {
   const router = useRouter();
   const [textes, setTextes] = useState<Record<ChampCandidat, string>>({
@@ -104,6 +125,12 @@ export function EditionRegle({
   const fautes = verifierTextesCandidat(textes);
   const textesRecevables = publiable(textes);
   const peutPublier = textesRecevables && motif.trim().length > 0 && habiliteAPublier;
+  /**
+   * Ce qui empêche d'enregistrer, et rien de plus. Une faute n'empêche
+   * l'enregistrement que sur une version en vigueur, où enregistrer publie
+   * — c'est le refus que le serveur opposerait, annoncé avant le clic.
+   */
+  const refusDeLEnregistrement = enregistrementEnLigne && fautes.length > 0;
 
   /** Le corps de la branche `textes` : ce que l'écran édite, et rien de plus. */
   const corpsDesTextes = {
@@ -175,10 +202,10 @@ export function EditionRegle({
           <>
             <Button
               variante="secondaire"
-              disabled={fautes.length > 0 || envoi !== ""}
+              disabled={refusDeLEnregistrement || envoi !== ""}
               raisonDesactivation={
-                fautes.length > 0
-                  ? "Un texte destiné au candidat est refusé : corrige-le avant d'enregistrer."
+                refusDeLEnregistrement
+                  ? SUITE_DU_REFUS_EN_VIGUEUR
                   : "Enregistrement en cours."
               }
               onClick={enregistrerLeBrouillon}

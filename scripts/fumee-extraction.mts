@@ -212,6 +212,8 @@ const { analyserUnePiece, TENTATIVES_AVANT_REVUE } = await import("../src/server
 const { lExtracteur, EXTRACTEUR_NON_BRANCHE } = await import("../src/server/dossiers/extracteur");
 const { GESTE_SANS_DATE_CIBLE } = await import("../src/domain/dossiers/extraction");
 const { solde } = await import("../src/server/acces/quota");
+const { trancherLaRevue } = await import("../src/server/revue/decision");
+const { TITRE_DE_LA_DECISION } = await import("../src/domain/backoffice/revue");
 const { enregistrerLAutorisation, etatDeLAutorisation } = await import(
   "../src/server/acces/consentements"
 );
@@ -635,6 +637,20 @@ try {
     */
     verifier((await relireVersion(p.version.id)).analysisAttempts === 0, "le compteur est soldé");
     verifier(await solde(p.application.id) === 5, "aucune des trois tentatives n'est facturée");
+    /*
+      Et le candidat l'apprend. Ce verdict-là n'en disait rien, alors que
+      les trois autres produisent un avis chacun : c'est pourtant celui
+      qui ouvre la seule attente qui dépend d'une personne.
+    */
+    const avis = await db.notification.findMany({ where: { applicationId: p.application.id } });
+    verifier(
+      avis.length === 1 && avis[0]!.kind === "ANALYSE",
+      `un avis part quand la pièce entre en revue (${avis.length})`,
+    );
+    verifier(
+      avis[0]?.body === (await relireDocument(p.document.id)).feedback,
+      "et il porte le texte que la checklist affiche, pas un second",
+    );
   }
 
   console.log("\nUne clé refusée ne se rejoue pas : elle se répare");
@@ -786,6 +802,110 @@ try {
     verifier(
       (await etatDeLAutorisation(p.user.id, "mesure_audience")) === "jamais_donnee",
       "et l'histoire d'un genre ne déteint pas sur les autres",
+    );
+  }
+
+  /*
+    B-05 — le message de la revue est envoyé, et pas seulement écrit.
+
+    `CLAUDE.md` compte « B-05 pour le message **envoyé** après une revue
+    manuelle » parmi les quatre points d'application du vocabulaire
+    interdit, et `refusDuMessage` s'intitule « validation du message
+    envoyé au candidat ». Il était validé, rangé dans `ManualReview` et
+    recopié sur la pièce — et aucun avis n'en partait. La décision vit
+    désormais hors de `next/headers`, et cette fumée compte ce qui est
+    réellement écrit.
+  */
+  console.log("\nLa décision d'une revue manuelle parvient au candidat");
+  {
+    reponseDuService = { statut: 401, corps: '{"type":"error","error":{"type":"authentication_error"}}' };
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+
+    const analyse = await analyseDe(p.version.id);
+    const revue = await db.manualReview.findFirstOrThrow({ where: { analysisId: analyse!.id } });
+    const avant = await db.notification.count({ where: { applicationId: p.application.id } });
+
+    const operateur = await db.user.create({
+      data: { email: `fumee-op-${process.pid}@exemple.test`, role: "ADMIN" },
+    });
+    const MESSAGE =
+      "Ton passeport est lisible, mais la page des informations est coupée en bas. Reprends la photo en cadrant la page entière, jusqu'aux bords.";
+
+    const suite = await trancherLaRevue(
+      revue.id,
+      { id: operateur.id },
+      { decision: "A_CORRIGER", message: MESSAGE, motif: "Relecture de la pièce en échec technique" },
+    );
+    verifier(suite.decidee, "la décision est prise");
+    verifier(suite.quotaRendu === false, "une pièce à corriger ne rend pas l'analyse");
+
+    const avis = await db.notification.findMany({
+      where: { applicationId: p.application.id },
+      orderBy: { createdAt: "desc" },
+    });
+    verifier(
+      avis.length === avant + 1,
+      `un avis part avec la décision (${avant} avant, ${avis.length} après)`,
+    );
+    verifier(
+      avis[0]?.body === MESSAGE,
+      "et il porte le message de l'opérateur, tel qu'il l'a écrit",
+    );
+    verifier(
+      avis[0]?.title === TITRE_DE_LA_DECISION.A_CORRIGER,
+      `le titre dit qu'une personne a relu (${avis[0]?.title})`,
+    );
+    verifier(
+      avis[0]?.userId === p.user.id,
+      "le destinataire est le candidat, pas l'opérateur qui tranche",
+    );
+    verifier(
+      (await relireDocument(p.document.id)).feedback === MESSAGE,
+      "et la checklist porte le même texte que l'avis",
+    );
+
+    /* Une décision rejouée est refusée : elle n'envoie pas un second avis. */
+    let rejouee = "acceptée";
+    try {
+      await trancherLaRevue(
+        revue.id,
+        { id: operateur.id },
+        { decision: "CONFORME", message: MESSAGE, motif: "Seconde tentative" },
+      );
+    } catch {
+      rejouee = "refusée";
+    }
+    verifier(rejouee === "refusée", `une décision déjà prise est ${rejouee}`);
+    verifier(
+      (await db.notification.count({ where: { applicationId: p.application.id } })) === avis.length,
+      "et aucun second avis n'est parti",
+    );
+
+    /* Le message refusé ne part pas davantage : rien n'est écrit du tout. */
+    const autre = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(autre.tache, lExtracteur());
+    const analyse2 = await analyseDe(autre.version.id);
+    const revue2 = await db.manualReview.findFirstOrThrow({ where: { analysisId: analyse2!.id } });
+    const avisAvant = await db.notification.count({ where: { applicationId: autre.application.id } });
+    let refuse = "acceptée";
+    try {
+      await trancherLaRevue(
+        revue2.id,
+        { id: operateur.id },
+        { decision: "A_CORRIGER", message: "Non conforme.", motif: "Relecture" },
+      );
+    } catch {
+      refuse = "refusée";
+    }
+    verifier(refuse === "refusée", `un constat nu est ${refuse} (RG-06.3)`);
+    verifier(
+      (await db.notification.count({ where: { applicationId: autre.application.id } })) === avisAvant,
+      "et rien n'est envoyé d'un message qui n'a pas passé le contrôle",
+    );
+    verifier(
+      (await db.manualReview.findUniqueOrThrow({ where: { id: revue2.id } })).decidedAt === null,
+      "la revue reste ouverte",
     );
   }
 } finally {

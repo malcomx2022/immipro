@@ -237,6 +237,27 @@ export async function analyserUnePiece(
     });
     await solderLesTentatives(version.id, version.analysisAttempts);
     await rendreUneAnalyse(tache.applicationId, analyse.id, "Lecture automatique sans résultat");
+    /*
+      Et le candidat l'apprend — comme pour les trois autres verdicts.
+
+      Celui-ci n'en produisait aucun, alors qu'il ouvre la seule attente
+      du produit qui dépend d'une personne : la pièce part en revue, et
+      rien ne dit quand elle en reviendra. Le silence y coûtait donc plus
+      qu'ailleurs, et c'est là qu'il était.
+
+      Le corps est celui de l'analyse, pas un second texte : deux
+      formulations du même fait finiraient par se contredire, et celle
+      que le candidat lit dans sa checklist est celle-là.
+    */
+    await db.notification.create({
+      data: {
+        userId: application.userId,
+        applicationId: tache.applicationId,
+        kind: "ANALYSE",
+        title: analyse.title,
+        body: analyse.body,
+      },
+    });
     await recalculerCompletude(tache.applicationId);
     return "TERMINEE";
   }

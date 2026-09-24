@@ -7,6 +7,12 @@ import {
   visaRulesSchema,
   type VisaRulesPayload,
 } from "@/domain/rules/schema";
+import { exigerUnEnregistrementAffichable } from "@/server/regles/edition";
+import {
+  SUITE_DU_REFUS_EN_VIGUEUR,
+  refusDuReferentiel,
+} from "@/domain/backoffice/regle";
+import { EchecHttp } from "@/server/http/echecs";
 import { sansCommentaires } from "@/domain/copy/source";
 import { COMMANDES_ATTENDUES } from "@/domain/backoffice/couts";
 import { COMMANDES_ATTENDUES_B04 } from "@/domain/backoffice/reconciliation";
@@ -134,11 +140,21 @@ describe("la route n'accepte que ce que l'écran édite", () => {
     expect(route).toContain("avecLesTextesCandidat(enBase.data, corps)");
   });
 
-  /** Les deux branches convergent sur une seule écriture et un seul contrôle. */
-  it("les deux branches passent par le même contrôle de vocabulaire", () => {
+  /**
+   * Les deux branches convergent sur une seule écriture et un seul
+   * garde-fou — et il n'est plus dans la route.
+   *
+   * Il y était, et y levait avant toute écriture : la route refusait
+   * l'enregistrement d'un brouillon, que `CLAUDE.md` protège. La décision
+   * est partie dans `server/regles/edition.ts`, où des essais peuvent
+   * l'exécuter au lieu de compter ses appels.
+   */
+  it("les deux branches passent par le même garde-fou, et il est exécutable", () => {
     const put = route.slice(route.indexOf("export const PUT"), route.indexOf("export const POST"));
-    expect([...put.matchAll(/verifierPayloadCandidat\(/gu)]).toHaveLength(1);
+    expect([...put.matchAll(/exigerUnEnregistrementAffichable\(/gu)]).toHaveLength(1);
     expect([...put.matchAll(/db\.visaRule\.update\(/gu)]).toHaveLength(1);
+    // Et la route ne rejuge rien elle-même.
+    expect(put).not.toMatch(/verifierPayloadCandidat|verifierTextesCandidat/u);
   });
 
   /**
@@ -592,5 +608,172 @@ describe("B-07 — un coût manquant ne vaut jamais zéro", () => {
     const code = sansCommentaires(lire("prisma/seed/demonstration.ts"));
     expect(code).toContain("coutMicrosDesJetons");
     expect(code).not.toMatch(/costMicros:\s*\d+_/u);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Le refus du vocabulaire porte sur ce que le candidat verra
+ * ------------------------------------------------------------------ */
+
+/**
+ * Le garde-fou était au mauvais moment — S.90.
+ *
+ * `CLAUDE.md` : « L'enregistrement d'un brouillon n'est pas bloqué, la
+ * publication l'est. Un texte en cours d'écriture doit pouvoir être sauvé ;
+ * le refuser pousserait à rédiger ailleurs et à coller à la fin, c'est-à-dire
+ * à écrire hors du garde-fou. »
+ *
+ * La route de B-02 faisait l'inverse : elle levait sur
+ * `verifierPayloadCandidat` avant toute écriture, et l'écran désactivait
+ * « Enregistrer le brouillon » avec « corrige-le avant d'enregistrer ».
+ * C'est la contradiction que J.C avait levée pour B-08 et qui restait
+ * entière ici — le commentaire de la route annonçait déjà « la publication
+ * est bloquée » à côté d'un code qui bloquait la sauvegarde.
+ *
+ * Et le refus portait sur tout `textesCandidat(payload)`, alors que la
+ * branche `textes` n'écrit que deux champs : une formulation refusée dans un
+ * `message_echec` rendait inenregistrables les deux champs du formulaire,
+ * avec un message demandant de reformuler un champ que B-02 n'affiche pas.
+ */
+describe("le vocabulaire n'est refusé que là où le candidat lira", () => {
+  const EN_VIGUEUR = { status: "PUBLISHED" };
+  const BROUILLON = { status: "DRAFT" };
+
+  const enregistrer = (regle: { status: string }, libelleCandidat: string) =>
+    exigerUnEnregistrementAffichable(regle, {
+      champ: "textes",
+      libelleCandidat,
+      reserveCandidat: "",
+    });
+
+  const refusDe = (appel: () => void): EchecHttp => {
+    try {
+      appel();
+    } catch (erreur) {
+      if (erreur instanceof EchecHttp) return erreur;
+      throw erreur;
+    }
+    throw new Error("aucun refus n'a été opposé");
+  };
+
+  it("un brouillon s'enregistre, même avec une formulation refusée", () => {
+    expect(() => enregistrer(BROUILLON, "Visa garanti")).not.toThrow();
+  });
+
+  /**
+   * Une version archivée non plus : la route la refuse en amont, et pour une
+   * autre raison — « une version archivée ne se modifie plus ».
+   */
+  it("une version archivée ne déclenche pas ce refus-là", () => {
+    expect(() => enregistrer({ status: "ARCHIVED" }, "Visa garanti")).not.toThrow();
+  });
+
+  it("la même formulation, en vigueur, est refusée avant l'écriture", () => {
+    const refus = refusDe(() => enregistrer(EN_VIGUEUR, "Visa garanti"));
+    expect(refus.echec.code).toBe("publication_refusee");
+    expect(refus.echec.statut).toBe(409);
+    expect(refus.champs).toHaveProperty("libelleCandidat");
+  });
+
+  /**
+   * Et le message dit la suite : l'enregistrement d'une version en vigueur
+   * est une publication. Sans cette phrase, le veilleur lit un refus sur
+   * un bouton intitulé « Enregistrer le brouillon » et ne comprend pas
+   * pourquoi.
+   */
+  it("le refus dit pourquoi cet enregistrement-là publie", () => {
+    const refus = refusDe(() => enregistrer(EN_VIGUEUR, "Visa garanti"));
+    expect(refus.echec.corps).toContain(SUITE_DU_REFUS_EN_VIGUEUR);
+    expect(SUITE_DU_REFUS_EN_VIGUEUR).toMatch(/en vigueur/u);
+    expect(SUITE_DU_REFUS_EN_VIGUEUR).toMatch(/Reformule/u);
+  });
+
+  /**
+   * Le message nomme l'intitulé du formulaire, pas un chemin de payload :
+   * « Reformule ce passage de "Libellé affiché au candidat" » se corrige,
+   * « reformule le champ "conditions.3.message_echec" » ne se corrige pas
+   * depuis B-02.
+   */
+  it("il pointe le champ tel que l'écran le nomme", () => {
+    const refus = refusDe(() => enregistrer(EN_VIGUEUR, "Visa garanti"));
+    expect(refus.echec.corps).toContain("Libellé affiché au candidat");
+    expect(refus.echec.corps).not.toMatch(/conditions\.\d|pieces_requises\./u);
+  });
+
+  /**
+   * Le cœur de la seconde moitié du défaut : la branche `textes` ne
+   * réécrit pas les `message_echec`, qui traversent depuis la base. Les
+   * refuser interdisait la correction des deux champs corrigeables, sans
+   * rien ôter de l'écran du candidat — la phrase y était déjà.
+   */
+  it("une faute que l'écran ne peut pas atteindre ne bloque pas ses deux champs", () => {
+    const fautif = visaRulesSchema.parse({
+      ...PAYLOAD,
+      conditions: [
+        {
+          code: "preuve_fonds",
+          operateur: "gte",
+          valeur: 20635,
+          unite: "CAD",
+          bloquant: false,
+          message_echec: "Tes chances d'obtention baissent sous ce montant.",
+        },
+      ],
+    });
+    // La phrase est bien refusée par la lecture complète du référentiel…
+    expect(refusDuReferentiel(fautif)).not.toBeNull();
+    // … et la publication s'en charge. L'enregistrement des deux textes,
+    // lui, n'a pas à en répondre : il ne les écrit pas.
+    expect(() =>
+      exigerUnEnregistrementAffichable(EN_VIGUEUR, {
+        champ: "textes",
+        libelleCandidat: "Permis d'études — Canada",
+        reserveCandidat: "Une réserve sobre",
+      }),
+    ).not.toThrow();
+  });
+
+  /**
+   * La branche `payload`, elle, soumet tout : rien n'y traverse depuis la
+   * base, et tout y est donc examiné.
+   */
+  it("la branche payload répond de tout ce qu'elle soumet", () => {
+    const fautif = visaRulesSchema.parse({
+      ...PAYLOAD,
+      reserves: ["Le taux d'acceptation de cette procédure est élevé."],
+    });
+    const refus = refusDe(() =>
+      exigerUnEnregistrementAffichable(EN_VIGUEUR, { champ: "payload", payload: fautif }),
+    );
+    expect(refus.echec.code).toBe("publication_refusee");
+    expect(Object.keys(refus.champs ?? {})).toContain("reserves.0");
+    // Et sur un brouillon, elle passe comme l'autre.
+    expect(() =>
+      exigerUnEnregistrementAffichable(BROUILLON, { champ: "payload", payload: fautif }),
+    ).not.toThrow();
+  });
+
+  /**
+   * L'écran lit le même fait que la route, sur la même ligne.
+   *
+   * `editionDeLaRegle` rend deux versions, et l'écran s'adresse à `id` :
+   * c'est `cible` — la ligne que l'adresse désigne et que le `PUT` relira —
+   * qui décide, jamais `brouillon`, qui retombe sur `cible` faute de
+   * brouillon et n'est donc pas une réponse à la question posée.
+   */
+  it("l'écran lit le statut de la ligne que la route réécrira", () => {
+    const lecture = lire("src/server/lecture/backoffice.ts");
+    expect(lecture).toContain('enregistrementEnLigne: cible.status === "PUBLISHED"');
+    expect(lecture).not.toMatch(/enregistrementEnLigne: brouillon\./u);
+    expect(lire("src/app/(admin)/regles/[id]/page.tsx")).toContain(
+      "enregistrementEnLigne={vue.enregistrementEnLigne}",
+    );
+  });
+
+  /** La publication garde sa lecture complète : rien ne s'y relâche. */
+  it("la publication continue de relire tout le référentiel", () => {
+    const publication = lire("src/server/regles/publication.ts");
+    expect(publication).toContain("refusDuReferentiel(lu.data)");
+    expect(lire("prisma/seed/visa-rules.ts")).toContain("refusDuReferentiel");
   });
 });

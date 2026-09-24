@@ -169,3 +169,88 @@ describe("commande — $-01 et $-02", () => {
     }
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * Le crédit interrompu — S.92
+ * ------------------------------------------------------------------ */
+
+/**
+ * La troisième façon de ne rien recevoir après avoir payé.
+ *
+ * `crediterLAchat` court **hors** de la transaction qui pose `CONFIRMEE` :
+ * l'état est commité, puis la contrepartie s'ouvre. Un arrêt entre les
+ * deux laisse un paiement encaissé et rien d'ouvert, et les deux filets
+ * passaient à côté. Exécuté sur PostgreSQL, avant correction :
+ *
+ *     transaction        CONFIRMEE, confirmedAt posé
+ *     quota ouvert       0 analyses · dossier BROUILLON
+ *     webhook rejoué  →  { issue: "rejeu" }         quota : 0
+ *     réconciliation  →  { examinees: 0 }           quota : 0
+ *
+ * Le rejeu s'arrête à `effetDeLaNotification(CONFIRMEE, CONFIRMEE)`, juste
+ * pour l'état et faux pour la contrepartie ; la réconciliation ne lisait
+ * que `INITIEE | EN_ATTENTE`, où la transaction n'est plus. Son en-tête
+ * annonce pourtant « le filet du pire défaut possible de ce produit : un
+ * candidat débité qui ne voit rien arriver ».
+ *
+ * Ces assertions tiennent la structure. C'est `smoke:reconciliation` qui
+ * exécute la reprise contre PostgreSQL, vérifie qu'elle n'ouvre rien deux
+ * fois, et qu'elle laisse une couverture partielle tranquille.
+ */
+describe("un paiement confirmé sans contrepartie se rattrape", () => {
+  const paiements = readFileSync("src/server/acces/paiements.ts", "utf8");
+  const job = readFileSync("src/server/jobs/reconciliation.ts", "utf8");
+
+  /**
+   * Une seule porte vers le crédit, et elle est gardée. La notification
+   * signée y passe comme la reprise : deux chemins d'écriture auraient
+   * deux façons de se tromper.
+   */
+  it("la notification signée passe par la même porte que la reprise", () => {
+    const applique = paiements.slice(
+      paiements.indexOf("export async function appliquerLaNotification"),
+      paiements.indexOf("async function contrepartieOuverte"),
+    );
+    expect(applique).toContain("await acheverLeCredit(maj)");
+    expect(applique).not.toContain("await crediterLAchat(");
+    expect(paiements).toMatch(/export async function acheverLeCredit/u);
+  });
+
+  /**
+   * La garde porte sur une contrepartie **entièrement** absente. « Toute »
+   * aurait repris les Pro achetés avant le second dossier, qui n'ont rien
+   * de cassé : leur couverture s'applique au fur et à mesure.
+   */
+  it("la garde distingue l'absence totale de la couverture partielle", () => {
+    const garde = paiements.slice(
+      paiements.indexOf("async function contrepartieOuverte"),
+      paiements.indexOf("export async function acheverLeCredit"),
+    );
+    expect(garde).toMatch(/db\.analysisCredit\.count/u);
+    expect(garde).toMatch(/ouverts > 0/u);
+    // Un créneau seulement tenu est la contrepartie qui manque, côté
+    // consultation ; un créneau absent n'est pas une attente.
+    expect(garde).toMatch(/status: "TENU"/u);
+    expect(garde).toMatch(/tenus === 0/u);
+  });
+
+  /** Et la passe regarde là où la transaction est, pas là où elle était. */
+  it("la reprise lit les transactions confirmées", () => {
+    const passe = job.slice(job.indexOf("async function acheverLesCreditsEnSouffrance"));
+    expect(passe).toMatch(/status: "CONFIRMEE"/u);
+    expect(passe).toContain("acheverLeCredit(transaction)");
+    // Le bilan la porte : une reprise silencieuse ne se relit pas.
+    expect(job).toMatch(/creditsAcheves: number/u);
+    expect(job).toMatch(/creditsAcheves: await acheverLesCreditsEnSouffrance\(\)/u);
+    // Et elle laisse une trace au journal, comme tout rattrapage.
+    expect(passe).toContain('action: "paiement.reconciliation"');
+  });
+
+  /** La fumée exécute ce que ces lignes ne font que lire. */
+  it("la fumée couvre la reprise et son idempotence", () => {
+    const fumee = readFileSync("scripts/fumee-reconciliation.mts", "utf8");
+    expect(fumee).toContain("creditsAcheves === 1");
+    expect(fumee).toContain("creditsAcheves === 0");
+    expect(fumee).toContain("ne crédite pas deux fois");
+  });
+});

@@ -681,6 +681,17 @@ export interface VueEditionRegle {
   dossiersConcernes: number;
   dossiersSousLaNouvelleRegle: number;
   historique: readonly { version: number; le: string; par: string }[];
+  /**
+   * La version que l'enregistrement écrira est-elle celle que le candidat
+   * lit ? Elle se lit sur la ligne que l'adresse désigne — la même que le
+   * `PUT` relira —, et non sur `brouillon` : l'écran s'adresse à `id`.
+   *
+   * L'écran en a besoin pour dire la vérité sur sa propre commande. Écrire
+   * une version en vigueur est une publication ; le vocabulaire y est donc
+   * refusé, et le bouton doit le dire avant le clic. Sur un brouillon, il
+   * n'a rien à empêcher (`CLAUDE.md`).
+   */
+  enregistrementEnLigne: boolean;
 }
 
 export async function editionDeLaRegle(id: string): Promise<VueEditionRegle | null> {
@@ -710,6 +721,9 @@ export async function editionDeLaRegle(id: string): Promise<VueEditionRegle | nu
       le: iso(v.verifiedAt),
       par: v.verifiedBy,
     })),
+    // `cible`, et non `brouillon` : c'est la ligne que l'adresse désigne,
+    // donc celle que le `PUT` relira et réécrira.
+    enregistrementEnLigne: cible.status === "PUBLISHED",
   };
 }
 
