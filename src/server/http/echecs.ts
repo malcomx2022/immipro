@@ -384,6 +384,55 @@ export function pourCandidat(e: EchecHttp): EchecCandidat {
   };
 }
 
+/**
+ * Les échecs dont le « ce qui reste » parle de ce que le **candidat**
+ * possède — et qui n'a donc rien à dire à un opérateur.
+ *
+ * Vingt codes sont atteignables depuis une route du back-office, et
+ * plusieurs servaient au veilleur la phrase écrite pour un candidat. Sur
+ * une fiche au contenu illisible, l'administrateur lisait :
+ *
+ *     Les conditions n'ont pas pu être chargées
+ *     Rien n'est affiché plutôt qu'une information peut-être périmée […]
+ *     **Ton dossier et tes pièces ne changent pas.**
+ *     Réessayer
+ *
+ * Il n'a ni dossier ni pièces. Et « Réessayer » était la seule issue
+ * offerte, alors que le serveur avait calculé — et envoyé — de quoi agir :
+ * `trace: "NL/etudes_mvv_vvr v3"`, qui nomme la fiche à réparer.
+ *
+ * Pour un opérateur, « ce qui reste » n'est pas la question : c'est le
+ * diagnostic qui y répond. La ligne est donc omise, et non réécrite —
+ * inventer huit phrases d'opérateur ferait décider ici d'une voix qui
+ * appartient au produit.
+ *
+ * Le critère est de **nommer un objet du candidat** — son dossier, ses
+ * pièces, son panier, son accord, son analyse — et non d'employer la
+ * deuxième personne : le back-office tutoie aussi son opérateur. « Tes
+ * autres réponses sont gardées » reste donc servi, parce qu'un veilleur qui
+ * édite une règle a bien des réponses ; « ton panier reste tel quel », non.
+ *
+ * La liste est tenue par un essai dans les deux sens : un `conserve` qui
+ * nomme un objet du candidat est ici, et un code d'ici en nomme bien un.
+ * Un échec nouveau force donc la décision.
+ */
+export const CONSERVE_DU_CANDIDAT: readonly CodeEchec[] = [
+  "authentification_requise",
+  "consentement_manquant",
+  "quota_epuise",
+  "dossiers_au_maximum",
+  "regle_indisponible",
+  "etat_incompatible",
+  "fichier_refuse",
+  "piece_deja_deposee",
+  "televersement_indisponible",
+  "creneau_indisponible",
+  "paiement_indisponible",
+  "ouverture_refusee",
+  "paiement_introuvable",
+  "recu_indisponible",
+];
+
 /** Ce que reçoit le back-office : la même chose, plus de quoi agir dessus. */
 export interface EchecOperateur extends EchecCandidat {
   code: CodeEchec;
@@ -391,8 +440,16 @@ export interface EchecOperateur extends EchecCandidat {
 }
 
 export function pourOperateur(e: EchecHttp): EchecOperateur {
+  const candidat = pourCandidat(e);
+  /*
+    Le `conserve` du candidat ne suit pas quand il parle de ce qu'il
+    possède : un veilleur n'a ni dossier, ni pièces, ni panier. Ceux qui
+    parlent du référentiel — « la version enregistrée reste celle d'avant »
+    — restent, parce qu'ils disent à l'opérateur ce qu'il voulait savoir.
+  */
+  if (CONSERVE_DU_CANDIDAT.includes(e.echec.code)) delete candidat.conserve;
   return {
-    ...pourCandidat(e),
+    ...candidat,
     code: e.echec.code,
     ...(e.diagnostic ? { diagnostic: e.diagnostic } : {}),
   };
