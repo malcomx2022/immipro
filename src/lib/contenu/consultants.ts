@@ -1,3 +1,4 @@
+import { instantDeLHeureLocale, jourDuFuseau } from "@/domain/consultants/rendez-vous";
 import type { ConsultantHabilite } from "@/domain/consultants/annuaire";
 import type { Creneau } from "@/domain/consultants/rendez-vous";
 
@@ -96,23 +97,31 @@ const OUVERTURES = [
 /** Un créneau déjà pris dans le jeu de démonstration : l'écran doit savoir le montrer. */
 const PRIS = new Set(["11:30"]);
 
+/*
+  Les heures d'`OUVERTURES` sont **locales**, comme celles que le serveur
+  propose : posées en UTC, elles s'affichaient une heure plus tard que ce
+  que la liste annonce, et le jeu de démonstration décrivait des horaires
+  que le produit ne propose pas.
+*/
 export function creneaux(aujourdhui: Date): readonly Creneau[] {
-  const base = Date.UTC(
-    aujourdhui.getUTCFullYear(),
-    aujourdhui.getUTCMonth(),
-    aujourdhui.getUTCDate(),
-  );
-  return OUVERTURES.flatMap(({ dansNJours, heures }) =>
-    heures.map((heure) => {
+  const cejour = jourDuFuseau(aujourdhui);
+  return OUVERTURES.flatMap(({ dansNJours, heures }) => {
+    const cible = new Date(Date.UTC(cejour.annee, cejour.mois - 1, cejour.jour + dansNJours));
+    return heures.map((heure) => {
       const [h, m] = heure.split(":").map(Number);
-      const debut = new Date(base + dansNJours * 86_400_000);
-      debut.setUTCHours(h!, m!, 0, 0);
+      const debut = instantDeLHeureLocale(
+        cible.getUTCFullYear(),
+        cible.getUTCMonth() + 1,
+        cible.getUTCDate(),
+        h!,
+      );
+      debut.setUTCMinutes(debut.getUTCMinutes() + m!);
       return {
         debut: debut.toISOString(),
         disponible: !(dansNJours === 2 && PRIS.has(heure)),
       };
-    }),
-  );
+    });
+  });
 }
 
 /** Fuseaux annoncés sur T-05 : celui du candidat, celui du consultant. */

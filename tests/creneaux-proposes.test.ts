@@ -4,7 +4,7 @@ import {
   JOURS_PROPOSES,
   creneauxProposes,
   estUnCreneauPropose,
-  instantDuFuseau,
+  instantDeLHeureLocale,
   jourAffiche,
   libelleHeure,
 } from "@/domain/consultants/rendez-vous";
@@ -59,8 +59,8 @@ describe("T-05 — créneaux proposés", () => {
   });
 
   it("lit l'avance du fuseau au lieu de la supposer", () => {
-    expect(instantDuFuseau("2026-11-30", 9).toISOString()).toBe("2026-11-30T08:00:00.000Z");
-    expect(instantDuFuseau("2027-01-01", 0).toISOString()).toBe("2026-12-31T23:00:00.000Z");
+    expect(instantDeLHeureLocale(2026, 11, 30, 9).toISOString()).toBe("2026-11-30T08:00:00.000Z");
+    expect(instantDeLHeureLocale(2027, 1, 1, 0).toISOString()).toBe("2026-12-31T23:00:00.000Z");
   });
 });
 

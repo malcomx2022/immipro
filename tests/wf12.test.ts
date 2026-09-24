@@ -156,20 +156,34 @@ describe("T-05 — créneaux et confirmation", () => {
     const jours = grouperParJour(liste);
     const pris = jours[0]!.creneaux.filter((c) => !c.disponible);
     expect(pris).toHaveLength(1);
-    expect(libelleHeure(pris[0]!)).toBe("12 h 30");
+    expect(libelleHeure(pris[0]!)).toBe("11 h 30");
   });
 
   /**
-   * Les heures ont gagné une heure au lot I.E, et c'est la correction :
-   * les formateurs écrivaient en UTC sous une phrase qui annonçait « les
-   * horaires sont donnés dans ton fuseau, Cotonou ». Un créneau stocké à
-   * 14 h 30 UTC se lit 15 h 30 à Cotonou, et c'est cette heure-là que le
-   * candidat doit retenir.
+   * L'heure écrite dans la grille est celle que le candidat lit — I.E,
+   * seconde moitié.
+   *
+   * Les créneaux étaient **posés** en UTC pendant que les formateurs les
+   * rendent dans le fuseau d'affichage : une grille écrite « 09:00,
+   * 11:30, 15:30 » s'affichait « 10 h 00, 12 h 30, 16 h 30 ». Les essais
+   * de ce fichier attendaient l'heure décalée, c'est-à-dire le défaut ;
+   * celui-ci tient la règle plutôt que le résultat d'alors.
+   */
+  it("chaque créneau s'affiche à l'heure où il est écrit", () => {
+    const attendues = ["09 h 00", "11 h 30", "15 h 30"];
+    expect(grouperParJour(liste)[0]!.creneaux.map(libelleHeure)).toEqual(attendues);
+  });
+
+  /**
+   * Les formateurs rendent l'heure du fuseau d'affichage, sous une phrase
+   * qui annonce « les horaires sont donnés dans ton fuseau, Cotonou » —
+   * c'est la première moitié du lot I.E. La seconde a posé les créneaux
+   * dans ce même fuseau : l'heure écrite et l'heure lue coïncident enfin.
    */
   it("nomme l'heure et le jour sans abréviation dans la confirmation", () => {
     const creneau = grouperParJour(liste)[0]!.creneaux[2]!;
-    expect(libelleHeure(creneau)).toBe("16 h 30");
-    expect(libelleRendezVous(creneau)).toBe("Jeudi 17 septembre, 16 h 30");
+    expect(libelleHeure(creneau)).toBe("15 h 30");
+    expect(libelleRendezVous(creneau)).toBe("Jeudi 17 septembre, 15 h 30");
   });
 
   it("le fuseau d'affichage est déclaré en un seul endroit", () => {
@@ -182,14 +196,14 @@ describe("T-05 — créneaux et confirmation", () => {
   it("calcule la limite d'annulation depuis la grille, pas depuis l'écran", () => {
     expect(CONSULTATION_ANNULATION_HEURES).toBe(24);
     const creneau = grouperParJour(liste)[0]!.creneaux[2]!;
-    expect(limiteAnnulation(creneau)).toBe("2026-09-16T15:30:00.000Z");
+    expect(limiteAnnulation(creneau)).toBe("2026-09-16T14:30:00.000Z");
   });
 
   it("garde l'heure sur la limite d'annulation", () => {
     // Écrite au jour près, la limite ferait annuler trop tard quelqu'un qui
     // s'y fie — et la consultation serait due.
     const creneau = grouperParJour(liste)[0]!.creneaux[2]!;
-    expect(libelleLimiteAnnulation(creneau)).toBe("mercredi 16 septembre à 16 h 30");
+    expect(libelleLimiteAnnulation(creneau)).toBe("mercredi 16 septembre à 15 h 30");
   });
 
   /**

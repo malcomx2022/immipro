@@ -61,6 +61,9 @@ export const consultantParId = async (id: string): Promise<ConsultantHabilite | 
   (await annuaire()).find((c) => c.id === id) ?? null;
 
 
+// La grille vit dans le domaine ; la fumée la relit ici.
+export { HEURES_PROPOSEES, JOURS_PROPOSES } from "@/domain/consultants/rendez-vous";
+
 /**
  * Créneaux proposés — T-05.
  *
@@ -77,8 +80,11 @@ export async function creneaux(consultantId: string, aujourdhui = new Date()): P
   });
   if (!consultant) throw echec("introuvable");
 
-  // Les horaires et leur fuseau viennent du domaine, que la route de
-  // réservation relit : l'offre et l'acceptation ne peuvent plus diverger.
+  /*
+    Les heures proposées sont **locales** — I.E., et le jour est celui du
+    fuseau. La grille vient du domaine, que la route de réservation relit :
+    l'offre et l'acceptation ne peuvent plus diverger.
+  */
   const proposes = creneauxProposes(aujourdhui);
 
   /*
