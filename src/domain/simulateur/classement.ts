@@ -1,3 +1,4 @@
+import { MENTION_HORS_CLASSEMENT } from "../format/change";
 import type { Reponses } from "./questions";
 
 /**
@@ -121,9 +122,36 @@ export interface Retenue {
    * et la note est renormalisée sur celles qui l'ont été — I.B.
    */
   interne: { note: number; detail: Record<keyof typeof POIDS, number | null> };
-  /** Ce qui n'a pas pu être pesé ici, et pourquoi (I.B). */
-  nonPesees: readonly string[];
+  /**
+   * Pourquoi le budget n'est pas entré dans le classement de cette
+   * destination, ou `null` quand il y est entré.
+   *
+   * Le champ s'appelait `nonPesees` et portait un libellé — « le budget » —
+   * sans dire laquelle des deux causes l'avait retiré. Aucun écran ne
+   * l'affichait : l'API le lisait pour redeviner la cause, et la redevinait
+   * mal. La cause est nommée, la phrase en découle, et le libellé disparaît
+   * avec le dernier lecteur qui le reconstituait.
+   */
+  causeBudget: CauseBudgetNonPese | null;
+  /**
+   * La réserve à afficher sous le rang, ou `null` quand le budget a été pesé.
+   *
+   * `causeBudget` est le fait, celle-ci en est la phrase : un appelant qui
+   * n'affiche pas — un export, un comparateur — lit la cause sans avoir à la
+   * relire dans une chaîne. La phrase, elle, se calcule ici une fois, parce
+   * que c'est la seule forme où l'appelant ne peut pas en retirer un cas.
+   */
+  reserve: string | null;
 }
+
+/**
+ * Les deux raisons pour lesquelles le budget sort du classement d'une
+ * destination. La conséquence est la même — la composante n'est pas pesée —
+ * mais la phrase à écrire ne l'est pas : l'une tient au référentiel et le
+ * candidat n'y peut rien, l'autre tient à une question qu'il n'a pas
+ * remplie et qu'il peut remplir.
+ */
+export type CauseBudgetNonPese = "monnaie" | "non-declare";
 
 export interface Ecartee {
   destination: DestinationEvaluable;
@@ -223,38 +251,25 @@ function filtrageStrict(
   return null;
 }
 
-/**
- * Ce qui n'a pas pu être pesé pour une destination donnée — arbitrage I.B,
- * tranché le 20/09/2026.
- *
- * Un coût publié dans une monnaie à cours variable n'est pas converti : le
- * faire avec un taux écrit en dur donnerait une information non sourcée
- * (INV-8). La destination reste présentée — l'écarter serait plus dommageable
- * que de la garder avec sa limite annoncée — mais **le budget sort de son
- * classement**.
- *
- * Il en sortait déjà du filtrage strict ; il entrait encore dans la
- * pondération, et pour une valeur moyenne inventée. Une destination dont le
- * budget n'est pas comparable gagnait ainsi la moitié des points de la
- * composante sans les avoir mérités, pendant qu'une destination au budget
- * réellement mesuré et défavorable en gagnait moins. Le hasard de la monnaie
- * de publication décidait d'un rang.
- */
-const BUDGET_NON_PESE = "le budget";
-
 function evaluer(d: DestinationEvaluable, profil: Profil): Retenue {
   const exige = exigence(d.niveauLangueMin);
   // Une marge au-dessus de l'exigence compte, mais plafonne : dépasser B2 de
   // deux crans n'ouvre pas deux fois plus de portes.
   const langue = Math.min(1, (profil.niveau - exige + 1) / 2);
 
+  // Deux causes, la même conséquence — une monnaie sans parité sûre, ou un
+  // candidat qui n'a pas déclaré de budget. La cause est nommée ici, une
+  // fois : tout ce qui en dépend s'en déduit, plutôt que de la reconstituer
+  // à partir de ses conséquences.
+  const causeBudget = causeDuBudgetNonPese(d, profil);
+
   // `null`, et non une valeur moyenne : la composante est retirée du calcul,
-  // pas remplie au jugé. Deux causes, la même conséquence — une monnaie sans
-  // parité sûre, ou un candidat qui n'a pas déclaré de budget.
+  // pas remplie au jugé. Le second test n'ajoute pas de règle — une cause
+  // existe déjà dès que le coût manque — il donne son type au calcul.
   const budget =
-    d.coutPremiereAnneeXOF === null || profil.budget === 0
-      ? null
-      : Math.min(1, profil.budget / d.coutPremiereAnneeXOF - 1 + 0.5);
+    causeBudget === null && d.coutPremiereAnneeXOF !== null
+      ? Math.min(1, profil.budget / d.coutPremiereAnneeXOF - 1 + 0.5)
+      : null;
 
   // Facilité administrative : le délai de traitement, et le permis employeur
   // qui n'est pas une formalité — le droit au travail appartient à
@@ -276,10 +291,44 @@ function evaluer(d: DestinationEvaluable, profil: Profil): Retenue {
 
   return {
     destination: d,
-    motifs: motifsDe(d, profil).slice(0, 3),
+    motifs: motifsDe(d, profil, causeBudget).slice(0, 3),
     interne: { note: noteRenormalisee(detail), detail },
-    nonPesees: budget === null ? [BUDGET_NON_PESE] : [],
+    causeBudget,
+    reserve: reserveDuBudget(causeBudget, d.coutPremiereAnneeXOF),
   };
+}
+
+/**
+ * Ce qui n'a pas pu être pesé pour une destination donnée — arbitrage I.B,
+ * tranché le 20/09/2026.
+ *
+ * Un coût publié dans une monnaie à cours variable n'est pas converti : le
+ * faire avec un taux écrit en dur donnerait une information non sourcée
+ * (INV-8). La destination reste présentée — l'écarter serait plus dommageable
+ * que de la garder avec sa limite annoncée — mais **le budget sort de son
+ * classement**.
+ *
+ * Il en sortait déjà du filtrage strict ; il entrait encore dans la
+ * pondération, et pour une valeur moyenne inventée. Une destination dont le
+ * budget n'est pas comparable gagnait ainsi la moitié des points de la
+ * composante sans les avoir mérités, pendant qu'une destination au budget
+ * réellement mesuré et défavorable en gagnait moins. Le hasard de la monnaie
+ * de publication décidait d'un rang.
+ *
+ * **Deux causes, et la seconde était muette.** Le candidat qui n'a pas
+ * répondu à la question du budget n'a rien à comparer non plus : la
+ * composante sort pour lui aussi. La monnaie passe d'abord, et l'ordre a une
+ * conséquence — quand le coût n'est pas convertible, déclarer un budget n'y
+ * changerait rien, et inviter le candidat à le faire serait lui promettre un
+ * effet qui ne viendra pas.
+ */
+function causeDuBudgetNonPese(
+  d: DestinationEvaluable,
+  profil: Profil,
+): CauseBudgetNonPese | null {
+  if (d.coutPremiereAnneeXOF === null) return "monnaie";
+  if (profil.budget === 0) return "non-declare";
+  return null;
 }
 
 /**
@@ -313,8 +362,17 @@ const borne = (n: number) => Math.min(1, Math.max(0, n));
  * pas. Les défavorables sont dites aussi : une destination retenue qui exige
  * un permis employeur doit le dire au rang où elle apparaît, pas trois
  * écrans plus loin.
+ *
+ * Un motif est toujours une comparaison faite : `favorable` dit de quel côté
+ * elle est tombée, il ne dit pas « on n'a pas comparé ». Une composante qui
+ * n'a pas été pesée n'a donc pas de motif — elle a une réserve, où le
+ * chiffre est dit sans être compté contre la destination.
  */
-function motifsDe(d: DestinationEvaluable, profil: Profil): Motif[] {
+function motifsDe(
+  d: DestinationEvaluable,
+  profil: Profil,
+  causeBudget: CauseBudgetNonPese | null,
+): Motif[] {
   const motifs: Motif[] = [];
 
   if (d.niveauLangueMin) {
@@ -326,14 +384,14 @@ function motifsDe(d: DestinationEvaluable, profil: Profil): Motif[] {
     motifs.push({ texte: "Aucun niveau de langue exigé.", favorable: true });
   }
 
-  if (d.coutPremiereAnneeXOF !== null) {
-    const reste = profil.budget - d.coutPremiereAnneeXOF;
+  // Une destination retenue dont le budget a été pesé est, par construction,
+  // dans le budget : `filtrageStrict` a déjà écarté les autres. La marge est
+  // donc toujours positive ici, et la seule phrase à écrire est celle-là.
+  if (causeBudget === null && d.coutPremiereAnneeXOF !== null) {
+    const marge = profil.budget - d.coutPremiereAnneeXOF;
     motifs.push({
-      texte:
-        reste >= 0
-          ? `Première année estimée à ${francs(d.coutPremiereAnneeXOF)}, ${francs(reste)} de marge sur ton budget.`
-          : `Première année estimée à ${francs(d.coutPremiereAnneeXOF)}.`,
-      favorable: reste >= 0,
+      texte: `Première année estimée à ${francs(d.coutPremiereAnneeXOF)}, ${francs(marge)} de marge sur ton budget.`,
+      favorable: true,
     });
   }
 
@@ -376,6 +434,34 @@ const libelleCategorie = (c: Categorie) => LIBELLE_CATEGORIE[c];
 
 /** Les trois meilleures, comme l'affiche P-03. */
 export const TROIS_MEILLEURES = 3;
+
+/**
+ * La réserve affichée sous le rang, quand le budget n'est pas entré dans le
+ * classement de cette destination — I.B.
+ *
+ * Elle existait pour une seule des deux causes. L'API la calculait par un
+ * prédicat de son cru — « une composante manque **et** le coût n'est pas
+ * converti » — qui redisait la monnaie et retirait l'autre cas. Un candidat
+ * qui n'avait pas répondu à la question du budget recevait donc un
+ * classement où le budget ne comptait pas, sans que rien ne le dise, et son
+ * coût de première année lui était présenté comme un point défavorable alors
+ * qu'il n'avait été comparé à rien.
+ *
+ * La phrase se déduit maintenant de la cause, là où la cause est établie.
+ * `null` quand le budget a été pesé : il n'y a alors rien à réserver.
+ */
+function reserveDuBudget(cause: CauseBudgetNonPese | null, coutXOF: number | null): string | null {
+  if (cause === null) return null;
+  if (cause === "monnaie") return MENTION_HORS_CLASSEMENT;
+  // « non-declare » implique un coût connu : `causeDuBudgetNonPese` rend
+  // « monnaie » dès qu'il manque, et la monnaie passe d'abord. Le type ne le
+  // sait pas ; écrire une branche pour ce cas serait écrire du code mort.
+  const montant = francs(coutXOF!);
+  // Le chiffre est dit ici, puisqu'il ne l'est plus en motif : le candidat
+  // garde le coût sous les yeux, sans qu'il soit compté contre la
+  // destination. La phrase nomme l'action, elle n'est pas un simple constat.
+  return `Tu n'as pas indiqué de budget : la première année, estimée à ${montant}, n'est pas comparée et n'entre pas dans le classement de cette destination. Modifie tes réponses pour l'y faire entrer.`;
+}
 
 /**
  * Ce que le classement a pesé, et ce qu'il n'a pas pu peser — I.A.

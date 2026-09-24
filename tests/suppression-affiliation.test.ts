@@ -13,10 +13,12 @@ import {
   COMMISSION_BPS_ANNONCEE,
   ETAT_APRES,
   commissionDue,
+  SILENCE,
   estProposable,
   tauxConformeALAnnonce,
   type Recevabilite,
 } from "@/domain/partenaires/affiliation";
+import { ETAT_INITIAL } from "@/domain/comptes/consentements";
 import { COMMISSION_PARTENAIRE, tauxCommissionFormate } from "@/domain/payments/pricing";
 import { GENRE_DE_LETAPE } from "@/server/lecture/partenaires";
 import { EFFETS_CLOTURE } from "@/domain/dossiers/cloture";
@@ -203,14 +205,69 @@ describe("WF-13 — proposition de partenaire", () => {
     expect(ETAT_APRES.NE_PLUS_PROPOSER).toBe("DECLINEE");
   });
 
+  /**
+   * L'écran disait un geste, et il le disait à ceux qui ne l'avaient pas
+   * fait.
+   *
+   * « Tu as coupé les offres de partenaire » est vrai d'un candidat qui a
+   * coupé. Il est faux de tous les autres — c'est-à-dire, au premier
+   * passage, de tout le monde : `ETAT_INITIAL` met chaque autorisation à
+   * faux (RG-02.1), et rien n'accorde celle-ci à l'inscription. La phrase
+   * s'adressait donc d'abord à ceux qu'elle décrivait le moins bien, et les
+   * renvoyait « rétablir » un accord qui n'avait jamais existé.
+   */
+  it("aucune autorisation n'est active au premier passage", () => {
+    expect(ETAT_INITIAL.partenaires).toBe(false);
+  });
+
+  it("l'écran n'impute un geste qu'à qui l'a fait", () => {
+    expect(SILENCE.retiree.titre).toContain("coupé");
+    // Le texte du compte neuf ne peut ni reprocher un geste, ni supposer un
+    // accord passé : « rétablir » présuppose exactement ce qui manque.
+    expect(SILENCE.jamais_donnee.titre).not.toMatch(/coupé|retiré/u);
+    expect(SILENCE.jamais_donnee.explication).not.toMatch(/rétabli|de nouveau|à nouveau/u);
+    expect(SILENCE.jamais_donnee.titre).toContain("pas encore autorisé");
+  });
+
+  it("les deux situations ne se lisent pas de la même façon", () => {
+    const champs = ["titre", "explication", "lien"] as const;
+    for (const champ of champs) {
+      expect(SILENCE.jamais_donnee[champ], champ).not.toBe(SILENCE.retiree[champ]);
+      // Ni l'un ni l'autre ne laisse la personne sans suite à donner.
+      expect(SILENCE.jamais_donnee[champ].length).toBeGreaterThan(10);
+      expect(SILENCE.retiree[champ].length).toBeGreaterThan(10);
+    }
+  });
+
+  /**
+   * Une implémentation, pas deux. L'écran choisit la carte, il n'en écrit
+   * pas le texte — sans quoi la distinction se referait à la main au
+   * prochain écran qui lit la même autorisation.
+   */
+  it("l'écran prend ses phrases dans le domaine", () => {
+    const composant = lire("src/app/(app)/(dossier)/services/Services.tsx");
+    expect(composant).toContain("SILENCE[autorisation]");
+    expect(composant).not.toContain("Tu as coupé");
+    const lecture = lire("src/server/lecture/partenaires.ts");
+    expect(lecture).toMatch(/etatDeLAutorisation\(userId, "partenaires"\)/u);
+    // Et la lecture du registre reste unique : la version booléenne s'en
+    // déduit, elle ne réinterroge pas la table pour son compte.
+    const acces = lire("src/server/acces/consentements.ts");
+    expect(acces).toMatch(/autorisationAccordee[\s\S]{0,220}etatDeLAutorisation\(/u);
+    expect(acces.match(/db\.consent\.findFirst/gu)).toHaveLength(1);
+  });
+
   it("« ne plus me proposer » survit au rechargement", () => {
     // La promesse « tu peux revenir sur ce choix depuis ton profil » ne
     // vaut que si le refus est écrit là où le profil le lit : dans
     // l'autorisation, pas dans l'état d'un composant.
     const acces = lire("src/server/acces/partenaires.ts");
     expect(acces).toMatch(/NE_PLUS_PROPOSER[\s\S]{0,200}partenaires/u);
+    // La lecture interroge le registre par le même code. Elle en lit
+    // désormais l'état plutôt que le seul verdict, ce qui ne change rien à
+    // ce que ce test garde : le refus vaut parce qu'il est écrit là.
     const lecture = lire("src/server/lecture/partenaires.ts");
-    expect(lecture).toMatch(/autorisationAccordee\(userId, "partenaires"\)/u);
+    expect(lecture).toMatch(/etatDeLAutorisation\(userId, "partenaires"\)/u);
   });
 
   it("la commission se calcule au résultat, arrondie en faveur du partenaire", () => {

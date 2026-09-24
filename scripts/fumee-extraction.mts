@@ -212,7 +212,9 @@ const { analyserUnePiece, TENTATIVES_AVANT_REVUE } = await import("../src/server
 const { lExtracteur, EXTRACTEUR_NON_BRANCHE } = await import("../src/server/dossiers/extracteur");
 const { GESTE_SANS_DATE_CIBLE } = await import("../src/domain/dossiers/extraction");
 const { solde } = await import("../src/server/acces/quota");
-const { enregistrerLAutorisation } = await import("../src/server/acces/consentements");
+const { enregistrerLAutorisation, etatDeLAutorisation } = await import(
+  "../src/server/acces/consentements"
+);
 
 let rang = 0;
 
@@ -749,6 +751,42 @@ try {
       `le journal nomme la variable à renseigner (${analyse?.engineLog})`,
     );
     verifier(await solde(p.application.id) === 5, "et le candidat n'a rien payé");
+  }
+
+  console.log("\nRG-02.1 — « jamais donnée » et « retirée » ne se confondent pas");
+  {
+    /*
+      La distinction ne se voit que sur le registre : elle tient à
+      l'existence d'une ligne, pas à sa valeur. Un essai pur ne peut donc
+      pas la tenir, et son absence n'avait rien cassé — elle avait fait
+      dire à T-06, pour tout compte neuf, « tu as coupé les offres de
+      partenaire ».
+    */
+    const p = await piece({ dateCible: "2027-09-01", sansAutorisation: true });
+
+    verifier(
+      (await etatDeLAutorisation(p.user.id, "partenaires")) === "jamais_donnee",
+      "un compte neuf n'a rien retiré : l'autorisation n'a jamais été donnée",
+    );
+
+    await enregistrerLAutorisation(p.user.id, "partenaires", true);
+    verifier(
+      (await etatDeLAutorisation(p.user.id, "partenaires")) === "accordee",
+      "accordée après l'accord",
+    );
+
+    await enregistrerLAutorisation(p.user.id, "partenaires", false);
+    verifier(
+      (await etatDeLAutorisation(p.user.id, "partenaires")) === "retiree",
+      "retirée après le retrait, et non ramenée à « jamais donnée »",
+    );
+
+    // Un genre ne répond pas pour un autre : le registre est interrogé par
+    // genre, et deux autorisations distinctes ont deux histoires distinctes.
+    verifier(
+      (await etatDeLAutorisation(p.user.id, "mesure_audience")) === "jamais_donnee",
+      "et l'histoire d'un genre ne déteint pas sur les autres",
+    );
   }
 } finally {
   await db.$disconnect().catch(() => undefined);

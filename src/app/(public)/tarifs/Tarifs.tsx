@@ -8,6 +8,7 @@ import {
   type Devise,
   type Pack,
 } from "@/domain/payments/pricing";
+import { AVANTAGES, SOUS_TITRES } from "@/domain/payments/avantages";
 import { formatMontant } from "@/lib/utils";
 
 /**
@@ -23,36 +24,6 @@ import { formatMontant } from "@/lib/utils";
  * populaire : une popularité n'est pas une raison, et le produit la
  * contredirait en support.
  */
-const AVANTAGES: Record<string, readonly string[]> = {
-  decouverte: [
-    "Simulateur complet et trois fiches destination",
-    "Aperçu de la checklist, sans analyse de pièces",
-    "Alertes de changement de règles",
-  ],
-  essentiel: [
-    "Checklist complète et échéancier jusqu'au dépôt",
-    "Analyse de 10 pièces, avec message de correction",
-    "Complétude du dossier et prochaine action",
-  ],
-  dossier: [
-    "Tout l'Essentiel, sur une destination",
-    "Analyse de 30 pièces",
-    "Rédaction assistée de la lettre de motivation",
-  ],
-  pro: [
-    "Tout le pack Dossier, sur trois destinations",
-    "Analyse de 90 pièces",
-    "Comparateur des trois dossiers en parallèle",
-  ],
-};
-
-const SOUS_TITRES: Record<string, string> = {
-  decouverte: "Pour savoir où tu en es.",
-  essentiel: "Un dossier, une destination.",
-  dossier: "Une destination, analyse étendue.",
-  pro: "Trois destinations comparées.",
-};
-
 /** Le pack gratuit n'est pas un achat : il n'a pas sa place dans `PACKS`. */
 const DECOUVERTE = {
   code: "decouverte",

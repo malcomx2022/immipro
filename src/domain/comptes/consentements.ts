@@ -82,6 +82,19 @@ export const CONSENTEMENTS: readonly Consentement[] = [
 
 export type EtatConsentements = Record<CodeConsentement, boolean>;
 
+/**
+ * L'état d'une autorisation, quand savoir « pourquoi pas » compte autant que
+ * « pas ».
+ *
+ * Un booléen suffit à décider — on traite, ou on ne traite pas. Il ne suffit
+ * pas à écrire une phrase : « jamais donnée » et « retirée » se ressemblent
+ * pour le code et ne se ressemblent pas du tout pour la personne. Un écran
+ * qui les confond finit par annoncer à quelqu'un un geste qu'il n'a pas
+ * fait, et c'est ce qui se passait sur T-06 — donc pour tout le monde, car
+ * `ETAT_INITIAL` met chaque autorisation à faux au premier passage.
+ */
+export type EtatAutorisation = "accordee" | "retiree" | "jamais_donnee";
+
 /** Aucune autorisation active au premier passage (RG-02.1). */
 export const ETAT_INITIAL: EtatConsentements = Object.freeze(
   Object.fromEntries(CONSENTEMENTS.map((c) => [c.code, false])),

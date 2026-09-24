@@ -9,8 +9,10 @@ import {
   COMPOSANTES_ABSENTES,
   COMPOSANTES_PESEES,
   perimetreDuClassement,
+  type DestinationEvaluable,
 } from "@/domain/simulateur/classement";
-import { versXOF, convertible } from "@/domain/format/change";
+import type { Reponses } from "@/domain/simulateur/questions";
+import { versXOF, convertible, MENTION_HORS_CLASSEMENT } from "@/domain/format/change";
 import { verdictDeConnexion, aBloquer, libelleEchec, ESSAIS_AVANT_BLOCAGE } from "@/domain/comptes/connexion";
 import { comparer } from "@/server/jobs/divergence";
 import { sansCommentaires } from "@/domain/copy/source";
@@ -328,10 +330,10 @@ describe("WF-01 — classement des destinations", () => {
     const incomparable = classer([{ ...base, coutPremiereAnneeXOF: null }], reponses).retenues[0]!;
 
     expect(comparable.interne.detail.budget).not.toBeNull();
-    expect(comparable.nonPesees).toEqual([]);
+    expect(comparable.causeBudget).toBeNull();
 
     expect(incomparable.interne.detail.budget).toBeNull();
-    expect(incomparable.nonPesees).toEqual(["le budget"]);
+    expect(incomparable.causeBudget).toBe("monnaie");
     // Les autres composantes valent la même chose : seule leur part change.
     expect(incomparable.interne.detail.langue).toBe(comparable.interne.detail.langue);
   });
@@ -362,7 +364,7 @@ describe("WF-01 — classement des destinations", () => {
   it("un budget non déclaré sort de la même façon", () => {
     const sansReponse = classer([base], { objectif: "Étudier", langue: "C1 et plus" }).retenues[0]!;
     expect(sansReponse.interne.detail.budget).toBeNull();
-    expect(sansReponse.nonPesees).toEqual(["le budget"]);
+    expect(sansReponse.causeBudget).toBe("non-declare");
   });
 
   /**
@@ -389,7 +391,7 @@ describe("WF-01 — classement des destinations", () => {
     // Le budget des Pays-Bas est mesuré et médiocre ; celui de la Suisse
     // n'est pas mesurable. La seconde passe devant, sur les trois autres.
     expect(retenues.map((r) => r.destination.pays)).toEqual(["Suisse", "Pays-Bas"]);
-    expect(retenues[0]!.nonPesees).toEqual(["le budget"]);
+    expect(retenues[0]!.causeBudget).toBe("monnaie");
   });
 
   /**
@@ -426,6 +428,107 @@ describe("WF-01 — classement des destinations", () => {
     expect(perimetreDuClassement(["coût de la vie"]).absentes).toBe(
       "Un critère prévu n'y entre pas, faute d'une source datée : coût de la vie.",
     );
+  });
+
+  /**
+   * I.B, suite — la réserve ne couvrait qu'une des deux causes.
+   *
+   * Le domaine retirait bien le budget du classement dans les deux cas, et
+   * un test le vérifiait déjà. Mais la route décidait seule de la phrase à
+   * afficher, par un prédicat qui exigeait en plus que le coût ne soit pas
+   * converti : un candidat qui n'avait pas répondu à la question du budget
+   * recevait un classement où le budget ne comptait pas, en silence.
+   */
+  const reponsesCompletes = { objectif: "Étudier", langue: "C1 et plus", budget: "Plus de 12 millions F" };
+  const sansMonnaie = { ...base, coutPremiereAnneeXOF: null };
+  const retenue = (destination: DestinationEvaluable, reponses: Reponses) =>
+    classer([destination], reponses).retenues[0]!;
+
+  it("les deux causes sont distinguées, pas seulement constatées", () => {
+    expect(retenue(base, reponsesCompletes).causeBudget).toBeNull();
+    expect(retenue(sansMonnaie, reponsesCompletes).causeBudget).toBe("monnaie");
+    expect(retenue(base, { objectif: "Étudier", langue: "C1 et plus" }).causeBudget).toBe(
+      "non-declare",
+    );
+  });
+
+  it("la réserve se déduit de la cause, elle n'est pas recomposée ailleurs", () => {
+    expect(retenue(base, reponsesCompletes).reserve).toBeNull();
+    expect(retenue(sansMonnaie, reponsesCompletes).reserve).toBe(MENTION_HORS_CLASSEMENT);
+    expect(retenue(base, { objectif: "Étudier", langue: "C1 et plus" }).reserve).not.toBeNull();
+  });
+
+  it("un budget non déclaré porte sa réserve, avec le montant et l'action", () => {
+    const { reserve } = retenue(base, { objectif: "Étudier", langue: "C1 et plus" });
+
+    expect(reserve).not.toBeNull();
+    // Le montant est formaté par `Intl` : l'espace du millier est insécable,
+    // et l'écrire à la main ferait échouer un test pourtant juste.
+    expect(reserve).toContain(`${new Intl.NumberFormat("fr-FR").format(8_000_000)} F`);
+    expect(reserve).toContain("Modifie tes réponses");
+    // Ce n'est pas la phrase de la monnaie : la cause n'est pas la même, et
+    // celle-ci se lève.
+    expect(reserve).not.toBe(MENTION_HORS_CLASSEMENT);
+  });
+
+  /**
+   * L'ordre des causes a une conséquence. Quand le coût n'est pas
+   * convertible, répondre à la question du budget n'y changerait rien :
+   * inviter le candidat à le faire serait lui promettre un effet qui ne
+   * viendra pas.
+   */
+  it("la monnaie l'emporte sur le budget non déclaré", () => {
+    const r = retenue(sansMonnaie, { objectif: "Étudier", langue: "C1 et plus" });
+    expect(r.causeBudget).toBe("monnaie");
+    expect(r.reserve).toBe(MENTION_HORS_CLASSEMENT);
+  });
+
+  it("un budget pesé n'a rien à réserver", () => {
+    expect(retenue(base, reponsesCompletes).reserve).toBeNull();
+  });
+
+  /**
+   * Un motif est une comparaison faite ; `favorable` dit de quel côté elle
+   * est tombée, jamais « on n'a pas comparé ».
+   *
+   * La branche fautive écrivait « Première année estimée à 8 000 000 F. »
+   * avec la pastille défavorable. Elle était inatteignable pour un budget
+   * déclaré — `filtrageStrict` écarte déjà les destinations hors budget — et
+   * ne servait donc qu'au candidat qui n'en avait pas déclaré : le seul à
+   * qui le coût était opposé sans avoir été comparé à quoi que ce soit.
+   */
+  it("le budget n'a de motif que là où il a été pesé", () => {
+    for (const reponses of [reponsesCompletes, { objectif: "Étudier", langue: "C1 et plus" }]) {
+      for (const r of classer([base, sansMonnaie], reponses).retenues) {
+        const compare = r.motifs.some((m) => m.texte.includes("de marge sur ton budget"));
+        // Le motif dit une comparaison faite : il apparaît quand la
+        // composante a été pesée, et seulement là. La première version de
+        // cette assertion ne refusait que la pastille défavorable — une
+        // marge négative annoncée comme favorable lui échappait.
+        expect(compare).toBe(r.causeBudget === null);
+        for (const m of r.motifs) {
+          if (m.texte.includes("de marge sur ton budget")) expect(m.favorable).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("une destination hors budget est écartée, jamais retenue avec une marge négative", () => {
+    const resultat = classer([base], { objectif: "Étudier", langue: "C1 et plus", budget: "Moins de 4 millions F" });
+    expect(resultat.retenues).toHaveLength(0);
+    expect(resultat.ecartees[0]!.ecart).toContain("au-dessus de ton budget");
+  });
+
+  /**
+   * Une implémentation, pas deux. La route demande la phrase au domaine ;
+   * si elle se remet à la composer, c'est ici que ça se voit — et c'est
+   * exactement par là que la cause manquante était entrée.
+   */
+  it("la route ne recompose pas la réserve", () => {
+    const route = sansCommentaires(lire("src/app/api/simulations/route.ts"));
+    expect(route).toContain("r.reserve");
+    expect(route).not.toContain("MENTION_HORS_CLASSEMENT");
+    expect(route).not.toContain("causeBudget");
   });
 
   /**

@@ -12,10 +12,10 @@ import {
 } from "@/server/acces/editorial";
 import {
   corpsSchema,
-  messageDeRefusEditorial,
   verifierLeDocument,
   type GenreDocument,
 } from "@/domain/editorial/document";
+import { exigerUnTexteAffichable } from "@/server/editorial/publication";
 
 /** Le motif, consigné au journal d'audit : les trois actions l'exigent. */
 const MOTIF = z.string().min(3).max(500);
@@ -42,11 +42,16 @@ function revalider(genre: GenreDocument, slug: string): void {
  * Édition et publication d'un document éditorial — B-08, J.C.
  *
  * Le vocabulaire interdit est vérifié **à chaque enregistrement** et ne
- * bloque **que la publication**. La nuance est celle que `CLAUDE.md`
+ * bloque que ce que le public verra. La nuance est celle que `CLAUDE.md`
  * décrit : « sa publication est bloquée tant que la formulation est
  * refusée ». Refuser aussi le brouillon empêcherait d'enregistrer un texte
  * en cours d'écriture, et pousserait à rédiger ailleurs pour recoller à la
  * fin — c'est-à-dire hors du garde-fou.
+ *
+ * « Que la publication » était trop étroit, et la phrase suivante de ce
+ * même fichier le disait déjà : enregistrer un document **en ligne** est
+ * une publication, tout comme y restaurer une version. Les trois chemins
+ * passent par `exigerUnTexteAffichable`, qui porte la règle et son motif.
  *
  * La négation reste reconnue, comme partout : « ImmiPro ne garantit pas
  * l'obtention du visa » est exactement la phrase qu'un guide doit pouvoir
@@ -81,6 +86,16 @@ export const PUT = route({
           lu.error.issues.map((i) => [i.path.map(String).join(".") || "corps", i.message]),
         ),
       });
+    }
+
+    /**
+     * Un document en ligne n'a pas de brouillon : l'enregistrer publie.
+     * Le refus vient donc **avant** l'écriture, et non après — un texte
+     * refusé ne doit pas même s'installer dans la ligne que la page
+     * publique relit.
+     */
+    if (document.status === "PUBLIE") {
+      exigerUnTexteAffichable({ titre: corps.titre, chapeau: corps.chapeau }, lu.data, "enLigne");
     }
 
     await db.editorialDoc.update({
@@ -211,9 +226,29 @@ export const POST = route({
         throw echec("introuvable");
       }
 
+      /**
+       * Une version d'avant le garde-fou peut porter ce qu'il refuse
+       * aujourd'hui. La remettre sur un document en ligne la republie :
+       * elle passe donc la même porte que le texte courant.
+       */
+      const restauree = champsDeLaVersion(version);
+      const corpsRestaure = corpsSchema.safeParse(restauree.body);
+      if (vue.etat === "PUBLIE") {
+        if (!corpsRestaure.success) {
+          throw echec("etat_incompatible", {
+            corps: `Le corps de la version ${version.rang} ne se relit plus. Elle ne peut pas revenir sur un document en ligne.`,
+          });
+        }
+        exigerUnTexteAffichable(
+          { titre: restauree.title, chapeau: restauree.standfirst },
+          corpsRestaure.data,
+          "restauration",
+        );
+      }
+
       await db.editorialDoc.update({
         where: { id: vue.id },
-        data: champsDeLaVersion(version),
+        data: restauree,
       });
 
       const motif = `Restauration de la version ${version.rang} — ${corps.motif}`;
@@ -253,15 +288,7 @@ export const POST = route({
       });
     }
 
-    const refus = verifierLeDocument({ titre: vue.titre, chapeau: vue.chapeau }, vue.corps);
-    if (refus.length > 0) {
-      // Le refus nomme le fait : la publication est refusée, et les champs
-      // ne sont pas « invalides » — le document est bien formé, c'est sa
-      // formulation qui ne peut pas s'afficher (DOC-12 §16 règle 1).
-      throw echec("publication_refusee", {
-        champs: Object.fromEntries(refus.map((f) => [f.chemin, messageDeRefusEditorial(f)])),
-      });
-    }
+    exigerUnTexteAffichable({ titre: vue.titre, chapeau: vue.chapeau }, vue.corps, "publication");
 
     await db.editorialDoc.update({
       where: { id: vue.id },
