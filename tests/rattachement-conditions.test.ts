@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   conditionsDeLaPiece,
   conditionsHorsPieces,
   evaluerConditions,
+  exigencesDeLaPiece,
   type Condition,
 } from "@/domain/dossiers/verification";
 import { raisonsDIncompletabilite, visaRulesSchema } from "@/domain/rules/schema";
@@ -275,5 +277,90 @@ describe("le référentiel livré est terminable", () => {
       );
       expect(portees.length, `${regle.countryCode}/${regle.visaType}`).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * La troisième devinette, que le correctif du 22/09/2026 n'avait pas vue.
+ *
+ * Il en nommait deux — le job d'analyse et le calcul de complétude — et
+ * les a ramenées à `conditionsDeLaPiece`. Une troisième restait dans la
+ * lecture qui alimente C-08 : `exigenceDe`, dans `server/lecture/dossiers.ts`,
+ * appariait le code d'une condition et celui d'une pièce par `startsWith`,
+ * dans les deux sens, et ne rendait qu'une condition sur les n qui portent.
+ *
+ * Mesuré sur le référentiel réel avant correction : dix-neuf pièces, sept
+ * portent une exigence déclarée, la devinette en trouvait quatre — par
+ * coïncidence de graphie. Les trois perdues étaient `contrat_travail`
+ * (cinq conditions), `admission` et `diplome` de la procédure émiratie.
+ */
+describe("Ce que la règle demande d'une pièce — C-08", () => {
+  /** La devinette telle qu'elle était écrite, pour mesurer l'écart. */
+  const parPrefixe = (conditions: readonly Condition[], code: string) =>
+    conditions.find(
+      (c) => c.code.startsWith(code) || code.startsWith(c.code.split("_")[0] ?? ""),
+    );
+
+  it("rend toutes les exigences que le référentiel rattache, pas une devinée", () => {
+    for (const regle of REGLES_DE_REFERENCE) {
+      const payload = visaRulesSchema.parse(regle.rules);
+      for (const piece of payload.pieces_requises) {
+        const rattachees = conditionsDeLaPiece(payload.conditions, piece.code);
+        const rendues = exigencesDeLaPiece(payload.conditions, piece.code).flatMap(
+          (bloc) => bloc.exigences,
+        );
+        expect(rendues.length, `${regle.visaType} · ${piece.code}`).toBe(rattachees.length);
+      }
+    }
+  });
+
+  /**
+   * Et le contrat de travail kennismigrant, le cas qui a nommé le défaut :
+   * cinq conditions rattachées, dont quatre en alternative. La devinette
+   * n'en trouvait aucune.
+   */
+  it("le contrat de travail kennismigrant porte ses cinq conditions", () => {
+    const regle = REGLES_DE_REFERENCE.find((r) => r.visaType === "emploi_kennismigrant")!;
+    const payload = visaRulesSchema.parse(regle.rules);
+    expect(parPrefixe(payload.conditions, "contrat_travail")).toBeUndefined();
+
+    const blocs = exigencesDeLaPiece(payload.conditions, "contrat_travail");
+    expect(blocs.flatMap((b) => b.exigences)).toHaveLength(5);
+    const auChoix = blocs.filter((b) => b.auChoix);
+    expect(auChoix).toHaveLength(1);
+    expect(auChoix[0]!.exigences.length).toBeGreaterThan(1);
+  });
+
+  /**
+   * Les seuils d'un groupe restent groupés jusqu'à l'écran. Les aplatir
+   * ferait lire quatre exigences cumulées là où une seule s'applique —
+   * la faute que `evaluerConditions` refuse déjà de commettre en jugeant.
+   */
+  it("un groupe d'alternatives ne se découpe pas en exigences cumulées", () => {
+    const blocs = exigencesDeLaPiece([MOINS_30, PLUS_30, REDUIT, EMPLOYEUR], "contrat_travail");
+    const groupe = blocs.find((b) => b.auChoix)!;
+    expect(groupe.exigences.map((e) => e.intitule)).toEqual([
+      "salaire min moins 30 ans",
+      "salaire min 30 ans et plus",
+      "salaire min critere reduit",
+    ]);
+    const seule = blocs.find((b) => !b.auChoix)!;
+    expect(seule.exigences).toHaveLength(1);
+    expect(seule.exigences[0]!.intitule).toBe("employeur reconnu");
+  });
+
+  /** Une pièce sans condition rend une liste vide — jamais une exigence nulle. */
+  it("une pièce qu'aucune condition ne vise rend une liste vide", () => {
+    expect(exigencesDeLaPiece([MOINS_30, EMPLOYEUR], "passeport")).toEqual([]);
+  });
+
+  /**
+   * Et la lecture n'invente plus d'exigence : le mot `startsWith` a
+   * disparu du module, avec la devinette qu'il portait.
+   */
+  it("la lecture de C-08 ne rapproche plus par préfixe", () => {
+    const lecture = readFileSync("src/server/lecture/dossiers.ts", "utf8");
+    expect(lecture).toContain("exigencesDeLaPiece");
+    expect(lecture).not.toContain("startsWith");
   });
 });

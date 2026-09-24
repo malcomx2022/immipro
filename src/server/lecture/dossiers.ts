@@ -2,7 +2,7 @@ import type { Application, Document, DocumentVersion, VisaRule } from "@prisma/c
 import { db } from "@/lib/db";
 import { aidePourLaChecklist, type AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { echec } from "@/server/http/echecs";
-import { versFiche, payload } from "@/server/acces/regles";
+import { versFiche, payload, mentionDe } from "@/server/acces/regles";
 import { versDossier, versPiece } from "@/server/vue/dossier";
 import { compteur } from "@/server/acces/quota";
 import type { Dossier } from "@/domain/dossiers/dossier";
@@ -13,6 +13,7 @@ import type { Echeance } from "@/domain/dossiers/echeancier";
 import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
 import type { CalendrierAEvaluer } from "@/domain/dossiers/faisabilite";
 import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers/analyse";
+import { exigencesDeLaPiece } from "@/domain/dossiers/verification";
 import type { Quota } from "@/domain/dossiers/televersement";
 import { getPack } from "@/domain/payments/pricing";
 
@@ -272,6 +273,7 @@ export async function analyseDeLaPiece(
 
   const derniere = document.versions[0];
   const analyse = derniere?.analyses[0];
+  const regle = document.application.visaRule;
 
   return {
     piece: versPiece(document),
@@ -285,7 +287,10 @@ export async function analyseDeLaPiece(
           titre: analyse.title,
           corps: analyse.body,
           champs: champsLus(analyse.fields),
-          exigence: exigenceDe(document.code, document.application.visaRule),
+          exigences: regle ? exigencesDeLaPiece(payload(regle).conditions, document.code) : [],
+          // Pas de règle relisible, pas d'exigence citée — et donc pas de
+          // source à porter. INV-8 ne se tient pas avec une mention vide.
+          mention: regle ? mentionDe(regle) : null,
         }
       : null,
   };
@@ -308,23 +313,4 @@ function champsLus(fields: unknown): ChampLu[] {
     intitule: intitule.replace(/_/gu, " "),
     valeur: valeur === null || valeur === undefined ? null : String(valeur),
   }));
-}
-
-/**
- * L'exigence affichée en regard de la lecture. Elle vient de la condition du
- * référentiel qui porte sur cette pièce : une analyse qui montre ce qu'elle a
- * lu sans montrer ce qui est attendu ne se conteste pas non plus.
- */
-function exigenceDe(code: string, regle: VisaRule | null): ChampLu {
-  if (!regle) return { intitule: "Exigence", valeur: null };
-  const condition = payload(regle).conditions.find(
-    (c) => c.code.startsWith(code) || code.startsWith(c.code.split("_")[0] ?? ""),
-  );
-  if (!condition) return { intitule: "Exigence", valeur: null };
-  return {
-    intitule: condition.code.replace(/_/gu, " "),
-    valeur: `${Array.isArray(condition.valeur) ? condition.valeur.join(", ") : condition.valeur}${
-      condition.unite ? ` ${condition.unite}` : ""
-    }`,
-  };
 }

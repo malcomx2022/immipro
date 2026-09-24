@@ -203,7 +203,15 @@ export const ANALYSE_RESSOURCES: ResultatAnalyse = {
     { intitule: "Solde disponible", valeur: "10 000 €" },
     { intitule: "Date du relevé", valeur: "2 septembre 2026" },
   ],
-  exigence: { intitule: "Montant exigé", valeur: "13 569,24 € · 8 901 000 F" },
+  exigences: [
+    {
+      auChoix: false,
+      exigences: [
+        { intitule: "preuve fonds annuelle", valeur: "13 569,24 € · 8 901 000 F", bloquante: true },
+      ],
+    },
+  ],
+  mention: { source: "ind.nl", verifieeLe: "2026-09-01" },
 };
 
 /**

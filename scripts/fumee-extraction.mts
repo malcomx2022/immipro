@@ -908,6 +908,120 @@ try {
       "la revue reste ouverte",
     );
   }
+
+  /*
+    C-08 — ce que la règle demande de la pièce.
+
+    La lecture de l'écran d'analyse appariait le code d'une condition et
+    celui d'une pièce par préfixe : la troisième devinette du genre, que
+    le correctif du 22/09/2026 n'avait pas vue. Sur le contrat de travail
+    kennismigrant — cinq conditions rattachées, dont quatre en alternative
+    — elle n'en trouvait aucune, et l'écran affichait « Exigence : non
+    lue », c'est-à-dire que la pièce du candidat était illisible sur un
+    point où rien n'avait été cherché.
+
+    Une fumée, et pas seulement un essai du domaine : la règle réelle doit
+    traverser Prisma, `payload` et la lecture pour que la relation soit
+    éprouvée là où elle sert. Une fixture écrite à la main aurait pu tenir
+    par coïncidence de graphie, comme celle de ce fichier le fait pour le
+    passeport.
+  */
+  console.log("\nC-08 — l'exigence vient du référentiel, elle ne se devine pas");
+  {
+    const { analyseDeLaPiece } = await import("../src/server/lecture/dossiers");
+    const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
+    const kennismigrant = REGLES_DE_REFERENCE.find(
+      (r) => r.visaType === "emploi_kennismigrant",
+    )!;
+
+    rang += 1;
+    const user = await db.user.create({
+      data: { email: `fumee-exig-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const regle = await db.visaRule.create({
+      data: {
+        countryCode: kennismigrant.countryCode,
+        visaType: kennismigrant.visaType,
+        category: "EMPLOI",
+        version: 900 + rang,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: kennismigrant.rules as object,
+        sourceUrl: "https://ind.nl/regle",
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-08-01"),
+        verifiedBy: "fumée",
+        nextReviewAt: new Date("2027-01-01"),
+        status: "PUBLISHED",
+      },
+    });
+    const application = await db.application.create({
+      data: { userId: user.id, visaRuleId: regle.id, status: "ACTIF" },
+    });
+
+    /** Une pièce analysée, telle que l'écran la relit. */
+    async function pieceAnalysee(code: string, libelle: string) {
+      const document = await db.document.create({
+        data: {
+          applicationId: application.id,
+          code,
+          label: libelle,
+          status: "A_CORRIGER",
+          required: true,
+          remedy: "TELEVERSER",
+        },
+      });
+      const version = await db.documentVersion.create({
+        data: {
+          documentId: document.id,
+          rank: 1,
+          objectKey: `dossiers/${application.id}/${code}.pdf`,
+          scanState: "SAINE",
+          scannedAt: new Date(),
+        },
+      });
+      await db.documentAnalysis.create({
+        data: {
+          versionId: version.id,
+          verdict: "A_CORRIGER",
+          fields: { salaire_min_moins_30_ans: 4400 },
+          title: "Le salaire lu ne correspond pas au seuil",
+          body: "Le contrat indique 4 400 € bruts par mois. Vérifie le seuil qui te concerne.",
+        },
+      });
+      return document.id;
+    }
+
+    const contrat = await pieceAnalysee("contrat_travail", "Contrat de travail");
+    const lue = await analyseDeLaPiece(contrat, application.id, user.id);
+    const exigences = lue.analyse?.exigences ?? [];
+    const toutes = exigences.flatMap((b) => b.exigences);
+    verifier(
+      toutes.length === 5,
+      `les cinq conditions du contrat de travail sont rendues (${toutes.length})`,
+    );
+    verifier(
+      exigences.filter((b) => b.auChoix).length === 1,
+      "dont un seul groupe d'alternatives, resté groupé",
+    );
+    verifier(
+      toutes.some((e) => e.intitule.includes("employeur reconnu")),
+      "la condition sans seuil chiffré est là aussi",
+    );
+    // INV-8 : une exigence citée porte sa source et sa date de vérification.
+    verifier(
+      lue.analyse?.mention?.source === "ind.nl" &&
+        lue.analyse.mention.verifieeLe === "2026-08-01",
+      `la source et sa date accompagnent l'exigence (${JSON.stringify(lue.analyse?.mention)})`,
+    );
+
+    // Et une pièce qu'aucune condition ne vise ne rend pas une exigence nulle.
+    const passeport = await pieceAnalysee("passeport", "Passeport");
+    const sans = await analyseDeLaPiece(passeport, application.id, user.id);
+    verifier(
+      (sans.analyse?.exigences ?? []).length === 0,
+      `le passeport de cette procédure ne porte aucun seuil (${(sans.analyse?.exigences ?? []).length})`,
+    );
+  }
 } finally {
   await db.$disconnect().catch(() => undefined);
   service.close();

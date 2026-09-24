@@ -18,6 +18,8 @@ import {
   dossierParId,
 } from "@/lib/contenu/dossiers";
 import { LIBELLE_PALIER } from "@/domain/completeness/score";
+import { VALEUR_NON_LUE } from "@/domain/dossiers/analyse";
+import { MENTION_AU_CHOIX, SANS_EXIGENCE_CHIFFREE } from "@/domain/dossiers/verification";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -355,9 +357,61 @@ describe("C-08 — Résultat d'analyse", () => {
     const { container } = rendrePiece();
     expect(screen.getByText("Solde disponible")).toBeDefined();
     expect(screen.getByText("10 000 €")).toBeDefined();
-    expect(screen.getByText("Montant exigé")).toBeDefined();
+    expect(screen.getByText("preuve fonds annuelle")).toBeDefined();
     expect(container.textContent).toContain("Lecture automatique, susceptible d'erreur");
     expect(screen.getByRole("link", { name: "Signaler une erreur de lecture" })).toBeDefined();
+  });
+
+  /*
+    L'exigence était une ligne de plus sous « Ce que nous avons lu », et
+    `valeurAffichee` rendait son absence « non lue ». Deux fautes en une :
+    une exigence ne se lit pas dans le fichier du candidat, et « non lue »
+    dit à quelqu'un que sa pièce était illisible sur un point où rien
+    n'avait été cherché.
+  */
+  it("sépare ce que la règle demande de ce qui a été lu", () => {
+    rendrePiece();
+    const section = screen
+      .getByRole("heading", { name: "Ce que la règle demande" })
+      .closest("section")!;
+    expect(section.textContent).toContain("preuve fonds annuelle");
+    expect(
+      screen.getByRole("heading", { name: "Ce que nous avons lu" }).closest("section")!.textContent,
+    ).not.toContain("preuve fonds annuelle");
+    // INV-8 : une exigence citée porte sa source et sa date de vérification.
+    expect(section.textContent).toContain("ind.nl");
+  });
+
+  it("dit qu'aucun seuil n'est attaché plutôt que « non lue »", () => {
+    const { container } = rendrePiece({
+      analyse: { ...ANALYSE_RESSOURCES, exigences: [] },
+    });
+    expect(container.textContent).toContain(SANS_EXIGENCE_CHIFFREE);
+    expect(container.textContent).not.toContain(VALEUR_NON_LUE);
+  });
+
+  /*
+    Quatre seuils de salaire ne sont pas quatre exigences cumulées : un seul
+    s'applique, et lequel dépend d'un fait que le dossier ne porte pas.
+  */
+  it("dit qu'un seul seuil s'applique quand la règle en donne plusieurs", () => {
+    const { container } = rendrePiece({
+      analyse: {
+        ...ANALYSE_RESSOURCES,
+        exigences: [
+          {
+            auChoix: true,
+            exigences: [
+              { intitule: "salaire min moins 30 ans", valeur: "4 357 EUR", bloquante: true },
+              { intitule: "salaire min 30 ans et plus", valeur: "5 942 EUR", bloquante: true },
+            ],
+          },
+        ],
+      },
+    });
+    expect(container.textContent).toContain("4 357 EUR");
+    expect(container.textContent).toContain("5 942 EUR");
+    expect(container.textContent).toContain(MENTION_AU_CHOIX);
   });
 
   it("ne vaut jamais décision consulaire", () => {
