@@ -79,14 +79,14 @@ describe("C-01 — Tableau de bord", () => {
 });
 
 describe("C-02 — Profil", () => {
-  // Le profil vient de la page ; l'écran l'édite. Trois champs renseignés,
-  // comme un compte qui a repris les réponses du simulateur.
-  const initial = {
-    nom: "Aline Dossou",
-    naissance: "12/04/2004",
-    nationalite: "Béninoise",
-    diplome: "Licence en gestion",
-  };
+  /*
+    Le profil vient de la page ; l'écran l'édite. L'écran n'affiche que ce
+    que le produit sait garder : la date de naissance et la nationalité
+    étaient rendues, comptées, puis jetées avant l'envoi faute de colonne,
+    et cette fixture les portait — l'essai vérifiait donc un décompte de
+    champs dont deux ne se seraient jamais enregistrés.
+  */
+  const initial = { nom: "Aline Dossou", diplome: "Licence en gestion" };
 
   it("compte les champs restants au lieu d'afficher une part", () => {
     const { container } = render(<Profil initial={initial} />);
@@ -96,13 +96,34 @@ describe("C-02 — Profil", () => {
 
   it("met le décompte à jour à la frappe, dans une région vivante", () => {
     render(<Profil initial={initial} />);
-    const avant = screen.getByText(/Il manque 3 champs/);
+    const avant = screen.getByText(/Il manque 1 champ/);
     expect(avant.closest("[aria-live='polite']")).not.toBeNull();
 
     fireEvent.change(screen.getByLabelText("Niveau d'anglais attesté"), {
       target: { value: "B2" },
     });
-    expect(screen.getByText(/Il manque 2 champs/)).toBeDefined();
+    expect(
+      screen.getByText("Profil complet. Ta checklist tient compte de toutes ces informations."),
+    ).toBeDefined();
+  });
+
+  /**
+   * Et l'écran n'affiche rien qu'il ne sache enregistrer : c'est la même
+   * garde que côté domaine, prise depuis le rendu, là où le candidat voit
+   * les champs.
+   */
+  it("n'affiche aucun champ qu'il jetterait à l'envoi", () => {
+    const { container } = render(<Profil initial={initial} />);
+    for (const orphelin of [
+      "Date de naissance",
+      "Nationalité",
+      "Personnes à charge",
+      "Refus de visa antérieur",
+    ]) {
+      expect(container.textContent, `« ${orphelin} » n'a nulle part où aller`).not.toContain(
+        orphelin,
+      );
+    }
   });
 
   it("dit que rien n'est transmis à une administration", () => {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
+import { enregistrerLeProfil } from "@/server/acces/profil";
 
 /**
  * Profil — A-05 et C-02, WF-02 étapes 3 et 4.
@@ -13,6 +14,11 @@ import { db } from "@/lib/db";
  * Le téléphone est validé par format avant tout paiement Mobile Money
  * (RG-02.3) : le format international est exigé ici, à la saisie, plutôt
  * qu'au moment du paiement où l'échec coûte un parcours entier.
+ *
+ * L'écriture vit dans `server/acces/profil` : elle effaçait les colonnes
+ * qu'on ne lui donnait pas — dont les réponses du simulateur que cet
+ * en-tête annonce —, et derrière `next/headers` aucune fumée ne pouvait
+ * relire la ligne après coup.
  */
 const TELEPHONE = /^\+[1-9]\d{7,14}$/u;
 
@@ -44,6 +50,9 @@ export const PUT = route({
   acces: "candidat",
   limite: "sensible",
   corps: z.object({
+    // `min` absent, et volontairement : la chaîne vide est le geste
+    // « j'efface ce champ », que `enregistrerLeProfil` distingue d'une
+    // absence. La refuser rendrait les champs ineffaçables.
     prenom: z.string().trim().max(80).optional(),
     nom: z.string().trim().max(80).optional(),
     telephone: z
@@ -63,32 +72,7 @@ export const PUT = route({
     budgetDevise: z.enum(["XOF", "EUR"]).optional(),
   }),
   async traiter({ corps, acteur }) {
-    await db.user.update({
-      where: { id: acteur!.id },
-      data: {
-        ...(corps.prenom !== undefined ? { firstName: corps.prenom } : {}),
-        ...(corps.nom !== undefined ? { lastName: corps.nom } : {}),
-        ...(corps.telephone !== undefined ? { phone: corps.telephone } : {}),
-        ...(corps.pays !== undefined ? { countryCode: corps.pays } : {}),
-      },
-    });
-
-    const donneesProfil = {
-      objectif: corps.objectif ?? null,
-      highestDegree: corps.diplome ?? null,
-      fieldOfStudy: corps.domaine ?? null,
-      yearsExperience: corps.anneesExperience ?? null,
-      languages: (corps.langues ?? null) as never,
-      budgetTotal: corps.budgetTotal ?? null,
-      budgetCurrency: corps.budgetDevise ?? null,
-    };
-
-    await db.profile.upsert({
-      where: { userId: acteur!.id },
-      create: { userId: acteur!.id, ...donneesProfil },
-      update: donneesProfil,
-    });
-
+    await enregistrerLeProfil(acteur!.id, corps);
     return { enregistre: true };
   },
 });
