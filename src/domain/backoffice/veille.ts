@@ -195,6 +195,36 @@ export const MENTION_FILE_VIDE =
   "Une file vide est un état normal, pas une panne de collecte : la date du dernier relevé le prouve.";
 
 /**
+ * Horizon de la file — la fenêtre que la requête de DOC-11 retient.
+ *
+ * Il vit ici et non dans la lecture serveur parce que l'écran en parle :
+ * l'état vide doit dire quand une fiche entrera dans la file, et la seule
+ * façon d'en être sûr est de lire le nombre qui filtre la requête. Écrit
+ * des deux côtés, il aurait fini par dire trente là où la requête en
+ * retenait quarante-cinq.
+ */
+export const HORIZON_VEILLE_JOURS = 30;
+
+/**
+ * L'état vide, et la porte qu'il n'a pas.
+ *
+ * Il offrait « Voir les règles publiées » vers `/regles/nl-etudes`. Cette
+ * adresse ne mène nulle part : `/regles/[id]` attend un `VisaRule.id`, qui
+ * est un identifiant technique — la graine en produit quatre, et aucun ne
+ * s'appelle ainsi. La page répondait donc 404, et c'était le seul lien de
+ * l'écran où le veilleur n'a précisément rien d'autre à cliquer.
+ *
+ * Le back-office n'a pas d'index des règles : `src/app/(admin)/regles/`
+ * ne porte que l'édition d'une fiche, et la navigation n'a pas d'entrée
+ * pour elles. Une fiche se relit depuis cette file, où elle entre à
+ * l'approche de son échéance. C'est ce que l'état vide dit désormais —
+ * nommer le chemin réel vaut mieux qu'un lien vers un index absent, et
+ * retirer le lien ne crée pas le manque : il cesse de le cacher.
+ */
+export const SANS_INDEX_DES_REGLES =
+  `Une fiche se relit depuis cette file, où elle entre ${HORIZON_VEILLE_JOURS} jours avant son échéance de relecture. Le back-office n'a pas d'autre index des règles : il n'y a rien à ouvrir tant que la file est vide.`;
+
+/**
  * Ce que l'écran dit du seul automatisme qui dépublie.
  *
  * Il annonçait l'inverse. La phrase est celle que RG-14.1 impose, et elle

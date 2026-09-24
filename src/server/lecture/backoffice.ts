@@ -9,7 +9,12 @@ import {
 import { echec } from "@/server/http/echecs";
 import { payload } from "@/server/acces/regles";
 import { editorialDe, EDITORIAL } from "@/lib/contenu/destinations";
-import type { FicheSuivie, Collecte, StatutFiche } from "@/domain/backoffice/veille";
+import {
+  HORIZON_VEILLE_JOURS,
+  type FicheSuivie,
+  type Collecte,
+  type StatutFiche,
+} from "@/domain/backoffice/veille";
 import type { Compte, StatutCompte } from "@/domain/backoffice/comptes";
 import type { Paiement, EtatOperateur, EtatRapprochement } from "@/domain/backoffice/reconciliation";
 import type { EcritureAudit, CategorieAudit } from "@/domain/backoffice/audit";
@@ -43,9 +48,11 @@ const STATUT_FICHE: Record<string, StatutFiche> = {
   ARCHIVED: "ARCHIVE",
 };
 
-/** File de veille — B-01. Trente jours d'horizon, comme la requête de DOC-11. */
-export const HORIZON_VEILLE_JOURS = 30;
-
+/**
+ * File de veille — B-01. L'horizon vient du domaine, qui le dit aussi à
+ * l'écran : l'état vide annonce quand une fiche y entrera, et les deux
+ * doivent lire le même nombre.
+ */
 export async function fichesSuivies(aujourdhui = new Date()): Promise<FicheSuivie[]> {
   const horizon = new Date(aujourdhui);
   horizon.setUTCDate(horizon.getUTCDate() + HORIZON_VEILLE_JOURS);

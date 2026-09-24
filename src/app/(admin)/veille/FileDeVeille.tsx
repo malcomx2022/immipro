@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
@@ -18,6 +17,7 @@ import {
   MENTION_DEPUBLICATION_A_LECHEANCE,
   MENTION_FILE_VIDE,
   MENTION_SOURCE_MUETTE_SANS_EFFET,
+  SANS_INDEX_DES_REGLES,
   enRetard,
   collecteComplete,
   filtrerVeille,
@@ -275,14 +275,13 @@ function FileVide({ collecte }: { collecte: Collecte }) {
         diverge des règles publiées. La prochaine collecte est programmée{" "}
         {moment(collecte.prochaineLe)}.
       </p>
-      <div className="flex gap-2 pt-1">
-        <Link
-          href="/regles/nl-etudes"
-          className="flex min-h-touch items-center text-14 text-accent-700 underline"
-        >
-          Voir les règles publiées
-        </Link>
-      </div>
+      {/* Aucun lien : le back-office n'a pas d'index des règles, et l'état
+          vide est le seul écran où le veilleur n'a rien d'autre à cliquer.
+          Il dit donc par où une fiche revient, plutôt que d'offrir une
+          porte qui répond 404. */}
+      <p className="max-w-[70ch] text-pretty text-13 text-ink-500">
+        {SANS_INDEX_DES_REGLES}
+      </p>
     </div>
   );
 }
