@@ -92,6 +92,8 @@ const { editionDeLaRegle, collecte, fichesSuivies } = await import(
   "../src/server/lecture/backoffice"
 );
 const { consignerLeReleve } = await import("../src/server/veille/releve");
+const { alertesDuCandidat } = await import("../src/server/lecture/alertes");
+const { mentionDeLaCoupe } = await import("../src/domain/notifications/alerte");
 
 const brute = REGLES_DE_REFERENCE.find(
   (r) => r.countryCode === "NL" && r.visaType === "emploi_kennismigrant",
@@ -681,7 +683,7 @@ try {
       );
 
       const lues = await alertesDuCandidat(alerte.userId);
-      const lue = lues.find((a) => a.id === alerte.id);
+      const lue = lues.alertes.find((a) => a.id === alerte.id);
       const phrase = lue ? libelleContexte(lue, new Date()) : "";
       verifier(
         phrase.includes("source :") && phrase.includes("vérifiée le"),
@@ -1731,6 +1733,69 @@ try {
       .then(() => "acceptée")
       .catch((e: { echec?: { code?: string } }) => e.echec?.code ?? "?");
     verifier(nu === "champs_invalides", `un écart sans texte est refusé (${nu})`);
+  }
+
+  // ── T-01 : la coupe à cinquante ne mange plus les non lues ─────────
+  /*
+    L'ordre était `[{ readAt: "asc" }, { createdAt: "desc" }]`, et il
+    disait l'inverse de son intention : en PostgreSQL, `ASC` place les
+    `NULL` en dernier, donc les non lues partaient en fin de liste et
+    `take: 50` les coupait avant tout le reste. La route comptait ensuite
+    ses non lues sur cette page-là, et le bandeau annonçait « Aucune
+    alerte non lue » à quelqu'un qui en avait.
+
+    Une fumée, parce que c'est le tri de PostgreSQL qui est en cause : un
+    essai sur un tableau trié en mémoire n'aurait jamais reproduit le
+    défaut — JavaScript, lui, range `null` en premier.
+  */
+  console.log("\nT-01 — la coupe à cinquante ne coupe pas les non lues");
+  {
+    const lecteur = await db.user.create({
+      data: {
+        email: `alertes-${process.pid}@exemple.test`,
+        role: "CANDIDAT",
+        emailVerified: new Date(),
+      },
+    });
+    const JOUR = 86_400_000;
+    const origine = Date.parse("2026-01-01T00:00:00Z");
+    for (let i = 0; i < 55; i += 1) {
+      await db.notification.create({
+        data: {
+          userId: lecteur.id,
+          kind: "ECHEANCE",
+          title: `lue ${i}`,
+          body: "…",
+          createdAt: new Date(origine + i * JOUR),
+          readAt: new Date(origine + i * JOUR + 3_600_000),
+        },
+      });
+    }
+    for (let i = 0; i < 3; i += 1) {
+      await db.notification.create({
+        data: {
+          userId: lecteur.id,
+          kind: "REGLEMENTATION",
+          title: `non lue ${i}`,
+          body: "…",
+          createdAt: new Date(origine + (100 + i) * JOUR),
+        },
+      });
+    }
+
+    const page = await alertesDuCandidat(lecteur.id);
+    const nonLuesServies = page.alertes.filter((a) => !a.lue).length;
+    verifier(page.alertes.length === 50, `la page en sert cinquante (${page.alertes.length})`);
+    verifier(nonLuesServies === 3, `les trois non lues y sont (${nonLuesServies})`);
+    // Le compte est celui du compte, pas de la page : tiré de la page, il
+    // redevenait faux dès la première coupe.
+    verifier(page.nonLues === 3, `le compte des non lues est celui du compte (${page.nonLues})`);
+    verifier(page.total === 58, `et le total dit ce qui existe (${page.total})`);
+    const coupe = mentionDeLaCoupe(page.alertes.length, page.total);
+    verifier(
+      (coupe ?? "").startsWith("8 alertes plus anciennes"),
+      `la page dit ce qu'elle ne montre pas (« ${coupe} »)`,
+    );
   }
 
 } catch (erreur) {

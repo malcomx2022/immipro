@@ -87,6 +87,25 @@ export const LIBELLE_FILTRE: Record<FiltreAlerte, string> = {
 
 export const FILTRES: readonly FiltreAlerte[] = ["TOUTES", "REGLEMENTATION", "ECHEANCE"];
 
+/**
+ * Ce que la page ne montre pas, dit à qui la lit.
+ *
+ * Une liste coupée qui ne dit pas qu'elle est coupée se lit comme une
+ * liste complète. La phrase nomme donc l'ordre de la coupe — non lues
+ * d'abord, puis les plus récentes — pour que le candidat sache ce qui
+ * manque, et non seulement qu'il manque quelque chose.
+ *
+ * `null` quand rien n'est coupé : une ligne qui dirait « 0 alerte de plus »
+ * est du bruit sur l'écran de tout le monde.
+ */
+export function mentionDeLaCoupe(affichees: number, total: number): string | null {
+  const reste = total - affichees;
+  if (reste <= 0) return null;
+  return reste > 1
+    ? `${reste} alertes plus anciennes ne sont pas affichées. Les non lues sont montrées en premier, puis les plus récentes.`
+    : "1 alerte plus ancienne n'est pas affichée. Les non lues sont montrées en premier, puis les plus récentes.";
+}
+
 export function filtrer(alertes: readonly Alerte[], filtre: FiltreAlerte): Alerte[] {
   const retenues =
     filtre === "TOUTES" ? [...alertes] : alertes.filter((a) => a.genre === filtre);

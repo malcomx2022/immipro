@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { sansCommentaires } from "@/domain/copy/source";
 import {
   compterMots,
   dureeEstimee,
@@ -29,6 +31,7 @@ import {
 import {
   compterNonLues,
   filtrer,
+  mentionDeLaCoupe,
   libelleContexte,
   libelleMoment,
   libelleProgression,
@@ -343,6 +346,49 @@ describe("T-01 — alertes", () => {
     for (const a of ALERTES) {
       expect(verifierTexte(`${a.titre} ${a.corps}`, INTERDITS_ECRAN_CANDIDAT), a.id).toEqual([]);
     }
+  });
+
+  /**
+   * ── La coupe à cinquante mangeait les non lues ─────────────────────
+   *
+   * L'ordre de lecture était `[{ readAt: "asc" }, { createdAt: "desc" }]`.
+   * En PostgreSQL, `ASC` place les `NULL` **en dernier** : une alerte non
+   * lue partait donc en fin de liste, et `take: 50` la coupait avant
+   * toutes les autres. Les cinquante servies étaient les plus anciennement
+   * lues, et la route comptait ses non lues sur cette page-là — le bandeau
+   * annonçait « Aucune alerte non lue » à quelqu'un qui en avait trois.
+   *
+   * La garde tient la règle à sa source, parce qu'aucun essai en mémoire ne
+   * peut reproduire le tri de PostgreSQL : JavaScript, lui, range `null` en
+   * premier. La fumée de publication l'exécute sur une vraie base ; celle-ci
+   * refuse que l'expression reparte à `asc` sans que personne ne le voie.
+   */
+  it("les non lues passent avant la coupe, et le compte ne vient pas de la page", () => {
+    const source = sansCommentaires(
+      readFileSync("src/server/lecture/alertes.ts", "utf8"),
+    );
+    expect(source).toContain('readAt: { sort: "desc", nulls: "first" }');
+    // Le compte des non lues est une donnée du compte : il se compte en
+    // base, et jamais sur les lignes déjà coupées.
+    expect(source).toMatch(/count\(\{ where: \{ userId, readAt: null \} \}\)/u);
+
+    const route = sansCommentaires(
+      readFileSync("src/app/api/notifications/route.ts", "utf8"),
+    );
+    expect(route).not.toContain("filter((a) => !a.lue)");
+  });
+
+  /**
+   * Une liste coupée qui ne dit pas qu'elle est coupée se lit comme une
+   * liste complète. La phrase nomme aussi l'ordre de la coupe : savoir ce
+   * qui manque vaut mieux que savoir qu'il manque quelque chose.
+   */
+  it("dit ce que la page ne montre pas, et se tait quand elle montre tout", () => {
+    expect(mentionDeLaCoupe(50, 50)).toBeNull();
+    expect(mentionDeLaCoupe(50, 40)).toBeNull();
+    expect(mentionDeLaCoupe(50, 51)).toMatch(/^1 alerte plus ancienne n'est pas affichée\./u);
+    expect(mentionDeLaCoupe(50, 58)).toMatch(/^8 alertes plus anciennes/u);
+    expect(mentionDeLaCoupe(50, 58)).toContain("Les non lues sont montrées en premier");
   });
 });
 
