@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import type { EchecCandidat, Ton } from "@/server/http/echecs";
+import type { Ton } from "@/server/http/echecs";
+import type { EchecRecu } from "@/lib/api";
 
 /**
  * Affichage d'un échec — DOC-12 §16.
@@ -36,7 +37,12 @@ const TITRE: Record<Ton, string> = {
 };
 
 export interface BlocEchecProps {
-  echec: EchecCandidat;
+  /**
+   * `EchecRecu` et non `EchecCandidat` : une route du back-office ajoute le
+   * code et le diagnostic, et le client les jetait. Un candidat n'en reçoit
+   * jamais, donc rien de plus ne s'affiche sur ses écrans.
+   */
+  echec: EchecRecu;
   /** Action principale. Sans elle, le bloc se contente d'informer. */
   children?: ReactNode;
   /** Vrai quand l'échec survient en réponse à un geste : il est alors annoncé. */
@@ -66,6 +72,25 @@ export function BlocEchec({ echec, children, annonce = true, className }: BlocEc
         </ul>
       ) : null}
       {children ? <div className="flex flex-wrap items-center gap-3 pt-1">{children}</div> : null}
+      {/*
+        Le diagnostic, quand il y en a un — donc sur un écran du back-office
+        et nulle part ailleurs (règle 3). Le serveur le calculait et
+        l'envoyait ; `appeler` le jetait, et l'administrateur lisait
+        « Réessayer » devant une fiche dont le serveur savait le nom.
+
+        En dernier, après l'action : c'est ce qu'on lit quand le geste
+        proposé n'a pas suffi.
+      */}
+      {echec.diagnostic ? (
+        <p className="text-pretty text-13 text-ink-500">
+          {echec.code}
+          {echec.diagnostic.service ? ` · ${echec.diagnostic.service}` : ""}
+          {echec.diagnostic.statutAmont ? ` · réponse ${echec.diagnostic.statutAmont}` : ""}
+          {echec.diagnostic.trace ? ` · ${echec.diagnostic.trace}` : ""}
+          {" · "}
+          <time dateTime={echec.diagnostic.survenuA}>{echec.diagnostic.survenuA}</time>
+        </p>
+      ) : null}
     </div>
   );
 }

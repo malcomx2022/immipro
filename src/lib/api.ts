@@ -1,4 +1,4 @@
-import type { EchecCandidat } from "@/server/http/echecs";
+import type { EchecCandidat, EchecOperateur } from "@/server/http/echecs";
 
 /**
  * Appel de l'API depuis un écran.
@@ -12,9 +12,24 @@ import type { EchecCandidat } from "@/server/http/echecs";
  * Son ton est `attente` et non `echec` : rien n'a échoué, tout est différé
  * (règle 7). Et il dit ce qui est conservé, comme les autres (règle 2).
  */
+/**
+ * L'échec tel qu'un écran le reçoit.
+ *
+ * `EchecCandidat` **plus** ce qu'une route du back-office ajoute, quand
+ * elle l'ajoute. Le serveur sépare soigneusement les deux charges —
+ * `pourCandidat` ne sérialise ni le code ni le diagnostic, `pourOperateur`
+ * les conserve —, et le client les jetait : `appeler` typait toute réponse
+ * d'échec en `EchecCandidat`, si bien que le `trace` qui nomme la fiche
+ * illisible n'atteignait aucun écran.
+ *
+ * Les deux champs sont optionnels, et c'est exact : un candidat n'en reçoit
+ * jamais. `BlocEchec` ne montre donc que ce qui est là.
+ */
+export type EchecRecu = EchecCandidat & Partial<Pick<EchecOperateur, "code" | "diagnostic">>;
+
 export type Resultat<T> =
   | { ok: true; donnees: T }
-  | { ok: false; echec: EchecCandidat };
+  | { ok: false; echec: EchecRecu };
 
 export const HORS_LIGNE: EchecCandidat = {
   titre: "Tu es hors ligne",
@@ -63,7 +78,7 @@ export async function appeler<T>(url: string, options: Options = {}): Promise<Re
   }
 
   if (!reponse.ok) {
-    const echec = (charge as { echec?: EchecCandidat }).echec;
+    const echec = (charge as { echec?: EchecRecu }).echec;
     return { ok: false, echec: echec ?? ILLISIBLE };
   }
   return { ok: true, donnees: charge as T };
