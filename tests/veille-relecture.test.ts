@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  HORIZON_VEILLE_JOURS,
   MENTION_DEPUBLICATION_A_LECHEANCE,
   MENTION_SOURCE_MUETTE_SANS_EFFET,
   PERIODICITE_AVANT_REVISION_JOURS,
   PERIODICITE_RELECTURE_JOURS,
+  SANS_INDEX_DES_REGLES,
   prochaineRelecture,
 } from "@/domain/backoffice/veille";
 import { sansCommentaires } from "@/domain/copy/source";
@@ -165,5 +167,45 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
     expect(route).toContain("prochaineRelecture(jour, null)");
     expect(route).toMatch(/Aucune colonne ne porte la date de révision connue/u);
     expect(lire("prisma/schema.prisma")).not.toMatch(/revisionConnue|knownRevisionAt/u);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * L'état vide n'offre plus une porte qui répond 404
+ * ------------------------------------------------------------------ */
+
+describe("l'état vide dit par où une fiche revient", () => {
+  /**
+   * « Voir les règles publiées » menait à `/regles/nl-etudes`. Le back-office
+   * n'a pas d'index des règles : `/regles/[id]` attend un `VisaRule.id`, que
+   * Prisma génère, et la graine n'en produit aucun qui s'appelle ainsi.
+   * `editionDeLaRegle("nl-etudes")` rend `null` et la page appelle
+   * `notFound()` — exécuté sur une base jetable portant le référentiel livré.
+   */
+  it("aucun lien ne part de la file vide, et le texte dit pourquoi", () => {
+    const ecran = lire("src/app/(admin)/veille/FileDeVeille.tsx");
+    expect(ecran).not.toMatch(/nl-etudes/u);
+    // Le seul lien littéral de l'écran était celui-là : il n'en reste aucun.
+    expect(sansCommentaires(ecran)).not.toMatch(/href="\/regles/u);
+    // Et la phrase vient du domaine : l'écran la rend, il ne la retape pas.
+    expect(sansCommentaires(ecran)).not.toContain("index des règles");
+  });
+
+  /**
+   * La phrase annonce l'horizon de la file, et il n'y a qu'un horizon : la
+   * requête de la lecture serveur lit la même constante. Deux nombres
+   * auraient fini par se contredire, et c'est l'écran qui aurait menti.
+   */
+  it("la phrase et la requête lisent le même horizon", () => {
+    expect(SANS_INDEX_DES_REGLES).toContain(`${HORIZON_VEILLE_JOURS} jours`);
+    const lecture = lire("src/server/lecture/backoffice.ts");
+    expect(lecture).toContain("HORIZON_VEILLE_JOURS");
+    expect(lecture).not.toMatch(/export const HORIZON_VEILLE_JOURS/u);
+  });
+
+  /** Et elle nomme l'absence plutôt que de la contourner. */
+  it("elle dit qu'il n'y a pas d'index, au lieu d'en promettre un", () => {
+    expect(SANS_INDEX_DES_REGLES).toMatch(/pas d'autre index des règles/u);
+    expect(SANS_INDEX_DES_REGLES).toMatch(/depuis cette file/u);
   });
 });

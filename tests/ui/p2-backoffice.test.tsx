@@ -18,6 +18,7 @@ import {
   type Depassement,
   type Journee,
 } from "@/domain/backoffice/couts";
+import { SANS_INDEX_DES_REGLES } from "@/domain/backoffice/veille";
 import {
   COLLECTE,
   COLLECTE_PARTIELLE,
@@ -265,6 +266,25 @@ describe("B-01 — File de veille", () => {
   it("annonce qu'une publication versionne et alerte", () => {
     const { container } = rendre();
     expect(container.textContent).toContain("Toute publication crée une version horodatée");
+  });
+
+  /**
+   * L'état vide est le seul écran où le veilleur n'a rien d'autre à
+   * cliquer, et il offrait « Voir les règles publiées » vers
+   * `/regles/nl-etudes` — une adresse qu'aucune fiche ne porte, servie en
+   * 404. Il dit maintenant par où une fiche revient, et n'offre aucune
+   * porte : le back-office n'a pas d'index des règles.
+   */
+  it("la file vide dit par où une fiche revient, sans lien à cliquer", () => {
+    const { container } = render(
+      <FileDeVeille fiches={[]} collecte={COLLECTE} aujourdhui={AUJOURDHUI} />,
+    );
+    expect(container.textContent).toContain("Aucun écart à arbitrer");
+    expect(container.textContent).toContain(SANS_INDEX_DES_REGLES);
+    expect(screen.queryByRole("link", { name: /règles publiées/u })).toBeNull();
+    for (const lien of screen.queryAllByRole("link")) {
+      expect(lien.getAttribute("href"), lien.textContent ?? "").not.toMatch(/^\/regles\//u);
+    }
   });
 });
 

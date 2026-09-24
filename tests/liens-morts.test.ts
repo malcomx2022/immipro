@@ -42,13 +42,16 @@ const ROUTES = fichiers("src/app", /^page\.tsx$/u).map((f) =>
     .replace(/^$/u, "/"),
 );
 
-const sert = (adresse: string): boolean =>
-  ROUTES.some((motif) => {
+/** Les motifs de l'arborescence qui acceptent cette adresse, jokers compris. */
+const motifsDe = (adresse: string): string[] =>
+  ROUTES.filter((motif) => {
     const segmentsMotif = motif.split("/").filter(Boolean);
     const segments = adresse.split("/").filter(Boolean);
     if (segmentsMotif.length !== segments.length) return false;
     return segmentsMotif.every((m, i) => m === "*" || m === segments[i]);
   });
+
+const sert = (adresse: string): boolean => motifsDe(adresse).length > 0;
 
 const ECRANS = [
   ...fichiers("src/app", /\.tsx$/u),
@@ -116,6 +119,38 @@ describe("aucun lien interne ne mène nulle part", () => {
 
   it.each(liens)("%s → %s est servi", (_fichier, adresse) => {
     expect(sert(adresse), `${adresse} n'a pas de page`).toBe(true);
+  });
+
+  /**
+   * Le quatrième genre de lien mort, et celui que ce test laissait passer.
+   *
+   * Sa raison d'être est qu'« une chaîne entière n'a aucun segment
+   * vérifié ». Il vérifiait pourtant la seule moitié qu'une chaîne entière
+   * satisfait toujours : la **forme**. `/regles/nl-etudes` répond à
+   * `/regles/[id]`, donc le test concluait que l'adresse était servie —
+   * alors que `VisaRule.id` est un identifiant technique qu'aucune fiche
+   * ne porte sous ce nom. La page appelait `notFound()`, et le lien vivait
+   * dans l'état vide de B-01, c'est-à-dire là où le veilleur n'a rien
+   * d'autre à cliquer.
+   *
+   * La règle qui manquait : une adresse littérale ne comble pas un segment
+   * dynamique. Soit l'adresse est servie telle quelle par une route dont
+   * tous les segments sont écrits, soit elle est construite par
+   * interpolation — et le typage des paramètres en tient alors la moitié.
+   * Entre les deux, il n'y a qu'un identifiant deviné.
+   *
+   * Le jour où une route prendra des adresses choisies à la main — un slug
+   * de guide pays, par exemple —, ce test tombera et obligera à le dire
+   * ici, plutôt qu'à laisser passer le suivant avec lui.
+   */
+  it("aucune adresse littérale ne comble un segment dynamique", () => {
+    const devinees = liens
+      .filter(([, adresse]) => {
+        const motifs = motifsDe(adresse);
+        return motifs.length > 0 && motifs.every((m) => m.includes("*"));
+      })
+      .map(([fichier, adresse]) => `${fichier} → ${adresse}`);
+    expect(devinees).toEqual([]);
   });
 
   /**
