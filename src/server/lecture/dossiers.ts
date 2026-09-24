@@ -168,9 +168,40 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
     imposee: e.code === "depot",
   }));
 
+  /*
+    « Demander : X au plus tôt le … » ne s'adresse qu'à qui n'a pas encore
+    la pièce.
+
+    La ligne conseille le bon moment pour **aller chercher** un document
+    périssable : trop tôt, il sera périmé le jour du dépôt. Le conseil n'a
+    plus d'objet une fois la pièce déposée — elle est chez nous, sa date
+    de péremption est écrite, et la passe de péremption s'en occupe.
+
+    Constaté en exécution, passeport valable six mois, dépôt visé au
+    3 juin 2027 :
+
+        ATTENDUE    -> « Demander : Passeport » le 2026-12-03
+        EN_ANALYSE  -> « Demander : Passeport » le 2026-12-03
+        ILLISIBLE   -> « Demander : Passeport » le 2026-12-03
+        CONFORME    -> (aucune ligne)
+
+    Le candidat dont le passeport était en cours de lecture lisait, dans
+    son échéancier, qu'il devait aller le demander en décembre.
+
+    C'est la moitié manquante du lot précédent : `evaluerLeCalendrier` a
+    cessé de recompter le délai d'une pièce déjà déposée, et cette
+    ligne-ci continuait de la réclamer. Les deux moitiés vivent sur le
+    même écran, et elles se contredisaient — le verdict disait que le
+    calendrier tient, la liste disait d'aller chercher la pièce.
+  */
   const perissables: Echeance[] = reference
     ? dossier.documents
-        .filter((d) => d.validityMonths !== null && estEncoreDemandee(d.status))
+        .filter(
+          (d) =>
+            d.validityMonths !== null &&
+            estEncoreDemandee(d.status) &&
+            !delaiDobtentionDepense(d.status),
+        )
         .map((d) => ({
           id: `${d.code}-au-plus-tot`,
           date: dateAuPlusTot(reference, d.validityMonths!),
