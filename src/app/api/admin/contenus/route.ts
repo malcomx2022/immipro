@@ -3,6 +3,7 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { documentsEditoriaux } from "@/server/lecture/editorial";
+import { journaliser } from "@/server/acces/journal";
 import { slugDe } from "@/domain/editorial/document";
 
 /**
@@ -29,6 +30,17 @@ export const GET = route({
  *
  * Le slug se dérive du titre et se fige ensuite : c'est l'adresse publique,
  * et un lien entrant qui tombe est un lecteur perdu.
+ *
+ * **Elle laisse une trace.** L'écran de la liste porte `MENTION_AUDIT` —
+ * « chaque action est horodatée au journal d'audit avec ton identifiant » —
+ * et c'était la seule action qu'il déclenche. Créer un consultant se
+ * journalise depuis B-09 ; créer la page qu'un public lira ne se
+ * journalisait pas, et l'écran affirmait le contraire au-dessus du bouton.
+ *
+ * Le motif est composé, non demandé : une création n'a pas de décision à
+ * justifier, et exiger une phrase avant d'avoir écrit une ligne ferait
+ * saisir n'importe quoi — la même raison qui laisse la source de côté.
+ * Ce que la ligne porte, c'est qui a ouvert cette adresse, et quand.
  */
 export const POST = route({
   nom: "admin.contenus.creation",
@@ -41,7 +53,7 @@ export const POST = route({
     rubrique: z.string().max(80).optional(),
     auteur: z.string().max(80).optional(),
   }),
-  async traiter({ corps }) {
+  async traiter({ corps, acteur }) {
     const slug = slugDe(corps.titre);
     if (!slug) {
       throw echec("champs_invalides", {
@@ -85,6 +97,14 @@ export const POST = route({
         ...(corps.rubrique ? { section: corps.rubrique } : {}),
         ...(corps.auteur ? { author: corps.auteur } : {}),
       },
+    });
+
+    await journaliser({
+      acteurId: acteur!.id,
+      action: "contenu.creation",
+      cible: `editorialDoc:${document.id}`,
+      motif: `Création d'un ${corps.genre === "GUIDE" ? "guide" : "article"} — ${corps.titre}`,
+      details: { genre: corps.genre, slug: document.slug },
     });
 
     return { id: document.id, slug: document.slug };

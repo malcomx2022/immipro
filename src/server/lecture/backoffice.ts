@@ -372,7 +372,9 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "paiement.remboursement": "PAIEMENT",
   "paiement.reconciliation": "PAIEMENT",
   "regle.publication": "REGLE",
+  "regle.republication": "REGLE",
   "contenu.publication": "REGLE",
+  "contenu.creation": "REGLE",
   "revue.decision": "ACCES_PIECE",
   /**
    * Les deux exports du back-office.

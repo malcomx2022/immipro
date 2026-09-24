@@ -3,6 +3,7 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { collecte, fichesSuivies } from "@/server/lecture/backoffice";
+import { journaliser } from "@/server/acces/journal";
 import { prochaineRelecture } from "@/domain/backoffice/veille";
 
 /**
@@ -38,11 +39,11 @@ export const GET = route({
  * heures finissait par la dépublier (RG-14.1). Le travail était fait, et
  * le produit se comportait comme s'il ne l'avait pas été.
  *
- * **Pas de ligne d'audit, et c'est voulu.** RG-14.4 désigne la preuve de
- * diligence : « chaque version conserve son `sourceUrl`, `verifiedAt` et
- * `verifiedBy` ». C'est le champ qui porte qui a relu et quand, pas une
- * entrée de journal — en ajouter une doublerait la preuve sans
- * l'améliorer, et les deux finiraient par diverger.
+ * **Pas de ligne d'audit pour la relecture, et c'est voulu.** RG-14.4
+ * désigne la preuve de diligence : « chaque version conserve son
+ * `sourceUrl`, `verifiedAt` et `verifiedBy` ». C'est le champ qui porte qui
+ * a relu et quand, pas une entrée de journal — en ajouter une doublerait la
+ * preuve sans l'améliorer, et les deux finiraient par diverger.
  *
  * **Une fiche dépubliée par l'échéance redevient publiée.** C'est le sens
  * de RG-14.1 : le retour en `DRAFT` dit « personne n'a relu », pas « cette
@@ -50,6 +51,15 @@ export const GET = route({
  * plus. Une fiche mise en brouillon pour une autre raison — une version
  * en préparation — n'est pas republiée par une relecture : seule
  * l'échéance dépassée est réversible ainsi.
+ *
+ * **Et cette remise en ligne, elle, laisse une trace.** Le raisonnement
+ * ci-dessus couvre la relecture et non la republication : `verifiedAt` et
+ * `verifiedBy` disent qui a relu, pas qu'une règle est redevenue visible
+ * pour les candidats. C'est le même effet que `publierLaRegle`, qui le
+ * journalise — et une règle qui rentre à l'affichage sans trace est
+ * précisément ce qu'un contrôle vient chercher. La ligne n'est écrite que
+ * lorsque la republication a lieu : une relecture qui ne change rien à la
+ * visibilité n'a rien à consigner.
  */
 export const PUT = route({
   nom: "admin.veille.relecture",
@@ -97,6 +107,22 @@ export const PUT = route({
         ...(republier ? { status: "PUBLISHED" as const } : {}),
       },
     });
+
+    if (republier) {
+      await journaliser({
+        acteurId: acteur!.id,
+        action: "regle.republication",
+        cible: `visaRule:${fiche.id}`,
+        motif: `Remise en ligne après relecture : l'échéance du ${fiche.nextReviewAt
+          .toISOString()
+          .slice(0, 10)} l'avait dépubliée (RG-14.1)`,
+        details: {
+          pays: fiche.countryCode,
+          type: fiche.visaType,
+          version: fiche.version,
+        },
+      });
+    }
 
     return {
       relueLe: maj.verifiedAt.toISOString().slice(0, 10),

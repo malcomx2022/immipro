@@ -126,18 +126,29 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
     expect(put).toMatch(/verifiedBy: acteur!\.email/u);
     expect(put).toMatch(/nextReviewAt: echeance/u);
     // « pas de nouvelle version » : WF-14 étape 2, branche inchangé.
-    expect(put).not.toMatch(/visaRule\.create|version: /u);
+    expect(put).not.toMatch(/visaRule\.create/u);
   });
 
   /**
-   * Pas de ligne d'audit, et c'est voulu : RG-14.4 désigne `verifiedBy`
-   * comme la preuve de diligence. En ajouter une doublerait la preuve
-   * sans l'améliorer, et les deux finiraient par diverger.
+   * ── Deux faits, deux traces, et une seule était posée ───────────────
+   *
+   * La relecture ne se journalise pas, et c'est voulu : RG-14.4 désigne
+   * `verifiedAt` et `verifiedBy` comme la preuve de diligence, et en
+   * ajouter une seconde la doublerait sans l'améliorer.
+   *
+   * Mais le raisonnement couvrait aussi la **republication**, qu'il ne
+   * regarde pas. Ces deux champs disent qui a relu ; ils ne disent pas
+   * qu'une règle est redevenue visible pour les candidats. C'est le même
+   * effet que `publierLaRegle`, qui le journalise — et une règle qui
+   * rentre à l'affichage sans trace est ce qu'un contrôle vient chercher.
    */
-  it("la preuve reste le champ, pas une seconde écriture", () => {
+  it("la relecture reste le champ, la remise en ligne laisse une ligne", () => {
     const put = route.slice(route.indexOf("export const PUT"));
-    expect(put).not.toContain("journaliser(");
     expect(route).toMatch(/RG-14\.4/u);
+    // Une seule ligne, et seulement quand la visibilité change.
+    expect([...put.matchAll(/journaliser\(/gu)]).toHaveLength(1);
+    expect(put).toMatch(/if \(republier\) \{[\s\S]{0,120}journaliser\(/u);
+    expect(put).toContain('action: "regle.republication"');
   });
 
   /**

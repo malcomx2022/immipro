@@ -28,7 +28,29 @@ export type ActionAuditee =
   | "paiement.remboursement"
   | "paiement.reconciliation"
   | "regle.publication"
+  /**
+   * La remise en ligne d'une fiche que l'échéance avait dépubliée — B-01.
+   *
+   * Distincte de `regle.publication` : elle ne crée aucune version et ne
+   * propage aucune divergence. Elle rend à l'affichage candidat une règle
+   * qui en était sortie, et c'est à ce titre qu'elle se trace. La route
+   * de relecture argumentait l'absence de ligne par RG-14.4 — « la preuve
+   * de diligence est `verifiedAt`, `verifiedBy` » — ce qui est juste pour
+   * la relecture et muet sur la remise en ligne : ces deux champs disent
+   * qui a relu, pas qu'une règle est redevenue visible.
+   */
+  | "regle.republication"
   | "contenu.publication"
+  /**
+   * La naissance d'un guide ou d'un article — B-08.
+   *
+   * L'écran de la liste porte `MENTION_AUDIT`, « chaque action est
+   * horodatée au journal d'audit avec ton identifiant », et la seule
+   * action qu'il déclenche n'y était pas. Créer un consultant se
+   * journalise (`consultant.creation`) ; créer la page qu'un public lira
+   * ne se journalisait pas.
+   */
+  | "contenu.creation"
   | "revue.decision"
   // Les deux exports du back-office. Emporter un journal entier ou un
   // grand livre laisse une trace comme n'importe quel autre accès à

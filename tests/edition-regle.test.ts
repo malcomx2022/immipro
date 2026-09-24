@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   avecLesTextesCandidat,
@@ -874,5 +874,94 @@ describe("l'enregistrement de B-02 ne touche jamais la version en vigueur", () =
     const fumee = lire("scripts/fumee-publication.mts");
     expect(fumee).toContain("la version que le dossier a figée n'a pas bougé — INV-3");
     expect(fumee).toContain("publier ne migre personne (INV-3)");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Le sens inverse : aucun acte du back-office sans sa trace — S.96
+ * ------------------------------------------------------------------ */
+
+/**
+ * Le garde-fou précédent tient un sens : une action déclarée a un
+ * écrivain. Il ne tenait pas l'autre, et c'est par là que deux actes sont
+ * passés.
+ *
+ * `MENTION_AUDIT` — « Chaque action est horodatée au journal d'audit avec
+ * ton identifiant » — est affichée sur six écrans du back-office. Sa
+ * raison d'être est dans son commentaire : « l'opérateur doit savoir
+ * qu'il est tracé **avant** d'agir, pas après : c'est ce qui rend le
+ * journal dissuasif plutôt que punitif. » Une dissuasion fausse sur un
+ * point est une dissuasion qui se découvre.
+ *
+ * Deux routes écrivaient sans laisser de ligne :
+ *
+ * - `admin/contenus` (POST) créait un guide ou un article — la seule
+ *   action de l'écran qui porte la mention. Créer un consultant se
+ *   journalise depuis B-09 ; créer la page qu'un public lira, non.
+ * - `admin/veille` (PUT) remettait en ligne une fiche que l'échéance
+ *   avait dépubliée. Son commentaire écartait la ligne d'audit au nom de
+ *   RG-14.4 — ce qui vaut pour la relecture et non pour la remise en
+ *   ligne : `verifiedAt` et `verifiedBy` disent qui a relu, pas qu'une
+ *   règle est redevenue visible.
+ */
+describe("aucune route du back-office n'écrit sans laisser de trace", () => {
+  const ROUTES_ADMIN = fichiers("src/app/api/admin").filter((f) => f.endsWith("/route.ts"));
+
+  const ECRITURE =
+    /db\.[a-zA-Z]+\.(?:update|updateMany|create|createMany|delete|deleteMany|upsert)\(/u;
+
+  it("il y a des routes à vérifier", () => {
+    expect(ROUTES_ADMIN.length).toBeGreaterThan(10);
+  });
+
+  /**
+   * Une route qui écrit journalise, ou délègue à un module qui le fait.
+   * Le critère porte sur la route **et** ce qu'elle appelle : B-02 et B-05
+   * ont sorti leur décision de `next/headers`, et la ligne est partie
+   * avec elle.
+   */
+  it("toute route qui écrit porte sa ligne, ici ou dans ce qu'elle appelle", () => {
+    const muettes = ROUTES_ADMIN.filter((f) => {
+      const route = sansCommentaires(lire(f));
+      if (route.includes("journaliser(")) return false;
+
+      /*
+        Qui écrit journalise. La première version de ce garde-fou
+        absolvait une route dès qu'un module appelé quelque part dans ses
+        imports journalisait — et `admin/contenus` importe la lecture
+        éditoriale, qui en contient une. La mutation qui retirait sa
+        ligne passait donc au vert ici : c'est l'ancien garde-fou, celui
+        des actions sans écrivain, qui l'a rattrapée. Cinquième fois de
+        la série qu'un garde-fou ne connaît que la forme pour laquelle il
+        a été écrit.
+
+        Le critère juste sépare les deux cas : une route qui écrit
+        elle-même porte sa ligne ; une route qui délègue l'écriture est
+        couverte par le module auquel elle la confie.
+      */
+      if (ECRITURE.test(route)) return true;
+
+      const delegue = [...route.matchAll(/from "(@\/server\/[a-z/-]+)"/gu)].map(
+        (m) => `src/${m[1]!.slice(2)}.ts`,
+      );
+      const ecrivains = delegue.filter(
+        (m) => existsSync(m) && ECRITURE.test(sansCommentaires(lire(m))),
+      );
+      if (ecrivains.length === 0) return false;
+      return !ecrivains.some((m) => sansCommentaires(lire(m)).includes("journaliser("));
+    });
+    expect(muettes).toEqual([]);
+  });
+
+  /** Et les deux actes qui manquaient portent chacun son nom. */
+  it("la création d'un contenu et la remise en ligne d'une fiche sont nommées", () => {
+    const journal = lire("src/server/acces/journal.ts");
+    expect(journal).toContain('| "contenu.creation"');
+    expect(journal).toContain('| "regle.republication"');
+    // Nommées ne suffit pas : le garde-fou d'en face exige un écrivain,
+    // et la table des catégories de B-06 exige un classement.
+    const categories = lire("src/server/lecture/backoffice.ts");
+    expect(categories).toContain('"contenu.creation": "REGLE"');
+    expect(categories).toContain('"regle.republication": "REGLE"');
   });
 });
