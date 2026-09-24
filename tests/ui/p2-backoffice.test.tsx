@@ -19,6 +19,7 @@ import {
   type Journee,
 } from "@/domain/backoffice/couts";
 import { SANS_INDEX_DES_REGLES } from "@/domain/backoffice/veille";
+import { SUITE_DU_REFUS_EN_VIGUEUR } from "@/domain/backoffice/regle";
 import {
   COLLECTE,
   COLLECTE_PARTIELLE,
@@ -107,11 +108,14 @@ const AUJOURDHUI = "2026-09-18";
 const MAINTENANT = "2026-09-18T09:41:00Z";
 const espaces = (t: string) => t.replace(/[\s  ]/gu, " ");
 
-const editerRegle = ({ peutPublier = true } = {}) =>
+const editerRegle = ({ peutPublier = true, enregistrementEnLigne = false } = {}) =>
   render(
     <EditionRegle
       id="regle-de-test"
       peutPublier={peutPublier}
+      // Par défaut un brouillon : c'est ce que la commande annonce, et
+      // `CLAUDE.md` veut qu'il s'enregistre sans être refusé.
+      enregistrementEnLigne={enregistrementEnLigne}
       enVigueur={REGLE_EN_VIGUEUR}
       brouillon={REGLE_BROUILLON}
       dossiersConcernes={DOSSIERS_EN_VERSION_4}
@@ -388,7 +392,7 @@ describe("B-02 — les commandes partent vraiment au serveur", () => {
 });
 
 describe("B-02 — un administrateur ne peut pas publier une promesse", () => {
-  it("refuse la saisie à l'enregistrement et bloque la publication", () => {
+  it("signale la faute champ par champ et bloque la publication", () => {
     editerRegle();
     const libelle = screen.getByLabelText("Libellé affiché au candidat");
     fireEvent.change(libelle, {
@@ -402,6 +406,49 @@ describe("B-02 — un administrateur ne peut pas publier une promesse", () => {
     expect(
       screen.getByRole("button", { name: /Publier la version 5/ }),
     ).toHaveProperty("disabled", true);
+  });
+
+  /**
+   * Mais enregistrer le brouillon reste possible — `CLAUDE.md` : « Un texte
+   * en cours d'écriture doit pouvoir être sauvé ; le refuser pousserait à
+   * rédiger ailleurs et à coller à la fin, c'est-à-dire à écrire hors du
+   * garde-fou. » L'écran désactivait la commande avec « corrige-le avant
+   * d'enregistrer », ce qui est exactement ce que la règle refuse.
+   */
+  it("laisse enregistrer un brouillon dont une formulation est refusée", () => {
+    editerRegle();
+    fireEvent.change(screen.getByLabelText("Libellé affiché au candidat"), {
+      target: { value: "95 % de réussite sur cette procédure." },
+    });
+    // La faute est dite…
+    expect(screen.getByRole("alert")).toBeDefined();
+    // … et l'enregistrement n'est pas empêché.
+    const enregistrer = screen.getByRole("button", { name: /Enregistrer le brouillon/u });
+    expect(enregistrer).toHaveProperty("disabled", false);
+    expect(screen.queryByText(/avant d'enregistrer/u)).toBeNull();
+  });
+
+  /**
+   * Sur la version en vigueur, l'enregistrement **est** une publication : le
+   * candidat lit le texte à la seconde. L'écran l'annonce avant le clic avec
+   * la phrase même que le serveur opposerait.
+   */
+  it("mais pas sur la version en vigueur, où enregistrer publie", () => {
+    editerRegle({ enregistrementEnLigne: true });
+    fireEvent.change(screen.getByLabelText("Libellé affiché au candidat"), {
+      target: { value: "95 % de réussite sur cette procédure." },
+    });
+    const enregistrer = screen.getByRole("button", { name: /Enregistrer le brouillon/u });
+    expect(enregistrer).toBeDisabled();
+    expect(enregistrer).toHaveAccessibleDescription(SUITE_DU_REFUS_EN_VIGUEUR);
+  });
+
+  /** Et sans faute, elle s'enregistre comme le reste. */
+  it("une version en vigueur sans faute s'enregistre", () => {
+    editerRegle({ enregistrementEnLigne: true });
+    expect(
+      screen.getByRole("button", { name: /Enregistrer le brouillon/u }),
+    ).toHaveProperty("disabled", false);
   });
 
   it("laisse écrire la phrase qui protège", () => {

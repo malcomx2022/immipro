@@ -6,9 +6,8 @@ import {
   avecLesTextesCandidat,
   visaRulesSchema,
   SCHEMA_VERSION,
-  textesCandidat,
 } from "@/domain/rules/schema";
-import { verifierPayloadCandidat, messageDeRefusPayload } from "@/domain/backoffice/regle";
+import { exigerUnEnregistrementAffichable } from "@/server/regles/edition";
 import { publierLaRegle } from "@/server/regles/publication";
 
 /**
@@ -17,14 +16,18 @@ import { publierLaRegle } from "@/server/regles/publication";
  * Trois garde-fous, dans cet ordre, parce qu'ils coûtent de moins en moins
  * cher à corriger quand ils sont vus tôt :
  *
- * 1. **Le vocabulaire (INV-1, INV-2).** Un administrateur qui écrit une
+ * 1. **Le schéma (WF-14 étape 3).** Aucune écriture sans validation Zod.
+ * 2. **Le vocabulaire (INV-1, INV-2).** Un administrateur qui écrit une
  *    promesse dans un texte de règle bute sur la même liste qu'un
- *    développeur. La publication est bloquée tant que la formulation est
- *    refusée — c'est le troisième point d'application de la liste unique.
- * 2. **Le schéma (WF-14 étape 3).** Aucune écriture sans validation Zod.
+ *    développeur. Le refus est opposé là où le candidat verra le texte, et
+ *    la décision vit dans `server/regles/edition.ts` : cette route bloquait
+ *    l'enregistrement, y compris celui d'un brouillon, quand `CLAUDE.md`
+ *    bloque la publication et protège le brouillon. Ce commentaire disait
+ *    déjà « la publication est bloquée » à côté d'un code qui bloquait la
+ *    sauvegarde.
  * 3. **La source (RG-14.2).** Une règle de source secondaire ne se publie
- *    pas. La base le refuse aussi ; le refuser ici permet de le **dire**,
- *    au lieu de rendre une erreur de contrainte.
+ *    pas. La base le refuse aussi ; le refuser dans `publierLaRegle` permet
+ *    de le **dire**, au lieu de rendre une erreur de contrainte.
  */
 export const PUT = route({
   nom: "admin.regle.maj",
@@ -97,13 +100,23 @@ export const PUT = route({
       });
     }
 
-    const fautes = verifierPayloadCandidat(textesCandidat(lu.data));
-    if (fautes.length > 0) {
-      throw echec("champs_invalides", {
-        corps: messageDeRefusPayload(fautes[0]!),
-        champs: Object.fromEntries(fautes.map((f) => [f.chemin, messageDeRefusPayload(f)])),
-      });
-    }
+    /**
+     * Le vocabulaire, opposé à ce que cet enregistrement **introduit**, et
+     * seulement quand la version écrite est celle que le candidat lit —
+     * l'écrire alors est une publication, et le refus vient donc avant
+     * l'écriture. Sur un brouillon, rien n'est refusé : `publierLaRegle`
+     * relira le référentiel entier le jour où il entrera en vigueur.
+     */
+    exigerUnEnregistrementAffichable(
+      regle,
+      corps.champ === "textes"
+        ? {
+            champ: "textes",
+            libelleCandidat: corps.libelleCandidat,
+            reserveCandidat: corps.reserveCandidat,
+          }
+        : { champ: "payload", payload: lu.data },
+    );
 
     const maj = await db.visaRule.update({
       where: { id: regle.id },

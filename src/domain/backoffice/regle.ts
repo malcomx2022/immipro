@@ -85,9 +85,20 @@ export interface FauteDeSaisie extends Faute {
 }
 
 /**
- * Validation à l'enregistrement. Elle lit la même liste que `check:copy` et
- * que le test de l'interface candidat : une seule liste, trois points
- * d'application.
+ * Les deux textes du formulaire, passés à la liste.
+ *
+ * Elle lit la même liste que `check:copy` et que le test de l'interface
+ * candidat : une seule liste, quatre points d'application.
+ *
+ * **Ce n'est pas un contrôle « à l'enregistrement ».** L'en-tête de cette
+ * fonction le disait, et la route de B-02 l'appliquait ainsi : elle levait
+ * avant toute écriture, y compris sur un brouillon. `CLAUDE.md` tranche
+ * l'inverse — « l'enregistrement d'un brouillon n'est pas bloqué, la
+ * publication l'est », parce que refuser le brouillon pousse à rédiger
+ * ailleurs et à coller à la fin, c'est-à-dire hors du garde-fou. Le moment
+ * du refus vit désormais dans `server/regles/edition.ts`, avec sa raison :
+ * la question n'est pas « enregistrer ou publier », elle est « le candidat
+ * le verra-t-il ».
  *
  * La négation reste reconnue ici comme ailleurs — « ImmiPro ne garantit pas
  * l'obtention du visa » doit pouvoir être saisi par un administrateur, c'est
@@ -116,6 +127,23 @@ export const messageDeRefus = (faute: FauteDeSaisie): string =>
 /** Rien ne se publie tant qu'un texte destiné au candidat est refusé. */
 export const publiable = (regle: Pick<Regle, ChampCandidat>): boolean =>
   verifierTextesCandidat(regle).length === 0;
+
+/**
+ * Ce que le refus ajoute quand l'enregistrement porte sur la version en
+ * vigueur — la suite, jamais le seul constat.
+ *
+ * L'écran appelle « brouillon » la version qu'il ouvre, et elle ne l'est
+ * pas toujours : une version publiée se réécrit par la même commande, et le
+ * candidat lit le texte à la seconde. Cet enregistrement-là est une
+ * publication, et c'est le seul que le vocabulaire refuse. Le brouillon
+ * passe : la publication le refusera, et d'ici là le texte en cours
+ * d'écriture reste enregistrable.
+ *
+ * C'est la distinction que J.C a posée pour B-08, mot pour mot : pas
+ * « enregistrer ou publier », mais « le public le verra-t-il ».
+ */
+export const SUITE_DU_REFUS_EN_VIGUEUR =
+  "Cette version est en vigueur : l'enregistrer la republie, et le candidat la lit aussitôt. Reformule ce passage, puis enregistre.";
 
 export interface Difference {
   champ: string;
