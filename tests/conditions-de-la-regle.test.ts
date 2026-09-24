@@ -76,7 +76,16 @@ describe("les conditions d'une règle figée", () => {
       new Set(),
     );
     expect(orpheline).toEqual([
-      { code: "attestation", bloquant: true, satisfaite: false, messageEchec: "Il en faut une." },
+      {
+        code: "attestation",
+        bloquant: true,
+        satisfaite: false,
+        messageEchec: "Il en faut une.",
+        // Aucune pièce ne l'établit, et c'est ce qui la fait remonter dans
+        // « ce qui manque » : celles qu'une pièce porte y sont déjà par la
+        // ligne de cette pièce.
+        etabliePar: null,
+      },
     ]);
   });
 });

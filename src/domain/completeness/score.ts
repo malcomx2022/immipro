@@ -36,6 +36,16 @@ export interface ConditionInput {
   bloquant: boolean;
   satisfaite: boolean;
   messageEchec: string;
+  /**
+   * La pièce que le référentiel désigne pour l'établir, ou `null`.
+   *
+   * Le champ existe pour que « ce qui manque » ne compte pas deux fois le
+   * même manque. `MissingPoint.origine` annonce déjà une exigence « qu'aucune
+   * pièce n'établit » ; le calcul, lui, remontait toutes les bloquantes non
+   * satisfaites, pièce désignée comprise. Il est obligatoire : une condition
+   * construite sans décider de ce point ne compile pas.
+   */
+  etabliePar: string | null;
 }
 
 export interface CompletenessInput {
@@ -141,7 +151,37 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
 
   const requisManquants = requis.filter((d) => d.status !== "CONFORME");
   const facultatifsManquants = facultatifs.filter((d) => d.status !== "CONFORME");
-  const conditionsEchouees = bloquantes.filter((c) => !c.satisfaite);
+  /*
+    Les exigences qu'**aucune pièce** n'établit, et elles seules — ce que
+    `MissingPoint.origine` annonce déjà.
+
+    Une condition rattachée à une pièce est tenue dès que cette pièce est
+    conforme : son verdict **est** celui de la pièce, et l'explication de
+    C-09 le dit déjà — « La plupart sont tenues par une pièce, et leur
+    résultat est le verdict de cette pièce ». La remonter séparément
+    comptait deux fois le même manque et faisait mentir la phrase qui
+    l'accompagne. Constaté en exécution sur un dossier kennismigrant qui
+    vient d'être ouvert, rien de déposé :
+
+        ce qui manque (6 lignes) :
+          [piece]    CON — Il te reste à téléverser : Contrat de travail.
+          [exigence] salaire_min_moins_30_ans     — 4 357 € bruts par mois.
+          [exigence] salaire_min_30_ans_et_plus   — 5 942 € bruts par mois.
+          [exigence] employeur_reconnu            — …
+        « Trois exigences […] ne sont pas remplies : […] et aucune pièce
+          ne les lève. »
+
+    Les trois sont rattachées au contrat de travail, listé juste au-dessus.
+    Une seule pièce les lève toutes les trois. Et les deux seuils de
+    salaire sont des alternatives — un seul s'applique, et lequel dépend
+    d'un fait que le dossier ne porte pas : les cumuler est exactement ce
+    que `evaluerConditions` refuse de faire en jugeant une pièce.
+
+    Le passage à `PRET` ne change pas : `ratioCond` porte toujours sur
+    toutes les bloquantes. C'est ce qui est **montré** qui cesse de
+    doubler, pas ce qui est exigé.
+  */
+  const conditionsEchouees = bloquantes.filter((c) => !c.satisfaite && c.etabliePar === null);
 
   const missing: MissingPoint[] = [
     ...requisManquants.map((d) => ({
