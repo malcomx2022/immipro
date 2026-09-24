@@ -223,6 +223,9 @@ const { raisonSansApercu } = await import("../src/server/acces/pieces");
 const { MENTION_EN_QUARANTAINE, ATTENTE_ORDINAIRE_MS } = await import(
   "../src/domain/dossiers/quarantaine"
 );
+const { reprendreLesQuarantaines } = await import("../src/server/jobs/quarantaine");
+const { getQueue, JOBS } = await import("../src/lib/queue");
+const { REPOS_AVANT_REPRISE_MINUTES } = await import("../src/domain/securite/balayage");
 const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
   "../src/domain/exploitation/constats"
 );
@@ -605,6 +608,112 @@ try {
     );
   }
 
+  console.log("\nCe qui reste sans verdict est repris quand le moteur revient");
+  {
+    /*
+      Quatre causes sur six laissent le fichier en quarantaine en disant
+      au candidat « tu n'as rien à faire ». Personne ne reprenait la
+      main : `BALAYAGE_PIECE` n'était postée que par la confirmation du
+      dépôt, une fois. Exécuté avant correction, moteur revenu :
+
+          état après l'échec : EN_QUARANTAINE, cause reponse_illisible
+          ce que le candidat lit : « nous reprenons la main dessus »
+          moteur pris en défaut ? false
+          état du fichier : EN_QUARANTAINE, en quarantaine true
+          ce que le candidat lit toujours : « nous reprenons la main dessus »
+    */
+    reponseDuMoteur = { statut: 200, corps: "<html>une passerelle</html>" };
+    const bloquee = await piece({ avecQuota: true });
+    await balayerUnePiece(bloquee.tache, leBalayeur());
+    verifier(
+      raisonSansApercu(await relire(bloquee.tache.versionId))?.includes(
+        "nous reprenons la main",
+      ) === true,
+      "le candidat lit que la plateforme reprend la main dessus",
+    );
+
+    // Et une pièce dont le refus demande un geste au candidat : sa
+    // consigne dit de redéposer, et rejouer par-dessus la ferait mentir.
+    const sienne = await piece({ avecQuota: true });
+    await balayerUnePiece(sienne.tache, leBalayeur());
+    await db.documentVersion.update({
+      where: { id: sienne.tache.versionId },
+      data: { scanIncidentCause: "trop_volumineux" },
+    });
+
+    /* Le moteur revient, et le prouve : il reconnaît EICAR. */
+    reponseDuMoteur = { statut: 200, corps: '{"status":"infected"}' };
+    await sonderLesServices();
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+
+    // Les deux tentatives viennent d'avoir lieu : le repos court, et la
+    // passe ne double pas une tâche encore en vol.
+    const tropTot = await reprendreLesQuarantaines();
+    verifier(
+      !tropTot.moteurMuet && tropTot.remises === 0,
+      `moteur revenu, rien n'est repris tant que le repos court (${JSON.stringify(tropTot)})`,
+    );
+
+    const plusTard = new Date(Date.now() + (REPOS_AVANT_REPRISE_MINUTES + 1) * 60 * 1000);
+
+    /*
+      Le repos est passé, mais le moteur ne prouve plus rien : la passe
+      s'abstient. « Dès que le service revient » n'est pas encore
+      arrivé, et rejouer dans le vide rouvrirait l'incident qu'on vient
+      d'ouvrir.
+    */
+    await noterLeConstat("antivirus", false, "le moteur n'a pas signalé le fichier d'essai");
+    const muet = await reprendreLesQuarantaines(plusTard);
+    verifier(
+      muet.moteurMuet && muet.remises === 0,
+      `sans sonde concluante, la passe s'abstient (${JSON.stringify(muet)})`,
+    );
+    verifier(
+      (await relire(bloquee.tache.versionId)).scanState === "EN_QUARANTAINE",
+      "et le fichier reste où il est",
+    );
+
+    /* Le moteur le prouve de nouveau. */
+    reponseDuMoteur = { statut: 200, corps: '{"status":"infected"}' };
+    await sonderLesServices();
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+
+    const reprise = await reprendreLesQuarantaines(plusTard);
+    verifier(
+      reprise.remises >= 1,
+      `le moteur revenu, la passe remet en file (${JSON.stringify(reprise)})`,
+    );
+
+    const enFile = await (await getQueue()).getQueueSize(JOBS.BALAYAGE_PIECE);
+    verifier(enFile >= 1, `et la tâche est bien dans la file (${enFile})`);
+
+    /*
+      Ce que la passe ne reprend pas : la pièce dont la consigne demande
+      un nouveau dépôt. `quiPeutAgir` le disait déjà cause par cause, et
+      rien n'en découlait.
+    */
+    verifier(
+      (await relire(sienne.tache.versionId)).scanState === "EN_QUARANTAINE" &&
+        reprise.laissees >= 1,
+      `celle qui attend un geste du candidat n'est pas reprise (laissées ${reprise.laissees})`,
+    );
+
+    /*
+      Et le contrôle repris conclut pour de bon : c'est `balayerUnePiece`
+      qui décide, la passe ne fait que la rappeler.
+    */
+    const suite = await balayerUnePiece(bloquee.tache, leBalayeur());
+    const finie = await relire(bloquee.tache.versionId);
+    verifier(
+      suite === "ANALYSE" && finie.scanState === "SAINE" && finie.scanIncidentAt === null,
+      `le contrôle repris conclut, incident soldé (${suite}, ${finie.scanState})`,
+    );
+    verifier(
+      enConfiance(bloquee.cle) && !enQuarantaine(bloquee.cle),
+      "et le fichier a rejoint le stockage de confiance",
+    );
+  }
+
   console.log("\nUne promotion interrompue laisse une pièce bloquée, jamais une pièce admise");
   {
     reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
@@ -897,6 +1006,11 @@ try {
     }
   }
 } finally {
+  /*
+    La reprise poste un job : pg-boss tient ses propres connexions sur la
+    base jetable, et les laisser ouvertes fait échouer le `DROP`.
+  */
+  await (await getQueue()).stop({ wait: true }).catch(() => {});
   await new Promise<void>((ok) => {
     moteur.closeAllConnections();
     moteur.close(() => ok());

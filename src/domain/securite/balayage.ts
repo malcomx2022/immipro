@@ -100,13 +100,13 @@ export function seReprendSeule(cause: CauseDIndisponibilite): boolean {
 
 export const MOTIF_INDISPONIBILITE: Record<CauseDIndisponibilite, string> = {
   non_configure:
-    "Aucun moteur de balayage n'est configuré. Les pièces déposées restent en quarantaine, et le dépôt est refusé en amont.",
+    "Aucun moteur de balayage n'est configuré. Les pièces déposées restent en quarantaine, et le dépôt est refusé en amont. Elles seront reprises d'elles-mêmes dès qu'un moteur aura reconnu le fichier d'essai.",
   injoignable:
     "Le moteur de balayage n'a pas répondu. La pièce reste en quarantaine et la tâche sera reprise.",
   delai_depasse:
     "Le moteur de balayage a dépassé le délai accordé. La pièce reste en quarantaine et la tâche sera reprise.",
   reponse_illisible:
-    "Le moteur de balayage a répondu quelque chose que le contrat ne prévoit pas. À vérifier à la main : rejouer ne changera rien.",
+    "Le moteur de balayage a répondu quelque chose que le contrat ne prévoit pas. À vérifier de ce côté-ci : rejouer ne changera rien tant que la réponse ne suit pas le contrat. La pièce sera reprise d'elle-même dès que la sonde le validera.",
   trop_volumineux:
     "Le fichier dépasse la taille que le balayage accepte de transmettre. Il reste en quarantaine et n'y passera jamais : à traiter à la main.",
   objet_absent:
@@ -337,3 +337,72 @@ export const ATTENTE_AU_CONTROLE: Record<CauseDIndisponibilite, string> = {
   reponse_illisible:
     "Le contrôle des fichiers est interrompu de notre côté. Ton fichier est conservé, nous reprenons la main dessus, tu n'as rien à faire.",
 };
+
+/* ------------------------------------------------------------------ *
+ * La reprise d'un contrôle resté sans verdict.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Ce que le candidat lit, et que personne ne tenait — I.D, RG-06.3.
+ *
+ * Quatre des six causes laissent le fichier en quarantaine sans rien
+ * demander à son propriétaire, et le lui disent : « Ton fichier est
+ * conservé et **sera contrôlé dès que le service revient**, tu n'as rien
+ * à faire », « Ton fichier est conservé, **nous reprenons la main
+ * dessus**, tu n'as rien à faire. »
+ *
+ * Personne ne reprenait la main. `BALAYAGE_PIECE` n'était postée que par
+ * la confirmation du dépôt, une fois, et deux chemins la perdaient :
+ *
+ * — `non_configure` et `reponse_illisible` ne se reprennent pas seules
+ *   (`seReprendSeule`), donc la tâche s'achève sur `BLOQUEE` sans
+ *   consommer la moindre reprise de la file ;
+ * — `injoignable` et `delai_depasse` s'en remettent aux six reprises de
+ *   pg-boss, qui couvrent « une indisponibilité de l'ordre de dix
+ *   minutes ». Au-delà, la file abandonne.
+ *
+ * Exécuté, moteur revenu et sonde concluante :
+ *
+ *     état après l'échec : EN_QUARANTAINE, cause reponse_illisible
+ *     ce que le candidat lit : « nous reprenons la main dessus »
+ *     moteur pris en défaut ? false
+ *     état du fichier : EN_QUARANTAINE, en quarantaine true
+ *     ce que le candidat lit toujours : « nous reprenons la main dessus »
+ *
+ * L'incident était **visible** — `/api/health` le compte et le date —
+ * sans être **traité**. Une visibilité n'est pas une reprise, et c'est
+ * précisément ce que la phrase promettait.
+ *
+ * Le repos avant reprise : vingt minutes, soit plus que les six reprises
+ * de la file réunies. Reprendre plus tôt doublerait une tâche encore en
+ * vol, et une pièce balayée deux fois n'est pas fausse, seulement
+ * payée deux fois.
+ */
+export const REPOS_AVANT_REPRISE_MINUTES = 20;
+
+/**
+ * Une version sans verdict se reprend-elle ?
+ *
+ * La question n'est pas neuve : `quiPeutAgir` la tranche déjà, cause par
+ * cause. Elle disait qui doit agir sans que rien n'agisse — la
+ * plateforme reprend ce qui lui revient, et ne reprend pas ce qui attend
+ * un geste du candidat. Un fichier trop lourd ne rétrécira pas, un objet
+ * absent ne reviendra pas : les deux messages demandent un nouveau
+ * dépôt, et rejouer par-dessus ferait mentir la consigne.
+ *
+ * Une version sans cause est reprise : le contrôle n'a rien conclu et
+ * n'a rien demandé à personne — un ouvrier tué avant la première
+ * tentative laisse exactement cela.
+ */
+export function reprendreAuControle(etat: {
+  cause: CauseDIndisponibilite | null;
+  derniereTentative: Date | null;
+  maintenant: Date;
+}): boolean {
+  if (etat.cause !== null && quiPeutAgir(etat.cause) !== "plateforme") return false;
+  if (etat.derniereTentative === null) return true;
+  return (
+    etat.maintenant.getTime() - etat.derniereTentative.getTime() >=
+    REPOS_AVANT_REPRISE_MINUTES * 60 * 1000
+  );
+}

@@ -17,6 +17,7 @@ import { envoyerLesRappels } from "./rappels";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
+import { reprendreLesQuarantaines } from "./quarantaine";
 import { propagerLaPublication, doitRejouer } from "./divergence";
 import {
   traiterLesBrouillonsInactifs,
@@ -134,6 +135,17 @@ async function main() {
     console.info("[rappels]", await envoyerLesRappels());
   });
 
+  await boss.work(JOBS.REPRISE_QUARANTAINE, async () => {
+    const bilan = await reprendreLesQuarantaines();
+    /*
+      `moteurMuet` n'est pas une panne de la passe : c'est le cas où
+      « dès que le service revient » n'est pas encore arrivé. Elle sort
+      sans rien remettre, et repassera à l'heure suivante. Lever ferait
+      d'une attente annoncée au candidat une tâche en échec.
+    */
+    if (bilan.remises > 0 || bilan.moteurMuet) console.info("[quarantaine]", bilan);
+  });
+
   await boss.work(JOBS.BROUILLONS_INACTIFS, async () => {
     const bilan = await traiterLesBrouillonsInactifs();
     console.info("[inactivite]", bilan);
@@ -202,6 +214,21 @@ async function main() {
     installée se voit au bout de trois heures au plus.
   */
   await boss.schedule(JOBS.SONDE_SERVICES, "0 * * * *");
+
+  /*
+    La reprise des quarantaines, toutes les heures — I.D.
+
+    À la vingtième minute, après la resonde : la passe ne remet en file
+    que sur une sonde concluante, et la lire juste après la sonde lui
+    donne un constat de l'heure plutôt que de la précédente. Vingt
+    minutes laissent aussi le temps au balayage remis en file de
+    conclure avant que la passe suivante le revoie.
+
+    Horaire et non quotidienne : la phrase dit « dès que le service
+    revient », et un candidat qui attend son contrôle ne l'attend pas
+    jusqu'au lendemain trois heures.
+  */
+  await boss.schedule(JOBS.REPRISE_QUARANTAINE, "20 * * * *");
 
   // Et une fois tout de suite : attendre l'heure ronde laisserait
   // l'instance sans constat pendant jusqu'à soixante minutes après un
