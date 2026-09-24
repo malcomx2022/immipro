@@ -115,7 +115,7 @@ export function Comparateur({
       ) : null}
 
       {mention ? (
-        <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+        <SourceNote {...mention}>
           Ce tableau compare des exigences publiées, il ne prédit aucune décision.
         </SourceNote>
       ) : null}

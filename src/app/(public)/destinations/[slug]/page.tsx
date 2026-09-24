@@ -152,7 +152,7 @@ export default async function PageDestination({
           ))}
         </section>
 
-        <SourceNote source={fiche.mention.source} verifieeLe={fiche.mention.verifieeLe}>
+        <SourceNote {...fiche.mention}>
           ImmiPro reproduit les exigences publiées par l&apos;administration et
           n&apos;intervient pas dans la décision.
         </SourceNote>

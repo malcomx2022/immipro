@@ -139,7 +139,7 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
         sousTitre="Renforcent le dossier"
       />
 
-      <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+      <SourceNote {...mention}>
         ImmiPro contrôle la complétude de ton dossier, pas la décision de
         l&apos;administration.
       </SourceNote>

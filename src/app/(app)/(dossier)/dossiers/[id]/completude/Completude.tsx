@@ -133,7 +133,7 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
         </section>
       ) : null}
 
-      <SourceNote source={mention.source} verifieeLe={mention.verifieeLe}>
+      <SourceNote {...mention}>
         Un dossier complet n&apos;est pas un dossier accepté.
       </SourceNote>
 
