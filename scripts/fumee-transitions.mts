@@ -787,6 +787,38 @@ try {
     });
     await db.$executeRaw`UPDATE "DocumentVersion" SET "uploadedAt" = ${ilYA(10)} WHERE id = ${version.id}`;
 
+    /*
+      Et celui qui travaille son entretien de rédaction.
+
+      C'est ici, et pas dans un essai d'unité, que ce cas se tient : le
+      domaine était juste, et la requête du job incomplète — elle ne lisait
+      que `DocumentVersion`. Une garde montée sur une matière fabriquée à
+      la main serait restée verte, parce qu'on lui aurait donné la date que
+      la requête ne savait pas aller chercher.
+
+      Le geste est réel et long : un entretien se remplit sur des semaines,
+      une réponse par question quittée, et aucune ne produit de version —
+      la mise en forme, qui en produirait une, demande un pack qu'un
+      brouillon n'a pas. Sans ce bloc, un candidat dont la dernière réponse
+      datait de l'avant-veille était clos, ses pièces programmées à la
+      purge, et sans même la relance : à quatre cents jours, l'abandon
+      passe avant.
+    */
+    const entretien = await ouvrir("entretien", ABANDON_JOURS + 35);
+    const pieceEntretien = await db.document.findFirstOrThrow({
+      where: { applicationId: entretien },
+    });
+    const reponse = await db.interviewAnswer.create({
+      data: {
+        documentId: pieceEntretien.id,
+        rank: 0,
+        section: "Parcours",
+        question: "Pourquoi cette formation\u202f?",
+        answer: "Parce que je prépare ce projet depuis deux ans.",
+      },
+    });
+    await db.$executeRaw`UPDATE "InterviewAnswer" SET "updatedAt" = ${ilYA(2)} WHERE id = ${reponse.id}`;
+
     /* Et ce que la plateforme écrit d'elle-même sur un brouillon oublié :
        exactement ce que pose le job de rappels d'échéance. */
     await db.application.update({
@@ -824,6 +856,16 @@ try {
     verifier(
       (await etat(actif)).status === "BROUILLON",
       "ni celui dont le candidat a déposé une pièce il y a dix jours",
+    );
+    verifier(
+      (await etat(entretien)).status === "BROUILLON",
+      `ni celui qui répondait à son entretien avant-hier (${(await etat(entretien)).status})`,
+    );
+    verifier(
+      (await db.notification.count({
+        where: { applicationId: entretien, kind: "INACTIVITE" },
+      })) === 0,
+      "et il n'est ni clos ni relancé : il est là, et l'horloge le voit",
     );
     verifier(
       (await etat(loin)).status === "BROUILLON",
