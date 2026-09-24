@@ -72,8 +72,6 @@ export const HORS_PORTEE: readonly string[] = [
 export const MENTION_REVOCATION =
   "Le consultant ne voit rien tant que tu n'as pas donné ton accord. Tu peux le retirer à tout moment depuis « Mes consentements ».";
 
-export const MENTION_JOURNAL =
-  "Chaque consultation de ton dossier par le consultant est inscrite au journal, que tu peux demander à tout moment.";
 
 export type MotifRefus = "NON_HABILITE" | "SANS_ACCORD";
 
@@ -143,6 +141,39 @@ export function evenementLecture(
 export const ACCORD_DUREE_JOURS = 14;
 
 /**
+ * ── Deux phrases du consentement disaient autre chose que le code ────
+ *
+ * **Le journal des lectures.** L'écran annonçait, juste au-dessus de la
+ * case : « Chaque consultation de ton dossier par le consultant est
+ * inscrite au journal, que tu peux demander à tout moment. » Rien n'écrit
+ * une telle ligne : `evenementLecture` n'a aucun appelant en production,
+ * `LECTURE_CONSULTANT` n'existe nulle part ailleurs, et aucune surface
+ * candidat ne parle de journal — la promesse portait à la fois sur un
+ * enregistrement qui n'a pas lieu et sur un extrait que personne ne sert.
+ *
+ * Elle est retirée plutôt que reformulée. Un consentement doit dire ce qui
+ * est vrai au moment où il est donné ; ce qui viendra avec l'accès des
+ * consultants se dira le jour où l'accès existera, et le garde-fou de
+ * `tests/partage.test.ts` ramène la phrase ce jour-là.
+ *
+ * **L'échéance.** La case disait « jusqu'à ce que je retire cet accord », et
+ * l'accord expire de lui-même : RG-12.2 dit « révocable **et** expire
+ * automatiquement », `confirmerLaConsultation` écrit `expiresAt`, et « Mes
+ * consentements » affiche l'état échu. Le candidat signait donc une
+ * autorisation plus longue que la vraie, et se croyait tenu de la retirer
+ * pour qu'elle cesse.
+ *
+ * Les deux phrases se composent ici, à partir de `ACCORD_DUREE_JOURS` :
+ * écrire le nombre à l'écran l'aurait laissé diverger de celui que la base
+ * applique.
+ */
+export const libelleDeLAutorisation = (consultant: string, pays: string): string =>
+  `J'autorise ${consultant} à consulter mon dossier ${pays} jusqu'à ce que je retire cet accord, et au plus tard ${ACCORD_DUREE_JOURS} jours après le rendez-vous.`;
+
+export const MENTION_DE_LAUTORISATION =
+  `Il ne verra rien avant. L'accord s'arrête dès que tu le retires, et de lui-même ${ACCORD_DUREE_JOURS} jours après le rendez-vous : tu n'as rien à faire pour qu'il expire.`;
+
+/**
  * Un accord vu depuis « Mes consentements » — A-05, RG-12.2.
  *
  * L'accord était annoncé révocable à trois endroits — la mention de T-04,
@@ -171,9 +202,15 @@ export const LIBELLE_ETAT_PARTAGE: Record<EtatPartage, string> = {
  * Ce que le retrait fait, et ce qu'il ne fait pas. Dit avant le geste :
  * quelqu'un qui croit effacer une consultation déjà eue se tromperait sur
  * ce qu'il obtient.
+ *
+ * Elle citait le même journal que la case de T-05 — « les consultations
+ * déjà inscrites au journal restent lisibles » — et il n'existe pas
+ * davantage ici. Ce qui reste vrai et qui est le point du paragraphe :
+ * le retrait vaut pour l'avenir, il ne défait pas ce qui a déjà été
+ * ouvert. La phrase le dit sans s'appuyer sur un registre absent.
  */
 export const MENTION_RETRAIT =
-  "Le retrait ferme l'accès immédiatement. Les consultations déjà inscrites au journal restent lisibles : c'est ce qui permet de savoir ce qui a été vu, et quand.";
+  "Le retrait ferme l'accès immédiatement, et pour l'avenir seulement : ce que le consultant a déjà ouvert, il l'a déjà vu, et le retrait ne le lui retire pas de la mémoire.";
 
 export const PARTAGES_VIDES =
   "Aucun consultant n'a accès à tes dossiers. Un accès s'ouvre quand tu prends rendez-vous, et se referme seul à la date convenue.";

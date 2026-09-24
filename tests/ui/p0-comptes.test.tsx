@@ -327,10 +327,16 @@ describe("A-05 — Consentements", () => {
 
   it("dit ce que le retrait ne fait pas", async () => {
     repondrePartages(PARTAGES);
-    render(<Consentements />);
+    const { container } = render(<Consentements />);
     await waitFor(() => expect(screen.getByText(/Le retrait ferme l'accès/)).toBeDefined());
-    // Quelqu'un qui croit effacer une consultation déjà eue se tromperait.
-    expect(screen.getByText(/restent lisibles/)).toBeDefined();
+    /*
+      Quelqu'un qui croit effacer une consultation déjà eue se tromperait.
+      La phrase le disait en citant « les consultations déjà inscrites au
+      journal » — un journal que rien n'écrit. Elle dit désormais le même
+      fait sans s'appuyer sur lui.
+    */
+    expect(screen.getByText(/pour l'avenir seulement/)).toBeDefined();
+    expect(container.textContent).not.toContain("journal");
   });
 
   it("aucun partage : l'écran dit quand un accès s'ouvre", async () => {

@@ -5,7 +5,11 @@ import { PriseDeRendezVous } from "@/app/(app)/(dossier)/consultants/[id]/rendez
 import { CONSULTANTS, consultantParId, creneaux } from "@/lib/contenu/consultants";
 import { PIECES_NL, dossierParId } from "@/lib/contenu/dossiers";
 import { ALLEMAGNE } from "@/lib/contenu/destinations";
-import { PORTEE_CONSULTANT, LIBELLE_PORTEE } from "@/domain/consultants/access";
+import {
+  ACCORD_DUREE_JOURS,
+  PORTEE_CONSULTANT,
+  LIBELLE_PORTEE,
+} from "@/domain/consultants/access";
 
 vi.mock("next/navigation", () => ({
   notFound: () => {
@@ -102,13 +106,23 @@ describe("T-05 — Accord d'accès", () => {
     expect(container.textContent).toContain("Tes dossiers pour d'autres destinations");
   });
 
-  it("dit que l'accord se retire avant de le demander", () => {
+  /**
+   * L'écran annonçait « Chaque consultation de ton dossier par le
+   * consultant est inscrite au journal, que tu peux demander à tout
+   * moment. » Rien n'écrit cette ligne et aucune surface ne la sert : la
+   * phrase est partie, et à sa place l'accord dit **comment il s'arrête**,
+   * ce qui est vrai et que la case taisait.
+   */
+  it("dit comment l'accord s'arrête, avant de le demander", () => {
     const { container } = rendre();
     expect(container.textContent).toContain(
       "Le consultant ne voit rien tant que tu n'as pas donné ton accord",
     );
     expect(container.textContent).toContain("Mes consentements");
-    expect(container.textContent).toContain("inscrite au journal");
+    // Les deux façons dont il finit, et non la seule qui demande un geste.
+    expect(container.textContent).toContain("je retire cet accord");
+    expect(container.textContent).toContain(`${ACCORD_DUREE_JOURS} jours après le rendez-vous`);
+    expect(container.textContent).not.toContain("inscrite au journal");
   });
 
   it("ne pré-coche pas l'accord et explique le bouton bloqué", () => {

@@ -14,7 +14,8 @@ import { libelleDelai } from "@/domain/consultants/annuaire";
 import {
   HORS_PORTEE,
   LIBELLE_PORTEE,
-  MENTION_JOURNAL,
+  MENTION_DE_LAUTORISATION,
+  libelleDeLAutorisation,
   MENTION_REVOCATION,
   PORTEE_CONSULTANT,
 } from "@/domain/consultants/access";
@@ -419,14 +420,14 @@ export function PriseDeRendezVous({
         </section>
       </div>
 
+      {/* Les deux phrases viennent du domaine : elles citent la durée que
+          la base applique, et l'écran ne la réécrit pas. */}
       <Checkbox
-        libelle={`J'autorise ${consultant.nom} à consulter mon dossier ${dossier.destination.pays} jusqu'à ce que je retire cet accord.`}
-        description="Il ne verra rien avant, et plus rien après le retrait."
+        libelle={libelleDeLAutorisation(consultant.nom, dossier.destination.pays)}
+        description={MENTION_DE_LAUTORISATION}
         checked={accord}
         onChangement={setAccord}
       />
-
-      <p className="text-pretty text-13 text-ink-500">{MENTION_JOURNAL}</p>
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
         <Button
