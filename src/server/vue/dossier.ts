@@ -4,7 +4,7 @@ import { completudeDesPieces, premiereATraiter, libelleAction } from "@/domain/d
 import type { CompletenessPublic } from "@/domain/completeness/score";
 import { codesConformes } from "@/domain/completeness/conditions";
 import type { Dossier, StatutDossier } from "@/domain/dossiers/dossier";
-import { MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
+import { MENTION_CLOTURE, MENTION_DEPOSE, MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDeDepot } from "@/domain/dossiers/faisabilite";
 import { estEchue } from "@/domain/dossiers/peremption";
 
@@ -200,6 +200,22 @@ export function prochaineAction(
     seul dossier dont le dépôt était bloqué.
   */
   if (statut === "EN_PAUSE") return MENTION_EN_PAUSE;
+  /*
+    Et deux autres états n'ont pas de prochaine action de checklist. La
+    pause était le seul cas intercepté ; les deux suivants tombaient donc
+    sur la même déduction, qui n'a de sens que sur un dossier en cours :
+
+        déposé    → « Remplacer ton relevé bancaire. »
+        clôturé   → « Rien ne bloque un dépôt. »
+        abandonné → « Ajouter ton passeport. »
+
+    Le premier est le plus coûteux : la péremption d'une pièce est écrite
+    au dépôt et relue chaque jour, si bien qu'un dossier parti à l'autorité
+    finit toujours par demander au candidat de corriger ce qu'il ne peut
+    plus toucher.
+  */
+  if (statut === "SOUMIS") return MENTION_DEPOSE;
+  if (statut === "CLOTURE") return MENTION_CLOTURE;
 
   const suivante = premiereATraiter(pieces);
   if (!suivante) {
