@@ -20,7 +20,7 @@ import type { Paiement, EtatOperateur, EtatRapprochement } from "@/domain/backof
 import type { EcritureAudit, CategorieAudit } from "@/domain/backoffice/audit";
 import type { PieceEnEchec } from "@/domain/backoffice/revue";
 import type { ConsultantAdministre } from "@/domain/backoffice/consultants";
-import { aReconcilier } from "@/server/paiement/cycle";
+import { aReconcilier, DELAI_RECONCILIATION_MINUTES } from "@/server/paiement/cycle";
 import { getPack, type Devise } from "@/domain/payments/pricing";
 import { achatDepuisLeCode } from "@/domain/payments/achat";
 import {
@@ -379,23 +379,62 @@ function etatDuRapprochement(
   return aTraiter ? "ECART" : "EN_ATTENTE";
 }
 
+/** Au-delà, le rapprochement automatique n'a plus donné signe de vie. */
+const SILENCE_MINUTES = 60;
+
 /**
  * État de l'opérateur — B-04.
  *
- * L'interrogation du fournisseur n'est pas branchée : l'état se déduit donc
- * de ce que la base sait, à savoir la date du dernier rapprochement réussi.
- * Annoncer « disponible » sans avoir interrogé personne serait une
- * affirmation sans mesure.
+ * L'état se déduit de la date du dernier rapprochement : une confirmation
+ * reçue par webhook signé, ou une consultation qui a abouti dans le job de
+ * réconciliation. Les deux sont la parole du fournisseur, et il n'y en a
+ * pas d'autre à confronter.
+ *
+ * ── Une heure sans achat n'est pas une panne d'opérateur ─────────────
+ *
+ * La règle était « rien depuis une heure ⇒ indisponible », et elle accusait
+ * un tiers sur un silence qui n'était pas le sien. Un site où personne ne
+ * paie entre deux heures et sept heures du matin affichait, tous les
+ * matins : « L'API Stripe ne répond plus », le total de la journée passait
+ * pour impubliable et l'export partait avec l'attestation d'un incident qui
+ * n'avait pas eu lieu. C'est la faute symétrique de celle que la note
+ * d'origine refusait — annoncer « disponible » sans avoir interrogé
+ * personne —, et la plus coûteuse des deux : elle déclenche une réaction.
+ *
+ * Une indisponibilité ne s'affirme donc que si quelque chose attendait
+ * l'opérateur : des transactions non abouties au-delà du délai de
+ * rattrapage, celles-là mêmes que le job lui soumet toutes les quinze
+ * minutes. S'il n'y en a aucune, personne n'a rien demandé, et la date du
+ * dernier rapprochement — affichée en clair, jour compris — dit tout ce que
+ * la plateforme sait.
  */
-export async function etatOperateur(): Promise<EtatOperateur | null> {
+export async function etatOperateur(maintenant = new Date()): Promise<EtatOperateur | null> {
   const dernier = await db.transaction.findFirst({
     where: { reconciledAt: { not: null } },
     orderBy: { reconciledAt: "desc" },
     select: { reconciledAt: true, provider: true },
   });
   if (!dernier?.reconciledAt) return null;
+
+  const repondRecemment =
+    maintenant.getTime() - dernier.reconciledAt.getTime() < SILENCE_MINUTES * 60 * 1000;
+
+  /*
+    Ce que le job soumet au fournisseur à chaque passe (RG-05.4). Zéro
+    ligne, c'est une question qui n'a pas été posée : le silence est le
+    nôtre, pas celui de l'opérateur.
+  */
+  const enSouffrance = repondRecemment
+    ? 0
+    : await db.transaction.count({
+        where: {
+          status: { in: ["INITIEE", "EN_ATTENTE"] },
+          createdAt: { lt: new Date(maintenant.getTime() - DELAI_RECONCILIATION_MINUTES * 60 * 1000) },
+        },
+      });
+
   return {
-    disponible: Date.now() - dernier.reconciledAt.getTime() < 60 * 60 * 1000,
+    disponible: repondRecemment || enSouffrance === 0,
     dernierRapprochement: dernier.reconciledAt.toISOString(),
     operateur: dernier.provider === "FEDAPAY" ? "FedaPay" : "Stripe",
   };

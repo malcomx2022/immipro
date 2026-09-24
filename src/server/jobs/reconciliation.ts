@@ -36,6 +36,11 @@ import { libererLesTenuesEchues } from "@/server/acces/consultations";
  *   la prononcent : `aExpirer` seul décide, comme avant ;
  * - **l'écart s'ouvre au délai prévu**, que la consultation ait répondu ou
  *   non — c'est le filet du filet.
+ *
+ * Ce qu'elle ajoute : une consultation qui aboutit **date le
+ * rapprochement** de la ligne, même quand l'état retrouvé ne change rien.
+ * C'est la seule mesure que la plateforme ait de la santé de l'opérateur,
+ * et B-04 la lit pour dire si le rapprochement automatique tourne encore.
  */
 export const HEURES_AVANT_TICKET = 24;
 
@@ -125,6 +130,23 @@ export async function reconcilierLesPaiements(
     }
 
     if (vu.issue === "connu") {
+      /*
+        La ligne vient d'être confrontée à ce que le fournisseur en dit, et
+        les deux se lisent : c'est un rapprochement, que l'état retrouvé
+        change quelque chose ou non. Un panier abandonné que le fournisseur
+        annonce toujours en attente ne fait rien écrire d'autre — et c'est
+        pourtant la preuve que l'opérateur répond.
+
+        Sans cette ligne, B-04 n'avait qu'une seule mesure de la santé de
+        l'opérateur, la confirmation d'un paiement, et déclarait donc l'API
+        muette dès qu'une heure passait sans que personne n'achète. Ici,
+        l'interrogation a bien eu lieu et la réponse est arrivée.
+      */
+      await db.transaction.update({
+        where: { id: transaction.id },
+        data: { reconciledAt: maintenant },
+      });
+
       /*
         Le même service que les webhooks, avec un identifiant d'événement
         déterministe : deux passes qui lisent le même état écrivent la

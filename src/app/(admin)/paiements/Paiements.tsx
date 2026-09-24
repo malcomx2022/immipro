@@ -28,7 +28,7 @@ import { Select } from "@/components/ui/Select";
 import { appeler } from "@/lib/api";
 import { telechargerFichier } from "@/lib/telechargement";
 import type { EchecCandidat } from "@/server/http/echecs";
-import { jourEnFrancais } from "@/domain/format/moment";
+import { jourEnFrancais, momentEnFrancais } from "@/domain/format/moment";
 import {
   ISSUES_ECART,
   LIBELLE_ISSUE,
@@ -174,10 +174,11 @@ export function Paiements({
 }: {
   paiements: readonly Paiement[];
   /**
-   * État de l'opérateur. Nul tant qu'aucun rapprochement n'a abouti :
-   * l'interrogation du fournisseur n'est pas branchée, et annoncer
-   * « disponible » sans avoir interrogé personne serait une affirmation
-   * sans mesure.
+   * État de l'opérateur. Nul tant qu'aucun rapprochement n'a abouti — ni
+   * webhook signé confirmant un paiement, ni consultation aboutie du job de
+   * réconciliation. Une absence de rapprochement récente ne devient un
+   * incident que si quelque chose attendait l'opérateur : une nuit sans
+   * achat n'est pas une panne.
    */
   operateur: EtatOperateur | null;
   /** Libellé de la journée traitée. */
@@ -206,7 +207,14 @@ export function Paiements({
     lignesDeTotal(totaux)
       .map((l) => formatMontant(l.montant, l.devise))
       .join(" · ");
-  const incident = operateur ? messageIncidentOperateur(operateur, heure) : null;
+  /*
+    Le moment du dernier rapprochement porte son jour. Il était rendu par
+    `heure` seul : un rapprochement de l'avant-veille s'affichait « 23 h 04 »
+    à côté de la journée consultée, et se lisait comme s'il en faisait
+    partie. Les lignes du tableau, elles, restent en heure seule — leur jour
+    est celui du tableau.
+  */
+  const incident = operateur ? messageIncidentOperateur(operateur, momentEnFrancais) : null;
   const journeeVide = diagnostiquerLaJournee(paiements, jourIso, aujourdhuiIso);
   const publiable = operateur ? totalPubliable(operateur) : false;
   const [envoiExport, setEnvoiExport] = useState(false);
@@ -236,8 +244,8 @@ export function Paiements({
           !operateur
             ? `${journee} · aucun rapprochement automatique enregistré`
             : publiable
-              ? `${journee} · dernier rapprochement ${heure(operateur.dernierRapprochement)}`
-              : `${journee} · dernier rapprochement automatique ${heure(operateur.dernierRapprochement)}`
+              ? `${journee} · dernier rapprochement le ${momentEnFrancais(operateur.dernierRapprochement)}`
+              : `${journee} · dernier rapprochement automatique le ${momentEnFrancais(operateur.dernierRapprochement)}`
         }
         actions={
           <Button
