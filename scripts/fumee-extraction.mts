@@ -704,6 +704,83 @@ try {
     );
   }
 
+  console.log("\nL'échéancier ne réclame pas une pièce périssable déjà déposée");
+  {
+    /*
+      « Demander : X au plus tôt le … » conseille le bon moment pour aller
+      chercher un document périssable. Le conseil n'a plus d'objet une
+      fois la pièce déposée. Constaté en exécution avant correction,
+      passeport valable six mois, dépôt visé au 3 juin 2027 :
+
+          ATTENDUE    -> « Demander : Passeport » le 2026-12-03
+          EN_ANALYSE  -> « Demander : Passeport » le 2026-12-03
+          ILLISIBLE   -> « Demander : Passeport » le 2026-12-03
+          CONFORME    -> (aucune ligne)
+
+      C'est la moitié manquante du lot sur le calendrier : le verdict
+      avait cessé de recompter le délai d'une pièce déposée, et cette
+      ligne continuait de la réclamer — sur le même écran.
+    */
+    const { echeancierDuDossier } = await import("../src/server/lecture/dossiers");
+    const { evaluerLeCalendrier } = await import("../src/domain/dossiers/faisabilite");
+
+    reponseDuService = reponseDeLecture({
+      piece_identifiee: "passeport", obstacle: null,
+      champs: { passeport_validite_min: "2029-01-01" },
+    });
+    const p = await piece({ dateCible: "2027-09-01" });
+    await db.document.update({
+      where: { id: p.document.id },
+      data: { validityMonths: 6 },
+    });
+    await db.deadline.create({
+      data: {
+        applicationId: p.application.id,
+        code: "depot",
+        label: "Dépôt de la demande",
+        dueAt: new Date("2027-06-03T00:00:00Z"),
+      },
+    });
+
+    const ligneAuPlusTot = async () => {
+      const vue = await echeancierDuDossier(p.application.id, p.user.id);
+      return {
+        ligne: vue.echeances.find((e) => e.id.endsWith("-au-plus-tot")) ?? null,
+        verdict: evaluerLeCalendrier(vue.calendrier),
+      };
+    };
+
+    /* Le témoin : rien n'est déposé, le conseil a tout son sens. */
+    await db.document.update({ where: { id: p.document.id }, data: { status: "ATTENDUE" } });
+    const attendue = await ligneAuPlusTot();
+    verifier(
+      attendue.ligne?.titre === "Demander : Passeport",
+      `témoin : la pièce à obtenir garde sa ligne (${attendue.ligne?.titre})`,
+    );
+
+    for (const etat of ["EN_ANALYSE", "ILLISIBLE"] as const) {
+      await db.document.update({ where: { id: p.document.id }, data: { status: etat } });
+      const vu = await ligneAuPlusTot();
+      verifier(vu.ligne === null, `${etat} : plus de ligne « Demander » (${vu.ligne?.titre})`);
+      /*
+        Et les deux moitiés de l'écran disent la même chose : le verdict
+        ne compte plus le délai de cette pièce, la liste ne la réclame
+        plus. Se contredire sur un même écran est le défaut qu'on ferme.
+      */
+      verifier(
+        vu.verdict.enRetard.every((r) => r.piece.code !== "passeport"),
+        `${etat} : et le verdict ne la compte pas non plus en retard`,
+      );
+    }
+
+    /* Une pièce périmée, elle, se redemande : le conseil revient. */
+    await db.document.update({ where: { id: p.document.id }, data: { status: "EXPIREE" } });
+    verifier(
+      (await ligneAuPlusTot()).ligne?.titre === "Demander : Passeport",
+      "une pièce périmée retrouve sa ligne : il en faut une nouvelle",
+    );
+  }
+
   console.log("\nUne saturation du service se rejoue, elle n'accuse pas le fichier");
   {
     reponseDuService = { statut: 429, corps: '{"type":"error","error":{"type":"rate_limit_error"}}' };
