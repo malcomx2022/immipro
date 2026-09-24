@@ -16,6 +16,7 @@ import {
   type EtatOperateur,
   type Totaux,
   type Paiement,
+  diagnostiquerLaJournee,
 } from "@/domain/backoffice/reconciliation";
 import { formatMontant } from "@/lib/utils";
 import { LIBELLE_CAUSE } from "@/domain/paiement/echec";
@@ -169,6 +170,7 @@ export function Paiements({
   operateur,
   journee,
   jourIso,
+  aujourdhuiIso,
 }: {
   paiements: readonly Paiement[];
   /**
@@ -182,6 +184,14 @@ export function Paiements({
   journee: string;
   /** La même journée en ISO court : elle borne l'export et nomme le fichier. */
   jourIso: string;
+  /**
+   * Le jour courant, en ISO court, tel que le serveur le voit.
+   *
+   * Il sépare une journée creuse d'une journée à venir, et il vient du
+   * serveur : le calculer ici le ferait dépendre du fuseau du navigateur,
+   * qui n'est pas celui du livre.
+   */
+  aujourdhuiIso: string;
 }) {
   const agregats = agreger(paiements);
   // La file se déplie sur demande : B-04 est d'abord un tableau de bord,
@@ -197,6 +207,7 @@ export function Paiements({
       .map((l) => formatMontant(l.montant, l.devise))
       .join(" · ");
   const incident = operateur ? messageIncidentOperateur(operateur, heure) : null;
+  const journeeVide = diagnostiquerLaJournee(paiements, jourIso, aujourdhuiIso);
   const publiable = operateur ? totalPubliable(operateur) : false;
   const [envoiExport, setEnvoiExport] = useState(false);
   const [echecExport, setEchecExport] = useState<EchecCandidat | null>(null);
@@ -306,6 +317,21 @@ export function Paiements({
           <p className="text-pretty text-13 text-ink-500">{MENTION_TOTAL_SUSPENDU}</p>
         )}
 
+        {/*
+          L'état vide de la journée — `CLAUDE.md`, et la doctrine du journal
+          d'audit : « s'il n'affiche rien, il ne s'est rien passé ». Quatre
+          compteurs à zéro au-dessus d'un tableau sans ligne ne disent pas si
+          la lecture a échoué ; cette phrase le dit, et distingue une journée
+          creuse d'une journée qui n'est pas encore venue.
+        */}
+        {journeeVide ? (
+          <div className="flex flex-col gap-1 rounded-lg border border-ink-300 bg-white p-6">
+            <p className="text-16 font-semibold text-ink-900">{journeeVide.message}</p>
+            <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+              {journeeVide.precision}
+            </p>
+          </div>
+        ) : (
         <div className="overflow-hidden rounded-lg border border-ink-300 bg-white">
           <table className="w-full text-14">
             <caption className="sr-only">Paiements de la journée</caption>
@@ -352,6 +378,7 @@ export function Paiements({
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Le traitement des écarts — arbitrage du 21/09/2026.
             Ce bouton n'avait pas d'action derrière lui : le compteur

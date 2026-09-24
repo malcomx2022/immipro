@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default async function PagePaiements() {
   await exigerAdmin("/paiements");
   const aujourdhui = new Date().toISOString().slice(0, 10);
-  const [lignes, operateur] = await Promise.all([paiements(), etatOperateur()]);
+  const [lignes, operateur] = await Promise.all([paiements(aujourdhui), etatOperateur()]);
 
   return (
     <Paiements
@@ -27,6 +27,9 @@ export default async function PagePaiements() {
       // 2026 » côté client marcherait jusqu'au premier changement de
       // libellé.
       jourIso={aujourdhui}
+      // Le jour courant vient du serveur : le calculer à l'écran le ferait
+      // dépendre du fuseau du navigateur, qui n'est pas celui du livre.
+      aujourdhuiIso={aujourdhui}
     />
   );
 }

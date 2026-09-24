@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { route } from "@/server/http/route";
 import { etatOperateur, paiements } from "@/server/lecture/backoffice";
 
@@ -13,7 +14,20 @@ export const GET = route({
   nom: "admin.paiements",
   acces: "admin",
   limite: "lecture",
-  async traiter() {
-    return { paiements: await paiements(), operateur: await etatOperateur() };
+  /*
+    Le jour est un paramètre, et il borne la lecture — 24/09/2026. Elle
+    rendait les cent dernières transactions, toutes dates confondues, sous
+    un écran qui annonce une journée. Absent, c'est aujourd'hui : c'est ce
+    que la page demande.
+  */
+  requete: z.object({
+    jour: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/u, "Date attendue au format AAAA-MM-JJ")
+      .optional(),
+  }),
+  async traiter({ requete }) {
+    const jour = requete.jour ?? new Date().toISOString().slice(0, 10);
+    return { paiements: await paiements(jour), operateur: await etatOperateur() };
   },
 });
