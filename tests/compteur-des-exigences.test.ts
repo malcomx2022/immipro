@@ -8,7 +8,14 @@ import {
 } from "@/domain/completeness/explication";
 import { resumeDuJour, type Dossier } from "@/domain/dossiers/dossier";
 import { prochaineAction } from "@/server/vue/dossier";
-import { libelleAPreparer, libelleBlocage, type Piece } from "@/domain/dossiers/piece";
+import {
+  completudeDesPieces,
+  libelleAPreparer,
+  libelleBlocage,
+  type Piece,
+} from "@/domain/dossiers/piece";
+import { codesConformes } from "@/domain/completeness/conditions";
+import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
 
 const piece = (code: string, etat: Piece["etat"]): Piece => ({
   id: code,
@@ -57,6 +64,9 @@ const resultat = (conditionsEchouees: number, piecesManquantes = 0) =>
         bloquant: true,
         satisfaite: false,
         messageEchec: `L'autorité exige la pièce numéro ${i}.`,
+        // Aucune pièce ne l'établit : c'est ce que « ce qui manque »
+        // remonte, et le cas que ces essais décrivent.
+        etabliePar: null,
       })),
       coherence: 1,
       redaction: 1,
@@ -353,5 +363,102 @@ describe("le dossier témoin — toutes les pièces conformes, une exigence en t
     expect(libelleAPreparer(pieces, sans.compteurs)).toMatch(RASSURANT);
     expect(resumeDuJour([apaise])).toMatch(RASSURANT);
     expect(prochaineAction(pieces, "ACTIF", sans)).toMatch(RASSURANT);
+  });
+});
+
+/**
+ * Et une exigence rattachée à une pièce n'est pas un manque de plus —
+ * C-09, suite du même compteur.
+ *
+ * `MissingPoint.origine` annonce « une exigence de la règle figée
+ * qu'aucune pièce n'établit », et le calcul remontait toutes les
+ * bloquantes non satisfaites. Sur un dossier kennismigrant qui vient
+ * d'être ouvert, rien de déposé, constaté en exécution :
+ *
+ *     ce qui manque (6 lignes) :
+ *       [piece]    CON — Il te reste à téléverser : Contrat de travail.
+ *       [exigence] salaire_min_moins_30_ans     — 4 357 € bruts par mois.
+ *       [exigence] salaire_min_30_ans_et_plus   — 5 942 € bruts par mois.
+ *       [exigence] employeur_reconnu            — …
+ *     « Trois exigences […] ne sont pas remplies : […] et aucune pièce
+ *       ne les lève. »
+ *
+ * Les trois sont portées par le contrat de travail, listé juste au-dessus :
+ * une seule pièce les lève toutes. Et les deux seuils de salaire sont des
+ * alternatives — un seul s'applique, et lequel dépend d'un fait que le
+ * dossier ne porte pas.
+ */
+describe("une exigence portée par une pièce ne se compte pas deux fois", () => {
+  const kennismigrant = REGLES_DE_REFERENCE.find(
+    (r) => r.visaType === "emploi_kennismigrant",
+  )!;
+  const payload = kennismigrant.rules as unknown as {
+    pieces_requises: { code: string; libelle: string; obligatoire: boolean }[];
+  };
+
+  /** Le dossier tel qu'il s'ouvre : la checklist, et rien de déposé. */
+  const ouvert = () =>
+    completudeDesPieces(
+      payload.pieces_requises.map((p) => ({
+        id: p.code,
+        code: p.code.slice(0, 3).toUpperCase(),
+        libelle: p.libelle,
+        famille: p.obligatoire ? ("OBLIGATOIRE" as const) : ("COMPLEMENTAIRE" as const),
+        etat: "ATTENDUE" as const,
+        remede: "TELEVERSER" as const,
+      })),
+      { regle: kennismigrant.rules, conformes: codesConformes([]) },
+    );
+
+  it("ce qui manque ne liste que les pièces, quand toutes les exigences en ont une", () => {
+    const completude = ouvert();
+    expect(completude.missing.every((m) => m.origine === "piece")).toBe(true);
+    expect(completude.compteurs.exigencesNonTenues).toBe(0);
+  });
+
+  it("les deux seuils de salaire alternatifs ne sont pas cumulés", () => {
+    const codes = ouvert().missing.map((m) => m.code);
+    expect(codes).not.toContain("salaire_min_moins_30_ans");
+    expect(codes).not.toContain("salaire_min_30_ans_et_plus");
+  });
+
+  it("et la phrase de l'explication cesse d'être fausse", () => {
+    const phrases = expliquerLaCompletude(ouvert()).surTonDossier;
+    expect(phrases.join(" ")).not.toContain("aucune pièce ne les lève");
+    expect(phrases.join(" ")).not.toContain("aucune pièce ne la lève");
+  });
+
+  /*
+    Le contrôle négatif : une exigence qu'aucune pièce n'établit remonte
+    toujours, et c'est tout l'intérêt de la distinction. Sans lui, ce
+    tableau passerait aussi sur un calcul qui ne remonte plus rien.
+  */
+  it("une exigence sans pièce remonte toujours", () => {
+    const orpheline = completudeDesPieces([], {
+      regle: {
+        conditions: [
+          {
+            code: "attestation_prealable",
+            bloquant: true,
+            message_echec: "L'autorité exige une attestation préalable.",
+          },
+        ],
+      },
+      conformes: codesConformes([]),
+    });
+    expect(orpheline.compteurs.exigencesNonTenues).toBe(1);
+    expect(orpheline.missing[0]?.origine).toBe("exigence");
+    expect(orpheline.ready).toBe(false);
+  });
+
+  /*
+    Et le passage à PRET ne s'assouplit pas : une bloquante rattachée à une
+    pièce non conforme continue de tenir le dossier. C'est ce qui est
+    montré qui cesse de doubler, pas ce qui est exigé.
+  */
+  it("le dossier n'est pas prêt pour autant", () => {
+    const completude = ouvert();
+    expect(completude.ready).toBe(false);
+    expect(completude.palier).toBe("INCOMPLET");
   });
 });

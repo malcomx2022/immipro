@@ -120,5 +120,6 @@ export function conditionsEvaluees(
       bloquant: c.bloquant,
       satisfaite: conditionTenue(c, conformes),
       messageEchec: c.message_echec,
+      etabliePar: c.piece ?? null,
     }));
 }

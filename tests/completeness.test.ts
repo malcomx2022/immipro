@@ -2,8 +2,19 @@ import { describe, it, expect } from "vitest";
 import { computeCompleteness, versClient } from "../src/domain/completeness/score";
 
 const doc = (code: string, status: any, required = true) => ({ code, required, status });
-const cond = (code: string, satisfaite: boolean, bloquant = true) => ({
-  code, bloquant, satisfaite, messageEchec: `échec ${code}`,
+/**
+ * `etabliePar` est nul par défaut : une exigence qu'aucune pièce n'établit
+ * est celle que « ce qui manque » remonte, et c'est le cas que ces essais
+ * décrivent. Une condition rattachée à une pièce se passe explicitement,
+ * pour que la distinction se lise dans l'appel.
+ */
+const cond = (
+  code: string,
+  satisfaite: boolean,
+  bloquant = true,
+  etabliePar: string | null = null,
+) => ({
+  code, bloquant, satisfaite, messageEchec: `échec ${code}`, etabliePar,
 });
 
 describe("complétude du dossier", () => {
