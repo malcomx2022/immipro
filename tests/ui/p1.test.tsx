@@ -28,7 +28,11 @@ import {
   REGLE_NOUVELLE,
 } from "@/lib/contenu/alertes";
 import { tauxCommissionFormate } from "@/domain/payments/pricing";
-import { FENETRE_BLOQUEE, SITE_NON_OUVERT } from "@/domain/partenaires/affiliation";
+import {
+  AUCUN_PARTENAIRE_ACTIVE,
+  FENETRE_BLOQUEE,
+  SITE_NON_OUVERT,
+} from "@/domain/partenaires/affiliation";
 
 /**
  * L'appel réseau, remplacé — R-02.
@@ -1173,8 +1177,9 @@ describe("T-06 — Services partenaires", () => {
     const { container } = render(
       <Services dossier={DOSSIER} offres={[]} autorisation="accordee" />,
     );
-    expect(container.textContent).toContain("Aucun partenaire n'est référencé");
-    expect(container.textContent).toContain("vérification destination par destination");
+    // Liés à la constante du domaine : l'écran ne porte plus ces phrases.
+    expect(container.textContent).toContain(AUCUN_PARTENAIRE_ACTIVE.titre(DOSSIER.destination.pays));
+    expect(container.textContent).toContain(AUCUN_PARTENAIRE_ACTIVE.explication);
   });
 
   it("dit que l'autorisation est coupée, et où la rétablir", () => {

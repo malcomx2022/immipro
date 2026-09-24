@@ -6,6 +6,10 @@ import {
   REMPLIES_PAR_LA_DEMONSTRATION,
   habilitationDe,
 } from "@/domain/exploitation/habilitations";
+import {
+  AUCUN_PARTENAIRE_ACTIVE,
+  SILENCE,
+} from "@/domain/partenaires/affiliation";
 
 /**
  * Les tables qu'aucune ligne du produit ne remplit — S.10.
@@ -183,5 +187,50 @@ describe("aucune table de vérification ne manque au registre", () => {
   it("la lecture des partenaires filtre bien sur l'activation", () => {
     const lecture = readFileSync("src/server/lecture/partenaires.ts", "utf8");
     expect(lecture).toMatch(/activations:\s*\{\s*some:/u);
+  });
+
+  /**
+   * ── Le registre citait la phrase d'un autre manque ──────────────────
+   *
+   * `enAttendant` disait : « La surface des services annonce qu'elle reste
+   * vide sans **autorisation**, et que c'est l'état normal plutôt qu'une
+   * panne. » L'autorisation est le consentement du candidat ; le manque
+   * consigné ici est le registre d'activation, un fait de conformité dont le
+   * candidat n'est pas l'auteur.
+   *
+   * La confusion ne se voyait pas parce que la branche du consentement passe
+   * avant : aucune autorisation n'étant active au premier passage (RG-02.1),
+   * le vide de l'activation était inatteignable. Le registre annonçait donc
+   * que son manque était dit à l'écran en désignant une phrase que personne
+   * dans ce cas ne voyait — et il existe précisément pour qu'aucun de ces
+   * points ne disparaisse en silence.
+   */
+  it("ce qui est dit en attendant est la phrase du bon manque", () => {
+    const h = habilitationDe("PartnerActivation")!;
+    // Citée par référence, pas recopiée : une copie se périme sans bruit.
+    expect(h.enAttendant).toBe(AUCUN_PARTENAIRE_ACTIVE.explication);
+    // Et ce n'est pas le vocabulaire du consentement : le manque n'est pas
+    // un geste du candidat.
+    expect(h.enAttendant).not.toMatch(/autorisation|rétabli|coupé/u);
+    for (const silence of Object.values(SILENCE)) {
+      expect(h.enAttendant).not.toBe(silence.explication);
+    }
+    // Elle nomme ce qui manque vraiment : la vérification par destination.
+    expect(h.enAttendant).toContain("vérification destination par destination");
+  });
+
+  /**
+   * La phrase vit dans le domaine et l'écran la lit. Si l'écran la réécrit,
+   * le registre citera de nouveau une phrase qui peut dériver de celle
+   * qu'on affiche — c'est par là que l'erreur était entrée.
+   */
+  it("l'écran ne réécrit pas la phrase que le registre cite", () => {
+    const ecran = readFileSync(
+      "src/app/(app)/(dossier)/services/Services.tsx",
+      "utf8",
+    );
+    expect(ecran).toMatch(/AUCUN_PARTENAIRE_ACTIVE\.explication/u);
+    expect(ecran).not.toContain("vérification destination par");
+    expect(ecran).not.toContain("Aucun partenaire n&apos;est référencé pour {");
   });
 });
