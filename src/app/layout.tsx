@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
+import { origineDuSite } from "@/domain/exploitation/plan-du-site";
 
 export const metadata: Metadata = {
+  // Les URL relatives des métadonnées — image de partage comprise — se
+  // résolvent sur l'origine du déploiement, jamais sur une supposition.
+  metadataBase: origineDuSite(process.env.APP_URL),
   title: { default: "ImmiPro", template: "%s — ImmiPro" },
   description: "Préparez votre dossier d'immigration, pièce par pièce.",
   icons: { icon: "/favicon.svg", apple: "/apple-touch-icon.png" },

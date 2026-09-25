@@ -34,6 +34,22 @@ Ces règles s'appliquent à **tous** les workflows. Elles ne sont pas rappelées
 
 ---
 
+### Périmètre V1 définitif (25/09/2026)
+
+Ce qui suit l'emporte sur toute étape de ce document qui le contredirait. Une capacité marquée **V2** reste décrite, pour garder la trace de la spécification ; elle n'est ni promise, ni affichée, ni configurée en V1.
+
+| Sujet | V1 |
+|---|---|
+| Langue | Produit en français, sur tous les écrans, courriels et documents. |
+| Fuseau horaire | Les rappels suivent le fuseau choisi par le candidat (RG-09.4). Tous les autres écrans datent à l'heure de Cotonou (`FUSEAU_AFFICHAGE`). |
+| Connexion | Adresse électronique et mot de passe. **OAuth Google : V2.** |
+| SMS | **V2.** Les rappels partent dans l'application et par courriel. Aucune variable de fournisseur SMS n'est déclarée. |
+| Montée en gamme | Essentiel → Dossier seulement (RG-05.6). **Essentiel → Dossier Pro : V2.** |
+| Date de dépôt | La correction autonome par le candidat est **reportée**. Le recours passe par le support : le candidat signale la bonne date depuis son dossier, et un opérateur l'applique ou la refuse (RG-10.8). |
+| Partenaires | Désactivés tant qu'aucune activation conformité n'existe pour la destination (K.D, RG-13.4). Aucune offre n'apparaît sans elle, et le filtre est dans la requête. |
+
+---
+
 ## 1. Vue d'ensemble des parcours
 
 ```
@@ -144,7 +160,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 **Étapes**
 
-1. Création de compte : email + mot de passe, ou OAuth Google (NextAuth, sessions en base).
+1. Création de compte : email + mot de passe, sessions en base. *(OAuth Google : V2, hors périmètre V1.)*
 2. Vérification de l'email par lien à usage unique, validité 24 h.
 3. Reprise automatique des réponses du simulateur dans le profil — le candidat ne resaisit rien.
 4. Complément progressif du profil : téléphone (format international, indispensable au Mobile Money), diplômes, certifications, expérience.
@@ -345,7 +361,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 1. Construction de l'échéancier à rebours depuis la date cible (rentrée, prise de poste), en remontant les délais de chaque étape : équivalence de diplôme, test de langue, prise de rendez-vous consulaire, traitement du dossier.
 2. Tableau de bord : score de complétude, prochaine action, jours restants, pièces expirantes.
-3. Rappels par email et, pour les échéances critiques, par SMS.
+3. Rappels dans l'application et par email, à l'heure du fuseau choisi par le candidat. *(SMS pour les échéances critiques : V2, hors périmètre V1.)*
 4. Alerte d'incompatibilité si le calendrier ne tient plus, avec proposition de replanification.
 
 **Règles de gestion**
@@ -353,7 +369,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-09.1 : les délais utilisés proviennent de `rules.delai_traitement_jours` et `pieces_requises[].delai_obtention_jours`, jamais d'estimations codées en dur.
 - RG-09.2 : les rappels sont regroupés — un email hebdomadaire, sauf urgence à moins de 7 jours.
 - RG-09.3 : un délai réglementaire modifié déclenche un recalcul intégral de l'échéancier et une notification explicite.
-- RG-09.4 : les rappels se règlent sur le compte — activation globale, email en plus de l'alerte dans l'application, fuseau horaire (liste de villes, Cotonou par défaut), délai d'alerte de 3, 7 ou 14 jours (7 par défaut, RG-09.2). Un rappel part au plus une fois par dossier et par jour local du candidat, à partir de 8 h dans son fuseau ; la clé `echeance:<dossier>:<jour>` est unique en base. L'email n'est annoncé que si le transport est constaté opérationnel ; un courrier non accepté par le serveur n'est jamais présenté comme envoyé, il reste en attente et est repris dans la journée, puis abandonné — la notification demeure. Aucun rappel pour une échéance faite, une pièce déjà déposée, un dossier déposé, clos, abandonné ou suspendu, un compte en suppression, des rappels coupés. Aucun SMS n'est proposé tant qu'aucun fournisseur n'est branché (arbitrage S.87).
+- RG-09.4 : les rappels se règlent sur le compte — activation globale, email en plus de l'alerte dans l'application, fuseau horaire (liste de villes, Cotonou par défaut), délai d'alerte de 3, 7 ou 14 jours (7 par défaut, RG-09.2). Un rappel part au plus une fois par dossier et par jour local du candidat, à partir de 8 h dans son fuseau ; la clé `echeance:<dossier>:<jour>` est unique en base. L'email n'est annoncé que si le transport est constaté opérationnel ; un courrier non accepté par le serveur n'est jamais présenté comme envoyé, il reste en attente et est repris dans la journée, puis abandonné — la notification demeure. Aucun rappel pour une échéance faite, une pièce déjà déposée, un dossier déposé, clos, abandonné ou suspendu, un compte en suppression, des rappels coupés. Aucun SMS n'est proposé : le SMS est hors V1 (arbitrage S.87, périmètre V1 du 25/09/2026).
 
 ---
 

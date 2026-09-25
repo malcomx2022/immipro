@@ -12,6 +12,13 @@ import {
 } from "@/domain/dossiers/dossier";
 
 /**
+ * Une date civile (`AAAA-MM-JJ`) se lit en UTC, qui est le fuseau où elle
+ * a été construite : au fuseau du navigateur, elle reculait d'un jour à
+ * l'ouest de Greenwich.
+ */
+const JOUR_CIVIL = new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC" });
+
+/**
  * C-01 — Tableau de bord, présentation. WF-09.
  *
  * Séparé de la page pour la même raison que partout ailleurs ici : la page
@@ -79,7 +86,7 @@ export function TableauDeBord({ dossiers, prenom, aArbitrer }: TableauDeBordProp
                         alors elle affiche le dépôt.
                       */}
                       {dossier.depot
-                        ? ` · dépôt le ${new Intl.DateTimeFormat("fr-FR").format(new Date(dossier.depot))}`
+                        ? ` · dépôt le ${JOUR_CIVIL.format(new Date(dossier.depot))}`
                         : " · date non fixée"}
                     </span>
                   </span>

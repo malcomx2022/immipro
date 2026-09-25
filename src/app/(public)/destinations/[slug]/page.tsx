@@ -5,6 +5,10 @@ import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
 import { LISTE_VIDE, libellePieces } from "@/domain/destinations/fiche";
 import { ficheParSlugPubliee } from "@/server/lecture/destinations";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
+
+/** Au fuseau d'affichage, Cotonou : pas au fuseau du navigateur (périmètre V1). */
+const DATE_A_COTONOU = new Intl.DateTimeFormat("fr-FR", { timeZone: FUSEAU_AFFICHAGE });
 
 /**
  * P-04 — Fiche destination. WF-01, INV-8.
@@ -89,13 +93,11 @@ export default async function PageDestination({
           </p>
           <p className="text-13 text-accent-700">
             Vérifiée le{" "}
-            {new Intl.DateTimeFormat("fr-FR").format(new Date(fiche.mention.verifieeLe))}
+            {DATE_A_COTONOU.format(new Date(fiche.mention.verifieeLe))}
             {fiche.mention.relectureLe ? (
               <>
                 {" · prochaine relecture le "}
-                {new Intl.DateTimeFormat("fr-FR").format(
-                  new Date(fiche.mention.relectureLe),
-                )}
+                {DATE_A_COTONOU.format(new Date(fiche.mention.relectureLe))}
               </>
             ) : null}
           </p>

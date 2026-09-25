@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Mention } from "@/domain/destinations/fiche";
+import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
 
 /**
  * Mention de source — INV-8.
@@ -26,10 +27,17 @@ export interface SourceNoteProps extends Omit<Partial<Mention>, "verifieeLe"> {
   className?: string;
 }
 
+/**
+ * Au fuseau d'affichage, Cotonou, et non à celui du navigateur : hors des
+ * rappels, qui suivent le fuseau choisi, tout écran date à l'heure de
+ * Cotonou (périmètre V1). Une date de vérification ne change pas de jour
+ * selon l'endroit d'où on la lit.
+ */
 const FORMAT = new Intl.DateTimeFormat("fr-FR", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
+  timeZone: FUSEAU_AFFICHAGE,
 });
 
 export function SourceNote({

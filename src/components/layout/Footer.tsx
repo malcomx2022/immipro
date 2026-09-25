@@ -44,6 +44,10 @@ import { cn } from "@/lib/utils";
  * est pire qu'une colonne absente — et le lien, lui, promettait déjà ce
  * document sans l'avoir. Ce qui manque est consigné en annexe Q.
  *
+ * « Comment ça marche » est revenu le 25/09/2026 : la page existe, écrite
+ * à partir du parcours implémenté (Q.A). Les trois pages légales et le
+ * contact attendent leurs textes validés, et ne reviennent qu'avec eux.
+ *
  * « Consultants partenaires » est parti pour une autre raison : l'écran
  * existe, mais derrière la garde candidat. Un lien public qui mène à un
  * mur de connexion n'est pas un lien mort, c'est une porte close — et le
@@ -60,6 +64,7 @@ const COLONNES = [
   {
     titre: "Produit",
     liens: [
+      { href: "/comment-ca-marche", libelle: "Comment ça marche" },
       { href: "/tarifs", libelle: "Tarifs" },
       { href: "/guides", libelle: "Guides pays" },
       { href: "/articles", libelle: "Articles" },
