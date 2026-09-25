@@ -26,7 +26,7 @@ import { VALEUR_NON_LUE } from "@/domain/dossiers/analyse";
 import { MENTION_AU_CHOIX, SANS_EXIGENCE_CHIFFREE } from "@/domain/dossiers/verification";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   notFound: () => {
     throw new Error("notFound");
   },
