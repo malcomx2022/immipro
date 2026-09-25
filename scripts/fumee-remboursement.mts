@@ -10,6 +10,11 @@
  * **Aucun appel réseau, aucun virement.** Le rembourseur est injecté :
  * ce qui est vérifié, c'est l'enchaînement de la plateforme.
  *
+ * Le rail FedaPay (S.91) passe par son **vrai** adaptateur : FedaPay n'a
+ * pas d'API de remboursement, il n'y a donc rien à simuler — et surtout
+ * pas un succès. `fetch` est remplacé par un piège qui compte : un seul
+ * appel réseau sur ce rail ferait échouer la fumée.
+ *
  * La base est jetable : créée et supprimée par ce script.
  *
  *     DATABASE_URL=postgresql://…/postgres npm run smoke:remboursement
@@ -63,14 +68,19 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
-const { initierLeRemboursement, ouvrirUnRemboursement, appliquerLaNotification } = await import(
-  "../src/server/acces/paiements"
-);
+const {
+  initierLeRemboursement,
+  ouvrirUnRemboursement,
+  appliquerLaNotification,
+  declarerLeRemboursementManuel,
+} = await import("../src/server/acces/paiements");
+const { remboursementFedaPay } = await import("../src/server/paiement/fedapay");
+const { dettesFedaPay } = await import("../src/server/lecture/backoffice");
+const { EchecHttp } = await import("../src/server/http/echecs");
 const { ouvrirDuQuota, debiterUneAnalyse } = await import("../src/server/acces/quota");
 const { relancerLesRemboursements } = await import("../src/server/jobs/relances");
-const { TENTATIVES_AVANT_HUMAIN, REPOS_AVANT_RELANCE_MINUTES } = await import(
-  "../src/domain/paiement/remboursement"
-);
+const { TENTATIVES_AVANT_HUMAIN, REPOS_AVANT_RELANCE_MINUTES, A_REMBOURSER_A_LA_MAIN } =
+  await import("../src/domain/paiement/remboursement");
 type Rembourseur = import("../src/server/paiement/rembourseur").Rembourseur;
 type Remboursement = import("../src/server/paiement/rembourseur").Remboursement;
 
@@ -129,7 +139,9 @@ const TEMPORAIRE: Remboursement = { issue: "temporaire", detail: "réseau" };
 let rang = 0;
 
 /** Un candidat, son dossier, et une transaction confirmée et remboursable. */
-async function candidatPaye(options: { analyses?: number; providerTxId?: string | null } = {}) {
+async function candidatPaye(
+  options: { analyses?: number; providerTxId?: string | null; fedapay?: boolean } = {},
+) {
   rang += 1;
   const user = await db.user.create({
     data: { email: `fumee-r-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
@@ -159,15 +171,17 @@ async function candidatPaye(options: { analyses?: number; providerTxId?: string 
       userId: user.id,
       applicationId: application.id,
       packCode: "dossier",
-      amount: 29,
-      currency: "EUR",
-      provider: "STRIPE",
+      amount: options.fedapay ? 25_000 : 29,
+      currency: options.fedapay ? "XOF" : "EUR",
+      provider: options.fedapay ? "FEDAPAY" : "STRIPE",
       status: "CONFIRMEE",
       confirmedAt: new Date("2026-09-20T10:00:00.000Z"),
       // Unique en base : chaque candidat de fumée a le sien.
       providerTxId:
         options.providerTxId === undefined
-          ? `stripe:cs_${rang}_${process.pid}`
+          ? options.fedapay
+            ? `fedapay:${rang}${process.pid}`
+            : `stripe:cs_${rang}_${process.pid}`
           : options.providerTxId,
     },
   });
@@ -557,6 +571,190 @@ try {
       })
       .catch(() => null);
     verifier(second === null, "un second retrait de remboursement est refusé par la base");
+  }
+
+  // ── 11. FedaPay : une procédure manuelle, tracée (S.91) ─────────────
+  console.log("\nFedaPay : rembourser au tableau de bord, déclarer, attendre la notification");
+  {
+    /*
+      Le piège réseau. FedaPay n'expose aucune API de remboursement : ce
+      rail ne doit rien appeler, ni en initiation, ni en relance, ni en
+      déclaration. Il remplace `fetch` pour la durée du bloc.
+    */
+    const fetchDOrigine = globalThis.fetch;
+    let appelsReseau = 0;
+    globalThis.fetch = (async () => {
+      appelsReseau += 1;
+      throw new Error("aucun appel réseau n'est attendu sur le rail FedaPay");
+    }) as typeof fetch;
+
+    const code = async (geste: () => Promise<unknown>): Promise<string> => {
+      try {
+        await geste();
+        return "aucun";
+      } catch (erreur) {
+        return erreur instanceof EchecHttp ? erreur.echec.code : `inattendu: ${String(erreur)}`;
+      }
+    };
+
+    try {
+      const admin = await db.user.create({
+        data: { email: `fumee-admin-${process.pid}@exemple.test`, role: "ADMIN" },
+      });
+      const rail = remboursementFedaPay();
+
+      // a. L'initiation : droits retirés une fois, écart avec le geste à faire.
+      const { application, transaction } = await candidatPaye({ analyses: 30, fedapay: true });
+      const envoi = await initierLeRemboursement(transaction.reference, rail);
+      verifier(envoi.issue === "procedure_manuelle", `l'initiation le dit (${envoi.issue})`);
+      const initiee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+      verifier(initiee.refundAttempts === 1, "la tentative est réservée et comptée une fois");
+      verifier((await solde(application.id)) === 0, "les droits non consommés sont retirés (K.C)");
+      verifier(
+        initiee.discrepancy?.startsWith(A_REMBOURSER_A_LA_MAIN) === true,
+        "un écart dit le geste à faire au tableau de bord",
+      );
+      verifier(
+        initiee.refundRequestedAt === null && initiee.refundedAt === null,
+        "rien n'est déclaré demandé, rien n'est déclaré rendu",
+      );
+
+      // b. La passe de relance ne s'y acharne pas : un humain a la main.
+      await relancerLesRemboursements(
+        new Date(Date.now() + 10 * REPOS_AVANT_RELANCE_MINUTES * 60_000),
+        rail,
+      );
+      verifier(
+        (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } }))
+          .refundAttempts === 1,
+        "la relance ne brûle aucune tentative sur un rail sans API",
+      );
+
+      // c. La dette se voit en B-04, toutes dates confondues.
+      const visibles = await dettesFedaPay();
+      verifier(
+        visibles.some((d) => d.reference === transaction.reference && d.etape === "DECIDE"),
+        "B-04 montre la dette, décidée et non demandée",
+      );
+
+      // d. Une référence mal formée est refusée, avec son champ.
+      verifier(
+        (await code(() => declarerLeRemboursementManuel(transaction.reference, "88 41", admin.id))) ===
+          "champs_invalides",
+        "une référence mal formée est refusée",
+      );
+
+      // e. La déclaration : demandée, référencée, jamais versée.
+      const declaration = await declarerLeRemboursementManuel(transaction.reference, "8841", admin.id);
+      verifier(declaration.issue === "declaree", `la déclaration passe (${declaration.issue})`);
+      const declaree = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+      verifier(declaree.refundProviderRef === "fedapay:8841", "la référence du fournisseur est gardée");
+      verifier(declaree.refundRequestedAt !== null, "la dette passe à « demandée »");
+      verifier(
+        declaree.status === "CONFIRMEE" && declaree.refundedAt === null,
+        "mais rien n'est déclaré rendu (INV-7)",
+      );
+      verifier(
+        declaree.discrepancyOutcome === "ATTENTE_CONFIRMATION" &&
+          declaree.discrepancyResolvedBy === admin.id,
+        "l'écart se referme en attente du fournisseur, au nom de l'opérateur",
+      );
+
+      // f. Le rejeu ne réécrit rien.
+      const rejeu = await declarerLeRemboursementManuel(transaction.reference, "fedapay:8841", admin.id);
+      const apresRejeu = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+      verifier(rejeu.issue === "deja_declaree", `le rejeu est reconnu (${rejeu.issue})`);
+      verifier(
+        apresRejeu.refundRequestedAt?.getTime() === declaree.refundRequestedAt?.getTime(),
+        "et la date du premier geste reste",
+      );
+
+      // g. Une autre référence sur le même paiement : conflit, pas réécriture.
+      verifier(
+        (await code(() => declarerLeRemboursementManuel(transaction.reference, "9999", admin.id))) ===
+          "etat_incompatible",
+        "une seconde référence sur le même paiement est refusée",
+      );
+
+      // h. La même référence sur un autre paiement : l'unicité refuse.
+      const autre = await candidatPaye({ analyses: 30, fedapay: true });
+      await initierLeRemboursement(autre.transaction.reference, rail);
+      verifier(
+        (await code(() => declarerLeRemboursementManuel(autre.transaction.reference, "8841", admin.id))) ===
+          "etat_incompatible",
+        "un remboursement du fournisseur ne solde pas deux dettes",
+      );
+      verifier(
+        (await db.transaction.findUniqueOrThrow({ where: { id: autre.transaction.id } }))
+          .refundRequestedAt === null,
+        "et l'autre dette reste décidée",
+      );
+
+      // i. Deux déclarations simultanées : une seule passe.
+      const course = await Promise.allSettled([
+        declarerLeRemboursementManuel(autre.transaction.reference, "7001", admin.id),
+        declarerLeRemboursementManuel(autre.transaction.reference, "7002", admin.id),
+      ]);
+      const passees = course.filter((r) => r.status === "fulfilled").length;
+      const courue = await db.transaction.findUniqueOrThrow({ where: { id: autre.transaction.id } });
+      verifier(passees === 1, `deux clics simultanés, une seule déclaration (${passees})`);
+      verifier(
+        courue.refundProviderRef === "fedapay:7001" || courue.refundProviderRef === "fedapay:7002",
+        "et c'est la sienne qui reste",
+      );
+
+      // j. Non initiée : les droits du pack ne sont pas retirés, on refuse.
+      const brute = await candidatPaye({ analyses: 30, fedapay: true });
+      verifier(
+        (await code(() => declarerLeRemboursementManuel(brute.transaction.reference, "6001", admin.id))) ===
+          "etat_incompatible",
+        "une dette non initiée ne se déclare pas",
+      );
+      verifier((await solde(brute.application.id)) === 30, "et ses droits sont intacts");
+
+      // k. Stripe ne passe pas par ce formulaire.
+      const euro = await candidatPaye({ analyses: 30 });
+      await initierLeRemboursement(euro.transaction.reference, rembourseurSimule([TEMPORAIRE]));
+      verifier(
+        (await code(() => declarerLeRemboursementManuel(euro.transaction.reference, "5001", admin.id))) ===
+          "etat_incompatible",
+        "un paiement Stripe ne se déclare pas à la main",
+      );
+
+      // l. La base refuse une référence sans demande datée.
+      const orpheline = await db.$executeRawUnsafe(
+        `UPDATE "Transaction" SET "refundProviderRef" = 'fedapay:orpheline' WHERE id = $1`,
+        brute.transaction.id,
+      ).catch(() => null);
+      verifier(orpheline === null, "la base refuse une référence sans demande datée");
+
+      // m. Seule la notification signée solde la dette.
+      const avantNotification = await dettesFedaPay();
+      verifier(
+        avantNotification.some((d) => d.reference === transaction.reference && d.etape === "DEMANDE"),
+        "déclarée, la dette reste visible en B-04",
+      );
+      const suite = await appliquerLaNotification({
+        providerEventId: `fedapay:refunded:${process.pid}`,
+        providerTxId: declaree.providerTxId!,
+        reference: declaree.reference,
+        statut: "REMBOURSEE",
+      });
+      verifier(suite.issue !== "refusee", `la notification signée s'applique (${suite.issue})`);
+      const soldee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+      verifier(
+        soldee.status === "REMBOURSEE" && soldee.refundedAt !== null,
+        "et c'est elle qui date le versement",
+      );
+      verifier(
+        !(await dettesFedaPay()).some((d) => d.reference === transaction.reference),
+        "la dette sort de B-04 à ce moment-là, pas avant",
+      );
+
+      verifier(appelsReseau === 0, `aucun appel réseau sur le rail FedaPay (${appelsReseau})`);
+    } finally {
+      globalThis.fetch = fetchDOrigine;
+    }
   }
 } finally {
   await db.$disconnect().catch(() => {});

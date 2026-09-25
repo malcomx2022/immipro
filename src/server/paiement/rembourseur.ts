@@ -14,9 +14,9 @@
  * dette que personne n'a payée. La file des obligations se viderait
  * toute seule, ce qui est le pire des états — il a l'air sain.
  *
- * ── Cinq issues, parce qu'elles n'appellent pas la même suite ────────
+ * ── Six issues, parce qu'elles n'appellent pas la même suite ─────────
  *
- * Le détail des cinq vit dans le domaine (`IssueDeDemande`), avec ce que
+ * Le détail des six vit dans le domaine (`IssueDeDemande`), avec ce que
  * chacune implique. Ici, seule la forme : ce que l'adaptateur rend, et
  * ce qu'il a le droit de rendre. Aucune n'est une exception — un
  * fournisseur injoignable est un cas ordinaire du métier.
@@ -56,9 +56,10 @@ export interface Rembourseur {
   /**
    * L'adaptateur sait-il parler à ce fournisseur ?
    *
-   * `false` quand il est écrit mais non opérationnel — le cas de FedaPay,
-   * dont le format de remboursement n'a pas pu être vérifié. Il répond
-   * alors `non_configure` sans appeler personne.
+   * `false` quand il est écrit mais ne rembourse rien de lui-même — le
+   * cas de FedaPay, qui n'expose aucune API de remboursement. Il répond
+   * alors `procedure_manuelle` sans appeler personne, et un opérateur
+   * déclare en B-04 le remboursement fait au tableau de bord (S.91).
    *
    * C'est une déclaration, et une déclaration se dément : un test
    * l'éprouve contre le comportement des deux adaptateurs, parce qu'un

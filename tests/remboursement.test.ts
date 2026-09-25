@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { lireFedaPay, lireStripe } from "@/server/paiement/notifications";
 import { effetDeLaNotification } from "@/server/paiement/cycle";
@@ -11,6 +11,17 @@ import {
   LIBELLE_RAPPROCHEMENT,
   type Paiement,
 } from "@/domain/backoffice/reconciliation";
+import {
+  A_REMBOURSER_A_LA_MAIN,
+  MOTIF_DE_REFUS_DE_DECLARATION,
+  cleDIdempotence,
+  consigneFedaPay,
+  defautDeDeclaration,
+  lireLaReferenceDeRemboursement,
+  suiteDeLaTentative,
+} from "@/domain/paiement/remboursement";
+import { REMBOURSEMENT_NON_OPERATIONNEL, remboursementFedaPay } from "@/server/paiement/fedapay";
+import { leRembourseur } from "@/server/paiement/remboursement";
 
 /**
  * Le remboursement arrive — M.B.
@@ -204,5 +215,150 @@ describe("B-04 — un total ne mélange pas deux monnaies", () => {
       { devise: "EUR", montant: 2 },
       { devise: "XOF", montant: 1 },
     ]);
+  });
+});
+
+/**
+ * Le rail FedaPay — arbitrage S.91.
+ *
+ * FedaPay n'expose aucune API de remboursement (documentation relue le
+ * 25/09/2026) : le geste se fait à son tableau de bord, puis sa référence
+ * se déclare en B-04. Ce bloc tient ce qui ne demande pas de base ; la
+ * fumée `smoke:remboursement` tient le reste, sur une base réelle.
+ */
+describe("FedaPay — aucun appel, aucun secret, aucune promesse de versement", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const DEMANDE = {
+    reference: "IMP-260920-AAAAAA",
+    providerTxId: "fedapay:42",
+    montant: 25_000,
+    devise: "XOF",
+    cle: cleDIdempotence("IMP-260920-AAAAAA"),
+  };
+
+  it("l'adaptateur n'appelle pas le réseau et rend la procédure manuelle", async () => {
+    const appels = vi.fn();
+    vi.stubGlobal("fetch", appels);
+    const issue = await remboursementFedaPay().demander(DEMANDE);
+    expect(issue).toEqual({ issue: "procedure_manuelle", detail: REMBOURSEMENT_NON_OPERATIONNEL });
+    expect(appels).not.toHaveBeenCalled();
+  });
+
+  it("la clé d'API n'apparaît dans rien de ce qu'il rend", async () => {
+    const secret = "sk_live_NE_DOIT_JAMAIS_SORTIR";
+    vi.stubGlobal("fetch", vi.fn());
+    const rail = leRembourseur("FEDAPAY", { FEDAPAY_API_KEY: secret });
+    const issue = await rail!.demander(DEMANDE);
+    expect(JSON.stringify(issue)).not.toContain(secret);
+    expect(JSON.stringify(suiteDeLaTentative(issue.issue))).not.toContain(secret);
+  });
+
+  it("la procédure appelle un humain tout de suite, et ne vaut ni demande ni versement", () => {
+    const suite = suiteDeLaTentative("procedure_manuelle");
+    expect(suite.acceptee).toBe(false);
+    expect(suite.exigeUnHumain).toBe(true);
+    // Actionnable : où agir, quoi saisir, ce qui soldera la dette.
+    expect(suite.message).toBe(A_REMBOURSER_A_LA_MAIN);
+    expect(suite.message).toMatch(/tableau de bord FedaPay/u);
+    expect(suite.message).toMatch(/référence/u);
+    expect(suite.message).toMatch(/notification signée/u);
+  });
+
+  it("la clé d'idempotence est stable d'une reprise à l'autre", () => {
+    expect(cleDIdempotence("IMP-260920-AAAAAA")).toBe(cleDIdempotence("IMP-260920-AAAAAA"));
+    expect(cleDIdempotence("IMP-260920-AAAAAA")).not.toBe(cleDIdempotence("IMP-260920-BBBBBB"));
+  });
+});
+
+describe("FedaPay — la référence saisie par l'opérateur", () => {
+  it("se préfixe, et le même geste donne toujours la même référence", () => {
+    expect(lireLaReferenceDeRemboursement("  8841 ")).toEqual({
+      valide: true,
+      reference: "fedapay:8841",
+    });
+    // Recopiée avec son préfixe : aucun double préfixe, aucune seconde forme.
+    expect(lireLaReferenceDeRemboursement("fedapay:8841")).toEqual(
+      lireLaReferenceDeRemboursement("8841"),
+    );
+    expect(lireLaReferenceDeRemboursement("rf_A-12")).toEqual({
+      valide: true,
+      reference: "fedapay:rf_A-12",
+    });
+  });
+
+  it("vide ou mal formée, elle est refusée avec ce qu'il faut faire", () => {
+    const vide = lireLaReferenceDeRemboursement("   ");
+    expect(vide.valide).toBe(false);
+    if (!vide.valide) expect(vide.message).toMatch(/tableau de bord FedaPay/u);
+
+    for (const saisie of ["88 41", "8841;DROP", "é8841", "x".repeat(65), "-8841"]) {
+      const lue = lireLaReferenceDeRemboursement(saisie);
+      expect(lue.valide, saisie).toBe(false);
+      if (!lue.valide) expect(lue.message, saisie).toMatch(/recopie-la/u);
+    }
+  });
+});
+
+describe("FedaPay — qui peut recevoir une déclaration", () => {
+  const due = new Date("2026-09-20T09:00:00Z");
+  const base = {
+    provider: "FEDAPAY" as const,
+    refundDueAt: due,
+    refundedAt: null,
+    refundAttemptedAt: due,
+  };
+
+  it("une dette FedaPay initiée et non soldée, et elle seule", () => {
+    expect(defautDeDeclaration(base)).toBeNull();
+    expect(defautDeDeclaration({ ...base, refundDueAt: null })).toBe("sans_dette");
+    expect(defautDeDeclaration({ ...base, refundedAt: due })).toBe("deja_rendue");
+    expect(defautDeDeclaration({ ...base, provider: "STRIPE" })).toBe("autre_rail");
+    // K.C : les droits non consommés partent à l'initiation. Déclarer
+    // avant rendrait l'argent en laissant le pack utilisable.
+    expect(defautDeDeclaration({ ...base, refundAttemptedAt: null })).toBe("non_initiee");
+  });
+
+  it("chaque refus dit quoi faire", () => {
+    for (const motif of Object.values(MOTIF_DE_REFUS_DE_DECLARATION)) {
+      expect(motif.length).toBeGreaterThan(30);
+    }
+    expect(MOTIF_DE_REFUS_DE_DECLARATION.non_initiee).toMatch(/Lance d'abord le remboursement/u);
+    expect(MOTIF_DE_REFUS_DE_DECLARATION.autre_rail).toMatch(/Relancer l'envoi/u);
+  });
+
+  it("une dette déclarée reste une dette : la consigne attend la notification", () => {
+    expect(consigneFedaPay({ etape: "DEMANDE", initiee: true })).toMatch(
+      /n'est tenue pour rendue qu'à la notification signée/u,
+    );
+    expect(consigneFedaPay({ etape: "DECIDE", initiee: true })).toBe(A_REMBOURSER_A_LA_MAIN);
+    expect(consigneFedaPay({ etape: "DECIDE", initiee: false })).toMatch(/pas encore initié/u);
+  });
+});
+
+describe("FedaPay — la déclaration n'écrit jamais le versement (INV-7)", () => {
+  const source = readFileSync("src/server/acces/paiements.ts", "utf8");
+  const debut = source.indexOf("export async function declarerLeRemboursementManuel");
+  const fonction = source.slice(debut, source.indexOf("\n}\n", debut));
+
+  it("elle pose la demande et la référence, sous condition", () => {
+    expect(debut).toBeGreaterThan(-1);
+    expect(fonction).toMatch(/refundRequestedAt: null,\s*\n\s*refundProviderRef: null,/u);
+    expect(fonction).toMatch(/data: \{ refundRequestedAt: maintenant, refundProviderRef: lue\.reference \}/u);
+  });
+
+  it("ni `status` ni `refundedAt` ne sont écrits", () => {
+    const ecritures = fonction.match(/data: \{[^}]*\}/gu) ?? [];
+    expect(ecritures.length).toBeGreaterThan(0);
+    for (const e of ecritures) {
+      expect(e).not.toMatch(/refundedAt|status:/u);
+    }
+  });
+
+  it("la référence est unique en base : un remboursement ne solde pas deux dettes", () => {
+    const schema = readFileSync("prisma/schema.prisma", "utf8");
+    expect(schema).toMatch(/refundProviderRef String\?\s+@unique/u);
   });
 });

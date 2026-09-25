@@ -10294,3 +10294,38 @@ Chaque exécution échouait en une seconde, sans aucun job, sous le nom du fichi
 Les deux lignes sont corrigées, et actionlint passe sur les trois fichiers. Les fumées `smoke:montee` et `smoke:depot` entrent dans la porte de validation.
 
 Si des exécutions restent bloquées après ce correctif, la cause restante sera la facturation GitHub Actions. Elle se règle dans les paramètres du compte, pas dans le dépôt.
+
+## S.91 — Le rail de remboursement FedaPay : une procédure manuelle, tracée
+
+### Le constat
+
+La demande était d'écrire l'appel réel de remboursement FedaPay. La documentation de FedaPay, relue le 25/09/2026 dans sa version courante et dans la v1, ne décrit **aucune API de remboursement**. Le remboursement se fait au tableau de bord (bouton « Rembourser », courriel du client, motif), et **par MTN Mobile Money seulement**. La référence d'API couvre les transactions (création, lecture, mise à jour, suppression, jeton de paiement) et les dépôts (`/payouts`), et rien d'autre.
+
+Deux chemins ressemblent à un remboursement. Ils sont écartés :
+
+- `PUT /transactions/{id}` avec `status: "refunded"` : rien ne documente que cette écriture déplace de l'argent. Elle pourrait n'étiqueter que la ligne ;
+- `POST /payouts` : c'est un nouveau versement vers un numéro, sans lien avec le paiement d'origine et sans idempotence documentée. Une reprise pourrait payer deux fois. C'est une autre décision métier.
+
+### La décision
+
+Le rail FedaPay devient une **procédure manuelle tracée en B-04**. La capacité `remboursement` reste « non branchée » : rien d'automatique ne rembourse sur ce rail.
+
+1. **Initiation** : elle est inchangée (K.C). La tentative est réservée, puis les droits non consommés sont retirés une seule fois. Ensuite, l'adaptateur rend la nouvelle issue `procedure_manuelle`, sans aucun appel réseau et sans clé. L'issue exige un humain : un écart s'ouvre avec le geste à faire (`A_REMBOURSER_A_LA_MAIN`), et la passe de relance ne s'acharne pas.
+2. **B-04** : la section « Remboursements FedaPay à faire au tableau de bord » liste toutes les dettes FedaPay ouvertes, **toutes dates confondues**. Le tableau du jour ne montrait pas une dette née la semaine précédente.
+3. **Déclaration** : l'opérateur saisit la référence du remboursement que le tableau de bord affiche. Elle est stockée préfixée (`fedapay:…`) dans `Transaction.refundProviderRef` et pose `refundRequestedAt`. **Ni `status`, ni `refundedAt`** : la dette reste due et visible.
+4. **Solde** : il ne vient que de la notification signée `refunded` de FedaPay (INV-7).
+
+### Pas de double remboursement
+
+- L'écriture est conditionnée à `refundRequestedAt IS NULL` : de deux clics simultanés, un seul passe.
+- La même référence redite est un rejeu : rien ne change, et le journal n'est pas écrit deux fois.
+- Une autre référence sur un paiement déjà déclaré est refusée, avec ce qu'il faut vérifier chez FedaPay.
+- `refundProviderRef` est **unique** en base : un remboursement du fournisseur ne solde pas deux dettes.
+- Une contrainte `CHECK` refuse une référence sans demande datée.
+- Une dette non initiée ne se déclare pas : ses droits n'ont pas été retirés (K.C). Un pack entamé, en revue manuelle, se tranche d'abord dans la file des écarts.
+
+La déclaration est journalisée (`paiement.remboursement.manuel`) avec la référence du fournisseur. Aucune clé n'y figure : ni la route ni l'adaptateur n'en manipulent.
+
+### Vérifications
+
+`tests/remboursement.test.ts` (adaptateur sans réseau ni secret, référence, conditions, INV-7), `tests/ui/remboursements-fedapay.test.tsx` (états vide, envoi, refus, déclarée, non initiée), `smoke:remboursement` bloc 11. Ce bloc passe par le vrai adaptateur, avec `fetch` piégé : zéro appel réseau. Rien n'y simule un succès du fournisseur.

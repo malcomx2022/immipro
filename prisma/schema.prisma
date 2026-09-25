@@ -599,6 +599,14 @@ model Transaction {
   /// seule sa notification signée fait passer la transaction à
   /// `REMBOURSEE` (INV-7).
   refundRequestedAt DateTime?
+  /// La référence du remboursement chez le fournisseur — arbitrage S.91.
+  ///
+  /// Posée aujourd'hui par une seule main : la déclaration d'un
+  /// remboursement FedaPay fait au tableau de bord (FedaPay n'a pas d'API
+  /// de remboursement). Préfixée (`fedapay:…`) et unique : un même
+  /// remboursement du fournisseur ne peut pas solder deux dettes. Elle
+  /// accompagne `refundRequestedAt`, elle ne vaut pas versement (INV-7).
+  refundProviderRef String?   @unique
   /// La dernière tentative, réussie ou non — une dette dont l'envoi
   /// échoue reste une dette, et il faut savoir depuis quand on essaie.
   refundAttemptedAt DateTime?

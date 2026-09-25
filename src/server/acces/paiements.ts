@@ -5,10 +5,14 @@ import { miseEnEtat } from "@/domain/dossiers/etat";
 import { echec } from "@/server/http/echecs";
 import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
 import {
+  A_REMBOURSER_A_LA_MAIN,
+  MOTIF_DE_REFUS_DE_DECLARATION,
   MOTIF_IDENTIFIANT,
   MOTIF_REVUE_PARTIELLE,
   cleDIdempotence,
+  defautDeDeclaration,
   defautDIdentifiant,
+  lireLaReferenceDeRemboursement,
   suiteDeLaTentative,
   suiteDuQuota,
   type IssueDeDemande,
@@ -913,6 +917,136 @@ export async function initierLeRemboursement(
     await noterLEcart(transaction.id, `${suite.message} (${reponse.detail})`);
   }
   return { issue: reponse.issue, detail: reponse.detail };
+}
+
+/**
+ * Déclarer un remboursement FedaPay fait au tableau de bord — arbitrage S.91.
+ *
+ * FedaPay n'a pas d'API de remboursement : l'initiation sur ce rail rend
+ * `procedure_manuelle` et ouvre un écart qui dit le geste à faire. Ce qui
+ * suit enregistre le geste une fois fait.
+ *
+ * ── Ce que la déclaration écrit, et ce qu'elle n'écrit pas ───────────
+ *
+ * Elle pose `refundRequestedAt` et la référence du fournisseur : la dette
+ * passe de « décidée » à « demandée ». Elle **n'écrit ni `status` ni
+ * `refundedAt`** : un opérateur qui dit avoir cliqué « Rembourser » ne
+ * prouve pas que l'argent est parti — FedaPay peut encore échouer à
+ * verser. Seule sa notification signée `refunded` solde la dette (INV-7),
+ * et d'ici là elle reste visible en B-04.
+ *
+ * ── Pas de double déclaration ────────────────────────────────────────
+ *
+ * - l'écriture est **conditionnée** à `refundRequestedAt: null` : deux
+ *   clics simultanés, un seul passe ;
+ * - la même référence redite sur la même transaction est un **rejeu** :
+ *   rien ne change, la réponse le dit ;
+ * - une autre référence sur une transaction déjà déclarée est un
+ *   **conflit** : on ne réécrit pas le premier geste, qui est celui que
+ *   FedaPay confirmera ;
+ * - une référence déjà portée par une autre transaction est refusée par
+ *   l'index unique : un remboursement du fournisseur ne solde pas deux
+ *   dettes.
+ *
+ * L'écart ouvert par la procédure se referme avec la déclaration, sur
+ * l'issue « en attente d'une nouvelle confirmation du fournisseur » —
+ * l'écart se referme, la vigilance non. Un autre écart, rédigé par
+ * quelqu'un d'autre, n'est pas touché.
+ */
+export type IssueDeDeclaration = "declaree" | "deja_declaree";
+
+export async function declarerLeRemboursementManuel(
+  reference: string,
+  saisie: string,
+  acteurId: string,
+  maintenant = new Date(),
+): Promise<{ issue: IssueDeDeclaration; referenceFournisseur: string }> {
+  const lue = lireLaReferenceDeRemboursement(saisie);
+  if (!lue.valide) {
+    throw echec("champs_invalides", { champs: { referenceFournisseur: lue.message } });
+  }
+
+  const transaction = await db.transaction.findUnique({
+    where: { reference },
+    select: {
+      id: true,
+      provider: true,
+      refundDueAt: true,
+      refundedAt: true,
+      refundAttemptedAt: true,
+      refundRequestedAt: true,
+      refundProviderRef: true,
+    },
+  });
+  if (!transaction) throw echec("paiement_introuvable");
+
+  const defaut = defautDeDeclaration(transaction);
+  if (defaut) {
+    throw echec("etat_incompatible", {
+      corps: `Aucune déclaration possible : ${MOTIF_DE_REFUS_DE_DECLARATION[defaut]}.`,
+    });
+  }
+
+  // Déjà déclarée : la même référence est un rejeu, une autre un conflit.
+  if (transaction.refundRequestedAt !== null) {
+    if (transaction.refundProviderRef === lue.reference) {
+      return { issue: "deja_declaree", referenceFournisseur: lue.reference };
+    }
+    throw echec("etat_incompatible", {
+      corps: transaction.refundProviderRef
+        ? `Un remboursement est déjà déclaré sur ce paiement, sous la référence ${transaction.refundProviderRef}. Vérifie au tableau de bord FedaPay lequel est le bon : si c'est un second remboursement, il faut le faire annuler chez FedaPay, pas le déclarer.`
+        : "Une demande de remboursement est déjà partie pour ce paiement. Attends la notification de FedaPay avant de déclarer quoi que ce soit.",
+    });
+  }
+
+  let ecrites: number;
+  try {
+    ({ count: ecrites } = await db.transaction.updateMany({
+      where: {
+        id: transaction.id,
+        refundedAt: null,
+        refundRequestedAt: null,
+        refundProviderRef: null,
+      },
+      data: { refundRequestedAt: maintenant, refundProviderRef: lue.reference },
+    }));
+  } catch (erreur) {
+    if (!estUnDoublon(erreur)) throw erreur;
+    throw echec("etat_incompatible", {
+      corps: `La référence ${lue.reference} est déjà déclarée sur un autre paiement. Vérifie au tableau de bord FedaPay la transaction que ce remboursement concerne.`,
+    });
+  }
+
+  if (ecrites !== 1) {
+    // Un autre clic est passé entre la lecture et l'écriture : on relit
+    // ce qu'il a écrit pour dire rejeu ou conflit, sans rien réécrire.
+    const relue = await db.transaction.findUnique({
+      where: { id: transaction.id },
+      select: { refundProviderRef: true },
+    });
+    if (relue?.refundProviderRef === lue.reference) {
+      return { issue: "deja_declaree", referenceFournisseur: lue.reference };
+    }
+    throw echec("etat_incompatible", {
+      corps: "Ce paiement vient de changer d'état pendant ta saisie. Recharge la page et vérifie ce qui a été déclaré.",
+    });
+  }
+
+  await db.transaction.updateMany({
+    where: {
+      id: transaction.id,
+      discrepancyResolvedAt: null,
+      discrepancy: { startsWith: A_REMBOURSER_A_LA_MAIN },
+    },
+    data: {
+      discrepancyResolvedAt: maintenant,
+      discrepancyOutcome: "ATTENTE_CONFIRMATION",
+      discrepancyNote: `Remboursé au tableau de bord FedaPay, référence ${lue.reference}. La dette reste due jusqu'à la notification signée de FedaPay.`,
+      discrepancyResolvedBy: acteurId,
+    },
+  });
+
+  return { issue: "declaree", referenceFournisseur: lue.reference };
 }
 
 /**
