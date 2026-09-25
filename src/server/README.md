@@ -405,6 +405,8 @@ traite son absence plutôt que de faire semblant :
 | Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée. Sur FedaPay, sans API de remboursement, l'initiation ouvre un écart avec le geste à faire au tableau de bord, et l'opérateur déclare la référence en B-04 (S.91) |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
 
+Extraction et rédaction ne parlent aujourd'hui qu'à Anthropic (`ANTHROPIC_API_KEY`). Les contrats `Extracteur`, `Redacteur` et `Critique` sont neutres ; seuls les adaptateurs sont liés au SDK. Le plan pour proposer d'autres fournisseurs, et ce qu'il faut trancher avant, est dans [`docs/IA-fournisseurs.md`](../../docs/IA-fournisseurs.md) (S.94, à arbitrer).
+
 ### La lecture d'une pièce, et ce qu'elle ne décide pas
 
 Branchée le 22/09/2026, sur `ANTHROPIC_API_KEY`. Trois choses la tiennent.
