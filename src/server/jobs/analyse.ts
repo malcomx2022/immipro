@@ -257,6 +257,7 @@ export async function analyserUnePiece(
     `analyse:${document.code}`,
     lu.jetonsEntree,
     lu.jetonsSortie,
+    lu.appel,
   );
 
   if (lu.etat === "NON_LUE") {

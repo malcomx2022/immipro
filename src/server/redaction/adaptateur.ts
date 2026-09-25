@@ -45,21 +45,29 @@ import {
 } from "@/domain/redaction/commande";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import { leClient } from "@/lib/ai";
+import type { AppelMesure } from "@/server/ia/appel";
 
 /** Ce qu'une mise en forme rend, dans les deux cas. Les jetons sont toujours là. */
-export type Redaction =
+export type Redaction = (
   | { etat: "ECRITE"; texte: string; jetonsEntree: number; jetonsSortie: number }
-  | { etat: "SANS_TEXTE"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number };
+  | { etat: "SANS_TEXTE"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number }
+) & {
+  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
+  appel?: AppelMesure;
+};
 
-/** Ce qu'une relecture rend. `remarques: []` est un résultat, pas une absence. */
-export type Relecture =
+export type Relecture = (
   | {
       etat: "RELUE";
       remarques: readonly RemarqueProduite[];
       jetonsEntree: number;
       jetonsSortie: number;
     }
-  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number };
+  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number }
+) & {
+  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
+  appel?: AppelMesure;
+};
 
 export type Redacteur = (matiere: MatiereDeLaPiece) => Promise<Redaction>;
 export type Critique = (texte: string, matiere: MatiereDeLaPiece) => Promise<Relecture>;
@@ -71,10 +79,18 @@ const sansJetons = <E extends "SANS_TEXTE" | "SANS_AVIS">(
 ) => ({ etat, cause, detail, jetonsEntree: 0, jetonsSortie: 0 }) as const;
 
 export const REDACTEUR_NON_BRANCHE: Redacteur = async () =>
-  sansJetons("SANS_TEXTE", "non_configure", "ANTHROPIC_API_KEY est vide dans cet environnement");
+  sansJetons(
+    "SANS_TEXTE",
+    "non_configure",
+    "aucun fournisseur de rédaction n'est branché dans cet environnement : l'écran Coûts IA dit ce qui manque",
+  );
 
 export const CRITIQUE_NON_BRANCHEE: Critique = async () =>
-  sansJetons("SANS_AVIS", "non_configure", "ANTHROPIC_API_KEY est vide dans cet environnement");
+  sansJetons(
+    "SANS_AVIS",
+    "non_configure",
+    "aucun fournisseur de rédaction n'est branché dans cet environnement : l'écran Coûts IA dit ce qui manque",
+  );
 
 /**
  * La classification des erreurs du SDK et la lecture du texte rendu
@@ -130,12 +146,14 @@ export const redacteurClaude =
 
     const jetonsEntree = message.usage.input_tokens;
     const jetonsSortie = message.usage.output_tokens;
+    const appel: AppelMesure = { fournisseur: "anthropic", modele };
     const echoue = (cause: CauseDAppel, detail: string): Redaction => ({
       etat: "SANS_TEXTE",
       cause,
       detail,
       jetonsEntree,
       jetonsSortie,
+      appel,
     });
 
     if (message.stop_reason === "refusal") {
@@ -157,7 +175,7 @@ export const redacteurClaude =
       return echoue("reponse_illisible", "le texte rendu est trop court pour être une version");
     }
 
-    return { etat: "ECRITE", texte, jetonsEntree, jetonsSortie };
+    return { etat: "ECRITE", texte, jetonsEntree, jetonsSortie, appel };
   };
 
 /* ------------------------------------------------------------------ *
@@ -185,12 +203,14 @@ export const critiqueClaude =
 
     const jetonsEntree = message.usage.input_tokens;
     const jetonsSortie = message.usage.output_tokens;
+    const appel: AppelMesure = { fournisseur: "anthropic", modele };
     const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
       etat: "SANS_AVIS",
       cause,
       detail,
       jetonsEntree,
       jetonsSortie,
+      appel,
     });
 
     if (message.stop_reason === "refusal") {
@@ -212,5 +232,5 @@ export const critiqueClaude =
       return echoue(relue.cause, "la réponse n'a pas la forme annoncée au schéma");
     }
 
-    return { etat: "RELUE", remarques: relue, jetonsEntree, jetonsSortie };
+    return { etat: "RELUE", remarques: relue, jetonsEntree, jetonsSortie, appel };
   };

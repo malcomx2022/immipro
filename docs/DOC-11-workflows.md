@@ -47,6 +47,7 @@ Ce qui suit l'emporte sur toute étape de ce document qui le contredirait. Une c
 | Montée en gamme | Essentiel → Dossier seulement (RG-05.6). **Essentiel → Dossier Pro : V2.** |
 | Date de dépôt | La correction autonome par le candidat est **reportée**. Le recours passe par le support : le candidat signale la bonne date depuis son dossier, et un opérateur l'applique ou la refuse (RG-10.8). |
 | Partenaires | Désactivés tant qu'aucune activation conformité n'existe pour la destination (K.D, RG-13.4). Aucune offre n'apparaît sans elle, et le filtre est dans la requête. |
+| Fournisseur d'IA | Choisi par l'exploitant, par fonction (lecture des pièces, rédaction et relecture) : Anthropic par défaut, ou toute API compatible OpenAI. Les pièces d'identité ne partent chez un autre sous-traitant qu'Anthropic que sur autorisation écrite. Aucune bascule automatique (S.94, RG-06.7, RG-08.6). |
 
 ---
 
@@ -284,6 +285,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-06.4 : les URLs MinIO présignées ont une durée de vie de 5 minutes et sont générées à la demande.
 - RG-06.5 : quota épuisé → dégradation gracieuse, proposition du pack supérieur, jamais de dépassement silencieux (INV-6).
 - RG-06.6 : les pièces à durée de validité limitée (relevés bancaires, extraits de casier) portent une date de péremption et basculent en `EXPIREE` automatiquement.
+- RG-06.7 : le fournisseur de la lecture automatique est choisi par l'exploitant (`AI_FOURNISSEUR_EXTRACTION`) : Anthropic par défaut, ou une API compatible OpenAI. Une pièce d'identité ne part chez un autre sous-traitant qu'Anthropic que si `AI_PIECES_SOUS_TRAITANT_AUTORISE` porte son code, posée une fois la sous-traitance validée ; sans elle, la lecture n'est pas branchée et la pièce part en revue humaine, analyse recréditée. Un PDF n'est envoyé qu'à un fournisseur déclaré lecteur de PDF ; sinon, revue humaine. Chaque appel consigne son fournisseur et son modèle, et son coût se calcule au tarif de ce fournisseur. Le quota des packs reste compté en jetons (arbitrage S.94).
 
 **Cas limites**
 
@@ -348,6 +350,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-08.3 : cohérence croisée obligatoire — si la lettre mentionne un financement familial et que le relevé est au nom du candidat, l'incohérence est signalée.
 - RG-08.4 : chaque itération débite le quota de tokens ; le compteur restant est visible en permanence.
 - RG-08.5 : la rédaction assistée — proposition de texte à partir des réponses, reformulation, analyse critique, recoupements qui exigent la lecture automatique de pièces — est un droit des packs Dossier et Dossier Pro, dérivé de la couverture attribuée au dossier et jamais du dernier pack acheté par le compte. Une recharge d'analyses ne l'ouvre pas. Tous les packs gardent l'entretien guidé, l'écriture et la réécriture manuelles, les versions, les exports et les recoupements déterministes. Un refus ne perd jamais les réponses, le texte ni les versions (arbitrage S.80).
+- RG-08.6 : le fournisseur de la mise en forme et de la relecture est choisi par l'exploitant (`AI_FOURNISSEUR_REDACTION`) : Anthropic par défaut, ou une API compatible OpenAI. Les consignes, le schéma de la relecture et la lecture des réponses sont les mêmes quel que soit le fournisseur ; une réponse hors schéma, coupée ou refusée ne produit ni version ni avis. Aucune bascule automatique vers un autre fournisseur (arbitrage S.94).
 
 ---
 

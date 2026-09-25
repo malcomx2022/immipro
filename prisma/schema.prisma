@@ -686,6 +686,11 @@ model AiUsage {
   applicationId String?
   application   Application? @relation(fields: [applicationId], references: [id])
   operation     String
+  /// Le fournisseur appelé, et le modèle — S.94. Nuls sur les lignes
+  /// écrites avant : il n'y avait qu'Anthropic, et l'historique se lit
+  /// ainsi sans être réécrit (`fournisseurDeLUsage`).
+  provider      String?
+  model         String?
   inputTokens   Int
   outputTokens  Int
   costMicros    Int

@@ -116,6 +116,7 @@ export const POST = route({
       `relecture:${piece.type}`,
       avis.jetonsEntree,
       avis.jetonsSortie,
+      avis.appel,
     );
 
     if (avis.etat === "SANS_AVIS") {

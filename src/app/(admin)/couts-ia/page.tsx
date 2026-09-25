@@ -6,9 +6,18 @@ import {
   mesureDepuisLesLignes,
   metriquesMesurees,
   serieQuotidienne,
-  tarifDepuisEnvironnement,
 } from "@/domain/backoffice/couts";
-import { consommationParJour, coutsParDossier } from "@/server/lecture/backoffice";
+import {
+  consommationParFournisseur,
+  consommationParJour,
+  coutsParDossier,
+} from "@/server/lecture/backoffice";
+import {
+  deviseCommune,
+  etatDesFonctions,
+  fournisseursATarifer,
+  tarifDu,
+} from "@/domain/ia/fournisseurs";
 import { exigerAdmin } from "@/server/securite/page";
 import { jourCivil } from "@/domain/format/fuseau";
 
@@ -38,21 +47,33 @@ export const metadata: Metadata = {
 export default async function PageCoutsIa() {
   await exigerAdmin("/couts-ia");
 
-  const tarif = tarifDepuisEnvironnement(process.env);
+  /*
+    Un tarif par fournisseur (S.94). Les totaux ne se calculent que si
+    chaque fournisseur qui a servi a le sien, et dans la même devise :
+    sinon l'écran dit que les coûts attendent un tarif, comme avant.
+  */
+  const tarifs = (fournisseur: Parameters<typeof tarifDu>[1]) => tarifDu(process.env, fournisseur);
   const aujourdhui = new Date();
   const depuis = new Date(aujourdhui.getTime() - (FENETRE_JOURS - 1) * 86_400_000);
 
-  const [lignes, relevees] = await Promise.all([
-    coutsParDossier(tarif),
+  const [lignes, relevees, parFournisseur] = await Promise.all([
+    coutsParDossier(tarifs),
     consommationParJour(depuis),
+    consommationParFournisseur(tarifs),
   ]);
+  const devise = deviseCommune(
+    process.env,
+    fournisseursATarifer(process.env, parFournisseur.map((l) => l.fournisseur)),
+  );
 
   return (
     <CoutsIa
-      metriques={metriquesMesurees(mesureDepuisLesLignes(lignes, tarif?.devise ?? null))}
+      metriques={metriquesMesurees(mesureDepuisLesLignes(lignes, devise))}
       serie={serieQuotidienne(relevees, jourCivil(aujourdhui), FENETRE_JOURS)}
       candidats={candidatsAuDepassement(lignes)}
-      tarife={tarif !== null}
+      tarife={devise !== null}
+      fonctions={etatDesFonctions(process.env)}
+      parFournisseur={parFournisseur}
     />
   );
 }

@@ -51,16 +51,25 @@ import {
   type DemandeDeLecture,
 } from "@/domain/dossiers/extraction";
 import type { ChampsExtraits } from "@/domain/dossiers/verification";
-import { leClient, modeleConfigure } from "@/lib/ai";
+import { leClient } from "@/lib/ai";
+import type { AppelMesure } from "@/server/ia/appel";
+import { lireDesOctetsCompatible, type ConfigurationCompatible } from "@/server/ia/openai-compatible";
+import {
+  FOURNISSEURS,
+  adresseDeBase,
+  fournisseurChoisi,
+  litLesPdf,
+  manqueDuFournisseur,
+  modeleDu,
+  piecesAutoriseesChez,
+} from "@/domain/ia/fournisseurs";
 import { lireUnePiece, tailleDUnePiece } from "@/lib/storage";
 
 /** Ce qu'une lecture rend, dans les deux cas. Les jetons sont toujours là. */
-export type Lecture =
+export type Lecture = (
   | {
       etat: "LUE";
-      /** Les faits bruts, sous les codes demandés. Jamais une mesure. */
       bruts: ChampsExtraits;
-      /** La pièce que le modèle reconnaît, choisie dans la checklist. */
       pieceIdentifiee: string | null;
       jetonsEntree: number;
       jetonsSortie: number;
@@ -68,13 +77,15 @@ export type Lecture =
   | {
       etat: "NON_LUE";
       cause: CauseDeNonLecture;
-      /** La forme de ce qui s'est passé. Jamais une clé, jamais un extrait. */
       detail: string;
       jetonsEntree: number;
       jetonsSortie: number;
-    };
+    }
+) & {
+  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
+  appel?: AppelMesure;
+};
 
-/** Ce dont l'adaptateur a besoin pour appeler : la pièce, et ce qu'on y cherche. */
 export interface Piece {
   objectKey: string;
   mimeType: string | null;
@@ -96,10 +107,14 @@ const sansJetons = (cause: CauseDeNonLecture, detail: string): Lecture => ({
 });
 
 export const EXTRACTEUR_NON_BRANCHE: Extracteur = async () =>
-  sansJetons("non_configure", "ANTHROPIC_API_KEY est vide dans cet environnement");
+  sansJetons(
+    "non_configure",
+    "aucun fournisseur de lecture n'est branché dans cet environnement : l'écran Coûts IA dit ce qui manque",
+  );
 
 /** La clé sans laquelle la lecture n'existe pas. Voir `DEPENDANCES`. */
-export const VARIABLES = ["ANTHROPIC_API_KEY"] as const;
+/** Les variables du fournisseur par défaut ; celles du fournisseur choisi se lisent dans `domain/ia/fournisseurs.ts`. */
+export const VARIABLES = FOURNISSEURS.anthropic.variables;
 
 /**
  * Lit la pièce, sous plafond.
@@ -206,12 +221,14 @@ export async function lireDesOctets(
 
   const jetonsEntree = message.usage.input_tokens;
   const jetonsSortie = message.usage.output_tokens;
+  const appel: AppelMesure = { fournisseur: "anthropic", modele };
   const echoue = (cause: CauseDeNonLecture, detail: string): Lecture => ({
     etat: "NON_LUE",
     cause,
     detail,
     jetonsEntree,
     jetonsSortie,
+    appel,
   });
 
   /*
@@ -248,12 +265,24 @@ export async function lireDesOctets(
     pieceIdentifiee: relue.pieceIdentifiee,
     jetonsEntree,
     jetonsSortie,
+    appel,
   };
 }
 
 /** L'adaptateur complet : du stockage à la lecture. */
-export const extracteurClaude =
-  (cle: string, modele: string): Extracteur =>
+/**
+ * Ce que tout lecteur partage, quel que soit le fournisseur — S.94 : le
+ * type, la taille, la lecture du stockage de confiance. Seul l'envoi des
+ * octets change d'un fournisseur à l'autre.
+ */
+type LecteurDOctets = (
+  type: keyof typeof TYPES_LISIBLES,
+  octets: Buffer,
+  demande: DemandeDeLecture,
+) => Promise<Lecture>;
+
+export const extracteurAvec =
+  (lecteur: LecteurDOctets): Extracteur =>
   async (piece: Piece, demande: DemandeDeLecture): Promise<Lecture> => {
     if (!typeLisible(piece.mimeType)) {
       return sansJetons("type_non_lisible", `type déposé : ${piece.mimeType ?? "aucun"}`);
@@ -287,7 +316,7 @@ export const extracteurClaude =
       return sansJetons("objet_absent", "la lecture du stockage de confiance a échoué");
     }
 
-    return lireDesOctets(cle, modele, piece.mimeType, octets, demande);
+    return lecteur(piece.mimeType, octets, demande);
   };
 
 /**
@@ -298,12 +327,45 @@ export const extracteurClaude =
  * un adaptateur existe, sans qu'aucune déclaration puisse survivre au
  * code qu'elle décrit.
  */
+export const extracteurClaude = (cle: string, modele: string): Extracteur =>
+  extracteurAvec((type, octets, demande) => lireDesOctets(cle, modele, type, octets, demande));
+
+/**
+ * L'extracteur que l'environnement désigne — S.94.
+ *
+ * Le fournisseur est celui de `AI_FOURNISSEUR_EXTRACTION` (Anthropic par
+ * défaut). Tout ce qui empêche un appel rend **la même** fonction non
+ * branchée — clé absente, fournisseur inconnu, pièces non autorisées chez
+ * ce sous-traitant — : l'état de service la reconnaît par identité, et
+ * l'écran Coûts IA dit laquelle des raisons tient.
+ */
 export const lExtracteur = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,
 ): Extracteur => {
-  const cle = (environnement.ANTHROPIC_API_KEY ?? "").trim();
-  return cle === "" ? EXTRACTEUR_NON_BRANCHE : extracteurClaude(cle, modeleConfigure(environnement));
+  const choix = fournisseurChoisi(environnement, "extraction");
+  if (!choix.connu) return EXTRACTEUR_NON_BRANCHE;
+  const code = choix.fournisseur;
+  if (manqueDuFournisseur(environnement, code) !== null) return EXTRACTEUR_NON_BRANCHE;
+  if (!piecesAutoriseesChez(environnement, code)) return EXTRACTEUR_NON_BRANCHE;
+
+  if (code === "anthropic") {
+    const cle = (environnement[FOURNISSEURS.anthropic.variables[0]!] ?? "").trim();
+    return extracteurClaude(cle, modeleDu(environnement, code)!);
+  }
+  const config = configurationCompatible(environnement);
+  return config ? extracteurAvec((type, octets, demande) => lireDesOctetsCompatible(config, type, octets, demande)) : EXTRACTEUR_NON_BRANCHE;
 };
+
+/** La configuration du fournisseur compatible OpenAI, ou `null` si elle est incomplète. */
+export function configurationCompatible(
+  environnement: Readonly<Record<string, string | undefined>>,
+): ConfigurationCompatible | null {
+  const base = adresseDeBase((environnement.AI_OPENAI_URL ?? "").trim());
+  const cle = (environnement.AI_OPENAI_API_KEY ?? "").trim();
+  const modele = modeleDu(environnement, "openai_compatible");
+  if (!base || cle === "" || !modele) return null;
+  return { base, cle, modele, pdf: litLesPdf(environnement, "openai_compatible") };
+}
 
 export const extractionConfiguree = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,

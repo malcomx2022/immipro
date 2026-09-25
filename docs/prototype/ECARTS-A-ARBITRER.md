@@ -10425,3 +10425,22 @@ Le détail est dans `docs/IA-fournisseurs.md`.
 5. le jeu d'évaluation et son seuil.
 
 **Rien n'est implémenté.** En V1, Anthropic reste le seul fournisseur.
+
+### S.94 — suite (26/09/2026) : implémenté
+
+La demande est d'implémenter de bout en bout, en front comme en back. Les options recommandées sont retenues :
+
+- **Choix par configuration**, un fournisseur par fonction : `AI_FOURNISSEUR_EXTRACTION`, `AI_FOURNISSEUR_REDACTION`, Anthropic par défaut.
+- **Un second adaptateur** « compatible OpenAI » (`src/server/ia/openai-compatible.ts`, sans SDK). Il sert OpenAI, Mistral, Gemini ou un serveur local. Le produit ne devine aucun modèle.
+- **Garde des pièces.** Chez un autre sous-traitant qu'Anthropic, la lecture n'est branchée que si `AI_PIECES_SOUS_TRAITANT_AUTORISE` porte son code. La variable se pose une fois la conformité tranchée ; sans elle, les pièces partent en revue humaine.
+- **PDF.** Envoyé seulement à un fournisseur déclaré lecteur de PDF (`AI_OPENAI_PDF=oui`).
+- **Pas de bascule automatique.** Un fournisseur en panne rend sa cause, sans repli sur un autre.
+- **Quota en jetons** (option a).
+- **Traçabilité et coûts.** `AiUsage.provider` et `model` (migration, l'historique n'est pas réécrit), tarif par fournisseur. B-07 affiche une section « Fournisseurs d'IA » : état par fonction, raison actionnable, consommation par fournisseur.
+- **Règles et documentation.** RG-06.7 et RG-08.6 sont ajoutées dans DOC-11, avec une ligne dans le périmètre V1. Le §9 de `docs/IA-fournisseurs.md` détaille la procédure d'activation.
+
+**Reste hors code.**
+
+1. La décision de conformité, et le texte de `/donnees-personnelles`.
+2. Le jeu d'évaluation des pièces.
+3. Le repli explicite pour la rédaction, qui n'est pas implémenté.

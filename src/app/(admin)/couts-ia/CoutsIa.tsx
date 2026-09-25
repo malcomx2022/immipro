@@ -24,6 +24,13 @@ import {
   type Metrique,
 } from "@/domain/backoffice/couts";
 import { jourEnFrancais } from "@/domain/format/moment";
+import {
+  FOURNISSEURS,
+  MENTION_CHOIX_DU_FOURNISSEUR,
+  MENTION_QUOTA_EN_JETONS,
+  type ConsommationDuFournisseur,
+  type EtatDeLaFonction,
+} from "@/domain/ia/fournisseurs";
 
 /**
  * B-07 — Supervision des coûts IA, présentation. WF-16.
@@ -58,9 +65,20 @@ export interface CoutsIaProps {
   candidats: readonly Depassement[];
   /** Un tarif de jeton est configuré. Sans lui, aucun coût n'est calculable. */
   tarife: boolean;
+  /** Le fournisseur de chaque fonction, et ce qui manque pour l'appeler (S.94). */
+  fonctions?: readonly EtatDeLaFonction[];
+  /** La consommation par fournisseur et par modèle (S.94). */
+  parFournisseur?: readonly ConsommationDuFournisseur[];
 }
 
-export function CoutsIa({ metriques, serie, candidats, tarife }: CoutsIaProps) {
+export function CoutsIa({
+  metriques,
+  serie,
+  candidats,
+  tarife,
+  fonctions = [],
+  parFournisseur = [],
+}: CoutsIaProps) {
   const vide = aucuneMesure(metriques);
   const sansAppel = serieVide(serie);
   /*
@@ -99,6 +117,8 @@ export function CoutsIa({ metriques, serie, candidats, tarife }: CoutsIaProps) {
             </p>
           </section>
         )}
+
+        <FournisseursIA fonctions={fonctions} parFournisseur={parFournisseur} />
 
         <div className="grid grid-cols-5 gap-3">
           {metriques.map((m) => (
@@ -254,5 +274,114 @@ function Histogramme({ serie }: { serie: readonly Journee[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+const NOMBRE = new Intl.NumberFormat("fr-FR");
+const MONTANT = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 });
+
+/**
+ * Les fournisseurs d'IA — S.94.
+ *
+ * Deux questions, dans l'ordre où un exploitant se les pose : qui sert
+ * chaque fonction, et est-ce branché — la raison dite comme une action
+ * quand ce ne l'est pas ; puis ce que chacun a consommé. Le choix ne se
+ * fait pas ici : il se fait par configuration, et l'écran le dit.
+ */
+function FournisseursIA({
+  fonctions,
+  parFournisseur,
+}: {
+  fonctions: readonly EtatDeLaFonction[];
+  parFournisseur: readonly ConsommationDuFournisseur[];
+}) {
+  return (
+    <section
+      aria-labelledby="fournisseurs-ia"
+      className="flex flex-col gap-4 rounded-lg border border-ink-300 bg-white p-5"
+    >
+      <div className="flex flex-col gap-1">
+        <h2 id="fournisseurs-ia" className="text-16 font-semibold text-ink-900">
+          Fournisseurs d&apos;IA
+        </h2>
+        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+          {MENTION_CHOIX_DU_FOURNISSEUR}
+        </p>
+      </div>
+
+      <dl className="flex flex-col">
+        {fonctions.map((f) => (
+          <div
+            key={f.fonction}
+            className="flex flex-col gap-1 border-t border-ink-300 py-2.5 md:flex-row md:items-baseline md:justify-between md:gap-6"
+          >
+            <dt className="text-14 font-medium text-ink-900">{f.libelle}</dt>
+            <dd className="flex flex-col gap-0.5 md:items-end">
+              <span className="text-14 text-ink-900">
+                {f.libelleFournisseur}
+                {f.modele ? <span className="font-mono text-13 text-ink-500"> · {f.modele}</span> : null}
+              </span>
+              <span
+                className={
+                  f.branche ? "text-13 font-medium text-success" : "text-13 font-medium text-warning"
+                }
+              >
+                {f.branche ? "Branché" : "Non branché"}
+                {f.tarife ? " · tarif renseigné" : " · sans tarif de jeton"}
+              </span>
+              {f.raison ? (
+                <span className="max-w-[60ch] text-pretty text-13 text-ink-700 md:text-right">
+                  {f.raison}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-14 font-semibold text-ink-900">Consommation par fournisseur</h3>
+        {parFournisseur.length === 0 ? (
+          <p className="text-14 text-ink-700">
+            Aucun appel enregistré : la ventilation par fournisseur apparaîtra au premier appel.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-14">
+              <caption className="sr-only">Consommation par fournisseur et par modèle</caption>
+              <thead>
+                <tr className="bg-ink-100 text-13 font-medium text-ink-700">
+                  <th scope="col" className="px-3 py-2 text-left">Fournisseur</th>
+                  <th scope="col" className="px-3 py-2 text-left">Modèle</th>
+                  <th scope="col" className="px-3 py-2 text-right">Appels</th>
+                  <th scope="col" className="px-3 py-2 text-right">Jetons d&apos;entrée</th>
+                  <th scope="col" className="px-3 py-2 text-right">Jetons de sortie</th>
+                  <th scope="col" className="px-3 py-2 text-right">Coût</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parFournisseur.map((l) => (
+                  <tr key={`${l.fournisseur}-${l.modele ?? "historique"}`} className="border-t border-ink-300">
+                    <td className="px-3 py-2 text-ink-900">{FOURNISSEURS[l.fournisseur].libelle}</td>
+                    <td className="px-3 py-2 font-mono text-13 text-ink-700">
+                      {l.modele ?? "non consigné (avant S.94)"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.appels)}</td>
+                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsEntree)}</td>
+                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsSortie)}</td>
+                    <td className="px-3 py-2 text-right text-ink-900">
+                      {l.coutMicros === null || l.devise === null
+                        ? "sans tarif"
+                        : `${MONTANT.format(l.coutMicros / 1_000_000)} ${l.devise}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">{MENTION_QUOTA_EN_JETONS}</p>
+      </div>
+    </section>
   );
 }

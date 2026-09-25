@@ -1,3 +1,4 @@
+import { FOURNISSEURS, fournisseurChoisi, manqueDuFournisseur } from "@/domain/ia/fournisseurs";
 /**
  * La mise en forme et l'analyse critique — R-03 et R-04, WF-08.
  *
@@ -25,20 +26,17 @@ export type {
 } from "@/domain/redaction/commande";
 
 /** La clé sans laquelle ni l'une ni l'autre ne tourne. */
-export const VARIABLES = ["ANTHROPIC_API_KEY"];
+/** Les variables du fournisseur par défaut ; celles du fournisseur choisi se lisent dans `domain/ia/fournisseurs.ts`. */
+export const VARIABLES = FOURNISSEURS.anthropic.variables;
 
 /**
- * La clé est-elle posée ?
- *
- * **Ce n'est pas la question qu'un écran doit poser.** Une clé renseignée
- * dit que l'appel est possible, jamais qu'il a eu lieu — et R-04 s'en
- * servait pour décider s'il y avait un avis à montrer, ce qui faisait
- * lire « rien à reprendre » sur un texte que personne n'avait lu. Ce
- * qu'une version a reçu se constate sur la version (`critiquedAt`).
- *
- * Reste ce à quoi une configuration sert : savoir s'il faut proposer le
- * geste, et renseigner l'état de service.
+ * La rédaction est-elle configurée ? Pour le fournisseur **choisi**
+ * (`AI_FOURNISSEUR_REDACTION`, Anthropic par défaut) — S.94. Un
+ * fournisseur inconnu ne l'est jamais.
  */
 export const redactionConfiguree = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,
-): boolean => VARIABLES.every((v) => (environnement[v] ?? "").trim() !== "");
+): boolean => {
+  const choix = fournisseurChoisi(environnement, "redaction");
+  return choix.connu && manqueDuFournisseur(environnement, choix.fournisseur) === null;
+};

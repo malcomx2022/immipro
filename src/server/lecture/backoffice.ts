@@ -23,12 +23,17 @@ import type { PieceEnEchec } from "@/domain/backoffice/revue";
 import type { ConsultantAdministre } from "@/domain/backoffice/consultants";
 import { aReconcilier, DELAI_RECONCILIATION_MINUTES } from "@/server/paiement/cycle";
 import { PACKS, getPack } from "@/domain/payments/pricing";
+import {
+  fournisseurDeLUsage,
+  tarifDu,
+  type CodeFournisseur,
+  type ConsommationDuFournisseur,
+} from "@/domain/ia/fournisseurs";
 import { packEffectif, type AchatCouvrant, type PackEffectif } from "@/domain/payments/droits";
 import { achatDepuisLeCode } from "@/domain/payments/achat";
 import {
   coutMicrosDesJetons,
   partDuQuotaIA,
-  tarifDepuisEnvironnement,
   type Journee,
   type TarifIA,
 } from "@/domain/backoffice/couts";
@@ -737,6 +742,8 @@ export interface LigneDeCout {
    * du jeton n'est pas renseigné.
    */
   partDuQuota: number | null;
+  /** Les fournisseurs qui ont servi ce dossier (S.94). */
+  fournisseurs: readonly CodeFournisseur[];
 }
 
 /**
@@ -823,14 +830,65 @@ const leurPack = <T extends { packCode: string }>(
   transactions: readonly T[],
 ): T | undefined => transactions.find((t) => achatDepuisLeCode(t.packCode).type === "pack");
 
+/**
+ * Le tarif de chaque fournisseur — S.94. Un tarif unique passé ici vaut
+ * pour tous (c'était la seule forme avant S.94, et les tests la gardent).
+ */
+export type TarifsIA = TarifIA | null | ((fournisseur: CodeFournisseur) => TarifIA | null);
+
+const tarifDe = (tarifs: TarifsIA, fournisseur: CodeFournisseur): TarifIA | null =>
+  typeof tarifs === "function" ? tarifs(fournisseur) : tarifs;
+
 export async function coutsParDossier(
-  tarif: TarifIA | null = tarifDepuisEnvironnement(process.env),
+  tarifs: TarifsIA = (fournisseur) => tarifDu(process.env, fournisseur),
 ): Promise<LigneDeCout[]> {
-  const usages = await db.aiUsage.groupBy({
-    by: ["applicationId"],
+  /*
+    Par dossier **et par fournisseur** (S.94) : un jeton n'a pas le même
+    prix chez deux fournisseurs, et le coût d'un dossier servi par les
+    deux est la somme de deux tarifs — ou rien, si l'un manque ou si leurs
+    devises diffèrent. Une somme partielle se lirait comme un coût complet.
+  */
+  const parFournisseur = await db.aiUsage.groupBy({
+    by: ["applicationId", "provider"],
     _sum: { inputTokens: true, outputTokens: true },
     _count: { _all: true },
   });
+  const usages = [
+    ...parFournisseur
+      .reduce((dossiers, u) => {
+        const cle = u.applicationId ?? "";
+        const fournisseur = fournisseurDeLUsage(u.provider);
+        const entree = u._sum.inputTokens ?? 0;
+        const sortie = u._sum.outputTokens ?? 0;
+        const tarif = tarifDe(tarifs, fournisseur);
+        const cout = coutMicrosDesJetons(tarif, entree, sortie);
+        const deja = dossiers.get(cle);
+        const devises = new Set([...(deja?.devises ?? []), ...(tarif ? [tarif.devise] : [])]);
+        dossiers.set(cle, {
+          applicationId: u.applicationId,
+          _sum: {
+            inputTokens: (deja?._sum.inputTokens ?? 0) + entree,
+            outputTokens: (deja?._sum.outputTokens ?? 0) + sortie,
+          },
+          _count: { _all: (deja?._count._all ?? 0) + u._count._all },
+          fournisseurs: [...new Set([...(deja?.fournisseurs ?? []), fournisseur])].sort(),
+          devises,
+          cout:
+            (deja && deja.cout === null) || cout === null || devises.size > 1
+              ? null
+              : (deja?.cout ?? 0) + cout,
+        });
+        return dossiers;
+      }, new Map<string, {
+        applicationId: string | null;
+        _sum: { inputTokens: number; outputTokens: number };
+        _count: { _all: number };
+        fournisseurs: CodeFournisseur[];
+        devises: Set<string>;
+        cout: number | null;
+      }>())
+      .values(),
+  ];
 
   const dossiers = await db.application.findMany({
     where: { id: { in: usages.flatMap((u) => (u.applicationId ? [u.applicationId] : [])) } },
@@ -863,7 +921,7 @@ export async function coutsParDossier(
       const achat = effectif ? { currency: effectif.devise } : premier;
       const jetonsEntree = u._sum.inputTokens ?? 0;
       const jetonsSortie = u._sum.outputTokens ?? 0;
-      const coutMicros = coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie);
+      const coutMicros = u.cout;
       return [
         {
           dossierId: u.applicationId,
@@ -878,6 +936,7 @@ export async function coutsParDossier(
             prix && coutMicros !== null ? coutMicros / 1_000_000 / prix : null,
           quotaJetons: pack?.tokensIA ?? null,
           partDuQuota: partDuQuotaIA(jetonsEntree + jetonsSortie, pack?.tokensIA ?? null),
+          fournisseurs: u.fournisseurs,
         },
       ];
     })
@@ -919,6 +978,42 @@ export async function consommationParJour(depuis: Date): Promise<Journee[]> {
   }
 
   return [...parJour.values()].sort((a, b) => a.jour.localeCompare(b.jour));
+}
+
+/**
+ * La consommation par fournisseur et par modèle — B-07, S.94.
+ *
+ * Ce qui permet de lire l'écart que le quota en jetons ne voit pas : un
+ * même dossier consomme plus ou moins de jetons selon le fournisseur. Le
+ * coût de chaque ligne est calculé au tarif **de son fournisseur**, ou
+ * vaut `null` sans tarif — jamais celui d'un autre.
+ */
+
+export async function consommationParFournisseur(
+  tarifs: TarifsIA = (fournisseur) => tarifDu(process.env, fournisseur),
+): Promise<ConsommationDuFournisseur[]> {
+  const lignes = await db.aiUsage.groupBy({
+    by: ["provider", "model"],
+    _sum: { inputTokens: true, outputTokens: true },
+    _count: { _all: true },
+  });
+  return lignes
+    .map((l) => {
+      const fournisseur = fournisseurDeLUsage(l.provider);
+      const tarif = tarifDe(tarifs, fournisseur);
+      const jetonsEntree = l._sum.inputTokens ?? 0;
+      const jetonsSortie = l._sum.outputTokens ?? 0;
+      return {
+        fournisseur,
+        modele: l.model,
+        appels: l._count._all,
+        jetonsEntree,
+        jetonsSortie,
+        coutMicros: coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie),
+        devise: tarif?.devise ?? null,
+      };
+    })
+    .sort((a, b) => b.jetonsEntree + b.jetonsSortie - (a.jetonsEntree + a.jetonsSortie));
 }
 
 /** Une règle du back-office, par identifiant — B-02. */
