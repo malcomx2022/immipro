@@ -10384,3 +10384,44 @@ La page est écrite à partir du parcours réellement implémenté. Ses nombres 
 Le registre Q.A la marque servie (`servie: { le, source }`) **sans effacer** son responsable ni ce qui manquait le jour du relevé. Le test, qui interdisait jusqu'ici toute page servie, vérifie désormais l'accord entre le registre et l'arborescence, page par page.
 
 Les trois pages juridiques et le contact restent absents : aucun texte juridique ni aucune identité d'entreprise n'est inventé.
+
+## S.94 — Plusieurs fournisseurs d'IA au choix (ouvert)
+
+**Question posée le 25/09/2026 : peut-on proposer d'autres fournisseurs d'IA qu'Anthropic, au choix ?**
+
+**Constat.** Oui, et l'essentiel est déjà prêt :
+
+- les contrats `Extracteur`, `Redacteur` et `Critique` sont neutres ;
+- les consignes, les schémas, la lecture des réponses et les causes d'échec vivent dans le domaine ;
+- l'état de service mesure le résolveur.
+
+Le couplage tient dans les adaptateurs : le client du SDK, la classification de ses erreurs, les blocs PDF, la sortie par schéma et `stop_reason`. S'y ajoutent les variables `ANTHROPIC_API_KEY`, un tarif unique et `AiUsage`, qui ne porte ni fournisseur ni modèle.
+
+**Ce qui n'est pas technique, et bloque avant le code :**
+
+- chaque fournisseur est un sous-traitant qui recevrait des pièces d'identité ;
+- le quota INV-6 est compté en jetons, qui ne se comparent pas d'un fournisseur à l'autre ;
+- la qualité de lecture est à mesurer sur un jeu d'évaluation.
+
+**Proposition.**
+
+- **Choix par configuration**, un fournisseur par fonction (`AI_FOURNISSEUR_EXTRACTION`, `AI_FOURNISSEUR_REDACTION`, défaut `anthropic`).
+- **Aucune bascule automatique** pour les pièces.
+- Cinq lots :
+  1. neutraliser sans changement visible ;
+  2. tracer par fournisseur (migration `AiUsage.provider` et `model`, tarifs par fournisseur) ;
+  3. un second fournisseur pour la rédaction ;
+  4. l'extraction chez ce fournisseur, après décision de conformité et jeu d'évaluation ;
+  5. un repli explicite, facultatif, pour la rédaction seulement.
+
+Le détail est dans `docs/IA-fournisseurs.md`.
+
+**À trancher :**
+
+1. les fournisseurs et les fonctions ;
+2. la sous-traitance : convention, `/donnees-personnelles`, consentement ;
+3. le quota : jetons, coût ou coefficient ;
+4. le repli ;
+5. le jeu d'évaluation et son seuil.
+
+**Rien n'est implémenté.** En V1, Anthropic reste le seul fournisseur.

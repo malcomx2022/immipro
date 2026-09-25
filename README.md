@@ -159,6 +159,7 @@ Règle : `domain/` ne connaît ni Prisma, ni Next, ni le réseau. Tout ce qui es
 | `docs/DOC-12-prototype.md` | Design system, inventaire des 39 écrans |
 | `docs/BRAND.md` | Usage de la marque |
 | `docs/visa-rules.md` | Référentiel réglementaire et veille |
+| `docs/IA-fournisseurs.md` | Fournisseurs d'IA : état actuel (Anthropic seul en V1) et plan pour en proposer plusieurs — à arbitrer (S.94) |
 
 ---
 
