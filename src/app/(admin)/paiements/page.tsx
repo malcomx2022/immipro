@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Paiements } from "./Paiements";
-import { etatOperateur, paiements } from "@/server/lecture/backoffice";
+import { dettesFedaPay, etatOperateur, paiements } from "@/server/lecture/backoffice";
 import { exigerAdmin } from "@/server/securite/page";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { jourCivil } from "@/domain/format/fuseau";
@@ -16,11 +16,16 @@ export const metadata: Metadata = {
 export default async function PagePaiements() {
   await exigerAdmin("/paiements");
   const aujourdhui = jourCivil(new Date());
-  const [lignes, operateur] = await Promise.all([paiements(aujourdhui), etatOperateur()]);
+  const [lignes, operateur, dettes] = await Promise.all([
+    paiements(aujourdhui),
+    etatOperateur(),
+    dettesFedaPay(),
+  ]);
 
   return (
     <Paiements
       paiements={lignes}
+      dettesFedaPay={dettes}
       operateur={operateur}
       journee={`Journée du ${jourEnFrancais(aujourdhui)}`}
       // Le jour en ISO à côté du libellé : c'est lui qui nomme le fichier

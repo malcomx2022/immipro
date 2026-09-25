@@ -37,6 +37,8 @@ import {
   type IssueEcart,
 } from "@/domain/backoffice/ecart";
 import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
+import type { DetteFedaPay } from "@/domain/paiement/remboursement";
+import { RemboursementsFedaPay } from "./RemboursementsFedaPay";
 
 /**
  * B-04 — Paiements et réconciliation. WF-15, INV-7.
@@ -168,12 +170,15 @@ function TraitementDeLEcart({ paiement }: { paiement: Paiement }) {
 
 export function Paiements({
   paiements,
+  dettesFedaPay = [],
   operateur,
   journee,
   jourIso,
   aujourdhuiIso,
 }: {
   paiements: readonly Paiement[];
+  /** Les dettes FedaPay ouvertes, toutes dates confondues (S.91). */
+  dettesFedaPay?: readonly DetteFedaPay[];
   /**
    * État de l'opérateur. Nul tant qu'aucun rapprochement n'a abouti — ni
    * webhook signé confirmant un paiement, ni consultation aboutie du job de
@@ -414,6 +419,8 @@ export function Paiements({
                 ))
             : null}
         </div>
+
+        <RemboursementsFedaPay dettes={dettesFedaPay} />
 
         <p className="text-13 text-ink-500">{MENTION_AUDIT}</p>
       </div>

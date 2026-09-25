@@ -115,13 +115,14 @@ describe("les trois faits ne se confondent pas", () => {
   });
 });
 
-describe("les cinq issues d'une demande", () => {
+describe("les six issues d'une demande", () => {
   const TOUTES: readonly IssueDeDemande[] = [
     "acceptee",
     "refusee_definitivement",
     "temporaire",
     "reponse_illisible",
     "non_configure",
+    "procedure_manuelle",
   ];
 
   /**
@@ -143,10 +144,11 @@ describe("les cinq issues d'une demande", () => {
    * reprendra jamais, si. Confondre les deux noie la file d'écarts sous
    * des coupures réseau, ou laisse une demande morte s'y relancer.
    */
-  it("seuls le refus définitif et l'illisible appellent un humain", () => {
+  it("le refus définitif, l'illisible et la procédure manuelle appellent un humain", () => {
     expect(TOUTES.filter((i) => suiteDeLaTentative(i).exigeUnHumain)).toEqual([
       "refusee_definitivement",
       "reponse_illisible",
+      "procedure_manuelle",
     ]);
   });
 
@@ -302,7 +304,7 @@ describe("FedaPay ne devine pas ce qu'il ne sait pas", () => {
       ...DEMANDE,
       providerTxId: "fedapay:42",
     });
-    expect(issue).toEqual({ issue: "non_configure", detail: REMBOURSEMENT_NON_OPERATIONNEL });
+    expect(issue).toEqual({ issue: "procedure_manuelle", detail: REMBOURSEMENT_NON_OPERATIONNEL });
     // Et il n'appelle personne : pas de format inventé sur le réseau.
     expect(appels).toHaveLength(0);
   });
@@ -319,7 +321,7 @@ describe("FedaPay ne devine pas ce qu'il ne sait pas", () => {
 
     // Non opérationnel ⇒ il refuse sans réseau.
     const sans = simuler(reponse(200, {}));
-    expect((await remboursementFedaPay().demander(DEMANDE)).issue).toBe("non_configure");
+    expect((await remboursementFedaPay().demander(DEMANDE)).issue).toBe("procedure_manuelle");
     expect(sans).toHaveLength(0);
 
     // Opérationnel ⇒ il appelle, et ne rend jamais `non_configure`.

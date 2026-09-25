@@ -90,14 +90,19 @@ export const cleDIdempotence = (reference: string): string => `remboursement:${r
  * - **`reponse_illisible`** — il a répondu quelque chose qui n'est pas
  *   au schéma. On ne devine pas : ni accepté, ni refusé ;
  * - **`non_configure`** — aucune clé, ou adaptateur non opérationnel.
- *   Rien n'est parti, et c'est dit.
+ *   Rien n'est parti, et c'est dit ;
+ * - **`procedure_manuelle`** — le fournisseur n'a pas d'API de
+ *   remboursement (FedaPay, arbitrage S.91). Rien n'est parti, et rien ne
+ *   partira par ce chemin : un opérateur rembourse au tableau de bord du
+ *   fournisseur, puis déclare la référence en B-04.
  */
 export type IssueDeDemande =
   | "acceptee"
   | "refusee_definitivement"
   | "temporaire"
   | "reponse_illisible"
-  | "non_configure";
+  | "non_configure"
+  | "procedure_manuelle";
 
 export interface SuiteDeLaTentative {
   /**
@@ -163,11 +168,153 @@ export function suiteDeLaTentative(issue: IssueDeDemande): SuiteDeLaTentative {
         message:
           "Aucune demande n'est partie : le rail de remboursement n'est pas configuré pour ce fournisseur. La dette reste due.",
       };
+    /*
+      Un humain, tout de suite, et pas après cinq relances : relancer un
+      rail sans API ne ferait que compter des tentatives qui n'ont pas eu
+      lieu, puis accuser le fournisseur d'un silence qui est le nôtre.
+      L'écart ouvert sort la dette de la passe de relance et la pose dans
+      la file de B-04, avec le geste à faire.
+    */
+    case "procedure_manuelle":
+      return {
+        acceptee: false,
+        exigeUnHumain: true,
+        message: A_REMBOURSER_A_LA_MAIN,
+      };
     default: {
       const jamais: never = issue;
       throw new Error(`Issue de remboursement non arbitrée : ${JSON.stringify(jamais)}`);
     }
   }
+}
+
+/* ── Le remboursement FedaPay, fait à la main — arbitrage S.91 ─────────── */
+
+/**
+ * Ce que l'opérateur lit, et doit faire.
+ *
+ * FedaPay n'expose aucune API de remboursement : sa documentation (lue le
+ * 22/09/2026, relue le 25/09/2026) décrit un geste au tableau de bord,
+ * possible par MTN Mobile Money seulement. Le message le dit, et dit la
+ * suite — sans quoi la dette resterait « décidée » sans que personne ne
+ * sache qui doit bouger.
+ */
+export const A_REMBOURSER_A_LA_MAIN =
+  "FedaPay n'a pas d'API de remboursement. Rembourse cette transaction depuis le tableau de bord FedaPay (MTN Mobile Money uniquement), puis saisis ici la référence du remboursement qu'il affiche. La somme ne sera tenue pour rendue qu'à la notification signée de FedaPay.";
+
+/**
+ * La référence d'un remboursement fait au tableau de bord, telle que
+ * l'opérateur la saisit.
+ *
+ * Préfixée comme les identifiants de transaction (`fedapay:`), pour
+ * qu'une même colonne puisse porter un jour la référence d'un autre rail
+ * sans collision. Le préfixe est accepté s'il est recopié, et ajouté
+ * sinon : l'opérateur colle ce que le tableau de bord montre.
+ *
+ * Refusée plutôt que nettoyée au-delà des espaces : une référence
+ * corrigée en silence ne retrouverait plus la ligne chez le fournisseur,
+ * et c'est sa seule fonction.
+ */
+export type LectureDeReference =
+  | { valide: true; reference: string }
+  | { valide: false; message: string };
+
+const FORME_DE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u;
+
+export function lireLaReferenceDeRemboursement(saisie: string): LectureDeReference {
+  const brute = saisie.trim().replace(/^fedapay:/iu, "");
+  if (brute === "") {
+    return {
+      valide: false,
+      message:
+        "Saisis la référence du remboursement affichée par le tableau de bord FedaPay, dans la liste des remboursements.",
+    };
+  }
+  if (!FORME_DE_REFERENCE.test(brute)) {
+    return {
+      valide: false,
+      message:
+        "Cette référence ne ressemble pas à celle d'un remboursement FedaPay : recopie-la telle que le tableau de bord l'affiche, sans espace ni ponctuation (lettres, chiffres, tiret, soulignement, 64 caractères au plus).",
+    };
+  }
+  return { valide: true, reference: `${PREFIXE_FOURNISSEUR.FEDAPAY}${brute}` };
+}
+
+/**
+ * Peut-on déclarer, sur cette transaction, un remboursement fait à la main ?
+ *
+ * Trois conditions, et chacune garde une règle déjà écrite :
+ *
+ * - **la dette existe et n'est pas soldée** — on ne déclare pas le
+ *   remboursement d'une somme que personne ne doit ;
+ * - **l'initiation a eu lieu** (`refundAttemptedAt`) — c'est elle qui
+ *   retire les droits non consommés (K.C). Déclarer avant rendrait
+ *   l'argent en laissant le pack utilisable ; et un pack entamé, envoyé
+ *   en revue manuelle, n'est jamais initié : la question commerciale se
+ *   tranche avant, pas par ce formulaire ;
+ * - **aucune demande n'est déjà déclarée** — la même référence redite est
+ *   un rejeu sans effet, une autre est un conflit (voir l'appelant).
+ */
+export type DefautDeDeclaration =
+  | "sans_dette"
+  | "deja_rendue"
+  | "autre_rail"
+  | "non_initiee";
+
+export function defautDeDeclaration(t: {
+  provider: "FEDAPAY" | "STRIPE";
+  refundDueAt: Date | null;
+  refundedAt: Date | null;
+  refundAttemptedAt: Date | null;
+}): DefautDeDeclaration | null {
+  if (t.refundDueAt === null) return "sans_dette";
+  if (t.refundedAt !== null) return "deja_rendue";
+  if (t.provider !== "FEDAPAY") return "autre_rail";
+  if (t.refundAttemptedAt === null) return "non_initiee";
+  return null;
+}
+
+export const MOTIF_DE_REFUS_DE_DECLARATION: Record<DefautDeDeclaration, string> = {
+  sans_dette: "aucun remboursement n'est dû sur ce paiement",
+  deja_rendue:
+    "la notification signée du fournisseur a déjà confirmé ce remboursement, il n'y a plus rien à déclarer",
+  autre_rail:
+    "ce paiement a été encaissé par Stripe, dont le remboursement part par API : utilise « Relancer l'envoi » plutôt qu'une déclaration manuelle",
+  non_initiee:
+    "le remboursement n'a pas encore été initié, donc les droits non consommés du pack n'ont pas été retirés. Lance d'abord le remboursement, puis déclare la référence",
+};
+
+/**
+ * Une dette FedaPay telle que B-04 la montre — toutes dates confondues.
+ *
+ * Le tableau de B-04 ne porte que les paiements de la journée ; une dette
+ * FedaPay née d'un achat de la semaine dernière n'y apparaîtrait pas, et
+ * c'est précisément celle qu'un humain doit rembourser à la main. Elle a
+ * donc sa liste, jusqu'à la notification signée qui la solde.
+ */
+export interface DetteFedaPay {
+  reference: string;
+  compte: string;
+  montant: number;
+  devise: string;
+  etape: EtapeRemboursement;
+  motif: string | null;
+  /** L'initiation a eu lieu : les droits sont retirés, la déclaration est possible. */
+  initiee: boolean;
+  decideeLe: string;
+  demandeeLe: string | null;
+  referenceFournisseur: string | null;
+}
+
+/** Ce que l'opérateur lit sous une dette FedaPay, selon où elle en est. */
+export function consigneFedaPay(dette: Pick<DetteFedaPay, "etape" | "initiee">): string {
+  if (dette.etape === "DEMANDE") {
+    return "Remboursement déclaré. La somme n'est tenue pour rendue qu'à la notification signée de FedaPay : si elle n'arrive pas, vérifie l'état du remboursement dans son tableau de bord.";
+  }
+  if (!dette.initiee) {
+    return "Le remboursement n'est pas encore initié : les droits non consommés du pack n'ont pas été retirés. S'il a été envoyé en revue manuelle, la question se tranche d'abord dans la file des écarts.";
+  }
+  return A_REMBOURSER_A_LA_MAIN;
 }
 
 /**

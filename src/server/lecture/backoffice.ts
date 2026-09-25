@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
+import { etapeDe, type DetteFedaPay } from "@/domain/paiement/remboursement";
 import {
   acteurLisible,
   compteDeLActeur,
@@ -435,6 +436,45 @@ const SILENCE_MINUTES = 60;
  * dernier rapprochement — affichée en clair, jour compris — dit tout ce que
  * la plateforme sait.
  */
+/**
+ * Les dettes FedaPay ouvertes — B-04, arbitrage S.91.
+ *
+ * Toutes dates confondues, et jusqu'à la notification signée : FedaPay
+ * n'a pas d'API de remboursement, chaque dette de ce rail attend un geste
+ * humain puis la confirmation du fournisseur. Une dette déclarée reste
+ * dans la liste — « demandée » n'est pas « versée » (INV-7).
+ */
+export async function dettesFedaPay(): Promise<DetteFedaPay[]> {
+  const dettes = await db.transaction.findMany({
+    where: { provider: "FEDAPAY", refundDueAt: { not: null }, refundedAt: null },
+    orderBy: { refundDueAt: "asc" },
+    select: {
+      reference: true,
+      amount: true,
+      currency: true,
+      refundDueAt: true,
+      refundRequestedAt: true,
+      refundedAt: true,
+      refundAttemptedAt: true,
+      refundBasis: true,
+      refundProviderRef: true,
+      user: { select: { email: true } },
+    },
+  });
+  return dettes.map((d) => ({
+    reference: d.reference,
+    compte: d.user.email,
+    montant: d.amount,
+    devise: d.currency,
+    etape: etapeDe({ dueAt: d.refundDueAt, requestedAt: d.refundRequestedAt, refundedAt: d.refundedAt }) ?? "DECIDE",
+    motif: d.refundBasis,
+    initiee: d.refundAttemptedAt !== null,
+    decideeLe: d.refundDueAt!.toISOString(),
+    demandeeLe: d.refundRequestedAt?.toISOString() ?? null,
+    referenceFournisseur: d.refundProviderRef,
+  }));
+}
+
 export async function etatOperateur(maintenant = new Date()): Promise<EtatOperateur | null> {
   const dernier = await db.transaction.findFirst({
     where: { reconciledAt: { not: null } },
@@ -480,6 +520,7 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "compte.suppression": "COMPTE",
   "compte.export": "COMPTE",
   "paiement.remboursement": "PAIEMENT",
+  "paiement.remboursement.manuel": "PAIEMENT",
   "paiement.reconciliation": "PAIEMENT",
   "regle.publication": "REGLE",
   "regle.republication": "REGLE",

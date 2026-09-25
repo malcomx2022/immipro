@@ -5,8 +5,9 @@
  *
  * Il n'y avait rien : `NON_BRANCHE` rendait `null`, et c'était la
  * réponse honnête tant qu'aucun adaptateur n'était écrit. Stripe l'est
- * désormais ; FedaPay ne l'est pas, faute de documentation vérifiée, et
- * le dit lui-même plutôt que de deviner un format (voir `fedapay.ts`).
+ * désormais. FedaPay n'expose aucune API de remboursement : son
+ * adaptateur rend `procedure_manuelle`, et le remboursement se fait au
+ * tableau de bord puis se déclare en B-04 (S.91, voir `fedapay.ts`).
  *
  * **La règle d'INV-7 est intacte.** Ce module envoie une demande et rend
  * ce que le fournisseur a répondu. Il n'écrit rien, ne solde aucune
@@ -75,15 +76,15 @@ export const remboursementConfigure = (
  * La capacité est-elle réellement branchée ?
  *
  * **Non, et pour une raison que le code porte.** La question est posée
- * aux adaptateurs — `operationnel` —, et FedaPay répond non : son format
- * de remboursement n'a pas pu être vérifié, il ne devine pas. Aucun
+ * aux adaptateurs — `operationnel` —, et FedaPay répond non : il n'a pas
+ * d'API de remboursement, le geste est manuel (S.91). Aucun
  * appel réseau n'est fait pour le savoir : ce serait interroger un
  * fournisseur à chaque lecture de l'état de service.
  *
  * Il faut **les deux** rails, comme la rédaction demande ses deux
  * fonctions : un candidat qui a payé en francs CFA ne se rembourse pas
- * parce que l'euro, lui, est branché. Tant que FedaPay ne l'est pas, la
- * capacité se lit non branchée — ce qui est la vérité, et ce que la
+ * parce que l'euro, lui, est branché. Une procédure manuelle, même
+ * tracée, n'est pas un branchement : la capacité se lit non branchée — ce qui est la vérité, et ce que la
  * décision d'exploitation doit voir.
  *
  * Un test éprouve `operationnel` contre le comportement des deux

@@ -26,6 +26,8 @@ export type ActionAuditee =
   | "compte.export"
   | "partage.retrait"
   | "paiement.remboursement"
+  /** Remboursement FedaPay fait au tableau de bord, déclaré en B-04 (S.91). */
+  | "paiement.remboursement.manuel"
   | "paiement.reconciliation"
   | "regle.publication"
   /**

@@ -307,7 +307,7 @@ describe("un `.env` complet devant des points de branchement vides", () => {
         devise: "XOF",
         cle: "IMP-0001",
       }),
-    ).toMatchObject({ issue: "non_configure" });
+    ).toMatchObject({ issue: "procedure_manuelle" });
     /*
       L'extraction est branchée, mais sans clé elle ne rend pas une
       lecture vide : elle nomme la cause. Un objet vide se serait

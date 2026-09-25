@@ -402,7 +402,7 @@ traite son absence plutôt que de faire semblant :
 | Antivirus | `securite/antivirus.ts`, `leBalayeur` | Le dépôt est refusé et le message dit que le contrôle manque (I.D). Avec un moteur, une indisponibilité laisse la pièce en quarantaine et ouvre un incident — jamais une promotion |
 | Extraction IA | `dossiers/extracteur.ts`, `lExtracteur` | La pièce part en revue manuelle et l'analyse est recréditée — jamais déclarée conforme sans lecture. Avec une clé, une lecture qui n'aboutit pas nomme sa cause : une saturation se rejoue, un scan flou demande une photo, une clé refusée appelle un exploitant |
 | Rédaction IA | `redaction/service.ts`, `leRedacteur` / `laCritique` | L'écran dit ce qui manque ; la réécriture par le candidat, elle, n'attend rien. Avec une clé, une relecture qui n'aboutit pas ne date rien : R-04 continue de dire que le texte n'a pas été lu, et rien n'est débité |
-| Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée |
+| Remboursement | `paiement/remboursement.ts`, `leRembourseur` | La dette reste ouverte et visible en B-04, la tentative est comptée. Sur FedaPay, sans API de remboursement, l'initiation ouvre un écart avec le geste à faire au tableau de bord, et l'opérateur déclare la référence en B-04 (S.91) |
 | Interrogation des fournisseurs | `jobs/reconciliation.ts`, `Interrogation` | Le retard est marqué, un écart s'ouvre au-delà de 24 h, rien n'est accusé sur un silence |
 
 ### La lecture d'une pièce, et ce qu'elle ne décide pas
@@ -1060,7 +1060,7 @@ Ce que chaque usage consomme aujourd'hui :
 | Création de paiement | `paiement/ouvreurs.ts` | `*_API_KEY` | **oui**, les deux rails — FedaPay conforme à sa documentation depuis le 22/09/2026, toujours non éprouvé contre un serveur |
 | Webhooks | `paiement/signature.ts` | `*_WEBHOOK_SECRET` | **oui** |
 | Consultation fournisseur | `paiement/consultation.ts` | `*_API_KEY` | **oui**, les deux rails — la table d'états FedaPay est confirmée par sa documentation |
-| Remboursement sortant | `paiement/remboursement.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay **n'expose aucune API de remboursement** — geste manuel au tableau de bord, MTN Mobile Money seulement |
+| Remboursement sortant | `paiement/remboursement.ts` | `*_API_KEY` | Stripe **oui** ; FedaPay **n'expose aucune API de remboursement** — geste manuel au tableau de bord, MTN Mobile Money seulement, déclaré en B-04 avec sa référence (`declarerLeRemboursementManuel`, S.91) |
 | Espace FedaPay | `paiement/fedapay.ts` | `FEDAPAY_ENVIRONMENT` | **oui** — `baseDe` choisit le bac à sable ou la production |
 
 Ce tableau avait dérivé : il annonçait « non » sur trois lignes que les

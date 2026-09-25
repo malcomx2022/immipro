@@ -415,47 +415,59 @@ export const consultantFedaPay = (cle: string, espace: string | undefined): Cons
  * ------------------------------------------------------------------ */
 
 /**
- * L'adaptateur de remboursement FedaPay existe, et ne rembourse rien.
+ * L'adaptateur de remboursement FedaPay : une procédure, pas un appel.
  *
- * ── La raison a changé le 22/09/2026 ────────────────────────────────
+ * ── Pourquoi aucun appel ne part — relu le 25/09/2026 ───────────────
  *
- * Elle était « faute de documentation vérifiée, on ne devine pas ». La
- * documentation a été lue, et elle dit mieux que cela : **FedaPay
- * n'expose aucune API de remboursement.** Le remboursement est un geste
- * manuel dans leur tableau de bord — six étapes, un formulaire, un
- * courriel de client — et il n'est possible **que par MTN Mobile
- * Money**. Il n'y a donc pas de chemin à obtenir, pas d'en-tête
- * d'idempotence à connaître, pas de forme de réponse à vérifier : ces
- * choses n'existent pas.
+ * La documentation de FedaPay, dans sa version courante comme dans la
+ * v1, ne décrit **aucune API de remboursement** : le remboursement est un
+ * geste au tableau de bord (bouton « Rembourser », courriel du client,
+ * motif), possible **par MTN Mobile Money seulement**. La référence d'API
+ * liste la création, la lecture, la mise à jour et la suppression d'une
+ * transaction, son jeton de paiement, et des dépôts (`/payouts`) — rien
+ * qui rende un paiement.
  *
- * `PUT /transactions/{id}` accepte bien un champ `status`, et `refunded`
- * figure parmi les états d'une transaction. Rien ne documente qu'écrire
- * cet état **déclenche** un remboursement — cela pourrait aussi bien ne
- * faire qu'étiqueter la ligne. Le tenter reviendrait à deviner un
- * mouvement d'argent, ce qui est exactement ce qu'on refuse de faire.
+ * Les deux chemins qui y ressemblent ont été écartés, et la raison reste
+ * écrite pour qu'on ne les rouvre pas par distraction :
  *
- * ── Ce que cela veut dire pour l'exploitation ───────────────────────
+ * - `PUT /transactions/{id}` avec `status: "refunded"` : rien ne
+ *   documente qu'écrire cet état **déplace de l'argent**. Il pourrait
+ *   n'étiqueter que la ligne — une dette « soldée » chez eux sans que le
+ *   candidat ait rien reçu ;
+ * - `POST /payouts` : un **nouveau** versement vers un numéro, sans lien
+ *   avec le paiement d'origine, sans idempotence documentée. Une reprise
+ *   après une coupure pourrait payer deux fois. C'est une autre décision
+ *   métier, pas un remboursement.
  *
- * Un remboursement en francs CFA se fait **à la main**, au tableau de
- * bord du fournisseur. L'issue rendue reste `non_configure` : la dette
- * reste due, visible en B-04, et la notification signée du fournisseur
- * l'éteindra quand l'argent sera reparti — le chemin n'a pas changé,
- * seul l'ordre de départ est humain.
+ * ── La procédure retenue (arbitrage S.91) ───────────────────────────
  *
- * `remboursementBranche()` continue donc de rendre `false`, et la
- * capacité se lit non branchée. Ce n'est plus « en attente de
- * documentation » : c'est l'état durable de ce rail, jusqu'à ce que
- * FedaPay publie une API ou qu'on décide d'assumer le geste manuel comme
- * procédure.
+ * L'initiation se fait comme sur l'autre rail — tentative réservée,
+ * droits non consommés retirés une fois (K.C) —, puis cet adaptateur rend
+ * `procedure_manuelle`. L'appelant ouvre un écart en B-04 avec le geste à
+ * faire, ce qui sort la dette de la passe de relance : cinq relances d'un
+ * rail sans API n'auraient compté que des tentatives qui n'ont pas eu lieu.
+ *
+ * L'opérateur rembourse au tableau de bord, puis déclare la référence du
+ * remboursement (`declarerLeRemboursementManuel`). Cette déclaration pose
+ * `refundRequestedAt` — « demandé », pas « versé ». La dette reste due et
+ * visible jusqu'à la notification signée `refunded` de FedaPay, seule à
+ * écrire `refundedAt` (INV-7).
+ *
+ * L'adaptateur ne reçoit pas la clé d'API : il n'en a pas l'usage, et ce
+ * qu'il n'a pas, il ne peut ni l'envoyer ni le journaliser.
+ *
+ * `operationnel` reste `false` : rien d'automatique ne rembourse sur ce
+ * rail, et la capacité continue de se lire non branchée. C'est la vérité,
+ * et c'est ce que la décision d'exploitation doit voir.
  */
 export const REMBOURSEMENT_NON_OPERATIONNEL =
-  "FedaPay n'expose aucune API de remboursement : le geste est manuel au tableau de bord du fournisseur, et par MTN Mobile Money uniquement";
+  "FedaPay n'expose aucune API de remboursement : le geste se fait au tableau de bord du fournisseur, par MTN Mobile Money uniquement, puis sa référence se déclare en B-04";
 
 export const remboursementFedaPay = (): Rembourseur => ({
   fournisseur: "FEDAPAY",
   operationnel: false,
   demander: async () => ({
-    issue: "non_configure",
+    issue: "procedure_manuelle",
     detail: REMBOURSEMENT_NON_OPERATIONNEL,
   }),
 });
