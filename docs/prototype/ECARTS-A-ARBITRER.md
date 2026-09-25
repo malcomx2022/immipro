@@ -10079,3 +10079,106 @@ lu nulle part.
 rappels suivent le fuseau choisi, et l'écran de préférences le dit
 (« à l'heure de cette ville »). Faire suivre tout l'affichage
 demanderait de reprendre chaque formateur d'heure.
+
+## S.88 — Montée en gamme Essentiel → Dossier tranchée : la différence, vingt analyses, la rédaction assistée
+
+Cette décision ferme le point que S.86 laissait ouvert.
+
+Un dossier couvert par Essentiel ne pouvait pas passer à Dossier. La page des packs renvoyait au dossier tout candidat qui en avait déjà payé un. Le récapitulatif, lui, vendait Dossier **au prix plein** à qui en forgeait l'adresse : 15 000 F de plus sur un dossier déjà payé 5 000 F, et 40 analyses au lieu de 30.
+
+### Le prix (RG-05.6)
+
+    prix actuel de Dossier, dans la devise de l'achat Essentiel
+  − montant effectivement payé pour cet achat Essentiel
+  = montant dû, jamais négatif
+
+| Devise | Dossier | Essentiel payé | Dû |
+|---|---|---|---|
+| XOF | 15 000 F | 5 000 F | 10 000 F |
+| EUR | 29 € | 12 € | 17 € |
+
+- **Les grilles restent natives.** Aucune conversion n'est faite, et la montée garde la devise de l'achat d'origine. La route ignore la devise envoyée par le navigateur et `montantDe` refuse toute autre devise.
+- **Le montant retranché est celui que l'achat a réellement encaissé** (`Transaction.amount`), et non le tarif d'Essentiel aujourd'hui. Un Essentiel acheté avant une hausse paie ainsi la différence réelle.
+- **Le navigateur n'envoie que la catégorie** `{ type: "montee" }`. L'achat d'origine et le prix se retrouvent en base.
+
+### La couverture
+
+La montée crédite un octroi `ACHAT_PACK` de **20** analyses rattaché à sa propre transaction. Le quota issu du pack passe ainsi de 10 à 30. La rédaction assistée s'ouvre par la même lecture que pour un pack (`CODES_REDACTION_ASSISTEE`).
+
+La montée ne passe pas par `appliquerLaCouverture`. Elle ne couvre pas de nouvelle destination : elle change la couverture d'un dossier déjà servi.
+
+Les recharges restent des achats séparés : elles ne changent ni le prix ni les vingt analyses.
+
+### L'achat d'origine, et une seule montée
+
+Conditions du `verdictDeLaMontee` (domaine, sans base) :
+
+1. le dossier n'est pas déjà couvert par Dossier ou Pro (`DEJA_DOSSIER`) ;
+2. un Essentiel **confirmé** couvre ce dossier (`SANS_ESSENTIEL`). « Couvrir » se lit dans le grand livre : un octroi de cet achat sur ce dossier ;
+3. l'achat d'origine n'est ni remboursé, ni en cours de remboursement (`REMBOURSEMENT`) ;
+4. aucune montée confirmée n'en est partie (`DEJA_MONTE`, `MONTEE_EN_REMBOURSEMENT`). Une montée en attente est reprise, pas doublée ;
+5. la différence est positive (`SANS_SUPPLEMENT`).
+
+Chaque refus dit ce qui l'arrête et ce qui reste possible. La route les rend sous le code `montee_indisponible`.
+
+En base :
+
+- `Transaction.sourceTransactionId` lie la montée à son achat. Une contrainte `CHECK` l'exige sur `montee-dossier` et l'interdit ailleurs.
+- Un index unique partiel refuse une seconde montée initiée, en attente ou confirmée depuis le même achat et sur le même dossier. Une montée échouée, expirée ou remboursée ne compte plus.
+- Deux clics simultanés sur « Payer » : le second bute sur l'index et reprend la transaction du premier.
+
+**Le défaut trouvé en chemin.** `creerOuReprendre` reprenait *n'importe quelle* transaction en attente sur le dossier. Une recharge en suspens aurait été reprise à la place du passage à Dossier, et inversement. La reprise porte maintenant sur le même code d'achat, et, pour une montée, sur le même achat d'origine. La fumée le vérifie dans les deux sens, et une mutation qui retire le filtre la fait tomber.
+
+### Le rejeu
+
+C'est le mécanisme existant qui le couvre :
+
+- la notification est idempotente par `providerEventId` ;
+- la table d'états refuse de faire avancer une transaction déjà confirmée ;
+- `acheverLeCredit` vérifie qu'aucun octroi de la transaction n'existe avant de créditer.
+
+La fumée rejoue la même notification, en envoie une nouvelle, puis lance deux achèvements simultanés : il n'y a toujours qu'un octroi.
+
+### Le remboursement du supplément
+
+- La décision (`refundDueAt`) retire aussitôt le droit à de nouveaux appels de rédaction assistée.
+- L'envoi retire les **20 analyses ajoutées** encore disponibles, et elles seules. L'achat Essentiel n'est pas touché, et les réponses, textes et versions ne le sont jamais.
+- Les consommations ne portent pas de transaction : les analyses ajoutées sont tenues pour **consommées en dernier**, après celles d'Essentiel et des recharges.
+  - Si le solde couvre encore les 20, le retrait est intégral et se fait sans humain. C'est le cas d'un candidat qui a épuisé ses dix analyses d'Essentiel.
+  - En deçà, une partie a servi : la transaction passe en **revue manuelle** par l'écart, et aucune demande ne part.
+
+Compter toutes les consommations du dossier, comme pour un pack, aurait envoyé en revue manuelle tout candidat qui avait simplement utilisé Essentiel.
+
+### Les écrans
+
+**`/paiement/pack`** — un dossier Essentiel n'est plus renvoyé à son dossier. L'écran lui propose deux gestes distincts, aucun présélectionné :
+
+- **« Passer à Dossier »**, avec le calcul écrit en entier ;
+- **« Ajouter des analyses »**, une recharge indépendante.
+
+Un dossier déjà en Dossier ou en Pro est toujours renvoyé à son dossier.
+
+**Récapitulatif d'une montée** :
+
+- le prix de Dossier, le montant déjà payé et la différence ;
+- ce que la montée ouvre ;
+- la devise, figée à celle de l'achat d'origine.
+
+**Récapitulatif d'un pack au prix plein** sur un dossier déjà couvert : il se dit **pack supplémentaire, au prix plein**, et précise que ce n'est pas un passage à Dossier. Il donne le prix du passage quand celui-ci est ouvert.
+
+**Quota épuisé** — le bouton s'appelle **« Ajouter des analyses »** (il disait « Recharger 10 analyses »). « Passer à Dossier — 10 000 F » s'affiche à côté quand le passage est ouvert.
+
+**Rédaction et relecture réservées** — le lien mène à la page des packs quand le passage est ouvert, sinon à la page Tarifs.
+
+**Reçu, attente, confirmation, échec** — ils nomment le « Passage d'Essentiel à Dossier ». L'écran d'échec propose de reprendre le passage.
+
+### Ce qui a été corrigé au passage
+
+L'écran de dépôt nommait le pack d'après la **dernière transaction confirmée**. Une recharge en est une, et `getPack("recharge")` ne rend rien : un dossier qui venait de recharger lisait « sans pack ». Le pack se lit maintenant sur la couverture du dossier (`packDeLaCouverture`), et une montée y compte pour Dossier.
+
+### Ce que ce lot ne tranche pas
+
+- **Le passage d'Essentiel à Dossier Pro.** L'arbitrage ne porte que sur Dossier.
+- **Le remboursement de l'Essentiel d'origine après une montée confirmée.** Il suit la règle d'un pack : toute consommation sur le dossier l'envoie en revue manuelle. La montée, elle, reste en place.
+- **Le back-office.** La liste des candidats et la marge par dossier lisent toujours le premier pack confirmé. Elles affichent « Essentiel » et son prix pour un dossier monté.
+- **Une différence inférieure au minimum de 3 000 F** (RG-05.5). Elle est impossible aux tarifs actuels, et le minimum s'appliquerait comme à tout achat.

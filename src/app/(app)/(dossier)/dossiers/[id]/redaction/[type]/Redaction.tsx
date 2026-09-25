@@ -111,6 +111,12 @@ export interface RedactionProps {
    * packs — jamais un bouton qui serait refusé.
    */
   redactionAssistee: boolean;
+  /**
+   * Où mène le chemin vers ce qui ouvre la rédaction assistée : la page des
+   * packs, qui propose le passage à Dossier sur un dossier Essentiel
+   * (S.88), ou la page Tarifs quand ce passage n'est pas ouvert.
+   */
+  lienDesPacks?: string;
   /** Horodatage de rendu, passé par le serveur pour que « il y a 4 minutes » soit stable. */
   maintenant: string;
 }
@@ -125,6 +131,7 @@ export function Redaction({
   suggestion,
   redactionDisponible,
   redactionAssistee,
+  lienDesPacks = "/tarifs",
   maintenant,
 }: RedactionProps) {
   const router = useRouter();
@@ -428,7 +435,7 @@ export function Redaction({
               </p>
               {etat === "MISE_EN_FORME_RESERVEE" && message.action ? (
                 <LienBouton
-                  href="/tarifs"
+                  href={lienDesPacks}
                   variante="secondaire"
                   className="mt-1"
                 >

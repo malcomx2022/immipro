@@ -228,6 +228,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-05.3 : les routes de webhook sont exclues du rate limiting mais soumises à vérification de signature.
 - RG-05.4 : un job de réconciliation interroge le fournisseur toutes les 15 minutes sur les transactions `EN_ATTENTE` de plus de 10 minutes — le webhook peut se perdre.
 - RG-05.5 : montant minimum 3 000 XOF, en dessous duquel frais de collecte et coût IA rendent la transaction non rentable.
+- RG-05.6 : sur un même dossier, le passage d'Essentiel à Dossier se paie la différence — prix actuel de Dossier dans la devise de l'achat Essentiel, moins le montant effectivement payé pour cet achat, jamais négatif, sans conversion XOF/EUR (15 000 − 5 000 = 10 000 F ; 29 − 12 = 17 €). Il ajoute 20 analyses (le quota issu du pack passe de 10 à 30) et ouvre la rédaction assistée ; les recharges n'en réduisent ni le prix ni les analyses. L'achat Essentiel d'origine doit être confirmé, couvrir ce dossier, n'être ni remboursé ni en cours de remboursement ; une seule montée ouverte par achat et par dossier. La montée est une transaction distincte liée à l'achat source ; un rejeu ne débite ni ne crédite deux fois. Son remboursement retire les 20 analyses encore disponibles et le droit à de nouveaux appels de rédaction assistée, jamais les réponses, textes ou versions ; si des analyses ajoutées ont servi, il passe en revue manuelle. Un achat de Dossier au prix plein reste un achat supplémentaire et n'est pas présenté comme une montée (arbitrage S.88).
 
 **Cas limites**
 

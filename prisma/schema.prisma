@@ -598,6 +598,16 @@ model Transaction {
   /// d'un geste, et lequel.
   refundBasis       String?
 
+  /// L'achat Essentiel dont part un passage à Dossier — arbitrage S.88.
+  ///
+  /// Posé sur la transaction de montée, et seulement sur elle : la base
+  /// exige qu'il existe si et seulement si `packCode` est `montee-dossier`.
+  /// Un index unique partiel interdit une seconde montée ouverte (initiée,
+  /// en attente ou confirmée) depuis le même achat sur le même dossier.
+  sourceTransactionId String?
+  sourceTransaction   Transaction?  @relation("MonteeEnGamme", fields: [sourceTransactionId], references: [id], onDelete: Restrict)
+  montees             Transaction[] @relation("MonteeEnGamme")
+
   credits AnalysisCredit[]
   events  PaymentEvent[]
 

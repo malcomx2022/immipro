@@ -6,6 +6,7 @@ import { faitsDuDossier, pieceARediger, vueDeLaRelecture } from "@/server/lectur
 import { exigerCandidat } from "@/server/securite/page";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { redactionAssisteeDuDossier } from "@/server/acces/droits";
+import { lienDesPacks } from "@/server/acces/montee";
 
 /**
  * R-04 — Analyse critique. WF-08.
@@ -72,6 +73,11 @@ export default async function PageRelecture({
   );
 
   return (
-    <Relecture dossier={vue.dossier} type={type} {...vueRelecture} />
+    <Relecture
+      dossier={vue.dossier}
+      type={type}
+      {...vueRelecture}
+      lienDesPacks={await lienDesPacks(id, acteur.id)}
+    />
   );
 }

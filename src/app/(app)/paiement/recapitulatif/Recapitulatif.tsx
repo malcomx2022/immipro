@@ -14,6 +14,12 @@ import type { Devise } from "@/domain/payments/pricing";
 import { corpsDAchat, type Achat, type Tarif } from "@/domain/payments/achat";
 import { deroulement, mentionDuRail } from "@/domain/payments/rail";
 import { formatMontant } from "@/lib/utils";
+import {
+  CODE_MONTEE_DOSSIER,
+  LIBELLE_MONTEE,
+  ceQueLaMonteeOuvre,
+  type DetailDuPrix,
+} from "@/domain/payments/montee";
 
 /**
  * $-02 — Récapitulatif.
@@ -51,25 +57,47 @@ import { formatMontant } from "@/lib/utils";
 export interface RecapitulatifProps {
   tunnel: Tunnel;
   achat: Achat;
-  tarif: Tarif;
+  /** Le tarif de la grille. Absent pour la montée, qui n'y figure pas. */
+  tarif?: Tarif;
   deviseInitiale: Devise;
+  /**
+   * Le passage à Dossier (S.88) : le prix différentiel, calculé par le
+   * serveur depuis l'achat Essentiel. Sa devise est celle de cet achat,
+   * et elle ne se choisit pas.
+   */
+  montee?: DetailDuPrix;
+  /**
+   * Un pack acheté sur un dossier déjà couvert. C'est un achat
+   * supplémentaire au prix plein, et l'écran le dit — il ne doit pas se
+   * lire comme une montée en gamme. `passage` est le prix du passage à
+   * Dossier quand il est possible, pour que le candidat compare.
+   */
+  supplementaire?: { passage: string | null };
 }
 
 /** Dérivée une fois, au module : le registre est un littéral. */
 const RESERVE_PAIEMENT = reserveDeLAcceptation(["conditions"]);
 
-export function Recapitulatif({ tunnel, achat, tarif, deviseInitiale }: RecapitulatifProps) {
+export function Recapitulatif({
+  tunnel,
+  achat,
+  tarif,
+  deviseInitiale,
+  montee,
+  supplementaire,
+}: RecapitulatifProps) {
   const [conditions, setConditions] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   // La devise est figée dès la première transaction ouverte (RG-05, cas
   // limites) : elle se choisit sur $-01 et se lit ici, elle ne bascule plus.
-  const devise = deviseInitiale;
+  const devise = montee ? montee.devise : deviseInitiale;
 
   // La raison vient du domaine, comme sur $-01 : une phrase de refus écrite
   // deux fois est une phrase dont une copie se périme en silence.
   const obstacle = obstacleAuPaiement(conditions);
-  const montant = formatMontant(tarif.prix[devise], devise);
+  const montant = formatMontant(montee ? montee.montant : (tarif?.prix[devise] ?? 0), devise);
+  const libelle = montee ? LIBELLE_MONTEE : (tarif?.libelle ?? "");
   const autreDevise: Devise = devise === "XOF" ? "EUR" : "XOF";
 
   async function payer() {
@@ -121,14 +149,64 @@ export function Recapitulatif({ tunnel, achat, tarif, deviseInitiale }: Recapitu
           <p className="text-32 font-semibold text-ink-900">{montant}</p>
           <p className="text-pretty text-14 text-ink-500">
             {mentionDuRail(devise)}{" "}
-            La grille en {autreDevise === "XOF" ? "francs CFA" : "euros"} est
-            distincte, ce n&apos;est pas une conversion.
+            {montee
+              ? "La différence se paie dans la devise de ton achat Essentiel : aucune conversion n'est faite."
+              : `La grille en ${autreDevise === "XOF" ? "francs CFA" : "euros"} est distincte, ce n'est pas une conversion.`}
           </p>
         </div>
 
+        {montee ? (
+          <section className="flex flex-col gap-2 rounded-lg border border-ink-300 p-5">
+            <h2 className="text-16 font-semibold text-ink-900">Tu paies la différence</h2>
+            <dl className="flex flex-col text-14">
+              {[
+                { intitule: "Dossier aujourd'hui", valeur: formatMontant(montee.prixDossier, devise) },
+                {
+                  intitule: "Déjà payé pour Essentiel",
+                  valeur: `− ${formatMontant(montee.dejaPaye, devise)}`,
+                },
+                { intitule: "À payer", valeur: montant },
+              ].map((ligne) => (
+                <div key={ligne.intitule} className="flex justify-between gap-4 py-1.5">
+                  <dt className="text-ink-700">{ligne.intitule}</dt>
+                  <dd className="text-right font-medium text-ink-900">{ligne.valeur}</dd>
+                </div>
+              ))}
+            </dl>
+            <ul className="flex flex-col gap-1.5 pt-1">
+              {ceQueLaMonteeOuvre().map((ligne) => (
+                <li key={ligne} className="text-pretty text-14 text-ink-700">
+                  {ligne}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {supplementaire ? (
+          <section className="flex flex-col gap-1.5 rounded-lg border border-ink-300 p-4">
+            <h2 className="text-16 font-semibold text-ink-900">
+              Ce dossier est déjà couvert par un pack
+            </h2>
+            <p className="text-pretty text-14 text-ink-700">
+              Cet achat est un pack supplémentaire, au prix plein. Ce n&apos;est pas
+              un passage à Dossier : ton pack actuel et ses analyses restent, et
+              celui-ci s&apos;y ajoute.
+            </p>
+            {supplementaire.passage ? (
+              <Link
+                href={`/paiement/recapitulatif?dossier=${tunnel.dossier.id}&achat=${CODE_MONTEE_DOSSIER}`}
+                className="flex min-h-touch items-center text-14 font-medium text-accent-600"
+              >
+                Passer plutôt à Dossier pour {supplementaire.passage}
+              </Link>
+            ) : null}
+          </section>
+        ) : null}
+
         <dl className="flex flex-col">
           {[
-            { intitule: "Achat", valeur: tarif.libelle },
+            { intitule: "Achat", valeur: libelle },
             {
               intitule: "Dossier",
               valeur: `${tunnel.dossier.pays} — ${tunnel.dossier.intitule}`,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getPack, RECHARGE_ANALYSES, CONSULTATION, type Devise } from "./pricing";
+import { CODE_MONTEE_DOSSIER } from "./montee";
 
 /**
  * Ce qui s'achète, et comment cela se nomme d'un bout à l'autre.
@@ -40,7 +41,13 @@ import { getPack, RECHARGE_ANALYSES, CONSULTATION, type Devise } from "./pricing
 export type Achat =
   | { type: "pack"; code: string }
   | { type: "recharge" }
-  | { type: "consultation" };
+  | { type: "consultation" }
+  /**
+   * Le passage d'Essentiel à Dossier sur un même dossier — S.88. Il ne
+   * porte rien d'autre que sa catégorie : l'achat Essentiel d'origine et
+   * le montant se retrouvent côté serveur, jamais reçus du navigateur.
+   */
+  | { type: "montee" };
 
 export type CategorieDAchat = Achat["type"];
 
@@ -57,6 +64,7 @@ export const schemaAchat = z.discriminatedUnion("type", [
   z.object({ type: z.literal("pack"), code: z.string().min(1) }),
   z.object({ type: z.literal("recharge") }),
   z.object({ type: z.literal("consultation") }),
+  z.object({ type: z.literal("montee") }),
 ]) satisfies z.ZodType<Achat>;
 
 /**
@@ -76,6 +84,8 @@ export function corpsDAchat(achat: Achat): Achat {
       return { type: "recharge" };
     case "consultation":
       return { type: "consultation" };
+    case "montee":
+      return { type: "montee" };
     default: {
       const jamais: never = achat;
       throw new Error(`Achat non sérialisable : ${JSON.stringify(jamais)}`);
@@ -92,6 +102,7 @@ export function corpsDAchat(achat: Achat): Achat {
 export function achatDuParametre(parametre: string): Achat | null {
   if (parametre === "recharge") return { type: "recharge" };
   if (parametre === "consultation") return { type: "consultation" };
+  if (parametre === CODE_MONTEE_DOSSIER) return { type: "montee" };
   return getPack(parametre) ? { type: "pack", code: parametre } : null;
 }
 
@@ -107,8 +118,10 @@ export interface Tarif {
  * deux passent par ici, si bien qu'un montant affiché est le montant
  * enregistré, ou rien ne s'ouvre.
  *
- * Rend `null` pour un code de pack absent de la grille — le seul cas où
- * une catégorie connue ne porte pas de prix.
+ * Rend `null` pour un code de pack absent de la grille, et pour la montée
+ * en gamme : son prix n'est pas sur la grille, il dépend de ce que l'achat
+ * Essentiel d'origine a réellement coûté (`prixDeLaMontee`), et seul le
+ * serveur connaît cet achat.
  */
 export function tarifDe(achat: Achat): Tarif | null {
   switch (achat.type) {
@@ -120,6 +133,8 @@ export function tarifDe(achat: Achat): Tarif | null {
       return { libelle: RECHARGE_ANALYSES.libelle, prix: RECHARGE_ANALYSES.prix };
     case "consultation":
       return { libelle: CONSULTATION.libelle, prix: CONSULTATION.prix };
+    case "montee":
+      return null;
     default: {
       const jamais: never = achat;
       throw new Error(`Achat sans tarif : ${JSON.stringify(jamais)}`);
@@ -144,6 +159,8 @@ export function codeEnregistre(achat: Achat): string {
       return "recharge";
     case "consultation":
       return "consultation";
+    case "montee":
+      return CODE_MONTEE_DOSSIER;
     default: {
       const jamais: never = achat;
       throw new Error(`Achat sans code : ${JSON.stringify(jamais)}`);
@@ -160,6 +177,7 @@ export function codeEnregistre(achat: Achat): string {
 const SANS_CODE_PROPRE = {
   recharge: { type: "recharge" },
   consultation: { type: "consultation" },
+  [CODE_MONTEE_DOSSIER]: { type: "montee" },
 } as const satisfies Record<string, Achat>;
 
 export const CODES_HORS_PACK: readonly string[] = Object.keys(SANS_CODE_PROPRE);
@@ -235,6 +253,13 @@ export function ouvrableDepuisLeRecapitulatif(achat: Achat): boolean {
       return true;
     case "consultation":
       return false;
+    /*
+      La montée se paie depuis le récapitulatif comme un pack, mais le
+      montant n'y vient pas de la grille : la page le demande au serveur,
+      qui retrouve l'achat Essentiel et refuse s'il ne convient pas.
+    */
+    case "montee":
+      return true;
     default: {
       const jamais: never = achat;
       throw new Error(`Achat non arbitré : ${JSON.stringify(jamais)}`);

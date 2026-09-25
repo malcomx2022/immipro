@@ -43,6 +43,13 @@ import {
   type CauseDEchecDOuverture,
 } from "@/domain/paiement/ouverture";
 import { lOuvreur } from "@/server/paiement/ouvreurs";
+import { sourceDeLaMontee, type SourceDeLaMontee } from "@/server/acces/montee";
+import {
+  ANALYSES_AJOUTEES,
+  CODE_MONTEE_DOSSIER,
+  LIBELLE_MONTEE,
+  suiteDuRemboursementDeLaMontee,
+} from "@/domain/payments/montee";
 import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 
@@ -73,14 +80,45 @@ import type { CauseRefus } from "@/domain/paiement/echec";
  * `switch` exhaustifs du domaine, eux, refusent de compiler tant qu'elle
  * n'a pas de prix ni de code.
  */
-type Rattache<A> = A extends unknown ? A & { applicationId: string } : never;
+type Rattache<A> = A extends { type: "montee" }
+  ? A & { applicationId: string; source: SourceDeLaMontee }
+  : A extends unknown
+    ? A & { applicationId: string }
+    : never;
 export type Achat = Rattache<AchatDuDomaine>;
 
-/** Rattache au dossier l'achat reçu de la route, sans conversion forcée. */
-export const rattacher = (achat: AchatDuDomaine, applicationId: string): Achat => ({
+/** Rattache au dossier un achat reçu de la route, hors montée en gamme. */
+export const rattacher = (
+  achat: Exclude<AchatDuDomaine, { type: "montee" }>,
+  applicationId: string,
+): Achat => ({
   ...achat,
   applicationId,
 });
+
+/**
+ * Rattache au dossier l'achat reçu de la route — montée comprise.
+ *
+ * La montée en gamme (S.88) ne porte que sa catégorie. Son achat Essentiel
+ * d'origine et son prix se retrouvent ici, en base : le navigateur ne dit
+ * ni lequel, ni combien. Un dossier qui ne s'y prête pas lève
+ * `montee_indisponible`, avec la raison précise.
+ */
+export async function preparerLAchat(
+  achat: AchatDuDomaine,
+  applicationId: string,
+  userId: string,
+): Promise<Achat> {
+  if (achat.type !== "montee") return rattacher(achat, applicationId);
+  return { ...achat, applicationId, source: await sourceDeLaMontee(applicationId, userId) };
+}
+
+/**
+ * La devise d'un achat. Celle que le candidat a choisie, sauf pour la
+ * montée : elle garde la devise de l'achat Essentiel, sans conversion.
+ */
+export const deviseDeLAchat = (achat: Achat, choisie: Devise): Devise =>
+  achat.type === "montee" ? achat.source.devise : choisie;
 
 /**
  * Le montant et le libellé d'un achat, pris sur la grille du domaine.
@@ -91,6 +129,12 @@ export const rattacher = (achat: AchatDuDomaine, applicationId: string): Achat =
  * l'écran l'avait déjà fait.
  */
 export function montantDe(achat: Achat, devise: Devise): { montant: number; libelle: string } {
+  if (achat.type === "montee") {
+    // La différence, calculée en base depuis l'achat d'origine, dans sa
+    // devise et aucune autre : il n'y a pas de grille à convertir.
+    if (devise !== achat.source.devise) throw echec("devise_figee");
+    return { montant: achat.source.du, libelle: LIBELLE_MONTEE };
+  }
   const tarif = tarifDe(achat);
   if (!tarif) throw echec("champs_invalides", { champs: { pack: "Ce pack n'existe pas." } });
   return { montant: tarif.prix[devise], libelle: tarif.libelle };
@@ -108,12 +152,22 @@ export async function creerOuReprendre(
   achat: Achat,
   devise: Devise,
 ): Promise<{ transaction: Transaction; reprise: boolean }> {
+  /*
+    La reprise porte sur **le même achat** : même code, et pour une montée,
+    même achat d'origine. Elle reprenait n'importe quelle transaction en
+    attente sur le dossier — une recharge en suspens aurait été reprise à
+    la place du passage à Dossier, et le candidat aurait payé l'une en
+    croyant payer l'autre.
+  */
+  const memeAchat = {
+    userId,
+    applicationId: achat.applicationId,
+    packCode: codeEnregistre(achat),
+    ...(achat.type === "montee" ? { sourceTransactionId: achat.source.transactionId } : {}),
+    status: { in: ["INITIEE", "EN_ATTENTE"] as TransactionStatus[] },
+  };
   const enCours = await db.transaction.findFirst({
-    where: {
-      userId,
-      applicationId: achat.applicationId,
-      status: { in: ["INITIEE", "EN_ATTENTE"] },
-    },
+    where: memeAchat,
     orderBy: { createdAt: "desc" },
   });
 
@@ -129,11 +183,14 @@ export async function creerOuReprendre(
     throw echec("montant_sous_le_minimum");
   }
 
-  const transaction = await db.transaction.create({
+  const creation = db.transaction.create({
     data: {
       reference: referenceInterne(),
       userId,
       applicationId: achat.applicationId,
+      // S.88 — la montée cite son achat d'origine ; la base l'exige, et
+      // refuse une seconde montée ouverte depuis le même achat.
+      ...(achat.type === "montee" ? { sourceTransactionId: achat.source.transactionId } : {}),
       // La colonne porte le code du pack, ou la catégorie du complément.
       // La conversion est celle du domaine, exhaustive, et son inverse
       // (`achatDepuisLeCode`) vit à côté d'elle.
@@ -147,7 +204,24 @@ export async function creerOuReprendre(
       status: "INITIEE",
     },
   });
-  return { transaction, reprise: false };
+  try {
+    return { transaction: await creation, reprise: false };
+  } catch (erreur) {
+    /*
+      Deux clics simultanés sur « Payer » une montée : le second bute sur
+      l'index unique partiel. Il reprend la transaction que le premier
+      vient d'ouvrir — c'est le même achat — au lieu de répondre par une
+      erreur à un geste légitime.
+    */
+    if (achat.type === "montee" && estUnDoublon(erreur)) {
+      const ouverte = await db.transaction.findFirst({ where: memeAchat });
+      if (ouverte) return { transaction: ouverte, reprise: true };
+      throw echec("montee_indisponible", {
+        corps: "Un passage à Dossier est déjà confirmé ou en cours sur ce dossier.",
+      });
+    }
+    throw erreur;
+  }
 }
 
 /**
@@ -699,7 +773,11 @@ export async function initierLeRemboursement(
   if (!transaction.refundDueAt || transaction.refundedAt) return { issue: "sans_objet" };
 
   if (transaction.applicationId) {
-    const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction.id);
+    const suite = await suiteDuQuotaDuPack(
+      transaction.applicationId,
+      transaction.id,
+      transaction.packCode,
+    );
     if (suite.suite === "REVUE_MANUELLE") {
       // On ne tranche pas ce que vaut une analyse déjà rendue : c'est une
       // question commerciale. L'écart porte la question à un humain, et
@@ -753,7 +831,11 @@ export async function initierLeRemboursement(
     n'a pas écrit.
   */
   if (transaction.applicationId) {
-    const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction.id);
+    const suite = await suiteDuQuotaDuPack(
+      transaction.applicationId,
+      transaction.id,
+      transaction.packCode,
+    );
     /*
       La lecture préalable n'est pas la garantie — l'index unique partiel
       l'est —, elle évite seulement de provoquer une violation à chaque
@@ -856,7 +938,25 @@ async function noterLEcart(transactionId: string, motif: string): Promise<void> 
  * solde du dossier, sans savoir quel pack l'a ouverte — et c'est bien
  * ainsi, un solde n'a pas de couleur.
  */
-async function suiteDuQuotaDuPack(applicationId: string, transactionId: string) {
+async function suiteDuQuotaDuPack(
+  applicationId: string,
+  transactionId: string,
+  packCode: string,
+) {
+  /*
+    Le remboursement d'un passage à Dossier (S.88) ne retire que les
+    analyses **ajoutées** encore disponibles, lues sur le solde : elles
+    sont tenues pour consommées en dernier. Compter toutes les analyses
+    du dossier, comme pour un pack, enverrait en revue manuelle tout
+    candidat qui a simplement utilisé ses dix analyses d'Essentiel.
+  */
+  if (packCode === CODE_MONTEE_DOSSIER) {
+    const solde = await db.analysisCredit.aggregate({
+      where: { applicationId },
+      _sum: { delta: true },
+    });
+    return suiteDuRemboursementDeLaMontee(ANALYSES_AJOUTEES, solde._sum.delta ?? 0);
+  }
   const [octrois, consommations] = await Promise.all([
     db.analysisCredit.aggregate({
       where: { applicationId, transactionId, delta: { gt: 0 } },
@@ -971,6 +1071,29 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
     */
     case "consultation":
       await confirmerLaConsultation(transaction);
+      return;
+
+    /*
+      Le passage à Dossier (S.88) ajoute **vingt** analyses, pas trente :
+      les dix d'Essentiel restent au dossier, et le quota issu du pack
+      passe ainsi à trente. L'octroi est un `ACHAT_PACK` rattaché à cette
+      transaction, ce qui ouvre la rédaction assistée par la même lecture
+      que pour un pack (`CODES_REDACTION_ASSISTEE`), et la retire de même
+      au remboursement.
+
+      Il ne passe pas par `appliquerLaCouverture` : la montée ne couvre pas
+      de nouvelle destination, elle change la couverture d'un dossier déjà
+      servi. Un rejeu ne crédite pas deux fois — `acheverLeCredit` vérifie
+      d'abord qu'aucun octroi de cette transaction n'existe.
+    */
+    case "montee":
+      await ouvrirDuQuota({
+        applicationId: transaction.applicationId,
+        analyses: ANALYSES_AJOUTEES,
+        motif: "ACHAT_PACK",
+        transactionId: transaction.id,
+        note: `${LIBELLE_MONTEE} — ${ANALYSES_AJOUTEES} analyses ajoutées`,
+      });
       return;
 
     case "pack": {

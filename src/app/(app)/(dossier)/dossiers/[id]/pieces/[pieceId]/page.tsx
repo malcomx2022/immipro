@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { offreDeMontee } from "@/server/acces/montee";
 import { PieceDuDossier } from "./PieceDuDossier";
 import { RECHARGE_ANALYSES, deviseParDefaut } from "@/domain/payments/pricing";
 import { db } from "@/lib/db";
@@ -52,15 +53,22 @@ export default async function PagePiece({
   if (!vueDossier || !vuePiece) notFound();
 
   const devise = deviseParDefaut(compte?.countryCode);
+  const quota = await quotaDuDossier(id);
+  // Lu même quand il reste des analyses : le quota peut s'épuiser au
+  // dépôt suivant, et l'écran bascule alors sans recharger la page.
+  const passage = await offreDeMontee(id, acteur.id);
 
   return (
     <PieceDuDossier
       dossier={vueDossier.dossier}
       piece={vuePiece.piece}
-      quota={await quotaDuDossier(id)}
+      quota={quota}
       analyse={vuePiece.analyse ?? undefined}
       prixRecharge={formatMontant(RECHARGE_ANALYSES.prix[devise], devise)}
       volumeRecharge={RECHARGE_ANALYSES.volume}
+      prixPassage={
+        passage.ouverte ? formatMontant(passage.detail.montant, passage.detail.devise) : null
+      }
     />
   );
 }

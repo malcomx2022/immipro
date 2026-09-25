@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { montantDe, ouvrirLeTunnel, rattacher } from "@/server/acces/paiements";
+import {
+  deviseDeLAchat,
+  montantDe,
+  ouvrirLeTunnel,
+  preparerLAchat,
+} from "@/server/acces/paiements";
 import { dossierDuCandidat } from "@/server/acces/dossiers";
 import { schemaAchat } from "@/domain/payments/achat";
 import { formatMontant } from "@/lib/utils";
@@ -41,10 +46,12 @@ export const POST = route({
   }),
   async traiter({ corps, acteur }) {
     const dossier = await dossierDuCandidat(corps.dossierId, acteur!.id);
-    const achat = rattacher(corps.achat, dossier.id);
+    const achat = await preparerLAchat(corps.achat, dossier.id, acteur!.id);
+    // La montée garde la devise de l'achat Essentiel (S.88).
+    const devise = deviseDeLAchat(achat, corps.devise);
 
-    const { montant } = montantDe(achat, corps.devise);
-    const { reference, url, reprise } = await ouvrirLeTunnel(acteur!.id, achat, corps.devise);
+    const { montant } = montantDe(achat, devise);
+    const { reference, url, reprise } = await ouvrirLeTunnel(acteur!.id, achat, devise);
 
     return {
       reference,
@@ -55,8 +62,8 @@ export const POST = route({
        */
       url,
       montant,
-      montantFormate: formatMontant(montant, corps.devise),
-      devise: corps.devise,
+      montantFormate: formatMontant(montant, devise),
+      devise,
       reprise,
     };
   },
