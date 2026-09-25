@@ -1,4 +1,10 @@
-import type { Application, Document, DocumentVersion, VisaRule } from "@prisma/client";
+import type {
+  Application,
+  DepositCorrectionRequest,
+  Document,
+  DocumentVersion,
+  VisaRule,
+} from "@prisma/client";
 import { db } from "@/lib/db";
 import { aidePourLaChecklist, type AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { echec } from "@/server/http/echecs";
@@ -20,6 +26,7 @@ import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers
 import { exigencesDeLaPiece } from "@/domain/dossiers/verification";
 import type { Quota } from "@/domain/dossiers/televersement";
 import { packDeLaCouverture } from "@/domain/payments/droits";
+import { depuisDateCivile } from "@/domain/dossiers/depot";
 import { couverturesDuDossier } from "@/server/acces/droits";
 import { jourCivil } from "@/domain/format/fuseau";
 
@@ -34,7 +41,11 @@ import { jourCivil } from "@/domain/format/fuseau";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-type DossierComplet = Application & { documents: Document[]; visaRule: VisaRule | null };
+type DossierComplet = Application & {
+  documents: Document[];
+  visaRule: VisaRule | null;
+  correctionsDeDepot: DepositCorrectionRequest[];
+};
 
 /**
  * Tableau de bord — C-01.
@@ -63,6 +74,7 @@ async function charger(id: string, userId: string): Promise<DossierComplet> {
     include: {
       documents: { orderBy: [{ family: "asc" }, { createdAt: "asc" }] },
       visaRule: true,
+      correctionsDeDepot: { where: { status: "EN_ATTENTE" }, take: 1 },
     },
   });
   if (!dossier) throw echec("introuvable");
@@ -92,8 +104,24 @@ export async function vueDuDossier(id: string, userId: string): Promise<VueDossi
   // Un seul jour pour toute la lecture — et jamais l'index du tableau.
   const aujourdhui = jourCivil(new Date());
   const pieces = brut.documents.map((d) => versPiece(d, aujourdhui));
+  const dossier = versDossier(brut, brut.documents, fiche, brut.visaRule);
+  // S.90 — la demande de correction en attente, lue avec la conservation
+  // qu'elle concerne : l'écran dit que la date affichée n'est pas encore
+  // corrigée, plutôt que de laisser croire que la demande s'est perdue.
+  if (dossier.conservation) {
+    const demande = brut.correctionsDeDepot[0];
+    dossier.conservation = {
+      ...dossier.conservation,
+      correctionDemandee: demande
+        ? {
+            deposeLe: depuisDateCivile(demande.requestedDate),
+            demandeeLe: jourCivil(demande.createdAt),
+          }
+        : null,
+    };
+  }
   return {
-    dossier: versDossier(brut, brut.documents, fiche, brut.visaRule),
+    dossier,
     pieces,
     checklist: grouperPourCompletude(pieces),
     quota: await compteur(brut.id),

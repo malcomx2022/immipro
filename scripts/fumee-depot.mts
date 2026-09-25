@@ -69,9 +69,13 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
-const { declarerLeDepot, corrigerLeDepot, cloturerLeDossier } = await import(
-  "../src/server/dossiers/parcours"
-);
+const {
+  declarerLeDepot,
+  corrigerLeDepot,
+  cloturerLeDossier,
+  demanderUneCorrectionDuDepot,
+  refuserLaCorrectionDuDepot,
+} = await import("../src/server/dossiers/parcours");
 const { traiterLesDepots } = await import("../src/server/jobs/conservation");
 const { relancerLesDepots } = await import("../src/server/jobs/suivi-depot");
 const { brancherTransport } = await import("../src/server/courrier");
@@ -294,6 +298,71 @@ try {
       typeof ligne.depotDeclareDansImmiProLe === "string" && String(ligne.depotDeclareDansImmiProLe).startsWith("2025-10-20"),
       `date de déclaration exportée (${String(ligne.depotDeclareDansImmiProLe)})`,
     );
+  }
+  console.log("\nLa demande de correction du candidat (S.90)");
+  {
+    const { application, user } = await dossierPret(aMidi("2026-06-01"));
+    const admin = await db.user.create({ data: { email: `admin2-${process.pid}@exemple.test`, role: "ADMIN" } });
+    const soumis = await declarerLeDepot(application, { deposeLe: "2026-09-10", maintenant: aMidi("2026-09-12") });
+    const maintenant = aMidi("2026-09-25");
+    const demande = (d: string, explication = "Mon récépissé porte une autre date.") =>
+      demanderUneCorrectionDuDepot(soumis, { deposeLe: d, explication, maintenant }).catch((e) => e);
+
+    verifier(/est déjà le/u.test(champDe(await demande("2026-09-10"))), "une date identique est refusée");
+    verifier(/après/u.test(champDe(await demande("2026-09-15"))), "une date postérieure à la déclaration est refusée");
+    const courte = await demande("2026-09-01", "oups");
+    verifier(
+      codeDe(courte) === "champs_invalides" &&
+        /d'où vient l'erreur/u.test((courte as { champs?: Record<string, string> }).champs?.explication ?? ""),
+      "une explication vide est refusée, sur son champ",
+    );
+    const faite = await demande("2026-09-01");
+    verifier(faite.status === "EN_ATTENTE", "la demande est enregistrée, en attente");
+    const doublon = await demande("2026-09-02");
+    verifier(codeDe(doublon) === "etat_incompatible", "une seconde demande en attente est refusée");
+    const inchangee = await db.application.findUniqueOrThrow({ where: { id: application.id } });
+    verifier(inchangee.depositedOn?.toISOString().slice(0, 10) === "2026-09-10", "la date enregistrée ne bouge pas");
+
+    // L'opérateur l'applique : la demande est tranchée par la correction.
+    await corrigerLeDepot(application.id, {
+      deposeLe: "2026-09-01",
+      motif: "Demande du candidat, récépissé vérifié.",
+      acteurId: admin.id,
+      maintenant: aMidi("2026-09-26"),
+    });
+    const tranchee = await db.depositCorrectionRequest.findUniqueOrThrow({ where: { id: faite.id } });
+    verifier(tranchee.status === "APPLIQUEE" && tranchee.resolvedBy === admin.id, "la demande est appliquée, et par qui");
+    const avis = await db.notification.findFirst({ where: { userId: user.id, title: "Date de dépôt corrigée" } });
+    verifier(avis?.body.includes("1er septembre 2026") === true, "le candidat est prévenu de la nouvelle date");
+
+    // Une nouvelle demande, non retenue.
+    const corrigee = await db.application.findUniqueOrThrow({ where: { id: application.id } });
+    const seconde = await demanderUneCorrectionDuDepot(corrigee, {
+      deposeLe: "2026-08-20",
+      explication: "Je crois que c'était plutôt en août.",
+      maintenant: aMidi("2026-09-27"),
+    });
+    const promesse = await refuserLaCorrectionDuDepot(seconde.id, {
+      reponse: "Pas d'inquiétude, visa garanti de toute façon.",
+      acteurId: admin.id,
+    }).catch((e) => e);
+    verifier(codeDe(promesse) === "champs_invalides", "une réponse qui promet un résultat ne part pas");
+    await refuserLaCorrectionDuDepot(seconde.id, {
+      reponse: "Le récépissé que tu as joint porte le 1er septembre : la date reste celle-ci.",
+      acteurId: admin.id,
+    });
+    const refusee = await db.depositCorrectionRequest.findUniqueOrThrow({ where: { id: seconde.id } });
+    verifier(refusee.status === "REFUSEE" && refusee.answer !== null, "la demande est refusée, avec sa réponse");
+    const recu = await db.notification.findFirst({ where: { userId: user.id, title: "Date de dépôt inchangée" } });
+    verifier(recu?.body.includes("porte le 1er septembre") === true, "le candidat lit la réponse dans ses alertes");
+    const trace = await db.auditLog.count({ where: { action: "dossier.depot.correction.refus" } });
+    verifier(trace === 1, "le refus est au journal");
+    const final = await db.application.findUniqueOrThrow({ where: { id: application.id } });
+    verifier(final.depositedOn?.toISOString().slice(0, 10) === "2026-09-01", "la date reste celle corrigée");
+
+    const donnees = (await donneesDuCompte(user.id)) as unknown as { dossiers: Array<Record<string, unknown>> };
+    const demandes = (donnees.dossiers[0]?.demandesDeCorrectionDuDepot ?? []) as unknown[];
+    verifier(demandes.length === 2, `l'export rend ses deux demandes (${demandes.length})`);
   }
 } finally {
   brancherTransport(null);

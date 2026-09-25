@@ -208,3 +208,63 @@ export function correctionDuDepot(avant: {
       : null;
   return { retentionUntil, purgeDueAt };
 }
+
+// ── La demande de correction faite par le candidat — S.90 ─────────────
+
+/**
+ * Pourquoi une date corrigée est refusée — pour la demande du candidat
+ * comme pour la correction du back-office, qui appliquent la même règle.
+ *
+ * Aux bornes de la déclaration s'ajoutent deux évidences : un dépôt ne
+ * peut pas avoir eu lieu après avoir été déclaré, et une correction qui
+ * ne change rien n'en est pas une.
+ */
+export function refusDeLaCorrection(c: {
+  nouvelle: string;
+  actuelle: string;
+  declareLe: string;
+  aujourdhui: string;
+  ouvertLe: string;
+}): string | null {
+  return (
+    refusDeLaDateDeDepot(c.nouvelle, c.aujourdhui, c.ouvertLe) ??
+    (c.nouvelle > c.declareLe
+      ? `Le dépôt a été déclaré le ${jourEnFrancais(c.declareLe)} : il ne peut pas avoir eu lieu après.`
+      : c.nouvelle === c.actuelle
+        ? `La date du dépôt est déjà le ${jourEnFrancais(c.actuelle)}.`
+        : null)
+  );
+}
+
+/** L'explication du candidat : assez pour que l'opérateur comprenne l'erreur. */
+export const EXPLICATION_MINIMALE = 10;
+
+export const refusDeLExplication = (explication: string): string | null =>
+  explication.trim().length < EXPLICATION_MINIMALE
+    ? "Dis en une phrase d'où vient l'erreur — par exemple la date qui figure sur ton récépissé de dépôt."
+    : null;
+
+export const AIDE_DEMANDE_DE_CORRECTION =
+  "Une fois déclarée, la date de ton dépôt ne se modifie pas directement : elle commande la conservation de tes pièces et les questions sur l'issue. Signale la bonne date, et un membre de l'équipe la vérifie.";
+
+export const demandeEnAttente = (deposeLe: string, demandeeLe: string): string =>
+  `Tu as demandé le ${jourEnFrancais(demandeeLe)} que la date de ton dépôt soit corrigée au ${jourEnFrancais(deposeLe)}. Un membre de l'équipe la vérifie ; en attendant, la date enregistrée reste celle que tu avais déclarée.`;
+
+export interface AvisDeCorrection {
+  titre: string;
+  corps: string;
+}
+
+export function correctionAppliquee(nouvelle: string, conserveesJusquAu: Date): AvisDeCorrection {
+  return {
+    titre: "Date de dépôt corrigée",
+    corps: `La date de ton dépôt est maintenant le ${jourEnFrancais(nouvelle)}. Tes pièces sont conservées jusqu'au ${jourEnFrancais(depuisDateCivile(conserveesJusquAu))}, et les questions sur l'issue se comptent depuis cette date.`,
+  };
+}
+
+export function correctionRefusee(demandee: string, reponse: string): AvisDeCorrection {
+  return {
+    titre: "Date de dépôt inchangée",
+    corps: `Ta demande de corriger la date de ton dépôt au ${jourEnFrancais(demandee)} n'a pas été retenue. ${reponse.trim()}`,
+  };
+}

@@ -12,6 +12,7 @@ import {
 import { PieceDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier";
 import { Cloture } from "@/app/(app)/(dossier)/dossiers/[id]/cloture/Cloture";
 import { Depot } from "@/app/(app)/(dossier)/dossiers/[id]/depot/Depot";
+import { DemandeDeCorrection } from "@/app/(app)/(dossier)/dossiers/[id]/DemandeDeCorrection";
 import { CONSERVATION_SOUMIS_MOIS } from "@/domain/dossiers/conservation";
 import { PREFERENCES_PAR_DEFAUT, phraseDesRappels } from "@/domain/dossiers/preferences-rappels";
 import {
@@ -719,6 +720,50 @@ describe("C-11a — Déclaration de dépôt", () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toEqual({ deposeLe: "2026-09-02" });
+  });
+
+  /**
+   * S.90 — la date déclarée ne se modifie pas depuis le dossier : le
+   * candidat la signale, et l'écran dit ensuite que la demande attend.
+   */
+  it("permet de signaler une date de dépôt erronée, sans la modifier", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ deposeLe: "2026-09-01", message: "Demande enregistrée : un membre de l'équipe la vérifie." }),
+      } as Response),
+    );
+    global.fetch = fetch as unknown as typeof globalThis.fetch;
+    render(<DemandeDeCorrection dossierId="nl-1" deposeLe="2026-09-10" enAttente={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "La date de ton dépôt est fausse ?" }));
+    const bouton = () => screen.getByRole("button", { name: "Demander la correction" });
+    expect(bouton()).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByLabelText("Date réelle de ton dépôt"), { target: { value: "2026-09-01" } });
+    expect(bouton()).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByLabelText("D'où vient l'erreur ?"), {
+      target: { value: "Mon récépissé porte le 1er septembre." },
+    });
+    fireEvent.click(bouton());
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Demande enregistrée"));
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/dossiers/nl-1/depot/correction");
+    expect(JSON.parse(String(init.body))).toEqual({
+      deposeLe: "2026-09-01",
+      explication: "Mon récépissé porte le 1er septembre.",
+    });
+  });
+
+  it("dit qu'une demande attend, sans rouvrir le formulaire", () => {
+    render(
+      <DemandeDeCorrection
+        dossierId="nl-1"
+        deposeLe="2026-09-10"
+        enAttente={{ deposeLe: "2026-09-01", demandeeLe: "2026-09-25" }}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain("la date enregistrée reste celle que tu avais déclarée");
+    expect(screen.queryByRole("button", { name: /date de ton dépôt est fausse/u })).toBeNull();
   });
 
   it("n'offre aucun bouton à un dossier qui n'est pas prêt, et dit pourquoi", () => {

@@ -72,7 +72,9 @@ export type ActionAuditee =
    * conservation et les relances : l'ancienne et la nouvelle valeur, et
    * les échéances recalculées, partent au journal avec le motif.
    */
-  | "dossier.depot.correction";
+  | "dossier.depot.correction"
+  /** Une demande de correction du candidat non retenue — S.90. */
+  | "dossier.depot.correction.refus";
 
 export interface EcritureAudit {
   acteurId: string;

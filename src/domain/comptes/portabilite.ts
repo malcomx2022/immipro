@@ -118,6 +118,7 @@ export const EXPORTE: Record<string, true | string> = {
   credits: true,
   migrations: true,
   appointments: true,
+  correctionsDeDepot: true,
   referrals: true,
   accesses:
     "Accords de partage avec un consultant. Ils se lisent et se révoquent à l'écran ; leur export reste à trancher, comme le journal d'audit des accès administrateurs à une pièce (RG-15.1).",

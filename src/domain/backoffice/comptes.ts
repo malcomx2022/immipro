@@ -50,6 +50,8 @@ export interface DepotDeclare {
   deposeLe: string;
   /** Instant où le candidat l'a déclarée dans ImmiPro, ISO. */
   declareLe: string;
+  /** La demande de correction du candidat, en attente (S.90). */
+  demande?: { id: string; deposeLe: string; explication: string; demandeeLe: string } | null;
 }
 
 export type FiltreCompte = "TOUS" | "EMAIL_NON_VERIFIE" | "SUPPRESSION_DEMANDEE";

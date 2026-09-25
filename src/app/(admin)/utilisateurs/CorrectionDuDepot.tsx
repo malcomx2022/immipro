@@ -30,7 +30,11 @@ export function CorrectionDuDepot({ depot }: { depot: DepotDeclare }) {
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [fait, setFait] = useState<string | null>(null);
+  const [demande, setDemande] = useState(depot.demande ?? null);
+  const [reponse, setReponse] = useState("");
+  const [refus, setRefus] = useState(false);
   const idMotif = useId();
+  const idReponse = useId();
 
   const manque =
     deposeLe === actuelle
@@ -51,6 +55,8 @@ export function CorrectionDuDepot({ depot }: { depot: DepotDeclare }) {
     if (resultat.ok) {
       setActuelle(resultat.donnees.nouvelle);
       setMotif("");
+      // La correction tranche la demande du candidat, s'il y en avait une.
+      setDemande(null);
       setFait(
         `Date corrigée : ${jourEnFrancais(resultat.donnees.nouvelle)}.${
           resultat.donnees.conservationJusquAu
@@ -63,12 +69,75 @@ export function CorrectionDuDepot({ depot }: { depot: DepotDeclare }) {
     setEchec(resultat.echec);
   }
 
+  async function refuser() {
+    if (!demande) return;
+    setRefus(true);
+    setEchec(null);
+    setFait(null);
+    const resultat = await appeler<{ statut: string }>(
+      `/api/admin/depots/demandes/${demande.id}/refus`,
+      { corps: { reponse } },
+    );
+    setRefus(false);
+    if (resultat.ok) {
+      setDemande(null);
+      setReponse("");
+      setFait("Demande non retenue : le candidat a reçu ta réponse dans ses alertes.");
+      return;
+    }
+    setEchec(resultat.echec);
+  }
+
+  const manqueReponse =
+    reponse.trim().length < 20
+      ? "Écris la réponse au candidat : pourquoi la date reste inchangée, et ce qu'il peut fournir."
+      : null;
+
   return (
     <div className="flex flex-col gap-2 border-t border-ink-300 pt-3">
       <p className="text-14 font-medium text-ink-900">{depot.destination}</p>
       <p className="text-13 text-ink-700">
         Déposé le {jourEnFrancais(actuelle)} · déclaré le {momentEnFrancais(depot.declareLe)}
       </p>
+      {/* S.90 — la demande du candidat, avec ce qu'il en dit. La retenir,
+          c'est appliquer la correction ci-dessous ; ne pas la retenir
+          demande une réponse, qu'il lira. */}
+      {demande ? (
+        <div className="flex flex-col gap-2 rounded-md bg-ink-100 p-3">
+          <p className="text-pretty text-13 text-ink-900">
+            Demande du {momentEnFrancais(demande.demandeeLe)} : corriger au{" "}
+            {jourEnFrancais(demande.deposeLe)}.
+          </p>
+          <p className="text-pretty text-13 text-ink-700">« {demande.explication} »</p>
+          <Button variante="tertiaire" onClick={() => setDeposeLe(demande.deposeLe)}>
+            Reprendre la date demandée
+          </Button>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={idReponse} className="text-13 font-medium text-ink-900">
+              Réponse au candidat, si la demande n&apos;est pas retenue
+            </label>
+            <textarea
+              id={idReponse}
+              rows={2}
+              value={reponse}
+              onChange={(e) => setReponse(e.target.value)}
+              className={cn(CHAMP_CONTROLE, "h-auto py-2.5")}
+            />
+            {echec?.champs?.reponse ? (
+              <span className="text-13 text-danger">{echec.champs.reponse}</span>
+            ) : null}
+          </div>
+          <Button
+            variante="secondaire"
+            disabled={manqueReponse !== null}
+            chargement={refus}
+            raisonDesactivation={manqueReponse ?? undefined}
+            onClick={() => void refuser()}
+          >
+            Ne pas retenir la demande
+          </Button>
+        </div>
+      ) : null}
       <Input
         type="date"
         libelle="Date réelle du dépôt"
@@ -88,7 +157,7 @@ export function CorrectionDuDepot({ depot }: { depot: DepotDeclare }) {
           className={cn(CHAMP_CONTROLE, "h-auto py-2.5")}
         />
       </div>
-      {echec && !echec.champs?.deposeLe ? <BlocEchec echec={echec} annonce /> : null}
+      {echec && !echec.champs ? <BlocEchec echec={echec} annonce /> : null}
       {fait ? (
         <p role="status" className="text-pretty text-13 text-ink-900">
           {fait}

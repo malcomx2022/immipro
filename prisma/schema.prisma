@@ -344,6 +344,7 @@ model Application {
   credits       AnalysisCredit[]
   notifications Notification[]
   migrations    RuleMigration[]
+  correctionsDeDepot DepositCorrectionRequest[]
   accesses      ConsultantAccess[]
   appointments  Appointment[]
   referrals     PartnerReferral[]
@@ -1461,4 +1462,36 @@ enum EditorialStatus {
   /// Dépublié. La ligne survit : l'adresse a été indexée, et savoir qu'un
   /// document a existé vaut mieux que de ne plus rien savoir de lui.
   RETIRE
+}
+
+/// Une demande de correction de la date réelle du dépôt, faite par le
+/// candidat — S.90, suite de S.89.
+///
+/// Une fois déclarée, la date ne se modifie pas depuis le dossier : le
+/// candidat la **signale**, et un opérateur l'applique ou la refuse. Une
+/// seule demande en attente par dossier (index unique partiel). La demande
+/// garde la date proposée et l'explication ; la correction elle-même reste
+/// l'action auditée de S.89.
+model DepositCorrectionRequest {
+  id            String                  @id @default(uuid())
+  applicationId String
+  application   Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Date réelle proposée par le candidat.
+  requestedDate DateTime                @db.Date
+  /// Ce que le candidat dit de l'erreur — lu par l'opérateur.
+  explanation   String
+  status        DepositCorrectionStatus @default(EN_ATTENTE)
+  createdAt     DateTime                @default(now())
+  resolvedAt    DateTime?
+  resolvedBy    String?
+  /// La réponse faite au candidat quand la demande n'est pas retenue.
+  answer        String?
+
+  @@index([status, createdAt])
+}
+
+enum DepositCorrectionStatus {
+  EN_ATTENTE
+  APPLIQUEE
+  REFUSEE
 }

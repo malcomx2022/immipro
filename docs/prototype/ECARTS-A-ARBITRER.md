@@ -10251,3 +10251,46 @@ La portabilité exporte `dateReelleDuDepot` et `depotDeclareDansImmiProLe`, qui 
 
 - **La demande de correction par le candidat.** Il la signale au support ; il n'y a pas encore de formulaire dédié.
 - **La langue des relances.** Elles restent en français, comme les autres courriers.
+
+## S.90 — Les trois points laissés ouverts par S.88 et S.89
+
+### 1. Remboursement du supplément Dossier : la règle est confirmée et écrite
+
+S.88 avait adopté une convention sans la faire figurer dans DOC-11. Comme les consommations ne portent pas d'achat, les 20 analyses ajoutées par la montée sont tenues pour **consommées en dernier** :
+
+- tant que le solde du dossier couvre les 20, elles sont toutes encore disponibles et se retirent sans revue ;
+- en deçà, la différence a servi, et le remboursement passe en revue manuelle.
+
+La règle figure maintenant dans RG-05.6. Le code et la fumée `smoke:montee` la tenaient déjà.
+
+### 2. Le candidat demande une correction de la date de dépôt
+
+S.89 réservait la correction au back-office : le candidat devait écrire au support, sans trace dans l'application. Il la **demande** maintenant depuis son dossier, sous le bloc « Conservation de tes pièces », avec le lien « La date de ton dépôt est fausse ? ».
+
+**Côté candidat**
+
+- Il donne la bonne date et d'où vient l'erreur. Tant que ces deux champs ne sont pas renseignés, le bouton reste désactivé et dit ce qui manque.
+- La date suit la règle de la correction (`refusDeLaCorrection`), commune au candidat et à l'opérateur : ni future, ni antérieure à l'ouverture, ni postérieure à la déclaration, ni identique à la date enregistrée.
+- Une seule demande peut être en attente par dossier ; un index unique partiel l'impose.
+- La date enregistrée ne change pas d'ici là, et l'écran le dit. Un refus du serveur garde la saisie.
+
+**Côté opérateur** (fiche du compte)
+
+- Il voit la demande et son explication.
+- « Reprendre la date demandée » préremplit la correction auditée de S.89. Cette correction tranche la demande (`APPLIQUEE`, avec l'auteur) et prévient le candidat dans ses alertes.
+- « Ne pas retenir la demande » exige une **réponse au candidat** d'au moins vingt caractères. La réponse passe par le vocabulaire interdit (point d'application B-05 de CLAUDE.md), part au journal comme motif et arrive dans les alertes du candidat.
+
+**Export** : l'export des données rend ses demandes avec leur statut et la réponse reçue.
+
+### 3. La CI était arrêtée par deux erreurs de syntaxe, pas seulement par la facturation
+
+Chaque exécution échouait en une seconde, sans aucun job, sous le nom du fichier plutôt que « CI ». C'est la signature d'un workflow que GitHub ne parvient pas à lire. actionlint le confirme :
+
+- **`validation.yml`** : un `run:` non entre guillemets contenait « suspendus : annonce » ; le « : » suivi d'une espace se lit comme une clé YAML. Cette ligne vient du lot S.78.
+- **`deploy.yml`** : `outputs: { tag: ${{ … }} }` ; les accolades de l'expression cassent la table en ligne.
+
+`ci.yml` appelle `validation.yml`, et `deploy.yml` échouait de lui-même : les trois workflows étaient donc refusés, quel que soit l'état de la facturation.
+
+Les deux lignes sont corrigées, et actionlint passe sur les trois fichiers. Les fumées `smoke:montee` et `smoke:depot` entrent dans la porte de validation.
+
+Si des exécutions restent bloquées après ce correctif, la cause restante sera la facturation GitHub Actions. Elle se règle dans les paramètres du compte, pas dans le dépôt.
