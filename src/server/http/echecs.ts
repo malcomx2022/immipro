@@ -66,6 +66,7 @@ export type CodeEchec =
   // Paiement
   | "montant_sous_le_minimum"
   | "devise_figee"
+  | "montee_indisponible"
   | "creneau_indisponible"
   | "paiement_indisponible"
   | "ouverture_impossible"
@@ -260,6 +261,20 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     corps: "Le paiement a déjà été créé dans une devise, elle reste la sienne.",
     conserve: "Le paiement en cours reste valable.",
     action: "Reprendre le paiement en cours",
+    ton: "limite",
+  },
+  /**
+   * Le passage d'Essentiel à Dossier n'est pas ouvert sur ce dossier —
+   * S.88. Le corps est remplacé par la raison précise, tirée du domaine
+   * (`MESSAGE_DU_REFUS`) : « non disponible » seul ne dirait pas quoi
+   * faire.
+   */
+  montee_indisponible: {
+    statut: 409,
+    titre: "Le passage à Dossier n'est pas possible sur ce dossier",
+    corps: "L'achat Essentiel de ce dossier ne permet pas de payer la différence.",
+    conserve: "Rien n'a été débité, et ton dossier garde sa couverture actuelle.",
+    action: "Revenir à mon dossier",
     ton: "limite",
   },
   creneau_indisponible: {
@@ -470,6 +485,7 @@ export const CONSERVE_DU_CANDIDAT: readonly CodeEchec[] = [
   "televersement_indisponible",
   "creneau_indisponible",
   "paiement_indisponible",
+  "montee_indisponible",
   "ouverture_impossible",
   "ouverture_refusee",
   "paiement_introuvable",

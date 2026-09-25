@@ -100,7 +100,11 @@ export function Echec({
     lien qui le ramène au paiement — sur l'écran où il en a le plus besoin.
   */
   const reessai =
-    dossier && ouvrableDepuisLeRecapitulatif(achat) && tarifDe(achat) !== null
+    dossier &&
+    ouvrableDepuisLeRecapitulatif(achat) &&
+    // La montée n'a pas de prix sur la grille : le récapitulatif le
+    // redemande au serveur, qui refuse si le dossier ne s'y prête plus.
+    (tarifDe(achat) !== null || achat.type === "montee")
       ? `/paiement/recapitulatif?dossier=${dossier}&achat=${paiement.achatCode}&devise=${paiement.devise}`
       : null;
   const autreDevise = paiement.devise === "XOF" ? "EUR" : "XOF";

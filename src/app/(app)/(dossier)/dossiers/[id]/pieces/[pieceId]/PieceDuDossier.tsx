@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { MENTION_AU_CHOIX, SANS_EXIGENCE_CHIFFREE } from "@/domain/dossiers/verification";
 import { SourceNote } from "@/components/ui/SourceNote";
 import { EnteteDossier } from "../../EnteteDossier";
+import { CODE_MONTEE_DOSSIER } from "@/domain/payments/montee";
 
 /**
  * C-07 téléversement et C-08 résultat d'analyse — WF-06.
@@ -65,6 +66,11 @@ export interface PieceDuDossierProps {
   prixRecharge: string;
   /** Volume de la recharge, en analyses. */
   volumeRecharge: number;
+  /**
+   * Prix du passage à Dossier, mis en forme, quand le dossier est couvert
+   * par Essentiel et peut passer à Dossier au prix de la différence (S.88).
+   */
+  prixPassage?: string | null;
 }
 
 type Vue = "ANALYSE" | "TELEVERSEMENT";
@@ -76,6 +82,7 @@ export function PieceDuDossier({
   analyse,
   prixRecharge,
   volumeRecharge,
+  prixPassage = null,
 }: PieceDuDossierProps) {
   const [vue, setVue] = useState<Vue>(analyse ? "ANALYSE" : "TELEVERSEMENT");
   const [etat, setEtat] = useState<EtatTeleversement>(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
@@ -252,8 +259,21 @@ export function PieceDuDossier({
               pleineLargeur
               className="md:w-auto"
             >
-              Recharger {volumeRecharge} analyses
+              Ajouter des analyses
             </LienBouton>
+            {/* S.88 — sur un dossier Essentiel, le passage à Dossier se
+                propose à côté de la recharge, sous son propre nom : l'un
+                change la couverture, l'autre ajoute des analyses. */}
+            {prixPassage ? (
+              <LienBouton
+                href={`/paiement/recapitulatif?dossier=${dossier.id}&achat=${CODE_MONTEE_DOSSIER}`}
+                variante="secondaire"
+                pleineLargeur
+                className="md:w-auto"
+              >
+                Passer à Dossier — {prixPassage}
+              </LienBouton>
+            ) : null}
             {/*
               Le dépôt sans analyse n'avait pas de route à écrire : RG-06.5
               l'avait déjà tranché, et toute la chaîne l'appliquait. Le

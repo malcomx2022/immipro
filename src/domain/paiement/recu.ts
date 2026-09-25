@@ -1,4 +1,5 @@
 import { PACKS, RECHARGE_ANALYSES, CONSULTATION } from "@/domain/payments/pricing";
+import { CODE_MONTEE_DOSSIER, LIBELLE_MONTEE } from "@/domain/payments/montee";
 
 /**
  * Reçu de paiement — $-06, WF-05.
@@ -84,6 +85,7 @@ export const moyenDe = (fournisseur: string): string =>
 export function libelleDeLAchat(packCode: string): string {
   if (packCode === "recharge") return RECHARGE_ANALYSES.libelle;
   if (packCode === "consultation") return CONSULTATION.libelle;
+  if (packCode === CODE_MONTEE_DOSSIER) return LIBELLE_MONTEE;
   return PACKS.find((p) => p.code === packCode)?.libelle ?? packCode;
 }
 

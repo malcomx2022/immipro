@@ -29,6 +29,7 @@
  */
 
 import type { Achat } from "../payments/achat";
+import { ANALYSES_AJOUTEES } from "../payments/montee";
 
 /**
  * Au futur — dernière étape du fil de $-03, pendant que le paiement se
@@ -42,6 +43,8 @@ export function ceQuiSOuvre(achat: Achat): string {
       return "tes analyses sont créditées";
     case "consultation":
       return "ton créneau est réservé";
+    case "montee":
+      return "ton dossier passe à Dossier";
     default: {
       const jamais: never = achat;
       throw new Error(`Achat sans contrepartie annoncée : ${JSON.stringify(jamais)}`);
@@ -66,6 +69,8 @@ export function phraseDeConfirmation(achat: Achat): string {
       return "Tes analyses supplémentaires sont créditées.";
     case "consultation":
       return "Ton rendez-vous est réservé.";
+    case "montee":
+      return `Ton dossier est passé à Dossier : ${ANALYSES_AJOUTEES} analyses ajoutées, et la rédaction assistée est ouverte.`;
     default: {
       const jamais: never = achat;
       throw new Error(`Achat sans phrase de confirmation : ${JSON.stringify(jamais)}`);
@@ -87,6 +92,7 @@ export function actionApresLAchat(achat: Achat): string {
     case "recharge":
       return "Revenir à ma pièce";
     case "consultation":
+    case "montee":
       return "Revenir à mon dossier";
     default: {
       const jamais: never = achat;

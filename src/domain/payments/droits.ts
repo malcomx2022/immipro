@@ -1,4 +1,5 @@
-import { PACKS } from "./pricing";
+import { PACKS, getPack } from "./pricing";
+import { CODE_MONTEE_DOSSIER, PACK_D_ARRIVEE } from "./montee";
 
 /**
  * Les droits qu'une couverture ouvre sur un dossier — arbitrage S.80.
@@ -43,8 +44,20 @@ export const PACKS_REDACTION_ASSISTEE: readonly string[] = PACKS.filter(
   (p) => p.redactionAssistee,
 ).map((p) => p.code);
 
+/**
+ * Les codes d'achat dont un octroi ouvre la rédaction assistée : les packs
+ * qui la portent, et le passage d'Essentiel à Dossier (S.88). La montée
+ * n'est pas un pack de la grille, mais elle fait du dossier un dossier
+ * couvert par Dossier — et son remboursement retire le droit comme celui
+ * d'un pack, par `retiree`.
+ */
+export const CODES_REDACTION_ASSISTEE: readonly string[] = [
+  ...PACKS_REDACTION_ASSISTEE,
+  CODE_MONTEE_DOSSIER,
+];
+
 export const redactionAssisteeOuverte = (couvertures: readonly CouvertureDuDossier[]): boolean =>
-  couvertures.some((c) => !c.retiree && PACKS_REDACTION_ASSISTEE.includes(c.packCode));
+  couvertures.some((c) => !c.retiree && CODES_REDACTION_ASSISTEE.includes(c.packCode));
 
 /** Les noms, dans l'ordre de la grille : « Dossier et Dossier Pro ». */
 export const packsDeLaRedactionAssistee = (): string => {
@@ -58,3 +71,25 @@ export const packsDeLaRedactionAssistee = (): string => {
  * de passer vingt minutes sur son entretien —, puis ce qui ouvre le geste.
  */
 export const MENTION_REDACTION_RESERVEE = `Tes réponses, ton texte et tes versions restent ici, et tu peux écrire ta pièce toi-même. La proposition de texte et l'analyse critique s'ouvrent avec les packs ${packsDeLaRedactionAssistee()}.`;
+
+/**
+ * Le pack qui couvre un dossier, tel que le candidat doit le lire — S.88.
+ *
+ * Il se lisait sur la **dernière transaction confirmée** du dossier. Une
+ * recharge ou un passage à Dossier en est une, et `getPack("recharge")`
+ * ne rendant rien, l'écran de dépôt affichait « sans pack » à un dossier
+ * qui venait d'en acheter un de plus.
+ *
+ * Il se lit maintenant sur la couverture : parmi les octrois encore
+ * valables, le pack le plus complet de la grille. Une montée compte pour
+ * Dossier. Rend `null` quand rien ne couvre le dossier.
+ */
+export function packDeLaCouverture(couvertures: readonly CouvertureDuDossier[]): string | null {
+  const rang = (code: string) => PACKS.findIndex((p) => p.code === code);
+  const codes = couvertures
+    .filter((c) => !c.retiree)
+    .map((c) => (c.packCode === CODE_MONTEE_DOSSIER ? PACK_D_ARRIVEE : c.packCode))
+    .filter((code) => rang(code) >= 0)
+    .sort((a, b) => rang(b) - rang(a));
+  return codes[0] ? (getPack(codes[0])?.libelle ?? null) : null;
+}

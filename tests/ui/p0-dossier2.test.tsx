@@ -309,6 +309,30 @@ describe("C-07 — Téléversement", () => {
     expect(container.textContent).toContain("Téléversement toujours possible sans analyse");
   });
 
+  /**
+   * S.88 — sur un dossier Essentiel, deux gestes sous deux noms : la
+   * recharge ajoute des analyses, le passage à Dossier change la
+   * couverture. Aucun ne se présente comme l'autre.
+   */
+  it("distingue « Ajouter des analyses » de « Passer à Dossier »", () => {
+    rendrePiece({
+      piece: motivation,
+      analyse: undefined,
+      quota: { ...QUOTA, restantes: 0 },
+      prixPassage: "10 000 F",
+    });
+    const recharge = screen.getByRole("link", { name: "Ajouter des analyses" });
+    expect(recharge.getAttribute("href")).toMatch(/achat=recharge$/u);
+    const passage = screen.getByRole("link", { name: "Passer à Dossier — 10 000 F" });
+    expect(passage.getAttribute("href")).toMatch(/achat=montee-dossier$/u);
+  });
+
+  it("ne propose pas le passage quand il n'est pas ouvert", () => {
+    rendrePiece({ piece: motivation, analyse: undefined, quota: { ...QUOTA, restantes: 0 } });
+    expect(screen.queryByRole("link", { name: /Passer à Dossier/u })).toBeNull();
+    expect(screen.getByRole("link", { name: "Ajouter des analyses" })).toBeDefined();
+  });
+
   it("donne les conseils de prise de vue avec leurs trois cadrages", () => {
     rendrePiece({ piece: passeport, analyse: undefined });
     expect(screen.getByText(/Coupe le flash/)).toBeDefined();

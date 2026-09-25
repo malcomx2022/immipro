@@ -80,6 +80,8 @@ export interface RelectureProps {
   analysePossible: boolean;
   /** La couverture du dossier ouvre l'analyse critique (arbitrage S.80). */
   redactionAssistee: boolean;
+  /** Le chemin vers ce qui ouvre l'analyse critique — voir `Redaction`. */
+  lienDesPacks?: string;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
   relectureLe: string;
 }
@@ -92,6 +94,7 @@ export function Relecture({
   texteExistant,
   analysePossible,
   redactionAssistee,
+  lienDesPacks = "/tarifs",
   relectureLe,
 }: RelectureProps) {
   const id = dossier.id;
@@ -204,7 +207,7 @@ export function Relecture({
           // Arbitrage S.80 : ni un bouton qui lancerait une analyse refusée,
           // ni un silence — le chemin vers ce qui l'ouvre.
           <LienBouton
-            href="/tarifs"
+            href={lienDesPacks}
             pleineLargeur
             className="min-h-action md:w-auto"
           >

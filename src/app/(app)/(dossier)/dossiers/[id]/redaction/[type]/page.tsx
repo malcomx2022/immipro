@@ -10,6 +10,7 @@ import {
 import { exigerCandidat } from "@/server/securite/page";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { redactionAssisteeDuDossier } from "@/server/acces/droits";
+import { lienDesPacks } from "@/server/acces/montee";
 
 /**
  * R-02 entretien et R-03 éditeur — WF-08.
@@ -66,6 +67,7 @@ export default async function PagePieceRedigee({
       // Arbitrage S.80 : la couverture de ce dossier, pas le dernier achat
       // du compte. Lu après `vueDuDossier`, qui a vérifié la propriété.
       redactionAssistee={await redactionAssisteeDuDossier(id)}
+      lienDesPacks={await lienDesPacks(id, acteur.id)}
       maintenant={new Date().toISOString()}
     />
   );

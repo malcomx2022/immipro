@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Recapitulatif } from "./Recapitulatif";
+import { MonteeRefusee } from "./MonteeRefusee";
+import { offreDeMontee } from "@/server/acces/montee";
+import { formatMontant } from "@/lib/utils";
 import { tunnelDuPaiement } from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
 import {
@@ -56,8 +59,43 @@ export default async function PageRecapitulatif({
   // confirmer (`ouvrableDepuisLeRecapitulatif`).
   if (!achat || !ouvrableDepuisLeRecapitulatif(achat)) notFound();
 
+  /*
+    Le passage à Dossier (S.88) n'a pas de prix sur la grille : c'est la
+    différence avec ce que l'achat Essentiel a coûté, et seul le serveur
+    connaît cet achat. Un dossier qui ne s'y prête pas reçoit la raison,
+    pas un récapitulatif à zéro.
+  */
+  if (achat.type === "montee") {
+    const offre = await offreDeMontee(tunnel.dossier.id, acteur.id);
+    if (!offre.ouverte) {
+      return <MonteeRefusee dossierId={tunnel.dossier.id} message={offre.message} />;
+    }
+    return (
+      <Recapitulatif
+        tunnel={tunnel}
+        achat={achat}
+        montee={offre.detail}
+        deviseInitiale={offre.detail.devise}
+      />
+    );
+  }
+
   const tarif = tarifDe(achat);
   if (!tarif) notFound();
+
+  /*
+    Un pack sur un dossier déjà couvert est un achat supplémentaire, au
+    prix plein. Il reste possible, et l'écran le dit en ces termes : il
+    ne doit pas passer pour une montée en gamme. Quand le passage à
+    Dossier est ouvert, son prix est donné à côté.
+  */
+  let supplementaire: { passage: string | null } | undefined;
+  if (achat.type === "pack" && tunnel.dejaOuvert) {
+    const offre = await offreDeMontee(tunnel.dossier.id, acteur.id);
+    supplementaire = {
+      passage: offre.ouverte ? formatMontant(offre.detail.montant, offre.detail.devise) : null,
+    };
+  }
 
   return (
     <Recapitulatif
@@ -65,6 +103,7 @@ export default async function PageRecapitulatif({
       achat={achat}
       tarif={tarif}
       deviseInitiale={devise === "EUR" || devise === "XOF" ? devise : tunnel.devise}
+      supplementaire={supplementaire}
     />
   );
 }

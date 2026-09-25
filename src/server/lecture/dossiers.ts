@@ -19,7 +19,8 @@ import type { CalendrierAEvaluer } from "@/domain/dossiers/faisabilite";
 import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers/analyse";
 import { exigencesDeLaPiece } from "@/domain/dossiers/verification";
 import type { Quota } from "@/domain/dossiers/televersement";
-import { getPack } from "@/domain/payments/pricing";
+import { packDeLaCouverture } from "@/domain/payments/droits";
+import { couverturesDuDossier } from "@/server/acces/droits";
 import { jourCivil } from "@/domain/format/fuseau";
 
 /**
@@ -109,19 +110,22 @@ export async function vueDuDossier(id: string, userId: string): Promise<VueDossi
 /**
  * Quota tel que l'écran de dépôt l'affiche — C-07.
  *
- * Le libellé du pack vient du dernier achat confirmé. Sans achat, le pack
+ * Le libellé du pack vient de la couverture du dossier. Sans achat, le pack
  * n'a pas de nom : écrire « Essentiel » par défaut annoncerait un quota que
  * personne n'a payé.
  */
 export async function quotaDuDossier(applicationId: string): Promise<Quota> {
-  const compte = await compteur(applicationId);
-  const achat = await db.transaction.findFirst({
-    where: { applicationId, status: "CONFIRMEE" },
-    orderBy: { confirmedAt: "desc" },
-    select: { packCode: true },
-  });
-  const pack = achat ? getPack(achat.packCode) : undefined;
-  return { restantes: compte.restantes, total: compte.total, pack: pack?.libelle ?? "sans pack" };
+  const [compte, couvertures] = await Promise.all([
+    compteur(applicationId),
+    couverturesDuDossier(applicationId),
+  ]);
+  // Lu sur la couverture, et non sur le dernier achat : une recharge ou un
+  // passage à Dossier est un achat, pas un pack (S.88).
+  return {
+    restantes: compte.restantes,
+    total: compte.total,
+    pack: packDeLaCouverture(couvertures) ?? "sans pack",
+  };
 }
 
 /**

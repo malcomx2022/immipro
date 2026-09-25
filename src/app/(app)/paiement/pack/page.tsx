@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ChoixDuPack } from "./ChoixDuPack";
+import { PasserADossier } from "./PasserADossier";
+import { offreDeMontee } from "@/server/acces/montee";
 import { tunnelDuPaiement } from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
 
@@ -15,7 +17,8 @@ import { exigerCandidat } from "@/server/securite/page";
  * L'écran ouvre **un** dossier, et le nomme. Sans lui, il n'y a rien à
  * ouvrir : il affichait « Pays-Bas — séjour études » pour tout le monde, et
  * « le Bénin » comme pays du compte. Un dossier dont le pack est déjà payé
- * ne repasse pas par ici — un second achat serait un second débit.
+ * ne repasse pas par ici — un second achat serait un second débit —, sauf
+ * pour passer d'Essentiel à Dossier au prix de la différence (S.88).
  */
 export const dynamic = "force-dynamic";
 
@@ -37,7 +40,17 @@ export default async function PagePack({
 
   const tunnel = await tunnelDuPaiement(dossier, acteur.id).catch(() => null);
   if (!tunnel) notFound();
-  if (tunnel.dejaOuvert) redirect(`/dossiers/${tunnel.dossier.id}`);
+  if (tunnel.dejaOuvert) {
+    /*
+      Un dossier déjà couvert ne rachète pas de pack ici. S'il est couvert
+      par Essentiel, l'écran propose le passage à Dossier au prix de la
+      différence, à côté de la recharge — deux gestes distincts (S.88).
+      Sinon, le candidat retourne à son dossier, comme avant.
+    */
+    const offre = await offreDeMontee(tunnel.dossier.id, acteur.id);
+    if (offre.ouverte) return <PasserADossier tunnel={tunnel} detail={offre.detail} />;
+    redirect(`/dossiers/${tunnel.dossier.id}`);
+  }
 
   return <ChoixDuPack tunnel={tunnel} />;
 }
