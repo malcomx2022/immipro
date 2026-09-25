@@ -93,3 +93,69 @@ export function packDeLaCouverture(couvertures: readonly CouvertureDuDossier[]):
     .sort((a, b) => rang(b) - rang(a));
   return codes[0] ? (getPack(codes[0])?.libelle ?? null) : null;
 }
+
+/**
+ * Le pack effectif d'un dossier et ce qu'il a réellement coûté — S.92.
+ *
+ * ── Ce que le back-office lisait ────────────────────────────────────
+ *
+ * B-03 prenait la **première transaction confirmée** du compte, B-07 le
+ * premier achat de catégorie « pack » du dossier. Après un passage à
+ * Dossier, les deux désignaient l'Essentiel d'origine : pack affiché
+ * « Essentiel », prix 5 000 F, quota de jetons d'Essentiel — et une
+ * marge calculée sur le tiers de ce que le candidat avait payé. Une
+ * recharge confirmée en premier donnait, elle, « aucun ».
+ *
+ * ── Ce qu'il lit maintenant ─────────────────────────────────────────
+ *
+ * Les achats qui **couvrent** le dossier — ses octrois `ACHAT_PACK`, qui
+ * excluent par construction les recharges et les consultations —, sans
+ * ceux dont le remboursement est engagé. Une montée compte pour Dossier,
+ * et son prix est **la somme réellement encaissée** : l'Essentiel
+ * d'origine plus la différence, dans leur devise commune. Parmi ce qui
+ * reste, le pack le plus complet de la grille.
+ */
+export interface AchatCouvrant {
+  id: string;
+  packCode: string;
+  montant: number;
+  devise: string;
+  /** L'achat Essentiel d'où part une montée. */
+  sourceTransactionId: string | null;
+  retiree: boolean;
+}
+
+export interface PackEffectif {
+  code: string;
+  prixPaye: number;
+  devise: string;
+  /** Le pack a été atteint par un passage à Dossier. */
+  parMontee: boolean;
+}
+
+export function packEffectif(achats: readonly AchatCouvrant[]): PackEffectif | null {
+  const rang = (code: string) => PACKS.findIndex((p) => p.code === code);
+  const valables = achats.filter((a) => !a.retiree);
+  const candidats: PackEffectif[] = valables.flatMap((a): PackEffectif[] => {
+    if (a.packCode === CODE_MONTEE_DOSSIER) {
+      const source = achats.find((s) => s.id === a.sourceTransactionId);
+      // La montée n'a de sens qu'avec sa source : même devise, par
+      // construction (S.88). Sans elle, on ne devine pas un prix.
+      if (!source || source.devise !== a.devise) return [];
+      return [
+        {
+          code: PACK_D_ARRIVEE,
+          prixPaye: source.montant + a.montant,
+          devise: a.devise,
+          parMontee: true,
+        },
+      ];
+    }
+    return [{ code: a.packCode, prixPaye: a.montant, devise: a.devise, parMontee: false }];
+  });
+  return (
+    [...candidats].sort(
+      (a, b) => rang(b.code) - rang(a.code) || Number(b.parMontee) - Number(a.parMontee),
+    )[0] ?? null
+  );
+}

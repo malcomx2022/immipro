@@ -22,7 +22,8 @@ import type { EcritureAudit, CategorieAudit } from "@/domain/backoffice/audit";
 import type { PieceEnEchec } from "@/domain/backoffice/revue";
 import type { ConsultantAdministre } from "@/domain/backoffice/consultants";
 import { aReconcilier, DELAI_RECONCILIATION_MINUTES } from "@/server/paiement/cycle";
-import { getPack, type Devise } from "@/domain/payments/pricing";
+import { PACKS, getPack } from "@/domain/payments/pricing";
+import { packEffectif, type AchatCouvrant, type PackEffectif } from "@/domain/payments/droits";
 import { achatDepuisLeCode } from "@/domain/payments/achat";
 import {
   coutMicrosDesJetons,
@@ -188,7 +189,7 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
       consents: { where: { revokedAt: null, granted: true } },
       applications: {
         include: {
-          credits: true,
+          credits: { include: { transaction: { select: SELECTION_COUVRANTE } } },
           transactions: { where: { status: "CONFIRMEE" }, orderBy: { confirmedAt: "asc" } },
           visaRule: { select: { countryCode: true, visaType: true } },
           correctionsDeDepot: { where: { status: "EN_ATTENTE" }, take: 1 },
@@ -201,8 +202,18 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
     const credits = u.applications.flatMap((a) => a.credits);
     const octroyees = credits.filter((c) => c.delta > 0).reduce((n, c) => n + c.delta, 0);
     const solde = credits.reduce((n, c) => n + c.delta, 0);
-    const achat = u.applications.flatMap((a) => a.transactions).at(0);
-    const pack = achat ? getPack(achat.packCode) : undefined;
+    /*
+      Le pack effectif, et non la première transaction confirmée (S.92) :
+      après un passage à Dossier, celle-ci était l'Essentiel d'origine, et
+      une recharge payée en premier affichait « aucun ». Sur plusieurs
+      dossiers, le plus complet.
+    */
+    const rang = (code: string) => PACKS.findIndex((p) => p.code === code);
+    const effectif = u.applications
+      .map((a) => packEffectif(achatsCouvrants(a.credits)))
+      .filter((p): p is PackEffectif => p !== null)
+      .sort((a, b) => rang(b.code) - rang(a.code))[0];
+    const pack = effectif ? getPack(effectif.code) : undefined;
 
     return {
       id: u.id,
@@ -762,6 +773,52 @@ export interface LigneDeCout {
  * ligne doit le nommer avec un quota inconnu plutôt que de désigner une
  * autre transaction — ou rien.
  */
+/** Ce qu'une transaction couvrante doit dire au calcul du pack effectif. */
+const SELECTION_COUVRANTE = {
+  id: true,
+  packCode: true,
+  amount: true,
+  currency: true,
+  status: true,
+  refundDueAt: true,
+  sourceTransactionId: true,
+} as const;
+
+/**
+ * Les achats qui couvrent un dossier, lus sur ses octrois `ACHAT_PACK`
+ * confirmés — jamais une recharge, jamais une consultation (S.92).
+ */
+function achatsCouvrants(
+  credits: readonly {
+    reason: string;
+    delta: number;
+    transaction: {
+      id: string;
+      packCode: string;
+      amount: number;
+      currency: string;
+      status: string;
+      refundDueAt: Date | null;
+      sourceTransactionId: string | null;
+    } | null;
+  }[],
+): AchatCouvrant[] {
+  const vus = new Map<string, AchatCouvrant>();
+  for (const c of credits) {
+    const t = c.transaction;
+    if (c.reason !== "ACHAT_PACK" || c.delta <= 0 || !t || t.status !== "CONFIRMEE") continue;
+    vus.set(t.id, {
+      id: t.id,
+      packCode: t.packCode,
+      montant: t.amount,
+      devise: t.currency,
+      sourceTransactionId: t.sourceTransactionId,
+      retiree: t.refundDueAt !== null,
+    });
+  }
+  return [...vus.values()];
+}
+
 const leurPack = <T extends { packCode: string }>(
   transactions: readonly T[],
 ): T | undefined => transactions.find((t) => achatDepuisLeCode(t.packCode).type === "pack");
@@ -779,15 +836,31 @@ export async function coutsParDossier(
     where: { id: { in: usages.flatMap((u) => (u.applicationId ? [u.applicationId] : [])) } },
     include: {
       transactions: { where: { status: "CONFIRMEE" }, orderBy: { confirmedAt: "asc" } },
+      credits: {
+        where: { reason: "ACHAT_PACK", delta: { gt: 0 } },
+        include: { transaction: { select: SELECTION_COUVRANTE } },
+      },
     },
   });
 
   return usages
     .flatMap((u) => {
       if (!u.applicationId) return [];
-      const achat = leurPack(dossiers.find((d) => d.id === u.applicationId)?.transactions ?? []);
-      const pack = achat ? getPack(achat.packCode) : undefined;
-      const prix = pack && achat ? pack.prix[achat.currency as Devise] : null;
+      const dossier = dossiers.find((d) => d.id === u.applicationId);
+      /*
+        Le pack effectif et le prix **réellement payé** (S.92) : après un
+        passage à Dossier, Dossier, et l'Essentiel plus la différence. La
+        part du prix et le quota de jetons se lisent sur lui, et non sur
+        le premier achat. Sans octroi lisible — une ligne antérieure au
+        grand livre —, on retombe sur le premier achat de catégorie pack,
+        au prix encaissé.
+      */
+      const effectif = packEffectif(achatsCouvrants(dossier?.credits ?? []));
+      const premier = effectif ? undefined : leurPack(dossier?.transactions ?? []);
+      const code = effectif?.code ?? premier?.packCode;
+      const pack = code ? getPack(code) : undefined;
+      const prix = effectif?.prixPaye ?? premier?.amount ?? null;
+      const achat = effectif ? { currency: effectif.devise } : premier;
       const jetonsEntree = u._sum.inputTokens ?? 0;
       const jetonsSortie = u._sum.outputTokens ?? 0;
       const coutMicros = coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie);
@@ -798,7 +871,7 @@ export async function coutsParDossier(
           jetonsEntree,
           jetonsSortie,
           coutMicros,
-          pack: pack?.code ?? null,
+          pack: pack?.code ?? code ?? null,
           prixPack: prix,
           devise: achat?.currency ?? null,
           partDuPrix:

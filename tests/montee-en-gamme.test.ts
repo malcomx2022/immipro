@@ -12,6 +12,9 @@ import {
   ceQueLaMonteeOuvre,
   detailDuPrix,
   prixDeLaMontee,
+  MONTEES_OUVERTES,
+  NOTE_REDACTION_ASSISTEE,
+  REFUS_ESSENTIEL_APRES_MONTEE,
   suiteDuRemboursementDeLaMontee,
   verdictDeLaMontee,
   type AchatSource,
@@ -30,8 +33,16 @@ import {
   CODES_REDACTION_ASSISTEE,
   PACKS_REDACTION_ASSISTEE,
   packDeLaCouverture,
+  packEffectif,
   redactionAssisteeOuverte,
+  type AchatCouvrant,
 } from "@/domain/payments/droits";
+import {
+  octroiAEntamer,
+  octroisDeLaTransaction,
+  repartir,
+  type LigneDuGrandLivre,
+} from "@/domain/payments/grand-livre";
 import { getPack, RECHARGE_ANALYSES } from "@/domain/payments/pricing";
 import { libelleDeLAchat } from "@/domain/paiement/recu";
 import { actionApresLAchat, ceQuiSOuvre, phraseDeConfirmation } from "@/domain/paiement/contrepartie";
@@ -216,28 +227,224 @@ describe("l'achat d'origine : confirmé, couvrant, non remboursé", () => {
   });
 });
 
-describe("le remboursement du supplément", () => {
-  it("retire les vingt analyses tant que le solde les couvre", () => {
-    expect(suiteDuRemboursementDeLaMontee(20, 30)).toEqual({ suite: "RETRAIT_INTEGRAL", retire: 20 });
-    expect(suiteDuRemboursementDeLaMontee(20, 20)).toEqual({ suite: "RETRAIT_INTEGRAL", retire: 20 });
+/* ── S.92 — décision définitive ─────────────────────────────────────── */
+
+/** Un grand livre écrit ligne à ligne, dans l'ordre. */
+function grandLivre() {
+  const lignes: LigneDuGrandLivre[] = [];
+  let t = Date.parse("2026-09-01T08:00:00Z");
+  const ecrire = (l: Omit<LigneDuGrandLivre, "id" | "createdAt">): string => {
+    const id = `l${String(lignes.length + 1).padStart(3, "0")}`;
+    t += 60_000;
+    lignes.push({ ...l, id, createdAt: new Date(t) });
+    return id;
+  };
+  const vide = { transactionId: null, analysisId: null, grantId: null };
+  return {
+    lignes,
+    octroi: (reason: "ACHAT_PACK" | "RECHARGE", transactionId: string, n: number) =>
+      ecrire({ ...vide, reason, delta: n, transactionId }),
+    /** Un débit tel que `debiterUneAnalyse` l'écrit : imputé par le rejeu. */
+    debiter: (analysisId: string | null = null) =>
+      ecrire({ ...vide, reason: "ANALYSE", delta: -1, analysisId, grantId: octroiAEntamer(lignes) }),
+    /** Un débit d'avant S.92 : sans imputation écrite. */
+    debiterSansImputation: () => ecrire({ ...vide, reason: "ANALYSE", delta: -1 }),
+    rendre: (analysisId: string | null, grantId: string | null = null) =>
+      ecrire({ ...vide, reason: "ANALYSE_RENDUE", delta: 1, analysisId, grantId }),
+    retirer: (transactionId: string, n: number, grantId: string | null = null) =>
+      ecrire({ ...vide, reason: "REMBOURSEMENT", delta: -n, transactionId, grantId }),
+  };
+}
+
+const etat = (lignes: readonly LigneDuGrandLivre[], transactionId: string) =>
+  octroisDeLaTransaction(lignes, transactionId)[0]!;
+
+describe("S.92 — la consommation est FIFO, et chaque débit nomme son octroi", () => {
+  it("Essentiel s'épuise avant les vingt analyses de la montée", () => {
+    const g = grandLivre();
+    g.octroi("ACHAT_PACK", "essentiel", 10);
+    const montee = g.octroi("ACHAT_PACK", "montee", 20);
+    for (let i = 0; i < 10; i += 1) g.debiter();
+    expect(etat(g.lignes, "essentiel")).toMatchObject({ consommees: 10, restantes: 0 });
+    expect(etat(g.lignes, "montee")).toMatchObject({ consommees: 0, restantes: 20 });
+
+    g.debiter();
+    expect(g.lignes.at(-1)!.grantId).toBe(montee);
+    expect(etat(g.lignes, "montee")).toMatchObject({ consommees: 1, restantes: 19 });
   });
 
-  /**
-   * Un candidat qui a consommé ses dix analyses d'Essentiel n'a touché à
-   * aucune des vingt ajoutées : elles se retirent sans humain.
-   */
-  it("les analyses ajoutées sont tenues pour consommées en dernier", () => {
-    // 10 + 20 ouvertes, 10 consommées : solde 20.
-    expect(suiteDuRemboursementDeLaMontee(20, 20).suite).toBe("RETRAIT_INTEGRAL");
+  it("une recharge achetée avant la montée se consomme avant elle", () => {
+    const g = grandLivre();
+    g.octroi("ACHAT_PACK", "essentiel", 10);
+    g.octroi("RECHARGE", "recharge", 10);
+    g.octroi("ACHAT_PACK", "montee", 20);
+    for (let i = 0; i < 20; i += 1) g.debiter();
+    expect(etat(g.lignes, "recharge").restantes).toBe(0);
+    expect(etat(g.lignes, "montee").consommees).toBe(0);
   });
 
-  it("des analyses ajoutées déjà consommées passent en revue manuelle", () => {
-    expect(suiteDuRemboursementDeLaMontee(20, 15)).toEqual({
-      suite: "REVUE_MANUELLE",
-      ouvertes: 20,
-      consommees: 5,
+  it("une recharge achetée après la montée se consomme après elle", () => {
+    const g = grandLivre();
+    g.octroi("ACHAT_PACK", "essentiel", 10);
+    g.octroi("ACHAT_PACK", "montee", 20);
+    g.octroi("RECHARGE", "recharge", 10);
+    for (let i = 0; i < 11; i += 1) g.debiter();
+    // Le solde couvre encore vingt analyses — et pourtant une de la
+    // montée a servi. C'est ce que la lecture par le solde manquait.
+    expect(g.lignes.reduce((n, l) => n + l.delta, 0)).toBe(29);
+    expect(etat(g.lignes, "montee").consommees).toBe(1);
+    expect(etat(g.lignes, "recharge").consommees).toBe(0);
+  });
+
+  it("une analyse rendue retourne à l'octroi qu'elle avait entamé", () => {
+    const g = grandLivre();
+    g.octroi("ACHAT_PACK", "essentiel", 10);
+    const montee = g.octroi("ACHAT_PACK", "montee", 20);
+    for (let i = 0; i < 10; i += 1) g.debiter();
+    g.debiter("analyse-x");
+    // Par l'analyse, puis par l'imputation écrite.
+    g.rendre("analyse-x");
+    expect(etat(g.lignes, "montee")).toMatchObject({ consommees: 0, restantes: 20 });
+    g.debiter();
+    g.rendre(null, montee);
+    expect(etat(g.lignes, "montee").consommees).toBe(0);
+  });
+
+  it("les lignes d'avant S.92 sont imputées par la même règle, sans réécriture", () => {
+    const g = grandLivre();
+    g.octroi("ACHAT_PACK", "essentiel", 10);
+    g.octroi("ACHAT_PACK", "montee", 20);
+    for (let i = 0; i < 12; i += 1) g.debiterSansImputation();
+    const r = repartir(g.lignes);
+    expect(etat(g.lignes, "essentiel").consommees).toBe(10);
+    expect(etat(g.lignes, "montee").consommees).toBe(2);
+    expect(g.lignes.every((l) => l.reason !== "ANALYSE" || l.grantId === null)).toBe(true);
+    expect([...r.imputations.values()].filter((v) => v !== null)).toHaveLength(12);
+  });
+
+  it("un retrait ne prend que sur l'achat remboursé", () => {
+    const g = grandLivre();
+    g.octroi("ACHAT_PACK", "essentiel", 10);
+    const montee = g.octroi("ACHAT_PACK", "montee", 20);
+    g.octroi("RECHARGE", "recharge", 10);
+    g.retirer("montee", 20, montee);
+    expect(etat(g.lignes, "montee")).toMatchObject({ retirees: 20, restantes: 0 });
+    expect(etat(g.lignes, "recharge").restantes).toBe(10);
+    // Et plus rien ne l'entame ensuite.
+    for (let i = 0; i < 11; i += 1) g.debiter();
+    expect(etat(g.lignes, "montee").consommees).toBe(0);
+  });
+});
+
+describe("S.92 — le remboursement automatique du supplément", () => {
+  const intact = { accordees: 20, consommees: 0, retirees: 0 };
+
+  it("intactes et sans rédaction : les vingt se retirent sans humain", () => {
+    expect(suiteDuRemboursementDeLaMontee({ octroi: intact, redactionUtilisee: false })).toEqual({
+      suite: "RETRAIT_INTEGRAL",
+      retire: 20,
     });
-    expect(suiteDuRemboursementDeLaMontee(20, 0)).toMatchObject({ consommees: 20 });
+  });
+
+  it("une consommation partielle envoie en revue manuelle", () => {
+    const suite = suiteDuRemboursementDeLaMontee({
+      octroi: { ...intact, consommees: 3 },
+      redactionUtilisee: false,
+    });
+    expect(suite.suite).toBe("REVUE_MANUELLE");
+    if (suite.suite === "REVUE_MANUELLE") expect(suite.motif).toMatch(/3 des 20 analyses/u);
+  });
+
+  it("une rédaction utilisée envoie en revue manuelle, même analyses intactes", () => {
+    const suite = suiteDuRemboursementDeLaMontee({ octroi: intact, redactionUtilisee: true });
+    expect(suite.suite).toBe("REVUE_MANUELLE");
+    if (suite.suite === "REVUE_MANUELLE") expect(suite.motif).toMatch(/rédaction assistée a été utilisée/u);
+  });
+
+  it("les deux causes se disent ensemble", () => {
+    const suite = suiteDuRemboursementDeLaMontee({
+      octroi: { ...intact, consommees: 1 },
+      redactionUtilisee: true,
+    });
+    if (suite.suite !== "REVUE_MANUELLE") throw new Error("revue attendue");
+    expect(suite.motif).toMatch(/1 des 20 analyses.*et la rédaction/u);
+  });
+
+  it("un octroi introuvable ne se rembourse pas à l'aveugle", () => {
+    expect(
+      suiteDuRemboursementDeLaMontee({ octroi: null, redactionUtilisee: false }).suite,
+    ).toBe("REVUE_MANUELLE");
+  });
+
+  it("les débits de rédaction portent leur trace, écrite avant l'appel", () => {
+    for (const route of ["version", "relecture"]) {
+      const code = readFileSync(
+        `src/app/api/dossiers/[id]/redaction/[type]/${route}/route.ts`,
+        "utf8",
+      );
+      expect(code, route).toMatch(/debiterUneAnalyse\(params\.id!, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u);
+    }
+    expect(NOTE_REDACTION_ASSISTEE).toBe("Rédaction assistée");
+  });
+});
+
+describe("S.92 — l'Essentiel d'origine et le périmètre", () => {
+  it("un Essentiel à la base d'une montée confirmée ne se rembourse pas seul", () => {
+    const code = readFileSync("src/server/acces/paiements.ts", "utf8");
+    const fonction = /export async function ouvrirUnRemboursement[\s\S]*?\n\}$/mu.exec(code)![0];
+    expect(fonction).toMatch(/where: \{ status: "CONFIRMEE", refundedAt: null \}/u);
+    expect(fonction).toMatch(/transaction\.packCode === PACK_DE_DEPART && transaction\.montees\.length > 0/u);
+    expect(REFUS_ESSENTIEL_APRES_MONTEE).toMatch(/Rembourse d'abord le passage à Dossier/u);
+  });
+
+  it("Essentiel → Dossier Pro est hors V1", () => {
+    expect(MONTEES_OUVERTES).toEqual(["dossier"]);
+    expect(achatDuParametre("montee-pro")).not.toEqual({ type: "montee" });
+  });
+});
+
+describe("S.92 — B-03 et B-07 lisent le pack effectif et le prix payé", () => {
+  const achat = (a: Partial<AchatCouvrant> & Pick<AchatCouvrant, "id" | "packCode" | "montant">) =>
+    ({ devise: "XOF", sourceTransactionId: null, retiree: false, ...a }) as AchatCouvrant;
+
+  it("après une montée : Dossier, au prix de l'Essentiel plus la différence", () => {
+    expect(
+      packEffectif([
+        achat({ id: "e", packCode: "essentiel", montant: 5_000 }),
+        achat({ id: "m", packCode: CODE_MONTEE_DOSSIER, montant: 10_000, sourceTransactionId: "e" }),
+      ]),
+    ).toEqual({ code: "dossier", prixPaye: 15_000, devise: "XOF", parMontee: true });
+  });
+
+  it("le prix est celui réellement encaissé, pas celui de la grille", () => {
+    expect(
+      packEffectif([
+        achat({ id: "e", packCode: "essentiel", montant: 4_000 }),
+        achat({ id: "m", packCode: CODE_MONTEE_DOSSIER, montant: 11_000, sourceTransactionId: "e" }),
+      ])?.prixPaye,
+    ).toBe(15_000);
+  });
+
+  it("une montée en remboursement ne compte plus : on revient à Essentiel", () => {
+    expect(
+      packEffectif([
+        achat({ id: "e", packCode: "essentiel", montant: 5_000 }),
+        achat({
+          id: "m",
+          packCode: CODE_MONTEE_DOSSIER,
+          montant: 10_000,
+          sourceTransactionId: "e",
+          retiree: true,
+        }),
+      ]),
+    ).toMatchObject({ code: "essentiel", prixPaye: 5_000, parMontee: false });
+  });
+
+  it("sans achat couvrant, rien — et la lecture serveur exclut recharges et consultations", () => {
+    expect(packEffectif([])).toBeNull();
+    const code = readFileSync("src/server/lecture/backoffice.ts", "utf8");
+    expect(code).toMatch(/c\.reason !== "ACHAT_PACK"/u);
+    expect(code).not.toMatch(/flatMap\(\(a\) => a\.transactions\)\.at\(0\)/u);
   });
 });
 

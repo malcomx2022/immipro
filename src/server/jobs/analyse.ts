@@ -242,7 +242,9 @@ export async function analyserUnePiece(
   // INV-6 — le débit précède l'appel. Débiter après laisserait une analyse
   // gratuite à chaque interruption, et l'invariant dit « jamais de
   // dépassement silencieux », pas « le plus souvent ».
-  if (consomme) await debiterUneAnalyse(tache.applicationId);
+  // L'octroi entamé est gardé : un rendu y retourne (S.92).
+  const debit = consomme ? await debiterUneAnalyse(tache.applicationId) : null;
+  const entame = debit?.octroi ?? null;
 
   const lu = await extraire(
     { objectKey: version.objectKey, mimeType: version.mimeType },
@@ -281,6 +283,7 @@ export async function analyserUnePiece(
         await rendreUneTentative(
           tache.applicationId,
           `Lecture non aboutie (${lu.cause}), tentative ${tentatives} — reprise en attente`,
+          entame,
         );
       }
       return "A_REPRENDRE";
@@ -316,6 +319,7 @@ export async function analyserUnePiece(
         tache.applicationId,
         analyse.id,
         "Lecture automatique sans résultat",
+        entame,
       );
     }
     /*
@@ -392,6 +396,17 @@ export async function analyserUnePiece(
       outputTokens: lu.jetonsSortie,
     },
   });
+  /*
+    Le débit nomme l'analyse qu'il a payée (S.92) : une revue qui la rend
+    plus tard retrouve ainsi l'octroi entamé, au lieu d'un rendu sans lien
+    qu'il faudrait deviner.
+  */
+  if (debit) {
+    await db.analysisCredit.updateMany({
+      where: { id: debit.ligne, analysisId: null },
+      data: { analysisId: analyse.id },
+    });
+  }
 
   await db.document.update({
     where: { id: document.id },

@@ -81,7 +81,11 @@ const { verdictDuDossier, offreDeMontee } = await import("../src/server/acces/mo
 const { compteur, solde, debiterUneAnalyse } = await import("../src/server/acces/quota");
 const { redactionAssisteeDuDossier } = await import("../src/server/acces/droits");
 const { quotaDuDossier } = await import("../src/server/lecture/dossiers");
-const { CODE_MONTEE_DOSSIER, ANALYSES_AJOUTEES } = await import("../src/domain/payments/montee");
+const { CODE_MONTEE_DOSSIER, ANALYSES_AJOUTEES, NOTE_REDACTION_ASSISTEE, REFUS_ESSENTIEL_APRES_MONTEE } =
+  await import("../src/domain/payments/montee");
+const { comptes, coutsParDossier } = await import("../src/server/lecture/backoffice");
+const { octroisDeLaTransaction } = await import("../src/domain/payments/grand-livre");
+const { lignesDuGrandLivre } = await import("../src/server/acces/quota");
 type Ouvreur = import("../src/server/paiement/ouvreur").Ouvreur;
 type Rembourseur = import("../src/server/paiement/rembourseur").Rembourseur;
 type Devise = import("../src/domain/payments/pricing").Devise;
@@ -116,18 +120,43 @@ function ouvreurSimule(devise: Devise): Ouvreur {
   };
 }
 
-function rembourseurSimule(): Rembourseur & { demandes: number } {
+function rembourseurSimule(
+  reponses: ("acceptee" | "temporaire")[] = ["acceptee"],
+): Rembourseur & { demandes: number } {
   const r = {
     fournisseur: "STRIPE" as const,
     operationnel: true,
     demandes: 0,
     async demander() {
+      const issue = reponses[Math.min(r.demandes, reponses.length - 1)]!;
       r.demandes += 1;
-      return { issue: "acceptee" as const, accepteLe: new Date(), providerRefundId: "stripe:re_1" };
+      return issue === "acceptee"
+        ? { issue: "acceptee" as const, accepteLe: new Date(), providerRefundId: "stripe:re_1" }
+        : { issue: "temporaire" as const, detail: "réseau" };
     },
   };
   return r;
 }
+
+/** Un dossier Essentiel passé à Dossier, en euros ; la montée confirmée. */
+async function dossierMonte(avant: "rien" | "recharge" = "rien") {
+  const x = await candidat();
+  await payer(x.userId, x.applicationId, { type: "pack", code: "essentiel" }, "EUR");
+  if (avant === "recharge") await payer(x.userId, x.applicationId, { type: "recharge" }, "EUR");
+  const o = await ouvrirLeTunnel(
+    x.userId,
+    await preparerLAchat({ type: "montee" }, x.applicationId, x.userId),
+    "EUR",
+    ouvreurSimule("EUR"),
+  );
+  await confirmer(o.reference);
+  const montee = await db.transaction.findUniqueOrThrow({ where: { reference: o.reference } });
+  return { ...x, reference: o.reference, montee };
+}
+
+/** L'état FIFO de l'octroi d'une transaction sur ce dossier. */
+const octroiDe = async (applicationId: string, transactionId: string) =>
+  octroisDeLaTransaction(await lignesDuGrandLivre(applicationId), transactionId)[0];
 
 let rang = 0;
 async function candidat(): Promise<{ userId: string; applicationId: string }> {
@@ -332,6 +361,42 @@ try {
     verifier(code === "montee_indisponible", `la route refuse (${code})`);
   }
 
+  console.log("\nS.92 — l'Essentiel d'origine ne se rembourse pas seul après la montée");
+  {
+    const refus = await ouvrirUnRemboursement(essentiel.id, "Geste de support — essai de fumée");
+    verifier(
+      !refus.ouvert && refus.raison === REFUS_ESSENTIEL_APRES_MONTEE,
+      `l'ouverture est refusée, avec quoi faire (${JSON.stringify(refus)})`,
+    );
+    const relu = await db.transaction.findUniqueOrThrow({ where: { id: essentiel.id } });
+    verifier(relu.refundDueAt === null, "aucune obligation n'est ouverte sur l'Essentiel");
+  }
+
+  console.log("\nS.92 — B-03 et B-07 lisent Dossier, au prix réellement payé");
+  {
+    const fiche = (await comptes()).find((c) => c.id === a.userId);
+    verifier(fiche?.pack === "Dossier", `B-03 : pack effectif Dossier, recharge comprise (${fiche?.pack})`);
+    await db.aiUsage.create({
+      data: {
+        userId: a.userId,
+        applicationId: a.applicationId,
+        operation: "analyse:passeport",
+        inputTokens: 1000,
+        outputTokens: 100,
+        costMicros: 0,
+      },
+    });
+    const ligne = (await coutsParDossier(null)).find((l) => l.dossierId === a.applicationId);
+    verifier(
+      ligne?.pack === "dossier" && ligne.prixPack === 29 && ligne.devise === "EUR",
+      `B-07 : Dossier, 12 + 17 = 29 € payés (${ligne?.pack}, ${ligne?.prixPack} ${ligne?.devise})`,
+    );
+    verifier(
+      ligne?.quotaJetons === (await import("../src/domain/payments/pricing")).getPack("dossier")!.tokensIA,
+      "le quota de jetons est celui de Dossier",
+    );
+  }
+
   console.log("\nRemboursement du supplément : les vingt analyses et le droit, rien d'écrit");
   {
     const avant = await solde(a.applicationId);
@@ -392,6 +457,148 @@ try {
     const issue = await initierLeRemboursement(o.reference, rembourseurSimule());
     verifier(issue.issue === "acceptee", `retrait intégral (${issue.issue})`);
     verifier((await solde(c.applicationId)) === 0, "le solde retombe à zéro, pas en dessous");
+  }
+
+  console.log("\nS.92 — l'Essentiel redevient remboursable une fois la montée remboursée");
+  {
+    const t = await db.transaction.findUniqueOrThrow({ where: { reference: ouverte.reference } });
+    evenement += 1;
+    await appliquerLaNotification({
+      providerEventId: `evt_${evenement}`,
+      providerTxId: t.providerTxId!,
+      reference: t.reference,
+      statut: "REMBOURSEE",
+    });
+    const ouverture = await ouvrirUnRemboursement(essentiel.id, "Geste de support — essai de fumée");
+    verifier(ouverture.ouvert, `l'Essentiel s'ouvre au remboursement (${JSON.stringify(ouverture)})`);
+  }
+
+  console.log("\nS.92 — une recharge achetée APRÈS la montée se consomme après elle");
+  {
+    const x = await dossierMonte();
+    await payer(x.userId, x.applicationId, { type: "recharge" }, "EUR");
+    for (let i = 0; i < 11; i += 1) await debiterUneAnalyse(x.applicationId);
+    const etat = await octroiDe(x.applicationId, x.montee.id);
+    verifier(etat?.consommees === 1, `une analyse de la montée a servi (${etat?.consommees})`);
+    verifier((await solde(x.applicationId)) === 29, "alors que le solde couvre encore vingt analyses");
+    await ouvrirUnRemboursement(x.montee.id, "Geste de support — essai de fumée");
+    const r = rembourseurSimule();
+    const issue = await initierLeRemboursement(x.reference, r);
+    verifier(issue.issue === "revue_manuelle" && r.demandes === 0, `revue manuelle, rien ne part (${issue.issue})`);
+  }
+
+  console.log("\nS.92 — une recharge achetée AVANT la montée se consomme avant elle");
+  {
+    const x = await dossierMonte("recharge");
+    for (let i = 0; i < 20; i += 1) await debiterUneAnalyse(x.applicationId);
+    const etat = await octroiDe(x.applicationId, x.montee.id);
+    verifier(etat?.consommees === 0, `Essentiel et recharge épuisés, montée intacte (${etat?.consommees})`);
+    await ouvrirUnRemboursement(x.montee.id, "Geste de support — essai de fumée");
+    const issue = await initierLeRemboursement(x.reference, rembourseurSimule());
+    verifier(issue.issue === "acceptee", `le supplément se rembourse sans humain (${issue.issue})`);
+    const apres = await octroiDe(x.applicationId, x.montee.id);
+    verifier(apres?.retirees === 20 && apres.restantes === 0, "les vingt sont retirées de leur octroi");
+  }
+
+  console.log("\nS.92 — la rédaction assistée utilisée : revue manuelle, même analyses intactes");
+  {
+    const x = await dossierMonte();
+    // Une mise en forme : le débit porte sa trace et entame l'Essentiel (FIFO).
+    await debiterUneAnalyse(x.applicationId, undefined, {
+      note: `${NOTE_REDACTION_ASSISTEE} — Mise en forme (lettre)`,
+    });
+    const etat = await octroiDe(x.applicationId, x.montee.id);
+    verifier(etat?.consommees === 0, "les vingt analyses de la montée sont intactes");
+    await ouvrirUnRemboursement(x.montee.id, "Geste de support — essai de fumée");
+    const r = rembourseurSimule();
+    const issue = await initierLeRemboursement(x.reference, r);
+    const relu = await db.transaction.findUniqueOrThrow({ where: { id: x.montee.id } });
+    verifier(issue.issue === "revue_manuelle" && r.demandes === 0, `revue manuelle (${issue.issue})`);
+    verifier(
+      relu.discrepancy?.includes("la rédaction assistée a été utilisée") === true,
+      "l'écart dit pourquoi",
+    );
+
+    // Et un appel noté sans trace de débit suffit aussi.
+    const y = await dossierMonte();
+    await db.aiUsage.create({
+      data: {
+        userId: y.userId,
+        applicationId: y.applicationId,
+        operation: "relecture:lettre",
+        inputTokens: 10,
+        outputTokens: 10,
+        costMicros: 0,
+      },
+    });
+    await ouvrirUnRemboursement(y.montee.id, "Geste de support — essai de fumée");
+    const issueY = await initierLeRemboursement(y.reference, rembourseurSimule());
+    verifier(issueY.issue === "revue_manuelle", `un appel de relecture suffit (${issueY.issue})`);
+  }
+
+  console.log("\nS.92 — trente débits simultanés : chaque octroi entamé au plus une fois par analyse");
+  {
+    const x = await dossierMonte();
+    const issues = await Promise.allSettled(
+      Array.from({ length: 31 }, () => debiterUneAnalyse(x.applicationId)),
+    );
+    const passes = issues.filter((i) => i.status === "fulfilled").length;
+    verifier(passes === 30, `30 passent, le 31e est refusé (${passes})`);
+    const essentielX = await db.transaction.findFirstOrThrow({
+      where: { applicationId: x.applicationId, packCode: "essentiel" },
+    });
+    const e = await octroiDe(x.applicationId, essentielX.id);
+    const m = await octroiDe(x.applicationId, x.montee.id);
+    verifier(
+      e?.consommees === 10 && e.restantes === 0 && m?.consommees === 20 && m.restantes === 0,
+      `ni dépassement ni octroi négatif (Essentiel ${e?.restantes}, montée ${m?.restantes})`,
+    );
+    const imputes = await db.analysisCredit.count({
+      where: { applicationId: x.applicationId, reason: "ANALYSE", grantId: { not: null } },
+    });
+    verifier(imputes === 30, `chaque débit nomme son octroi (${imputes})`);
+  }
+
+  console.log("\nS.92 — un débit et un remboursement simultanés : jamais les deux sur la montée");
+  {
+    const x = await dossierMonte();
+    for (let i = 0; i < 10; i += 1) await debiterUneAnalyse(x.applicationId);
+    await ouvrirUnRemboursement(x.montee.id, "Geste de support — essai de fumée");
+    const [debit, envoi] = await Promise.allSettled([
+      debiterUneAnalyse(x.applicationId),
+      initierLeRemboursement(x.reference, rembourseurSimule()),
+    ]);
+    const m = await octroiDe(x.applicationId, x.montee.id);
+    const retire = (m?.retirees ?? 0) > 0;
+    const debite = debit.status === "fulfilled";
+    const issue = envoi.status === "fulfilled" ? envoi.value.issue : "échec";
+    verifier(
+      (retire && !debite && issue === "acceptee") ||
+        (!retire && debite && m?.consommees === 1 && issue === "revue_manuelle"),
+      `l'un ou l'autre, jamais les deux (retrait ${retire}, débit ${debite}, ${issue})`,
+    );
+    verifier((m?.restantes ?? -1) >= 0, "l'octroi ne descend jamais sous zéro");
+  }
+
+  console.log("\nS.92 — un remboursement rejoué ne retire pas deux fois, ni n'ouvre d'écart");
+  {
+    const x = await dossierMonte();
+    await ouvrirUnRemboursement(x.montee.id, "Geste de support — essai de fumée");
+    const r = rembourseurSimule(["temporaire", "acceptee"]);
+    const premier = await initierLeRemboursement(x.reference, r);
+    const second = await initierLeRemboursement(x.reference, r);
+    const troisieme = await initierLeRemboursement(x.reference, r);
+    const retraits = await db.analysisCredit.count({
+      where: { transactionId: x.montee.id, reason: "REMBOURSEMENT" },
+    });
+    const relu = await db.transaction.findUniqueOrThrow({ where: { id: x.montee.id } });
+    verifier(
+      premier.issue === "temporaire" && second.issue === "acceptee" && troisieme.issue === "deja_en_cours",
+      `temporaire, puis acceptée, puis rien (${premier.issue}, ${second.issue}, ${troisieme.issue})`,
+    );
+    verifier(retraits === 1, `un seul retrait (${retraits})`);
+    verifier(relu.discrepancy === null, "la reprise ne prend pas ses propres droits retirés pour une consommation");
+    verifier(r.demandes === 2, `deux demandes pour trois reprises (${r.demandes})`);
   }
 
   console.log("\nUn Essentiel remboursé ne sert pas de base ; le franc CFA garde sa grille");

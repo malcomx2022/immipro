@@ -1,6 +1,7 @@
-import type { CreditReason } from "@prisma/client";
+import type { CreditReason, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
+import { octroiAEntamer, type LigneDuGrandLivre } from "@/domain/payments/grand-livre";
 
 /**
  * Quota d'analyses — INV-6, « jamais de dépassement silencieux ».
@@ -76,26 +77,84 @@ export async function ouvrirDuQuota(octroi: Octroi): Promise<void> {
 }
 
 /**
- * Débite une analyse. Rend l'identifiant de la ligne écrite, ou lève
+ * Le grand livre d'un dossier, sous verrou — arbitrage S.92.
+ *
+ * Le débit se faisait en une seule instruction SQL : « insère si la somme
+ * reste positive ». Elle tenait le solde, elle ne peut pas tenir
+ * **l'octroi** : deux débits simultanés liraient tous deux « il reste une
+ * analyse sur l'Essentiel » et l'entameraient deux fois, et la montée
+ * paraîtrait intacte alors qu'une de ses analyses a servi.
+ *
+ * Un verrou consultatif de transaction, par dossier, sérialise donc tout
+ * ce qui entame ou retire des analyses : les débits, et le retrait d'un
+ * remboursement. Il ne bloque rien d'autre — ni les autres dossiers, ni
+ * la lecture — et se relâche à la fin de la transaction, erreur comprise.
+ */
+export async function sousVerrouDuGrandLivre<T>(
+  applicationId: string,
+  travail: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`grand-livre:${applicationId}`}, 0))`;
+    return travail(tx);
+  });
+}
+
+/** Les lignes du grand livre d'un dossier, telles que le domaine les rejoue. */
+export async function lignesDuGrandLivre(
+  applicationId: string,
+  client: Prisma.TransactionClient | typeof db = db,
+): Promise<LigneDuGrandLivre[]> {
+  return client.analysisCredit.findMany({
+    where: { applicationId },
+    select: {
+      id: true,
+      delta: true,
+      reason: true,
+      transactionId: true,
+      analysisId: true,
+      grantId: true,
+      createdAt: true,
+    },
+  });
+}
+
+/**
+ * Débite une analyse. Rend la ligne écrite et l'octroi entamé, ou lève
  * `quota_epuise` — jamais un solde négatif.
  *
- * L'écriture conditionnelle est en SQL parce qu'aucune API de Prisma ne sait
- * exprimer « insère si l'agrégat vérifie une condition ». La remplacer par
- * une transaction sérialisable serait possible, au prix d'un réessai à
- * gérer dans chaque appelant.
+ * Premier octroi entré, premier consommé (S.92) : l'octroi est choisi par
+ * le rejeu du grand livre, et **écrit** sur la ligne. La consommation se
+ * relit ainsi achat par achat, sans convention à reconstituer.
+ *
+ * `note` dit ce qui a consommé quand ce n'est pas la lecture d'une pièce :
+ * la rédaction assistée s'y signale (`NOTE_REDACTION_ASSISTEE`), et c'est
+ * sur cette trace, écrite **avant** l'appel, que le remboursement d'une
+ * montée sait si elle a servi.
  */
 export async function debiterUneAnalyse(
   applicationId: string,
   analysisId?: string,
-): Promise<void> {
-  const ecrites = await db.$executeRaw`
-    INSERT INTO "AnalysisCredit" ("id", "applicationId", "delta", "reason", "analysisId", "createdAt")
-    SELECT gen_random_uuid(), ${applicationId}, -1, 'ANALYSE'::"CreditReason", ${analysisId ?? null}, NOW()
-    WHERE (
-      SELECT COALESCE(SUM("delta"), 0) FROM "AnalysisCredit" WHERE "applicationId" = ${applicationId}
-    ) > 0
-  `;
-  if (ecrites === 0) throw echec("quota_epuise");
+  options: { note?: string } = {},
+): Promise<{ ligne: string; octroi: string | null }> {
+  return sousVerrouDuGrandLivre(applicationId, async (tx) => {
+    const lignes = await lignesDuGrandLivre(applicationId, tx);
+    const restantes = lignes.reduce((n, l) => n + l.delta, 0);
+    if (restantes <= 0) throw echec("quota_epuise");
+    const grantId = octroiAEntamer(lignes);
+    const ligne = await tx.analysisCredit.create({
+      data: {
+        applicationId,
+        delta: -1,
+        reason: "ANALYSE",
+        analysisId: analysisId ?? null,
+        grantId,
+        note: options.note ?? null,
+      },
+      select: { id: true },
+    });
+    return { ligne: ligne.id, octroi: grantId };
+  });
 }
 
 /**
@@ -111,14 +170,32 @@ export async function rendreUneAnalyse(
   applicationId: string,
   analysisId: string,
   note: string,
+  /** L'octroi entamé par le débit, quand l'appelant le tient (S.92). */
+  grantId?: string | null,
 ): Promise<boolean> {
   const dejaRendue = await db.analysisCredit.findFirst({
     where: { applicationId, analysisId, reason: "ANALYSE_RENDUE" },
     select: { id: true },
   });
   if (dejaRendue) return false;
+  // Rendue à l'octroi que son débit avait entamé (S.92).
+  const debit =
+    grantId !== undefined
+      ? { grantId }
+      : await db.analysisCredit.findFirst({
+          where: { applicationId, analysisId, reason: "ANALYSE" },
+          orderBy: { createdAt: "desc" },
+          select: { grantId: true },
+        });
   await db.analysisCredit.create({
-    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", analysisId, note },
+    data: {
+      applicationId,
+      delta: 1,
+      reason: "ANALYSE_RENDUE",
+      analysisId,
+      grantId: debit?.grantId ?? null,
+      note,
+    },
   });
   return true;
 }
@@ -138,9 +215,14 @@ export async function rendreUneAnalyse(
  * `note` dit laquelle : sans elle, le grand livre montrerait des rendus
  * sans cause, et INV-6 demande que le quota se relise.
  */
-export async function rendreUneTentative(applicationId: string, note: string): Promise<void> {
+export async function rendreUneTentative(
+  applicationId: string,
+  note: string,
+  /** L'octroi que le débit avait entamé, tel que `debiterUneAnalyse` l'a rendu (S.92). */
+  grantId: string | null = null,
+): Promise<void> {
   await db.analysisCredit.create({
-    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", note },
+    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", note, grantId },
   });
 }
 
