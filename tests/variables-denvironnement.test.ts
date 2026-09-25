@@ -72,8 +72,13 @@ const SANS_LECTEUR: Readonly<Record<string, string>> = {
     aurait fait modifier un jour la valeur que personne ne lit, en
     croyant agir.
   */
-  SMS_PROVIDER_KEY:
-    "22/09/2026 — DOC-11 §346 prévoit des rappels par SMS pour les échéances critiques (WF-09 étape 3) ; rien ne les envoie, et l'écran de l'échéancier le dit. La variable marque la place d'une capacité spécifiée, non implémentée : la retirer effacerait la trace de l'écart.",
+  /*
+    `SMS_PROVIDER_KEY` est sortie le 25/09/2026. Elle marquait la place des
+    rappels SMS de WF-09 étape 3, une capacité spécifiée et non
+    implémentée ; le périmètre V1 définitif met le SMS hors V1. La trace de
+    l'écart est dans DOC-11, marquée V2 — une variable d'exemple n'avait
+    pas à la porter.
+  */
 };
 
 describe("toute variable déclarée est lue quelque part", () => {
@@ -105,6 +110,16 @@ describe("toute variable déclarée est lue quelque part", () => {
     }
     // Au-delà de cinq, ce n'est plus une exception, c'est une dérive.
     expect(Object.keys(SANS_LECTEUR).length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("périmètre V1 : ni SMS ni OAuth Google", () => {
+  it("aucune variable ne demande un fournisseur de SMS", () => {
+    expect(declarees.filter((v) => /SMS/u.test(v))).toEqual([]);
+  });
+
+  it("aucune variable ne demande des identifiants Google", () => {
+    expect(declarees.filter((v) => /GOOGLE/u.test(v))).toEqual([]);
   });
 });
 

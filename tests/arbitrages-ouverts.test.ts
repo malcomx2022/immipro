@@ -14,6 +14,7 @@ import {
   LIBELLE_PORTE,
   PAGES_PUBLIQUES,
   pagesBloquantes,
+  pagesServies,
 } from "@/domain/exploitation/pages-publiques";
 
 /**
@@ -486,9 +487,28 @@ describe("Q.A (sous réserve) — les six pages publiques et leur responsable", 
    * condition sont écrits. Une page à moitié faite ne devient pas liable
    * en silence.
    */
-  it("aucune page du registre n'est servie : le registre dit ce qui manque", () => {
-    const servies = PAGES_PUBLIQUES.filter((p) => ROUTES.includes(p.adresse));
-    expect(servies.map((p) => p.adresse)).toEqual([]);
+  it("le registre et l'arborescence disent la même chose, page par page", () => {
+    // Servie ⇔ la route existe. Une ébauche créée sans passer par le
+    // registre fait tomber ce test, et un registre qui déclare servie une
+    // page absente aussi.
+    for (const page of PAGES_PUBLIQUES) {
+      expect(ROUTES.includes(page.adresse), page.adresse).toBe(page.servie !== undefined);
+    }
+  });
+
+  /**
+   * 25/09/2026 — « Comment ça marche » est servie, et elle seule. Les trois
+   * pages légales et le contact attendent leurs textes validés : aucune
+   * n'est écrite sans eux.
+   */
+  it("seule « Comment ça marche » est servie ; le légal attend ses textes", () => {
+    expect(pagesServies().map((p) => p.adresse)).toEqual(["/comment-ca-marche"]);
+    for (const page of pagesBloquantes()) expect(page.servie, page.adresse).toBeUndefined();
+    // L'historique reste : la page servie garde son responsable et son manque.
+    const servie = pagesServies()[0]!;
+    expect(servie.responsable).toBe("Produit et contenu");
+    expect(servie.manque.length).toBeGreaterThan(60);
+    expect(servie.servie?.le).toMatch(/\d{2}\/\d{2}\/\d{4}/u);
   });
 
   /** Et rien ne promet ces adresses, ni dans un écran ni dans une table. */

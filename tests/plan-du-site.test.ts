@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { PAGES_STABLES, adresseAbsolue } from "@/domain/exploitation/plan-du-site";
+import {
+  ORIGINE_LOCALE,
+  PAGES_STABLES,
+  adresseAbsolue,
+  origineDuSite,
+} from "@/domain/exploitation/plan-du-site";
 
 /**
  * Q.B — le pied de page reste stable, et les liens profonds sont assurés
@@ -169,5 +174,63 @@ describe("une adresse de plan du site est absolue", () => {
   it("l'origine vient de la route, pas du domaine", () => {
     expect(lire("src/domain/exploitation/plan-du-site.ts")).not.toMatch(/process\.env/u);
     expect(lire("src/app/sitemap.ts")).toMatch(/process\.env\.APP_URL/u);
+  });
+});
+
+describe("metadataBase — l'origine vient d'APP_URL, avec un repli local sûr", () => {
+  it("une origine valide est gardée, sans chemin ni requête", () => {
+    expect(origineDuSite("https://immipro.test").href).toBe("https://immipro.test/");
+    expect(origineDuSite(" https://immipro.test/app?x=1 ").href).toBe("https://immipro.test/");
+    expect(origineDuSite("http://localhost:4000").href).toBe("http://localhost:4000/");
+  });
+
+  it("absente, vide, relative ou d'un autre protocole : le repli local", () => {
+    for (const valeur of [undefined, "", "   ", "immipro.test", "/chemin", "ftp://immipro.test", "javascript:alert(1)"]) {
+      expect(origineDuSite(valeur).href, String(valeur)).toBe(`${ORIGINE_LOCALE}/`);
+    }
+  });
+
+  it("le gabarit racine et le plan du site lisent la même origine", () => {
+    const racine = lire("src/app/layout.tsx");
+    expect(racine).toMatch(/metadataBase: origineDuSite\(process\.env\.APP_URL\)/u);
+    expect(lire("src/app/sitemap.ts")).toMatch(/origineDuSite\(process\.env\.APP_URL\)\.origin/u);
+  });
+});
+
+describe("« Comment ça marche » — le parcours implémenté, périmètre V1", () => {
+  const page = lire("src/app/(public)/comment-ca-marche/page.tsx");
+
+  it("elle est au plan du site et au pied de page", () => {
+    expect(PAGES_STABLES).toContain("/comment-ca-marche");
+    expect(lire("src/components/layout/Footer.tsx")).toMatch(/href: "\/comment-ca-marche"/u);
+  });
+
+  it("elle porte ses métadonnées et un titre atteignable par le lien d'évitement", () => {
+    expect(page).toMatch(/export const metadata: Metadata = \{\s*title: "Comment ça marche"/u);
+    expect(page).toMatch(/id="contenu"\s*tabIndex=\{-1\}/u);
+    expect(page).toMatch(/<ol/u);
+  });
+
+  /** Ses nombres sont ceux que le produit applique, lus et non recopiés. */
+  it("aucun nombre du parcours n'est recopié", () => {
+    for (const constante of [
+      "ANALYSES_AJOUTEES",
+      "DELAIS_D_ALERTE",
+      "JALONS_DE_SUIVI",
+      "CONSERVATION_SOUMIS_MOIS",
+      "PROLONGATION_MOIS",
+      "PURGE_JOURS",
+      "PACKS",
+    ]) {
+      expect(page, constante).toMatch(new RegExp(`import \\{[^}]*\\b${constante}\\b`, "u"));
+    }
+    const textes = page.slice(page.indexOf("const ETAPES"), page.indexOf("export default"));
+    expect(textes).not.toMatch(/\b(?:10|20|30|60|12|6|90)\b(?! ?\})/u);
+  });
+
+  it("rien de ce qui est hors V1 n'y est promis", () => {
+    const textes = page.slice(page.indexOf("const ETAPES"));
+    expect(textes).not.toMatch(/Google|SMS|partenaire/iu);
+    expect(textes).not.toMatch(/passage[^.]*Pro/u);
   });
 });

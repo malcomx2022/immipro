@@ -12,7 +12,7 @@ ImmiPro **informe et prépare**. Elle ne délivre pas de conseil juridique et ne
 |---|---|
 | Application | Next.js (App Router), TypeScript, Tailwind |
 | Base de données | PostgreSQL 16 natif, Prisma |
-| Authentification | NextAuth, sessions en base |
+| Authentification | Adresse électronique et mot de passe, sessions en base écrites par le dépôt (OAuth Google : V2) |
 | Fichiers | MinIO, buckets privés, URLs présignées 5 min |
 | Jobs asynchrones | pg-boss (files dans PostgreSQL) |
 | IA | Claude API, vision directe sur document |
@@ -133,7 +133,7 @@ pas contre une reconstruction.
 ```
 src/
 ├── app/
-│   ├── (public)/     accueil, simulateur, fiches pays, blog, tarifs
+│   ├── (public)/     accueil, simulateur, fiches pays, guides, articles, tarifs, comment ça marche
 │   ├── (app)/        espace candidat : dossiers, checklist, paiement
 │   ├── (admin)/      back-office : veille, utilisateurs, audit
 │   └── api/          routes serveur, webhooks
@@ -180,4 +180,18 @@ Une issue par écran du prototype (code de l'inventaire DOC-12) ou par règle de
 
 ## Statut
 
-Squelette. Le prototype Claude Design est en cours ; les écrans seront implémentés à partir de la bibliothèque de composants, pas en découpant les maquettes.
+**V1 implémentée, avant ouverture au public.** Les parcours candidat (simulateur, dossier, pièces, rédaction assistée, paiement, échéancier et rappels, dépôt, clôture et conservation), le back-office et le worker sont en place, et la porte de qualité ci-dessus les tient.
+
+Le périmètre V1 définitif est fixé en tête de [`docs/DOC-11-workflows.md`](./docs/DOC-11-workflows.md) (§0, 25/09/2026) :
+
+- produit en français ;
+- rappels au fuseau choisi par le candidat, tous les autres écrans à l'heure de Cotonou ;
+- hors V1 : OAuth Google, SMS, passage d'Essentiel à Dossier Pro ;
+- correction autonome de la date de dépôt reportée, avec recours au support ;
+- partenaires désactivés tant qu'aucune activation conformité n'existe.
+
+Ce qui reste avant l'ouverture au public est tenu dans des registres vérifiés par les tests, et non dans ce fichier :
+
+- `src/domain/exploitation/pages-publiques.ts` (Q.A) : les mentions légales, les données personnelles, les conditions et le contact attendent leurs textes validés. Aucun n'est écrit sans eux ;
+- `src/domain/exploitation/prealables.ts` : les préalables d'ouverture ;
+- `docs/prototype/ECARTS-A-ARBITRER.md` : l'historique des arbitrages.

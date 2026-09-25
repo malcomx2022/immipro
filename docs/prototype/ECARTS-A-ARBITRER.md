@@ -10361,3 +10361,26 @@ La migration `20260925230000_imputation_des_analyses` ajoute `grantId` (nullable
 - `tests/montee-en-gamme.test.ts` : FIFO avec recharge avant et après, rendus, lignes anciennes, retrait ; suite du remboursement ; Essentiel ; Pro ; pack effectif.
 - `tests/remboursement.test.ts` : rejeu et verrou.
 - `smoke:montee` : l'Essentiel bloqué puis débloqué, B-03 et B-07, recharge avant et après, rédaction utilisée, 31 débits simultanés, un débit et un remboursement simultanés, un remboursement rejoué.
+
+## S.93 — Périmètre V1 définitif : documentation et surfaces de lancement
+
+Le périmètre est fixé en tête de DOC-11 (§0, « Périmètre V1 définitif »). Il l'emporte sur toute étape qui le contredirait.
+
+### Ce qui a été aligné
+
+- **SMS : V2.** WF-09 étape 3 et RG-09.4 le disent. `SMS_PROVIDER_KEY` quitte `.env.example` : c'était la seule variable documentée que rien ne lit, gardée depuis le 22/09/2026 comme trace d'un écart. La trace vit maintenant dans DOC-11. Un test interdit qu'une variable SMS ou Google revienne.
+- **OAuth Google : V2.** WF-02 étape 1 le dit, et le README ne nomme plus NextAuth, retiré le 22/09/2026.
+- **Essentiel → Dossier Pro : V2** (déjà écrit dans RG-05.6 par S.92), repris dans le périmètre.
+- **Date de dépôt.** La correction autonome est reportée ; le recours passe par le support. RG-10.8 le décrivait déjà : le candidat signale la date, et un opérateur tranche.
+- **Partenaires** désactivés sans activation conformité : c'était déjà l'état du produit (K.D, filtre en requête), désormais écrit dans le périmètre.
+- **Fuseau.** Les rappels suivent le fuseau choisi, tous les autres écrans l'heure de Cotonou. Trois affichages suivaient encore le fuseau du navigateur : la mention de source (`SourceNote`), les dates de vérification d'une fiche pays, et la date de dépôt du tableau de bord (une date civile, qui reculait d'un jour à l'ouest de Greenwich). Ils sont corrigés.
+- **`metadataBase`** est lu sur `APP_URL` par `origineDuSite`, avec un repli local sûr pour une valeur absente, relative ou d'un autre protocole. Le plan du site lit la même fonction.
+- **README** : le statut « Squelette » est remplacé par l'état réel et renvoie aux registres.
+
+### `/comment-ca-marche` — Q.A, « Produit et contenu »
+
+La page est écrite à partir du parcours réellement implémenté. Ses nombres sont importés du domaine (grille des packs, délais de rappel, jalons de suivi, durées de conservation), et rien de ce qui est hors V1 n'y figure. Elle entre au pied de page et au plan du site.
+
+Le registre Q.A la marque servie (`servie: { le, source }`) **sans effacer** son responsable ni ce qui manquait le jour du relevé. Le test, qui interdisait jusqu'ici toute page servie, vérifie désormais l'accord entre le registre et l'arborescence, page par page.
+
+Les trois pages juridiques et le contact restent absents : aucun texte juridique ni aucune identité d'entreprise n'est inventé.

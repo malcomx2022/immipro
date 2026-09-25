@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { fichesPubliees } from "@/server/lecture/destinations";
 import { adressesPubliees } from "@/server/lecture/editorial";
-import { PAGES_STABLES, adresseAbsolue } from "@/domain/exploitation/plan-du-site";
+import { PAGES_STABLES, adresseAbsolue, origineDuSite } from "@/domain/exploitation/plan-du-site";
 
 /**
  * Le plan du site — Q.B, fermé sans liens dynamiques pour la V1.
@@ -54,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    * plan qui renvoie vers `localhost` — invisible à tout test, parfaitement
    * lisible par un moteur.
    */
-  const origine = process.env.APP_URL ?? "http://localhost:3000";
+  const origine = origineDuSite(process.env.APP_URL).origin;
   const maintenant = new Date();
   return [...PAGES_STABLES, ...profondes].map((adresse) => ({
     url: adresseAbsolue(origine, adresse),
