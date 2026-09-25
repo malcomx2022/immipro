@@ -14,6 +14,7 @@ import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
 import { declasserLesPiecesEchues } from "./peremption";
 import { envoyerLesRappels } from "./rappels";
+import { relancerLesDepots } from "./suivi-depot";
 import { reconcilierLesPaiements } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
@@ -192,6 +193,10 @@ async function main() {
     }
   });
 
+  await boss.work(JOBS.SUIVI_DEPOT, async () => {
+    console.info("[suivi-depot]", await relancerLesDepots());
+  });
+
   // Cadences de DOC-11 : quinze minutes pour la réconciliation (RG-05.4),
   // une fois par jour pour la veille (WF-14) et la purge (INV-5).
   //
@@ -249,6 +254,16 @@ async function main() {
     jour près et que le préavis en dépend.
   */
   await boss.schedule(JOBS.CONSERVATION_PIECES, "15 8 * * *");
+
+  /*
+    Les relances après dépôt, toutes les heures — WF-10 étape 2, S.89.
+
+    Horaire comme les rappels d'échéance : la relance part à partir de
+    huit heures dans le fuseau du candidat, et une passe manquée est
+    rattrapée à la suivante. La clé `suivi-depot:<dossier>:<jalon>` rend
+    les vingt-quatre passes du jour sans effet après la première.
+  */
+  await boss.schedule(JOBS.SUIVI_DEPOT, "20 * * * *");
 
   /*
     La resonde, toutes les heures — I.C, 22/09/2026.

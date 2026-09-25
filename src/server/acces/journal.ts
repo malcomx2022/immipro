@@ -66,7 +66,13 @@ export type ActionAuditee =
   | "consultant.habiliter"
   | "consultant.retirer"
   | "consultant.suspendre"
-  | "consultant.retablir";
+  | "consultant.retablir"
+  /**
+   * La correction de la date réelle d'un dépôt — S.89. Elle commande la
+   * conservation et les relances : l'ancienne et la nouvelle valeur, et
+   * les échéances recalculées, partent au journal avec le motif.
+   */
+  | "dossier.depot.correction";
 
 export interface EcritureAudit {
   acteurId: string;

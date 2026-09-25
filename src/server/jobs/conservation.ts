@@ -116,7 +116,7 @@ export async function traiterLesDepots(maintenant: Date = new Date()): Promise<B
       id: true,
       userId: true,
       submittedAt: true,
-      updatedAt: true,
+      depositedOn: true,
       retentionUntil: true,
       purgeDueAt: true,
       visaRule: { select: { countryCode: true, visaType: true } },

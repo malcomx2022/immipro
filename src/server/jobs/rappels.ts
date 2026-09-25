@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { envoyerRappelDEcheance } from "@/server/courrier";
-import { suiteDeLEnvoi } from "@/domain/courrier/transport";
+import { tenterUnCourrierReserve } from "./courrier-reserve";
 import { COMPTE_JOIGNABLE } from "@/server/acces/suppression";
 import {
   HORIZON_HEBDOMADAIRE_JOURS,
@@ -9,7 +9,6 @@ import {
   type DossierARappeler,
 } from "@/domain/dossiers/rappels";
 import {
-  BAIL_DE_TENTATIVE_MS,
   cleDuRappel,
   etatApresLEnvoi,
   heureDuRappelAtteinte,
@@ -122,60 +121,20 @@ const compter = (bilan: BilanDesRappels, etat: EtatDuCourrier | null): void => {
   else if (etat === "NON_ENVOYE") bilan.sansCourrier += 1;
 };
 
-/**
- * Tente le courrier d'une notification réservée, et note ce qui s'est
- * passé.
- *
- * La tentative se **prend** avant l'envoi : `emailAttempts` ne s'incrémente
- * que s'il vaut encore ce qu'on a lu, et qu'aucune tentative n'est en vol
- * (`BAIL_DE_TENTATIVE_MS`). Deux passes qui reprennent le même courrier
- * ne l'envoient pas deux fois. Rend `null` quand une autre passe l'a pris.
- */
-async function tenterLeCourrier(
+/** Le courrier d'un rappel réservé : repris le jour même seulement. */
+const tenterLeCourrier = (
   notification: { id: string; title: string; body: string; emailAttempts: number },
   destinataire: string,
   jourDuRappel: string,
   jourCourant: string,
   maintenant: Date,
-): Promise<EtatDuCourrier | null> {
-  const tentative = notification.emailAttempts + 1;
-  const prise = await db.notification.updateMany({
-    where: {
-      id: notification.id,
-      emailStatus: "EN_ATTENTE",
-      emailAttempts: notification.emailAttempts,
-      // Une tentative en vol n'est pas une tentative à reprendre.
-      OR: [
-        { emailAttemptAt: null },
-        { emailAttemptAt: { lt: new Date(maintenant.getTime() - BAIL_DE_TENTATIVE_MS) } },
-      ],
-    },
-    data: { emailAttempts: tentative, emailAttemptAt: maintenant },
-  });
-  if (prise.count === 0) return null;
-
-  const envoi = await envoyerRappelDEcheance(
-    destinataire,
-    notification.title,
-    notification.body,
-  ).catch(() => null);
-  /*
-    La suite se lit dans le domaine, qui arbitre les cinq issues d'un
-    envoi. Une exception — réseau coupé en plein appel — vaut coupure :
-    on ne sait pas, on reprendra.
-  */
-  const suite = envoi ? suiteDeLEnvoi(envoi.issue) : { parti: false, renvoyable: true };
-  const etat = etatApresLEnvoi(suite, tentative, jourDuRappel, jourCourant);
-
-  await db.notification.update({
-    where: { id: notification.id },
-    data: {
-      emailStatus: etat,
-      ...(etat === "ENVOYE" ? { emailSentAt: maintenant } : {}),
-    },
-  });
-  return etat;
-}
+): Promise<EtatDuCourrier | null> =>
+  tenterUnCourrierReserve(
+    notification,
+    () => envoyerRappelDEcheance(destinataire, notification.title, notification.body),
+    (suite, tentative) => etatApresLEnvoi(suite, tentative, jourDuRappel, jourCourant),
+    maintenant,
+  );
 
 /**
  * Les courriers restés en attente — reprise de l'heure précédente.

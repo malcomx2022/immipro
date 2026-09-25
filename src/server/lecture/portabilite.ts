@@ -169,7 +169,11 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
         statut: a.status,
         ouvertLe: iso(a.createdAt),
         departVise: jour(a.targetDate),
-        deposeLe: iso(a.submittedAt),
+        // S.89 — deux faits distincts, et nommés comme tels : le jour où
+        // la demande est partie, que le candidat a déclaré, et l'instant
+        // où il l'a déclaré dans ImmiPro.
+        dateReelleDuDepot: jour(a.depositedOn),
+        depotDeclareDansImmiProLe: iso(a.submittedAt),
         issue: a.issue,
         // Le barème interne n'est pas ici : l'export rend ce que les écrans
         // disent, un palier et un dénombrement (arbitrage C-09).

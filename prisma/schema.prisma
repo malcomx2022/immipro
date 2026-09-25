@@ -308,7 +308,16 @@ model Application {
   /// hebdomadaire ». La cadence porte sur le dossier ; l'exception
   /// d'urgence porte sur l'échéance (`Deadline.remindedAt`).
   lastReminderAt DateTime?
+  /// **Quand le candidat a déclaré** son dépôt dans ImmiPro — un instant.
+  /// Il sert l'audit, et à lire une déclaration tardive. Il ne commande ni
+  /// la conservation ni les relances : c'est `depositedOn` (S.89).
   submittedAt DateTime?
+  /// **La date réelle du dépôt**, telle que le candidat la déclare — une
+  /// date civile, sans heure (S.89). Elle commande les relances J+30 et
+  /// J+60, l'échéance normale de conservation à douze mois, le suivi et
+  /// l'export. Elle ne précède pas l'ouverture du dossier et ne dépasse
+  /// pas le jour de la déclaration ; la base l'exige avec `submittedAt`.
+  depositedOn DateTime? @db.Date
   issue       Issue?
   issueReason String?
   /// Échéance de purge **annoncée** au candidat (INV-5, RG-10.2) : à la
@@ -975,6 +984,9 @@ enum NotificationKind {
   /// Conservation des pièces — arbitrage S.78 : invitation à confirmer
   /// l'instruction, préavis de purge, avertissement de suspension.
   CONSERVATION
+  /// Relance après dépôt, J+30 puis J+60 depuis la date réelle — WF-10
+  /// étape 2, S.89. Une par jalon, par sa clé d'idempotence.
+  SUIVI_DEPOT
 }
 
 /// Alerte adressée à un candidat (T-01, WF-11).

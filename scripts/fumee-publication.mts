@@ -393,7 +393,7 @@ try {
 
     let refus = "";
     try {
-      await declarerLeDepot(avecPieces);
+      await declarerLeDepot(avecPieces, { deposeLe: new Date().toISOString().slice(0, 10) });
     } catch (erreur) {
       refus = corpsDe(erreur);
     }

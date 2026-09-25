@@ -10,8 +10,17 @@ import {
   debutDeLInvitation,
   echeanceProlongee,
 } from "@/domain/dossiers/conservation";
-import { echeanceDuDepot, echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
-import { jourCivil } from "@/domain/format/fuseau";
+import { echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
+import {
+  correctionDuDepot,
+  depuisDateCivile,
+  echeanceNormale,
+  refusDeLaDateDeDepot,
+  versDateCivile,
+} from "@/domain/dossiers/depot";
+import { lirePreferences } from "@/domain/dossiers/preferences-rappels";
+import { journaliser } from "@/server/acces/journal";
+import { FUSEAU_AFFICHAGE, jourCivil, momentDans } from "@/domain/format/fuseau";
 import { jourEnFrancais } from "@/domain/format/moment";
 
 /**
@@ -54,9 +63,17 @@ import { jourEnFrancais } from "@/domain/format/moment";
  * Le candidat qui avait tout réuni recevait une erreur de service sur le
  * dernier geste du parcours.
  */
+export interface DeclarationDeDepot {
+  /** La date réelle du dépôt, `AAAA-MM-JJ`, telle que le candidat la déclare. */
+  deposeLe: string;
+  /** Le fuseau du candidat : « aujourd'hui » et l'ouverture s'y lisent. */
+  fuseau?: string;
+  maintenant?: Date;
+}
+
 export async function declarerLeDepot(
   dossier: Application,
-  maintenant: Date = new Date(),
+  { deposeLe, fuseau = FUSEAU_AFFICHAGE, maintenant = new Date() }: DeclarationDeDepot,
 ): Promise<Application> {
   /*
     Deux refus, parce qu'il y a deux raisons et qu'elles n'appellent pas le
@@ -73,20 +90,139 @@ export async function declarerLeDepot(
         "Ton dossier n'est pas encore complet : il reste des pièces obligatoires à réunir. La checklist dit lesquelles.",
     });
   }
+
+  /*
+    Arbitrage S.89 — la date réelle du dépôt, lue dans le fuseau du
+    candidat : « aujourd'hui » est son jour, pas celui du serveur. Elle ne
+    peut ni venir après aujourd'hui, ni précéder l'ouverture du dossier.
+    Elle n'est pas comparée à `readyAt`, et aucun retard n'est refusé.
+  */
+  const refus = refusDeLaDateDeDepot(
+    deposeLe,
+    momentDans(maintenant, fuseau).jour,
+    momentDans(dossier.createdAt, fuseau).jour,
+  );
+  if (refus) throw echec("champs_invalides", { champs: { deposeLe: refus } });
+
   return db.application.update({
     where: { id: dossier.id },
     data: {
       ...miseEnEtat("SOUMIS", dossier, maintenant),
+      // Deux faits, et aucun ne remplace l'autre : le jour où la demande
+      // est partie, et l'instant où le candidat nous l'a dit.
+      depositedOn: versDateCivile(deposeLe),
       submittedAt: maintenant,
       /*
-        Arbitrage S.78 : les pièces d'un dossier soumis sont conservées
-        douze mois après le dépôt déclaré. L'inactivité ne vaut plus
-        abandon — le candidat attend un tiers —, et c'est cette échéance
-        qui borne la conservation à sa place.
+        Arbitrage S.78, précisé par S.89 : les pièces d'un dossier soumis
+        sont conservées douze mois après **la date réelle** du dépôt. Une
+        déclaration tardive peut donc poser une échéance proche, voire
+        passée : la passe de conservation ne purge alors qu'après un
+        préavis de trente jours (`echeanceAnnoncee`), jamais sur-le-champ.
       */
-      retentionUntil: echeanceDuDepot(maintenant),
+      retentionUntil: echeanceNormale(deposeLe),
     },
   });
+}
+
+export interface CorrectionDuDepotEnregistree {
+  dossier: Application;
+  ancienne: string;
+  nouvelle: string;
+}
+
+/**
+ * Corriger la date réelle d'un dépôt déjà déclaré — arbitrage S.89.
+ *
+ * Après confirmation, la date ne se modifie pas librement depuis le
+ * dossier : le candidat qui s'est trompé le signale, et la correction est
+ * une action du back-office, **auditée** — motif, ancienne et nouvelle
+ * valeur, échéances avant et après. Le journal s'écrit avant la
+ * modification : une correction sans trace ne doit pas pouvoir exister.
+ *
+ * Elle recalcule ce que la date commande (`correctionDuDepot`) : la fin
+ * de conservation, sans raccourcir une prolongation obtenue, et l'annonce
+ * de purge, sans jamais la rapprocher d'un préavis déjà donné. Les
+ * relances J+30 et J+60 se déduisent de la date à chaque passe ; celles
+ * déjà envoyées le restent.
+ */
+export async function corrigerLeDepot(
+  dossierId: string,
+  {
+    deposeLe,
+    motif,
+    acteurId,
+    maintenant = new Date(),
+  }: { deposeLe: string; motif: string; acteurId: string; maintenant?: Date },
+): Promise<CorrectionDuDepotEnregistree> {
+  const dossier = await db.application.findUnique({
+    where: { id: dossierId },
+    include: {
+      user: {
+        select: {
+          remindersEnabled: true,
+          reminderEmail: true,
+          reminderTimeZone: true,
+          reminderLeadDays: true,
+        },
+      },
+    },
+  });
+  if (!dossier) throw echec("introuvable");
+  if (!dossier.depositedOn || !dossier.submittedAt) {
+    throw echec("etat_incompatible", {
+      corps: "Ce dossier n'a pas de dépôt déclaré : il n'y a pas de date à corriger.",
+    });
+  }
+
+  // Les jours se lisent dans le fuseau du candidat, comme à la déclaration.
+  const fuseau = lirePreferences(dossier.user).fuseau;
+  const ancienne = depuisDateCivile(dossier.depositedOn);
+  const declareLe = momentDans(dossier.submittedAt, fuseau).jour;
+  const refus =
+    refusDeLaDateDeDepot(
+      deposeLe,
+      momentDans(maintenant, fuseau).jour,
+      momentDans(dossier.createdAt, fuseau).jour,
+    ) ??
+    (deposeLe > declareLe
+      ? `Le dépôt a été déclaré le ${jourEnFrancais(declareLe)} : il ne peut pas avoir eu lieu après.`
+      : deposeLe === ancienne
+        ? `La date du dépôt est déjà le ${jourEnFrancais(ancienne)}.`
+        : null);
+  if (refus) throw echec("champs_invalides", { champs: { deposeLe: refus } });
+
+  const correction = correctionDuDepot({
+    deposeLe: ancienne,
+    retentionUntil: dossier.retentionUntil,
+    purgeDueAt: dossier.purgeDueAt,
+    nouvelle: deposeLe,
+  });
+
+  await journaliser({
+    acteurId,
+    action: "dossier.depot.correction",
+    cible: `application:${dossier.id}`,
+    motif,
+    details: {
+      ancienne,
+      nouvelle: deposeLe,
+      declareLe: dossier.submittedAt.toISOString(),
+      conservationAvant: dossier.retentionUntil?.toISOString() ?? null,
+      conservationApres: correction.retentionUntil.toISOString(),
+      purgeAvant: dossier.purgeDueAt?.toISOString() ?? null,
+      purgeApres: correction.purgeDueAt?.toISOString() ?? null,
+    },
+  });
+
+  const maj = await db.application.update({
+    where: { id: dossier.id },
+    data: {
+      depositedOn: versDateCivile(deposeLe),
+      retentionUntil: correction.retentionUntil,
+      purgeDueAt: correction.purgeDueAt,
+    },
+  });
+  return { dossier: maj, ancienne, nouvelle: deposeLe };
 }
 
 export interface ConservationProlongee {

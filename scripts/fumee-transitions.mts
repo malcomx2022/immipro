@@ -122,6 +122,7 @@ process.env.SMTP_FROM = "ne-pas-repondre@immipro.test";
 
 const { db } = await import("../src/lib/db");
 const { declarerLeDepot, cloturerLeDossier } = await import("../src/server/dossiers/parcours");
+const { jourCivil } = await import("../src/domain/format/fuseau");
 const { arbitrerLaDivergence } = await import("../src/server/dossiers/migration");
 const { propagerLaPublication, doitRejouer } = await import("../src/server/jobs/divergence");
 const { purgerSurDemande, purgerLesPiecesEchues } = await import("../src/server/jobs/purge");
@@ -246,9 +247,12 @@ try {
   {
     const r = await regle(brute.rules);
     const { application } = await dossierPret(r.id);
-    const maj = await declarerLeDepot(application);
+    const maj = await declarerLeDepot(application, { deposeLe: jourCivil(new Date()) });
     verifier(maj.status === "SOUMIS", `le dossier passe à SOUMIS (${maj.status})`);
-    verifier(maj.submittedAt !== null, "et la date de dépôt est posée");
+    verifier(
+      maj.submittedAt !== null && maj.depositedOn !== null,
+      "et la date réelle du dépôt est posée, avec l'instant de sa déclaration",
+    );
     verifier(maj.readyAt === null, "la date de mise en état est retirée avec l'état");
 
     /*

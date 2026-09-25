@@ -223,9 +223,12 @@ try {
     const r = await regle(brute.rules);
     const deposeLe = new Date("2026-01-31T10:00:00Z");
     const { application, user } = await dossierPret(r.id, deposeLe);
-    const soumis = await declarerLeDepot(application, deposeLe);
+    const soumis = await declarerLeDepot(application, {
+      deposeLe: deposeLe.toISOString().slice(0, 10),
+      maintenant: deposeLe,
+    });
     verifier(
-      soumis.retentionUntil?.toISOString() === "2027-01-31T10:00:00.000Z",
+      soumis.retentionUntil?.toISOString() === "2027-01-31T00:00:00.000Z",
       `le dépôt pose douze mois de conservation (${soumis.retentionUntil?.toISOString()})`,
     );
 
@@ -244,7 +247,7 @@ try {
 
     const { jusquAu } = await confirmerLInstruction(await etat(application.id), new Date("2026-12-10T08:00:00Z"));
     verifier(
-      jusquAu.toISOString() === "2027-07-31T10:00:00.000Z",
+      jusquAu.toISOString() === "2027-07-31T00:00:00.000Z",
       `la confirmation prolonge de six mois depuis l'échéance (${jusquAu.toISOString()})`,
     );
 
@@ -278,7 +281,10 @@ try {
     const r = await regle(brute.rules);
     const deposeLe = new Date("2025-01-15T10:00:00Z");
     const { application, user } = await dossierPret(r.id, deposeLe);
-    await declarerLeDepot(application, deposeLe);
+    await declarerLeDepot(application, {
+      deposeLe: deposeLe.toISOString().slice(0, 10),
+      maintenant: deposeLe,
+    });
     differees.add(user.email);
     // Le stock ancien : l'échéance théorique est passée depuis longtemps.
     const maintenant = new Date("2027-03-01T08:00:00Z");

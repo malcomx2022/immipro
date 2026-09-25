@@ -32,6 +32,7 @@ import {
 } from "@/domain/backoffice/couts";
 import { moyenDe } from "@/domain/paiement/recu";
 import { bornesDesJoursCivils, jourCivil } from "@/domain/format/fuseau";
+import { depuisDateCivile } from "@/domain/dossiers/depot";
 
 /**
  * Lecture du back-office — B-01 à B-07, WF-14 à WF-16.
@@ -188,6 +189,7 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
         include: {
           credits: true,
           transactions: { where: { status: "CONFIRMEE" }, orderBy: { confirmedAt: "asc" } },
+          visaRule: { select: { countryCode: true, visaType: true } },
         },
       },
     },
@@ -211,6 +213,21 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
       analysesUtilisees: octroyees - solde,
       analysesTotal: octroyees,
       statut: statutDuCompte(u),
+      depots: u.applications.flatMap((a) =>
+        a.depositedOn && a.submittedAt
+          ? [
+              {
+                dossierId: a.id,
+                destination:
+                  (a.visaRule && editorialDe(a.visaRule.countryCode, a.visaRule.visaType)?.pays) ??
+                  a.visaRule?.countryCode ??
+                  "Dossier",
+                deposeLe: depuisDateCivile(a.depositedOn),
+                declareLe: a.submittedAt.toISOString(),
+              },
+            ]
+          : [],
+      ),
     };
   });
 }

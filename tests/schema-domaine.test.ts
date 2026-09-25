@@ -163,6 +163,9 @@ describe("le schéma et le domaine nomment les mêmes choses", () => {
       // préavis de purge, l'avertissement d'une suspension. Même rôle
       // d'idempotence que le précédent.
       "CONSERVATION",
+      // Arbitrage S.89 : les relances J+30 et J+60 après la date réelle
+      // du dépôt. Leur clé d'idempotence porte le jalon.
+      "SUIVI_DEPOT",
     ];
     expect(valeursDeLEnum("NotificationKind")).toEqual(trie(genres));
   });
