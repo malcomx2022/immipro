@@ -9,6 +9,7 @@ import type { EchecCandidat } from "@/server/http/echecs";
 import type { ConservationDuDepot as Conservation } from "@/domain/dossiers/dossier";
 import { PROLONGATION_MOIS } from "@/domain/dossiers/conservation";
 import { jourEnFrancais } from "@/domain/format/moment";
+import { DemandeDeCorrection } from "./DemandeDeCorrection";
 
 /**
  * La conservation des pièces d'un dossier déposé — arbitrage S.78.
@@ -71,12 +72,19 @@ export function ConservationDuDepot({
         {/* S.89 — la date réelle du dépôt commande la suite : elle se lit
             avant l'échéance qu'elle fixe, avec la prochaine question. */}
         {conservation.deposeLe ? (
-          <p className="text-pretty text-14 text-ink-700">
-            {`Demande déposée le ${jourEnFrancais(conservation.deposeLe)}.`}
-            {conservation.prochaineQuestion
-              ? ` Le ${jourEnFrancais(conservation.prochaineQuestion)}, nous te demanderons si l'autorité t'a répondu.`
-              : ""}
-          </p>
+          <>
+            <p className="text-pretty text-14 text-ink-700">
+              {`Demande déposée le ${jourEnFrancais(conservation.deposeLe)}.`}
+              {conservation.prochaineQuestion
+                ? ` Le ${jourEnFrancais(conservation.prochaineQuestion)}, nous te demanderons si l'autorité t'a répondu.`
+                : ""}
+            </p>
+            <DemandeDeCorrection
+              dossierId={dossierId}
+              deposeLe={conservation.deposeLe}
+              enAttente={conservation.correctionDemandee ?? null}
+            />
+          </>
         ) : null}
         <p className="text-pretty text-14 text-ink-700" role="status">
           {confirmee

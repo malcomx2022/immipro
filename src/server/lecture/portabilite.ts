@@ -71,6 +71,9 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
           deadlines: { orderBy: { dueAt: "asc" } },
           credits: { orderBy: { createdAt: "asc" } },
           appointments: { orderBy: { startsAt: "asc" }, include: { consultant: true } },
+          // S.90 — ses demandes de correction de la date de dépôt, et
+          // ce qui leur a été répondu : c'est lui qui les a écrites.
+          correctionsDeDepot: { orderBy: { createdAt: "asc" } },
           /*
             Les deux décisions que le candidat a prises lui-même, et que
             l'export ne rendait pas : son arbitrage sur une divergence
@@ -174,6 +177,14 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
         // où il l'a déclaré dans ImmiPro.
         dateReelleDuDepot: jour(a.depositedOn),
         depotDeclareDansImmiProLe: iso(a.submittedAt),
+        demandesDeCorrectionDuDepot: a.correctionsDeDepot.map((d) => ({
+          dateDemandee: jour(d.requestedDate),
+          explication: d.explanation,
+          demandeeLe: iso(d.createdAt),
+          statut: d.status,
+          trancheeLe: iso(d.resolvedAt),
+          reponse: d.answer,
+        })),
         issue: a.issue,
         // Le barème interne n'est pas ici : l'export rend ce que les écrans
         // disent, un palier et un dénombrement (arbitrage C-09).

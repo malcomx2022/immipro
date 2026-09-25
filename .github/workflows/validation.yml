@@ -115,7 +115,9 @@ jobs:
       # l'annonce soit partie.
       - name: Conservation des pièces
         run: npm run smoke:conservation
-      - run: echo "- **Conservation des pièces** — dossiers payés, soumis et suspendus : annonce, puis purge, et le dossier reste" >> "$GITHUB_STEP_SUMMARY"
+      # Entre apostrophes : un « : » suivi d'une espace dans une valeur nue
+      # se lit comme une clé YAML, et le fichier entier était refusé.
+      - run: 'echo "- **Conservation des pièces** — dossiers payés, soumis et suspendus : annonce, puis purge, et le dossier reste" >> "$GITHUB_STEP_SUMMARY"'
 
       # La demande de remboursement : deux reprises à la même
       # milliseconde, le retrait de droits qui n'a lieu qu'une fois, et la
@@ -186,6 +188,20 @@ jobs:
       - name: Purge de rétention
         run: npm run smoke:purge
       - run: echo "- **Purge de rétention** — rien ne se déclare purgé tant que les octets n'ont pas quitté le stockage" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le passage d'Essentiel à Dossier (S.88) : prix différentiel depuis
+      # l'achat réel, une seule montée par achat, vingt analyses, rejeu
+      # sans double crédit, remboursement du seul supplément.
+      - name: Montée en gamme
+        run: npm run smoke:montee
+      - run: 'echo "- **Montée en gamme** — différence de prix, une montée par achat, rejeu sans double crédit, remboursement du supplément" >> "$GITHUB_STEP_SUMMARY"'
+
+      # La date réelle du dépôt (S.89) : deux dates distinctes, déclaration
+      # tardive sans purge immédiate, relances J+30 et J+60 sans rafale,
+      # correction auditée, export.
+      - name: Date réelle du dépôt
+        run: npm run smoke:depot
+      - run: 'echo "- **Date réelle du dépôt** — relances sans rafale, préavis tenu, correction auditée" >> "$GITHUB_STEP_SUMMARY"'
 
       # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
       # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.

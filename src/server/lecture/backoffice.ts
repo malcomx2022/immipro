@@ -190,6 +190,7 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
           credits: true,
           transactions: { where: { status: "CONFIRMEE" }, orderBy: { confirmedAt: "asc" } },
           visaRule: { select: { countryCode: true, visaType: true } },
+          correctionsDeDepot: { where: { status: "EN_ATTENTE" }, take: 1 },
         },
       },
     },
@@ -224,6 +225,14 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
                   "Dossier",
                 deposeLe: depuisDateCivile(a.depositedOn),
                 declareLe: a.submittedAt.toISOString(),
+                demande: a.correctionsDeDepot[0]
+                  ? {
+                      id: a.correctionsDeDepot[0].id,
+                      deposeLe: depuisDateCivile(a.correctionsDeDepot[0].requestedDate),
+                      explication: a.correctionsDeDepot[0].explanation,
+                      demandeeLe: a.correctionsDeDepot[0].createdAt.toISOString(),
+                    }
+                  : null,
               },
             ]
           : [],

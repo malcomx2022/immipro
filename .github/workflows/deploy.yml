@@ -21,7 +21,10 @@ jobs:
     needs: valider
     runs-on: ubuntu-latest
     permissions: { contents: read, packages: write }
-    outputs: { tag: ${{ steps.meta.outputs.tag }} }
+    # En bloc, et non entre accolades : `${{ … }}` dans une table en ligne
+    # ne s'analyse pas en YAML, et le fichier entier était refusé.
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

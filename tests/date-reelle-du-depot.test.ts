@@ -230,3 +230,55 @@ describe("le serveur tient ce que le domaine décide", () => {
     expect(worker).toContain('boss.schedule(JOBS.SUIVI_DEPOT, "20 * * * *")');
   });
 });
+
+describe("la demande de correction du candidat — S.90", () => {
+  const base = {
+    actuelle: "2026-09-10",
+    declareLe: "2026-09-12",
+    aujourdhui: "2026-09-25",
+    ouvertLe: "2026-06-01",
+  };
+
+  it("suit les règles de la correction : bornes, pas après la déclaration, pas identique", async () => {
+    const { refusDeLaCorrection } = await import("@/domain/dossiers/depot");
+    expect(refusDeLaCorrection({ ...base, nouvelle: "2026-09-01" })).toBeNull();
+    expect(refusDeLaCorrection({ ...base, nouvelle: "2026-09-10" })).toContain("est déjà le");
+    expect(refusDeLaCorrection({ ...base, nouvelle: "2026-09-15" })).toContain("ne peut pas avoir eu lieu après");
+    expect(refusDeLaCorrection({ ...base, nouvelle: "2026-05-01" })).toContain("ne peut pas le précéder");
+    expect(refusDeLaCorrection({ ...base, nouvelle: "2026-10-01" })).toContain("pas encore arrivé");
+  });
+
+  it("demande d'où vient l'erreur", async () => {
+    const { refusDeLExplication } = await import("@/domain/dossiers/depot");
+    expect(refusDeLExplication("  trop  ")).toContain("d'où vient l'erreur");
+    expect(refusDeLExplication("Le récépissé porte le 1er septembre.")).toBeNull();
+  });
+
+  it("dit que la demande attend, et que la date enregistrée reste d'ici là", async () => {
+    const { demandeEnAttente, correctionAppliquee, correctionRefusee, AIDE_DEMANDE_DE_CORRECTION } =
+      await import("@/domain/dossiers/depot");
+    const attente = demandeEnAttente("2026-09-01", "2026-09-25");
+    expect(attente).toContain("la date enregistrée reste celle que tu avais déclarée");
+    const appliquee = correctionAppliquee("2026-09-01", new Date("2027-09-01T00:00:00Z"));
+    expect(appliquee.corps).toContain("1er septembre 2027");
+    const refusee = correctionRefusee("2026-09-01", "Le récépissé joint porte le 10 septembre.");
+    expect(refusee.corps).toContain("Le récépissé joint porte le 10 septembre.");
+    for (const t of [attente, appliquee.corps, refusee.corps, AIDE_DEMANDE_DE_CORRECTION]) {
+      expect(verifierTexte(t, INTERDITS_PARTOUT), t).toEqual([]);
+    }
+  });
+
+  it("le serveur tranche la demande en appliquant la correction, et vérifie la réponse d'un refus", () => {
+    const parcours = readFileSync("src/server/dossiers/parcours.ts", "utf8");
+    const correction = parcours.slice(parcours.indexOf("export async function corrigerLeDepot"));
+    expect(correction).toMatch(/depositCorrectionRequest\.updateMany\(\{\s*where: \{ applicationId: dossier\.id, status: "EN_ATTENTE" \}/u);
+    const refus = parcours.slice(parcours.indexOf("export async function refuserLaCorrectionDuDepot"));
+    expect(refus).toMatch(/verifierTexte\(reponse, INTERDITS_PARTOUT\)/u);
+    expect(refus).toMatch(/action: "dossier\.depot\.correction\.refus"/u);
+    const migration = readFileSync(
+      "prisma/migrations/20260925180000_demande_de_correction_du_depot/migration.sql",
+      "utf8",
+    );
+    expect(migration).toMatch(/CREATE UNIQUE INDEX "correction_de_depot_une_en_attente"/u);
+  });
+});

@@ -12,12 +12,17 @@ import {
 } from "@/domain/dossiers/conservation";
 import { echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
 import {
+  correctionAppliquee,
   correctionDuDepot,
+  correctionRefusee,
   depuisDateCivile,
   echeanceNormale,
+  refusDeLExplication,
+  refusDeLaCorrection,
   refusDeLaDateDeDepot,
   versDateCivile,
 } from "@/domain/dossiers/depot";
+import { INTERDITS_PARTOUT, verifierTexte } from "@/domain/copy/vocabulaire-interdit";
 import { lirePreferences } from "@/domain/dossiers/preferences-rappels";
 import { journaliser } from "@/server/acces/journal";
 import { FUSEAU_AFFICHAGE, jourCivil, momentDans } from "@/domain/format/fuseau";
@@ -178,17 +183,13 @@ export async function corrigerLeDepot(
   const fuseau = lirePreferences(dossier.user).fuseau;
   const ancienne = depuisDateCivile(dossier.depositedOn);
   const declareLe = momentDans(dossier.submittedAt, fuseau).jour;
-  const refus =
-    refusDeLaDateDeDepot(
-      deposeLe,
-      momentDans(maintenant, fuseau).jour,
-      momentDans(dossier.createdAt, fuseau).jour,
-    ) ??
-    (deposeLe > declareLe
-      ? `Le dépôt a été déclaré le ${jourEnFrancais(declareLe)} : il ne peut pas avoir eu lieu après.`
-      : deposeLe === ancienne
-        ? `La date du dépôt est déjà le ${jourEnFrancais(ancienne)}.`
-        : null);
+  const refus = refusDeLaCorrection({
+    nouvelle: deposeLe,
+    actuelle: ancienne,
+    declareLe,
+    aujourdhui: momentDans(maintenant, fuseau).jour,
+    ouvertLe: momentDans(dossier.createdAt, fuseau).jour,
+  });
   if (refus) throw echec("champs_invalides", { champs: { deposeLe: refus } });
 
   const correction = correctionDuDepot({
@@ -214,15 +215,151 @@ export async function corrigerLeDepot(
     },
   });
 
-  const maj = await db.application.update({
-    where: { id: dossier.id },
-    data: {
-      depositedOn: versDateCivile(deposeLe),
-      retentionUntil: correction.retentionUntil,
-      purgeDueAt: correction.purgeDueAt,
-    },
-  });
+  const avis = correctionAppliquee(deposeLe, correction.retentionUntil);
+  const [maj] = await db.$transaction([
+    db.application.update({
+      where: { id: dossier.id },
+      data: {
+        depositedOn: versDateCivile(deposeLe),
+        retentionUntil: correction.retentionUntil,
+        purgeDueAt: correction.purgeDueAt,
+      },
+    }),
+    /*
+      S.90 — la demande du candidat, s'il en a fait une, est tranchée par
+      la correction elle-même : quelle que soit la date retenue, la
+      question qu'il avait posée a reçu sa réponse.
+    */
+    db.depositCorrectionRequest.updateMany({
+      where: { applicationId: dossier.id, status: "EN_ATTENTE" },
+      data: { status: "APPLIQUEE", resolvedAt: maintenant, resolvedBy: acteurId },
+    }),
+    // Le candidat apprend la nouvelle date là où il suit son dossier.
+    db.notification.create({
+      data: {
+        userId: dossier.userId,
+        applicationId: dossier.id,
+        kind: "SUIVI_DEPOT",
+        title: avis.titre,
+        body: avis.corps,
+      },
+    }),
+  ]);
   return { dossier: maj, ancienne, nouvelle: deposeLe };
+}
+
+/**
+ * Le candidat signale une date de dépôt erronée — arbitrage S.90.
+ *
+ * Il ne la modifie pas : la date commande la conservation et les
+ * relances, et c'est l'action auditée de S.89 qui la change. Il **demande**,
+ * avec la date qu'il pense juste et d'où vient l'erreur ; la demande
+ * attend un opérateur, et la date enregistrée reste celle qu'il a
+ * déclarée d'ici là.
+ *
+ * La date proposée suit exactement les règles de la correction : pas dans
+ * le futur, pas avant l'ouverture, pas après la déclaration, pas la même.
+ * Une seule demande en attente par dossier ; la base le garantit.
+ */
+export async function demanderUneCorrectionDuDepot(
+  dossier: Application,
+  {
+    deposeLe,
+    explication,
+    fuseau = FUSEAU_AFFICHAGE,
+    maintenant = new Date(),
+  }: { deposeLe: string; explication: string; fuseau?: string; maintenant?: Date },
+) {
+  if (!dossier.depositedOn || !dossier.submittedAt) {
+    throw echec("etat_incompatible", {
+      corps: "Tu n'as pas encore déclaré ton dépôt : la date se choisit au moment de la déclaration.",
+    });
+  }
+  const champs: Record<string, string> = {};
+  const refusDate = refusDeLaCorrection({
+    nouvelle: deposeLe,
+    actuelle: depuisDateCivile(dossier.depositedOn),
+    declareLe: momentDans(dossier.submittedAt, fuseau).jour,
+    aujourdhui: momentDans(maintenant, fuseau).jour,
+    ouvertLe: momentDans(dossier.createdAt, fuseau).jour,
+  });
+  if (refusDate) champs.deposeLe = refusDate;
+  const refusTexte = refusDeLExplication(explication);
+  if (refusTexte) champs.explication = refusTexte;
+  if (Object.keys(champs).length > 0) throw echec("champs_invalides", { champs });
+
+  try {
+    return await db.depositCorrectionRequest.create({
+      data: {
+        applicationId: dossier.id,
+        requestedDate: versDateCivile(deposeLe),
+        explanation: explication.trim(),
+        createdAt: maintenant,
+      },
+    });
+  } catch (erreur) {
+    if ((erreur as { code?: unknown } | null)?.code === "P2002") {
+      throw echec("etat_incompatible", {
+        corps:
+          "Une demande de correction est déjà en cours pour ce dossier : un membre de l'équipe la vérifie. Tu seras prévenu dans tes alertes.",
+      });
+    }
+    throw erreur;
+  }
+}
+
+/**
+ * Une demande de correction non retenue — S.90.
+ *
+ * La réponse est **pour le candidat** : elle part dans ses alertes, et au
+ * journal comme motif. Elle passe donc par le vocabulaire interdit, comme
+ * tout texte qu'un opérateur adresse à un candidat (B-05) : une réponse
+ * qui promettrait quelque chose ne part pas.
+ */
+export async function refuserLaCorrectionDuDepot(
+  demandeId: string,
+  { reponse, acteurId, maintenant = new Date() }: { reponse: string; acteurId: string; maintenant?: Date },
+) {
+  const demande = await db.depositCorrectionRequest.findUnique({
+    where: { id: demandeId },
+    include: { application: { select: { id: true, userId: true } } },
+  });
+  if (!demande) throw echec("introuvable");
+  if (demande.status !== "EN_ATTENTE") {
+    throw echec("etat_incompatible", { corps: "Cette demande a déjà été tranchée." });
+  }
+  const fautes = verifierTexte(reponse, INTERDITS_PARTOUT);
+  if (fautes.length > 0) {
+    throw echec("champs_invalides", {
+      champs: { reponse: `Reformule sans « ${fautes[0]!.extrait} » : cette réponse est lue par le candidat.` },
+    });
+  }
+
+  const demandee = depuisDateCivile(demande.requestedDate);
+  await journaliser({
+    acteurId,
+    action: "dossier.depot.correction.refus",
+    cible: `application:${demande.applicationId}`,
+    motif: reponse,
+    details: { demandeId, dateDemandee: demandee },
+  });
+  const avis = correctionRefusee(demandee, reponse);
+  const [maj] = await db.$transaction([
+    db.depositCorrectionRequest.update({
+      where: { id: demandeId },
+      data: { status: "REFUSEE", resolvedAt: maintenant, resolvedBy: acteurId, answer: reponse.trim() },
+    }),
+    db.notification.create({
+      data: {
+        userId: demande.application.userId,
+        applicationId: demande.applicationId,
+        kind: "SUIVI_DEPOT",
+        title: avis.titre,
+        body: avis.corps,
+      },
+    }),
+  ]);
+  return maj;
 }
 
 export interface ConservationProlongee {

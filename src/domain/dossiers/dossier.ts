@@ -115,6 +115,8 @@ export interface ConservationDuDepot {
   deposeLe?: string | null;
   /** Prochaine question sur l'issue — J+30 ou J+60 —, ou `null`. */
   prochaineQuestion?: string | null;
+  /** Demande de correction de la date en attente (S.90), ou `null`. */
+  correctionDemandee?: { deposeLe: string; demandeeLe: string } | null;
 }
 
 export interface Dossier {
