@@ -10182,3 +10182,72 @@ L'écran de dépôt nommait le pack d'après la **dernière transaction confirm�
 - **Le remboursement de l'Essentiel d'origine après une montée confirmée.** Il suit la règle d'un pack : toute consommation sur le dossier l'envoie en revue manuelle. La montée, elle, reste en place.
 - **Le back-office.** La liste des candidats et la marge par dossier lisent toujours le premier pack confirmé. Elles affichent « Essentiel » et son prix pour un dossier monté.
 - **Une différence inférieure au minimum de 3 000 F** (RG-05.5). Elle est impossible aux tarifs actuels, et le minimum s'appliquerait comme à tout achat.
+
+## S.89 — La date réelle du dépôt est demandée, et elle commande la suite
+
+Jusqu'ici, la déclaration posait `submittedAt` à l'instant du clic. Un dépôt fait le 1er septembre et déclaré le 20 comptait donc à partir du 20 : la conservation durait trois semaines de trop, et les relances J+30 et J+60 de DOC-11 n'existaient pas du tout.
+
+### Deux faits, et aucun ne tient lieu de l'autre (RG-10.8)
+
+| Fait | Colonne | Ce qu'il commande |
+|---|---|---|
+| Date réelle du dépôt | `Application.depositedOn` (`DATE`) | relances J+30 et J+60, échéance normale de conservation à douze mois, suivi, export |
+| Déclaration dans ImmiPro | `Application.submittedAt` (instant) | audit, et lecture d'une déclaration tardive |
+
+`updatedAt` ne tient lieu d'aucune des deux. Le repli sur la dernière écriture est retiré de `echeanceDuDossierSoumis`. Un dossier soumis sans aucune date est une anomalie : il lève une erreur, et la passe la compte comme incident au lieu de la combler.
+
+La base exige les deux dates ensemble. Elle refuse une date réelle postérieure à la déclaration ou antérieure à l'ouverture du dossier, avec une marge de fuseau horaire.
+
+**Reprise de l'existant.** Les dépôts déjà déclarés reçoivent comme date réelle le jour de leur déclaration, lu à Cotonou. C'est la seule date connue. Leur `retentionUntil` n'est pas touché.
+
+### L'écran
+
+- La question « Quand as-tu déposé ta demande ? » est suivie de l'aide « Indique la date où tu as remis ou envoyé la demande à l'autorité ou à son prestataire. »
+- Le champ est obligatoire, prérempli avec **le jour du candidat** et modifiable. La case de confirmation reste décochée.
+- Le jour se lit dans le fuseau du candidat, celui de ses rappels (S.87). À Montréal à 21 h, Cotonou est déjà au lendemain, et ce lendemain serait refusé comme futur.
+- Un refus s'affiche sous le champ avant l'envoi. Le serveur applique la même règle (`refusDeLaDateDeDepot`).
+- Deux refus seulement : une date future et une date antérieure à l'ouverture. Rien n'est comparé à `readyAt`, et aucun retard n'est refusé.
+
+### Déclaration tardive
+
+L'échéance normale est de douze mois après la date réelle ; elle peut donc être proche, voire passée. La passe de conservation envoie alors le préavis, et l'échéance effective vaut `max(douze mois, annonce + trente jours)`. La fumée le vérifie : un dépôt de février 2025 déclaré en septembre 2026 n'est purgé qu'après trente jours au moins.
+
+### Relances J+30 et J+60 (WF-10 étape 2)
+
+C'est le nouveau job `dossier.suivi-depot`. Il tourne toutes les heures et n'envoie qu'à partir de 8 h dans le fuseau du candidat.
+
+- **Calcul :** les jalons se comptent depuis la date réelle, et la décision est dans le domaine (`relanceDuJour`).
+- **Pas de rafale :**
+  - un jalon déjà dépassé le jour de la déclaration ne part jamais ;
+  - un rattrapage n'envoie que le jalon échu le plus récent ;
+  - un jalon plus ancien qu'un jalon déjà envoyé ne part plus.
+- **Idempotence :** chaque relance est réservée sous la clé `suivi-depot:<dossier>:<jalon>` avant tout envoi. Deux passes simultanées produisent un seul courrier.
+- **Courrier :** il n'est dit `ENVOYE` que s'il a été accepté. Il est repris quelques fois sous bail, puis abandonné en `NON_ENVOYE`. L'envoi réservé est désormais partagé avec les rappels d'échéance (`server/jobs/courrier-reserve.ts`).
+- **Exclusions :** aucune relance si le dossier n'est plus `SOUMIS` ou si la suppression du compte est demandée.
+- **Texte :** il demande si l'autorité a répondu et dit où déclarer l'issue. Il précise que continuer d'attendre ne demande rien. Il ne suppose rien de la réponse (INV-1, INV-2).
+
+L'écran du dossier affiche la date réelle du dépôt et la prochaine question prévue.
+
+### Correction auditée
+
+Une fois confirmée, la date ne se modifie pas depuis le dossier. La correction passe par la fiche du compte en back-office (`POST /api/admin/dossiers/[id]/depot`).
+
+- **Contrôles :**
+  - le motif est obligatoire (dix caractères au moins) ;
+  - la nouvelle date suit les mêmes règles que la déclaration ;
+  - elle ne peut pas être postérieure à la déclaration, ni identique à l'ancienne.
+- **Journal :** l'action `dossier.depot.correction` est écrite **avant** la modification. Elle porte l'acteur, le motif, l'ancienne et la nouvelle valeur, et les échéances avant et après.
+- **Recalcul** (`correctionDuDepot`) :
+  - la conservation suit la nouvelle date, sans jamais raccourcir une prolongation obtenue ;
+  - une purge annoncée garde son jour si la nouvelle échéance la précède ;
+  - si la nouvelle échéance est plus tardive, l'annonce tombe et la passe en refera une avec ses trente jours ;
+  - les relances se recalculent d'elles-mêmes, et celles déjà envoyées le restent.
+
+### Export
+
+La portabilité exporte `dateReelleDuDepot` et `depotDeclareDansImmiProLe`, qui remplacent le `deposeLe` ambigu.
+
+### Ce que ce lot ne tranche pas
+
+- **La demande de correction par le candidat.** Il la signale au support ; il n'y a pas encore de formulaire dédié.
+- **La langue des relances.** Elles restent en français, comme les autres courriers.

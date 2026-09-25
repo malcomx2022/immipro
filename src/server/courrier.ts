@@ -392,6 +392,19 @@ export const envoyerAvisDeConservation = (
     corps: `${corps}${SIGNATURE}`,
   });
 
+/**
+ * Relance après dépôt — WF-10 étape 2, S.89. J+30 puis J+60 depuis la
+ * date réelle du dépôt : « as-tu reçu une réponse ? ». Par courrier, parce
+ * que le candidat qui attend l'autorité n'ouvre plus l'application.
+ */
+export const envoyerRelanceDeSuivi = (destinataire: string, objet: string, corps: string) =>
+  expedier({
+    destinataire,
+    genre: "suivi_depot",
+    objet,
+    corps: `${corps}${SIGNATURE}`,
+  });
+
 export interface ConfirmationEntretien {
   destinataire: string;
   reference: string;

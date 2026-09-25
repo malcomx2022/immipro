@@ -35,6 +35,21 @@ export interface Compte {
   analysesUtilisees: number;
   analysesTotal: number;
   statut: StatutCompte;
+  /**
+   * Les dépôts déclarés de ce compte — S.89. La date réelle ne se modifie
+   * pas depuis le dossier ; sa correction passe par le back-office, avec
+   * motif, et c'est ici qu'elle se lit.
+   */
+  depots?: readonly DepotDeclare[];
+}
+
+export interface DepotDeclare {
+  dossierId: string;
+  destination: string;
+  /** Date réelle du dépôt, `AAAA-MM-JJ`. */
+  deposeLe: string;
+  /** Instant où le candidat l'a déclarée dans ImmiPro, ISO. */
+  declareLe: string;
 }
 
 export type FiltreCompte = "TOUS" | "EMAIL_NON_VERIFIE" | "SUPPRESSION_DEMANDEE";

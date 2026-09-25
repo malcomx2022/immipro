@@ -111,6 +111,10 @@ export interface ConservationDuDepot {
   confirmableLe: string;
   /** La confirmation est-elle ouverte aujourd'hui ? */
   confirmable: boolean;
+  /** Date réelle du dépôt, `AAAA-MM-JJ` (S.89). */
+  deposeLe?: string | null;
+  /** Prochaine question sur l'issue — J+30 ou J+60 —, ou `null`. */
+  prochaineQuestion?: string | null;
 }
 
 export interface Dossier {

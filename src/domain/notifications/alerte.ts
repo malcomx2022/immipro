@@ -19,7 +19,8 @@ import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
  * alignés. `INACTIVITE` est arrivée avec RG-04.2 : un brouillon qu'on
  * laisse de côté est relancé, puis clos. `CONSERVATION` avec l'arbitrage
  * S.78 : l'invitation à confirmer l'instruction d'un dossier soumis, le
- * préavis de purge, l'avertissement d'un dossier suspendu.
+ * préavis de purge, l'avertissement d'un dossier suspendu. `SUIVI_DEPOT`
+ * avec S.89 : les relances J+30 et J+60 après la date réelle du dépôt.
  */
 export type GenreAlerte =
   | "REGLEMENTATION"
@@ -28,7 +29,8 @@ export type GenreAlerte =
   | "PAIEMENT"
   | "VEILLE"
   | "INACTIVITE"
-  | "CONSERVATION";
+  | "CONSERVATION"
+  | "SUIVI_DEPOT";
 
 export interface Alerte {
   id: string;

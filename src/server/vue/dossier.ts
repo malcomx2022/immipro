@@ -14,6 +14,8 @@ import type { FicheDestination } from "@/domain/destinations/fiche";
 import { jourCivil } from "@/domain/format/fuseau";
 import { confirmationOuverte, debutDeLInvitation } from "@/domain/dossiers/conservation";
 import { echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
+import { depuisDateCivile } from "@/domain/dossiers/depot";
+import { prochaineRelance } from "@/domain/dossiers/suivi-depot";
 
 /**
  * Vue candidat d'un dossier.
@@ -243,17 +245,31 @@ const minuscule = (texte: string) => texte.charAt(0).toLowerCase() + texte.slice
 
 /**
  * La conservation d'un dossier déposé, telle que l'écran la dit — arbitrage
- * S.78. L'échéance vient du même calcul que celle du job.
+ * S.78. L'échéance vient du même calcul que celle du job. Depuis S.89,
+ * elle dit aussi la date réelle du dépôt et la prochaine question sur
+ * l'issue, calculée comme la relance elle-même.
  */
 export function conservationDuDepot(
   dossier: Pick<
     Application,
-    "retentionUntil" | "submittedAt" | "updatedAt" | "purgeDueAt" | "purgedAt"
+    "id" | "retentionUntil" | "depositedOn" | "submittedAt" | "purgeDueAt" | "purgedAt"
   >,
   maintenant: Date = new Date(),
 ): ConservationDuDepot {
   const echeance = echeanceDuDossierSoumis(dossier);
+  const deposeLe = dossier.depositedOn ? depuisDateCivile(dossier.depositedOn) : null;
+  const prochaine =
+    deposeLe && dossier.submittedAt
+      ? prochaineRelance({
+          deposeLe,
+          declareLe: jourCivil(dossier.submittedAt),
+          envoyes: [],
+          aujourdhui: jourCivil(maintenant),
+        })
+      : null;
   return {
+    deposeLe,
+    prochaineQuestion: prochaine?.le ?? null,
     jusquAu: jourCivil(echeance),
     purgeLe: dossier.purgeDueAt ? jourCivil(dossier.purgeDueAt) : null,
     purgeeLe: dossier.purgedAt ? jourCivil(dossier.purgedAt) : null,

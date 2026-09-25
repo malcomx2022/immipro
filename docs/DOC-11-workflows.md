@@ -365,8 +365,8 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 **Étapes**
 
-1. Le candidat déclare avoir déposé sa demande → `SOUMIS`.
-2. Relance à J+30 puis J+60 pour connaître l'issue.
+1. Le candidat déclare avoir déposé sa demande, avec **la date réelle du dépôt** → `SOUMIS`.
+2. Relance à J+30 puis J+60 après la date réelle du dépôt pour connaître l'issue.
 3. Déclaration de l'issue : accepté, refusé (avec motif si communiqué), sans réponse, renoncement → `ISSUE_DECLAREE`.
 4. Déclenchement de la **purge des pièces** selon la politique de rétention : suppression du contenu MinIO, conservation des seules métadonnées (type, verdict, horodatage). Les pièces passent en `PURGEE`.
 5. Passage en `ARCHIVE`.
@@ -381,6 +381,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-10.6 : `SOUMIS` — l'inactivité seule ne vaut pas abandon. Les pièces sont conservées 12 mois après le dépôt déclaré. Soixante jours avant l'échéance, le candidat est invité à confirmer que l'instruction continue ; une confirmation explicite prolonge la conservation de 6 mois, renouvelable. Sans réponse, un préavis de 30 jours précède la purge.
 - RG-10.7 : `SUSPENDU` — aucune inactivité ne clôt un dossier suspendu par la plateforme ; la suspension est une dette opérationnelle suivie par la sonde de santé. Avertissement après 11 mois de suspension, purge à 12 mois si elle n'est pas levée. Le dossier, le motif, la date et le statut antérieur restent ; les pièces encore nécessaires sont redemandées à la reprise.
 - Toute purge est annoncée au moins 30 jours avant d'avoir lieu, y compris lorsque l'échéance théorique est déjà passée.
+- RG-10.8 : la déclaration de dépôt demande la date réelle du dépôt (« Quand as-tu déposé ta demande ? »), obligatoire, préremplie avec la date locale du jour, modifiable avant confirmation ; la case de confirmation reste non pré-cochée. La date est civile, sans heure ; elle ne peut être ni future ni antérieure à l'ouverture du dossier ; elle n'est pas refusée si elle précède `readyAt`, et aucun retard maximal n'est imposé. Deux faits sont conservés : la date réelle, qui commande les relances J+30 et J+60, l'échéance normale de conservation à douze mois, le suivi et l'export ; et la date de déclaration dans ImmiPro, qui sert l'audit. `updatedAt` ne tient lieu d'aucune des deux. Une déclaration tardive ne provoque jamais de purge immédiate : l'échéance effective est la plus tardive entre douze mois après la date réelle et trente jours après l'annonce. Une relance déjà dépassée le jour de la déclaration n'est pas envoyée, et un rattrapage n'envoie que le jalon le plus récent. Après confirmation, la date se corrige par une action auditée du back-office (motif, ancienne et nouvelle valeur), qui recalcule les échéances sans raccourcir une prolongation ni rapprocher une purge annoncée. L'export distingue la date réelle du dépôt et la date de sa déclaration (arbitrage S.89).
 
 ---
 

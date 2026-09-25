@@ -103,12 +103,25 @@ describe("dossiers soumis — douze mois après le dépôt, six de plus par conf
 
   it("lit l'échéance posée, et se replie sur le dépôt déclaré à défaut", () => {
     const posee = new Date("2027-09-01T00:00:00Z");
+    const base = { id: "d1", depositedOn: null, submittedAt: DEPOT };
+    expect(echeanceDuDossierSoumis({ ...base, retentionUntil: posee })).toEqual(posee);
+    expect(echeanceDuDossierSoumis({ ...base, retentionUntil: null })).toEqual(echeance);
+  });
+
+  /**
+   * S.89 — la date réelle du dépôt commande l'échéance, pas le jour de sa
+   * déclaration ; et la dernière écriture du dossier n'en tient jamais lieu.
+   */
+  it("se compte depuis la date réelle du dépôt, jamais depuis updatedAt", () => {
+    const reel = new Date("2026-01-15T00:00:00Z");
     expect(
-      echeanceDuDossierSoumis({ retentionUntil: posee, submittedAt: DEPOT, updatedAt: DEPOT }),
-    ).toEqual(posee);
-    expect(
-      echeanceDuDossierSoumis({ retentionUntil: null, submittedAt: DEPOT, updatedAt: new Date() }),
-    ).toEqual(echeance);
+      echeanceDuDossierSoumis({ id: "d1", retentionUntil: null, depositedOn: reel, submittedAt: DEPOT })
+        .toISOString()
+        .slice(0, 10),
+    ).toBe("2027-01-15");
+    expect(() =>
+      echeanceDuDossierSoumis({ id: "d1", retentionUntil: null, depositedOn: null, submittedAt: null }),
+    ).toThrow(/sans date de dépôt/u);
   });
 
   const au = (avantEcheance: number) => new Date(echeance.getTime() - jours(avantEcheance));
@@ -156,9 +169,10 @@ describe("dossiers soumis — douze mois après le dépôt, six de plus par conf
 
   it("l'écran dit la même échéance, et le bouton suit la fenêtre", () => {
     const dossier = {
+      id: "d1",
       retentionUntil: null,
+      depositedOn: null,
       submittedAt: DEPOT,
-      updatedAt: DEPOT,
       purgeDueAt: null,
       purgedAt: null,
     };

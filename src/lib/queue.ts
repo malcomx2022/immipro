@@ -39,6 +39,12 @@ export const JOBS = {
   BROUILLONS_INACTIFS: "dossier.inactivite",
   /** Arbitrage S.78 — dossiers soumis et suspendus : annonce, puis échéance. */
   CONSERVATION_PIECES: "dossier.conservation",
+  /**
+   * Relances après dépôt, J+30 puis J+60 depuis la date réelle — WF-10
+   * étape 2, arbitrage S.89. L'étape était écrite dans DOC-11 et rien ne
+   * la tenait.
+   */
+  SUIVI_DEPOT: "dossier.suivi-depot",
 
   /**
    * Reprise des contrôles restés sans verdict — I.D, branchée le

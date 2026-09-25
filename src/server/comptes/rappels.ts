@@ -82,3 +82,22 @@ export async function enregistrerLesPreferencesDeRappel(
     },
   });
 }
+
+/**
+ * Le fuseau du candidat — celui qu'il a choisi pour ses rappels, ou le
+ * fuseau d'affichage. « Aujourd'hui » s'y lit quand il déclare une date :
+ * à Montréal à 21 h, Cotonou est déjà au lendemain, et la date du jour ne
+ * doit pas passer pour future (S.89).
+ */
+export async function fuseauDuCandidat(userId: string): Promise<string> {
+  const ligne = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: {
+      remindersEnabled: true,
+      reminderEmail: true,
+      reminderTimeZone: true,
+      reminderLeadDays: true,
+    },
+  });
+  return lirePreferences(ligne).fuseau;
+}

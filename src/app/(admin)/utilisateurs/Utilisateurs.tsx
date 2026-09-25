@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { CHAMP_CONTROLE } from "@/components/ui/champ";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
 import { appeler } from "@/lib/api";
+import { CorrectionDuDepot } from "./CorrectionDuDepot";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { Filtres } from "@/components/admin/Filtres";
 import { ListeSelectionnable } from "@/components/admin/ListeSelectionnable";
@@ -199,6 +200,21 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                   ))}
                 </ul>
               </section>
+
+              {retenu.depots && retenu.depots.length > 0 ? (
+                <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-4">
+                  <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
+                    Dépôts déclarés
+                  </h2>
+                  <p className="text-pretty text-13 text-ink-700">
+                    Le candidat ne modifie pas la date une fois déclarée. Une correction
+                    recalcule la conservation et les relances, et part au journal.
+                  </p>
+                  {retenu.depots.map((depot) => (
+                    <CorrectionDuDepot key={depot.dossierId} depot={depot} />
+                  ))}
+                </section>
+              ) : null}
 
               <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-4">
                 <h2 className="text-14 font-semibold text-ink-900">

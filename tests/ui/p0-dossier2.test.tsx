@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Checklist } from "@/app/(app)/(dossier)/dossiers/[id]/Checklist";
 import { aideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { Completude } from "@/app/(app)/(dossier)/dossiers/[id]/completude/Completude";
@@ -651,9 +651,10 @@ describe("C-11 — Clôture", () => {
  */
 describe("C-11a — Déclaration de dépôt", () => {
   const PRET = { ...DOSSIER, statut: "PRET" as const };
+  const JOURS = { aujourdhui: "2026-09-25", ouvertLe: "2026-06-01" };
 
   it("ne pré-coche pas la déclaration, et dit pourquoi le bouton attend", () => {
-    render(<Depot dossier={PRET} />);
+    render(<Depot dossier={PRET} {...JOURS} />);
     const bouton = screen.getByRole("button", { name: "Déclarer mon dépôt" });
     expect(bouton).toHaveProperty("disabled", true);
     expect(screen.getByText(/Coche d'abord la case/)).toBeDefined();
@@ -665,16 +666,64 @@ describe("C-11a — Déclaration de dépôt", () => {
   });
 
   it("dit ce que la déclaration fige, ce qu'elle conserve, et que rien n'est transmis (INV-1)", () => {
-    const { container } = render(<Depot dossier={PRET} />);
+    const { container } = render(<Depot dossier={PRET} {...JOURS} />);
     const texte = container.textContent ?? "";
     expect(texte).toContain(`conservées ${CONSERVATION_SOUMIS_MOIS} mois`);
     expect(texte).toContain("ImmiPro ne transmet aucune demande");
     expect(texte).toContain("ne s'annule pas");
   });
 
+  /**
+   * S.89 — la date réelle du dépôt : question, aide, préremplie avec le
+   * jour du candidat, modifiable, et refusée avant l'envoi quand elle est
+   * future ou antérieure à l'ouverture du dossier.
+   */
+  it("demande la date réelle du dépôt, préremplie avec aujourd'hui", () => {
+    const { container } = render(<Depot dossier={PRET} {...JOURS} />);
+    const champ = screen.getByLabelText("Quand as-tu déposé ta demande ?") as HTMLInputElement;
+    expect(champ.value).toBe("2026-09-25");
+    expect(champ.required).toBe(true);
+    expect(champ.max).toBe("2026-09-25");
+    expect(champ.min).toBe("2026-06-01");
+    expect(container.textContent).toContain(
+      "Indique la date où tu as remis ou envoyé la demande à l'autorité ou à son prestataire.",
+    );
+    expect(screen.getByRole("checkbox")).toHaveProperty("checked", false);
+  });
+
+  it("refuse une date future ou antérieure à l'ouverture, avec la raison", () => {
+    render(<Depot dossier={PRET} {...JOURS} />);
+    fireEvent.click(screen.getByRole("checkbox"));
+    const champ = screen.getByLabelText("Quand as-tu déposé ta demande ?");
+    fireEvent.change(champ, { target: { value: "2026-09-30" } });
+    expect(screen.getByText(/n'est pas encore arrivé/u)).toBeDefined();
+    expect(screen.getByRole("button", { name: "Déclarer mon dépôt" })).toHaveProperty("disabled", true);
+    fireEvent.change(champ, { target: { value: "2026-05-20" } });
+    expect(screen.getByText(/le dépôt ne peut pas le précéder/u)).toBeDefined();
+    // Une date ancienne mais valide passe : aucun retard n'est refusé.
+    fireEvent.change(champ, { target: { value: "2026-06-02" } });
+    expect(screen.getByRole("button", { name: "Déclarer mon dépôt" })).toHaveProperty("disabled", false);
+  });
+
+  it("envoie la date saisie, pas celle du jour", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ statut: "SOUMIS" }) } as Response),
+    );
+    global.fetch = fetch as unknown as typeof globalThis.fetch;
+    render(<Depot dossier={PRET} {...JOURS} />);
+    fireEvent.change(screen.getByLabelText("Quand as-tu déposé ta demande ?"), {
+      target: { value: "2026-09-02" },
+    });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Déclarer mon dépôt" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ deposeLe: "2026-09-02" });
+  });
+
   it("n'offre aucun bouton à un dossier qui n'est pas prêt, et dit pourquoi", () => {
     for (const statut of ["ACTIF", "EN_PAUSE", "SOUMIS", "CLOTURE"] as const) {
-      const { container, unmount } = render(<Depot dossier={{ ...DOSSIER, statut }} />);
+      const { container, unmount } = render(<Depot dossier={{ ...DOSSIER, statut }} {...JOURS} />);
       expect(screen.queryByRole("button", { name: "Déclarer mon dépôt" }), statut).toBeNull();
       expect(screen.getByRole("link", { name: "Revenir à la checklist" }), statut).toBeDefined();
       expect((container.textContent ?? "").length, statut).toBeGreaterThan(80);

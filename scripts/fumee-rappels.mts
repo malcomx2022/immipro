@@ -169,7 +169,7 @@ async function dossierAvec(
       userId: user.id,
       visaRuleId: regle.id,
       status: statut,
-      ...(statut === "SOUMIS" ? { submittedAt: new Date() } : {}),
+      ...(statut === "SOUMIS" ? { submittedAt: new Date(), depositedOn: new Date(new Date().toISOString().slice(0, 10)) } : {}),
       ...(options.dernierRappel ? { lastReminderAt: options.dernierRappel } : {}),
     },
   });

@@ -68,6 +68,16 @@ export function ConservationDuDepot({
     <section className="flex flex-col gap-3 rounded-lg border border-ink-300 p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-16 font-semibold text-ink-900">Conservation de tes pièces</h2>
+        {/* S.89 — la date réelle du dépôt commande la suite : elle se lit
+            avant l'échéance qu'elle fixe, avec la prochaine question. */}
+        {conservation.deposeLe ? (
+          <p className="text-pretty text-14 text-ink-700">
+            {`Demande déposée le ${jourEnFrancais(conservation.deposeLe)}.`}
+            {conservation.prochaineQuestion
+              ? ` Le ${jourEnFrancais(conservation.prochaineQuestion)}, nous te demanderons si l'autorité t'a répondu.`
+              : ""}
+          </p>
+        ) : null}
         <p className="text-pretty text-14 text-ink-700" role="status">
           {confirmee
             ? `C'est noté : tes pièces sont conservées jusqu'au ${jourEnFrancais(confirmee)}.`
