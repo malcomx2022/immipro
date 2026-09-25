@@ -449,8 +449,10 @@ describe("le quota d'un pack remboursé", () => {
     const fonction = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(
       lire(ACCES),
     )![0];
-    expect(fonction).toMatch(/analysisCredit\s*\n?\s*\.create/u);
-    expect(fonction).toMatch(/delta: -suite\.retire/u);
+    // Écrit sous le verrou du grand livre depuis S.92 : `createMany`, dans
+    // la transaction, et toujours une écriture — jamais une suppression.
+    expect(fonction).toMatch(/analysisCredit\s*\n?\s*\.createMany/u);
+    expect(fonction).toMatch(/delta: -lue\.retire/u);
     expect(fonction).toMatch(/reason: "REMBOURSEMENT"/u);
     expect(fonction).not.toMatch(/analysisCredit\.delete|deleteMany/u);
   });

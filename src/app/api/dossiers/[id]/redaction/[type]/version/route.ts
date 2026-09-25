@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
 import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
+import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
 import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { leRedacteur } from "@/server/redaction/service";
@@ -145,7 +146,9 @@ export const POST = route({
      * souvent ». Ici l'échec reste imprévisible — le service est branché,
      * et c'est l'appel qui peut ne pas aboutir.
      */
-    await debiterUneAnalyse(params.id!);
+    const debit = await debiterUneAnalyse(params.id!, undefined, {
+      note: `${NOTE_REDACTION_ASSISTEE} — Mise en forme (${piece.type})`,
+    });
 
     const produit = await leRedacteur()({
       // La pièce et la destination sont nommées : ce qui écrit pour le
@@ -189,6 +192,7 @@ export const POST = route({
       await rendreUneTentative(
         params.id!,
         `Mise en forme non aboutie (${produit.cause}) : aucun texte rendu`,
+        debit.octroi,
       );
       console.warn(`[redaction] ${MOTIF_DAPPEL[produit.cause]} — ${produit.detail}`);
       return { produite: false, disponible: true, rang: null };

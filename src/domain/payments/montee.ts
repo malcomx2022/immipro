@@ -214,35 +214,92 @@ export const PHRASE_MONTEE = `Passer à ${arrivee().libelle} : tu paies la diff�
 export const PHRASE_RECHARGE =
   "Ajouter des analyses : une recharge indépendante, qui ne change pas ton pack.";
 
-// ── Le remboursement du supplément ──────────────────────────────────────
+// ── Le remboursement du supplément — décision définitive S.92 ───────────
 
 /**
- * Ce que le remboursement d'une montée retire, lu sur le solde du dossier.
+ * La trace qu'une consommation vient de la rédaction assistée.
  *
- * Les consommations ne portent pas de transaction : un solde n'a pas de
- * couleur. Les analyses supplémentaires sont donc tenues pour consommées
- * **en dernier** — après celles d'Essentiel et des recharges. Tant que le
- * solde couvre les vingt, elles sont toutes encore disponibles et se
- * retirent ; en deçà, une partie a servi, et un humain tranche.
- *
- * Le remboursement ne touche jamais aux réponses, textes et versions :
- * il retire des analyses et le droit à de nouveaux appels, rien d'écrit.
+ * Écrite sur la ligne du débit, **avant** l'appel au service : une
+ * interruption entre les deux laisse quand même la trace, et le
+ * remboursement ne prend pas pour intacte une montée dont la rédaction a
+ * été sollicitée.
  */
-export type SuiteDuRemboursementDeLaMontee =
-  | { suite: "RETRAIT_INTEGRAL"; retire: number }
-  | { suite: "REVUE_MANUELLE"; ouvertes: number; consommees: number };
+export const NOTE_REDACTION_ASSISTEE = "Rédaction assistée";
 
-export function suiteDuRemboursementDeLaMontee(
-  ajoutees: number,
-  soldeDuDossier: number,
-): SuiteDuRemboursementDeLaMontee {
-  if (soldeDuDossier >= ajoutees) return { suite: "RETRAIT_INTEGRAL", retire: ajoutees };
-  return {
-    suite: "REVUE_MANUELLE",
-    ouvertes: ajoutees,
-    consommees: ajoutees - Math.max(0, soldeDuDossier),
-  };
+/**
+ * Ce que le remboursement du supplément doit savoir de la montée.
+ *
+ * - l'octroi de ses vingt analyses, tel que le rejeu FIFO du grand livre
+ *   le rend (`domain/payments/grand-livre.ts`) — `null` s'il n'a jamais
+ *   été crédité ;
+ * - si la rédaction assistée a servi sur ce dossier depuis la
+ *   confirmation de la montée : c'est elle que la montée a ouverte, et
+ *   c'est le seul moment où elle était à elle.
+ */
+export interface UsageDeLaMontee {
+  octroi: { accordees: number; consommees: number; retirees: number } | null;
+  redactionUtilisee: boolean;
 }
 
-export const MOTIF_REVUE_MONTEE = (consommees: number, ouvertes: number): string =>
-  `Remboursement d'un passage à Dossier : ${consommees} des ${ouvertes} analyses ajoutées ont déjà servi. Le montant à rendre se décide à la main.`;
+export type SuiteDuRemboursementDeLaMontee =
+  | { suite: "RETRAIT_INTEGRAL"; retire: number }
+  | { suite: "REVUE_MANUELLE"; motif: string };
+
+/**
+ * Le remboursement automatique du supplément, ou la revue manuelle.
+ *
+ * **Automatique seulement si les deux conditions tiennent** : les vingt
+ * analyses de la montée sont intactes — aucune consommation imputée à son
+ * octroi, premier entré premier consommé — **et** aucune rédaction
+ * assistée n'a servi depuis sa confirmation. Il retire alors les vingt
+ * analyses, et le droit à la rédaction s'éteint avec la couverture.
+ *
+ * Sinon, un humain : ce que valent des analyses ou une rédaction déjà
+ * rendues est une question commerciale, pas un calcul. Le motif dit
+ * laquelle des deux conditions manque — les deux quand c'est le cas.
+ *
+ * Rien d'écrit n'est jamais retiré : réponses, textes et versions restent.
+ */
+export function suiteDuRemboursementDeLaMontee(
+  usage: UsageDeLaMontee,
+): SuiteDuRemboursementDeLaMontee {
+  const causes: string[] = [];
+  if (!usage.octroi) {
+    causes.push("ses analyses ajoutées n'apparaissent pas au grand livre du dossier");
+  } else if (usage.octroi.consommees > 0) {
+    causes.push(
+      `${usage.octroi.consommees} des ${usage.octroi.accordees} analyses ajoutées ont déjà servi`,
+    );
+  } else if (usage.octroi.retirees > 0) {
+    causes.push("ses analyses ajoutées ont déjà été retirées en partie");
+  }
+  if (usage.redactionUtilisee) {
+    causes.push("la rédaction assistée a été utilisée depuis le passage");
+  }
+
+  if (causes.length === 0 && usage.octroi) {
+    return { suite: "RETRAIT_INTEGRAL", retire: usage.octroi.accordees };
+  }
+  return { suite: "REVUE_MANUELLE", motif: MOTIF_REVUE_MONTEE(causes) };
+}
+
+export const MOTIF_REVUE_MONTEE = (causes: readonly string[]): string =>
+  `Remboursement d'un passage à Dossier : ${causes.join(", et ")}. Le supplément ne se rembourse automatiquement que si les ${ANALYSES_AJOUTEES} analyses ajoutées sont intactes et que la rédaction assistée n'a pas servi : le montant à rendre se décide à la main.`;
+
+/**
+ * L'Essentiel d'origine, une fois la montée confirmée — S.92.
+ *
+ * Il ne se rembourse plus **seul** : il est la moitié du prix de Dossier
+ * que le candidat a en main. Le rendre en laissant la montée ferait d'un
+ * dossier couvert par Dossier un dossier payé la différence. Tant que la
+ * montée n'est pas elle-même remboursée, l'ouverture est refusée, et la
+ * raison dit quoi faire.
+ */
+export const REFUS_ESSENTIEL_APRES_MONTEE =
+  "cet achat Essentiel sert de base à un passage à Dossier confirmé : il ne se rembourse pas seul. Rembourse d'abord le passage à Dossier, ou traite l'ensemble en revue manuelle";
+
+/**
+ * Essentiel → Dossier Pro est hors V1 (S.92). La seule montée est vers
+ * Dossier ; Pro s'achète au prix plein, comme un achat supplémentaire.
+ */
+export const MONTEES_OUVERTES: readonly string[] = [PACK_D_ARRIVEE];

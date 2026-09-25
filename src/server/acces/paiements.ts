@@ -1,4 +1,4 @@
-import type { Transaction, TransactionStatus } from "@prisma/client";
+import type { Prisma, Transaction, TransactionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { appliquerLaCouverture } from "@/server/acces/couverture";
 import { miseEnEtat } from "@/domain/dossiers/etat";
@@ -32,7 +32,7 @@ import {
   type Achat as AchatDuDomaine,
 } from "@/domain/payments/achat";
 import { BAIL_DE_CREDIT_MINUTES, effetDeLaNotification } from "@/server/paiement/cycle";
-import { ouvrirDuQuota } from "./quota";
+import { lignesDuGrandLivre, ouvrirDuQuota, sousVerrouDuGrandLivre } from "./quota";
 import { confirmerLaConsultation, libererLaTenue } from "./consultations";
 import { suiteDictable } from "@/server/securite/secret";
 import { fournisseurDe } from "@/domain/payments/rail";
@@ -52,8 +52,12 @@ import {
   ANALYSES_AJOUTEES,
   CODE_MONTEE_DOSSIER,
   LIBELLE_MONTEE,
+  NOTE_REDACTION_ASSISTEE,
+  PACK_DE_DEPART,
+  REFUS_ESSENTIEL_APRES_MONTEE,
   suiteDuRemboursementDeLaMontee,
 } from "@/domain/payments/montee";
+import { repartir } from "@/domain/payments/grand-livre";
 import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 
@@ -776,7 +780,18 @@ export async function initierLeRemboursement(
   // Rien à envoyer : pas d'obligation, ou somme déjà rendue.
   if (!transaction.refundDueAt || transaction.refundedAt) return { issue: "sans_objet" };
 
-  if (transaction.applicationId) {
+  /*
+    Des droits déjà retirés ne se réévaluent pas : un rejeu — relance
+    après une panne, second clic — relirait une montée dont les vingt
+    analyses viennent d'être retirées et la prendrait pour entamée. La
+    question a été tranchée au premier passage ; on reprend l'envoi.
+  */
+  const dejaRetire = await db.analysisCredit.findFirst({
+    where: { transactionId: transaction.id, reason: "REMBOURSEMENT" },
+    select: { id: true },
+  });
+
+  if (transaction.applicationId && !dejaRetire) {
     const suite = await suiteDuQuotaDuPack(
       transaction.applicationId,
       transaction.id,
@@ -786,10 +801,7 @@ export async function initierLeRemboursement(
       // On ne tranche pas ce que vaut une analyse déjà rendue : c'est une
       // question commerciale. L'écart porte la question à un humain, et
       // aucune demande ne part.
-      await noterLEcart(
-        transaction.id,
-        `${MOTIF_REVUE_PARTIELLE} ${suite.consommees} analyse(s) consommée(s) sur ${suite.ouvertes}.`,
-      );
+      await noterLEcart(transaction.id, suite.motif);
       return { issue: "revue_manuelle", consommees: suite.consommees };
     }
   }
@@ -834,39 +846,52 @@ export async function initierLeRemboursement(
     migration ferme le reste — celui qui viendrait d'un appelant qu'on
     n'a pas écrit.
   */
-  if (transaction.applicationId) {
-    const suite = await suiteDuQuotaDuPack(
-      transaction.applicationId,
-      transaction.id,
-      transaction.packCode,
-    );
+  if (transaction.applicationId && !dejaRetire) {
+    const applicationId = transaction.applicationId;
     /*
-      La lecture préalable n'est pas la garantie — l'index unique partiel
-      l'est —, elle évite seulement de provoquer une violation à chaque
-      reprise ordinaire, qui est le cas fréquent. Une erreur de base
-      journalisée à chaque relance normale finirait par ne plus être lue.
+      Réévalué **sous le verrou du grand livre** (S.92), et le retrait
+      écrit dans la même transaction. Entre la première lecture et
+      celle-ci, une analyse a pu entamer l'octroi : sans le verrou, les
+      vingt analyses d'une montée se retiraient alors qu'une avait servi.
+      Si c'est le cas, la dette part en revue au lieu de partir chez le
+      fournisseur.
+
+      L'index unique partiel reste la garantie contre un second retrait —
+      celui d'un appelant qu'on n'a pas écrit. `skipDuplicates` le laisse
+      parler sans interrompre la transaction.
     */
-    const dejaRetire = await db.analysisCredit.findFirst({
-      where: { transactionId: transaction.id, reason: "REMBOURSEMENT" },
-      select: { id: true },
-    });
-    if (suite.suite === "RETRAIT_INTEGRAL" && suite.retire > 0 && !dejaRetire) {
-      await db.analysisCredit
-        .create({
-          data: {
-            applicationId: transaction.applicationId,
-            delta: -suite.retire,
-            reason: "REMBOURSEMENT",
-            transactionId: transaction.id,
-            note: `Droits retirés à l'initiation du remboursement de ${reference}.`,
-          },
-        })
-        // L'unicité a parlé : quelqu'un a retiré ces droits entre notre
-        // lecture et notre écriture. C'est la course qu'elle existe pour
-        // arbitrer, et le solde du candidat en sort juste.
-        .catch((erreur) => {
-          if (!estUnDoublon(erreur)) throw erreur;
+    const suite = await sousVerrouDuGrandLivre(applicationId, async (tx) => {
+      const retrait = await tx.analysisCredit.findFirst({
+        where: { transactionId: transaction.id, reason: "REMBOURSEMENT" },
+        select: { id: true },
+      });
+      if (retrait) return null;
+      const lue = await suiteDuQuotaDuPack(
+        applicationId,
+        transaction.id,
+        transaction.packCode,
+        tx,
+      );
+      if (lue.suite === "RETRAIT_INTEGRAL" && lue.retire > 0) {
+        await tx.analysisCredit.createMany({
+          data: [
+            {
+              applicationId,
+              delta: -lue.retire,
+              reason: "REMBOURSEMENT",
+              transactionId: transaction.id,
+              grantId: lue.octroi,
+              note: `Droits retirés à l'initiation du remboursement de ${reference}.`,
+            },
+          ],
+          skipDuplicates: true,
         });
+      }
+      return lue;
+    });
+    if (suite?.suite === "REVUE_MANUELLE") {
+      await noterLEcart(transaction.id, suite.motif);
+      return { issue: "revue_manuelle", consommees: suite.consommees };
     }
   }
 
@@ -1072,38 +1097,92 @@ async function noterLEcart(transactionId: string, motif: string): Promise<void> 
  * solde du dossier, sans savoir quel pack l'a ouverte — et c'est bien
  * ainsi, un solde n'a pas de couleur.
  */
+type SuiteDuRetrait =
+  | { suite: "RETRAIT_INTEGRAL"; retire: number; octroi: string | null }
+  | { suite: "REVUE_MANUELLE"; motif: string; consommees?: number };
+
 async function suiteDuQuotaDuPack(
   applicationId: string,
   transactionId: string,
   packCode: string,
-) {
+  client: Prisma.TransactionClient | typeof db = db,
+): Promise<SuiteDuRetrait> {
   /*
-    Le remboursement d'un passage à Dossier (S.88) ne retire que les
-    analyses **ajoutées** encore disponibles, lues sur le solde : elles
-    sont tenues pour consommées en dernier. Compter toutes les analyses
-    du dossier, comme pour un pack, enverrait en revue manuelle tout
-    candidat qui a simplement utilisé ses dix analyses d'Essentiel.
+    Le remboursement d'un passage à Dossier — décision définitive S.92.
+
+    Automatique seulement si les vingt analyses de la montée sont
+    intactes, lues sur **leur octroi** par le rejeu FIFO du grand livre,
+    et si la rédaction assistée n'a pas servi depuis la confirmation.
+    Sinon, revue manuelle. La convention de S.88 — « consommées en
+    dernier », lue sur le solde — est remplacée : elle faisait passer
+    pour intactes des analyses que le candidat avait utilisées.
   */
   if (packCode === CODE_MONTEE_DOSSIER) {
-    const solde = await db.analysisCredit.aggregate({
-      where: { applicationId },
-      _sum: { delta: true },
+    const [lignes, montee] = await Promise.all([
+      lignesDuGrandLivre(applicationId, client),
+      client.transaction.findUnique({
+        where: { id: transactionId },
+        select: { confirmedAt: true },
+      }),
+    ]);
+    const octroi =
+      repartir(lignes).octrois.find(
+        (o) => o.transactionId === transactionId && o.reason === "ACHAT_PACK",
+      ) ?? null;
+    const depuis = montee?.confirmedAt ?? new Date(0);
+    const [debitsDeRedaction, appels] = await Promise.all([
+      client.analysisCredit.count({
+        where: {
+          applicationId,
+          reason: "ANALYSE",
+          note: { startsWith: NOTE_REDACTION_ASSISTEE },
+          createdAt: { gte: depuis },
+        },
+      }),
+      client.aiUsage.count({
+        where: {
+          applicationId,
+          createdAt: { gte: depuis },
+          OR: [
+            { operation: { startsWith: "redaction:" } },
+            { operation: { startsWith: "relecture:" } },
+          ],
+        },
+      }),
+    ]);
+    const suite = suiteDuRemboursementDeLaMontee({
+      octroi,
+      redactionUtilisee: debitsDeRedaction + appels > 0,
     });
-    return suiteDuRemboursementDeLaMontee(ANALYSES_AJOUTEES, solde._sum.delta ?? 0);
+    return suite.suite === "RETRAIT_INTEGRAL"
+      ? { ...suite, octroi: octroi?.id ?? null }
+      : { suite: "REVUE_MANUELLE", motif: suite.motif, consommees: octroi?.consommees ?? 0 };
   }
-  const [octrois, consommations] = await Promise.all([
-    db.analysisCredit.aggregate({
+  const [octrois, consommations, octroiDuPack] = await Promise.all([
+    client.analysisCredit.aggregate({
       where: { applicationId, transactionId, delta: { gt: 0 } },
       _sum: { delta: true },
     }),
-    db.analysisCredit.aggregate({
+    client.analysisCredit.aggregate({
       where: { applicationId, reason: "ANALYSE" },
       _sum: { delta: true },
+    }),
+    client.analysisCredit.findFirst({
+      where: { applicationId, transactionId, delta: { gt: 0 } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
     }),
   ]);
   const ouvertes = octrois._sum.delta ?? 0;
   const consommees = Math.abs(consommations._sum.delta ?? 0);
-  return suiteDuQuota(ouvertes, consommees);
+  const suite = suiteDuQuota(ouvertes, consommees);
+  return suite.suite === "RETRAIT_INTEGRAL"
+    ? { ...suite, octroi: octroiDuPack?.id ?? null }
+    : {
+        suite: "REVUE_MANUELLE",
+        motif: `${MOTIF_REVUE_PARTIELLE} ${suite.consommees} analyse(s) consommée(s) sur ${suite.ouvertes}.`,
+        consommees: suite.consommees,
+      };
 }
 
 /**
@@ -1299,9 +1378,30 @@ export async function ouvrirUnRemboursement(
     // La référence sort avec : l'appelant enchaîne sur l'envoi de la
     // demande, qui s'adresse par référence et non par identifiant — la
     // relire serait une seconde requête pour une donnée déjà lue.
-    select: { reference: true, status: true, refundDueAt: true, refundedAt: true },
+    select: {
+      reference: true,
+      status: true,
+      refundDueAt: true,
+      refundedAt: true,
+      packCode: true,
+      // Une montée confirmée et non remboursée qui part de cet achat (S.92).
+      montees: {
+        where: { status: "CONFIRMEE", refundedAt: null },
+        select: { id: true },
+        take: 1,
+      },
+    },
   });
   if (!transaction) return { ouvert: false, raison: "transaction inconnue" };
+  /*
+    Un Essentiel qui a servi de base à une montée confirmée ne se
+    rembourse pas seul (S.92) : il porte la moitié du prix de Dossier
+    que le candidat a en main. Tant que la montée n'est pas remboursée,
+    l'obligation ne s'ouvre pas, et la raison dit quoi faire.
+  */
+  if (transaction.packCode === PACK_DE_DEPART && transaction.montees.length > 0) {
+    return { ouvert: false, raison: REFUS_ESSENTIEL_APRES_MONTEE };
+  }
   if (transaction.refundedAt) return { ouvert: false, raison: "déjà remboursée" };
   if (transaction.refundDueAt) return { ouvert: false, raison: "déjà ouverte" };
   // On ne doit que ce qu'on a encaissé. La base le refuserait ; le dire ici

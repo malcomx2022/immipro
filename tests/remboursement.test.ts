@@ -362,3 +362,49 @@ describe("FedaPay — la déclaration n'écrit jamais le versement (INV-7)", () 
     expect(schema).toMatch(/refundProviderRef String\?\s+@unique/u);
   });
 });
+
+/**
+ * Le remboursement d'une montée — décision définitive S.92.
+ *
+ * Les scénarios sur base réelle (concurrence, recharges, rédaction,
+ * rejeu) sont dans `smoke:montee`. Ici, ce qui se tient sans base.
+ */
+describe("S.92 — le remboursement du supplément se rejoue sans se contredire", () => {
+  const source = readFileSync("src/server/acces/paiements.ts", "utf8");
+  const initier = /export async function initierLeRemboursement[\s\S]*?\n\}$/mu.exec(source)![0];
+
+  it("une fois les droits retirés, la reprise ne réévalue pas la montée", async () => {
+    const { repartir } = await import("@/domain/payments/grand-livre");
+    const { suiteDuRemboursementDeLaMontee } = await import("@/domain/payments/montee");
+    const t = (m: number) => new Date(Date.UTC(2026, 8, 1, 8, m));
+    const vide = { analysisId: null, grantId: null };
+    const lignes = [
+      { ...vide, id: "e", delta: 10, reason: "ACHAT_PACK" as const, transactionId: "ess", createdAt: t(1) },
+      { ...vide, id: "m", delta: 20, reason: "ACHAT_PACK" as const, transactionId: "mon", createdAt: t(2) },
+      { id: "r", delta: -20, reason: "REMBOURSEMENT" as const, transactionId: "mon", analysisId: null, grantId: "m", createdAt: t(3) },
+    ];
+    const octroi = repartir(lignes).octrois.find((o) => o.transactionId === "mon")!;
+    // Relue après son propre retrait, la montée ne paraît plus intacte :
+    // la réévaluer ouvrirait un écart contre le candidat. D'où la garde.
+    expect(suiteDuRemboursementDeLaMontee({ octroi, redactionUtilisee: false }).suite).toBe(
+      "REVUE_MANUELLE",
+    );
+    expect(initier).toMatch(/if \(transaction\.applicationId && !dejaRetire\) \{\s*const suite = await suiteDuQuotaDuPack/u);
+  });
+
+  it("le retrait se décide et s'écrit sous le verrou du grand livre, imputé à l'octroi", () => {
+    expect(initier).toMatch(/sousVerrouDuGrandLivre\(applicationId, async \(tx\) =>/u);
+    expect(initier).toMatch(/grantId: lue\.octroi/u);
+    expect(initier).toMatch(/skipDuplicates: true/u);
+    // Relue sous verrou, une montée entamée entre-temps part en revue.
+    expect(initier).toMatch(/if \(suite\?\.suite === "REVUE_MANUELLE"\)/u);
+  });
+
+  it("le débit prend le même verrou, et nomme l'octroi qu'il entame", () => {
+    const quota = readFileSync("src/server/acces/quota.ts", "utf8");
+    expect(quota).toMatch(/pg_advisory_xact_lock\(hashtextextended\(\$\{`grand-livre:\$\{applicationId\}`\}, 0\)\)/u);
+    const debit = /export async function debiterUneAnalyse[\s\S]*?\n\}$/mu.exec(quota)![0];
+    expect(debit).toMatch(/sousVerrouDuGrandLivre/u);
+    expect(debit).toMatch(/const grantId = octroiAEntamer\(lignes\)/u);
+  });
+});

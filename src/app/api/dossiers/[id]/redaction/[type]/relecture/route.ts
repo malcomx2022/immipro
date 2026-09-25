@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
 import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
+import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
 import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { laCritique } from "@/server/redaction/service";
@@ -86,7 +87,9 @@ export const POST = route({
     }
 
     // INV-6 — le débit précède l'appel, comme partout ailleurs.
-    await debiterUneAnalyse(params.id!);
+    const debit = await debiterUneAnalyse(params.id!, undefined, {
+      note: `${NOTE_REDACTION_ASSISTEE} — Relecture (${piece.type})`,
+    });
 
     const reponses = await reponsesDeLEntretien(piece.documentId);
     const avis = await laCritique()(derniere.body, {
@@ -125,6 +128,7 @@ export const POST = route({
       await rendreUneTentative(
         params.id!,
         `Relecture non aboutie (${avis.cause}) : aucun avis rendu`,
+        debit.octroi,
       );
       console.warn(`[relecture] ${MOTIF_DAPPEL[avis.cause]} — ${avis.detail}`);
       return { relue: false, disponible: true, remarques: null };

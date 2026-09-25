@@ -923,10 +923,21 @@ model AnalysisCredit {
   transaction   Transaction? @relation(fields: [transactionId], references: [id])
   /// Analyse qui l'a consommé ou rendu, le cas échéant.
   analysisId    String?
+  /// L'octroi que cette ligne entame, rend ou retire — arbitrage S.92.
+  ///
+  /// Premier octroi entré, premier consommé : chaque débit nomme l'achat
+  /// dont il prend une analyse, et c'est ce qui dit, au remboursement
+  /// d'une montée, si ses vingt analyses sont intactes. Nul sur un octroi,
+  /// et sur les lignes écrites avant S.92 — le rejeu du grand livre
+  /// (`domain/payments/grand-livre.ts`) les impute par la même règle.
+  grantId       String?
+  grant         AnalysisCredit?  @relation("Imputation", fields: [grantId], references: [id], onDelete: SetNull)
+  imputees      AnalysisCredit[] @relation("Imputation")
   note          String?
   createdAt     DateTime     @default(now())
 
   @@index([applicationId, createdAt])
+  @@index([grantId])
 }
 
 // ═══════════════════════════════════════════════════════════

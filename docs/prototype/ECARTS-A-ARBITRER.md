@@ -10329,3 +10329,35 @@ La déclaration est journalisée (`paiement.remboursement.manuel`) avec la réf�
 ### Vérifications
 
 `tests/remboursement.test.ts` (adaptateur sans réseau ni secret, référence, conditions, INV-7), `tests/ui/remboursements-fedapay.test.tsx` (états vide, envoi, refus, déclarée, non initiée), `smoke:remboursement` bloc 11. Ce bloc passe par le vrai adaptateur, avec `fetch` piégé : zéro appel réseau. Rien n'y simule un succès du fournisseur.
+
+## S.92 — Essentiel → Dossier : décision définitive
+
+### Ce qui est tranché
+
+- **Prix** : la différence avec l'Essentiel réellement payé (inchangé depuis S.88).
+- **Analyses** : +20 (inchangé).
+- **Consommation FIFO, traçable par octroi.** Chaque débit nomme l'octroi qu'il entame (`AnalysisCredit.grantId`), le plus ancien qui a encore des analyses. Une analyse rendue retourne à l'octroi qu'elle avait entamé, et un retrait de remboursement ne prend que sur l'achat remboursé. La convention de S.90, « les analyses ajoutées sont consommées en dernier », est remplacée : lue sur le solde, elle faisait passer pour intacte une montée entamée dès qu'une recharge avait été achetée après elle.
+- **Remboursement automatique du supplément** seulement si les 20 analyses de la montée sont intactes **et** si aucune rédaction assistée n'a servi depuis la confirmation. La rédaction se reconnaît à deux traces : la note du débit, écrite avant l'appel (`NOTE_REDACTION_ASSISTEE`), et une ligne `AiUsage` `redaction:`/`relecture:`. Sinon, revue manuelle, avec un motif qui nomme la ou les causes.
+- **Essentiel d'origine** : tant qu'une montée confirmée n'est pas remboursée, il ne se rembourse pas seul. `ouvrirUnRemboursement` refuse avec `REFUS_ESSENTIEL_APRES_MONTEE`.
+- **Essentiel → Dossier Pro** : hors V1 (`MONTEES_OUVERTES = ["dossier"]`).
+
+### Le back-office
+
+- **B-03** lisait la première transaction confirmée du compte, et **B-07** le premier achat de catégorie « pack ». Après une montée, les deux désignaient l'Essentiel ; une recharge payée en premier affichait « aucun ».
+- Les deux lisent maintenant le **pack effectif** (`packEffectif`), calculé sur les octrois `ACHAT_PACK` confirmés et non retirés. Une montée compte pour Dossier, au **prix réellement payé** : l'Essentiel plus la différence (12 + 17 = 29 €).
+- La part du prix, donc la marge, et le quota de jetons se lisent sur ce pack.
+
+### Concurrence et idempotence
+
+- Un verrou consultatif de transaction par dossier (`sousVerrouDuGrandLivre`) sérialise les débits, ainsi que l'évaluation et l'écriture du retrait de remboursement. Sans lui, deux débits simultanés pouvaient entamer deux fois la dernière analyse d'un octroi, et un débit pouvait se glisser entre la lecture « intacte » et le retrait.
+- Des droits déjà retirés ne se réévaluent pas : une reprise après une panne reprend l'envoi sans prendre son propre retrait pour une consommation. L'index unique partiel reste la garantie contre un second retrait.
+
+### Données existantes
+
+La migration `20260925230000_imputation_des_analyses` ajoute `grantId` (nullable, clé étrangère, index) et un `CHECK` : seuls les débits, rendus et retraits en portent un. **Aucune ligne n'est réécrite.** Les lignes antérieures sont imputées au rejeu par la même règle (`domain/payments/grand-livre.ts`).
+
+### Vérifications
+
+- `tests/montee-en-gamme.test.ts` : FIFO avec recharge avant et après, rendus, lignes anciennes, retrait ; suite du remboursement ; Essentiel ; Pro ; pack effectif.
+- `tests/remboursement.test.ts` : rejeu et verrou.
+- `smoke:montee` : l'Essentiel bloqué puis débloqué, B-03 et B-07, recharge avant et après, rédaction utilisée, 31 débits simultanés, un débit et un remboursement simultanés, un remboursement rejoué.
