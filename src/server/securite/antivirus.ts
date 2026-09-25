@@ -38,6 +38,8 @@ import {
 } from "@/domain/securite/balayage";
 import { sondeDuConstat, type Constat } from "@/domain/exploitation/constats";
 import { lireEnQuarantaine, tailleEnQuarantaine } from "@/lib/storage";
+import { Agent as AgentHttp, request as requeteHttp } from "node:http";
+import { Agent as AgentHttps, request as requeteHttps } from "node:https";
 
 export type { Verdict } from "@/domain/securite/balayage";
 
@@ -96,20 +98,16 @@ async function lireSousPlafond(objectKey: string): Promise<Buffer | "trop_volumi
  * journal.
  */
 export async function balayerDesOctets(url: string, octets: Buffer): Promise<Verdict> {
-  let reponse: Response;
+  let reponse: ReponseDuMoteur;
   try {
-    reponse = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/octet-stream" },
-      body: new Uint8Array(octets),
-      signal: AbortSignal.timeout(DELAI_BALAYAGE_MS),
-    });
+    reponse = await posterAuMoteur(url, octets, AbortSignal.timeout(DELAI_BALAYAGE_MS));
   } catch (erreur) {
     /*
-      `AbortSignal.timeout` lève un `TimeoutError`. Le distinguer d'une
-      coupure ne change pas la suite — les deux se reprennent — mais
-      change ce que l'exploitant cherche : un moteur lent n'est pas un
-      moteur injoignable.
+      `AbortSignal.timeout` interrompt la requête : Node la rejette en
+      `AbortError`, dont la cause est un `TimeoutError`. Le distinguer
+      d'une coupure ne change pas la suite — les deux se reprennent —
+      mais change ce que l'exploitant cherche : un moteur lent n'est pas
+      un moteur injoignable.
     */
     const nom = (erreur as { name?: unknown })?.name;
     return nom === "TimeoutError" || nom === "AbortError"
@@ -121,12 +119,78 @@ export async function balayerDesOctets(url: string, octets: Buffer): Promise<Ver
       : { etat: "INDISPONIBLE", cause: "injoignable", detail: "le moteur n'a pas répondu" };
   }
 
-  if (!reponse.ok) {
-    return { etat: "INDISPONIBLE", cause: "injoignable", detail: `réponse ${reponse.status}` };
+  if (reponse.statut < 200 || reponse.statut > 299) {
+    return { etat: "INDISPONIBLE", cause: "injoignable", detail: `réponse ${reponse.statut}` };
   }
 
-  const charge = await reponse.json().catch(() => null);
+  let charge: unknown = null;
+  try {
+    charge = JSON.parse(reponse.corps);
+  } catch {
+    // Un corps illisible ne conclut rien : `lireLaReponse(null)` le dit.
+  }
   return lireLaReponse(charge);
+}
+
+interface ReponseDuMoteur {
+  statut: number;
+  corps: string;
+}
+
+/**
+ * Le moteur est joint **en direct**, jamais par le proxy de sortie.
+ *
+ * L'appel passait par le `fetch` global. Or Node le fait suivre
+ * `HTTP_PROXY` / `HTTPS_PROXY` dès qu'un environnement l'y autorise
+ * (`NODE_USE_ENV_PROXY`, ou un répartiteur global posé par la plateforme),
+ * et un `NO_PROXY` qui ne nomme pas l'hôte du moteur envoyait les octets de
+ * quarantaine au proxy. Constaté : devant un moteur local qui répond, avec
+ * `NODE_USE_ENV_PROXY=1` et un `NO_PROXY` vide, le balayage rendait
+ * `injoignable` et le dépôt était refusé. Le refus était juste — une
+ * indisponibilité n'est jamais « sain » —, la cause ne l'était pas.
+ *
+ * Et c'est aussi une question de confidentialité : une pièce d'identité en
+ * quarantaine n'a rien à faire chez un intermédiaire de sortie. Le moteur
+ * est un service interne ; on lui parle par un agent propre à cet
+ * adaptateur, qui ne lit aucune variable de proxy, sans connexion gardée
+ * entre deux balayages.
+ */
+const AGENTS = {
+  "http:": new AgentHttp({ keepAlive: false }),
+  "https:": new AgentHttps({ keepAlive: false }),
+} as const;
+
+function posterAuMoteur(url: string, octets: Buffer, signal: AbortSignal): Promise<ReponseDuMoteur> {
+  const cible = new URL(url);
+  const protocole = cible.protocol === "https:" ? "https:" : "http:";
+  const requete = protocole === "https:" ? requeteHttps : requeteHttp;
+  return new Promise<ReponseDuMoteur>((resoudre, rejeter) => {
+    const envoi = requete(
+      cible,
+      {
+        method: "POST",
+        agent: AGENTS[protocole],
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Content-Length": octets.length,
+        },
+        signal,
+      },
+      (reponse) => {
+        const morceaux: Buffer[] = [];
+        reponse.on("data", (bloc: Buffer) => morceaux.push(bloc));
+        reponse.on("end", () =>
+          resoudre({
+            statut: reponse.statusCode ?? 0,
+            corps: Buffer.concat(morceaux).toString("utf8"),
+          }),
+        );
+        reponse.on("error", rejeter);
+      },
+    );
+    envoi.on("error", rejeter);
+    envoi.end(octets);
+  });
 }
 
 /**

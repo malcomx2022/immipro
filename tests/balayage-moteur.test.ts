@@ -270,6 +270,40 @@ describe("l'adaptateur devant un moteur qui répond", () => {
   });
 
   /**
+   * Le moteur est joint en direct, jamais par le proxy de sortie.
+   *
+   * L'adaptateur passait par le `fetch` global, que Node fait suivre
+   * `HTTP_PROXY` / `HTTPS_PROXY` quand l'environnement l'y autorise. Avec
+   * un `NO_PROXY` qui ne nommait pas l'hôte du moteur, les octets de
+   * quarantaine partaient au proxy, et le balayage rendait `injoignable`
+   * devant un moteur qui répondait. L'essai pose ces variables vers un
+   * proxy mort et rend le `fetch` global inutilisable : le verdict doit
+   * rester celui du moteur, et les octets lui parvenir.
+   */
+  it("joint le moteur en direct, quelles que soient les variables de proxy", async () => {
+    const m = await moteur([{ statut: 200, corps: '{"status":"clean"}' }]);
+    quarantaine.set(CLE, OCTETS);
+    const fetchGlobal = vi.fn(() => Promise.reject(new Error("proxy de sortie")));
+    vi.stubGlobal("fetch", fetchGlobal);
+    for (const nom of ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]) {
+      vi.stubEnv(nom, "http://127.0.0.1:9");
+    }
+    vi.stubEnv("NO_PROXY", "");
+    vi.stubEnv("no_proxy", "");
+    try {
+      expect(await balayeurHttp(m.url)(CLE)).toEqual({ etat: "SAINE" });
+      expect(fetchGlobal).not.toHaveBeenCalled();
+      expect(m.recus).toHaveLength(1);
+      expect(m.recus[0]!.typeDeContenu).toBe("application/octet-stream");
+      expect(m.recus[0]!.corps.equals(OCTETS)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      await m.fermer();
+    }
+  });
+
+  /**
    * **Aucune URL ne part.** La quarantaine existe pour qu'il n'y ait
    * aucune adresse de lecture sur ces octets ; en confier une à un tiers
    * — même de courte durée — rouvrirait exactement ce qu'elle ferme, et
