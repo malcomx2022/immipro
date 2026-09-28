@@ -6,7 +6,9 @@ import {
   type Critique,
   type Redacteur,
 } from "./adaptateur";
-import { modeleConfigure } from "@/lib/ai";
+import { critiqueCompatible, redacteurCompatible } from "@/server/ia/openai-compatible";
+import { configurationCompatible } from "@/server/dossiers/extracteur";
+import { fournisseurChoisi, manqueDuFournisseur, modeleDu } from "@/domain/ia/fournisseurs";
 
 /**
  * Les deux points de branchement de WF-08, branchés le 22/09/2026.
@@ -20,19 +22,38 @@ import { modeleConfigure } from "@/lib/ai";
  * dit si un adaptateur existe, sans qu'aucune déclaration puisse
  * survivre au code qu'elle décrit.
  */
-const cleDe = (environnement: Readonly<Record<string, string | undefined>>): string =>
-  (environnement.ANTHROPIC_API_KEY ?? "").trim();
+type Environnement = Readonly<Record<string, string | undefined>>;
 
-export const leRedacteur = (
-  environnement: Readonly<Record<string, string | undefined>> = process.env,
-): Redacteur => {
-  const cle = cleDe(environnement);
-  return cle === "" ? REDACTEUR_NON_BRANCHE : redacteurClaude(cle, modeleConfigure(environnement));
+/**
+ * Le fournisseur de rédaction que l'environnement désigne — S.94.
+ *
+ * `AI_FOURNISSEUR_REDACTION`, Anthropic par défaut. La rédaction ne reçoit
+ * aucune pièce : elle n'a pas la garde de sous-traitance de la lecture.
+ * Tout empêchement rend la fonction non branchée, reconnue par identité.
+ */
+function fournisseurDeRedaction(environnement: Environnement) {
+  const choix = fournisseurChoisi(environnement, "redaction");
+  if (!choix.connu) return null;
+  if (manqueDuFournisseur(environnement, choix.fournisseur) !== null) return null;
+  if (choix.fournisseur === "anthropic") {
+    return {
+      code: "anthropic" as const,
+      cle: (environnement.ANTHROPIC_API_KEY ?? "").trim(),
+      modele: modeleDu(environnement, "anthropic")!,
+    };
+  }
+  const config = configurationCompatible(environnement);
+  return config ? { code: "openai_compatible" as const, config } : null;
+}
+
+export const leRedacteur = (environnement: Environnement = process.env): Redacteur => {
+  const f = fournisseurDeRedaction(environnement);
+  if (!f) return REDACTEUR_NON_BRANCHE;
+  return f.code === "anthropic" ? redacteurClaude(f.cle, f.modele) : redacteurCompatible(f.config);
 };
 
-export const laCritique = (
-  environnement: Readonly<Record<string, string | undefined>> = process.env,
-): Critique => {
-  const cle = cleDe(environnement);
-  return cle === "" ? CRITIQUE_NON_BRANCHEE : critiqueClaude(cle, modeleConfigure(environnement));
+export const laCritique = (environnement: Environnement = process.env): Critique => {
+  const f = fournisseurDeRedaction(environnement);
+  if (!f) return CRITIQUE_NON_BRANCHEE;
+  return f.code === "anthropic" ? critiqueClaude(f.cle, f.modele) : critiqueCompatible(f.config);
 };

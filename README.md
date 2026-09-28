@@ -15,7 +15,7 @@ ImmiPro **informe et prépare**. Elle ne délivre pas de conseil juridique et ne
 | Authentification | Adresse électronique et mot de passe, sessions en base écrites par le dépôt (OAuth Google : V2) |
 | Fichiers | MinIO, buckets privés, URLs présignées 5 min |
 | Jobs asynchrones | pg-boss (files dans PostgreSQL) |
-| IA | Claude API, vision directe sur document |
+| IA | Anthropic par défaut, ou une API compatible OpenAI au choix de l'exploitant, par fonction (S.94) |
 | Paiement | FedaPay (XOF) + Stripe (EUR) |
 | Proxy | Nginx + Let's Encrypt |
 | CI/CD | GitHub Actions → GHCR → pull sur VPS |
@@ -159,7 +159,7 @@ Règle : `domain/` ne connaît ni Prisma, ni Next, ni le réseau. Tout ce qui es
 | `docs/DOC-12-prototype.md` | Design system, inventaire des 39 écrans |
 | `docs/BRAND.md` | Usage de la marque |
 | `docs/visa-rules.md` | Référentiel réglementaire et veille |
-| `docs/IA-fournisseurs.md` | Fournisseurs d'IA : état actuel (Anthropic seul en V1) et plan pour en proposer plusieurs — à arbitrer (S.94) |
+| `docs/IA-fournisseurs.md` | Fournisseurs d'IA : Anthropic par défaut, API compatible OpenAI au choix ; activation et garde des pièces (S.94) |
 
 ---
 

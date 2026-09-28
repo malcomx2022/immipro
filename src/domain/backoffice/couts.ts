@@ -62,6 +62,12 @@ export const VARIABLES_TARIF = [
  */
 export function tarifDepuisEnvironnement(
   environnement: Readonly<Record<string, string | undefined>>,
+  /**
+   * Les trois noms à lire — ceux du tarif historique par défaut, qui est
+   * celui d'Anthropic. Un autre fournisseur passe les siens (S.94, voir
+   * `domain/ia/fournisseurs.ts`) : un jeton n'a pas le même prix partout.
+   */
+  noms: readonly [entree: string, sortie: string, devise: string] = VARIABLES_TARIF,
 ): TarifIA | null {
   const nombre = (cle: string): number | null => {
     const brut = (environnement[cle] ?? "").trim();
@@ -70,9 +76,9 @@ export function tarifDepuisEnvironnement(
     return Number.isFinite(valeur) && valeur >= 0 ? valeur : null;
   };
 
-  const entree = nombre("AI_TARIF_ENTREE_PAR_MILLION");
-  const sortie = nombre("AI_TARIF_SORTIE_PAR_MILLION");
-  const devise = (environnement.AI_TARIF_DEVISE ?? "").trim();
+  const entree = nombre(noms[0]);
+  const sortie = nombre(noms[1]);
+  const devise = (environnement[noms[2]] ?? "").trim();
 
   if (entree === null || sortie === null || devise.length === 0) return null;
   return { entreeParMillion: entree, sortieParMillion: sortie, devise };

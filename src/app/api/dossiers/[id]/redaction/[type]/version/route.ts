@@ -180,6 +180,7 @@ export const POST = route({
       `redaction:${piece.type}`,
       produit.jetonsEntree,
       produit.jetonsSortie,
+      produit.appel,
     );
 
     if (produit.etat === "SANS_TEXTE") {

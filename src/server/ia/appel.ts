@@ -1,10 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import type { CauseDAppel } from "@/domain/ia/appel";
+import { coutMicrosDesJetons } from "@/domain/backoffice/couts";
 import {
-  coutMicrosDesJetons,
-  tarifDepuisEnvironnement,
-} from "@/domain/backoffice/couts";
+  FOURNISSEUR_PAR_DEFAUT,
+  tarifDu,
+  type CodeFournisseur,
+} from "@/domain/ia/fournisseurs";
 
 /**
  * La plomberie que les deux chaînes d'appel au modèle partagent — WF-06,
@@ -127,21 +129,33 @@ export async function noterLesJetons(
   operation: string,
   jetonsEntree: number,
   jetonsSortie: number,
+  /**
+   * Chez qui l'appel est parti — S.94. Absent quand aucun appel n'a eu
+   * lieu (rien n'est alors écrit, zéro jeton) ; la ligne est sinon datée
+   * de son fournisseur et de son modèle, et tarifée au prix **de ce
+   * fournisseur**, jamais à celui d'un autre.
+   */
+  appel?: AppelMesure,
 ): Promise<void> {
   if (jetonsEntree === 0 && jetonsSortie === 0) return;
+  const fournisseur = appel?.fournisseur ?? FOURNISSEUR_PAR_DEFAUT;
   await db.aiUsage.create({
     data: {
       userId,
       applicationId,
       operation,
+      provider: fournisseur,
+      model: appel?.modele ?? null,
       inputTokens: jetonsEntree,
       outputTokens: jetonsSortie,
       costMicros:
-        coutMicrosDesJetons(
-          tarifDepuisEnvironnement(process.env),
-          jetonsEntree,
-          jetonsSortie,
-        ) ?? 0,
+        coutMicrosDesJetons(tarifDu(process.env, fournisseur), jetonsEntree, jetonsSortie) ?? 0,
     },
   });
+}
+
+/** Le fournisseur et le modèle d'un appel qui a eu lieu. */
+export interface AppelMesure {
+  fournisseur: CodeFournisseur;
+  modele: string;
 }
