@@ -80,6 +80,61 @@ Le worker vérifie la connexion au démarrage puis toutes les heures, sans
 envoyer de message ; `/api/health` passe la messagerie à `OPERATIONNELLE`
 quand elle aboutit.
 
+#### Avec Brevo
+
+Relevé le 01/10/2026 dans la documentation de Brevo. Les menus et les
+offres changent : en cas d'écart, la console de Brevo fait foi.
+
+1. **Authentifier le domaine** (*Expéditeurs, domaines et IP dédiées* →
+   *Domaines*). Recopier chez l'hébergeur DNS les trois enregistrements
+   affichés, propres à chaque domaine :
+   - le **code Brevo** (TXT), qui prouve la propriété du domaine ;
+   - le **DKIM** : deux CNAME, `brevo1._domainkey` et `brevo2._domainkey` ;
+   - le **DMARC** (TXT sur `_dmarc`). Pour commencer :
+     `v=DMARC1; p=none; rua=mailto:dmarc@<votre-domaine>`.
+
+   Attendre que Brevo affiche « Value matched » sur les trois. Une
+   inclusion SPF n'est pas nécessaire : sur les IP partagées de Brevo,
+   c'est la signature DKIM qui aligne le domaine pour DMARC.
+2. **Créer l'expéditeur** (*Expéditeurs*) sur ce domaine, par exemple
+   `notifications@<votre-domaine>`. Une adresse hors du domaine
+   authentifié est refusée à l'envoi.
+3. **Générer une clé SMTP** (*Paramètres* → *SMTP & API* → onglet
+   *SMTP*), et noter :
+   - le **login** affiché sur cette page, de la forme
+     `xxxxxxx@smtp-brevo.com`, qui n'est pas l'adresse du compte ;
+   - la **clé SMTP**, qui commence par `xsmtpsib-`. La clé API v3 ne
+     fonctionne pas ici : c'est l'erreur la plus fréquente.
+
+Dans `.env.app` :
+
+```bash
+# 587 + STARTTLS, recommandé par Brevo. Le « @ » du login s'écrit %40.
+SMTP_URL=smtp://xxxxxxx%40smtp-brevo.com:xsmtpsib-<cle>@smtp-relay.brevo.com:587
+SMTP_FROM=ImmiPro <notifications@<votre-domaine>>
+```
+
+- Un caractère spécial dans la clé (`/`, `:`, `#`, `?`, `%`) s'encode
+  aussi : `python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' '<cle>'`.
+- Si l'hébergeur bloque le port 587 :
+  `smtps://…@smtp-relay.brevo.com:465`. Le schéma `smtps` chiffre dès la
+  connexion.
+
+Vérifier ensuite, après `docker compose -f docker-compose.prod.yml up -d` :
+
+```bash
+docker compose -f docker-compose.prod.yml logs worker | grep sondes
+```
+
+La sonde s'authentifie sans envoyer de message. En cas d'échec, le journal
+dit la cause (authentification refusée, hôte injoignable) sans jamais
+citer la clé. Faire enfin un essai réel : un compte créé sur le pilote doit
+recevoir son courriel de vérification, et pas dans les indésirables.
+
+Avant d'ouvrir le pilote, vérifier le quota d'envoi quotidien de l'offre
+Brevo choisie : il doit couvrir les vérifications, les confirmations et
+les rappels.
+
 Après ces deux réglages : `docker compose -f docker-compose.prod.yml up -d`.
 
 Durcissement minimal avant la première mise en ligne : `ufw` limité aux ports 22, 80 et 443, authentification SSH par clés uniquement, `fail2ban`, `unattended-upgrades`.
