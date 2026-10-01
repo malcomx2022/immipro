@@ -10526,3 +10526,24 @@ Le transport SMTP est branché depuis S.43, et la fumée `smoke:courrier` l'épr
 - **un domaine d'envoi authentifié** (SPF, DKIM, DMARC), sans quoi les courriels de vérification partent en indésirables.
 
 Les identifiants vont dans `.env.app` (`SMTP_URL`, `SMTP_FROM`), jamais dans le dépôt. La procédure est dans `INSTALLATION-GITHUB.md` §4. Le registre `DEPENDANCES` reste inchangé : la messagerie est toujours bloquante avant l'ouverture au public, et elle se lève par configuration.
+
+## S.97 — Brouillons des mentions légales et des conditions
+
+**Demande du 01/10/2026.** Deux brouillons sont rédigés dans `docs/juridique/`, pour la direction et le conseil juridique (Q.A) : `mentions-legales.brouillon.md` et `conditions.brouillon.md`. Aucune page n'est créée.
+
+**Ils ne lèvent pas Q.A.** Un brouillon n'est pas un texte validé, et Q.A interdit d'inventer un texte juridique ou une identité d'entreprise. Le registre `PAGES_PUBLIQUES` reste donc inchangé : les pages restent absentes, leurs liens aussi, et la réserve affichée près des cases d'acceptation demeure.
+
+**Ce qu'ils contiennent**
+
+- Tout ce que le code fixe, avec un tableau des sources en fin de fichier : prix, passage d'Essentiel à Dossier, remboursements, moyens de paiement, reçu, durées de conservation, suppression de compte, export, sous-traitants, cookie de session.
+- Les limites du service : INV-1, INV-2, RG-08.2.
+- Des marques `[À COMPLÉTER]` pour ce que le produit ignore : identité de l'entité, immatriculation, hébergeur exact, âge minimum, délais de réponse.
+- Des marques `[À TRANCHER]` pour ce qui demande un avis : droit applicable, droit de rétractation (dont le cas des candidats de l'Union européenne qui paient en euros), TVA, facture (M.C), transfert de données vers le prestataire d'IA, autorité de contrôle, nouvelle acceptation après un changement de version.
+
+Les deux textes passent le vocabulaire interdit avec ses trois listes. `docs/` est hors du périmètre de `check:copy` ; le contrôle a été fait à la main avec la même fonction.
+
+**Trois écarts relevés en rédigeant**, consignés dans `docs/juridique/README.md` :
+
+- **Remboursement d'un pack entamé.** DOC-11 annonce une proratisation selon les jetons consommés. Le code n'en calcule aucune : la demande part en revue manuelle.
+- **Opérateurs Mobile Money.** DOC-11 nomme MTN MoMo et Moov. Le produit n'en nomme aucun.
+- **Remboursement FedaPay.** Il n'est possible que par MTN Mobile Money. Rien n'est prévu pour un paiement fait par un autre opérateur.
