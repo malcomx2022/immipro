@@ -53,9 +53,63 @@ services:
       postgres: { condition: service_healthy }
     networks: [internal]
 
+  # Balayage antivirus des pièces — I.D, branché par S.96.
+  #
+  # Deux conteneurs, parce que ClamAV n'expose pas d'HTTP et que le contrat
+  # de `ANTIVIRUS_URL` en est un (`domain/securite/balayage.ts`) :
+  #
+  # - `clamav` : le démon et freshclam, qui tient les signatures à jour
+  #   seul, plusieurs fois par jour. Les signatures vivent dans un volume :
+  #   un redémarrage ne les retélécharge pas. Le premier démarrage, lui,
+  #   les télécharge, et clamd n'écoute qu'une fois chargées — compter une
+  #   à deux minutes. Pendant ce temps, les pièces attendent en quarantaine
+  #   et la sonde horaire du worker rattrape le constat.
+  # - `antivirus` : la passerelle HTTP, même image que l'application.
+  #
+  # Mémoire : clamd tient les signatures en mémoire, autour de 1,5 Go, et
+  # le double le temps d'un rechargement. Le VPS doit les avoir.
+  #
+  # Rien n'est exposé hors du réseau interne. Le worker joint la passerelle
+  # par `ANTIVIRUS_URL=http://antivirus:8080/balayer`, dans `.env.app`.
+  #
+  # Aucun `depends_on` du worker vers eux : un antivirus en panne laisse
+  # les pièces en quarantaine, il ne doit pas arrêter la purge ni les
+  # paiements.
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    # La limite du flux suit celle du balayeur (`TAILLE_MAXI_BALAYAGE_OCTETS`,
+    # 32 Mo). Au-dessous, un fichier accepté par le balayeur serait refusé
+    # par le démon, et resterait en quarantaine à chaque reprise. L'image
+    # porte son propre contrôle de santé (`clamdcheck.sh`).
+    environment:
+      CLAMD_CONF_StreamMaxLength: 32M
+    volumes:
+      - clamdb:/var/lib/clamav
+    networks: [internal]
+
+  antivirus:
+    image: ghcr.io/${GH_OWNER}/immipro:${TAG}
+    restart: unless-stopped
+    command: ["node", "--enable-source-maps", "dist/passerelle-antivirus.js"]
+    environment:
+      CLAMD_HOST: clamav
+      CLAMD_PORT: "3310"
+      PORT: "8080"
+    networks: [internal]
+    # Vert quand clamd répond PONG : `docker compose ps` dit alors si le
+    # démon est debout, sans ouvrir la moindre pièce.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/sante > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+
 networks:
   internal: { driver: bridge }
 
 volumes:
   pgdata:
   miniodata:
+  clamdb:

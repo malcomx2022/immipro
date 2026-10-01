@@ -48,6 +48,40 @@ cd /srv/immipro
 docker login ghcr.io -u <votre-compte>
 ```
 
+### Brancher la messagerie et l'antivirus (pilote fermé)
+
+Les deux se branchent par `.env.app` ; aucun code n'est à écrire.
+
+**Antivirus.** `docker-compose.prod.yml` porte les services `clamav` et
+`antivirus` (S.96). Le déploiement ne recopie pas ce fichier : après une
+modification, le recopier sur le VPS. Puis, dans `.env.app` :
+
+```bash
+ANTIVIRUS_URL=http://antivirus:8080/balayer
+```
+
+Au premier démarrage, `clamav` télécharge ses signatures (une à deux
+minutes, environ 1,5 Go de mémoire ensuite). `docker compose ps` montre
+`antivirus` en bonne santé quand le démon répond. Le worker présente le
+fichier d'essai EICAR au démarrage puis toutes les heures : l'état de
+service (`/api/health`) passe le balayage à `OPERATIONNELLE` quand le
+fichier est reconnu.
+
+**Messagerie.** Un compte chez un fournisseur SMTP transactionnel, avec un
+domaine d'envoi authentifié (SPF, DKIM, DMARC) — sans quoi les courriels de
+vérification finissent en indésirables. Puis, dans `.env.app` :
+
+```bash
+SMTP_URL=smtps://<identifiant>:<mot-de-passe>@<hote>:465   # ou smtp://…:587 (STARTTLS)
+SMTP_FROM=ImmiPro <ne-pas-repondre@<votre-domaine>>
+```
+
+Le worker vérifie la connexion au démarrage puis toutes les heures, sans
+envoyer de message ; `/api/health` passe la messagerie à `OPERATIONNELLE`
+quand elle aboutit.
+
+Après ces deux réglages : `docker compose -f docker-compose.prod.yml up -d`.
+
 Durcissement minimal avant la première mise en ligne : `ufw` limité aux ports 22, 80 et 443, authentification SSH par clés uniquement, `fail2ban`, `unattended-upgrades`.
 
 ## 5. Étiquettes d'issues

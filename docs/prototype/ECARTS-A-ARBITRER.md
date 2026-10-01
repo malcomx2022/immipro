@@ -10476,3 +10476,53 @@ La demande est d'implémenter de bout en bout, en front comme en back. Les optio
 - **La légalisation d'un diplôme béninois** pour les Émirats n'est décrite par aucune source relevée. Elle reste en réserve, à confirmer auprès de l'établissement et de l'ambassade.
 - **Le niveau de langue.** Il est vide, et la fiche l'affiche donc « Aucun niveau exigé », ce qui est exact pour le titre de séjour. La réserve dit que l'établissement fixe le sien. Si l'affichage doit distinguer « non exigé par l'autorité » de « exigé par l'établissement », cela se tranche à part.
 - **Prochaine relecture** : le 01/01/2027.
+
+## S.96 — L'antivirus branché pour le pilote, la messagerie prête à l'être
+
+**Demande du 01/10/2026 : brancher la messagerie et l'antivirus pour le pilote fermé.**
+
+### Antivirus : un moteur réel en face de `ANTIVIRUS_URL`
+
+Le contrat de balayage date du 22/09/2026 (`domain/securite/balayage.ts`). Il est HTTP, et prévoit qu'un moteur sans HTTP se branche derrière « une trentaine de lignes de colle ». Aucune colle n'existait, et aucun moteur n'était décrit au déploiement : `ANTIVIRUS_URL` n'avait rien à désigner.
+
+**Ce qui est ajouté**
+
+- **`clamav`** (`clamav/clamav:1.4`) dans `docker-compose.prod.yml`. Il porte clamd et freshclam, qui tient les signatures à jour seul, et les signatures vivent dans un volume. `StreamMaxLength` est aligné sur `TAILLE_MAXI_BALAYAGE_OCTETS` (32 Mo) par `CLAMD_CONF_StreamMaxLength` : sans cela, un fichier accepté par le balayeur serait refusé par le démon à chaque reprise.
+- **`antivirus`** : la passerelle HTTP (`server/securite/passerelle-clamd.ts`), même image que l'application, commande `node dist/passerelle-antivirus.js`. Elle reçoit les octets, les passe au démon par `zINSTREAM` en blocs de 64 Kio, et rend la réponse du contrat. Son contrôle de santé interroge `/sante`, qui envoie `zPING` au démon.
+- **La lecture de la réponse du démon** (`domain/securite/clamd.ts`) : elle est pure et testée sans réseau. Seul `stream: OK` est sain. `… FOUND` est une infection. Le reste (`ERROR`, réponse vide, forme inconnue) est une erreur, que la passerelle rend en 502, 503 ou 504. Le balayeur lit ces statuts comme `INDISPONIBLE`, et la pièce reste en quarantaine.
+- **`ANTIVIRUS_URL=http://antivirus:8080/balayer`** dans `.env.app`. Rien n'est exposé hors du réseau interne.
+- **Aucun `depends_on` du worker vers ces services.** Un antivirus en panne laisse les pièces en quarantaine ; il n'arrête ni la purge ni les paiements.
+
+**Vérifications**
+
+- `tests/passerelle-clamd.test.ts` (27 cas), contre un faux démon TCP qui parle le protocole :
+  - les octets arrivent réassemblés à l'identique ;
+  - EICAR est vu, y compris à cheval sur deux blocs ;
+  - une erreur, une réponse hors protocole, un raccrochage, un démon muet ou un démon absent ne rendent jamais « saine » ;
+  - un corps vide ou trop gros est refusé avant le démon.
+- `smoke:worker` lance aussi la commande du service `antivirus`, depuis l'artefact seul et sans `node_modules`. En mode `--image`, il la lance depuis l'image. Sans démon, la passerelle doit tenir debout et répondre 503 sur `/sante`.
+- **Contre le vrai moteur, le 01/10/2026**, avec ClamAV 1.5.4 en local, puis l'image `clamav/clamav:1.4` sur un réseau Docker, sous le nom de service `clamav` :
+  - un fichier ordinaire est sain, et un fichier de 20 Mo passe ;
+  - EICAR est détecté, et un motif à cheval sur deux blocs aussi ;
+  - la sonde du worker conclut « reconnu » ;
+  - un démon absent rend `INDISPONIBLE` ;
+  - le contrôle de santé de l'image est vert.
+
+  La base de signatures était réduite à l'essai : le bac à sable ne joint pas `database.clamav.net`.
+
+**À faire sur le VPS**
+
+- Le déploiement ne recopie pas `docker-compose.prod.yml` : il faut le recopier une fois sur le VPS.
+- Renseigner `ANTIVIRUS_URL` dans `.env.app`.
+- Prévoir environ 1,5 Go de mémoire pour clamd, et le double le temps d'un rechargement.
+
+La procédure est dans `INSTALLATION-GITHUB.md` §4.
+
+### Messagerie : rien à coder, un compte à ouvrir
+
+Le transport SMTP est branché depuis S.43, et la fumée `smoke:courrier` l'éprouve sur un serveur local. Ce qui manque n'est pas du code, ce sont deux choses que le dépôt ne peut pas fournir :
+
+- **un compte chez un fournisseur SMTP transactionnel** ;
+- **un domaine d'envoi authentifié** (SPF, DKIM, DMARC), sans quoi les courriels de vérification partent en indésirables.
+
+Les identifiants vont dans `.env.app` (`SMTP_URL`, `SMTP_FROM`), jamais dans le dépôt. La procédure est dans `INSTALLATION-GITHUB.md` §4. Le registre `DEPENDANCES` reste inchangé : la messagerie est toujours bloquante avant l'ouverture au public, et elle se lève par configuration.
