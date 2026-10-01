@@ -11,7 +11,8 @@
  */
 /**
  * Vague 1 : Pays-Bas, Suisse, Émirats arabes unis.
- * Données relevées le 2026-09-11. Voir NOTES.md pour le niveau de confiance
+ * Données relevées le 2026-09-11 ; Émirats repris sur sources officielles
+ * le 2026-10-01 (S.95). Voir docs/visa-rules.md pour le niveau de confiance
  * de chaque source et les points restant à confirmer.
  */
 
@@ -283,83 +284,127 @@ export const REGLES_DE_REFERENCE = [
 
   // ────────────────────────────────────────────────────────────────
   // ÉMIRATS ARABES UNIS — études
-  // DRAFT : aucune source officielle (ICP / GDRFA / u.ae) vérifiée à ce jour.
+  // Reprise sur sources officielles le 2026-10-01 (S.95) :
+  //  - ICP, délivrance d'un titre de séjour (étudiant) — durée, pièces,
+  //    passeport 6 mois, assurance, 180 jours après les études, frais :
+  //    https://icp.gov.ae/en/services-details/?serviceid=64afe3c1035448005bd52e64
+  //  - ICP, permis d'entrée pour études — 60 jours pour entrer, frais :
+  //    https://icp.gov.ae/en/services-details/?serviceid=64afe3c1035448005bd52e60
+  //  - GDRFA Dubaï, titre de séjour étudiant — examen médical, frais,
+  //    60 jours de grâce : https://www.gdrfad.gov.ae/en/services/f52024e0-b812-11ed-5210-4cd98f768936
+  //  - u.ae, séjour pour études (parrainage) et dispositions générales
+  //    (examen médical à partir de 18 ans, carte d'identité émirienne)
+  //  - u.ae, permis de travail (permis de formation et d'emploi étudiant)
+  //  - ICP, résidence dorée (étudiants et diplômés exceptionnels)
+  // Reste en DRAFT : publication par un opérateur en B-02, qui relit
+  // (WF-14 §4, S.46).
   // ────────────────────────────────────────────────────────────────
   {
     countryCode: "AE",
     visaType: "etudes_residence_etudiante",
     category: "ETUDES" as const,
     version: 1,
-    effectiveFrom: "2026-01-01",
+    effectiveFrom: "2026-10-01",
     effectiveTo: null,
-    sourceUrl: "https://u.ae/en/information-and-services/visa-and-emirates-id",
-    sourceTier: "SECONDAIRE" as const,
-    verifiedAt: "2026-09-11",
-    verifiedBy: "gislain",
-    nextReviewAt: "2026-09-30", // à reprendre sur source officielle avant publication
+    sourceUrl: "https://icp.gov.ae/en/services-details/?serviceid=64afe3c1035448005bd52e64",
+    sourceTier: "OFFICIEL" as const,
+    verifiedAt: "2026-10-01",
+    // Relevé préparé avec un assistant IA : la relecture humaine reste à
+    // faire, et c'est elle qui publie.
+    verifiedBy: "releve-assiste",
+    nextReviewAt: "2027-01-01",
     status: "DRAFT" as const,
     rules: {
-      libelle: "Résidence étudiante parrainée par l'université",
+      libelle: "Titre de séjour pour études, parrainé par l'établissement",
+      // Langues d'enseignement : fixées par l'établissement, aucune par
+      // l'autorité d'immigration.
       langues_acceptees: ["en", "ar"],
-      niveau_langue_min: "IELTS 6.0",
-      frais_scolarite: { min: 10000, max: 30000, devise: "AED", periodicite: "annuel" },
+      // Aucune source officielle de séjour ne fixe de niveau : c'est
+      // l'établissement qui l'exige à l'admission. « IELTS 6.0 » venait
+      // d'un agrégateur.
+      niveau_langue_min: null,
+      // Fixés par chaque établissement ; aucune source officielle de
+      // séjour ne les publie.
+      frais_scolarite: null,
+      // Les frais diffèrent entre l'ICP et la GDRFA : ils sont donnés en
+      // réserve, autorité par autorité, plutôt qu'en un seul montant faux
+      // pour l'une des deux.
       frais_dossier: null,
+      // Ni l'ICP ni la GDRFA ne publient de preuve de ressources chiffrée.
       preuve_fonds: null,
-      delai_traitement_jours: { min: 21, max: 35 },
+      // 2 jours (ICP) ou 48 heures (GDRFA) une fois la demande déposée par
+      // l'établissement. Ce n'est pas le délai total, qui dépend de
+      // l'établissement : l'échéancier n'en tire donc aucune date.
+      delai_traitement_jours: null,
       travail_autorise: {
         autorise: true,
-        limite_hebdomadaire_heures: null,
+        limite_hebdomadaire_heures: null, // aucune limite publiée
         plein_temps_vacances: false,
         delai_carence_mois: null,
-        permis_employeur_requis: true, // permis MOHRE + NOC de l'université
+        permis_employeur_requis: true, // permis du MOHRE demandé par l'employeur
       },
       apres_etudes: {
-        dispositif: "Visa de travail parrainé par l'employeur, ou Golden Visa pour diplômés distingués",
-        duree_mois: 24,
-        renouvelable: true,
-        delai_depot_apres_diplome_mois: 24,
+        dispositif: "Maintien sur le territoire après la fin du programme (ICP)",
+        duree_mois: 6, // « 180 days after the completion of the study period »
+        renouvelable: false,
+        delai_depot_apres_diplome_mois: null,
         travail_pendant_recherche_heures: null,
       },
       conditions: [
         {
-          code: "parrainage_universite",
+          code: "parrainage_etablissement",
           piece: "admission",
           operateur: "exists",
-          valeur: "sponsor_universitaire",
+          valeur: "attestation_inscription",
           message_echec:
-            "Le titre de séjour étudiant est parrainé par l'université : sans inscription dans un établissement accrédité, aucune demande n'est possible.",
+            "Le titre de séjour étudiant est demandé par l'établissement, qui doit être agréé par le ministère de l'Éducation ou l'autorité éducative de l'émirat. Joignez l'attestation d'inscription qui précise votre programme et sa durée.",
           bloquant: true,
         },
         {
-          code: "noc_travail_etudiant",
-          operateur: "exists",
-          valeur: "noc_universite",
+          code: "passeport_validite_min",
+          piece: "passeport",
+          operateur: "gte",
+          valeur: 6,
+          unite: "mois",
           message_echec:
-            "Le droit au travail n'est pas inclus dans le titre étudiant : il faut un permis MOHRE obtenu par l'employeur et une attestation de non-objection de l'université.",
-          bloquant: false,
+            "Votre passeport doit rester valable au moins 6 mois à la date de la demande. Renouvelez-le avant que l'établissement ne dépose le dossier.",
+          bloquant: true,
         },
         {
-          code: "golden_visa_gpa",
-          piece: "diplome",
-          operateur: "gte",
-          valeur: 3.5,
-          unite: "GPA_sur_4",
+          code: "assurance_sante",
+          piece: "assurance_maladie",
+          operateur: "exists",
+          valeur: "assurance_valide_aux_emirats",
           message_echec:
-            "Le Golden Visa diplômés vise les meilleurs profils : GPA d'au moins 3,5 selon la classe de l'université, diplôme récent.",
+            "Une assurance santé valable aux Émirats est exigée pour le titre de séjour. Joignez l'attestation de couverture.",
+          bloquant: true,
+        },
+        {
+          code: "permis_travail_etudiant",
+          operateur: "exists",
+          valeur: "permis_mohre",
+          message_echec:
+            "Le titre étudiant ne vaut pas autorisation de travail : l'employeur doit obtenir un permis de formation et d'emploi étudiant auprès du MOHRE, valable trois mois.",
           bloquant: false,
         },
       ],
       pieces_requises: [
         { code: "passeport", libelle: "Passeport", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "admission", libelle: "Lettre d'admission d'un établissement accrédité", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "visite_medicale", libelle: "Examen médical sur place", nature: "demarche" as const, obligatoire: true, validite_mois: 6, traduction_assermentee: false, legalisation: false },
-        { code: "assurance_maladie", libelle: "Assurance santé", obligatoire: true, traduction_assermentee: false, legalisation: false },
-        { code: "diplome", libelle: "Diplôme légalisé et attesté", obligatoire: true, delai_obtention_jours: 45, traduction_assermentee: true, legalisation: true },
+        { code: "photo", libelle: "Photo d'identité en couleur, fond blanc", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "admission", libelle: "Attestation d'inscription précisant le programme et sa durée", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "assurance_maladie", libelle: "Assurance santé valable aux Émirats", obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "visite_medicale", libelle: "Examen médical sur place (à partir de 18 ans)", nature: "demarche" as const, obligatoire: true, traduction_assermentee: false, legalisation: false },
+        { code: "carte_identite_emirienne", libelle: "Demande de carte d'identité émirienne", nature: "demarche" as const, obligatoire: true, traduction_assermentee: false, legalisation: false },
       ],
       reserves: [
-        "Fiche non publiable en l'état : les chiffres proviennent de sources secondaires et doivent être repris sur icp.gov.ae, gdrfa.ae ou u.ae.",
-        "Les procédures diffèrent entre émirats (Dubaï relève de la GDRFA, les autres de l'ICP).",
-        "La légalisation des diplômes béninois pour les Émirats est une étape longue à confirmer auprès du consulat.",
+        "La demande est déposée par l'établissement, qui parraine l'étudiant. À Dubaï, elle relève de la GDRFA ; dans les autres émirats, de l'ICP.",
+        "Le permis d'entrée doit être utilisé dans les 60 jours suivant sa délivrance, et le titre de séjour demandé dans les 60 jours suivant l'entrée.",
+        "Frais publiés par l'ICP : 300 AED pour le permis d'entrée, puis 320 AED pour le titre de séjour. Par la GDRFA à Dubaï : 240 AED, plus 500 AED si la demande est faite depuis le territoire et 20 AED de livraison. Ces montants ne comprennent ni l'examen médical, ni la carte d'identité, ni l'assurance.",
+        "Le traitement annoncé par l'autorité est de 2 jours une fois la demande déposée. Le délai total dépend de l'établissement : demandez-lui le sien.",
+        "La durée du titre de séjour suit celle du programme. Après une annulation ou une expiration, la GDRFA accorde 60 jours pour quitter le territoire.",
+        "Le niveau de langue et les frais de scolarité sont fixés par chaque établissement, pas par l'autorité d'immigration.",
+        "Les diplômés peuvent demander une résidence dorée de 10 ans : moyenne d'au moins 3,5 sur 4 dans un établissement émirien de catégorie A, 3,8 en catégorie B, ou 3,5 dans l'une des 100 premières universités mondiales, diplôme obtenu depuis moins de deux ans et attesté par le ministère de l'Éducation. L'ICP fixe les critères ; la plateforme ne se prononce pas sur leur issue.",
+        "La légalisation d'un diplôme béninois pour les Émirats n'est décrite par aucune source relevée : à confirmer auprès de l'établissement et de l'ambassade.",
       ],
     },
   },

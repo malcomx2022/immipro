@@ -9,9 +9,9 @@
 | NL — études | ind.nl (autorité d'immigration) | **OFFICIEL** | PUBLISHED | 01/12/2026 |
 | NL — kennismigrant | ind.nl | **OFFICIEL** | PUBLISHED | 01/12/2026 |
 | CH — études | vd.ch (canton de Vaud) + EPFL + art. 21 al. 3 LEI | **INSTITUTIONNEL** | PUBLISHED | 15/11/2026 |
-| AE — études | agrégateurs commerciaux uniquement | **SECONDAIRE** | **DRAFT** | 30/09/2026 |
+| AE — études | icp.gov.ae, gdrfad.gov.ae, u.ae (repris le 01/10/2026, S.95) | **OFFICIEL** | **DRAFT**, publication en B-02 après relecture | 01/01/2027 |
 
-La fiche Émirats reste en `DRAFT` : le garde-fou `peutEtrePubliee()` la bloque automatiquement. C'est le comportement attendu — le schéma a fait son travail dès le premier jeu de données.
+La fiche Émirats est restée en `DRAFT` jusqu'au 01/10/2026 : le garde-fou `peutEtrePubliee()` la bloquait, et c'était le comportement attendu. Elle est reprise sur sources officielles (S.95) et reste en `DRAFT` jusqu'à sa relecture et sa publication par un opérateur en B-02.
 
 ## 2. Données confirmées
 
@@ -65,7 +65,7 @@ C'est le cœur opérationnel du projet. Une fiche non relue à l'échéance doit
 
 ## 5. Reste à faire
 
-1. **Émirats** : reprendre la fiche sur icp.gov.ae, gdrfa.ae et u.ae avant publication. Distinguer les procédures Dubaï (GDRFA) et fédérales (ICP).
+1. ~~**Émirats** : reprendre la fiche sur icp.gov.ae, gdrfa.ae et u.ae avant publication.~~ Fait le 01/10/2026 (S.95). Reste : relecture et publication en B-02, et la légalisation des diplômes béninois, qu'aucune source relevée ne décrit.
 2. **Suisse** : les montants de preuve de fonds varient d'un canton à l'autre. Décider si on modélise par canton ou si on affiche une fourchette assortie d'une réserve.
 3. **Frais de scolarité** : les fourchettes saisies sont indicatives, jamais vérifiées établissement par établissement. À marquer comme tel dans l'interface.
 4. **Job cron** : basculer automatiquement en `DRAFT` toute fiche dont `nextReviewAt` est dépassée.

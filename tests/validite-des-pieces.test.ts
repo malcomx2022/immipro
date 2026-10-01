@@ -111,7 +111,7 @@ describe("la durée de validité est une propriété de l'exigence", () => {
       "NL/etudes_mvv_vvr": { preuve_fonds: 3 },
       "NL/emploi_kennismigrant": {},
       "CH/etudes_permis_b": { preuve_fonds: 3 },
-      "AE/etudes_residence_etudiante": { visite_medicale: 6 },
+      "AE/etudes_residence_etudiante": {},
     });
   });
 });
