@@ -6,8 +6,9 @@
 |---|---|---|---|
 | `mentions-legales.brouillon.md` | `/mentions-legales` | Direction et conseil juridique | Bloquante avant l'ouverture au public |
 | `conditions.brouillon.md` | `/conditions` | Direction et conseil juridique | Bloquante avant l'ouverture au public |
+| `donnees-personnelles.brouillon.md` | `/donnees-personnelles` | Responsable conformité et conseil juridique | Bloquante avant l'ouverture au public |
 
-`/donnees-personnelles` et `/contact` ne sont pas rédigés ici : ils dépendent de la désignation du responsable de traitement et d'une voie de recours réellement tenue.
+`/contact` n'est pas rédigé ici : il dépend d'une voie de recours réellement tenue. Le brouillon de `/donnees-personnelles` ne peut être publié qu'une fois le responsable de traitement désigné.
 
 ## Ce que ces brouillons sont, et ce qu'ils ne sont pas
 
@@ -30,4 +31,5 @@
 | Remboursement d'un pack entamé | DOC-11 : « règle de proratisation selon les tokens déjà consommés » | Aucun prorata : une consommation partielle part en revue manuelle (`remboursement.ts`) | Direction, puis produit |
 | Opérateurs Mobile Money | DOC-11 nomme MTN MoMo et Moov | Le produit n'en nomme aucun : « l'opérateur de ton numéro, quel qu'il soit » (`rail.ts`) | Produit |
 | Remboursement FedaPay | — | Possible par MTN Mobile Money seulement (S.91) ; rien n'est prévu pour un paiement fait par un autre opérateur | Direction et opérations |
+| Consentements sans effet | `pieces_financieres` et `mesure_audience` sont proposés au candidat | Ils ne commandent rien ; aucune mesure d'audience n'existe | Produit, puis conformité |
 | Registre de langue | L'interface tutoie le candidat | Les brouillons vouvoient, comme un texte contractuel | Direction |
