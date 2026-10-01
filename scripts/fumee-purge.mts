@@ -283,6 +283,13 @@ async function unCompteComplet() {
   await db.analysisCredit.create({
     data: { applicationId: application.id, delta: 30, reason: "ACHAT_PACK" },
   });
+  // RG-10.8 (S.90) : une demande de correction de la date de dépôt.
+  await db.depositCorrectionRequest.create({
+    data: {
+      applicationId: application.id, requestedDate: new Date("2027-05-20"),
+      explanation: "La date enregistrée est celle du rendez-vous, pas du dépôt.",
+    },
+  });
   await db.documentVersion.updateMany({
     where: { document: { applicationId: application.id } },
     data: { body: "Lettre de motivation." },

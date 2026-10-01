@@ -10444,3 +10444,35 @@ La demande est d'implémenter de bout en bout, en front comme en back. Les optio
 1. La décision de conformité, et le texte de `/donnees-personnelles`.
 2. Le jeu d'évaluation des pièces.
 3. Le repli explicite pour la rédaction, qui n'est pas implémenté.
+
+## S.95 — La fiche Émirats reprise sur sources officielles
+
+**Demande du 01/10/2026.** La fiche `AE/etudes_residence_etudiante` reposait sur des agrégateurs (`SECONDAIRE`), et sa date de relecture, le 30/09/2026, était passée. Elle est reprise sur les sources officielles et passe en `OFFICIEL`.
+
+### Les sources relevées le 01/10/2026
+
+| Source | Ce qu'elle établit |
+|---|---|
+| ICP, délivrance d'un titre de séjour (étudiant) | durée du titre égale à celle du programme ; 180 jours sur le territoire après la fin des études ; passeport valable 6 mois ; assurance santé ; attestation d'inscription précisant le programme et sa durée ; frais |
+| ICP, permis d'entrée pour études | entrée dans les 60 jours ; frais |
+| GDRFA Dubaï, titre de séjour étudiant | l'établissement parraine ; examen médical ; frais propres à Dubaï ; 60 jours de grâce après une annulation ou une expiration |
+| u.ae, séjour pour études et dispositions générales | parrainage par l'établissement ou par un parent résident ; examen médical à partir de 18 ans ; carte d'identité émirienne |
+| u.ae, permis de travail | permis de formation et d'emploi étudiant, valable trois mois |
+| ICP, résidence dorée | étudiants et diplômés exceptionnels : seuils de moyenne, catégorie de l'établissement, diplôme de moins de deux ans |
+
+### Ce qui change
+
+- **Retiré, faute de source** : le niveau « IELTS 6.0 », la fourchette de frais de scolarité, le délai de 21 à 35 jours, la validité de 6 mois de l'examen médical et la pièce « diplôme légalisé ». Chaque champ vide l'est par choix : la plateforme n'annonce pas une valeur qu'aucune source ne porte (INV-8).
+- **Frais de dossier** : ils sont laissés vides et détaillés en réserve, autorité par autorité. Un montant unique serait faux pour Dubaï ou pour les autres émirats.
+- **Délai de traitement** : il est laissé vide. Les 2 jours de l'ICP et les 48 heures de la GDRFA courent à partir du dépôt par l'établissement, pas du début des démarches. Pris comme délai total, ils auraient fait poser par l'échéancier une date de dépôt deux jours avant le départ. Ils figurent en réserve.
+- **Après les études** : les 180 jours de l'ICP remplacent le « visa de travail ou Golden Visa, 24 mois » de l'agrégateur. La résidence dorée passe en réserve, avec ses seuils.
+- **Conditions** : la condition de moyenne pour la résidence dorée est retirée. Elle s'évaluait sur le diplôme d'entrée, alors qu'elle porte sur le diplôme obtenu aux Émirats ou dans l'une des 100 premières universités mondiales. Les conditions passeport et assurance s'ajoutent, toutes deux bloquantes et rattachées à leur pièce.
+- **Pièces** : s'ajoutent la photo et la demande de carte d'identité émirienne (démarche).
+- `tests/validite-des-pieces.test.ts` est mis à jour : la fiche ne porte plus aucune pièce périssable.
+
+### Ce qui reste
+
+- **La publication.** La fiche reste en `DRAFT`. Elle a été préparée avec un assistant IA (`verifiedBy: "releve-assiste"`) : un opérateur la relit sur les sources citées puis la publie en B-02. La règle de S.46, celui qui écrit ne publie pas, s'applique ainsi d'elle-même.
+- **La légalisation d'un diplôme béninois** pour les Émirats n'est décrite par aucune source relevée. Elle reste en réserve, à confirmer auprès de l'établissement et de l'ambassade.
+- **Le niveau de langue.** Il est vide, et la fiche l'affiche donc « Aucun niveau exigé », ce qui est exact pour le titre de séjour. La réserve dit que l'établissement fixe le sien. Si l'affichage doit distinguer « non exigé par l'autorité » de « exigé par l'établissement », cela se tranche à part.
+- **Prochaine relecture** : le 01/01/2027.
