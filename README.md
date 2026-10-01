@@ -84,6 +84,21 @@ Sans PostgreSQL, le worker doit échouer sur la connexion et rendre un code
 non nul : un artefact absent, amputé d'un module ou réduit à une fonction
 morte ne passe pas.
 
+### La passerelle antivirus
+
+ClamAV n'expose pas d'HTTP, et le contrat de `ANTIVIRUS_URL` en est un
+(`src/domain/securite/balayage.ts`). `docker-compose.prod.yml` ajoute donc
+deux services sur le réseau interne : `clamav` (le démon et freshclam,
+signatures dans un volume) et `antivirus`, une passerelle de la même image
+que l'application, lancée par `node dist/passerelle-antivirus.js`. Elle
+reçoit les octets, les passe au démon par `zINSTREAM`, et rend
+`{"status":"clean"}` ou `{"status":"infected",…}` — tout le reste est un
+statut d'échec, jamais « sain ». Le worker la joint par
+`ANTIVIRUS_URL=http://antivirus:8080/balayer`.
+
+`npm run smoke:worker` lance aussi sa commande, sans démon en face : elle
+doit tenir debout et répondre 503 sur `/sante`.
+
 `--base` ajoute l'autre moitié, celle que la première masquait : le paquet
 démarre deux fois sur une base **jetable** — créée et supprimée par le
 script, jamais celle du poste — pour vérifier que les files et les cadences

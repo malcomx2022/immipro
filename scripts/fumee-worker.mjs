@@ -276,6 +276,80 @@ if (!argImage) {
   }
 }
 
+// ── 3 ter. La passerelle antivirus (S.96) ────────────────────────────
+/*
+  Troisième commande du déploiement, même image, même piège : un artefact
+  absent ou un module manquant ferait boucler le conteneur `antivirus`, et
+  chaque pièce resterait en quarantaine sans que rien ne dise pourquoi.
+  Sans démon en face, la passerelle doit **tenir debout** et répondre 503
+  sur `/sante` — c'est son état normal pendant le premier chargement des
+  signatures.
+*/
+const commandePasserelle = commandeDuService("antivirus");
+console.log("\nPasserelle antivirus (service antivirus)");
+verifier(Array.isArray(commandePasserelle), "le service antivirus déclare une commande");
+
+if (commandePasserelle && !argImage) {
+  const artefactPasserelle = commandePasserelle[commandePasserelle.length - 1];
+  verifier(existsSync(join(RACINE, artefactPasserelle)), `${artefactPasserelle} existe après le build`);
+  const bac = mkdtempSync(join(tmpdir(), "fumee-passerelle-"));
+  try {
+    // L'artefact seul, sans aucun `node_modules` : la passerelle n'en a pas besoin.
+    mkdirSync(join(bac, "dist"), { recursive: true });
+    cpSync(join(RACINE, artefactPasserelle), join(bac, artefactPasserelle));
+    const port = 18_000 + (process.pid % 1_000);
+    const enfant = spawn(commandePasserelle[0], commandePasserelle.slice(1), {
+      cwd: bac,
+      env: { ...process.env, CLAMD_HOST: "127.0.0.1", CLAMD_PORT: "1", PORT: String(port) },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let sortie = "";
+    enfant.stdout.on("data", (m) => (sortie += m));
+    enfant.stderr.on("data", (m) => (sortie += m));
+    let arretee = false;
+    enfant.on("exit", () => (arretee = true));
+
+    const limite = Date.now() + 15_000;
+    while (Date.now() < limite && !arretee && !sortie.includes("écoute sur")) {
+      await new Promise((suite) => setTimeout(suite, 100));
+    }
+    verifier(!/Cannot find module|MODULE_NOT_FOUND/u.test(sortie), "passerelle : aucun module manquant");
+    verifier(!arretee && sortie.includes("écoute sur"), "passerelle : elle écoute sans démon en face");
+    if (!arretee) {
+      const sante = await fetch(`http://127.0.0.1:${port}/sante`).catch(() => null);
+      verifier(sante?.status === 503, `passerelle : /sante dit le démon absent (${sante?.status ?? "aucune réponse"})`);
+      enfant.kill("SIGTERM");
+      await new Promise((suite) => enfant.once("exit", suite));
+    } else {
+      console.log(`\n--- sortie observée ---\n${sortie.trim()}\n`);
+    }
+  } finally {
+    rmSync(bac, { recursive: true, force: true });
+  }
+} else if (commandePasserelle) {
+  const tagPasserelle = imageFournie ?? "immipro-fumee:worker";
+  const lancement = spawnSync(
+    "docker",
+    ["run", "--detach", "--network", "none", "-e", "CLAMD_HOST=127.0.0.1", "-e", "CLAMD_PORT=1", tagPasserelle, ...commandePasserelle],
+    { encoding: "utf8", timeout: 120_000 },
+  );
+  const conteneur = (lancement.stdout ?? "").trim();
+  verifier(lancement.status === 0 && conteneur !== "", "passerelle : l'image démarre sa commande");
+  if (conteneur) {
+    try {
+      await new Promise((suite) => setTimeout(suite, 5_000));
+      const etat = spawnSync("docker", ["inspect", "-f", "{{.State.Running}}", conteneur], { encoding: "utf8" });
+      const journal = spawnSync("docker", ["logs", conteneur], { encoding: "utf8" });
+      const sortie = `${journal.stdout ?? ""}${journal.stderr ?? ""}`;
+      verifier(!/Cannot find module|MODULE_NOT_FOUND/u.test(sortie), "passerelle : aucun module manquant dans l'image");
+      verifier((etat.stdout ?? "").trim() === "true", "passerelle : elle tient debout dans l'image");
+      if ((etat.stdout ?? "").trim() !== "true") console.log(`\n--- journal du conteneur ---\n${sortie.trim()}\n`);
+    } finally {
+      spawnSync("docker", ["rm", "--force", conteneur], { encoding: "utf8" });
+    }
+  }
+}
+
 // ── 4. Démarrage réel sur PostgreSQL, base jetable ───────────────────
 
 if (process.argv.includes("--base")) {

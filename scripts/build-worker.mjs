@@ -58,3 +58,27 @@ const resultat = await build({
 
 const octets = Object.values(resultat.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
 console.log(`dist/worker.js — ${(octets / 1024).toFixed(0)} Kio, externes : ${EXTERNES.join(", ")}`);
+
+/*
+  La passerelle antivirus (S.96), même image et même méthode : un seul
+  fichier, aucun module à résoudre à l'exécution. Elle n'importe ni Prisma
+  ni rien du worker — `node:http`, `node:net` et le domaine —, et ce
+  paquet le vérifie : un import de trop la ferait grossir, ou échouer ici.
+*/
+const passerelle = await build({
+  entryPoints: ["src/server/securite/passerelle-antivirus.ts"],
+  outfile: "dist/passerelle-antivirus.js",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "cjs",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsPasserelle =
+  Object.values(passerelle.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/passerelle-antivirus.js — ${(octetsPasserelle / 1024).toFixed(0)} Kio`);
