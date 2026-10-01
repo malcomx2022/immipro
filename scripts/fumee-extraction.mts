@@ -307,6 +307,8 @@ async function piece(
       userId: user.id,
       visaRuleId: regle.id,
       status: options.statut ?? "ACTIF",
+      // Un dossier suspendu porte sa date (`application_suspension_datee`, S.84).
+      ...(options.statut === "SUSPENDU" ? { suspendedAt: new Date() } : {}),
       ...(options.dateCible ? { targetDate: new Date(options.dateCible) } : {}),
     },
   });
@@ -948,14 +950,16 @@ try {
     verifier(apres.status === "ILLISIBLE", `la pièce n'est pas déclarée conforme (${apres.status})`);
     const analyse = await analyseDe(p.version.id);
     /*
-      Le motif est celui que tout appel partage ; le détail, lui, nomme la
-      variable à renseigner. C'est le détail qui rend la ligne
-      actionnable : « aucune clé » envoie chercher, `ANTHROPIC_API_KEY`
-      dit où.
+      Le motif est celui que tout appel partage ; le détail, lui, dit où
+      regarder. Depuis S.94, plusieurs causes ferment la lecture — fournisseur
+      inconnu, clé absente, pièces non autorisées chez ce sous-traitant —, et
+      l'écran Coûts IA est le seul endroit qui dit laquelle tient. C'est lui
+      que le détail nomme, plutôt qu'une variable qui ne serait juste que
+      pour Anthropic.
     */
     verifier(
-      (analyse?.engineLog ?? "").includes("ANTHROPIC_API_KEY"),
-      `le journal nomme la variable à renseigner (${analyse?.engineLog})`,
+      (analyse?.engineLog ?? "").includes("Coûts IA"),
+      `le journal dit où lire ce qui manque (${analyse?.engineLog})`,
     );
     verifier(await solde(p.application.id) === 5, "et le candidat n'a rien payé");
   }
