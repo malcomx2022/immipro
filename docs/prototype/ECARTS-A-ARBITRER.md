@@ -10547,3 +10547,18 @@ Les deux textes passent le vocabulaire interdit avec ses trois listes. `docs/` e
 - **Remboursement d'un pack entamé.** DOC-11 annonce une proratisation selon les jetons consommés. Le code n'en calcule aucune : la demande part en revue manuelle.
 - **Opérateurs Mobile Money.** DOC-11 nomme MTN MoMo et Moov. Le produit n'en nomme aucun.
 - **Remboursement FedaPay.** Il n'est possible que par MTN Mobile Money. Rien n'est prévu pour un paiement fait par un autre opérateur.
+
+### S.97 — suite : le brouillon des données personnelles
+
+`docs/juridique/donnees-personnelles.brouillon.md` est rédigé pour le responsable conformité et le conseil juridique. Il couvre :
+
+- les données collectées, relevées dans le schéma, et leurs finalités ;
+- les bases légales, toutes `[À TRANCHER]` ;
+- les consentements et l'effet de leur refus ;
+- l'analyse par l'IA, et la complétude, qui ne produit aucune décision ;
+- les destinataires et sous-traitants, les durées de conservation, les droits et la façon de les exercer ;
+- la sécurité, le cookie et le stockage du navigateur, les mineurs.
+
+Deux faits sont relevés dans le code au passage. Le simulateur ne garde rien côté serveur : les réponses restent dans le `sessionStorage` du navigateur (RG-01.1). L'adresse IP ne sert qu'au contrôle de débit, en mémoire, cinq minutes au plus.
+
+Un quatrième écart s'ajoute au `README` : les consentements `pieces_financieres` et `mesure_audience` sont proposés au candidat, mais ne commandent rien. Une page de données personnelles ne peut pas décrire un consentement sans effet.
