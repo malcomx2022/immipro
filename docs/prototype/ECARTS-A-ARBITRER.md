@@ -10756,3 +10756,28 @@ L'aptitude de l'instance ne change pas : ces deux dépendances sont facultatives
 **Hors de cette correction** : « Choisir un pack » sur `/tarifs` mène aussi à `/inscription` pour un candidat connecté. Le choix d'un pack se fait au récapitulatif de paiement d'un dossier ouvert ; la bonne destination est à décider par le produit.
 
 **Vérification** : `tests/entree-dossier.test.ts`, `tests/ui/p0-public.test.tsx` et `tests/ui/p0-comptes.test.tsx` (5 cas d'écran nouveaux), et un essai sur base jetable de `corrigerLAdresse` : mauvais mot de passe, même adresse, adresse prise sans changement, correction normalisée, ancien code invalide, nouveau code valide, adresse vérifiée refusée.
+
+## S.103 — La production n'avait aucune destination, et rien ne pouvait en ouvrir une
+
+**Relevé en test le 02/10/2026.** Après S.102, « Ouvrir un dossier » mène bien à `/dossiers/nouveau`, qui affiche « Aucune destination n'est ouverte en ce moment ». `https://immipro.app/destinations` le confirme : « Aucune destination n'est publiée pour l'instant ». Le test de dépôt de bout en bout est bloqué.
+
+**Cause.** Une règle entre en base par deux chemins, et aucun ne fonctionnait sur une production neuve :
+
+- **B-02** édite et publie une règle **existante** (`/regles/[id]`). Il n'en crée pas.
+- **La graine** (`npm run seed:rules`) ne pouvait pas tourner dans l'image. Ni `tsx` ni les sources TypeScript n'y sont.
+
+**Correction.** La graine est empaquetée comme le worker (`scripts/build-worker.mjs` → `dist/graine-regles.js`) et se lance comme une migration :
+
+    docker compose -f docker-compose.prod.yml run --rm app node dist/graine-regles.js
+
+Le paquet est le même code que `seed:rules`. Il applique les mêmes garde-fous :
+
+- vocabulaire de B-02 ;
+- source secondaire forcée en brouillon ;
+- archivage de la version précédente.
+
+Il publie les trois fiches à source officielle ou institutionnelle (Pays-Bas études, Pays-Bas kennismigrant, Suisse études). Il laisse les Émirats en brouillon, à relire et publier en B-02.
+
+**Ce qu'il ne fait pas.** Le déploiement ne le lance pas. La graine remet chaque fiche dans l'état du fichier : la relancer à chaque déploiement republierait une fiche que la veille a dépubliée, et réécrirait ce que B-02 a changé. C'est un chargement initial, à faire une fois.
+
+**Vérification.** `npm run smoke:graine`, ajoutée à la CI : paquet exécuté hors sources, sur une base jetable, deux fois. Résultat : 3 publiées et les Émirats en brouillon, sans doublon, statuts et bornes inchangés à la reprise.

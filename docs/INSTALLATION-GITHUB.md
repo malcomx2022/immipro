@@ -166,5 +166,6 @@ Durcissement minimal avant la première mise en ligne : `ufw` limité aux ports 
 - [ ] `npm install` puis `npx prisma migrate dev --name init`
 - [ ] Créer le bucket MinIO `immipro-documents` en accès privé
 - [ ] Lancer `npm run seed:rules` et vérifier que la fiche Émirats reste en `DRAFT`
+- [ ] En production, charger le même référentiel depuis l'image, une fois : `docker compose -f docker-compose.prod.yml run --rm app node dist/graine-regles.js`. B-02 publie une règle existante mais n'en crée pas : sans ce chargement, aucune destination n'est ouverte. Le déploiement ne le relance pas, pour ne pas écraser ce que B-02 et la veille ont changé.
 - [ ] Renseigner les clés FedaPay en bac à sable
 - [ ] Ouvrir une issue par écran du lot P0 de DOC-12
