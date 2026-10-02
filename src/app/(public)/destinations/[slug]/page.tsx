@@ -6,6 +6,8 @@ import { SourceNote } from "@/components/ui/SourceNote";
 import { LISTE_VIDE, libellePieces } from "@/domain/destinations/fiche";
 import { ficheParSlugPubliee } from "@/server/lecture/destinations";
 import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
+import { lienOuvrirUnDossier } from "@/domain/comptes/entree-dossier";
+import { acteurCourant } from "@/server/securite/page";
 
 /** Au fuseau d'affichage, Cotonou : pas au fuseau du navigateur (périmètre V1). */
 const DATE_A_COTONOU = new Intl.DateTimeFormat("fr-FR", { timeZone: FUSEAU_AFFICHAGE });
@@ -59,6 +61,9 @@ export default async function PageDestination({
   const { slug } = await params;
   const fiche = await ficheParSlugPubliee(slug);
   if (!fiche) notFound();
+  // Un candidat connecté va à l'ouverture de dossier sur cette destination,
+  // pas à une inscription qu'il a déjà faite.
+  const connecte = (await acteurCourant()) !== null;
 
   return (
     <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 py-6 md:flex-row md:gap-12 md:px-12 md:py-10">
@@ -163,7 +168,7 @@ export default async function PageDestination({
       <aside className="flex flex-col gap-3 rounded-lg border border-ink-300 p-5 md:w-60 md:flex-none md:self-start">
         <h2 className="text-16 font-semibold text-ink-900">Préparer ce dossier</h2>
         <p className="text-14 text-ink-700">{libellePieces(fiche.piecesAReunir)}</p>
-        <LienBouton href="/inscription" pleineLargeur>
+        <LienBouton href={lienOuvrirUnDossier(connecte, fiche.slug)} pleineLargeur>
           Voir la checklist
         </LienBouton>
       </aside>

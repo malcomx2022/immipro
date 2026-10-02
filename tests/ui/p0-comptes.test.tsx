@@ -194,6 +194,78 @@ describe("A-03 — Vérification email", () => {
   });
 });
 
+describe("A-03 — Correction de l'adresse", () => {
+  it("écrit l'adresse en cours, et ne renvoie plus vers les consentements", () => {
+    const { container } = render(<Verification email="aline.dosou@email.com" />);
+    expect(screen.getByText("aline.dosou@email.com")).toBeDefined();
+    expect(container.querySelector('a[href="/consentements"]')).toBeNull();
+  });
+
+  it("corrige l'adresse sur place, avec le mot de passe, et annonce le nouvel email", async () => {
+    const appels: { url: string; methode?: string; corps?: string }[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      appels.push({ url, methode: options?.method, corps: options?.body as string });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ email: "aline.dossou@email.com" }),
+      } as Response);
+    });
+    render(<Verification email="aline.dosou@email.com" />);
+
+    const bascule = screen.getByRole("button", { name: "Corriger mon adresse email" });
+    expect(bascule).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(bascule);
+    expect(bascule).toHaveAttribute("aria-expanded", "true");
+
+    const envoyer = screen.getByRole("button", { name: "Corriger et recevoir un code" });
+    expect(envoyer).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Nouvelle adresse email"), {
+      target: { value: "aline.dossou@email.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), {
+      target: { value: "un mot de passe assez long" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Corriger et recevoir un code" }));
+
+    await waitFor(() => expect(screen.getByRole("status")).toBeDefined());
+    expect(appels[0]?.url).toBe("/api/comptes/adresse");
+    expect(appels[0]?.methode).toBe("PUT");
+    expect(JSON.parse(appels[0]!.corps!)).toEqual({
+      email: "aline.dossou@email.com",
+      motDePasse: "un mot de passe assez long",
+    });
+    expect(screen.getByRole("status").textContent).toMatch(/Un email part à aline\.dossou@email\.com/);
+    // L'adresse affichée est la nouvelle.
+    expect(screen.getAllByText("aline.dossou@email.com").length).toBeGreaterThan(0);
+    expect(screen.queryByText("aline.dosou@email.com")).toBeNull();
+  });
+
+  it("un mot de passe refusé s'affiche sous son champ", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        echec: {
+          titre: "Certains champs sont à reprendre",
+          corps: "x",
+          action: "Corriger",
+          ton: "echec",
+          champs: { motDePasse: "Ce mot de passe ne correspond pas à ton compte." },
+        },
+      }),
+    } as Response);
+    render(<Verification email="aline.dosou@email.com" />);
+    fireEvent.click(screen.getByRole("button", { name: "Corriger mon adresse email" }));
+    fireEvent.change(screen.getByLabelText("Nouvelle adresse email"), {
+      target: { value: "aline.dossou@email.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: "faux" } });
+    fireEvent.click(screen.getByRole("button", { name: "Corriger et recevoir un code" }));
+    expect(await screen.findByText("Ce mot de passe ne correspond pas à ton compte.")).toBeDefined();
+  });
+});
+
 describe("A-04 — Mot de passe", () => {
   it("part de la demande et enchaîne sur la saisie du code", async () => {
     global.fetch = vi
