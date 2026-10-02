@@ -6,8 +6,11 @@
 # Ne jamais commiter le vrai secret : ce dépôt ne porte que ce modèle.
 #
 # Le service `minio` de docker-compose.prod.yml monte ce fichier en
-# /etc/garage.toml et expose l'API S3 sur le port 9000
+# /etc/garage.toml et expose lAPI S3 sur le port 9000
 # (MINIO_PORT=9000 dans .env.app).
+#
+# La région est us-east-1 : cest celle que le client `minio` utilise par
+# défaut pour signer ses requêtes (SigV4), et Garage la vérifie.
 
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
@@ -17,7 +20,7 @@ rpc_bind_addr = "[::]:3901"
 rpc_secret = "REMPLACEZ_MOI_PAR_UN_SECRET_GENERE_EX_OPENSSL_RAND_HEX_32"
 
 [s3_api]
-s3_region = "garage"
+s3_region = "us-east-1"
 api_bind_addr = "[::]:9000"
 
 [admin]
