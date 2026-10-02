@@ -18,6 +18,16 @@ RUN npx prisma generate && npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+
+# Next 15 (`standalone`, `node server.js`) écoute sur `process.env.HOSTNAME`
+# quand il est défini — et Docker remplit automatiquement HOSTNAME avec
+# l'ID du conteneur. Sans DNS (`--network none`, comme le test de fumée),
+# cet ID ne se résout pas : le serveur meurt au démarrage sur `EAI_AGAIN`.
+# Sur un réseau à DNS intégré il se résout, mais lier un nom interne
+# reste fragile et dépend du réseau. On fige donc l'écoute sur toutes
+# les interfaces : l'image se comporte pareil partout, en CI comme en
+# production. Ni le worker ni la passerelle n'utilisent HOSTNAME.
+ENV HOSTNAME=0.0.0.0
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
