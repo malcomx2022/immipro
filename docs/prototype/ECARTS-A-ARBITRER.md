@@ -10636,3 +10636,22 @@ Le défaut reste `anthropic` dans le code, et l'adaptateur n'est pas modifié. C
 | 4 | Sous-traitance (S.94 §4.1) pour le fournisseur de lecture retenu : contrat, conservation zéro, résidence, page `/donnees-personnelles` | Conformité et conseil juridique |
 
 **Haiku 4.5**, au passage : Anthropic peut le retirer dès le 15/10/2026. Il ne doit être retenu nulle part.
+
+### S.99 — suite (02/10/2026) : le jeu d'essai est prêt
+
+La deuxième décision à prendre (le jeu d'essai et les lectures attendues) est préparée. Le seuil de champs justes reste à fixer par le produit. Le détail est dans `docs/IA-benchmark.md` §8.1.
+
+**Le jeu d'essai**
+
+- 30 pièces factices sur les quatre règles du référentiel, dont 8 dégradées, 11 qui tendent un piège de fausse conformité et 13 non conformes.
+- 10 rédactions sur les quatre pièces que le produit sait mettre en forme, dont deux portent une incohérence à relever.
+- Chaque pièce a sa lecture attendue et son verdict attendu. `tests/banc-ia.test.ts` les recalcule avec la chaîne du produit : un jeu faux casse la suite, avant qu'aucun fournisseur ne soit jugé dessus.
+
+**Le banc**
+
+- `npm run banc:ia` fait passer un fournisseur par les adaptateurs du produit. Seul le stockage est contourné.
+- La notation rejoue la décision du job d'analyse.
+- Une seule fausse conformité disqualifie.
+- `npm run banc:ia:aveugle` prépare la relecture à l'aveugle des lettres.
+
+**Rien n'est changé dans le produit** : ni l'adaptateur, ni le fournisseur par défaut, ni le job d'analyse.

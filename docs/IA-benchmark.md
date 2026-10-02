@@ -186,6 +186,88 @@ Les classements ne mesurent ni nos pièces ni notre français administratif. S.9
 
 ---
 
+### 8.1 Le jeu d'essai est prêt (02/10/2026)
+
+| Élément | Où |
+|---|---|
+| Les 30 pièces et les 10 rédactions, avec la lecture attendue et le verdict attendu de chacune | `src/domain/banc-ia/jeu-d-essai.ts` |
+| Les pièces générées (images JPEG et PNG, PDF natifs, PDF scannés), 1,9 Mo | `tests/banc-ia/pieces/` |
+| La notation, qui rejoue la décision du job d'analyse | `src/domain/banc-ia/notation.ts` |
+| Le passage d'un fournisseur, par les adaptateurs du produit | `scripts/banc-ia/lancer.mts` (`npm run banc:ia`) |
+| L'anonymisation des lettres pour la relecture à l'aveugle | `scripts/banc-ia/melanger.mts` (`npm run banc:ia:aveugle`) |
+| La génération des pièces (Playwright, hors dépendances du projet) | `scripts/banc-ia/generer-pieces.mts` (`npm run banc:ia:pieces`) |
+| Les vérifications du jeu lui-même | `tests/banc-ia.test.ts` |
+
+**Les pièces.** Elles se répartissent sur les quatre règles du référentiel : Pays-Bas études (12), Suisse études (7), Pays-Bas emploi qualifié (6) et Émirats études (5).
+
+- **Dégradées** (8 pièces) : photo de travers, scan pâle, ombre portée, montant ajouté au stylo, flou complet, photo dans le noir.
+- **Pièges** (11 pièces, et 13 pièces non conformes en tout), chacun tendu vers une fausse conformité :
+  - un solde en FCFA, à ne pas recopier comme des euros ;
+  - un relevé déposé dans la ligne du passeport ;
+  - un bail déposé dans la ligne de l'assurance ;
+  - un contrat sans mention d'employeur reconnu ;
+  - une admission sans parrainage du visa ;
+  - un solde à 69 € sous le seuil ;
+  - deux photos illisibles, sur lesquelles toute valeur rendue est devinée.
+
+Tout est fictif, et chaque pièce porte en filigrane « SPÉCIMEN — DOCUMENT FICTIF ».
+
+**La notation juge comme le produit.** Chaque lecture passe par le même enchaînement que `server/jobs/analyse.ts` :
+
+1. pas de lecture : revue humaine ;
+2. une autre pièce reconnue : hors sujet ;
+3. sinon, `mesurer` puis `evaluerConditions`.
+
+Le banc compte ce que le candidat aurait lu :
+
+- **verdicts** justes ;
+- **champs** justes, manqués, inventés ou faux ;
+- **pièces** bien identifiées ;
+- **obstacles** reconnus ;
+- **échecs techniques**.
+
+Une seule fausse conformité disqualifie le fournisseur, et le script sort alors avec le code 2.
+
+**Les rédactions** sont vérifiées mécaniquement sur quatre points :
+
+- un nombre absent des réponses ;
+- le vocabulaire interdit ;
+- le tutoiement ;
+- l'incohérence que la relecture devait relever (R03, R07).
+
+Le reste se juge à l'aveugle. `banc:ia:aveugle` mélange les lettres des fournisseurs, cas par cas, sous des lettres neutres, et produit une grille de relecture.
+
+**Le banc a été éprouvé** sans clé ni réseau :
+
+| Essai | Résultat |
+|---|---|
+| Lecteur parfait (`--simulation parfaite`) | 30 verdicts justes sur 30, aucune fausse conformité |
+| Lecteur crédule (`--simulation credule`), qui remplit chaque champ vide | Disqualifié sur L07, L10, L17, L18, L23, L28 et L30 |
+| Faux serveur compatible OpenAI en local | Le chemin réel de l'adaptateur passe, bloc PDF compris, avec le coût calculé sur le tarif déclaré |
+
+**Pour faire passer un finaliste** : déclarer ses variables comme en production (S.94), puis lancer le banc.
+
+```bash
+# Anthropic
+ANTHROPIC_API_KEY=… AI_MODEL=claude-sonnet-5-5 npm run banc:ia -- --fournisseur anthropic
+
+# Tout fournisseur compatible OpenAI (ici Mistral, point d'accès UE)
+AI_OPENAI_URL=https://api.eu.mistral.ai/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=mistral-medium-latest \
+  AI_OPENAI_PDF=oui npm run banc:ia -- --fournisseur openai_compatible
+
+# Puis, une fois tous les finalistes passés
+npm run banc:ia:aveugle -- banc-ia-resultats/<passage 1> banc-ia-resultats/<passage 2> …
+```
+
+Renseigner aussi le tarif (`AI_TARIF_*`) pour que le rapport donne le coût réel. Les résultats vont dans `banc-ia-resultats/`, qui n'est pas versionné.
+
+Deux finalistes ne passent pas encore tels quels :
+
+- **Mistral** : son bloc PDF diffère (§7). Ses PDF partiront en erreur tant que l'adaptateur n'est pas modifié. On peut d'abord le passer sur les seules images (`--pieces` avec les identifiants JPEG et PNG).
+- **Gemini sur Vertex AI** : il faut l'adaptateur d'authentification (§7).
+
+C'est le moment de faire ces deux modifications, si la direction confirme ces finalistes.
+
 ## 9. Sources (lues le 02/10/2026)
 
 **OpenAI**
