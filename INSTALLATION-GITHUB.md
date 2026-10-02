@@ -48,6 +48,24 @@ cd /srv/immipro
 docker login ghcr.io -u <votre-compte>
 ```
 
+### Stockage des pièces : l'adresse publique (S.98)
+
+Le navigateur dépose et lit les pièces par des URL présignées. Elles sont
+signées pour l'adresse que **le navigateur** joint, distincte de celle du
+serveur :
+
+```bash
+MINIO_ENDPOINT=minio                              # le serveur, sur le réseau Docker
+MINIO_PUBLIC_URL=https://stockage.<votre-domaine> # le navigateur, en https
+```
+
+Côté VPS : un enregistrement DNS pour ce sous-domaine, un vhost nginx en
+HTTPS qui relaie vers `127.0.0.1:9000` **en préservant l'en-tête `Host`**
+(la signature SigV4 porte l'hôte), le port 9000 de Garage publié en
+boucle locale seulement, et une règle CORS qui n'autorise que l'origine
+du site (`PUT`, `GET`, préliminaire `OPTIONS`). Sans `MINIO_PUBLIC_URL`
+en production, le dépôt d'une pièce refuse avec un message qui la nomme.
+
 ### Brancher la messagerie et l'antivirus (pilote fermé)
 
 Les deux se branchent par `.env.app` ; aucun code n'est à écrire.

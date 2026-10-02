@@ -307,8 +307,8 @@ describe("ce que le candidat lit d'une attente au contrôle", () => {
 describe("la quarantaine est une zone, pas une convention de nommage", () => {
   it("le dépôt signe en quarantaine, la lecture en confiance", () => {
     const stockage = lire("src/lib/storage.ts");
-    expect(stockage).toMatch(/presignedPut = \(key: string\) =>\s*connexion\(\)\.presignedPutObject\(quarantaine\(\)/u);
-    expect(stockage).toMatch(/presignedGet = \(key: string\) =>\s*connexion\(\)\.presignedGetObject\(confiance\(\)/u);
+    expect(stockage).toMatch(/presignedPut = \(key: string\) =>\s*signataire\(\)\.presignedPutObject\(quarantaine\(\)/u);
+    expect(stockage).toMatch(/presignedGet = \(key: string\) =>\s*signataire\(\)\.presignedGetObject\(confiance\(\)/u);
     // Aucune URL de lecture n'est signée sur la quarantaine : c'est la
     // raison d'être de deux seaux.
     expect(stockage).not.toMatch(/presignedGetObject\(quarantaine\(\)/u);
