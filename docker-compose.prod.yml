@@ -45,6 +45,10 @@ services:
     image: dxflrs/garage:v2.2.0
     restart: unless-stopped
     command: ["/garage", "server"]
+    # Publié en loopback pour le vhost nginx du stockage public
+    # (https://stockage.immipro.app) — jamais exposé sur Internet.
+    ports:
+      - "127.0.0.1:9000:9000"
     volumes:
       - miniodata:/var/lib/garage/data
       - miniometa:/var/lib/garage/meta
