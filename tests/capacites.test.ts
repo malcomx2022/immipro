@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEPENDANCES,
+  LIBELLE_CAPACITE,
   capacite,
   constater,
   etatDesCapacites,
@@ -202,7 +203,14 @@ describe("un `.env` complet devant des points de branchement vides", () => {
         pilote, ce que la ligne suivante vérifie.
       */
       extraction: "CONFIGUREE_NON_VERIFIEE",
-      redaction: "IMPLEMENTATION_ABSENTE",
+      /*
+        La rédaction se lisait ici « aucun adaptateur », clé posée : sa
+        mesure lisait `process.env`, pas l'environnement observé — le
+        défaut corrigé pour l'antivirus le 22/09/2026. Mesurée sur le même
+        environnement que le reste (02/10/2026), elle dit la même chose
+        que l'extraction.
+      */
+      redaction: "CONFIGUREE_NON_VERIFIEE",
     });
     /*
       Trois bloquantes réparables, et une réserve. La distinction est
@@ -419,6 +427,70 @@ describe("un `.env` complet devant des points de branchement vides", () => {
     expect(constats.find((c) => c.cle === "ouverture_paiement")!.capacite).toBe(
       "NON_CONFIGUREE",
     );
+  });
+});
+
+describe("l'IA : un adaptateur présent ne se lit jamais « absent » faute de clé", () => {
+  /*
+    Constaté en production le 02/10/2026 : sans clé d'IA, `/api/health`
+    écrivait « Aucun adaptateur : le point de branchement ne rend rien »
+    pour la lecture des pièces et la rédaction. Les adaptateurs existent
+    (Anthropic, API compatible OpenAI) ; ce qui manquait, c'était la clé.
+  */
+  const lue = (env: Record<string, string>, cle: "extraction" | "redaction") =>
+    constaterLesDependances(env).find((c) => c.cle === cle)!;
+
+  it.each(["extraction", "redaction"] as const)("%s sans clé : adaptateur présent, configuration absente", (cle) => {
+    const constat = lue({}, cle);
+    expect(constat.observation).toMatchObject({ adaptateur: true, configuree: false });
+    expect(constat.capacite).toBe("NON_CONFIGUREE");
+    expect(LIBELLE_CAPACITE[constat.capacite]).toBe("Adaptateur présent, configuration absente");
+  });
+
+  it.each(["extraction", "redaction"] as const)("%s avec une clé : configurée, non vérifiée", (cle) => {
+    expect(lue({ ANTHROPIC_API_KEY: "clé" }, cle).capacite).toBe("CONFIGUREE_NON_VERIFIEE");
+  });
+
+  it("le fournisseur compatible se lit comme Anthropic", () => {
+    const env = {
+      AI_FOURNISSEUR_REDACTION: "openai_compatible",
+      AI_OPENAI_URL: "https://api.exemple.test/v1",
+      AI_OPENAI_API_KEY: "clé",
+      AI_OPENAI_MODEL: "modele-essai",
+    };
+    expect(lue(env, "redaction").capacite).toBe("CONFIGUREE_NON_VERIFIEE");
+    expect(lue({ ...env, AI_OPENAI_API_KEY: "" }, "redaction").capacite).toBe("NON_CONFIGUREE");
+  });
+
+  it("un fournisseur inconnu n'a pas d'adaptateur, et le dit", () => {
+    const constat = lue({ ANTHROPIC_API_KEY: "clé", AI_FOURNISSEUR_EXTRACTION: "openai" }, "extraction");
+    expect(constat.capacite).toBe("IMPLEMENTATION_ABSENTE");
+  });
+
+  it("des pièces non autorisées chez le sous-traitant choisi : configuration absente, pas adaptateur absent", () => {
+    const env = {
+      AI_FOURNISSEUR_EXTRACTION: "openai_compatible",
+      AI_OPENAI_URL: "https://api.exemple.test/v1",
+      AI_OPENAI_API_KEY: "clé",
+      AI_OPENAI_MODEL: "modele-essai",
+    };
+    expect(lue(env, "extraction").capacite).toBe("NON_CONFIGUREE");
+    expect(
+      lue({ ...env, AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible" }, "extraction").capacite,
+    ).toBe("CONFIGUREE_NON_VERIFIEE");
+  });
+
+  it("la rédaction se mesure sur l'environnement observé, pas sur celui du processus", () => {
+    // Clé dans l'environnement observé, aucune dans le processus : la
+    // mesure sur `process.env` rendait « aucun adaptateur ».
+    const avant = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      expect(lue({ ANTHROPIC_API_KEY: "clé" }, "redaction").capacite).toBe("CONFIGUREE_NON_VERIFIEE");
+    } finally {
+      if (avant === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = avant;
+    }
   });
 });
 
