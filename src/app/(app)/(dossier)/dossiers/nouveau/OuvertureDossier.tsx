@@ -86,11 +86,9 @@ export function datesProposees(aujourdhui = new Date()): Rentree[] {
 
 export function OuvertureDossier({
   fiche,
-  visaRuleId,
   apercu,
 }: {
   fiche: FicheDestination | null;
-  visaRuleId: string;
   apercu: readonly string[];
 }) {
   const router = useRouter();
@@ -104,13 +102,16 @@ export function OuvertureDossier({
   if (!fiche) return <SansDestination />;
 
   const autres = Math.max(0, fiche.piecesAReunir - apercu.length);
+  const destination = fiche.slug;
 
   async function ouvrir() {
     setEnvoi(true);
     setEchec(null);
     const choisie = DATES.find((d) => d.valeur === date);
     const resultat = await appeler<{ id: string }>("/api/dossiers", {
-      corps: { visaRuleId, ...(choisie?.iso ? { dateCible: choisie.iso } : {}) },
+      // La destination et non l'identifiant de la règle : le serveur
+      // retrouve lui-même la règle publiée (02/10/2026).
+      corps: { destination, ...(choisie?.iso ? { dateCible: choisie.iso } : {}) },
     });
     if (resultat.ok) {
       router.push(`/dossiers/${resultat.donnees.id}`);

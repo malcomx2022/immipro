@@ -10844,3 +10844,33 @@ Le back-office n'y est pas nommé : l'écrire publierait la carte de ses adresse
 - l'absence de « facture » et de TVA dans ce que la mise en forme ajoute.
 
 M.C reste ouvert jusqu'à réception de l'avis.
+
+## S.106 — L'ouverture d'un dossier échouait sur « Identifiant attendu »
+
+**Relevé en test de bout en bout, en production, le 02/10/2026.**
+
+| Étape | Résultat |
+|---|---|
+| Connexion | ✅ |
+| Destinations | ✅ visibles |
+| Création du dossier | ❌ échoue à chaque essai, sur les deux parcours testés, avec « Identifiant attendu » |
+| Dépôt d'une pièce | impossible sans dossier |
+
+**Ce que dit le message.** « Identifiant attendu » est la traduction du refus de format UUID. Or la route `POST /api/dossiers` n'avait qu'un seul champ de ce format : `visaRuleId`. L'écran recevait cet identifiant de la page serveur et le renvoyait tel quel. En production, il n'arrivait pas sous la forme que la route exigeait.
+
+**Non reproduit en local.** Sur une base chargée avec le même référentiel, l'écran envoie un UUID valide et le dossier s'ouvre, sur les trois destinations, avec ou sans date. La cause exacte en production n'est donc pas établie. Ce qui est établi, c'est que l'écran n'avait pas à porter un identifiant technique de la base pour que le serveur retrouve ce qu'il sait déjà.
+
+**Correction**
+
+- L'écran envoie la **destination** : le `slug` de la fiche, celui de l'adresse `?destination=`.
+- La route retrouve elle-même la règle publiée du jour, avec le même filtre que la fiche affichée (INV-4, RG-14.1).
+- Une destination inconnue, ou retirée entre-temps, reçoit un refus qui le dit : « Cette destination n'est pas ouverte en ce moment. Choisis-en une dans le catalogue des destinations. »
+- `visaRuleId` reste accepté pour compatibilité, sans exiger le format UUID. C'est `ouvrirDossier` qui vérifie que la règle existe et qu'elle est publiée.
+
+**Vérification**
+
+- Sur le serveur compilé, dans Chromium : `/dossiers/nouveau?destination=suisse` puis `?destination=pays-bas`, avec et sans date. La requête porte `{"destination": …}`, la réponse est 200, et le candidat arrive sur son dossier.
+- Une destination inconnue renvoie 422, avec le message sous le champ.
+- Tests : `tests/ouverture-dossier.test.ts` et `tests/ui/p0-dossier1.test.tsx` (corps envoyé).
+
+**Si l'erreur persiste après déploiement** : relever, dans l'onglet Réseau du navigateur, le corps de la requête `POST /api/dossiers` et sa réponse.
