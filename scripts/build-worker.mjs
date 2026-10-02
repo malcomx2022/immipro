@@ -82,3 +82,35 @@ const passerelle = await build({
 const octetsPasserelle =
   Object.values(passerelle.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
 console.log(`dist/passerelle-antivirus.js — ${(octetsPasserelle / 1024).toFixed(0)} Kio`);
+
+/*
+  Le chargement du référentiel de règles (`npm run seed:rules`), même
+  image et même méthode — relevé en test le 02/10/2026.
+
+  La production n'avait aucune fiche publiée, et rien ne pouvait en
+  publier une : B-02 édite et publie une règle **existante**, il n'en
+  crée pas, et la graine ne tournait pas dans l'image — ni `tsx` ni les
+  sources TypeScript n'y sont. Le paquet se lance comme une migration :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/graine-regles.js
+
+  Il n'est **pas** appelé par le déploiement : la graine remet chaque
+  fiche dans l'état du fichier, et un déploiement ne doit pas republier
+  une fiche que la veille a dépubliée ni réécrire ce que B-02 a changé.
+*/
+const graine = await build({
+  entryPoints: ["prisma/seed/visa-rules.ts"],
+  outfile: "dist/graine-regles.js",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "cjs",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsGraine = Object.values(graine.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/graine-regles.js — ${(octetsGraine / 1024).toFixed(0)} Kio`);

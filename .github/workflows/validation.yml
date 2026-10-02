@@ -88,6 +88,12 @@ jobs:
         run: npm run smoke:worker -- --base
       - run: echo "- **Worker** — paquet exécuté sans base, puis démarré sur une base vierge" >> "$GITHUB_STEP_SUMMARY"
 
+      # Le référentiel de règles se charge depuis l'image (dist/graine-regles.js) :
+      # sans lui, une production neuve n'a aucune fiche, et B-02 ne crée pas de règle.
+      - name: Chargement du référentiel
+        run: npm run smoke:graine
+      - run: echo "- **Référentiel** — paquet de la graine exécuté hors sources, deux fois, sans doublon" >> "$GITHUB_STEP_SUMMARY"
+
       # Le tunnel de paiement, sur une base réelle et un ouvreur simulé :
       # double soumission, reprise après réponse perdue, écart de montant,
       # fournisseur absent, ordre du webhook et du retour navigateur.
