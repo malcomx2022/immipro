@@ -164,7 +164,8 @@ Les décisions prises pour l'implémentation sont celles recommandées plus haut
 
 ### Activer un second fournisseur
 
-1. Renseigner `AI_OPENAI_URL` (adresse de base avec sa version, en https), `AI_OPENAI_API_KEY` et `AI_OPENAI_MODEL`. Ajouter `AI_OPENAI_PDF=oui` si ce fournisseur lit les PDF.
+1. Renseigner `AI_OPENAI_URL` (adresse de base avec sa version, en https), `AI_OPENAI_API_KEY` et `AI_OPENAI_MODEL`. Déclarer la forme sous laquelle ce fournisseur lit les PDF (S.99) : `AI_OPENAI_PDF=oui` pour OpenAI, `document_url` pour Mistral, `image_url` pour Vertex AI.
+   - **Gemini sur Vertex AI** n'accepte pas de clé fixe : `AI_OPENAI_AUTH=compte_de_service_google`, et le fichier JSON de la clé d'un compte de service ayant le rôle « Utilisateur Vertex AI » dans `AI_OPENAI_COMPTE_DE_SERVICE` (tel quel ou en base64). `AI_OPENAI_API_KEY` n'est alors pas demandée. Le serveur échange le compte contre un jeton d'une heure, le renouvelle cinq minutes avant son expiration, et le redemande une fois si Google le refuse en cours d'appel (`src/server/ia/jeton-google.ts`).
 2. Pour la rédaction : `AI_FOURNISSEUR_REDACTION=openai_compatible`.
 3. Pour la lecture des pièces, **seulement après la décision de conformité** (§4.1) : `AI_FOURNISSEUR_EXTRACTION=openai_compatible` **et** `AI_PIECES_SOUS_TRAITANT_AUTORISE=openai_compatible`, puis mettre à jour `/donnees-personnelles`.
 4. Renseigner son tarif (`AI_TARIF_OPENAI_COMPATIBLE_*`) pour que B-07 calcule les coûts.

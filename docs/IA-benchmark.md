@@ -23,9 +23,9 @@ Tous les prix sont en USD par million de jetons (entrée / sortie), hors taxes. 
 
 | Finaliste | Pourquoi il est retenu | Ce qui le freine |
 |---|---|---|
-| **Mistral** — Medium 3.5, point d'accès UE | Hébergement UE contractualisable, DPA, ISO 27001/27701, français natif, prix moyen | Bloc PDF différent (petite modification de l'adaptateur) ; moins bien classé en rédaction française que les trois autres ; facturation depuis le Bénin non vérifiée |
+| **Mistral** — Medium 3.5, point d'accès UE | Hébergement UE contractualisable, DPA, ISO 27001/27701, français natif, prix moyen | Bloc PDF différent (pris en charge depuis le 02/10 : `AI_OPENAI_PDF=document_url`) ; moins bien classé en rédaction française que les trois autres ; facturation depuis le Bénin non vérifiée |
 | **OpenAI** — GPT-6.1 Sol, résidence UE | Bénin pris en charge ; bloc PDF déjà compatible ; résidence UE (+10 %) | Résidence UE et conservation zéro sur approbation commerciale ; `max_tokens` déprécié (une ligne à changer) |
-| **Google** — Gemini 3.8 Flash sur Vertex AI, région UE | En tête des bancs publics de lecture de documents ; conservation zéro et résidence UE possibles | Authentification Vertex par compte de service : un adaptateur à écrire ; prix doublé au 01/01/2027 |
+| **Google** — Gemini 3.8 Flash sur Vertex AI, région UE | En tête des bancs publics de lecture de documents ; conservation zéro et résidence UE possibles | Authentification Vertex par compte de service (prise en charge depuis le 02/10) ; prix doublé au 01/01/2027 |
 | **Anthropic** — Sonnet 5.5 | Déjà branché, aucune modification ; en tête des classements de préférence en français | Stockage aux États-Unis seulement ; deux pages officielles se contredisent sur la conservation ; Claude 5.x n'a été mesuré sur aucun banc de lecture de documents |
 
 **Recommandation.** Faire l'essai du §8 avec les quatre finalistes, puis choisir **fonction par fonction**. S.94 le permet sans nouveau code : `AI_FOURNISSEUR_EXTRACTION` et `AI_FOURNISSEUR_REDACTION` sont distincts. Sur le papier, la lecture des pièces penche vers **Mistral (UE)** ou **Gemini sur Vertex (UE)** pour la protection des données. La rédaction, qui ne reçoit aucune pièce, peut aller au mieux classé en français dans l'essai.
@@ -150,7 +150,12 @@ Il n'envoie pas de `temperature`.
 | **Gemini sur Vertex AI** | Compatible | PDF possible en `image_url` (data URL), selon la documentation Vertex | Compatible, sauf schémas récursifs | `max_completion_tokens` accepté | **Moyen** : Vertex s'authentifie par jeton OAuth d'un compte de service, valable une heure. Il faut un adaptateur qui le renouvelle ; `AI_OPENAI_API_KEY` n'y suffit pas |
 | **Anthropic** | Natif | Natif | Natif | Natif | **Aucun** : déjà branché |
 
-Une fois le fournisseur choisi, ces changements se font en un lot avec des tests sur le faux serveur HTTP local de `tests/ia-fournisseurs.test.ts`. Ils ne sont pas faits ici, pour ne pas écrire de code pour un fournisseur qui ne serait pas retenu.
+**Fait le 02/10/2026 pour Mistral et Vertex AI**, à la demande de la direction, pour que les quatre finalistes passent le banc :
+
+- `AI_OPENAI_PDF` déclare la forme du bloc PDF : `oui` (OpenAI), `document_url` (Mistral), `image_url` (Vertex AI) ;
+- `AI_OPENAI_AUTH=compte_de_service_google` et `AI_OPENAI_COMPTE_DE_SERVICE` remplacent la clé pour Vertex AI. Le jeton est obtenu, gardé et renouvelé par `src/server/ia/jeton-google.ts`.
+
+Les deux sont éprouvés face à un vrai serveur HTTP local (`tests/ia-fournisseurs.test.ts`, `tests/ia-vertex.test.ts`). Reste le paramètre `max_completion_tokens` d'OpenAI, à faire si GPT-6.1 Sol refuse `max_tokens` au banc.
 
 ---
 
@@ -251,8 +256,8 @@ Le reste se juge à l'aveugle. `banc:ia:aveugle` mélange les lettres des fourni
 # Anthropic
 ANTHROPIC_API_KEY=… AI_MODEL=claude-sonnet-5-5 npm run banc:ia -- --fournisseur anthropic
 
-# Tout fournisseur compatible OpenAI (ici Mistral, point d'accès UE)
-AI_OPENAI_URL=https://api.eu.mistral.ai/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=mistral-medium-latest \
+# Tout fournisseur compatible OpenAI (ici OpenAI)
+AI_OPENAI_URL=https://api.openai.com/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=gpt-6.1-sol \
   AI_OPENAI_PDF=oui npm run banc:ia -- --fournisseur openai_compatible
 
 # Puis, une fois tous les finalistes passés
@@ -261,12 +266,19 @@ npm run banc:ia:aveugle -- banc-ia-resultats/<passage 1> banc-ia-resultats/<pass
 
 Renseigner aussi le tarif (`AI_TARIF_*`) pour que le rapport donne le coût réel. Les résultats vont dans `banc-ia-resultats/`, qui n'est pas versionné.
 
-Deux finalistes ne passent pas encore tels quels :
+Depuis le 02/10, les quatre finalistes passent tels quels (§7) :
 
-- **Mistral** : son bloc PDF diffère (§7). Ses PDF partiront en erreur tant que l'adaptateur n'est pas modifié. On peut d'abord le passer sur les seules images (`--pieces` avec les identifiants JPEG et PNG).
-- **Gemini sur Vertex AI** : il faut l'adaptateur d'authentification (§7).
+```bash
+# Mistral, point d'accès UE
+AI_OPENAI_URL=https://api.eu.mistral.ai/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=mistral-medium-latest \
+  AI_OPENAI_PDF=document_url npm run banc:ia -- --fournisseur openai_compatible
 
-C'est le moment de faire ces deux modifications, si la direction confirme ces finalistes.
+# Gemini sur Vertex AI, région UE
+AI_OPENAI_URL=https://europe-west4-aiplatform.googleapis.com/v1/projects/<projet>/locations/europe-west4/endpoints/openapi \
+  AI_OPENAI_MODEL=google/gemini-3.8-flash AI_OPENAI_PDF=image_url \
+  AI_OPENAI_AUTH=compte_de_service_google AI_OPENAI_COMPTE_DE_SERVICE="$(cat cle-compte-de-service.json)" \
+  npm run banc:ia -- --fournisseur openai_compatible
+```
 
 ## 9. Sources (lues le 02/10/2026)
 
