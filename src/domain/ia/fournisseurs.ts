@@ -1,4 +1,9 @@
 import { tarifDepuisEnvironnement, type TarifIA } from "@/domain/backoffice/couts";
+import {
+  MOTIF_DU_COMPTE,
+  VARIABLE_COMPTE_DE_SERVICE,
+  lireCompteDeService,
+} from "@/domain/ia/compte-de-service";
 
 /**
  * Les fournisseurs d'IA, et lequel sert chaque fonction — S.94.
@@ -77,7 +82,7 @@ export const FOURNISSEURS: Readonly<Record<CodeFournisseur, Fournisseur>> = {
   */
   openai_compatible: {
     code: "openai_compatible",
-    libelle: "API compatible OpenAI (OpenAI, Mistral, Gemini…)",
+    libelle: "API compatible OpenAI (OpenAI, Mistral, Gemini sur Vertex AI…)",
     variables: ["AI_OPENAI_URL", "AI_OPENAI_API_KEY", "AI_OPENAI_MODEL"],
     modele: { variable: "AI_OPENAI_MODEL", defaut: null },
     tarif: [
@@ -103,6 +108,63 @@ export const VARIABLE_PDF_COMPATIBLE = "AI_OPENAI_PDF";
 
 type Environnement = Readonly<Record<string, string | undefined>>;
 const lire = (env: Environnement, nom: string): string => (env[nom] ?? "").trim();
+
+/**
+ * La forme sous laquelle un PDF part chez un fournisseur compatible — S.99.
+ *
+ * Le protocole est commun, le bloc PDF ne l'est pas :
+ *
+ * - `file` — `{type: "file", file: {file_data}}`, la forme d'OpenAI ;
+ * - `document_url` — `{type: "document_url", document_url}`, celle de
+ *   Mistral, qui refuse un bloc `file` sans identifiant de fichier ;
+ * - `image_url` — le PDF en data URL dans un bloc image, ce que Vertex AI
+ *   admet pour toute entrée multimodale.
+ *
+ * `oui` reste la valeur d'OpenAI, pour ne rien renommer chez qui l'a déjà
+ * posée. Une valeur inconnue n'est pas lue comme `non` : elle est dite,
+ * comme un fournisseur inconnu, parce que l'exploitant qui l'a écrite
+ * croit que ses PDF partent.
+ */
+export const FORMES_DU_PDF = ["file", "document_url", "image_url"] as const;
+export type FormeDuPdf = (typeof FORMES_DU_PDF)[number];
+
+const VALEURS_PDF: Readonly<Record<string, FormeDuPdf | null>> = {
+  "": null,
+  non: null,
+  oui: "file",
+  file: "file",
+  document_url: "document_url",
+  image_url: "image_url",
+};
+
+export function formeDuPdf(
+  env: Environnement,
+): { connue: true; forme: FormeDuPdf | null } | { connue: false; valeur: string } {
+  const valeur = lire(env, VARIABLE_PDF_COMPATIBLE).toLowerCase();
+  return valeur in VALEURS_PDF ? { connue: true, forme: VALEURS_PDF[valeur]! } : { connue: false, valeur };
+}
+
+/**
+ * Comment le fournisseur compatible s'authentifie — S.99.
+ *
+ * Une clé fixe (`AI_OPENAI_API_KEY`) pour OpenAI, Mistral et les autres ;
+ * un compte de service Google pour Vertex AI, qui n'accepte qu'un jeton
+ * OAuth d'une heure, renouvelé par le serveur.
+ */
+export const VARIABLE_AUTH_COMPATIBLE = "AI_OPENAI_AUTH";
+export const MODES_D_AUTHENTIFICATION = ["cle", "compte_de_service_google"] as const;
+export type ModeDAuthentification = (typeof MODES_D_AUTHENTIFICATION)[number];
+
+export function modeDAuthentification(
+  env: Environnement,
+): { connu: true; mode: ModeDAuthentification } | { connu: false; valeur: string } {
+  const valeur = lire(env, VARIABLE_AUTH_COMPATIBLE).toLowerCase();
+  if (valeur === "") return { connu: true, mode: "cle" };
+  return (MODES_D_AUTHENTIFICATION as readonly string[]).includes(valeur)
+    ? { connu: true, mode: valeur as ModeDAuthentification }
+    : { connu: false, valeur };
+}
+
 
 export const estUnFournisseur = (valeur: string): valeur is CodeFournisseur =>
   (CODES_FOURNISSEURS as readonly string[]).includes(valeur);
@@ -143,12 +205,42 @@ export function adresseDeBase(valeur: string): URL | null {
 export const modeleDu = (env: Environnement, code: CodeFournisseur): string | null =>
   lire(env, FOURNISSEURS[code].modele.variable) || FOURNISSEURS[code].modele.defaut;
 
+/**
+ * Les variables sans lesquelles aucun appel ne part, dans cette
+ * configuration : le fournisseur compatible authentifié par un compte de
+ * service Google n'a pas de clé fixe, et n'en demande donc pas.
+ */
+export function variablesExigees(env: Environnement, code: CodeFournisseur): readonly string[] {
+  const auth = modeDAuthentification(env);
+  if (code === "openai_compatible" && auth.connu && auth.mode === "compte_de_service_google") {
+    return FOURNISSEURS.openai_compatible.variables.filter((v) => v !== "AI_OPENAI_API_KEY");
+  }
+  return FOURNISSEURS[code].variables;
+}
+
 /** Ce qui manque pour qu'un fournisseur puisse être appelé, ou `null`. */
 export function manqueDuFournisseur(env: Environnement, code: CodeFournisseur): string | null {
-  const absentes = FOURNISSEURS[code].variables.filter((v) => lire(env, v) === "");
+  if (code === "openai_compatible") {
+    const auth = modeDAuthentification(env);
+    if (!auth.connu) {
+      return `${VARIABLE_AUTH_COMPATIBLE} vaut « ${auth.valeur} » : écrire ${MODES_D_AUTHENTIFICATION.join(" ou ")}, ou vider la variable pour une clé d'API`;
+    }
+  }
+  const absentes = variablesExigees(env, code).filter((v) => lire(env, v) === "");
   if (absentes.length > 0) return `renseigner ${absentes.join(", ")}`;
-  if (code === "openai_compatible" && adresseDeBase(lire(env, "AI_OPENAI_URL")) === null) {
+  if (code !== "openai_compatible") return null;
+
+  if (adresseDeBase(lire(env, "AI_OPENAI_URL")) === null) {
     return "AI_OPENAI_URL doit être une adresse https (http n'est admis que sur la boucle locale)";
+  }
+  const pdf = formeDuPdf(env);
+  if (!pdf.connue) {
+    return `${VARIABLE_PDF_COMPATIBLE} vaut « ${pdf.valeur} » : écrire oui (OpenAI), document_url (Mistral), image_url (Vertex AI) ou non`;
+  }
+  const auth = modeDAuthentification(env);
+  if (auth.connu && auth.mode === "compte_de_service_google") {
+    const compte = lireCompteDeService(env[VARIABLE_COMPTE_DE_SERVICE]);
+    if (!compte.ok) return MOTIF_DU_COMPTE[compte.defaut];
   }
   return null;
 }
@@ -160,7 +252,10 @@ export const piecesAutoriseesChez = (env: Environnement, code: CodeFournisseur):
 /** Ce fournisseur lit-il les PDF, dans cette configuration ? */
 export function litLesPdf(env: Environnement, code: CodeFournisseur): boolean {
   const lit = FOURNISSEURS[code].lit.pdf;
-  if (lit === "selon_configuration") return lire(env, VARIABLE_PDF_COMPATIBLE).toLowerCase() === "oui";
+  if (lit === "selon_configuration") {
+    const pdf = formeDuPdf(env);
+    return pdf.connue && pdf.forme !== null;
+  }
   return lit === "oui";
 }
 

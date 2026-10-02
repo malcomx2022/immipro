@@ -19,9 +19,12 @@ import {
   texteExploitable,
   type MatiereDeLaPiece,
 } from "@/domain/redaction/commande";
+import type { CompteDeService } from "@/domain/ia/compte-de-service";
+import type { FormeDuPdf } from "@/domain/ia/fournisseurs";
 import type { Lecture } from "@/server/dossiers/extracteur";
 import type { Critique, Redacteur, Redaction, Relecture } from "@/server/redaction/adaptateur";
 import type { AppelMesure } from "./appel";
+import { jetonGoogle, oublierLeJetonGoogle } from "./jeton-google";
 
 /**
  * L'adaptateur « compatible OpenAI » — S.94.
@@ -45,9 +48,16 @@ import type { AppelMesure } from "./appel";
  *
  * ── Ce qui peut varier, et se dit ───────────────────────────────────
  *
- * - le PDF n'est pas lu partout : il ne part que si l'exploitant déclare
- *   `AI_OPENAI_PDF=oui` ; sinon la pièce part en revue humaine avec la
- *   cause `type_non_lisible`, et rien n'est converti en silence ;
+ * - le PDF n'est pas lu partout, ni sous la même forme : il ne part que
+ *   si l'exploitant déclare la forme que son fournisseur attend
+ *   (`AI_OPENAI_PDF` : `oui` pour OpenAI, `document_url` pour Mistral,
+ *   `image_url` pour Vertex AI — S.99) ; sinon la pièce part en revue
+ *   humaine avec la cause `type_non_lisible`, et rien n'est converti en
+ *   silence ;
+ * - l'authentification : une clé fixe, ou pour Vertex AI un jeton OAuth
+ *   d'une heure tiré d'un compte de service Google
+ *   (`AI_OPENAI_AUTH=compte_de_service_google`), renouvelé avant son
+ *   expiration et redemandé une fois si Google le refuse en cours de route ;
  * - la sortie par schéma est demandée (`response_format: json_schema`,
  *   non stricte) ; un serveur qui l'ignore rend du texte, que la lecture
  *   du domaine refuse s'il n'a pas la forme attendue.
@@ -56,13 +66,18 @@ import type { AppelMesure } from "./appel";
  * causes disent la forme de ce qui s'est passé, jamais le contenu.
  */
 
+/** Comment l'appel s'authentifie : une clé fixe, ou un compte de service Google (Vertex AI). */
+export type Authentification =
+  | { mode: "cle"; cle: string }
+  | { mode: "compte_de_service_google"; compte: CompteDeService };
+
 export interface ConfigurationCompatible {
   /** Adresse de base, déjà vérifiée : `https://…/v1`. */
   base: URL;
-  cle: string;
+  authentification: Authentification;
   modele: string;
-  /** Le serveur lit les PDF (`AI_OPENAI_PDF=oui`). */
-  pdf: boolean;
+  /** La forme du bloc PDF que ce fournisseur lit, ou `null` s'il ne lit pas les PDF. */
+  pdf: FormeDuPdf | null;
 }
 
 /** Ce que rend un appel : la réponse lue, ou la cause de son absence. */
@@ -119,19 +134,51 @@ const lireReponse = (charge: unknown): Omit<Extract<Reponse, { ok: true }>, "ok"
   };
 };
 
+/** Le porteur de l'en-tête `Authorization`, ou la cause qui empêche de l'obtenir. */
+async function porteur(
+  config: ConfigurationCompatible,
+): Promise<{ ok: true; valeur: string } | { ok: false; cause: CauseDAppel; detail: string }> {
+  if (config.authentification.mode === "cle") return { ok: true, valeur: config.authentification.cle };
+  const jeton = await jetonGoogle(config.authentification.compte);
+  return jeton.ok ? { ok: true, valeur: jeton.jeton } : jeton;
+}
+
 /** L'appel HTTP, et rien d'autre. */
 export async function appelerCompatible(
   config: ConfigurationCompatible,
   corps: Record<string, unknown>,
   delaiMs: number,
 ): Promise<Reponse> {
+  const premier = await envoyer(config, corps, delaiMs);
+  /*
+    Un jeton Google refusé en cours de route — révoqué, ou expiré entre la
+    lecture du cache et l'arrivée de l'appel — se redemande une fois. Une
+    clé fixe refusée ne se redemande pas : la même clé serait refusée de
+    la même façon.
+  */
+  if (premier.statut === 401 && config.authentification.mode === "compte_de_service_google") {
+    oublierLeJetonGoogle(config.authentification.compte);
+    return (await envoyer(config, corps, delaiMs)).reponse;
+  }
+  return premier.reponse;
+}
+
+async function envoyer(
+  config: ConfigurationCompatible,
+  corps: Record<string, unknown>,
+  delaiMs: number,
+): Promise<{ reponse: Reponse; statut: number | null }> {
+  const autorisation = await porteur(config);
+  if (!autorisation.ok) {
+    return { reponse: { ok: false, cause: autorisation.cause, detail: autorisation.detail }, statut: null };
+  }
   const url = new URL("chat/completions", config.base.href.endsWith("/") ? config.base : `${config.base.href}/`);
   let reponse: Response;
   try {
     reponse = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${config.cle}`,
+        Authorization: `Bearer ${autorisation.valeur}`,
         "Content-Type": "application/json",
         Accept: "application/json",
       },
@@ -140,21 +187,55 @@ export async function appelerCompatible(
     });
   } catch (erreur) {
     const nom = (erreur as { name?: unknown })?.name;
-    return nom === "TimeoutError" || nom === "AbortError"
-      ? { ok: false, cause: "delai_depasse", detail: `sans réponse après ${delaiMs} ms` }
-      : { ok: false, cause: "injoignable", detail: "le service n'a pas répondu" };
+    return {
+      reponse:
+        nom === "TimeoutError" || nom === "AbortError"
+          ? { ok: false, cause: "delai_depasse", detail: `sans réponse après ${delaiMs} ms` }
+          : { ok: false, cause: "injoignable", detail: "le service n'a pas répondu" },
+      statut: null,
+    };
   }
 
   if (!reponse.ok) {
     // Le corps n'est pas lu : il peut contenir un écho de la demande.
     await reponse.body?.cancel().catch(() => undefined);
-    return { ok: false, ...causeDuStatut(reponse.status) };
+    return { reponse: { ok: false, ...causeDuStatut(reponse.status) }, statut: reponse.status };
   }
 
   const charge = await reponse.json().catch(() => null);
   const lue = lireReponse(charge);
-  if (!lue) return { ok: false, cause: "reponse_illisible", detail: "la réponse n'a pas la forme d'une complétion" };
-  return { ok: true, ...lue };
+  if (!lue) {
+    return {
+      reponse: { ok: false, cause: "reponse_illisible", detail: "la réponse n'a pas la forme d'une complétion" },
+      statut: reponse.status,
+    };
+  }
+  return { reponse: { ok: true, ...lue }, statut: reponse.status };
+}
+
+/**
+ * Le bloc d'une pièce, dans la forme que le fournisseur lit.
+ *
+ * Un PDF ne part que sous la forme déclarée : l'envoyer sous une autre
+ * ferait refuser la demande (400, `reponse_illisible`), ou pire, lire le
+ * fichier comme une image vide.
+ */
+export function blocDeLaPiece(donnees: string, document: boolean, pdf: FormeDuPdf | null): Record<string, unknown> | null {
+  if (!document) return { type: "image_url", image_url: { url: donnees } };
+  switch (pdf) {
+    case null:
+      return null;
+    case "file":
+      return { type: "file", file: { filename: "piece.pdf", file_data: donnees } };
+    case "document_url":
+      return { type: "document_url", document_url: donnees };
+    case "image_url":
+      return { type: "image_url", image_url: { url: donnees } };
+    default: {
+      const jamais: never = pdf;
+      return jamais;
+    }
+  }
 }
 
 const mesure = (config: ConfigurationCompatible): AppelMesure => ({
@@ -182,17 +263,12 @@ export async function lireDesOctetsCompatible(
   });
 
   const donnees = `data:${type};base64,${octets.toString("base64")}`;
-  let piece: Record<string, unknown>;
-  if (TYPES_LISIBLES[type] === "document") {
-    if (!config.pdf) {
-      return sansJetons(
-        "type_non_lisible",
-        "ce fournisseur n'est pas déclaré lecteur de PDF (AI_OPENAI_PDF)",
-      );
-    }
-    piece = { type: "file", file: { filename: "piece.pdf", file_data: donnees } };
-  } else {
-    piece = { type: "image_url", image_url: { url: donnees } };
+  const piece = blocDeLaPiece(donnees, TYPES_LISIBLES[type] === "document", config.pdf);
+  if (piece === null) {
+    return sansJetons(
+      "type_non_lisible",
+      "ce fournisseur n'est pas déclaré lecteur de PDF (AI_OPENAI_PDF)",
+    );
   }
 
   const reponse = await appelerCompatible(

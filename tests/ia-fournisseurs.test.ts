@@ -11,8 +11,11 @@ import {
   fournisseurChoisi,
   fournisseurDeLUsage,
   fournisseursATarifer,
+  formeDuPdf,
   litLesPdf,
   manqueDuFournisseur,
+  variablesExigees,
+  type FormeDuPdf,
   modeleDu,
   piecesAutoriseesChez,
   tarifDu,
@@ -27,6 +30,7 @@ import { CRITIQUE_NON_BRANCHEE, REDACTEUR_NON_BRANCHE } from "@/server/redaction
 import { laCritique, leRedacteur } from "@/server/redaction/service";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import {
+  blocDeLaPiece,
   causeDuStatut,
   critiqueCompatible,
   lireDesOctetsCompatible,
@@ -100,6 +104,20 @@ describe("le domaine choisit, et ne devine rien", () => {
     expect(litLesPdf({ AI_OPENAI_PDF: "oui" }, "openai_compatible")).toBe(true);
   });
 
+  it("S.99 — la forme du PDF se déclare par fournisseur, et une valeur inconnue est dite", () => {
+    expect(formeDuPdf({})).toEqual({ connue: true, forme: null });
+    expect(formeDuPdf({ AI_OPENAI_PDF: "non" })).toEqual({ connue: true, forme: null });
+    expect(formeDuPdf({ AI_OPENAI_PDF: "oui" })).toEqual({ connue: true, forme: "file" });
+    expect(formeDuPdf({ AI_OPENAI_PDF: "Document_URL" })).toEqual({ connue: true, forme: "document_url" });
+    expect(formeDuPdf({ AI_OPENAI_PDF: "image_url" })).toEqual({ connue: true, forme: "image_url" });
+    expect(litLesPdf({ AI_OPENAI_PDF: "document_url" }, "openai_compatible")).toBe(true);
+    // Une faute de frappe ne vaut pas « non » : l'exploitant croit que ses PDF partent.
+    expect(litLesPdf({ AI_OPENAI_PDF: "mistral" }, "openai_compatible")).toBe(false);
+    expect(manqueDuFournisseur({ ...COMPATIBLE, AI_OPENAI_PDF: "mistral" }, "openai_compatible")).toMatch(
+      /AI_OPENAI_PDF vaut « mistral ».*document_url \(Mistral\).*image_url \(Vertex AI\)/u,
+    );
+  });
+
   it("chaque fournisseur a son tarif, et jamais celui d'un autre", () => {
     const env = {
       AI_TARIF_ENTREE_PAR_MILLION: "3",
@@ -154,7 +172,11 @@ describe("les résolveurs suivent la configuration", () => {
     };
     expect(lExtracteur(env)).not.toBe(EXTRACTEUR_NON_BRANCHE);
     expect(extractionConfiguree(env)).toBe(true);
-    expect(configurationCompatible(env)).toMatchObject({ cle: "cle-essai", modele: "modele-essai", pdf: false });
+    expect(configurationCompatible(env)).toMatchObject({
+      authentification: { mode: "cle", cle: "cle-essai" },
+      modele: "modele-essai",
+      pdf: null,
+    });
   });
 
   it("la rédaction suit AI_FOURNISSEUR_REDACTION, Anthropic par défaut", () => {
@@ -218,7 +240,12 @@ beforeAll(async () => {
 });
 afterAll(() => new Promise<void>((ok) => serveur.close(() => ok())));
 
-const config = (pdf = false): ConfigurationCompatible => ({ base, cle: "cle-secrete-essai", modele: "modele-essai", pdf });
+const config = (pdf: FormeDuPdf | null = null): ConfigurationCompatible => ({
+  base,
+  authentification: { mode: "cle", cle: "cle-secrete-essai" },
+  modele: "modele-essai",
+  pdf,
+});
 const completion = (contenu: string, fin = "stop", extra: Record<string, unknown> = {}) => ({
   choices: [{ finish_reason: fin, message: { content: contenu, ...extra } }],
   usage: { prompt_tokens: 120, completion_tokens: 30 },
@@ -260,15 +287,44 @@ describe("la lecture d'une pièce chez un fournisseur compatible", () => {
 
   it("un PDF non déclaré lisible ne part pas : revue humaine, sans appel ni jeton", async () => {
     repondre(completion("{}"));
-    const lue = await lireDesOctetsCompatible(config(false), "application/pdf", Buffer.from("%PDF"), DEMANDE);
+    const lue = await lireDesOctetsCompatible(config(null), "application/pdf", Buffer.from("%PDF"), DEMANDE);
     expect(lue).toMatchObject({ etat: "NON_LUE", cause: "type_non_lisible", jetonsEntree: 0 });
     expect(recus).toHaveLength(0);
   });
 
   it("déclaré lisible, le PDF part comme fichier", async () => {
     repondre(completion(JSON.stringify({ piece_identifiee: "passeport", obstacle: null, champs: { date_expiration: null } })));
-    await lireDesOctetsCompatible(config(true), "application/pdf", Buffer.from("%PDF"), DEMANDE);
+    await lireDesOctetsCompatible(config("file"), "application/pdf", Buffer.from("%PDF"), DEMANDE);
     expect(JSON.stringify(recus[0]!.corps.messages)).toContain('"type":"file"');
+  });
+
+  it("S.99 — chez Mistral, le PDF part en document_url, en data URL", async () => {
+    repondre(completion(JSON.stringify({ piece_identifiee: "passeport", obstacle: null, champs: { date_expiration: null } })));
+    await lireDesOctetsCompatible(config("document_url"), "application/pdf", Buffer.from("%PDF"), DEMANDE);
+    const [bloc] = (recus[0]!.corps.messages as { content: Record<string, unknown>[] }[])[0]!.content;
+    expect(bloc).toEqual({
+      type: "document_url",
+      document_url: `data:application/pdf;base64,${Buffer.from("%PDF").toString("base64")}`,
+    });
+  });
+
+  it("S.99 — chez Vertex AI, le PDF part en image_url, en data URL", async () => {
+    repondre(completion(JSON.stringify({ piece_identifiee: "passeport", obstacle: null, champs: { date_expiration: null } })));
+    await lireDesOctetsCompatible(config("image_url"), "application/pdf", Buffer.from("%PDF"), DEMANDE);
+    const [bloc] = (recus[0]!.corps.messages as { content: Record<string, unknown>[] }[])[0]!.content;
+    expect(bloc).toEqual({
+      type: "image_url",
+      image_url: { url: `data:application/pdf;base64,${Buffer.from("%PDF").toString("base64")}` },
+    });
+  });
+
+  it("une image part toujours en image_url, quelle que soit la forme du PDF", () => {
+    for (const forme of [null, "file", "document_url", "image_url"] as const) {
+      expect(blocDeLaPiece("data:image/png;base64,eA==", false, forme)).toEqual({
+        type: "image_url",
+        image_url: { url: "data:image/png;base64,eA==" },
+      });
+    }
   });
 
   it.each([

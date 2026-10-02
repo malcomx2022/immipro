@@ -10655,3 +10655,32 @@ La deuxième décision à prendre (le jeu d'essai et les lectures attendues) est
 - `npm run banc:ia:aveugle` prépare la relecture à l'aveugle des lettres.
 
 **Rien n'est changé dans le produit** : ni l'adaptateur, ni le fournisseur par défaut, ni le job d'analyse.
+
+### S.99 — suite (02/10/2026) : Mistral et Vertex AI passent par l'adaptateur
+
+À la demande de la direction, le code d'appel prend en charge les deux finalistes qui ne passaient pas tels quels. Aucun code fournisseur n'est ajouté : tous deux restent `openai_compatible`, ce qui laisse inchangés la traçabilité (`AiUsage.provider`), la garde des pièces et l'écran B-07.
+
+**Mistral : la forme du bloc PDF**
+
+- `AI_OPENAI_PDF` déclare la forme attendue : `oui` pour OpenAI (inchangé), `document_url` pour Mistral, `image_url` pour Vertex AI.
+- Une autre valeur n'est plus lue comme « non ». Elle est refusée et dite dans B-07, car l'exploitant qui l'a écrite croit que ses PDF partent.
+
+**Vertex AI : le compte de service**
+
+- `AI_OPENAI_AUTH=compte_de_service_google` et `AI_OPENAI_COMPTE_DE_SERVICE`, le fichier JSON de la clé, collé tel quel ou en base64, remplacent la clé d'API.
+- La lecture du compte et la composition de l'affirmation sont pures (`domain/ia/compte-de-service.ts`). Le jeton n'est échangé qu'auprès d'une adresse https de Google, jamais vers une adresse qu'un fichier modifié aurait choisie.
+- La signature RS256, l'échange et la garde en mémoire sont dans `server/ia/jeton-google.ts`, sans bibliothèque Google. Le jeton est renouvelé cinq minutes avant son expiration et redemandé une fois si Vertex le refuse en cours d'appel.
+- Aucun secret n'est journalisé : ni la clé, ni l'affirmation, ni le jeton.
+
+**Vérifications**
+
+- `tests/ia-vertex.test.ts` : 20 cas.
+  - Le compte de service : lecture, refus et motifs.
+  - Le registre : variables exigées, mode d'authentification inconnu.
+  - Une signature vérifiée par la clé publique.
+  - Un échange de jeton, sa garde et son renouvellement, contre un vrai serveur HTTP local.
+  - Le refus en cours d'appel suivi d'une seule nouvelle demande.
+  - Aucun appel vers Vertex sans jeton.
+- `tests/ia-fournisseurs.test.ts` : blocs `document_url` et `image_url`, valeur de PDF inconnue.
+
+Rien ne change pour une installation existante : sans ces variables, la configuration lue est la même qu'avant.

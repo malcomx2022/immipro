@@ -3,8 +3,10 @@
  *
  *     # le fournisseur et le modèle se déclarent comme en production (S.94)
  *     ANTHROPIC_API_KEY=… AI_MODEL=claude-sonnet-5-5 npm run banc:ia -- --fournisseur anthropic
- *     AI_OPENAI_URL=https://api.mistral.ai/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=mistral-medium-latest \
- *       AI_OPENAI_PDF=oui npm run banc:ia -- --fournisseur openai_compatible
+ *     AI_OPENAI_URL=https://api.eu.mistral.ai/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=mistral-medium-latest \
+ *       AI_OPENAI_PDF=document_url npm run banc:ia -- --fournisseur openai_compatible
+ *     # Vertex AI : AI_OPENAI_AUTH=compte_de_service_google, AI_OPENAI_COMPTE_DE_SERVICE
+ *     # et AI_OPENAI_PDF=image_url — voir docs/IA-benchmark.md §8.1
  *
  *     # vérifier le banc lui-même, sans clé ni réseau
  *     npm run banc:ia -- --simulation parfaite
@@ -56,7 +58,13 @@ import {
 import { coutMicrosDesJetons } from "@/domain/backoffice/couts";
 import { champsDemandes, type DemandeDeLecture, type TypeLisible } from "@/domain/dossiers/extraction";
 import { conditionsDeLaPiece, type Condition } from "@/domain/dossiers/verification";
-import { FOURNISSEURS, modeleDu, tarifDu, type CodeFournisseur } from "@/domain/ia/fournisseurs";
+import {
+  FOURNISSEURS,
+  manqueDuFournisseur,
+  modeleDu,
+  tarifDu,
+  type CodeFournisseur,
+} from "@/domain/ia/fournisseurs";
 import type { MatiereDeLaPiece, RemarqueProduite } from "@/domain/redaction/commande";
 import { PIECES_REDIGEABLES } from "@/lib/contenu/redaction";
 import { configurationCompatible, lireDesOctets } from "@/server/dossiers/extracteur";
@@ -169,9 +177,8 @@ function adaptateurs(): { modele: string; lire: Lecteur; ecrire: Ecrivain; relir
 
   const config = configurationCompatible(env);
   if (!config) {
-    return arreter(
-      "Renseigne AI_OPENAI_URL (https, avec la version), AI_OPENAI_API_KEY et AI_OPENAI_MODEL, et AI_OPENAI_PDF=oui si ce fournisseur lit les PDF.",
-    );
+    const manque = manqueDuFournisseur(env, "openai_compatible") ?? "renseigner AI_OPENAI_URL, AI_OPENAI_API_KEY et AI_OPENAI_MODEL";
+    return arreter(`Le fournisseur compatible n'est pas configuré : ${manque}.`);
   }
   const redacteur = redacteurCompatible(config);
   const critique = critiqueCompatible(config);

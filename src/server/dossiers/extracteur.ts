@@ -53,16 +53,22 @@ import {
 import type { ChampsExtraits } from "@/domain/dossiers/verification";
 import { leClient } from "@/lib/ai";
 import type { AppelMesure } from "@/server/ia/appel";
-import { lireDesOctetsCompatible, type ConfigurationCompatible } from "@/server/ia/openai-compatible";
+import {
+  lireDesOctetsCompatible,
+  type Authentification,
+  type ConfigurationCompatible,
+} from "@/server/ia/openai-compatible";
 import {
   FOURNISSEURS,
   adresseDeBase,
+  formeDuPdf,
   fournisseurChoisi,
-  litLesPdf,
   manqueDuFournisseur,
+  modeDAuthentification,
   modeleDu,
   piecesAutoriseesChez,
 } from "@/domain/ia/fournisseurs";
+import { VARIABLE_COMPTE_DE_SERVICE, lireCompteDeService } from "@/domain/ia/compte-de-service";
 import { lireUnePiece, tailleDUnePiece } from "@/lib/storage";
 
 /** Ce qu'une lecture rend, dans les deux cas. Les jetons sont toujours là. */
@@ -360,11 +366,22 @@ export const lExtracteur = (
 export function configurationCompatible(
   environnement: Readonly<Record<string, string | undefined>>,
 ): ConfigurationCompatible | null {
+  if (manqueDuFournisseur(environnement, "openai_compatible") !== null) return null;
   const base = adresseDeBase((environnement.AI_OPENAI_URL ?? "").trim());
-  const cle = (environnement.AI_OPENAI_API_KEY ?? "").trim();
   const modele = modeleDu(environnement, "openai_compatible");
-  if (!base || cle === "" || !modele) return null;
-  return { base, cle, modele, pdf: litLesPdf(environnement, "openai_compatible") };
+  const pdf = formeDuPdf(environnement);
+  const auth = modeDAuthentification(environnement);
+  if (!base || !modele || !pdf.connue || !auth.connu) return null;
+
+  let authentification: Authentification;
+  if (auth.mode === "compte_de_service_google") {
+    const compte = lireCompteDeService(environnement[VARIABLE_COMPTE_DE_SERVICE]);
+    if (!compte.ok) return null;
+    authentification = { mode: "compte_de_service_google", compte: compte.compte };
+  } else {
+    authentification = { mode: "cle", cle: (environnement.AI_OPENAI_API_KEY ?? "").trim() };
+  }
+  return { base, authentification, modele, pdf: pdf.forme };
 }
 
 export const extractionConfiguree = (
