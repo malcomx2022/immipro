@@ -45,6 +45,18 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # production est exactement le cas où une pile lisible se paie.
 COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
 
+# Les migrations Prisma : le déploiement les applique depuis l'image
+# (`docker compose run --rm app npx prisma migrate deploy`). Le schéma
+# et les migrations doivent donc être dans l'image finale — la sortie
+# `standalone` de Next ne les embarque pas.
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# La CLI Prisma pour les migrations : elle n'est pas dans l'image (le
+# `standalone` ne trace pas la CLI) et `npx prisma` seul téléchargerait la
+# 7, qui refuse le `url` du schéma au style v6 (P1012). Épinglée en v6,
+# comme package.json (`prisma: ^6.0.0`).
+RUN npm install -g prisma@6
+
 USER nextjs
 EXPOSE 3000
 
@@ -54,3 +66,4 @@ EXPOSE 3000
 # processus web — un job de fond qui tourne dans le même processus que
 # les requêtes partage leur mémoire et leur cycle de vie.
 CMD ["node", "server.js"]
+
