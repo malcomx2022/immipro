@@ -10,7 +10,7 @@ import type { EchecCandidat } from "@/server/http/echecs";
 import type { Recu as Donnees } from "@/server/lecture/paiements";
 import {
   confirmationDeRenvoi,
-  EMETTEUR,
+  EMETTEUR_NON_RENSEIGNE,
   EN_COURS_CORPS,
   EN_COURS_TITRE,
   LIBELLE_ETAT,
@@ -193,7 +193,15 @@ export function Recu({ recu }: { recu: Donnees }) {
         </div>
       </article>
 
-      <p className="text-14 text-ink-700">{EMETTEUR}</p>
+      {recu.emetteur ? (
+        <address className="flex flex-col text-14 not-italic text-ink-700">
+          {recu.emetteur.map((ligne) => (
+            <span key={ligne}>{ligne}</span>
+          ))}
+        </address>
+      ) : (
+        <p className="text-pretty text-14 text-ink-700">{EMETTEUR_NON_RENSEIGNE}</p>
+      )}
       {recu.etat === "rembourse" ? (
         <p className="text-pretty text-13 text-ink-700">
           {mentionRembourse(momentEnFrancais(recu.rembourseLe ?? recu.le))}

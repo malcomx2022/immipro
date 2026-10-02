@@ -90,16 +90,49 @@ export function libelleDeLAchat(packCode: string): string {
 }
 
 /**
- * Émetteur du reçu.
+ * Émetteur du reçu — 02/10/2026.
  *
- * La mention disait « sur le reçu comme sur la facture » — d'un document
- * qui n'existe pas, et dont M.C réserve l'existence même à un comptable.
- * Une phrase de commentaire suffit à installer l'idée qu'il y en a une.
+ * Il était écrit en dur : « ImmiPro SAS · RCCM Cotonou · service@immipro.bj ».
+ * Une entité, un registre sans numéro et un domaine qui ne sont pas ceux de
+ * l'exploitant — la note de cadrage M.C nomme Rêveur Digital, et le site est
+ * servi sur `immipro.app`. Un reçu est une pièce comptable : y imprimer une
+ * identité inventée est pire que n'en imprimer aucune.
  *
- * L'identité elle-même reste à compléter : elle est écrite en dur et sans
- * numéro d'immatriculation (arbitrage Q.A, ouvert).
+ * L'identité vient désormais des variables des textes juridiques (S.101),
+ * saisies une fois dans `/textes-juridiques` et relues avec les mentions
+ * légales. Une seule saisie pour les deux pièces : elles ne peuvent plus se
+ * contredire.
+ *
+ * Tant qu'une des variables manque, il n'y a pas d'émetteur, et le reçu le
+ * dit au lieu de compléter de lui-même. Le pilote fermé n'encaisse rien,
+ * et M.C bloque le premier encaissement commercial : aucun reçu réel ne
+ * part sans que l'identité ait été saisie.
+ *
+ * Il reste l'émetteur d'un **reçu** : ni « facture », ni TVA, ni numéro
+ * d'ordre (M.C). La mention de TVA des conditions n'y est pas reprise.
  */
-export const EMETTEUR = "ImmiPro SAS · RCCM Cotonou · service@immipro.bj";
+export const CLES_EMETTEUR = [
+  "denomination",
+  "forme_juridique",
+  "siege_social",
+  "rccm",
+  "ifu",
+  "email_contact",
+] as const;
+
+export function emetteurDuRecu(valeurs: Readonly<Record<string, string>>): readonly string[] | null {
+  const v = (cle: (typeof CLES_EMETTEUR)[number]) => (valeurs[cle] ?? "").trim();
+  if (CLES_EMETTEUR.some((cle) => v(cle) === "")) return null;
+  return [
+    `${v("denomination")}, ${v("forme_juridique")}`,
+    v("siege_social"),
+    `RCCM ${v("rccm")} · IFU ${v("ifu")}`,
+    v("email_contact"),
+  ];
+}
+
+export const EMETTEUR_NON_RENSEIGNE =
+  "L'identité de l'émetteur n'est pas encore enregistrée. Elle s'affichera ici dès sa saisie ; la référence et le montant de ce reçu n'en dépendent pas.";
 
 export const MENTION_ATTESTATION =
   "Ce reçu atteste du paiement d'un service de préparation de dossier. Il ne constitue pas une pièce à joindre à ta demande de visa, et les frais de demande versés à l'administration en sont exclus.";

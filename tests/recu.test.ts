@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  EMETTEUR,
+  CLES_EMETTEUR,
+  EMETTEUR_NON_RENSEIGNE,
+  emetteurDuRecu,
   LIBELLE_ETAT,
   MENTION_ATTESTATION,
   MENTION_PDF,
@@ -18,6 +20,16 @@ import { PACKS, RECHARGE_ANALYSES, CONSULTATION } from "@/domain/payments/pricin
 import { ECHECS } from "@/server/http/echecs";
 
 const lire = (f: string) => readFileSync(f, "utf8");
+
+const IDENTITE = {
+  denomination: "Société Fictive de Test",
+  forme_juridique: "SARL",
+  siege_social: "Lot 000, quartier fictif, Cotonou, Bénin",
+  rccm: "RB/COT/00 B 00000",
+  ifu: "0000000000000",
+  email_contact: "contact@exemple.test",
+};
+
 
 /**
  * Reçu de paiement — $-06, WF-05.
@@ -77,7 +89,38 @@ describe("ce que le reçu nomme", () => {
   it("dit ce qu'il atteste, et ce qu'il n'atteste pas (INV-1)", () => {
     expect(MENTION_ATTESTATION).toMatch(/service de préparation/u);
     expect(MENTION_ATTESTATION).toMatch(/ne constitue pas une pièce à joindre/u);
-    expect(EMETTEUR).toMatch(/RCCM/u);
+  });
+
+  describe("l'émetteur vient des variables des textes juridiques — 02/10/2026", () => {
+    it("compose l'identité saisie, et rien d'autre", () => {
+      expect(emetteurDuRecu(IDENTITE)).toEqual([
+        "Société Fictive de Test, SARL",
+        "Lot 000, quartier fictif, Cotonou, Bénin",
+        "RCCM RB/COT/00 B 00000 · IFU 0000000000000",
+        "contact@exemple.test",
+      ]);
+    });
+
+    it.each(CLES_EMETTEUR.map((c) => [c]))("sans %s, il n'y a pas d'émetteur", (cle) => {
+      expect(emetteurDuRecu({ ...IDENTITE, [cle]: "  " })).toBeNull();
+    });
+
+    it("le dit au lieu d'inventer une identité", () => {
+      expect(emetteurDuRecu({})).toBeNull();
+      expect(EMETTEUR_NON_RENSEIGNE).toMatch(/pas encore enregistrée/u);
+    });
+
+    it("plus aucune identité écrite en dur dans le code du reçu", () => {
+      for (const f of ["src/domain/paiement/recu.ts", "src/app/(app)/paiement/recu/[id]/Recu.tsx"]) {
+        const source = lire(f).replace(/\/\*[\s\S]*?\*\//gu, "");
+        expect(source, f).not.toMatch(/ImmiPro SAS|immipro\.bj|RCCM Cotonou/u);
+      }
+    });
+
+    it("chaque clé de l'émetteur est une variable déclarée des textes juridiques", async () => {
+      const { variable } = await import("@/domain/juridique/variables");
+      for (const cle of CLES_EMETTEUR) expect(variable(cle), cle).toBeDefined();
+    });
   });
 
   it("porte l'heure autant que le jour", () => {

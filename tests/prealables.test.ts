@@ -7,7 +7,7 @@ import {
   prealablesDe,
   type Jalon,
 } from "@/domain/exploitation/prealables";
-import { EMETTEUR } from "@/domain/paiement/recu";
+import { EMETTEUR_NON_RENSEIGNE, emetteurDuRecu } from "@/domain/paiement/recu";
 import { sansCommentaires } from "@/domain/copy/source";
 
 /**
@@ -77,8 +77,20 @@ describe("le reçu ne se présente pas comme une facture", () => {
 
   /** L'émetteur reste celui d'un reçu, et son identité reste à compléter. */
   it("l'émetteur ne promet pas de mentions qu'il ne porte pas", () => {
-    expect(EMETTEUR).not.toMatch(/factur/iu);
-    expect(EMETTEUR).not.toMatch(/TVA|SIRET|n°\s?\d/iu);
+    // Ce que la mise en forme ajoute aux valeurs saisies : seulement « RCCM »
+    // et « IFU ». Ni « facture », ni TVA, ni numéro d'ordre.
+    const lignes = emetteurDuRecu({
+      denomination: "D",
+      forme_juridique: "F",
+      siege_social: "S",
+      rccm: "R",
+      ifu: "I",
+      email_contact: "e@exemple.test",
+    })!.join(" ");
+    for (const texte of [lignes, EMETTEUR_NON_RENSEIGNE]) {
+      expect(texte).not.toMatch(/factur/iu);
+      expect(texte).not.toMatch(/TVA|SIRET|n°\s?\d/iu);
+    }
   });
 });
 

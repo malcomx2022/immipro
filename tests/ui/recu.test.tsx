@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Recu } from "@/app/(app)/paiement/recu/[id]/Recu";
 import type { Recu as Donnees } from "@/server/lecture/paiements";
-import { MENTION_ATTESTATION, RAISON_RENVOI_FERME } from "@/domain/paiement/recu";
+import { EMETTEUR_NON_RENSEIGNE, MENTION_ATTESTATION, RAISON_RENVOI_FERME } from "@/domain/paiement/recu";
 
 const reponse = (corps: unknown, statut = 200) =>
   Promise.resolve({
@@ -29,6 +29,7 @@ const PAYE: Donnees = {
   devise: "XOF",
   dossier: { id: "nl-1", pays: "Pays-Bas", intitule: "Séjour pour études (MVV + VVR)" },
   adresse: "awa@example.bj",
+  emetteur: ["Société Fictive de Test, SARL", "Cotonou, Bénin", "RCCM RB/COT/00 B 00000 · IFU 0000000000000", "contact@exemple.test"],
 };
 
 /**
@@ -142,5 +143,22 @@ describe("$-06 — les états où il n'y a pas de reçu", () => {
     expect(container.textContent).toContain("remboursé le 14 septembre 2026, 11 h 12");
     // La date du paiement reste celle du paiement : les deux se lisent.
     expect(container.textContent).toContain("11 septembre 2026, 10 h 43");
+  });
+});
+
+describe("$-06 — l'émetteur du reçu (02/10/2026)", () => {
+  it("affiche l'identité saisie dans les textes juridiques", () => {
+    const { container } = render(<Recu recu={PAYE} />);
+    const adresse = container.querySelector("address");
+    expect(adresse?.textContent).toContain("Société Fictive de Test, SARL");
+    expect(adresse?.textContent).toContain("RCCM RB/COT/00 B 00000 · IFU 0000000000000");
+    expect(container.textContent).not.toContain(EMETTEUR_NON_RENSEIGNE);
+  });
+
+  it("dit que l'identité n'est pas encore enregistrée, plutôt que d'en inventer une", () => {
+    const { container } = render(<Recu recu={{ ...PAYE, emetteur: null }} />);
+    expect(container.querySelector("address")).toBeNull();
+    expect(container.textContent).toContain(EMETTEUR_NON_RENSEIGNE);
+    expect(container.textContent).not.toMatch(/ImmiPro SAS|immipro\.bj/u);
   });
 });

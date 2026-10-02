@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { versFiche } from "@/server/acces/regles";
-import { etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
+import { emetteurDuRecu, etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
+import { valeursDesVariables } from "@/server/juridique/lecture";
 import { deviseParDefaut, estDevise, getPack, type Devise } from "@/domain/payments/pricing";
 import { destinationsServies } from "@/server/acces/couverture";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
@@ -39,6 +40,11 @@ export interface Recu {
   dossier: { id: string; pays: string; intitule: string } | null;
   /** Adresse du compte, pour que « Renvoyer » dise où il renvoie. */
   adresse: string;
+  /**
+   * Les lignes d'identité de l'émetteur, tirées des variables des textes
+   * juridiques ; `null` tant qu'elles ne sont pas toutes saisies.
+   */
+  emetteur: readonly string[] | null;
 }
 
 /**
@@ -78,6 +84,7 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
         ? { id: transaction.application.id, pays: fiche.pays, intitule: fiche.intitule }
         : null,
     adresse: transaction.user.email,
+    emetteur: emetteurDuRecu(await valeursDesVariables()),
   };
 }
 
