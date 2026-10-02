@@ -10781,3 +10781,32 @@ Il publie les trois fiches à source officielle ou institutionnelle (Pays-Bas é
 **Ce qu'il ne fait pas.** Le déploiement ne le lance pas. La graine remet chaque fiche dans l'état du fichier : la relancer à chaque déploiement republierait une fiche que la veille a dépubliée, et réécrirait ce que B-02 a changé. C'est un chargement initial, à faire une fois.
 
 **Vérification.** `npm run smoke:graine`, ajoutée à la CI : paquet exécuté hors sources, sur une base jetable, deux fois. Résultat : 3 publiées et les Émirats en brouillon, sans doublon, statuts et bornes inchangés à la reprise.
+
+## S.104 — Le retour après connexion se perdait, et `robots.txt` répondait 404
+
+**Relevés au contrôle de production du 02/10/2026 au soir.**
+
+**Retour après connexion.** Sans session, `/dossiers/nouveau?destination=suisse` renvoyait vers `/connexion` sans `?suite=`. La page posait bien sa suite, mais le gabarit `(dossier)` exige lui aussi une session. Or un gabarit Next ne connaît pas l'adresse de la page qu'il entoure, et c'est sa redirection qui partait la première. Après connexion, le candidat arrivait donc au tableau de bord.
+
+- **`src/middleware.ts`** relève le chemin et la requête dans un en-tête de requête (`x-immipro-chemin`). Il écrase toute valeur fournie par le client. Il ne fait rien d'autre : ni session, ni limitation, ni redirection.
+- **La garde (`server/securite/page.ts`)** lit cet en-tête quand on ne lui donne pas de suite.
+- **Une seule règle, `suiteInterne`** (`domain/comptes/suite.ts`), est appliquée par la garde, la connexion et la vérification. Elle refuse :
+  - une adresse absolue ;
+  - `//hôte` et `/\hôte` ;
+  - les caractères de contrôle ;
+  - les écrans du compte eux-mêmes.
+- **Un compte non vérifié garde la suite** jusqu'à `/verification?suite=…`. « Vérifier » et « Plus tard » y mènent ensuite.
+
+Vérifié sur le serveur compilé : `/dossiers/nouveau?destination=suisse`, `/profil`, `/tableau-de-bord` et `/paiement/recapitulatif` renvoient chacun vers `/connexion?suite=<leur adresse>`.
+
+**`robots.txt`** (`src/app/robots.ts`) :
+- ouvre le site public ;
+- ferme l'espace candidat, les écrans du compte et l'API ;
+- désigne le plan du site en adresse absolue.
+
+Le back-office n'y est pas nommé : l'écrire publierait la carte de ses adresses, et sa garde le ferme déjà sans dire qu'il existe (RG-15.3). La liste (`ESPACES_NON_INDEXES`) est vérifiée contre `PAGES_STABLES` : aucune page publique n'est fermée.
+
+**Vérification** :
+- `tests/suite-connexion.test.ts` ;
+- `tests/ui/suite-verification.test.tsx` ;
+- `tests/plan-du-site.test.ts` (robots).

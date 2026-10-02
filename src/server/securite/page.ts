@@ -1,7 +1,8 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { COOKIE_SESSION, lireSession, type Acteur } from "./session";
+import { EN_TETE_CHEMIN, suiteInterne } from "@/domain/comptes/suite";
 
 /**
  * Accès à l'acteur depuis une page serveur.
@@ -15,6 +16,10 @@ import { COOKIE_SESSION, lireSession, type Acteur } from "./session";
  * La redirection porte `suite` : quelqu'un qui ouvre un lien vers son dossier
  * après expiration de sa session doit y revenir après s'être reconnecté, pas
  * atterrir sur un tableau de bord et chercher.
+ *
+ * Sans suite explicite, la garde prend l'adresse que le middleware a
+ * relevée : un gabarit ne connaît pas la page qu'il entoure, et c'est le
+ * gabarit `(dossier)` qui redirigeait le premier, sans suite (02/10/2026).
  */
 
 export const acteurCourant = async (): Promise<Acteur | null> =>
@@ -22,7 +27,7 @@ export const acteurCourant = async (): Promise<Acteur | null> =>
 
 export async function exigerCandidat(suite?: string): Promise<Acteur> {
   const acteur = await acteurCourant();
-  if (!acteur) redirect(versConnexion(suite));
+  if (!acteur) redirect(await versConnexion(suite));
   return acteur;
 }
 
@@ -34,7 +39,7 @@ export async function exigerCandidat(suite?: string): Promise<Acteur> {
  */
 export async function exigerRole(roles: readonly Role[], suite?: string): Promise<Acteur> {
   const acteur = await acteurCourant();
-  if (!acteur) redirect(versConnexion(suite));
+  if (!acteur) redirect(await versConnexion(suite));
   if (!roles.includes(acteur.role)) redirect("/tableau-de-bord");
   return acteur;
 }
@@ -42,8 +47,10 @@ export async function exigerRole(roles: readonly Role[], suite?: string): Promis
 export const exigerVeilleur = (suite?: string) => exigerRole(["VEILLEUR", "ADMIN"], suite);
 export const exigerAdmin = (suite?: string) => exigerRole(["ADMIN"], suite);
 
-const versConnexion = (suite?: string) =>
-  suite ? `/connexion?suite=${encodeURIComponent(suite)}` : "/connexion";
+async function versConnexion(suite?: string): Promise<string> {
+  const retour = suiteInterne(suite ?? (await headers()).get(EN_TETE_CHEMIN));
+  return retour ? `/connexion?suite=${encodeURIComponent(retour)}` : "/connexion";
+}
 
 /** Initiales affichées dans l'en-tête mobile. Deux lettres, jamais l'adresse. */
 export function initiales(acteur: Acteur, prenom?: string | null, nom?: string | null): string {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import robots from "@/app/robots";
 import {
+  ESPACES_NON_INDEXES,
   ORIGINE_LOCALE,
   PAGES_STABLES,
   adresseAbsolue,
@@ -232,5 +234,35 @@ describe("« Comment ça marche » — le parcours implémenté, périmètre V1"
     const textes = page.slice(page.indexOf("const ETAPES"));
     expect(textes).not.toMatch(/Google|SMS|partenaire/iu);
     expect(textes).not.toMatch(/passage[^.]*Pro/u);
+  });
+});
+
+describe("robots.txt — l'adresse répondait 404 (02/10/2026)", () => {
+  it("ne ferme aucune page publique du plan du site", () => {
+    for (const page of PAGES_STABLES) {
+      for (const ferme of ESPACES_NON_INDEXES) {
+        expect(page === ferme || page.startsWith(ferme), `${page} fermé par ${ferme}`).toBe(false);
+      }
+    }
+  });
+
+  it("ne nomme pas le back-office", () => {
+    for (const adresse of ["/regles", "/veille", "/textes-juridiques", "/utilisateurs", "/journal"]) {
+      expect(ESPACES_NON_INDEXES).not.toContain(adresse);
+    }
+  });
+
+  it("ferme l'espace candidat et l'API, et désigne le plan du site en absolu", () => {
+    const avant = process.env.APP_URL;
+    process.env.APP_URL = "https://immipro.app";
+    try {
+      const r = robots();
+      const regle = Array.isArray(r.rules) ? r.rules[0]! : r.rules;
+      expect(regle.allow).toBe("/");
+      expect(regle.disallow).toEqual(expect.arrayContaining(["/api/", "/dossiers", "/paiement"]));
+      expect(r.sitemap).toBe("https://immipro.app/sitemap.xml");
+    } finally {
+      process.env.APP_URL = avant;
+    }
   });
 });

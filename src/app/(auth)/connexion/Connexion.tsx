@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { appeler } from "@/lib/api";
+import { suiteInterne } from "@/domain/comptes/suite";
 
 /**
  * A-02 — Connexion.
@@ -171,9 +172,15 @@ export function Connexion() {
  * La suite n'est suivie que si elle est interne. Une adresse absolue venue
  * du paramètre de requête ferait de cet écran une redirection ouverte, dont
  * on se sert pour faire atterrir quelqu'un sur une fausse page de connexion.
+ *
+ * La vérification garde la suite : un candidat qui se connecte pour ouvrir
+ * un dossier sur la Suisse doit y arriver une fois son adresse vérifiée,
+ * pas sur le tableau de bord.
  */
 function destination(suite: string | null, emailVerifie: boolean): string {
-  if (!emailVerifie) return "/verification";
-  if (suite && suite.startsWith("/") && !suite.startsWith("//")) return suite;
-  return "/tableau-de-bord";
+  const retour = suiteInterne(suite);
+  if (!emailVerifie) {
+    return retour ? `/verification?suite=${encodeURIComponent(retour)}` : "/verification";
+  }
+  return retour ?? "/tableau-de-bord";
 }
