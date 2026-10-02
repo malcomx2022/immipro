@@ -73,6 +73,17 @@ const HORS_PORTEE = [
   "src/app/(public)/mentions-legales/",
   "src/app/(public)/donnees-personnelles/",
   "src/app/(public)/conditions/",
+  /*
+    Ils sont arrivés le 02/10/2026 (S.101), et leur corps vit dans un
+    modèle du domaine plutôt que dans la page : la page ne fait que servir
+    la version validée. L'exception suit le corps, et lui seul — les
+    variables, l'écran du back-office et les liens restent dans la
+    portée. Le contact en fait partie : il partage ses variables avec les
+    conditions (remboursement, contact), et un même passage ne peut pas
+    changer de registre d'une page à l'autre. Le registre lui-même reste
+    une décision de la direction, consignée dans `docs/juridique/README.md`.
+  */
+  "src/domain/juridique/modeles.ts",
 ];
 
 const dansLaPortee = (f: string) => !HORS_PORTEE.some((h) => f.startsWith(h));

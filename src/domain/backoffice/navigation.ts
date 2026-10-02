@@ -21,6 +21,12 @@ export interface EntreeAdmin {
 export const NAVIGATION_ADMIN: readonly EntreeAdmin[] = [
   { href: "/veille", libelle: "Veille réglementaire" },
   { href: "/contenus", libelle: "Guides et articles" },
+  /*
+    `/textes-juridiques` et non `/juridique` ou `/conditions` : les pages
+    publiques (`/conditions`, `/mentions-legales`…) partagent l'espace
+    d'adresses du groupe `(admin)`.
+  */
+  { href: "/textes-juridiques", libelle: "Textes juridiques" },
   { href: "/revue", libelle: "Pièces en échec" },
   { href: "/utilisateurs", libelle: "Utilisateurs" },
   /*

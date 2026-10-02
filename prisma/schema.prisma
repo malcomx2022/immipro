@@ -1519,3 +1519,78 @@ enum DepositCorrectionStatus {
   APPLIQUEE
   REFUSEE
 }
+
+// ═══════════════════════════════════════════════════════════
+// Textes juridiques — S.101
+// ═══════════════════════════════════════════════════════════
+
+/// Une variable des textes juridiques : une dénomination, un numéro RCCM,
+/// une adresse de contact, le régime de rétractation retenu.
+///
+/// Le texte qui les entoure vit dans le dépôt (`domain/juridique/modeles.ts`) ;
+/// les variables se saisissent dans le back-office, par qui sait. La liste
+/// des clés admises est celle du domaine (`variables.ts`) : une clé qu'il
+/// ignore est refusée à l'écriture.
+///
+/// Pas d'historique ici : chaque modification part au journal d'audit avec
+/// l'ancienne et la nouvelle valeur, et chaque texte republié garde, dans
+/// sa version, les valeurs exactes qu'il affichait.
+model LegalVariable {
+  key       String   @id
+  value     String
+  updatedBy String
+  updatedAt DateTime @updatedAt
+}
+
+/// Ce que la page publique sert, et depuis quand — S.101.
+///
+/// Une ligne par publication. Une page juridique n'est servie qu'à partir
+/// de sa première ligne, qui naît d'un acte de validation dans le
+/// back-office : qui a validé, qui a relu le texte, quand. Q.A refusait un
+/// drapeau « validé » qu'on cocherait ; ceci n'en est pas un, c'est la
+/// trace d'une affirmation, avec son auteur.
+///
+/// **Immuable**, comme `EditorialVersion` et le journal d'audit : aucun
+/// chemin de code ne réécrit ni ne supprime une version. Un texte
+/// juridique qu'on pourrait corriger après coup ne prouverait plus ce
+/// qu'un candidat a accepté.
+model LegalPublication {
+  id   String @id @default(uuid())
+  /// `mentions-legales`, `conditions`, `donnees-personnelles`, `contact`.
+  page String
+  /// Rang de publication, continu par page : la première vaut 1. C'est le
+  /// numéro de version que la page affiche et que l'acceptation enregistre.
+  rang Int
+
+  kind LegalPublicationKind
+
+  /// Empreinte du modèle validé. Différente de celle du dépôt, la page est
+  /// « à revalider » : elle garde ce texte-ci jusqu'à la revalidation.
+  templateHash String
+  title        String
+  standfirst   String
+  /// Les blocs rendus, tels que la page les affiche.
+  body         Json
+  /// Les valeurs exactes des variables employées.
+  variables    Json
+
+  /// Qui a relu le texte, et quand — repris de la validation par une
+  /// republication : la relecture porte sur le texte, pas sur les variables.
+  reviewer   String
+  reviewedAt DateTime
+
+  /// L'administrateur qui a validé, ou qui a modifié les variables.
+  publishedBy String
+  reason      String
+  publishedAt DateTime @default(now())
+
+  @@unique([page, rang])
+  @@index([page, publishedAt])
+}
+
+enum LegalPublicationKind {
+  /// Un administrateur a validé le texte, en nommant son relecteur.
+  VALIDATION
+  /// Une variable employée par un texte déjà validé a changé.
+  MISE_A_JOUR_VARIABLES
+}

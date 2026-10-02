@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { LiensJuridiques } from "@/components/juridique/LiensJuridiques";
 
 /**
  * Pied de page du gabarit acquisition.
@@ -46,7 +47,9 @@ import { cn } from "@/lib/utils";
  *
  * « Comment ça marche » est revenu le 25/09/2026 : la page existe, écrite
  * à partir du parcours implémenté (Q.A). Les trois pages légales et le
- * contact attendent leurs textes validés, et ne reviennent qu'avec eux.
+ * contact reviennent avec leurs textes validés (S.101) : la colonne
+ * « Informations légales » ne liste que les pages réellement publiées,
+ * demandées par le navigateur, et le pied de page reste sans données.
  *
  * « Consultants partenaires » est parti pour une autre raison : l'écran
  * existe, mais derrière la garde candidat. Un lien public qui mène à un
@@ -100,6 +103,7 @@ export function Footer({ className }: FooterProps) {
             ))}
           </nav>
         ))}
+        <LiensJuridiques />
       </div>
 
       <p className="border-t border-ink-300 pt-4 text-13 text-ink-500">

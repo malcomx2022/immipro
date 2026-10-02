@@ -107,7 +107,7 @@ beforeEach(() => {
 
 describe("A-01 — Inscription", () => {
   it("n'ouvre pas de compte tant que les conditions ne sont pas acceptées", () => {
-    render(<Inscription />);
+    render(<Inscription publiees={{}} />);
     const creer = screen.getByRole("button", { name: "Créer mon compte" });
     expect(creer).toBeDisabled();
     expect(creer).toHaveAccessibleDescription(
@@ -116,12 +116,12 @@ describe("A-01 — Inscription", () => {
   });
 
   it("ne pré-coche pas les conditions", () => {
-    render(<Inscription />);
+    render(<Inscription publiees={{}} />);
     expect(screen.getByRole("checkbox")).not.toBeChecked();
   });
 
   it("annonce la raison qui bloque encore, une fois les conditions acceptées", () => {
-    render(<Inscription />);
+    render(<Inscription publiees={{}} />);
     fireEvent.click(screen.getByRole("checkbox"));
     expect(screen.getByRole("button", { name: "Créer mon compte" })).toHaveAccessibleDescription(
       "Le mot de passe doit faire au moins dix caractères.",
@@ -129,14 +129,14 @@ describe("A-01 — Inscription", () => {
   });
 
   it("annonce le consentement aux pièces d'identité comme demandé ailleurs", () => {
-    render(<Inscription />);
+    render(<Inscription publiees={{}} />);
     expect(
       screen.getByText(/est demandé séparément, au moment du premier téléversement/),
     ).toBeDefined();
   });
 
   it("commente la force du mot de passe à la frappe", () => {
-    render(<Inscription />);
+    render(<Inscription publiees={{}} />);
     const champ = screen.getByLabelText("Mot de passe");
     fireEvent.change(champ, { target: { value: "abc" } });
     expect(screen.getByText("Trop court, il manque des caractères.")).toBeDefined();

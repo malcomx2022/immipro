@@ -6,6 +6,7 @@ import { offreDeMontee } from "@/server/acces/montee";
 import { formatMontant } from "@/lib/utils";
 import { tunnelDuPaiement } from "@/server/lecture/paiements";
 import { exigerCandidat } from "@/server/securite/page";
+import { pagesPubliees } from "@/server/juridique/lecture";
 import {
   achatDuParametre,
   ouvrableDepuisLeRecapitulatif,
@@ -76,6 +77,7 @@ export default async function PageRecapitulatif({
         achat={achat}
         montee={offre.detail}
         deviseInitiale={offre.detail.devise}
+        publiees={await pagesPubliees()}
       />
     );
   }
@@ -104,6 +106,7 @@ export default async function PageRecapitulatif({
       tarif={tarif}
       deviseInitiale={devise === "EUR" || devise === "XOF" ? devise : tunnel.devise}
       supplementaire={supplementaire}
+      publiees={await pagesPubliees()}
     />
   );
 }

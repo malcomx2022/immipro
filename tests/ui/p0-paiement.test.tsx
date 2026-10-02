@@ -180,7 +180,7 @@ describe("$-02 — Récapitulatif", () => {
    */
   it("la case vit dans la zone d'action, immédiatement avant le bouton", () => {
     const { container } = render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
@@ -217,7 +217,7 @@ describe("$-02 — Récapitulatif", () => {
 
   it("ne coche pas les conditions d'avance", () => {
     render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
@@ -229,7 +229,7 @@ describe("$-02 — Récapitulatif", () => {
 
   it("ne débite pas tant que les conditions ne sont pas acceptées", () => {
     render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
@@ -249,7 +249,7 @@ describe("$-02 — Récapitulatif", () => {
   it("répète le montant sur le bouton, avant tout déclenchement", () => {
     const montant = formatMontant(PACKS[0]?.prix.XOF ?? 0, "XOF");
     render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
@@ -261,7 +261,7 @@ describe("$-02 — Récapitulatif", () => {
 
   it("n'annonce aucun taux de change entre les deux grilles", () => {
     const { container } = render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
@@ -274,7 +274,7 @@ describe("$-02 — Récapitulatif", () => {
 
   it("masque le numéro Mobile Money", () => {
     const { container } = render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={{ libelle: PACKS[0]!.libelle, prix: PACKS[0]!.prix }}
@@ -321,7 +321,7 @@ describe("$-02 — ce qui part quand on clique", () => {
     const aller = partirPayer();
 
     render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={achat}
         tarif={tarifDe(achat)!}
@@ -371,7 +371,7 @@ describe("$-02 — ce qui part quand on clique", () => {
     ] as const) {
       const tarif = tarifDe(achat)!;
       const { container, unmount } = render(
-        <Recapitulatif tunnel={TUNNEL} achat={achat} tarif={tarif} deviseInitiale="XOF" />,
+        <Recapitulatif publiees={{}} tunnel={TUNNEL} achat={achat} tarif={tarif} deviseInitiale="XOF" />,
       );
       expect(container.textContent).toContain(tarif.libelle);
       expect(container.textContent).toContain(formatMontant(tarif.prix.XOF, "XOF"));

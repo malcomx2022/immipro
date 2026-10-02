@@ -10710,3 +10710,28 @@ Rien ne change pour une installation existante : sans ces variables, la configur
 **Vérification** : `tests/capacites.test.ts`, 8 cas nouveaux ou corrigés. Sur l'ancien code, 7 échouent.
 
 L'aptitude de l'instance ne change pas : ces deux dépendances sont facultatives pour le pilote, et elles n'étaient ni bloquantes ni opérationnelles avant.
+
+## S.101 — Les textes juridiques se valident au back-office, leurs variables se modifient sans redéploiement
+
+**Demande du 02/10/2026.** Les trois brouillons (S.97) doivent être validés, et la page contact créée ; les principales variables des textes doivent pouvoir changer depuis le back-office.
+
+**Décisions de la direction (02/10/2026)**
+
+| Question | Décision |
+|---|---|
+| Qui valide | L'administrateur publie, en nommant le relecteur et la date de sa relecture ; la version est immuable et journalisée |
+| Une variable change | Republication automatique des textes déjà validés qui l'emploient, en nouvelle version tracée ; un changement du texte du modèle exige une nouvelle validation |
+| Page contact | Coordonnées seules, modifiables au back-office |
+
+**Ce qui tient Q.A.** Aucun drapeau « validé » dans le code : une page n'existe que s'il existe en base une version `LegalPublication` portant un relecteur nommé (contrainte SQL, au moins cinq caractères). Les routes répondent 404 jusque-là ; `PAGES_PUBLIQUES` les marque `surValidation`, et elles restent bloquantes dans les préalables tant qu'elles ne sont pas validées.
+
+**Mise en œuvre**
+
+- Domaine : `src/domain/juridique/` — variables (nature, groupe, contrôle), modèles (quatre textes, vouvoyés comme les brouillons), rendu (variables multi-lignes, passages facultatifs, empreinte), décisions de validation et de republication.
+- Base : `LegalVariable`, `LegalPublication` (rang unique par page, page connue, relecteur nommé), migration `20261002150000_textes_juridiques`.
+- Back-office : `/textes-juridiques`, accès administrateur ; actions journalisées `juridique.variables`, `juridique.validation`, `juridique.publication`.
+- Public : quatre pages servies depuis la dernière version ; liens du pied de page et plan du site selon les versions publiées ; consentement `CGU` enregistré avec les versions acceptées, à l'inscription et à l'ouverture d'un paiement.
+
+**Vérification** : `tests/textes-juridiques.test.ts` (33 cas), `tests/acceptation-sans-texte.test.ts`, `tests/arbitrages-ouverts.test.ts`, et la fumée `npm run smoke:juridique` sur base jetable (30 vérifications), ajoutée à la CI.
+
+**Reste à la direction** : saisir les valeurs réelles, faire relire par le conseil juridique, trancher les écarts de `docs/juridique/README.md` — registre de langue compris : l'interface tutoie, les textes vouvoient.

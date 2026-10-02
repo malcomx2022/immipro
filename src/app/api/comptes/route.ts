@@ -5,6 +5,9 @@ import { inscrire, emettreUnCode } from "@/server/acces/comptes";
 import { ouvrirSession, attributsCookie, COOKIE_SESSION } from "@/server/securite/session";
 import { envoyerCodeDeVerification, envoyerCompteDejaOuvert } from "@/server/courrier";
 import { LONGUEUR_MINIMALE } from "@/domain/comptes/mot-de-passe";
+import { versionAcceptee } from "@/domain/comptes/acceptation";
+import { pagesPubliees } from "@/server/juridique/lecture";
+import { db } from "@/lib/db";
 
 /**
  * Inscription — A-01, WF-02.
@@ -35,6 +38,17 @@ export const POST = route({
     if (existait || !user) {
       await envoyerCompteDejaOuvert(corps.email);
       return { etape: "verification" };
+    }
+
+    /*
+      L'acceptation des textes publiés, avec leur version — S.101. L'écran
+      ne laisse créer le compte qu'une fois la case cochée ; ce qui manquait
+      était la preuve de ce qui a été accepté. Un texte jamais publié ne
+      s'accepte pas : rien n'est enregistré tant qu'aucun ne l'est.
+    */
+    const version = versionAcceptee(["conditions", "donnees"], await pagesPubliees());
+    if (version) {
+      await db.consent.create({ data: { userId: user.id, kind: "CGU", granted: true, version } });
     }
 
     const code = await emettreUnCode(user.id, "VERIFICATION_EMAIL");
