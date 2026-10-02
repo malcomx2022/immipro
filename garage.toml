@@ -1,0 +1,24 @@
+# ── Modèle de configuration Garage — stockage des pièces ImmiPro ──────────
+#
+# COPIER ce fichier vers /srv/immipro/garage.toml sur le serveur
+# (permissions 600) et y mettre un vrai secret RPC, par exemple :
+#   openssl rand -hex 32
+# Ne jamais commiter le vrai secret : ce dépôt ne porte que ce modèle.
+#
+# Le service `minio` de docker-compose.prod.yml monte ce fichier en
+# /etc/garage.toml et expose l'API S3 sur le port 9000
+# (MINIO_PORT=9000 dans .env.app).
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_secret = "REMPLACEZ_MOI_PAR_UN_SECRET_GENERE_EX_OPENSSL_RAND_HEX_32"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:9000"
+
+[admin]
+api_bind_addr = "[::]:3903"
