@@ -2,6 +2,8 @@
 
 **Statut : implémenté le 26/09/2026 (S.94).** Anthropic reste le fournisseur par défaut ; un second adaptateur, « compatible OpenAI », sert au choix la lecture des pièces et la rédaction. Le §9 dit ce qui est fait, comment l'activer, et ce qui reste à trancher hors du code. Les §1 à §8 sont l'analyse d'origine, gardée telle quelle.
 
+**02/10/2026 (S.99)** : le choix du fournisseur se fait désormais sans priorité à Anthropic. Le banc comparatif (prix, protection des données, qualité publiée, travail sur l'adaptateur, essai proposé) est dans `docs/IA-benchmark.md`.
+
 ---
 
 ## 1. La réponse courte
