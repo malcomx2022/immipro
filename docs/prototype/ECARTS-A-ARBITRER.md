@@ -10594,3 +10594,45 @@ Vérifié depuis Internet : préliminaire `OPTIONS`, `PUT` et `GET` présignés 
 - Parcours complet contre un vrai Garage v2.2.0, avec deux adresses distinctes : `localhost` pour le serveur, `127.0.0.1` comme adresse publique. Dépôt, taille, lecture, promotion, lien de lecture et suppression passent.
 
 **Au passage**, `PUSH_TEST.txt`, un fichier d'essai poussé sur `main` par erreur, est retiré.
+
+## S.99 — Le choix du fournisseur d'IA, sans priorité à Anthropic (ouvert)
+
+**Demandé par la direction le 02/10/2026** : ne plus donner la priorité à l'API d'Anthropic et comparer les fournisseurs sur pied d'égalité. Le banc comparatif est dans `docs/IA-benchmark.md`, établi à partir des pages officielles lues le jour même.
+
+**Ce qu'il établit**
+
+- **Le prix ne départage pas.** Un dossier type (8 pièces et une lettre) coûte entre 0,01 $ et 0,27 $ en IA selon le modèle.
+- **Écartés pour les pièces :**
+  - DeepSeek : stockage en Chine, entraînement par défaut, ni PDF ni schéma JSON ;
+  - l'API Gemini « Developer » : 55 jours de conservation, sans lieu garanti ;
+  - les passerelles, déjà déconseillées par S.94 §5.
+- **Quatre finalistes :**
+  - Mistral Medium 3.5, point d'accès UE ;
+  - OpenAI GPT-6.1 Sol, résidence UE ;
+  - Gemini 3.8 Flash sur Vertex AI, région UE ;
+  - Anthropic Sonnet 5.5, déjà branché.
+- **Aucun classement public ne mesure la lecture de pièces béninoises.** Un essai sur des pièces factices est proposé (§8 du banc), avec un seuil disqualifiant : aucune pièce non conforme lue comme conforme.
+
+**Ce qui n'est pas fait, volontairement**
+
+Le défaut reste `anthropic` dans le code, et l'adaptateur n'est pas modifié. Chaque finaliste demande un changement différent :
+
+| Finaliste | Changement |
+|---|---|
+| OpenAI | `max_completion_tokens` |
+| Mistral | Bloc PDF `document_url` |
+| Vertex | Jeton OAuth renouvelé |
+| Anthropic | Aucun |
+
+Écrire ces changements avant le choix, ce serait maintenir du code pour des fournisseurs non retenus.
+
+**À trancher**
+
+| # | Question | Qui |
+|---|---|---|
+| 1 | Valider la liste des finalistes et ouvrir les comptes d'essai | Direction produit |
+| 2 | Écrire le jeu d'essai factice et les lectures attendues, et fixer le seuil de champs justes | Produit |
+| 3 | Choisir le fournisseur de lecture et celui de rédaction après l'essai | Direction produit |
+| 4 | Sous-traitance (S.94 §4.1) pour le fournisseur de lecture retenu : contrat, conservation zéro, résidence, page `/donnees-personnelles` | Conformité et conseil juridique |
+
+**Haiku 4.5**, au passage : Anthropic peut le retirer dès le 15/10/2026. Il ne doit être retenu nulle part.
