@@ -10684,3 +10684,29 @@ La deuxième décision à prendre (le jeu d'essai et les lectures attendues) est
 - `tests/ia-fournisseurs.test.ts` : blocs `document_url` et `image_url`, valeur de PDF inconnue.
 
 Rien ne change pour une installation existante : sans ces variables, la configuration lue est la même qu'avant.
+
+## S.100 — L'état de service disait « aucun adaptateur » pour l'IA
+
+**Relevé au contrôle avant ouverture du 02/10/2026, en production.** Sans clé d'IA, `/api/health` écrivait, pour la lecture des pièces et pour la rédaction : « Aucun adaptateur : le point de branchement ne rend rien ». Or les adaptateurs existent, pour Anthropic comme pour l'API compatible OpenAI (S.94, S.99). Le message envoyait l'exploitant chercher du code, alors que le remède était de poser une clé. Ce n'est pas un message d'échec actionnable (`CLAUDE.md`).
+
+**Deux causes**
+
+- La présence d'un adaptateur se déduisait du résolveur, qui rend la fonction non branchée dès que la clé manque. « Pas d'adaptateur » et « pas de clé » se confondaient.
+- La rédaction se mesurait sur `process.env` et non sur l'environnement observé : le défaut corrigé pour l'antivirus le 22/09/2026. Le test `capacites` l'avait figé : clé posée, il attendait « aucun adaptateur » pour la rédaction.
+
+**Correction** (`src/server/exploitation/capacites.ts`)
+
+- L'adaptateur se mesure par le fournisseur choisi : il en a un. Une valeur inconnue (`openai`) n'en a pas, et le dit toujours.
+- La configuration se mesure par `extractionConfiguree` et `redactionConfiguree`, sur l'environnement observé, garde des pièces et authentification comprises.
+
+**Ce que lit l'exploitant**
+
+| Situation | Ce que lit l'exploitant |
+|---|---|
+| Sans clé | « Adaptateur présent, configuration absente » |
+| Avec une clé | « Configurée, sans vérification concluante », comme avant pour l'extraction |
+| Pièces non autorisées chez le sous-traitant choisi | Configuration absente, et non adaptateur absent |
+
+**Vérification** : `tests/capacites.test.ts`, 8 cas nouveaux ou corrigés. Sur l'ancien code, 7 échouent.
+
+L'aptitude de l'instance ne change pas : ces deux dépendances sont facultatives pour le pilote, et elles n'étaient ni bloquantes ni opérationnelles avant.
