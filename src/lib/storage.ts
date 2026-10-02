@@ -1,4 +1,9 @@
 import { Client } from "minio";
+import {
+  MOTIF_ADRESSE,
+  REGION_DE_SIGNATURE,
+  lireAdressePublique,
+} from "@/domain/stockage/adresse-publique";
 
 /**
  * Accès au stockage des pièces. Buckets privés, jamais d'accès direct
@@ -29,10 +34,59 @@ function connexion(): Client {
     endPoint: process.env.MINIO_ENDPOINT!,
     port: Number(process.env.MINIO_PORT ?? 9000),
     useSSL: process.env.MINIO_USE_SSL === "true",
+    // Fixée plutôt que demandée au serveur avant chaque signature : c'est
+    // celle que Garage vérifie, et celle de MinIO par défaut en local.
+    region: REGION_DE_SIGNATURE,
     accessKey: process.env.MINIO_ROOT_USER!,
     secretKey: process.env.MINIO_ROOT_PASSWORD!,
   });
   return client;
+}
+
+/**
+ * Le client qui **signe** les URL que le navigateur ouvre — S.98.
+ *
+ * Il ne parle jamais au stockage : une signature présignée se calcule sans
+ * réseau dès que la région est donnée. Il porte l'adresse publique, parce
+ * que la signature SigV4 porte l'hôte et qu'une URL signée pour `minio:9000`
+ * ne se réécrit pas. Voir `domain/stockage/adresse-publique.ts`.
+ *
+ * Sans `MINIO_PUBLIC_URL`, le poste de développement signe avec l'adresse
+ * interne, joignable des deux côtés. En production, l'absence est une
+ * erreur de configuration : elle coupe le dépôt avec un message qui la
+ * nomme, plutôt que de distribuer des liens que personne ne peut ouvrir.
+ */
+let signataireConstruit: Client | null = null;
+
+function signataire(): Client {
+  if (signataireConstruit) return signataireConstruit;
+  const lue = lireAdressePublique(process.env.MINIO_PUBLIC_URL);
+  if (lue === null) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Stockage non configuré : MINIO_PUBLIC_URL (l'adresse du stockage que joint le navigateur, en https).",
+      );
+    }
+    signataireConstruit = connexion();
+    return signataireConstruit;
+  }
+  if (!lue.valide) throw new Error(`Stockage non configuré : ${MOTIF_ADRESSE[lue.defaut]}`);
+  connexion(); // mêmes variables exigées, même message si l'une manque
+  signataireConstruit = new Client({
+    endPoint: lue.adresse.hote,
+    port: lue.adresse.port,
+    useSSL: lue.adresse.chiffre,
+    region: REGION_DE_SIGNATURE,
+    accessKey: process.env.MINIO_ROOT_USER!,
+    secretKey: process.env.MINIO_ROOT_PASSWORD!,
+  });
+  return signataireConstruit;
+}
+
+/** Pour les tests : oublie les clients construits. */
+export function oublierLesClients(): void {
+  client = null;
+  signataireConstruit = null;
 }
 
 /**
@@ -72,11 +126,11 @@ const quarantaine = () => process.env.MINIO_BUCKET_QUARANTAINE!;
 export const TTL_PRESIGNE_SECONDES = 5 * 60;
 
 export const presignedGet = (key: string) =>
-  connexion().presignedGetObject(confiance(), key, TTL_PRESIGNE_SECONDES);
+  signataire().presignedGetObject(confiance(), key, TTL_PRESIGNE_SECONDES);
 
 /** Le dépôt du navigateur, toujours en quarantaine (I.D). */
 export const presignedPut = (key: string) =>
-  connexion().presignedPutObject(quarantaine(), key, TTL_PRESIGNE_SECONDES);
+  signataire().presignedPutObject(quarantaine(), key, TTL_PRESIGNE_SECONDES);
 
 /** Le flux lu par le balayeur. Seul appelant légitime de la quarantaine. */
 export const lireEnQuarantaine = (key: string) => connexion().getObject(quarantaine(), key);

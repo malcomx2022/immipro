@@ -10562,3 +10562,35 @@ Les deux textes passent le vocabulaire interdit avec ses trois listes. `docs/` e
 Deux faits sont relevés dans le code au passage. Le simulateur ne garde rien côté serveur : les réponses restent dans le `sessionStorage` du navigateur (RG-01.1). L'adresse IP ne sert qu'au contrôle de débit, en mémoire, cinq minutes au plus.
 
 Un quatrième écart s'ajoute au `README` : les consentements `pieces_financieres` et `mesure_audience` sont proposés au candidat, mais ne commandent rien. Une page de données personnelles ne peut pas décrire un consentement sans effet.
+
+## S.98 — Les URL présignées étaient signées pour une adresse que personne ne joint
+
+**Relevé au contrôle avant ouverture du 02/10/2026.** L'écran d'une pièce dépose le fichier par un `PUT` direct sur une URL présignée. Cette URL était signée avec `MINIO_ENDPOINT`, l'adresse par laquelle le serveur joint le stockage. En production, elle vaut `minio:9000`, un nom qui n'existe que sur le réseau Docker. Le candidat recevait donc `http://minio:9000/…` : son navigateur ne pouvait pas le joindre, et aucune pièce ne pouvait être déposée. Rien ne le voyait :
+
+- en local, `localhost:9000` est joignable des deux côtés ;
+- les fumées utilisent un faux stockage en mémoire.
+
+Le défaut existait avec MinIO, avant le passage à Garage.
+
+**Infrastructure** (faite sur le VPS par l'exploitant, le 02/10/2026) :
+
+- `stockage.immipro.app` en HTTPS, servi par nginx vers Garage, avec l'hôte d'origine préservé ;
+- le port 9000 publié en boucle locale seulement (PR malcomx2022/immipro#182) ;
+- une règle CORS limitée à `https://immipro.app`.
+
+Vérifié depuis Internet : préliminaire `OPTIONS`, `PUT` et `GET` présignés passent, et une origine étrangère est refusée.
+
+**Code**
+
+- `MINIO_PUBLIC_URL` est lue par `domain/stockage/adresse-publique.ts` (logique pure). Elle exige `https`, sauf sur la boucle locale, et n'admet ni chemin, ni paramètre, ni identifiant.
+- Un second client, le **signataire**, ne sert qu'à signer. Le client interne garde toutes les opérations du serveur.
+- La région de signature est fixée à `us-east-1`, celle que vérifie `garage.toml`. Sans elle, le client `minio` interrogeait le stockage avant chaque signature ; aucune signature ne passe plus par le réseau.
+- En production, l'absence de `MINIO_PUBLIC_URL` coupe le dépôt avec un message qui la nomme, plutôt que de distribuer des liens injoignables. Sur le poste de développement, l'adresse interne sert aux deux, comme avant.
+- Les invariants sont tenus et testés : le dépôt est signé sur la quarantaine, la lecture sur le seau de confiance, pour 5 minutes.
+
+**Vérifications**
+
+- `tests/stockage-adresse-publique.test.ts` : 16 cas. La signature est éprouvée devant un hôte en `.invalid`, qui prouve qu'aucun appel réseau n'est fait.
+- Parcours complet contre un vrai Garage v2.2.0, avec deux adresses distinctes : `localhost` pour le serveur, `127.0.0.1` comme adresse publique. Dépôt, taille, lecture, promotion, lien de lecture et suppression passent.
+
+**Au passage**, `PUSH_TEST.txt`, un fichier d'essai poussé sur `main` par erreur, est retiré.
