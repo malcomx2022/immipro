@@ -10810,3 +10810,37 @@ Le back-office n'y est pas nommé : l'écrire publierait la carte de ses adresse
 - `tests/suite-connexion.test.ts` ;
 - `tests/ui/suite-verification.test.tsx` ;
 - `tests/plan-du-site.test.ts` (robots).
+
+## S.105 — L'émetteur du reçu était une identité inventée ; la note M.C est corrigée
+
+**Relevé le 02/10/2026, en relisant la note de cadrage de l'avis comptable (M.C).** Le reçu affichait en dur « ImmiPro SAS · RCCM Cotonou · service@immipro.bj ». La note nomme l'exploitant **Rêveur Digital**, et le site est servi sur `immipro.app`. Un reçu est une pièce comptable : y imprimer une entité, un registre sans numéro et un domaine qui ne sont pas les bons est pire que de n'en imprimer aucun.
+
+**Correction** (`emetteurDuRecu`, `domain/paiement/recu.ts`)
+
+- L'émetteur est composé à partir des variables des textes juridiques (S.101) : dénomination, forme juridique, siège, RCCM, IFU et adresse de contact. Elles se saisissent une seule fois dans `/textes-juridiques` : les mentions légales et le reçu ne peuvent plus se contredire.
+- S'il manque une seule de ces variables, le reçu le dit (« L'identité de l'émetteur n'est pas encore enregistrée ») au lieu de compléter de lui-même.
+- L'émetteur reste celui d'un **reçu** : ni « facture », ni TVA, ni numéro d'ordre. La mention de TVA des conditions n'y est pas reprise.
+
+**La note de cadrage M.C** (`docs/comptable/note-cadrage-MC.md`) est corrigée pour décrire le produit tel qu'il est. Écarts relevés dans la version reçue :
+
+| Sujet | Version reçue | Version corrigée |
+|---|---|---|
+| Envoi du reçu | Envoyé par courriel et archivé dans le dossier | Le courriel porte la référence et le montant ; le reçu se consulte dans l'espace du client, sans PDF conservé |
+| Identité du payeur | Le reçu porterait le nom et l'adresse électronique | Il ne porte ni l'un ni l'autre (minimisation) |
+| Grille | « À fixer après le pilote » ; Dossier Pro « envisagé » | Les deux grilles (F CFA et euros) sont reproduites ; Dossier Pro existe |
+| Ventes | Packs et recharges | S'y ajoutent le passage d'Essentiel à Dossier et la consultation |
+| Opérateurs | « MTN, Moov et autres » | Le produit ne choisit ni ne nomme l'opérateur |
+| Remboursement | « Au prorata » | Aucun prorata : un pack entamé passe en revue manuelle, sans remboursement automatique |
+
+**Questions ajoutées** :
+- contre-valeur d'une facture en euros ;
+- moment d'émission de la facture et de l'avoir ;
+- facture du passage d'Essentiel à Dossier et de la consultation ;
+- suffisance d'une reconstitution à partir des données de paiement.
+
+**Vérification** : `tests/recu.test.ts`, `tests/ui/recu.test.tsx` et `tests/prealables.test.ts`. Ces tests vérifient trois points :
+- la composition de l'émetteur et son absence quand une variable manque ;
+- l'absence d'identité écrite en dur dans le code du reçu ;
+- l'absence de « facture » et de TVA dans ce que la mise en forme ajoute.
+
+M.C reste ouvert jusqu'à réception de l'avis.

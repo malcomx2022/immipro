@@ -69,7 +69,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "denomination",
     groupe: "editeur",
     libelle: "Dénomination sociale",
-    aide: "Telle qu'inscrite au RCCM. Le reçu de paiement affiche aujourd'hui « ImmiPro SAS » : à confirmer.",
+    aide: "Telle qu'inscrite au RCCM. Elle figure aussi sur les reçus de paiement, avec la forme juridique, le siège, le RCCM, l'IFU et l'adresse de contact.",
     nature: "ligne",
   },
   {
@@ -97,7 +97,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "rccm",
     groupe: "editeur",
     libelle: "Numéro RCCM",
-    aide: "Numéro d'immatriculation au registre du commerce et du crédit mobilier. Le reçu porte « RCCM Cotonou » sans numéro.",
+    aide: "Numéro d'immatriculation au registre du commerce et du crédit mobilier. Il figure aussi sur les reçus de paiement.",
     nature: "ligne",
   },
   {
