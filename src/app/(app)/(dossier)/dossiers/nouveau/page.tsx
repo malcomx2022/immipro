@@ -36,7 +36,7 @@ export default async function PageNouveauDossier({
     (await fichesPubliees()).fiches[0] ??
     null;
 
-  if (!fiche) return <OuvertureDossier fiche={null} visaRuleId="" apercu={[]} />;
+  if (!fiche) return <OuvertureDossier fiche={null} apercu={[]} />;
 
   const regle = await reglePubliieParSlug(fiche.slug);
   const apercu = regle
@@ -46,5 +46,5 @@ export default async function PageNouveauDossier({
         .map((p) => p.libelle)
     : [];
 
-  return <OuvertureDossier fiche={fiche} visaRuleId={regle?.id ?? ""} apercu={apercu} />;
+  return <OuvertureDossier fiche={fiche} apercu={apercu} />;
 }

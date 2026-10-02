@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TableauDeBord } from "@/app/(app)/(dossier)/tableau-de-bord/TableauDeBord";
 import { Comparateur } from "@/app/(app)/(dossier)/comparateur/Comparateur";
 import { Profil } from "@/app/(app)/(dossier)/profil/Profil";
@@ -288,7 +288,6 @@ describe("C-05 — Ouverture de dossier", () => {
   const ouverture = () => (
     <OuvertureDossier
       fiche={PAYS_BAS}
-      visaRuleId="00000000-0000-0000-0000-000000000001"
       apercu={["Passeport", "Lettre d'admission"]}
     />
   );
@@ -306,6 +305,23 @@ describe("C-05 — Ouverture de dossier", () => {
     render(ouverture());
     fireEvent.click(screen.getByRole("radio", { name: /Je ne sais pas encore/ }));
     expect(screen.getByRole("button", { name: "Créer mon dossier" })).toBeEnabled();
+  });
+
+  it("envoie la destination de la fiche, pas un identifiant technique (02/10/2026)", async () => {
+    const corps: unknown[] = [];
+    global.fetch = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+      corps.push(JSON.parse(String(options?.body)));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "dossier-1", statut: "BROUILLON" }),
+      } as Response);
+    });
+    render(ouverture());
+    fireEvent.click(screen.getByRole("radio", { name: /Je ne sais pas encore/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Créer mon dossier" }));
+    await waitFor(() => expect(corps).toHaveLength(1));
+    expect(corps[0]).toEqual({ destination: PAYS_BAS.slug });
   });
 
   it("affiche la destination que la page lui a donnée", () => {
@@ -364,7 +380,7 @@ describe("C-05 — Ouverture de dossier", () => {
   });
 
   it("sans destination publiée, il le dit au lieu de proposer un formulaire", () => {
-    render(<OuvertureDossier fiche={null} visaRuleId="" apercu={[]} />);
+    render(<OuvertureDossier fiche={null} apercu={[]} />);
     expect(
       screen.getByRole("heading", { name: "Aucune destination n'est ouverte en ce moment" }),
     ).toBeDefined();
