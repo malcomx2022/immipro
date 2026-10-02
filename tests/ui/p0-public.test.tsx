@@ -279,6 +279,40 @@ describe("P-03 — Résultats", () => {
     expect(texte).not.toMatch(/probabilit/i);
     expect(texte).not.toMatch(/garanti/i);
   });
+
+  describe("« Ouvrir un dossier » selon la session", () => {
+    const UNE_RETENUE = {
+      retenues: [
+        {
+          rang: "1",
+          slug: "pays-bas-etudes",
+          code: "NL",
+          pays: "Pays-Bas",
+          motifs: [{ texte: "B2 exigé, tu déclares B2.", favorable: true }],
+          mention: { source: "ind.nl", verifieeLe: "2026-09-11" },
+        },
+      ],
+      ecartees: [],
+      aucuneNePasse: false,
+      composantesAbsentes: [],
+    };
+
+    it("un candidat connecté va à l'ouverture de dossier, sur la destination en tête", async () => {
+      repondre(UNE_RETENUE);
+      window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
+      render(<Resultats connecte />);
+      const lien = await screen.findByRole("link", { name: "Ouvrir un dossier" });
+      expect(lien).toHaveAttribute("href", "/dossiers/nouveau?destination=pays-bas-etudes");
+    });
+
+    it("un visiteur va à l'inscription, comme avant", async () => {
+      repondre(UNE_RETENUE);
+      window.sessionStorage.setItem("immipro.simulation", JSON.stringify({ objectif: "Étudier" }));
+      render(<Resultats />);
+      const lien = await screen.findByRole("link", { name: "Ouvrir un dossier" });
+      expect(lien).toHaveAttribute("href", "/inscription");
+    });
+  });
 });
 
 describe("P-06 — Tarifs", () => {

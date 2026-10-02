@@ -230,6 +230,77 @@ export async function consommerUnCode(
 }
 
 /**
+ * Correction de l'adresse d'un compte non vérifié — A-03, « Mauvaise
+ * adresse ? ».
+ *
+ * Le lien menait à `/consentements`, où rien ne permet de changer
+ * d'adresse : un candidat qui s'était trompé d'une lettre à l'inscription
+ * n'avait aucune issue que de recréer un compte.
+ *
+ * Trois garde-fous :
+ *
+ * - **seulement tant que l'adresse n'est pas vérifiée**. Une adresse vérifiée
+ *   est celle où partent les alertes et la réinitialisation du mot de passe ;
+ *   la changer depuis une session suffirait à prendre le compte de qui a
+ *   laissé son téléphone ouvert. Ce cas passe par le support ;
+ * - **le mot de passe est redemandé**, pour la même raison ;
+ * - **une adresse déjà prise ne se dit pas** : la réponse est la même que
+ *   pour une adresse libre, et c'est le courrier envoyé à cette adresse qui
+ *   informe son titulaire — la règle de l'inscription, appliquée ici.
+ *
+ * Le code précédent est annulé à l'émission du suivant : un code envoyé à la
+ * mauvaise adresse ne vérifie jamais la nouvelle.
+ */
+export type IssueDeLaCorrection =
+  | { issue: "corrigee"; email: string; code: string }
+  | { issue: "deja_prise"; email: string };
+
+export async function corrigerLAdresse(
+  userId: string,
+  adresseSaisie: string,
+  motDePasse: string,
+): Promise<IssueDeLaCorrection> {
+  const email = normaliserEmail(adresseSaisie);
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw echec("authentification_requise");
+
+  const juste = user.passwordHash
+    ? await correspond(motDePasse, user.passwordHash)
+    : await correspond(motDePasse, LEURRE);
+  if (!juste) {
+    throw echec("champs_invalides", {
+      champs: { motDePasse: "Ce mot de passe ne correspond pas à ton compte. Saisis celui choisi à l'inscription." },
+    });
+  }
+  if (user.emailVerified) {
+    throw echec("champs_invalides", {
+      champs: {
+        email:
+          "Ton adresse est déjà vérifiée : elle ne se change pas depuis cet écran. Écris au support depuis la page Contact.",
+      },
+    });
+  }
+  if (email === user.email) {
+    throw echec("champs_invalides", {
+      champs: { email: "C'est déjà l'adresse de ton compte. Vérifie l'orthographe, ou demande un nouveau code." },
+    });
+  }
+
+  const prise = await db.user.findUnique({ where: { email }, select: { id: true } });
+  if (prise) return { issue: "deja_prise", email };
+
+  try {
+    await db.user.update({ where: { id: userId }, data: { email } });
+  } catch (erreur) {
+    // Prise entre la lecture et l'écriture : même réponse qu'une adresse prise.
+    if ((erreur as { code?: unknown } | null)?.code === "P2002") return { issue: "deja_prise", email };
+    throw erreur;
+  }
+  const code = await emettreUnCode(userId, "VERIFICATION_EMAIL");
+  return { issue: "corrigee", email, code };
+}
+
+/**
  * Changement de mot de passe. Il ferme toutes les sessions, y compris celle
  * qui l'a demandé : quelqu'un qui change son mot de passe après un vol de
  * téléphone doit reprendre la main sur l'appareil volé, et l'y laisser

@@ -262,6 +262,23 @@ Si c'était toi : connecte-toi avec ton mot de passe habituel, ou demande à le 
 Si ce n'était pas toi : il n'y a rien à faire, aucun compte n'a été créé et rien n'a changé.${SIGNATURE}`,
   });
 
+/**
+ * Pendant de `envoyerCompteDejaOuvert` pour la correction d'adresse (A-03) :
+ * l'écran répond pareil que l'adresse soit libre ou prise, et c'est ce
+ * courrier qui dit à son titulaire ce qui s'est passé.
+ */
+export const envoyerAdresseDejaInscrite = (destinataire: string) =>
+  expedier({
+    destinataire,
+    genre: "adresse_deja_inscrite",
+    objet: "Ton adresse est déjà liée à un compte ImmiPro",
+    corps: `Quelqu'un vient d'essayer de rattacher cette adresse à un autre compte ImmiPro. Elle est déjà celle d'un compte existant : rien n'a été changé.
+
+Si c'était toi : connecte-toi avec cette adresse et ton mot de passe habituel, ou demande à le réinitialiser depuis l'écran de connexion.
+
+Si ce n'était pas toi : il n'y a rien à faire.${SIGNATURE}`,
+  });
+
 /** Reçu de paiement — $-04. Le montant est déjà mis en forme par l'appelant. */
 export const envoyerRecu = (destinataire: string, reference: string, montant: string) =>
   expedier({

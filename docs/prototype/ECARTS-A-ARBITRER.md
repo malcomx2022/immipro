@@ -10735,3 +10735,24 @@ L'aptitude de l'instance ne change pas : ces deux dépendances sont facultatives
 **Vérification** : `tests/textes-juridiques.test.ts` (33 cas), `tests/acceptation-sans-texte.test.ts`, `tests/arbitrages-ouverts.test.ts`, et la fumée `npm run smoke:juridique` sur base jetable (30 vérifications), ajoutée à la CI.
 
 **Reste à la direction** : saisir les valeurs réelles, faire relire par le conseil juridique, trancher les écarts de `docs/juridique/README.md` — registre de langue compris : l'interface tutoie, les textes vouvoient.
+
+## S.102 — Deux liens menaient au mauvais endroit (test du 02/10/2026)
+
+**Relevé en test, transmis le 02/10/2026.**
+
+| Lien | Menait à | Mène à |
+|---|---|---|
+| « Corriger mon adresse email » (A-03) | `/consentements`, où rien ne change l'adresse | Un formulaire sur place : nouvelle adresse et mot de passe, puis un nouveau code |
+| « Ouvrir un dossier » (P-03), « Voir la checklist » (P-04) | `/inscription`, même connecté | Connecté : `/dossiers/nouveau`, sur la destination affichée. Visiteur : `/inscription`, comme avant |
+
+**Correction de l'adresse** (`PUT /api/comptes/adresse`, `corrigerLAdresse`)
+
+- Seulement tant que l'adresse n'est pas vérifiée. Une adresse vérifiée reçoit les alertes et la réinitialisation du mot de passe ; la changer depuis une session suffirait à prendre le compte. Ce cas passe par le support.
+- Le mot de passe est redemandé.
+- Une adresse déjà prise ne se dit pas à l'écran : la réponse est la même, et un courrier dit à son titulaire ce qui s'est passé (règle de l'inscription).
+- Le code précédent est annulé : un code parti à la mauvaise adresse ne vérifie jamais la nouvelle.
+- L'adresse en cours est écrite dans le chapeau, comme au prototype : c'est en la lisant qu'on voit la faute de frappe.
+
+**Hors de cette correction** : « Choisir un pack » sur `/tarifs` mène aussi à `/inscription` pour un candidat connecté. Le choix d'un pack se fait au récapitulatif de paiement d'un dossier ouvert ; la bonne destination est à décider par le produit.
+
+**Vérification** : `tests/entree-dossier.test.ts`, `tests/ui/p0-public.test.tsx` et `tests/ui/p0-comptes.test.tsx` (5 cas d'écran nouveaux), et un essai sur base jetable de `corrigerLAdresse` : mauvais mot de passe, même adresse, adresse prise sans changement, correction normalisée, ancien code invalide, nouveau code valide, adresse vérifiée refusée.

@@ -14,6 +14,7 @@ import { resumeReponses, type Reponses } from "@/domain/simulateur/questions";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { lireReponses } from "@/lib/simulation-session";
+import { lienOuvrirUnDossier } from "@/domain/comptes/entree-dossier";
 
 /**
  * P-03 — Résultats.
@@ -65,7 +66,7 @@ type Etat =
   | { phase: "echec"; echec: EchecCandidat; reponses: Reponses }
   | { phase: "prete"; reponses: Reponses; classement: Classement };
 
-export function Resultats() {
+export function Resultats({ connecte = false }: { connecte?: boolean }) {
   const [etat, setEtat] = useState<Etat>({ phase: "lecture" });
 
   const classer = useCallback(async (reponses: Reponses) => {
@@ -241,7 +242,11 @@ export function Resultats() {
 
       <div className="flex items-center gap-3 border-t border-ink-300 pt-4">
         <p className="flex-1 text-13 text-ink-500">Checklist en aperçu gratuit</p>
-        <LienBouton href="/inscription">Ouvrir un dossier</LienBouton>
+        {/* La première retenue est la destination en tête : c'est sur elle que
+            le dossier s'ouvre, et l'écran d'ouverture permet d'en changer. */}
+        <LienBouton href={lienOuvrirUnDossier(connecte, retenues[0]?.slug)}>
+          Ouvrir un dossier
+        </LienBouton>
       </div>
     </div>
   );
