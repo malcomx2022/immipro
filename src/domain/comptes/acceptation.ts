@@ -1,4 +1,4 @@
-import { PAGES_PUBLIQUES, type PagePublique } from "@/domain/exploitation/pages-publiques";
+import type { PageJuridique } from "@/domain/juridique/modeles";
 
 /**
  * Ce qu'une case d'acceptation nomme, et ce qu'on peut en lire — 24/09/2026.
@@ -31,8 +31,17 @@ import { PAGES_PUBLIQUES, type PagePublique } from "@/domain/exploitation/pages-
  * critères qu'il ne pèse pas, et comme une fiche pays dit qu'aucune réserve
  * n'est relevée.
  *
- * La phrase **disparaît d'elle-même** le jour où la page est publiée : elle
- * se déduit du registre, elle n'est pas écrite à côté de lui.
+ * La phrase **disparaît d'elle-même** le jour où la page est publiée.
+ *
+ * ── Depuis S.101 : la publication, et non le registre ───────────────
+ *
+ * Elle se déduisait du registre Q.A, statique : une page y était absente
+ * ou servie, pour toujours, jusqu'au prochain déploiement. Les pages
+ * juridiques sont désormais servies à partir de leur validation dans le
+ * back-office. L'absence se lit donc sur ce qui est **publié**, que
+ * l'appelant lit en base et passe ici. Et l'acceptation enregistre la
+ * version de chaque texte réellement publié — « il a accepté », sans dire
+ * quoi, ne prouve rien le jour où le texte a changé.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
@@ -62,15 +71,17 @@ export const DOCUMENTS_ACCEPTES = {
 
 export type DocumentAccepte = keyof typeof DOCUMENTS_ACCEPTES;
 
-/**
- * Le registre ne liste que ce qui manque — « une page déclarée absente l'est
- * réellement, et rien ne pointe vers elle ». Y figurer, c'est donc être
- * absente, et disparaître du registre, c'est exister.
- */
-export const pageAbsente = (
-  adresse: string,
-  registre: readonly PagePublique[] = PAGES_PUBLIQUES,
-): boolean => registre.some((p) => p.adresse === adresse);
+/** Les versions publiées, par page : ce que l'appelant lit en base (`pagesPubliees`). */
+export type Publiees = Readonly<Partial<Record<PageJuridique, number>>>;
+
+const PAGE_DU_DOCUMENT: Record<DocumentAccepte, PageJuridique> = {
+  conditions: "conditions",
+  donnees: "donnees-personnelles",
+};
+
+/** Un document qu'une case nomme est absent tant que sa page n'a aucune version publiée. */
+export const pageAbsente = (document: DocumentAccepte, publiees: Publiees): boolean =>
+  publiees[PAGE_DU_DOCUMENT[document]] === undefined;
 
 /**
  * Ce que l'écran ajoute sous la case, ou `null` quand tout ce qu'elle nomme
@@ -81,11 +92,9 @@ export const pageAbsente = (
  */
 export function reserveDeLAcceptation(
   nommes: readonly DocumentAccepte[],
-  registre: readonly PagePublique[] = PAGES_PUBLIQUES,
+  publiees: Publiees,
 ): string | null {
-  const absents = nommes
-    .map((cle) => DOCUMENTS_ACCEPTES[cle])
-    .filter((d) => pageAbsente(d.adresse, registre));
+  const absents = nommes.filter((cle) => pageAbsente(cle, publiees)).map((cle) => DOCUMENTS_ACCEPTES[cle]);
   if (absents.length === 0) return null;
 
   const noms = absents.map((d) => d.nom);
@@ -99,6 +108,28 @@ export function reserveDeLAcceptation(
   const accord = pluriel ? "ne sont pas encore publiées" : "n'est pas encore publiée";
 
   return `${majuscule(liste)} ${accord} : il n'existe à ce jour aucun texte à lire derrière cette case.`;
+}
+
+/** Les documents publiés qu'une case nomme : l'écran en fait des liens. */
+export const documentsALire = (
+  nommes: readonly DocumentAccepte[],
+  publiees: Publiees,
+): readonly { adresse: string; nom: string }[] =>
+  nommes.filter((cle) => !pageAbsente(cle, publiees)).map((cle) => DOCUMENTS_ACCEPTES[cle]);
+
+/**
+ * La version acceptée, telle que le consentement `CGU` l'enregistre — ou
+ * `null` si aucun des textes nommés n'est publié : on n'enregistre pas
+ * l'acceptation d'un texte qui n'existe pas.
+ *
+ * « conditions v3 · donnees-personnelles v2 » : la version de chaque texte
+ * réellement lu, et non un numéro global qu'il faudrait penser à changer.
+ */
+export function versionAcceptee(nommes: readonly DocumentAccepte[], publiees: Publiees): string | null {
+  const parties = nommes
+    .filter((cle) => !pageAbsente(cle, publiees))
+    .map((cle) => `${PAGE_DU_DOCUMENT[cle]} v${publiees[PAGE_DU_DOCUMENT[cle]]}`);
+  return parties.length > 0 ? parties.join(" · ") : null;
 }
 
 const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

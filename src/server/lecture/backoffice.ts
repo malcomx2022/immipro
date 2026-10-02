@@ -542,6 +542,10 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "regle.republication": "REGLE",
   "contenu.publication": "REGLE",
   "contenu.creation": "REGLE",
+  // S.101 — les textes juridiques se rangent avec les publications.
+  "juridique.variables": "REGLE",
+  "juridique.validation": "REGLE",
+  "juridique.publication": "REGLE",
   "revue.decision": "ACCES_PIECE",
   /**
    * Les deux exports du back-office.

@@ -183,6 +183,13 @@ jobs:
         run: npm run smoke:publication
       - run: echo "- **Publication d'une règle** — un seuil modifié est vu, relu par un second opérateur, et propagé selon son sens" >> "$GITHUB_STEP_SUMMARY"
 
+      # Les textes juridiques (S.101) : une page n'existe qu'une fois validée
+      # avec un relecteur nommé, une variable modifiée republie le texte
+      # validé qui l'emploie, et aucune version publiée ne se réécrit.
+      - name: Textes juridiques
+        run: npm run smoke:juridique
+      - run: echo "- **Textes juridiques** — validation nommée, republication sur variable, versions jamais réécrites" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention

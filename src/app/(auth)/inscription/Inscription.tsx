@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { reserveDeLAcceptation } from "@/domain/comptes/acceptation";
+import {
+  documentsALire,
+  reserveDeLAcceptation,
+  type Publiees,
+} from "@/domain/comptes/acceptation";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -13,11 +17,7 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { JaugeMotDePasse } from "../JaugeMotDePasse";
 
-/**
- * Dérivée une fois, au module : le registre des pages publiques est un
- * littéral, il ne change pas d'un rendu à l'autre.
- */
-const RESERVE_INSCRIPTION = reserveDeLAcceptation(["conditions", "donnees"]);
+const NOMMES = ["conditions", "donnees"] as const;
 
 /**
  * A-01 — Inscription.
@@ -31,7 +31,14 @@ const RESERVE_INSCRIPTION = reserveDeLAcceptation(["conditions", "donnees"]);
  * reçu qui distingue les deux : un formulaire d'inscription ne doit pas
  * servir à vérifier si quelqu'un a un compte ici.
  */
-export function Inscription() {
+export function Inscription({ publiees }: { publiees: Publiees }) {
+  /*
+    Les textes publiés sont lus par la page, en base (S.101) : la réserve
+    disparaît le jour où un texte est validé dans le back-office, sans
+    redéploiement, et la case mène alors au texte qu'elle fait accepter.
+  */
+  const reserve = reserveDeLAcceptation(NOMMES, publiees);
+  const aLire = documentsALire(NOMMES, publiees);
   const router = useRouter();
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -134,8 +141,20 @@ export function Inscription() {
               liens pour cette raison, l'acceptation ne l'avait pas suivi.
               La phrase se déduit du registre et disparaîtra avec lui — et
               elle se lit avant la case, comme sur l'écran de paiement. */}
-          {RESERVE_INSCRIPTION ? (
-            <p className="text-pretty text-13 text-ink-500">{RESERVE_INSCRIPTION}</p>
+          {reserve ? <p className="text-pretty text-13 text-ink-500">{reserve}</p> : null}
+          {aLire.length > 0 ? (
+            <p className="text-pretty text-13 text-ink-500">
+              À lire avant de cocher :{" "}
+              {aLire.map((d, i) => (
+                <span key={d.adresse}>
+                  {i > 0 ? " et " : ""}
+                  <Link href={d.adresse} className="text-accent-600 underline" target="_blank">
+                    {d.nom}
+                  </Link>
+                </span>
+              ))}
+              .
+            </p>
           ) : null}
           <Checkbox
             libelle="J'accepte les conditions d'utilisation et la politique de confidentialité."

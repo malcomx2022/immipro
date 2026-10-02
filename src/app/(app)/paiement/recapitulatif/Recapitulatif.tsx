@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { reserveDeLAcceptation } from "@/domain/comptes/acceptation";
+import { documentsALire, reserveDeLAcceptation, type Publiees } from "@/domain/comptes/acceptation";
 import { obstacleAuPaiement } from "@/domain/paiement/commande";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
@@ -73,10 +73,10 @@ export interface RecapitulatifProps {
    * Dossier quand il est possible, pour que le candidat compare.
    */
   supplementaire?: { passage: string | null };
+  /** Les textes juridiques publiés, lus en base par la page (S.101). */
+  publiees: Publiees;
 }
 
-/** Dérivée une fois, au module : le registre est un littéral. */
-const RESERVE_PAIEMENT = reserveDeLAcceptation(["conditions"]);
 
 export function Recapitulatif({
   tunnel,
@@ -85,7 +85,10 @@ export function Recapitulatif({
   deviseInitiale,
   montee,
   supplementaire,
+  publiees,
 }: RecapitulatifProps) {
+  const reserve = reserveDeLAcceptation(["conditions"], publiees);
+  const conditionsALire = documentsALire(["conditions"], publiees)[0];
   const [conditions, setConditions] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -280,8 +283,15 @@ export function Recapitulatif({
             rien ne s'intercale entre le consentement et le bouton qu'il
             déverrouille, et on apprend de toute façon mieux l'absence avant
             de cocher qu'après. */}
-        {RESERVE_PAIEMENT ? (
-          <p className="text-pretty text-13 text-ink-500">{RESERVE_PAIEMENT}</p>
+        {reserve ? <p className="text-pretty text-13 text-ink-500">{reserve}</p> : null}
+        {conditionsALire ? (
+          <p className="text-pretty text-13 text-ink-500">
+            À lire avant de cocher :{" "}
+            <Link href={conditionsALire.adresse} className="text-accent-600 underline" target="_blank">
+              {conditionsALire.nom}
+            </Link>
+            .
+          </p>
         ) : null}
         <Checkbox
           libelle="J'accepte les conditions d'utilisation et je comprends qu'ImmiPro prépare mon dossier sans garantir la décision de l'administration."

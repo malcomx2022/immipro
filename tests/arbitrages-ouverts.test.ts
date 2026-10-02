@@ -15,6 +15,7 @@ import {
   PAGES_PUBLIQUES,
   pagesBloquantes,
   pagesServies,
+  pagesSurValidation,
 } from "@/domain/exploitation/pages-publiques";
 
 /**
@@ -488,11 +489,31 @@ describe("Q.A (sous réserve) — les six pages publiques et leur responsable", 
    * en silence.
    */
   it("le registre et l'arborescence disent la même chose, page par page", () => {
-    // Servie ⇔ la route existe. Une ébauche créée sans passer par le
-    // registre fait tomber ce test, et un registre qui déclare servie une
-    // page absente aussi.
+    // Servie ou servie sur validation ⇔ la route existe. Une ébauche créée
+    // sans passer par le registre fait tomber ce test, et un registre qui
+    // déclare servie une page absente aussi.
     for (const page of PAGES_PUBLIQUES) {
-      expect(ROUTES.includes(page.adresse), page.adresse).toBe(page.servie !== undefined);
+      expect(ROUTES.includes(page.adresse), page.adresse).toBe(
+        page.servie !== undefined || page.surValidation !== undefined,
+      );
+    }
+  });
+
+  /**
+   * S.101 — les quatre bloquantes ont leur route, et elle ne sert rien
+   * avant la validation. La route lit la dernière version publiée et
+   * répond « introuvable » sans elle : le registre ne dit pas qu'elles
+   * sont validées, il dit qu'elles le seront par un acte tracé en base.
+   */
+  it("les quatre bloquantes sont servies sur validation, et seulement ainsi", () => {
+    expect(pagesSurValidation().map((p) => p.adresse).sort()).toEqual(
+      pagesBloquantes().map((p) => p.adresse).sort(),
+    );
+    for (const page of pagesSurValidation()) {
+      const source = lire(`src/app/(public)${page.adresse}/page.tsx`);
+      expect(source, page.adresse).toMatch(/texteServi\(/u);
+      expect(source, page.adresse).toMatch(/if \(!texte\) notFound\(\)/u);
+      expect(page.surValidation?.ecran, page.adresse).toBe("/textes-juridiques");
     }
   });
 
@@ -501,7 +522,7 @@ describe("Q.A (sous réserve) — les six pages publiques et leur responsable", 
    * pages légales et le contact attendent leurs textes validés : aucune
    * n'est écrite sans eux.
    */
-  it("seule « Comment ça marche » est servie ; le légal attend ses textes", () => {
+  it("seule « Comment ça marche » est servie sans condition ; le légal attend sa validation", () => {
     expect(pagesServies().map((p) => p.adresse)).toEqual(["/comment-ca-marche"]);
     for (const page of pagesBloquantes()) expect(page.servie, page.adresse).toBeUndefined();
     // L'historique reste : la page servie garde son responsable et son manque.

@@ -36,7 +36,7 @@ beforeEach(() => vi.restoreAllMocks());
 describe("Récapitulatif d'un passage à Dossier", () => {
   const rendre = (devise: "XOF" | "EUR" = "XOF") =>
     render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "montee" }}
         montee={detailDuPrix(devise === "XOF" ? { montant: 5000, devise } : { montant: 12, devise })}
@@ -83,7 +83,7 @@ describe("Récapitulatif d'un passage à Dossier", () => {
 describe("Un pack au prix plein sur un dossier déjà couvert", () => {
   it("se dit achat supplémentaire, et renvoie au passage quand il existe", () => {
     const { container } = render(
-      <Recapitulatif
+      <Recapitulatif publiees={{}}
         tunnel={TUNNEL}
         achat={{ type: "pack", code: "dossier" }}
         tarif={tarifDe({ type: "pack", code: "dossier" })!}

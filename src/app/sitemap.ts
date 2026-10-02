@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { fichesPubliees } from "@/server/lecture/destinations";
 import { adressesPubliees } from "@/server/lecture/editorial";
+import { pagesPubliees } from "@/server/juridique/lecture";
+import { MODELES, PAGES_JURIDIQUES } from "@/domain/juridique/modeles";
 import { PAGES_STABLES, adresseAbsolue, origineDuSite } from "@/domain/exploitation/plan-du-site";
 
 /**
@@ -29,10 +31,11 @@ import { PAGES_STABLES, adresseAbsolue, origineDuSite } from "@/domain/exploitat
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [{ fiches }, guides, articles] = await Promise.all([
+  const [{ fiches }, guides, articles, juridiques] = await Promise.all([
     fichesPubliees(),
     adressesPubliees("GUIDE"),
     adressesPubliees("ARTICLE"),
+    pagesPubliees(),
   ]);
 
   /**
@@ -46,6 +49,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...fiches.map((f) => `/destinations/${f.slug}`),
     ...guides.map((slug) => `/guides/${slug}`),
     ...articles.map((slug) => `/articles/${slug}`),
+    // S.101 — une page juridique n'entre au plan qu'une fois validée.
+    ...PAGES_JURIDIQUES.filter((p) => juridiques[p] !== undefined).map((p) => MODELES[p].adresse),
   ];
 
   /**

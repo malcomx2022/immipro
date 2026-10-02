@@ -28,11 +28,13 @@ const RACINES = [
  * titre focalisable dans chaque écran finirait par diverger. Chaque
  * porteur est vérifié une fois, ci-dessous.
  */
-const PORTEURS = ["EnteteAdmin", "Rubrique"];
+const PORTEURS = ["EnteteAdmin", "Rubrique", "TexteJuridique"];
 
 const FICHIERS_PORTEURS: Record<string, string> = {
   EnteteAdmin: join("src", "components", "admin", "EnteteAdmin.tsx"),
   Rubrique: join("src", "components", "ui", "Rubrique.tsx"),
+  // S.101 — les quatre pages juridiques le partagent.
+  TexteJuridique: join("src", "components", "juridique", "TexteJuridique.tsx"),
 };
 
 function routes(dir: string, acc: string[] = []): string[] {

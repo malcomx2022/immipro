@@ -9,6 +9,9 @@ import {
 import { dossierDuCandidat } from "@/server/acces/dossiers";
 import { schemaAchat } from "@/domain/payments/achat";
 import { formatMontant } from "@/lib/utils";
+import { db } from "@/lib/db";
+import { versionAcceptee } from "@/domain/comptes/acceptation";
+import { pagesPubliees } from "@/server/juridique/lecture";
 
 /**
  * Création d'un paiement — $-02, WF-05.
@@ -52,6 +55,18 @@ export const POST = route({
 
     const { montant } = montantDe(achat, devise);
     const { reference, url, reprise } = await ouvrirLeTunnel(acteur!.id, achat, devise);
+
+    /*
+      L'acceptation des conditions publiées, avec leur version — S.101.
+      L'écran ne laisse payer qu'une fois la case cochée ; les conditions
+      disent que « chaque acceptation est enregistrée avec la version des
+      conditions acceptée et sa date », et c'est ici qu'elle l'est. Une
+      reprise du même tunnel n'en ajoute pas une seconde.
+    */
+    const version = versionAcceptee(["conditions"], await pagesPubliees());
+    if (version && !reprise) {
+      await db.consent.create({ data: { userId: acteur!.id, kind: "CGU", granted: true, version } });
+    }
 
     return {
       reference,

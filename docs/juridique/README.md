@@ -1,28 +1,35 @@
-# Brouillons juridiques — statut et règles
+# Textes juridiques — statut et règles
 
-**Statut : brouillons de travail, non validés, non publiés.** Rédigés le 01/10/2026 (S.97) pour servir de base à la direction et au conseil juridique, conformément à l'arbitrage Q.A (`src/domain/exploitation/pages-publiques.ts`).
+**Statut : brouillons de travail, non validés, non publiés.** Rédigés le 01/10/2026 (S.97) pour servir de base à la direction et au conseil juridique, conformément à l'arbitrage Q.A (`src/domain/exploitation/pages-publiques.ts`). Depuis le 02/10/2026 (S.101), ils vivent comme **modèles à variables** dans `src/domain/juridique/modeles.ts`, et se publient depuis le back-office, écran **Textes juridiques** (`/textes-juridiques`).
 
-| Fichier | Page cible | Responsable (Q.A) | Porte |
+| Fichier de travail | Page | Responsable (Q.A) | Porte |
 |---|---|---|---|
 | `mentions-legales.brouillon.md` | `/mentions-legales` | Direction et conseil juridique | Bloquante avant l'ouverture au public |
 | `conditions.brouillon.md` | `/conditions` | Direction et conseil juridique | Bloquante avant l'ouverture au public |
 | `donnees-personnelles.brouillon.md` | `/donnees-personnelles` | Responsable conformité et conseil juridique | Bloquante avant l'ouverture au public |
+| — (modèle seulement) | `/contact` | Direction et opérations | Bloquante avant l'ouverture au public |
 
-`/contact` n'est pas rédigé ici : il dépend d'une voie de recours réellement tenue. Le brouillon de `/donnees-personnelles` ne peut être publié qu'une fois le responsable de traitement désigné.
+`/contact` ne porte que des coordonnées : adresse électronique, téléphone facultatif, horaires, adresse postale et délai de réponse. Il ne se publie que si cette voie est réellement tenue. `/donnees-personnelles` ne peut être validée qu'une fois le responsable de traitement désigné.
 
 ## Ce que ces brouillons sont, et ce qu'ils ne sont pas
 
 - **Ils décrivent le produit tel qu'il est codé.** Prix, remboursements, conservation, sous-traitants et cookies viennent du code. Chaque brouillon se termine par un tableau des sources, pour que la relecture vérifie le texte contre le produit et non contre une mémoire.
 - **Ils n'inventent rien de ce que le code ne connaît pas.** Identité de l'entité, immatriculation, droit applicable, droit de rétractation, âge minimum, délai de réponse : tout cela est marqué `[À COMPLÉTER]`. Les questions qui demandent un avis sont marquées `[À TRANCHER]`.
-- **Ils ne valent pas validation.** Un texte juridique faux est pire qu'une page absente (Q.A). Aucune route n'est créée tant que le texte n'est pas validé.
+- **Ils ne valent pas validation.** Un texte juridique faux est pire qu'une page absente (Q.A). Une page répond 404 tant qu'aucune version n'est validée au back-office.
 
-## Pour publier une page, une fois le texte validé
+## Pour publier une page
 
-1. Créer la route sous `src/app/(public)/`, à partir du texte validé, et non du brouillon.
-2. Marquer la page servie dans `PAGES_PUBLIQUES` (`servie: { le, source }`), sans effacer son responsable ni ce qui manquait. Les tests `arbitrages-ouverts` et `acceptation-sans-texte` le vérifient. Pour `/conditions`, la réserve affichée près des cases d'acceptation (inscription, récapitulatif de paiement) disparaît alors d'elle-même.
-3. Remettre le lien au pied de page et au plan du site.
-4. Mettre à jour la version des conditions acceptées (consentement `CGU`).
-5. Faire passer `npm run check:copy`. Les pages publiées sont dans l'interface candidat : le vocabulaire interdit de `CLAUDE.md` s'y applique entièrement.
+Plus aucune route ni aucun drapeau n'est à poser à la main : les quatre routes existent et répondent 404 tant qu'aucune version n'est validée.
+
+1. **Renseigner les variables** dans `/textes-juridiques` : identité de l'éditeur, hébergement, coordonnées, données personnelles, clauses des conditions. Chaque champ est vérifié à la saisie (format, longueur, vocabulaire interdit au rendu). La grille des prix et l'annulation d'une consultation viennent du produit et ne se saisissent pas.
+2. **Faire relire l'aperçu** par le conseil juridique. L'aperçu est le texte exact qui sera servi.
+3. **Valider et publier** : l'administrateur nomme le relecteur, la date de la relecture, un motif, et atteste que le texte relu est celui de l'aperçu. La validation est refusée tant qu'une variable obligatoire est vide ou qu'une formulation interdite subsiste. Elle crée une version numérotée, immuable, journalisée (`juridique.validation`).
+4. **Modifier une variable ensuite** republie aussitôt chaque texte déjà validé qui l'emploie, en nouvelle version qui reprend le relecteur et nomme les variables changées (`juridique.publication`). Un texte jamais validé n'est pas publié par une variable.
+5. **Modifier le texte d'un modèle** (dans le code, en revue) change son empreinte : la page passe « à revalider », continue de servir sa dernière version, et n'est plus republiée par les variables tant qu'une nouvelle validation nommée n'est pas faite.
+
+Le lien au pied de page, le plan du site, la réserve près des cases d'acceptation et la version des conditions enregistrée au consentement `CGU` (par exemple `conditions v3 · donnees-personnelles v2`) suivent d'eux-mêmes les versions publiées.
+
+**Ce que l'outil ne fait pas.** Il ne remplace pas la relecture : il la trace. Les valeurs saisies restent sous la responsabilité de la direction ; aucune n'est proposée par défaut.
 
 ## Écarts relevés en rédigeant, à trancher avant publication
 

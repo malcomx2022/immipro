@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   DOCUMENTS_ACCEPTES,
+  documentsALire,
   pageAbsente,
   reserveDeLAcceptation,
+  versionAcceptee,
   type DocumentAccepte,
 } from "@/domain/comptes/acceptation";
 import { PAGES_PUBLIQUES } from "@/domain/exploitation/pages-publiques";
@@ -30,22 +32,26 @@ const lire = (f: string) => readFileSync(f, "utf8");
  * retrouver ailleurs.
  */
 describe("l'acceptation ne nomme rien qu'on ne puisse lire", () => {
-  const PUBLIEE = PAGES_PUBLIQUES.filter((p) => p.adresse !== "/conditions");
+  /** Rien de publié : la situation d'avant la première validation. */
+  const RIEN = {};
+  /** Les conditions publiées en version 2, la politique de données non. */
+  const CONDITIONS = { conditions: 2 };
+  const TOUT = { conditions: 2, "donnees-personnelles": 1 };
 
-  it("les deux documents nommés sont bien ceux que le registre déclare absents", () => {
+  it("les deux documents nommés sont des pages bloquantes, servies sur validation", () => {
     for (const cle of Object.keys(DOCUMENTS_ACCEPTES) as DocumentAccepte[]) {
       const { adresse } = DOCUMENTS_ACCEPTES[cle];
-      expect(pageAbsente(adresse), adresse).toBe(true);
-      // Et bloquantes : ce ne sont pas des pages de confort.
-      expect(
-        PAGES_PUBLIQUES.find((p) => p.adresse === adresse)?.porte,
-        adresse,
-      ).toBe("BLOQUANTE");
+      const page = PAGES_PUBLIQUES.find((p) => p.adresse === adresse);
+      expect(page?.porte, adresse).toBe("BLOQUANTE");
+      expect(page?.surValidation, adresse).toBeDefined();
+      // Absent tant qu'aucune version n'est publiée, présent ensuite.
+      expect(pageAbsente(cle, RIEN), adresse).toBe(true);
+      expect(pageAbsente(cle, TOUT), adresse).toBe(false);
     }
   });
 
   it("la réserve nomme ce qui manque, dans l'ordre du libellé", () => {
-    const deux = reserveDeLAcceptation(["conditions", "donnees"]);
+    const deux = reserveDeLAcceptation(["conditions", "donnees"], RIEN);
     expect(deux).toContain("Les conditions d'utilisation");
     expect(deux).toContain("la politique de confidentialité");
     expect(deux!.indexOf("conditions")).toBeLessThan(deux!.indexOf("politique"));
@@ -62,40 +68,49 @@ describe("l'acceptation ne nomme rien qu'on ne puisse lire", () => {
    * phrase.
    */
   it("l'accord suit le nom du document, pas le nombre de documents", () => {
-    // Un seul document, au titre pluriel.
-    expect(reserveDeLAcceptation(["conditions"])).toContain("ne sont pas encore publiées");
-    // Un seul document, au titre singulier.
-    const singulier = reserveDeLAcceptation(["donnees"])!;
+    expect(reserveDeLAcceptation(["conditions"], RIEN)).toContain("ne sont pas encore publiées");
+    const singulier = reserveDeLAcceptation(["donnees"], RIEN)!;
     expect(singulier).toContain("n'est pas encore publiée");
     expect(singulier).not.toContain("ne sont pas");
-    // Deux documents : pluriel, quel que soit leur titre.
-    expect(reserveDeLAcceptation(["donnees", "conditions"])).toContain(
-      "ne sont pas encore publiées",
-    );
+    expect(reserveDeLAcceptation(["donnees", "conditions"], RIEN)).toContain("ne sont pas encore publiées");
   });
 
   /**
-   * La phrase se déduit du registre : le jour où la page est publiée, elle
-   * disparaît sans qu'on relise les écrans. C'est la même mécanique que les
-   * composantes absentes du classement.
+   * La phrase se déduit de ce qui est publié — en base depuis S.101 — et
+   * disparaît sans redéploiement quand le texte est validé.
    */
   it("elle disparaît quand la page est publiée", () => {
-    expect(reserveDeLAcceptation(["conditions"], PUBLIEE)).toBeNull();
+    expect(reserveDeLAcceptation(["conditions"], CONDITIONS)).toBeNull();
     // L'autre reste : une page publiée n'en publie pas une seconde.
-    expect(reserveDeLAcceptation(["conditions", "donnees"], PUBLIEE)).toContain(
+    expect(reserveDeLAcceptation(["conditions", "donnees"], CONDITIONS)).toContain(
       "La politique de confidentialité",
     );
-    expect(reserveDeLAcceptation([], PAGES_PUBLIQUES)).toBeNull();
+    expect(reserveDeLAcceptation(["conditions", "donnees"], TOUT)).toBeNull();
+    expect(reserveDeLAcceptation([], RIEN)).toBeNull();
   });
 
   it("elle ne promet rien et n'invente aucun contenu", () => {
     for (const nommes of [["conditions"], ["conditions", "donnees"]] as DocumentAccepte[][]) {
-      const phrase = reserveDeLAcceptation(nommes)!;
-      // Aucune date, aucun engagement de publication : le registre dit qui
-      // doit écrire ces pages, pas quand.
+      const phrase = reserveDeLAcceptation(nommes, RIEN)!;
       expect(phrase).not.toMatch(/bientôt|prochainement|\d{4}|dès que/u);
       expect(phrase).toContain("aucun texte à lire");
     }
+  });
+
+  /** Un document publié devient un lien ; un document absent n'en devient jamais un. */
+  it("seul un texte publié se lit, et se lie", () => {
+    expect(documentsALire(["conditions", "donnees"], RIEN)).toEqual([]);
+    expect(documentsALire(["conditions", "donnees"], CONDITIONS).map((d) => d.adresse)).toEqual(["/conditions"]);
+  });
+
+  /**
+   * L'acceptation enregistre la version de chaque texte réellement publié,
+   * et rien quand aucun ne l'est : on n'accepte pas un texte qui n'existe pas.
+   */
+  it("la version acceptée nomme chaque texte publié, et rien d'autre", () => {
+    expect(versionAcceptee(["conditions", "donnees"], RIEN)).toBeNull();
+    expect(versionAcceptee(["conditions", "donnees"], CONDITIONS)).toBe("conditions v2");
+    expect(versionAcceptee(["conditions", "donnees"], TOUT)).toBe("conditions v2 · donnees-personnelles v1");
   });
 
   /**
@@ -106,17 +121,28 @@ describe("l'acceptation ne nomme rien qu'on ne puisse lire", () => {
    * on apprend de toute façon mieux l'absence avant de cocher qu'après.
    */
   it.each([
-    ["src/app/(auth)/inscription/Inscription.tsx", "RESERVE_INSCRIPTION"],
-    ["src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx", "RESERVE_PAIEMENT"],
-  ])("%s affiche la réserve avant la case", (fichier, constante) => {
+    "src/app/(auth)/inscription/Inscription.tsx",
+    "src/app/(app)/paiement/recapitulatif/Recapitulatif.tsx",
+  ])("%s affiche la réserve et les liens avant la case", (fichier) => {
     const source = lire(fichier);
-    expect(source).toMatch(
-      new RegExp(`const ${constante} = reserveDeLAcceptation\\(`, "u"),
-    );
-    const iReserve = source.indexOf(`{${constante} ?`);
+    expect(source).toMatch(/const reserve = reserveDeLAcceptation\(/u);
+    const iReserve = source.indexOf("{reserve ?");
+    const iLiens = source.indexOf("À lire avant de cocher");
     const iCase = source.indexOf("<Checkbox");
     expect(iReserve).toBeGreaterThan(0);
     expect(iReserve).toBeLessThan(iCase);
+    expect(iLiens).toBeGreaterThan(0);
+    expect(iLiens).toBeLessThan(iCase);
+  });
+
+  /** Les deux routes qui font accepter enregistrent la version acceptée. */
+  it.each([
+    ["src/app/api/comptes/route.ts", '["conditions", "donnees"]'],
+    ["src/app/api/paiements/route.ts", '["conditions"]'],
+  ])("%s enregistre l'acceptation avec sa version", (fichier, nommes) => {
+    const source = lire(fichier);
+    expect(source).toContain(`versionAcceptee(${nommes}, await pagesPubliees())`);
+    expect(source).toMatch(/kind: "CGU", granted: true, version/u);
   });
 
   /**

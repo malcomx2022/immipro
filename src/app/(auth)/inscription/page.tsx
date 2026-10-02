@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inscription } from "./Inscription";
+import { pagesPubliees } from "@/server/juridique/lecture";
 
 /**
  * A-01 — Inscription. WF-02.
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
   description: "Crée ton compte ImmiPro pour ouvrir et suivre un dossier.",
 };
 
-export default function PageInscription() {
-  return <Inscription />;
+/** La case nomme des textes publiés ou non : cela se lit en base, à chaque visite (S.101). */
+export const dynamic = "force-dynamic";
+
+export default async function PageInscription() {
+  return <Inscription publiees={await pagesPubliees()} />;
 }
