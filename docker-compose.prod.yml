@@ -13,13 +13,42 @@ services:
       interval: 10s
       retries: 5
 
+  # Stockage objet S3 des pièces — I.D.
+  #
+  # MinIO n'est plus distribué en image Docker (source-only depuis fin
+  # 09/2026 : `minio/minio` n'existe plus sur Docker Hub). Le service est
+  # donc assuré par Garage (même image que les sauvegardes du VPS,
+  # `dxflrs/garage:v2.2.0`, déjà éprouvée), qui expose une API S3
+  # compatible avec le client `minio` de l'application
+  # (`src/lib/storage.ts` : presigned GET/PUT, get, stat, copy, remove).
+  #
+  # Le nom du service reste `minio` : `MINIO_ENDPOINT=minio` dans
+  # `.env.app` continue de fonctionner sans modification.
+  #
+  # Premier démarrage (à faire une fois, le layout persiste dans le
+  # volume `miniometa`) :
+  #   cid=$(docker compose exec minio /garage status | grep -oE '^[0-9a-f]{16}' | head -1)
+  #   docker compose exec minio /garage layout assign -z dc1 -c 100G $cid
+  #   docker compose exec minio /garage layout apply --version 1
+  # puis les seaux et la clé d'accès (le secret ne s'affiche qu'une fois) :
+  #   docker compose exec minio /garage bucket create immipro-documents
+  #   docker compose exec minio /garage bucket create immipro-quarantaine
+  #   docker compose exec minio /garage key create immipro-app
+  #   docker compose exec minio /garage bucket allow --read --write immipro-documents --key <ID>
+  #   docker compose exec minio /garage bucket allow --read --write immipro-quarantaine --key <ID>
+  # et reporter l'ID et le secret dans MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
+  # de `.env.app` (`.env.minio` est conservé pour mémoire).
+  #
+  # `garage.toml` porte un secret RPC : le dépôt ne contient qu'un modèle
+  # (secret à remplacer), le serveur porte le vrai fichier (600).
   minio:
-    image: minio/minio
+    image: dxflrs/garage:v2.2.0
     restart: unless-stopped
-    command: server /data
-    env_file: .env.minio
+    command: ["/garage", "server"]
     volumes:
-      - miniodata:/data
+      - miniodata:/var/lib/garage/data
+      - miniometa:/var/lib/garage/meta
+      - ./garage.toml:/etc/garage.toml:ro
     networks: [internal]
 
   app:
@@ -112,4 +141,5 @@ networks:
 volumes:
   pgdata:
   miniodata:
+  miniometa:
   clamdb:
