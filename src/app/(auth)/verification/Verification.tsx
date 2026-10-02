@@ -12,6 +12,7 @@ import {
   normaliserCode,
 } from "@/domain/comptes/code-verification";
 import { appeler } from "@/lib/api";
+import { suiteInterne } from "@/domain/comptes/suite";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,14 @@ import { cn } from "@/lib/utils";
  * cours est écrite dans le chapeau, comme au prototype : c'est en la lisant
  * qu'on voit la faute de frappe.
  */
+/**
+ * Où aller après la vérification, ou après « Plus tard » : la page qui avait
+ * demandé la connexion, si elle est interne, sinon le tableau de bord. Lue
+ * au moment du geste, comme à la connexion.
+ */
+const apres = (): string =>
+  suiteInterne(new URLSearchParams(window.location.search).get("suite")) ?? "/tableau-de-bord";
+
 export function Verification({ email = null }: { email?: string | null }) {
   const router = useRouter();
   const [code, setCode] = useState("");
@@ -53,7 +62,7 @@ export function Verification({ email = null }: { email?: string | null }) {
     setEchec(null);
     const resultat = await appeler("/api/comptes/verification", { corps: { code } });
     if (resultat.ok) {
-      router.push("/tableau-de-bord");
+      router.push(apres());
       return;
     }
     setEnvoi(false);
@@ -261,7 +270,7 @@ export function Verification({ email = null }: { email?: string | null }) {
           variante="tertiaire"
           pleineLargeur
           className="h-11 text-14"
-          onClick={() => router.push("/tableau-de-bord")}
+          onClick={() => router.push(apres())}
         >
           Plus tard
         </Button>
