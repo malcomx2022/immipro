@@ -5,10 +5,11 @@ import {
   etatDesCapacites,
   fileTenue,
   messageDeSurveillance,
+  surveillanceRemboursementManuel,
 } from "@/domain/exploitation/dependances";
 import { constaterLesDependances } from "@/server/exploitation/capacites";
 import { fournisseursDeclares } from "@/domain/payments/rail";
-import { CLE_FOURNISSEURS } from "@/server/paiement/secrets";
+import { CLE_FOURNISSEURS, espaceReel } from "@/server/paiement/secrets";
 import { lireLesConstats } from "@/server/exploitation/constats";
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
 import { ABANDON_JOURS } from "@/domain/dossiers/inactivite";
@@ -271,8 +272,27 @@ function messageDeLaPurge(purge: EtatDeLaPurge): string {
   return `${retard} ${purge.sansEcheance} dossier(s) inactifs depuis plus de ${ABANDON_JOURS} jours portent encore des pièces sans aucune échéance de rétention.`;
 }
 
+/**
+ * Les dossiers payés pour de vrai sur le rail sans API de remboursement —
+ * ce que la décision du 03/10/2026 plafonne. Un dossier, pas une
+ * transaction : une recharge sur le même dossier ne fait pas un dossier
+ * de plus à rembourser.
+ */
+async function compterLesDossiersPayes(): Promise<number> {
+  try {
+    const lignes = await db.transaction.findMany({
+      where: { provider: "FEDAPAY", status: { in: ["CONFIRMEE", "REMBOURSEE"] } },
+      distinct: ["applicationId"],
+      select: { applicationId: true },
+    });
+    return lignes.length;
+  } catch {
+    return 0;
+  }
+}
+
 export async function GET() {
-  const [base, file, quarantaine, purge, suspensions, faits] = await Promise.all([
+  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
@@ -292,9 +312,24 @@ export async function GET() {
       Les sondes restent pures et reçoivent ce qu'on a trouvé.
     */
     lireLesConstats(),
+    compterLesDossiersPayes(),
   ]);
 
-  const constats = constaterLesDependances(process.env, faits);
+  /*
+    Le remboursement manuel FedaPay, accepté pour le pilote — 03/10/2026.
+    L'acceptation tient au volume : au-delà du seuil, la procédure n'est
+    plus celle qui a été décidée, et le point redevient bloquant — c'est
+    l'alerte, et un 503 se voit de la surveillance.
+  */
+  const remboursementManuel = surveillanceRemboursementManuel(
+    dossiersPayes,
+    espaceReel("FEDAPAY"),
+  );
+  const constats = constaterLesDependances(process.env, faits).map((c) =>
+    c.cle === "remboursement" && c.capacite === "PROCEDURE_MANUELLE" && remboursementManuel.depasse
+      ? { ...c, capacite: "IMPLEMENTATION_ABSENTE" as const }
+      : c,
+  );
   const etat = etatDesCapacites(constats);
   const intitules = new Map(DEPENDANCES.map((d) => [d.cle, d.intitule]));
 
@@ -336,6 +371,7 @@ export async function GET() {
         de l'extérieur, d'un code qui l'ignore : les deux rendaient
         « configuration absente ».
       */
+      remboursementManuel,
       fournisseursDePaiement: (() => {
         const lu = fournisseursDeclares(process.env[CLE_FOURNISSEURS]);
         return {

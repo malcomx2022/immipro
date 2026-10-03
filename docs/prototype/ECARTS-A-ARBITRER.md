@@ -11121,3 +11121,15 @@ Le candidat coche qu'il accepte les conditions. En espace réel, lui faire payer
 ### 2. Pré-remplir le numéro dans le widget FedaPay — décidé : non, pour l'instant
 
 Aucune donnée personnelle de plus n'est transmise au prestataire : le candidat saisit son numéro dans le widget. À rouvrir après avis de la conformité. Il faudrait alors citer FedaPay comme destinataire du numéro dans la page des données personnelles.
+
+## S.112 — Décisions de la direction du 03/10/2026 : remboursement manuel, responsable de la revue
+
+1. **Remboursement manuel FedaPay : accepté pour le pilote.** FedaPay n'a pas d'API de remboursement : c'est une contrainte du prestataire, pas un choix. Pour un pilote de dix dossiers, la procédure au tableau de bord, déclarée en B-04, est gérable et traçable.
+   - **Nouvelle capacité `PROCEDURE_MANUELLE`.** Elle s'applique quand il n'y a pas d'adaptateur mais qu'une procédure tracée est acceptée. Elle compte comme une réserve, au même titre que `NON_VERIFIABLE` : l'instance passe en `PILOTE` et sort d'`INAPTE`. La capacité dérive du point de branchement : seul le rail sans API (FedaPay) en bénéficie, et Stripe garde son adaptateur.
+   - **Alerte de volume.** Au-delà de `SEUIL_PILOTE_REMBOURSEMENT_MANUEL` (10 dossiers payés pour de vrai, dossiers distincts, FedaPay confirmé ou remboursé), le point redevient bloquant : 503, avec un message qui dit de reprendre la décision. En bac à sable, les paiements d'essai ne comptent pas. Le détail figure dans `/api/health` → `remboursementManuel`.
+   - **Procédure opérateur** : `docs/exploitation/remboursement-fedapay.md`. Rembourser au tableau de bord FedaPay (MTN uniquement), déclarer la référence en B-04, puis attendre la notification signée `refunded`.
+2. **Blocage de l'encaissement réel sans conditions de vente : confirmé** (S.111, PR #199). Le motif : une exposition juridique dans tout l'espace CEDEAO.
+3. **Numéro non pré-rempli chez FedaPay : confirmé**, jusqu'à l'avis de la conformité (L.A).
+4. **Responsable de la revue manuelle : le superadmin.** Exigences du rôle : disponibilité sous 4 h (délai cible), rigueur sur les pièces d'identité, accès au back-office. Sans IA, chaque pièce du pilote passe par lui.
+
+**Pour ouvrir le pilote**, il reste à payer un pack de bout en bout en bac à sable (notification signée, puis crédit) et à vérifier en production le lien vers le numéro au profil et l'affichage après envoi.

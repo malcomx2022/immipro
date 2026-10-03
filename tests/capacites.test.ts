@@ -192,7 +192,12 @@ describe("un `.env` complet devant des points de branchement vides", () => {
         configurée, et personne n'a encore présenté EICAR au moteur.
       */
       antivirus: "CONFIGUREE_NON_VERIFIEE",
-      remboursement: "IMPLEMENTATION_ABSENTE",
+      /*
+        FedaPay n'a pas d'API de remboursement : la procédure manuelle
+        tracée en B-04 en tient lieu, acceptée pour le pilote par la
+        direction le 03/10/2026 (S.112). Stripe, lui, a son adaptateur.
+      */
+      remboursement: "PROCEDURE_MANUELLE",
       /*
         L'extraction est branchée depuis le 22/09/2026 : avec une clé,
         l'adaptateur existe. Elle s'arrête à « configurée, non vérifiée »
@@ -219,8 +224,8 @@ describe("un `.env` complet devant des points de branchement vides", () => {
       facturée. La ranger parmi les bloquantes rendait l'instance inapte
       pour toujours.
     */
-    expect(etat.bloquantes).toEqual(["messagerie", "antivirus", "remboursement"]);
-    expect(etat.reserves).toEqual(["ouverture_paiement"]);
+    expect(etat.bloquantes).toEqual(["messagerie", "antivirus"]);
+    expect(etat.reserves).toEqual(["ouverture_paiement", "remboursement"]);
   });
 
   /**
