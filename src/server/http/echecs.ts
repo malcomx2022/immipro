@@ -1,3 +1,4 @@
+import { MENTION_ENCAISSEMENT_SUSPENDU } from "@/domain/paiement/ouverture";
 /**
  * Contrat d'échec de l'API — DOC-12 §16, « Langue des messages d'erreur ».
  *
@@ -69,6 +70,7 @@ export type CodeEchec =
   | "montee_indisponible"
   | "creneau_indisponible"
   | "paiement_indisponible"
+  | "paiement_sans_conditions"
   | "ouverture_impossible"
   | "ouverture_refusee"
   | "signature_invalide"
@@ -286,6 +288,20 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     action: "Choisir un autre créneau",
     ton: "limite",
   },
+  /**
+   * Un paiement réel sans conditions de vente publiées — décision du
+   * 03/10/2026. L'espace d'essai reste ouvert ; l'encaissement réel attend
+   * que `/conditions` ait une version validée (Q.A). Ce n'est pas une
+   * panne : réessayer ne changera rien, et l'écran ne le propose pas.
+   */
+  paiement_sans_conditions: {
+    statut: 503,
+    titre: "Le paiement n'est pas encore ouvert",
+    corps: MENTION_ENCAISSEMENT_SUSPENDU,
+    conserve: "Rien n'a été débité, et ton dossier reste tel quel.",
+    action: "Revenir à mon dossier",
+    ton: "attente",
+  },
   paiement_indisponible: {
     statut: 503,
     titre: "Le paiement ne peut pas être ouvert",
@@ -485,6 +501,7 @@ export const CONSERVE_DU_CANDIDAT: readonly CodeEchec[] = [
   "televersement_indisponible",
   "creneau_indisponible",
   "paiement_indisponible",
+  "paiement_sans_conditions",
   "montee_indisponible",
   "ouverture_impossible",
   "ouverture_refusee",

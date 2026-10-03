@@ -108,6 +108,25 @@ export function fournisseursActifs(
   return fournisseurs;
 }
 
+/**
+ * Le fournisseur encaisse-t-il pour de vrai ? — 03/10/2026.
+ *
+ * FedaPay : `FEDAPAY_ENVIRONMENT=live` (le bac à sable est l'espace par
+ * défaut). Stripe : une clé `sk_live_` ou `rk_live_`. Sert à refuser
+ * l'encaissement réel tant que les conditions de vente ne sont pas
+ * publiées, sans fermer les essais.
+ */
+export function espaceReel(
+  fournisseur: FournisseurDePaiement,
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  const lu = environnementNormalise(environnement);
+  if (fournisseur === "FEDAPAY") {
+    return (lu[CLES.FEDAPAY.environnement] ?? "").trim().toLowerCase() === "live";
+  }
+  return /^(sk|rk)_live_/u.test((lu[CLES.STRIPE.apiKey] ?? "").trim());
+}
+
 /** Une fois par nom et par processus : un avertissement répété ne se lit plus. */
 const deja = new Set<string>();
 

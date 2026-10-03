@@ -11106,3 +11106,18 @@ L'API `PUT /api/comptes/profil` acceptait déjà le numéro, validé au format i
 - le lien du récapitulatif mène à `/profil#telephone`.
 
 **À noter.** Ce numéro n'est pas transmis à FedaPay : le widget demande le sien. Le pré-remplir (`customer.phone_number`, documenté à la création) éviterait une double saisie, mais transmet une donnée personnelle de plus au prestataire. C'est une décision produit et conformité.
+
+## S.111 — Décisions du 03/10/2026 sur le paiement
+
+### 1. Aucun encaissement réel sans conditions de vente publiées — décidé : oui
+
+Le candidat coche qu'il accepte les conditions. En espace réel, lui faire payer un texte « pas encore publié » n'est pas tenable. Le bac à sable reste ouvert, pour que les essais continuent.
+
+- **Espace réel** (`espaceReel`, `server/paiement/secrets.ts`) : `FEDAPAY_ENVIRONMENT=live` pour FedaPay, une clé `sk_live_` ou `rk_live_` pour Stripe.
+- **`ouvrirLeTunnel`** refuse avec `paiement_sans_conditions` tant que `/conditions` n'a pas de version validée. Le refus intervient avant toute écriture et sans appel au fournisseur. Le pack et la consultation passent tous deux par là.
+- **Récapitulatif** : il le dit avant le clic et désactive « Payer », avec la même phrase (`MENTION_ENCAISSEMENT_SUSPENDU`) que le refus du serveur.
+- **Vérifications** : `smoke:fedapay` (espace réel sans conditions : refus sans écriture), `tests/fournisseurs-ouverts.test.ts` (espace réel) et `tests/ui/p0-paiement.test.tsx` (bouton désactivé, mention).
+
+### 2. Pré-remplir le numéro dans le widget FedaPay — décidé : non, pour l'instant
+
+Aucune donnée personnelle de plus n'est transmise au prestataire : le candidat saisit son numéro dans le widget. À rouvrir après avis de la conformité. Il faudrait alors citer FedaPay comme destinataire du numéro dans la page des données personnelles.

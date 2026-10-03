@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { MENTION_ENCAISSEMENT_SUSPENDU } from "@/domain/paiement/ouverture";
 import { useState } from "react";
 import { documentsALire, reserveDeLAcceptation, type Publiees } from "@/domain/comptes/acceptation";
 import { obstacleAuPaiement } from "@/domain/paiement/commande";
@@ -75,6 +76,12 @@ export interface RecapitulatifProps {
   supplementaire?: { passage: string | null };
   /** Les textes juridiques publiés, lus en base par la page (S.101). */
   publiees: Publiees;
+  /**
+   * Le fournisseur de cette devise encaisse pour de vrai, et les
+   * conditions ne sont pas publiées : le paiement ne s'ouvre pas
+   * (décision du 03/10/2026). Le bac à sable n'est pas concerné.
+   */
+  encaissementSuspendu?: boolean;
 }
 
 
@@ -86,6 +93,7 @@ export function Recapitulatif({
   montee,
   supplementaire,
   publiees,
+  encaissementSuspendu = false,
 }: RecapitulatifProps) {
   const reserve = reserveDeLAcceptation(["conditions"], publiees);
   const conditionsALire = documentsALire(["conditions"], publiees)[0];
@@ -101,7 +109,11 @@ export function Recapitulatif({
   // Un rail fermé (`PAIEMENT_FOURNISSEURS`) ne se paie pas : l'adresse
   // peut porter `devise=EUR` pendant le pilote FedaPay (03/10/2026).
   const railFerme = !tunnel.devisesOuvertes.includes(devise);
-  const obstacle = railFerme ? mentionRailFerme(devise) : obstacleAuPaiement(conditions);
+  const obstacle = railFerme
+    ? mentionRailFerme(devise)
+    : encaissementSuspendu
+      ? MENTION_ENCAISSEMENT_SUSPENDU
+      : obstacleAuPaiement(conditions);
   const montant = formatMontant(montee ? montee.montant : (tarif?.prix[devise] ?? 0), devise);
   const libelle = montee ? LIBELLE_MONTEE : (tarif?.libelle ?? "");
   const autreDevise: Devise = devise === "XOF" ? "EUR" : "XOF";
@@ -279,6 +291,11 @@ export function Recapitulatif({
           comme avant. */}
       <div className="-mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
         {echec ? <BlocEchec echec={echec} annonce /> : null}
+        {encaissementSuspendu && !railFerme ? (
+          <p role="status" className="text-pretty text-14 text-ink-700">
+            {MENTION_ENCAISSEMENT_SUSPENDU}
+          </p>
+        ) : null}
         {railFerme ? (
           <p role="status" className="text-pretty text-14 text-ink-700">
             {mentionRailFerme(devise)}{" "}

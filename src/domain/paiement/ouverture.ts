@@ -248,3 +248,12 @@ export const traceDeLOuverture = (
  */
 export const OUVERTURE_SANS_PAGE =
   "Notre prestataire n'a pas rendu la page de paiement. Ta demande est enregistrée chez lui : en reprenant, tu retomberas sur la même, et rien ne sera débité deux fois.";
+
+/**
+ * Encaissement réel suspendu tant que les conditions de vente ne sont pas
+ * publiées — décision du 03/10/2026. Une seule phrase, lue par le
+ * catalogue d'échecs (refus serveur) et par le récapitulatif (avant le
+ * clic) : deux copies finiraient par dire deux choses.
+ */
+export const MENTION_ENCAISSEMENT_SUSPENDU =
+  "Nos conditions de vente ne sont pas encore publiées : aucun paiement ne peut être encaissé avant.";
