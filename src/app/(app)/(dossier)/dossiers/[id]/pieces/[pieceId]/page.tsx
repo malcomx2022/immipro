@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { analyseDeLaPiece, quotaDuDossier, vueDuDossier } from "@/server/lecture/dossiers";
 import { exigerCandidat } from "@/server/securite/page";
 import { formatMontant } from "@/lib/utils";
+import { autorisationAccordee } from "@/server/acces/consentements";
 
 /**
  * C-07 et C-08 — une pièce du dossier. WF-06, RG-06.5.
@@ -57,12 +58,16 @@ export default async function PagePiece({
   // Lu même quand il reste des analyses : le quota peut s'épuiser au
   // dépôt suivant, et l'écran bascule alors sans recharger la page.
   const passage = await offreDeMontee(id, acteur.id);
+  // RG-02.2 : aucune pièce sans cette autorisation. L'écran la demande sur
+  // place au lieu de laisser le dépôt échouer sans issue (03/10/2026).
+  const autorise = await autorisationAccordee(acteur.id, "pieces_identite");
 
   return (
     <PieceDuDossier
       dossier={vueDossier.dossier}
       piece={vuePiece.piece}
       quota={quota}
+      autorise={autorise}
       analyse={vuePiece.analyse ?? undefined}
       prixRecharge={formatMontant(RECHARGE_ANALYSES.prix[devise], devise)}
       volumeRecharge={RECHARGE_ANALYSES.volume}

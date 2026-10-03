@@ -44,8 +44,15 @@ export const libelleQuota = (quota: Quota): string =>
 export const messageQuotaEpuise = (volume: number, prixRecharge: string): string =>
   `Tu peux toujours téléverser et conserver tes pièces, sans vérification automatique. Une recharge de ${volume} analyses coûte ${prixRecharge}.`;
 
+/**
+ * Sans pack, il n'y a pas d'analyses « utilisées » : il n'y en a jamais eu.
+ * La phrase disait « Tes 0 analyses du pack sans pack sont utilisées »
+ * (test du 03/10/2026).
+ */
 export const titreQuotaEpuise = (quota: Quota): string =>
-  `Tes ${quota.total} analyses du pack ${quota.pack} sont utilisées`;
+  quota.total <= 0
+    ? "Aucune analyse n'est incluse tant que le dossier n'a pas de pack"
+    : `Tes ${quota.total} analyses du pack ${quota.pack} sont utilisées`;
 
 /** Libellé du bouton principal, par état. */
 export function libelleCta(etat: EtatTeleversement): string {

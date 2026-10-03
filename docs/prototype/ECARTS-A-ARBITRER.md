@@ -10874,3 +10874,47 @@ M.C reste ouvert jusqu'à réception de l'avis.
 - Tests : `tests/ouverture-dossier.test.ts` et `tests/ui/p0-dossier1.test.tsx` (corps envoyé).
 
 **Si l'erreur persiste après déploiement** : relever, dans l'onglet Réseau du navigateur, le corps de la requête `POST /api/dossiers` et sa réponse.
+
+## S.107 — Le dépôt d'une pièce n'aboutissait pas : l'autorisation ne pouvait pas être donnée
+
+**Relevé en test de bout en bout, en production, le 03/10/2026.**
+
+| Étape | Résultat |
+|---|---|
+| Création du dossier (S.106) | ✅ |
+| Fichier PDF choisi | ✅ |
+| « Ajouter la pièce » | ❌ aucun dépôt n'aboutit |
+
+Le testeur décrivait une case « J'autorise l'analyse de mes pièces d'identité » qui apparaissait puis disparaissait.
+
+**Ce que fait le code.** RG-02.2 refuse tout dépôt tant que l'autorisation de traiter les pièces d'identité n'est pas donnée. Le serveur répond alors « L'analyse de tes pièces demande ton autorisation », avec l'action « Ouvrir mes autorisations ». Or l'écran de dépôt :
+
+- ne proposait **aucune case** pour donner cette autorisation ;
+- affichait le refus **sans lien** vers « Mes consentements » ;
+- n'indiquait nulle part, avant le clic, que l'autorisation manquait.
+
+Un candidat qui n'était jamais passé par « Mes consentements » n'avait donc aucun moyen de déposer une pièce.
+
+**Non reproduit tel quel.** En local, le bouton envoie bien la requête de dépôt. La case décrite par le testeur n'existe pas sur cet écran.
+
+**Correction** (`PieceDuDossier`, page de la pièce)
+
+- La page lit l'autorisation côté serveur. Si elle manque, l'écran affiche la case « J'autorise l'analyse de mes pièces d'identité », décochée, avec le texte de « Mes consentements » et un lien vers cet écran pour la retirer.
+- Cocher la case enregistre l'autorisation par la même route que « Mes consentements » (`PUT /api/comptes/consentements`), avec sa date et sa version (RG-02.1).
+- Tant que l'autorisation manque, « Ajouter la pièce » et « Téléverser sans analyse » sont désactivés, et l'écran dit pourquoi.
+- L'état vit dans le composant : la case ne revient pas quand la page se rafraîchit après un dépôt. Si l'autorisation est retirée entre-temps depuis un autre appareil, le refus du serveur fait réapparaître la case, au lieu d'un refus sans issue.
+
+**Deux défauts corrigés au passage, sur le même écran**
+
+- **Autorisation inventée.** La phrase « Tu as autorisé l'analyse automatique des pièces financières le 11/09/2026 » s'affichait à tous les candidats : une autorisation et une date fictives. Elle est retirée. Seul un lien vers « Mes consentements » reste.
+- **Titre absurde sans pack.** Le titre disait « Tes 0 analyses du pack sans pack sont utilisées ». Il dit maintenant « Aucune analyse n'est incluse tant que le dossier n'a pas de pack ».
+
+**Vérification**
+
+- Sur le serveur compilé, dans Chromium, avec un compte sans autorisation :
+  - la case est visible et le reste après 2 s comme après le choix du fichier ;
+  - « Ajouter la pièce » est désactivé ;
+  - cocher la case envoie `PUT /api/comptes/consentements` (200), la case disparaît et le bouton s'active ;
+  - le clic envoie `POST …/depot`. En local, la réponse est 503 parce que l'antivirus n'y tourne pas ; il est opérationnel en production ;
+  - après rechargement, la case ne revient pas.
+- Tests : `tests/ui/p0-dossier2.test.tsx` (3 cas) et `tests/dossier2.test.ts` (titre sans pack).
