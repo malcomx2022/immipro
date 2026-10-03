@@ -114,10 +114,7 @@ export function mentionApercu(
  * retombe sur le message ordinaire : il reste vrai le plus souvent, et
  * inventer une inquiétude serait aussi faux que la taire.
  */
-export function mentionDeLAttente(
-  attente?: AttenteAuControle,
-  maintenant = new Date(),
-): string {
+export function mentionDeLAttente(attente?: AttenteAuControle, maintenant = new Date()): string {
   // Une cause connue l'emporte : elle dit ce qui se passe, et parfois
   // quoi faire. C'est plus qu'une durée.
   if (attente?.cause) return ATTENTE_AU_CONTROLE[attente.cause];
@@ -168,3 +165,78 @@ export function refusAuControle(libelleDeLaPiece: string): RefusDeContenu {
     corps: `Le contrôle de sécurité a écarté le fichier déposé pour « ${libelleDeLaPiece} », et il n'a pas été conservé. Reprends le document à la source — réexporte le PDF depuis ton application bancaire, ou photographie à nouveau la pièce — puis dépose le nouveau fichier.`,
   };
 }
+
+/**
+ * Ce que l'écran de la pièce dit du dernier fichier déposé — 03/10/2026.
+ *
+ * En test de production, le fichier arrivait, le balayage passait — la
+ * pastille « Conservée, non vérifiée » ne s'écrit qu'après un verdict
+ * sain — et l'écran de la pièce n'en disait rien : ni contrôle en cours,
+ * ni contrôle passé. Après 45 secondes, la personne qui testait concluait
+ * que l'antivirus ne s'était pas déclenché.
+ *
+ * Le contrôle était fait ; il n'était pas lu. La version porte son état,
+ * sa date de balayage et son attente, et `mentionApercu` savait déjà
+ * dire l'attente. Il manquait de l'afficher là où on vient de déposer.
+ *
+ * `null` quand il n'y a rien à dire : aucun fichier déposé, une version
+ * rédigée sans octet, ou un fichier purgé par la rétention.
+ */
+export type ControleDuDepot =
+  | { etat: "EN_QUARANTAINE"; titre: string; corps: string }
+  | { etat: "SAINE"; titre: string; corps: string }
+  | { etat: "INFECTEE"; titre: string; corps: string };
+
+export interface DernierDepot {
+  etat: EtatBalayage;
+  /** Un fichier existe ou a existé : une version rédigée n'a pas d'octet à contrôler. */
+  depose: boolean;
+  purge: boolean;
+  depuis: Date;
+  controleLe: Date | null;
+  cause?: CauseDIndisponibilite;
+}
+
+export function controleDuDepot(
+  depot: DernierDepot | null,
+  maintenant = new Date(),
+): ControleDuDepot | null {
+  if (!depot || depot.purge) return null;
+  switch (depot.etat) {
+    case "EN_QUARANTAINE":
+      if (!depot.depose) return null;
+      return {
+        etat: "EN_QUARANTAINE",
+        titre: "Contrôle de sécurité en cours",
+        corps: mentionDeLAttente(
+          { depuis: depot.depuis, ...(depot.cause ? { cause: depot.cause } : {}) },
+          maintenant,
+        ),
+      };
+    case "SAINE":
+      if (!depot.depose) return null;
+      return {
+        etat: "SAINE",
+        titre: "Fichier reçu et contrôlé",
+        corps: depot.controleLe
+          ? `Le contrôle de sécurité n'a rien détecté le ${jourAffiche(depot.controleLe)}. Ton fichier est conservé dans ton dossier.`
+          : "Le contrôle de sécurité n'a rien détecté. Ton fichier est conservé dans ton dossier.",
+      };
+    case "INFECTEE":
+      return {
+        etat: "INFECTEE",
+        titre: "Fichier écarté au contrôle",
+        corps: mentionApercu("INFECTEE")!,
+      };
+    default: {
+      const jamais: never = depot.etat;
+      throw new Error(`État de balayage non arbitré : ${JSON.stringify(jamais)}`);
+    }
+  }
+}
+
+/** « 03/10/2026 » — le jour UTC, identique au rendu serveur et au navigateur. */
+const jourAffiche = (date: Date): string => {
+  const [annee, mois, jour] = date.toISOString().slice(0, 10).split("-");
+  return `${jour}/${mois}/${annee}`;
+};

@@ -170,7 +170,7 @@ export function raisonSansApercu(version: DocumentVersion, maintenant = new Date
  * sinon on retombe sur le message d'attente ordinaire, qui ne promet
  * rien de faux.
  */
-const estUneCause = (valeur: string | null): valeur is CauseDIndisponibilite =>
+export const estUneCause = (valeur: string | null): valeur is CauseDIndisponibilite =>
   valeur !== null && valeur in ATTENTE_AU_CONTROLE;
 
 export async function enregistrerLaVersion(

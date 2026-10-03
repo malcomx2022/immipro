@@ -69,6 +69,7 @@ export default async function PagePiece({
       quota={quota}
       autorise={autorise}
       analyse={vuePiece.analyse ?? undefined}
+      controle={vuePiece.controle}
       prixRecharge={formatMontant(RECHARGE_ANALYSES.prix[devise], devise)}
       volumeRecharge={RECHARGE_ANALYSES.volume}
       prixPassage={

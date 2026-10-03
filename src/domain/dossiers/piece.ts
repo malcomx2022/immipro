@@ -211,11 +211,18 @@ export const LIBELLE_CONSERVEE_NON_VERIFIEE = "Conservée, non vérifiée";
  * Le motif est donc porté par la pièce, et la pastille reste la même : ce
  * qu'on veut savoir d'abord est que le fichier est arrivé.
  */
-export type MotifDeNonAnalyse = "quota" | "autorisation_retiree";
+export type MotifDeNonAnalyse = "quota" | "sans_pack" | "autorisation_retiree";
 
 export const MENTION_NON_ANALYSEE: Record<MotifDeNonAnalyse, string> = {
   quota:
     "Ton fichier est bien arrivé. Il n'a pas été analysé : tes analyses du pack sont utilisées. Tu peux le relire toi-même, ou recharger des analyses.",
+  /*
+    Sans pack, rien n'a été « utilisé » : il n'y a jamais eu d'analyse
+    incluse. La mention du quota le disait à un dossier tout juste ouvert
+    (test du 03/10/2026), comme le titre corrigé par S.107.
+  */
+  sans_pack:
+    "Ton fichier est bien arrivé et il est conservé. Il n'a pas été analysé : aucune analyse n'est incluse tant que le dossier n'a pas de pack. Tu peux relire la pièce toi-même, ou choisir un pack.",
   autorisation_retiree:
     "Ton fichier est bien arrivé et il est conservé. Il n'a pas été analysé : tu as retiré l'autorisation d'analyse de tes pièces. Tu peux la redonner depuis tes autorisations, ou relire la pièce toi-même.",
 };
@@ -253,10 +260,7 @@ export function libelleAction(piece: Piece): string {
 }
 
 /** « 3 sur 5 conformes » — le sous-titre de la section Obligatoires de C-06. */
-export function libelleAvancementFamille(
-  pieces: readonly Piece[],
-  famille: FamillePiece,
-): string {
+export function libelleAvancementFamille(pieces: readonly Piece[], famille: FamillePiece): string {
   const lot = pieces.filter((p) => p.famille === famille);
   return `${lot.filter(estConforme).length} sur ${lot.length} conformes`;
 }
@@ -331,7 +335,6 @@ export function completudeDesPieces(
     }),
   );
 }
-
 
 /**
  * Péremption d'une pièce au regard de la date de dépôt.
@@ -497,10 +500,7 @@ const enumerer = (libelles: readonly string[]): string => {
  * appel de quarante-cinq minutes. Le chiffre n'ajoutait qu'une note à
  * retenir de travers (arbitrage C-09).
  */
-export function libelleAPreparer(
-  pieces: readonly Piece[],
-  compteurs: CompteursDeBlocage,
-): string {
+export function libelleAPreparer(pieces: readonly Piece[], compteurs: CompteursDeBlocage): string {
   const exigences = compteurs.exigencesNonTenues;
   const { bloquantes, ensuite } = grouperPourCompletude(pieces);
   const aTraiter = bloquantes.length > 0 ? bloquantes : ensuite;

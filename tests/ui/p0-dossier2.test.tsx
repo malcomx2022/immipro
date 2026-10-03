@@ -836,3 +836,87 @@ describe("C-08 — l'autorisation des pièces d'identité se donne sur place", (
     expect(container.textContent).not.toMatch(/Tu as autorisé/u);
   });
 });
+
+/**
+ * Après l'envoi — test de production du 03/10/2026.
+ *
+ * Le fichier arrivait et l'écran restait sur « Envoi en cours » ; le
+ * contrôle de sécurité passait et l'écran n'en disait rien.
+ */
+describe("C-07 — ce que l'écran dit une fois le fichier envoyé", () => {
+  class EnvoiReussi {
+    status = 200;
+    upload: { onprogress: ((e: { loaded: number }) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    open() {}
+    setRequestHeader() {}
+    send(fichier: File) {
+      this.upload.onprogress?.({ loaded: fichier.size });
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+
+  it("sort de « Envoi en cours » quand le serveur confirme, et dit que le fichier est arrivé", async () => {
+    const appels: { url: string; methode: string }[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      appels.push({ url, methode: options?.method ?? "GET" });
+      const corps =
+        options?.method === "PUT"
+          ? { versionId: "v1", etat: "EN_ANALYSE", analyseraLaPiece: false }
+          : { depot: { url: "https://stockage.test/depot", cle: "cle" }, analyseraLaPiece: false };
+      return Promise.resolve({ ok: true, status: 200, json: async () => corps } as Response);
+    });
+    vi.stubGlobal("XMLHttpRequest", EnvoiReussi);
+
+    const { container } = rendrePiece({ piece: passeport, analyse: undefined, autorise: true });
+    const champ = container.querySelector<HTMLInputElement>('input[accept=".pdf,.jpg,.jpeg,.png"]')!;
+    const fichier = new File(["%PDF-1.4"], "passeport.pdf", { type: "application/pdf" });
+    Object.defineProperty(fichier, "arrayBuffer", {
+      value: async () => new TextEncoder().encode("%PDF-1.4").buffer,
+    });
+    fireEvent.change(champ, { target: { files: [fichier] } });
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter la pièce" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("« passeport.pdf » est bien arrivé"),
+    );
+    expect(screen.queryByText("Envoi en cours")).toBeNull();
+    expect(screen.getByRole("button", { name: "Ajouter la pièce" })).toBeEnabled();
+    expect(appels.map((a) => a.methode)).toEqual(["POST", "PUT"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("dit que le contrôle est en cours, sans promettre au-delà", () => {
+    rendrePiece({
+      piece: passeport,
+      analyse: undefined,
+      controle: {
+        etat: "EN_QUARANTAINE",
+        titre: "Contrôle de sécurité en cours",
+        corps: "Ton fichier est en cours de contrôle.",
+      },
+    });
+    expect(screen.getByRole("heading", { name: "Contrôle de sécurité en cours" })).toBeVisible();
+  });
+
+  it("dit que le contrôle est passé, et pourquoi l'analyse ne suit pas", () => {
+    rendrePiece({
+      piece: {
+        ...passeport,
+        etat: "ATTENDUE",
+        remede: "REMPLACER",
+        message: "Ton fichier est bien arrivé et il est conservé. Il n'a pas été analysé.",
+      },
+      analyse: undefined,
+      controle: {
+        etat: "SAINE",
+        titre: "Fichier reçu et contrôlé",
+        corps: "Le contrôle de sécurité n'a rien détecté le 03/10/2026.",
+      },
+    });
+    expect(screen.getByRole("heading", { name: "Fichier reçu et contrôlé" })).toBeVisible();
+    expect(screen.getByText(/Il n'a pas été analysé/u)).toBeVisible();
+  });
+});

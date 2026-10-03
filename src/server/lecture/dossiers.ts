@@ -11,6 +11,8 @@ import { echec } from "@/server/http/echecs";
 import { versFiche, payload, mentionDe } from "@/server/acces/regles";
 import { versDossier, versPiece } from "@/server/vue/dossier";
 import { compteur } from "@/server/acces/quota";
+import { estUneCause } from "@/server/acces/pieces";
+import { controleDuDepot, type ControleDuDepot } from "@/domain/dossiers/quarantaine";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import { trierDossiers } from "@/domain/dossiers/dossier";
 import type { Piece } from "@/domain/dossiers/piece";
@@ -165,7 +167,10 @@ export async function quotaDuDossier(applicationId: string): Promise<Quota> {
  * recalculées à l'affichage depuis le dépôt visé — demander un relevé de
  * trois mois six mois à l'avance le fait redemander deux fois.
  */
-export async function echeancierDuDossier(id: string, userId: string): Promise<{
+export async function echeancierDuDossier(
+  id: string,
+  userId: string,
+): Promise<{
   /** Date cible — rentrée ou prise de poste. Le dépôt s'en déduit. */
   departVise: string | null;
   echeances: Echeance[];
@@ -267,10 +272,7 @@ export async function echeancierDuDossier(id: string, userId: string): Promise<{
 export interface DossierAEvaluer {
   targetDate: Date | null;
   visaRule: VisaRule | null;
-  documents: readonly Pick<
-    Document,
-    "code" | "label" | "status" | "remedy" | "required"
-  >[];
+  documents: readonly Pick<Document, "code" | "label" | "status" | "remedy" | "required">[];
 }
 
 export function calendrierAEvaluer(
@@ -327,7 +329,12 @@ export async function analyseDeLaPiece(
   pieceId: string,
   applicationId: string,
   userId: string,
-): Promise<{ piece: Piece; analyse: ResultatAnalyse | null; versions: DocumentVersion[] }> {
+): Promise<{
+  piece: Piece;
+  analyse: ResultatAnalyse | null;
+  controle: ControleDuDepot | null;
+  versions: DocumentVersion[];
+}> {
   const document = await db.document.findFirst({
     where: { id: pieceId, applicationId, application: { userId } },
     include: {
@@ -347,6 +354,20 @@ export async function analyseDeLaPiece(
   return {
     piece: versPiece(document),
     versions: document.versions,
+    controle: controleDuDepot(
+      derniere
+        ? {
+            etat: derniere.scanState,
+            depose: derniere.objectKey !== null,
+            purge: derniere.purgedAt !== null,
+            depuis: derniere.uploadedAt,
+            controleLe: derniere.scannedAt,
+            ...(estUneCause(derniere.scanIncidentCause)
+              ? { cause: derniere.scanIncidentCause }
+              : {}),
+          }
+        : null,
+    ),
     analyse: analyse
       ? {
           verdict: verdictAffichable(analyse.verdict),

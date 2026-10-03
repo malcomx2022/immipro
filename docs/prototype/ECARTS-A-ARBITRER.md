@@ -10918,3 +10918,35 @@ Un candidat qui n'était jamais passé par « Mes consentements » n'avait donc 
   - le clic envoie `POST …/depot`. En local, la réponse est 503 parce que l'antivirus n'y tourne pas ; il est opérationnel en production ;
   - après rechargement, la case ne revient pas.
 - Tests : `tests/ui/p0-dossier2.test.tsx` (3 cas) et `tests/dossier2.test.ts` (titre sans pack).
+
+## S.108 — Après l'envoi : la barre restait bloquée, et le contrôle antivirus ne se lisait pas
+
+**Relevé en test de bout en bout, en production, le 03/10/2026, après S.107.**
+
+| Étape | Résultat |
+|---|---|
+| Case d'autorisation (S.107) | ✅ cochée, et elle reste cochée |
+| Envoi direct vers le stockage | ✅ aucune erreur CORS |
+| Pièce au retour sur la checklist | ✅ « Conservée, non vérifiée » |
+| Écran de la pièce après l'envoi | ❌ reste sur « Envoi en cours » |
+| Statut du contrôle antivirus | ❌ rien d'affiché après 45 s |
+
+**1. La barre d'envoi.** Quand le serveur confirmait le dépôt, l'écran rafraîchissait la page. Mais l'état de l'envoi vit dans le composant, et rien ne le faisait sortir de `ENVOI`. Le fichier était sur le serveur, l'écran disait le contraire.
+
+*Correction.* À la confirmation, l'écran sort de l'envoi, oublie le fichier choisi et annonce « Ton fichier « … » est bien arrivé » (`role="status"`).
+
+**2. Le contrôle antivirus avait bien eu lieu.** La pastille « Conservée, non vérifiée » est écrite par le job de balayage, et seulement après un verdict **sain**, sur un dossier sans analyse disponible (RG-06.5). Le contrôle s'était donc déclenché et avait abouti. C'est l'écran de la pièce qui ne lisait jamais l'état de la version déposée.
+
+*Correction.*
+
+- `controleDuDepot` (domaine, `quarantaine.ts`) traduit l'état de la dernière version en un bloc, pour trois cas :
+  - **en cours** : la mention d'attente existante, qui tient déjà compte d'une attente longue et des causes d'incident ;
+  - **passé** : « Le contrôle de sécurité n'a rien détecté le JJ/MM/AAAA » ;
+  - **écarté** : le fichier a été écarté et l'écran dit quoi refaire.
+- `analyseDeLaPiece` porte ce contrôle, et la page le passe à l'écran.
+- Tant que le contrôle est en cours, l'écran se relit toutes les 4 secondes, au plus pendant 2 minutes. Au-delà, la mention d'attente prend le relais.
+- Quand la pièce est conservée sans analyse, le bloc donne aussi le motif écrit par le balayage.
+
+**3. Défaut corrigé au passage.** Sans pack, le motif disait « tes analyses du pack sont utilisées ». Le titre avait le même défaut, corrigé par S.107. Un motif `sans_pack` est ajouté : « aucune analyse n'est incluse tant que le dossier n'a pas de pack ». Le balayage le choisit quand aucun crédit d'analyse n'a jamais été ouvert sur le dossier.
+
+**Tests.** Domaine : `tests/controle-du-depot.test.ts`. Écran : `tests/ui/p0-dossier2.test.tsx`, avec un envoi complet simulé, le contrôle en cours et le contrôle passé. La fumée `smoke:balayage` passe sur une base jetable.

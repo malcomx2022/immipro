@@ -15,7 +15,8 @@ import { LienBouton } from "@/components/ui/LienBouton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { Piece } from "@/domain/dossiers/piece";
-import { estAPhotographier, sousTitreDepot } from "@/domain/dossiers/piece";
+import { estAPhotographier, estDeposeeNonVerifiee, sousTitreDepot } from "@/domain/dossiers/piece";
+import type { ControleDuDepot } from "@/domain/dossiers/quarantaine";
 import type { ResultatAnalyse } from "@/domain/dossiers/analyse";
 import {
   PORTEE_ANALYSE,
@@ -69,6 +70,11 @@ export interface PieceDuDossierProps {
    */
   autorise?: boolean;
   analyse?: ResultatAnalyse;
+  /**
+   * Ce que le contrôle de sécurité a dit du dernier fichier déposé, lu sur
+   * la version au rendu. `null` tant qu'aucun fichier n'est déposé.
+   */
+  controle?: ControleDuDepot | null;
   /** Prix de la recharge, déjà mis en forme dans la devise du compte. */
   prixRecharge: string;
   /** Volume de la recharge, en analyses. */
@@ -88,6 +94,7 @@ export function PieceDuDossier({
   quota,
   autorise = true,
   analyse,
+  controle = null,
   prixRecharge,
   volumeRecharge,
   prixPassage = null,
@@ -127,8 +134,40 @@ export function PieceDuDossier({
   const [consenti, setConsenti] = useState(autorise);
   const [enregistrementConsentement, setEnregistrementConsentement] = useState(false);
   const [echecConsentement, setEchecConsentement] = useState<EchecCandidat | null>(null);
+  /**
+   * Le fichier vient d'arriver et le serveur l'a confirmé — 03/10/2026.
+   *
+   * L'écran restait sur « Envoi en cours » : la confirmation réussie
+   * rafraîchissait la page, mais l'état de l'envoi vit dans le composant,
+   * et rien ne le faisait sortir de `ENVOI`. Le fichier était sur le
+   * serveur, la barre disait le contraire.
+   */
+  const [recu, setRecu] = useState<string | null>(null);
   const champ = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  /*
+    Le contrôle se fait hors de la page, en quelques secondes : l'écran se
+    relit tant qu'il est en cours, pour que son issue apparaisse sans que
+    la personne recharge. Pas au-delà de deux minutes — passé ce délai, la
+    mention d'attente prend le relais et dit ce qui se passe.
+  */
+  const controleEnCours = controle?.etat === "EN_QUARANTAINE";
+  useEffect(() => {
+    if (!controleEnCours) return;
+    const debut = Date.now();
+    const minuteur = window.setInterval(() => {
+      if (Date.now() - debut > RELECTURE_MAXI_MS) window.clearInterval(minuteur);
+      else router.refresh();
+    }, RELECTURE_MS);
+    return () => window.clearInterval(minuteur);
+  }, [controleEnCours, router]);
+
+  // L'analyse d'un fichier qu'on vient de déposer s'ouvre d'elle-même dès
+  // qu'elle arrive : c'est la suite attendue du geste.
+  useEffect(() => {
+    if (recu && analyse) setVue("ANALYSE");
+  }, [recu, analyse]);
 
   // Le réseau est un état de l'écran, pas une erreur de fin d'envoi : le
   // dire avant que la personne appuie lui évite de croire que son geste a
@@ -195,6 +234,7 @@ export function PieceDuDossier({
     setEtat("ENVOI");
     setEchec(null);
     setEnvoyes(0);
+    setRecu(null);
 
     const empreinte = await empreinteDuFichier(brut);
     const demande = {
@@ -236,6 +276,11 @@ export function PieceDuDossier({
     // Le serveur relit le solde à la confirmation : c'est sa réponse qui
     // décide, pas celle de la préparation.
     setAnalysera(confirme.donnees.analyseraLaPiece);
+    setRecu(fichier.nom);
+    setFichier(null);
+    setBrut(null);
+    if (champ.current) champ.current.value = "";
+    setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
     router.refresh();
   }
 
@@ -274,6 +319,35 @@ export function PieceDuDossier({
         <p className="text-pretty rounded-md bg-ink-100 p-3.5 text-14 text-ink-700">
           {piece.constat}
         </p>
+      ) : null}
+
+      {recu ? (
+        <p
+          role="status"
+          className="text-pretty rounded-md border-l-6 border-success bg-white p-3.5 text-14 text-ink-900 shadow-e2"
+        >
+          Ton fichier « {recu} » est bien arrivé.
+        </p>
+      ) : null}
+
+      {controle ? (
+        <section
+          aria-live="polite"
+          className={cn(
+            "flex flex-col gap-1.5 rounded-lg p-4",
+            controle.etat === "INFECTEE"
+              ? "border-l-6 border-danger bg-white shadow-e2"
+              : "bg-ink-100",
+          )}
+        >
+          <h2 className="text-16 font-semibold text-ink-900">{controle.titre}</h2>
+          <p className="text-pretty text-14 text-ink-700">{controle.corps}</p>
+          {/* Pourquoi l'analyse ne suit pas (RG-06.5) : le motif est écrit
+              sur la pièce par le balayage. */}
+          {controle.etat === "SAINE" && estDeposeeNonVerifiee(piece) && piece.message ? (
+            <p className="text-pretty text-13 text-ink-700">{piece.message}</p>
+          ) : null}
+        </section>
       ) : null}
 
       {etat === "RESEAU_COUPE" ? (
@@ -363,9 +437,7 @@ export function PieceDuDossier({
               ? libelleAvancement(envoyes, fichier.octets, 20)
               : "Envoi démarré. Ne ferme pas cette page."}
           </p>
-          <p className="text-pretty text-13 text-ink-500">
-            {mentionPendantEnvoi(analysera)}
-          </p>
+          <p className="text-pretty text-13 text-ink-500">{mentionPendantEnvoi(analysera)}</p>
         </section>
       ) : null}
 
@@ -680,9 +752,7 @@ async function empreinteDuFichier(fichier: File): Promise<string> {
   if (typeof crypto === "undefined" || !crypto.subtle) return "";
   const octets = await fichier.arrayBuffer();
   const condensat = await crypto.subtle.digest("SHA-256", octets);
-  return [...new Uint8Array(condensat)]
-    .map((o) => o.toString(16).padStart(2, "0"))
-    .join("");
+  return [...new Uint8Array(condensat)].map((o) => o.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -709,6 +779,10 @@ function televerser(
     requete.send(fichier);
   });
 }
+
+/** Cadence de relecture pendant le contrôle, et sa limite. */
+const RELECTURE_MS = 4000;
+const RELECTURE_MAXI_MS = 2 * 60 * 1000;
 
 /** L'autorisation demandée sur place : le texte de « Mes consentements ». */
 const AUTORISATION_PIECES = CONSENTEMENTS.find((c) => c.code === "pieces_identite")!;
