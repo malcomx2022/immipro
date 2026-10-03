@@ -97,10 +97,20 @@ try {
   verifier(rejeu === "etat_incompatible", `une demande traitée ne se re-traite pas (${rejeu})`);
 
   console.log("\nContraintes de la base");
-  const incoherente = await db.completenessReviewRequest
-    .create({ data: { applicationId: dossier.id, explanation: "x".repeat(30), status: "TRAITEE" } })
-    .then(() => true, () => false);
-  verifier(!incoherente, "une demande traitée sans réponse ni relecteur est refusée par la base");
+  // Volontairement sans réponse ni relecteur : c'est ce que la contrainte doit refuser.
+  // Le try/catch couvre aussi une levée synchrone ; seul le refus de la contrainte
+  // nommée compte, pour qu'une autre erreur (client cassé, base perdue) ne passe
+  // pas pour un refus.
+  let refusParLaContrainte = false;
+  try {
+    await db.completenessReviewRequest.create({
+      data: { applicationId: dossier.id, explanation: "x".repeat(30), status: "TRAITEE" },
+    });
+  } catch (erreur) {
+    refusParLaContrainte = String(erreur instanceof Error ? erreur.message : erreur).includes("relecture_completude_traitee");
+    if (!refusParLaContrainte) throw erreur;
+  }
+  verifier(refusParLaContrainte, "une demande traitée sans réponse ni relecteur est refusée par la base");
   const nouvelle = await demanderUneRelecture(dossier.id, "Après la réponse, une nouvelle demande reste possible.");
   verifier(nouvelle.status === "EN_ATTENTE", "une fois traitée, le candidat peut redemander");
 } catch (erreur) {
