@@ -39,6 +39,19 @@ describe("fournisseursDeclares", () => {
     expect(fournisseursDeclares("").fournisseurs).toEqual(["FEDAPAY", "STRIPE"]);
   });
 
+  it("tolère les guillemets et un commentaire de fin, selon l'outil qui charge le fichier", () => {
+    expect(fournisseursDeclares('"FEDAPAY"')).toMatchObject({ fournisseurs: ["FEDAPAY"], declaration: "lue" });
+    expect(fournisseursDeclares("'fedapay'").fournisseurs).toEqual(["FEDAPAY"]);
+    expect(fournisseursDeclares("FEDAPAY # pilote").fournisseurs).toEqual(["FEDAPAY"]);
+    expect(fournisseursDeclares("FEDAPAY\r").fournisseurs).toEqual(["FEDAPAY"]);
+  });
+
+  it("dit ce que la déclaration a donné, pour l'état de service", () => {
+    expect(fournisseursDeclares(undefined).declaration).toBe("absente");
+    expect(fournisseursDeclares("FEDAPAY").declaration).toBe("lue");
+    expect(fournisseursDeclares("fedapy").declaration).toBe("illisible");
+  });
+
   it("une faute de frappe ne ferme pas tout le paiement, et se signale", () => {
     const lu = fournisseursDeclares("fedapy");
     expect(lu.fournisseurs).toEqual(["FEDAPAY", "STRIPE"]);

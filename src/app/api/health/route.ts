@@ -7,6 +7,8 @@ import {
   messageDeSurveillance,
 } from "@/domain/exploitation/dependances";
 import { constaterLesDependances } from "@/server/exploitation/capacites";
+import { fournisseursDeclares } from "@/domain/payments/rail";
+import { CLE_FOURNISSEURS } from "@/server/paiement/secrets";
 import { lireLesConstats } from "@/server/exploitation/constats";
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
 import { ABANDON_JOURS } from "@/domain/dossiers/inactivite";
@@ -327,6 +329,22 @@ export async function GET() {
         `PILOTE` tant qu'il en reste une.
       */
       reserves: etat.reserves,
+      /*
+        Les fournisseurs de paiement ouverts, tels que ce processus les lit
+        — 03/10/2026. Des noms, jamais une clé. Sans cette ligne, une
+        déclaration absente du conteneur ou mal lue ne se distinguait pas,
+        de l'extérieur, d'un code qui l'ignore : les deux rendaient
+        « configuration absente ».
+      */
+      fournisseursDePaiement: (() => {
+        const lu = fournisseursDeclares(process.env[CLE_FOURNISSEURS]);
+        return {
+          variable: CLE_FOURNISSEURS,
+          declaration: lu.declaration,
+          ouverts: lu.fournisseurs,
+          ...(lu.inconnus.length > 0 ? { inconnus: lu.inconnus } : {}),
+        };
+      })(),
       dependances: Object.fromEntries(
         constats.map((c) => [
           c.cle,

@@ -11040,3 +11040,27 @@ L'adaptateur rend `procedure_manuelle` sans aucun appel réseau. L'opérateur re
 2. **Essai de l'adaptateur :** sur le VPS, `docker compose -f docker-compose.prod.yml run --rm app node dist/sandbox-paiement.mjs`. Il ouvre une vraie session de bac à sable et doit passer, alors qu'il aurait échoué avant cette correction. Il refuse `FEDAPAY_ENVIRONMENT=live`, et ne fait rien sans clé. Le script est maintenant empaqueté dans l'image (`dist/`), comme la graine : l'image n'a ni `tsx` ni les sources.
 3. **Paiement depuis l'interface :** payer un pack en francs CFA avec un numéro de test FedaPay, puis vérifier le crédit, le reçu et la ligne B-04 rapprochée.
 4. **Rejet d'une notification non signée :** déjà constaté (400).
+
+### S.109 bis — en production, la déclaration n'était pas lue (03/10/2026)
+
+**Constat de l'exploitant après le déploiement de #196 :**
+
+- `PAIEMENT_FOURNISSEURS=FEDAPAY` figure dans `.env.app` ;
+- `/api/health` lit toujours « configuration absente » pour la confirmation et l'ouverture des paiements ;
+- une recherche dans `/app/.next/server/` ne trouve pas la variable.
+
+**Vérifié de ce côté :**
+
+- Le déploiement de `8e5d8b7` (fusion de #196) a réussi, et `app` a été recréé à 06:09:47 UTC avec l'image `ghcr.io/malcomx2022/immipro:8e5d8b7`.
+- La même construction, faite localement (`next build`), contient la variable dans `.next/standalone/.next/server/chunks/`. Une recherche à 0 résultat portait donc sur un conteneur antérieur, ou n'était pas récursive.
+- Lancé avec `PAIEMENT_FOURNISSEURS=FEDAPAY` et les clés Stripe vides, ce serveur compilé répond :
+  - `paiements` : `OPERATIONNELLE` ;
+  - `ouverture_paiement` : configurée, sans sonde sûre, donc en réserve.
+- En production, à 06:16:48, la réponse reste « configuration absente ».
+
+**Conclusion.** Le processus de production ne lit pas `FEDAPAY` dans cette variable : soit elle est absente de l'environnement du conteneur `app`, soit sa valeur n'est pas reconnue. Dans les deux cas, la déclaration vaut alors les deux rails, et Stripe est exigé. C'est exactement le symptôme observé.
+
+**Corrections :**
+
+- La valeur tolère les guillemets et un commentaire de fin (`"FEDAPAY"`, `FEDAPAY # pilote`). Selon l'outil qui charge le fichier, ils arrivent tels quels au processus.
+- `/api/health` expose `fournisseursDePaiement` : la variable, la déclaration (`absente`, `lue` ou `illisible`), les fournisseurs ouverts et les noms inconnus. Ce ne sont que des noms, jamais une clé. L'écart se lit désormais de l'extérieur.
