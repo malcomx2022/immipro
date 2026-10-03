@@ -6,8 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { CONSENTEMENTS } from "@/domain/comptes/consentements";
 import { appeler } from "@/lib/api";
-import type { EchecCandidat } from "@/server/http/echecs";
+import { ECHECS, type EchecCandidat } from "@/server/http/echecs";
 import { SOCLE_BOUTON, VARIANTES_BOUTON } from "@/components/ui/bouton-styles";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -61,6 +63,11 @@ export interface PieceDuDossierProps {
   dossier: Dossier;
   piece: Piece;
   quota: Quota;
+  /**
+   * L'autorisation de traiter les pièces d'identité (RG-02.1, RG-02.2),
+   * lue côté serveur au rendu. Sans elle, aucun dépôt n'est accepté.
+   */
+  autorise?: boolean;
   analyse?: ResultatAnalyse;
   /** Prix de la recharge, déjà mis en forme dans la devise du compte. */
   prixRecharge: string;
@@ -79,6 +86,7 @@ export function PieceDuDossier({
   dossier,
   piece,
   quota,
+  autorise = true,
   analyse,
   prixRecharge,
   volumeRecharge,
@@ -102,6 +110,23 @@ export function PieceDuDossier({
    * consommer la dernière analyse.
    */
   const [analysera, setAnalysera] = useState(!quotaEpuise(quota));
+  /*
+    L'autorisation est demandée ici, au moment où elle sert — 03/10/2026.
+
+    En test de production, le dépôt n'aboutissait pas : sans autorisation,
+    le serveur refusait la pièce (« L'analyse de tes pièces demande ton
+    autorisation ») et l'écran ne donnait aucun moyen de l'accorder — le
+    bloc annonçait « Ouvrir mes autorisations » sans lien. Le candidat
+    restait devant un bouton qui ne menait nulle part.
+
+    La case est la même autorisation que celle de « Mes consentements » :
+    séparée des conditions, décochée par défaut, enregistrée avec sa date
+    et révocable (RG-02.1). L'état vit dans le composant et ne se
+    réinitialise pas quand la page se rafraîchit après un dépôt.
+  */
+  const [consenti, setConsenti] = useState(autorise);
+  const [enregistrementConsentement, setEnregistrementConsentement] = useState(false);
+  const [echecConsentement, setEchecConsentement] = useState<EchecCandidat | null>(null);
   const champ = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -148,7 +173,21 @@ export function PieceDuDossier({
    * serveur de reconnaître un fichier déjà déposé et de ne rien refacturer
    * (RG-06.2). La calculer après l'envoi ferait monter les octets pour rien.
    */
+  async function autoriser(coche: boolean) {
+    if (!coche) return;
+    setEnregistrementConsentement(true);
+    setEchecConsentement(null);
+    const resultat = await appeler<{ accorde: boolean }>("/api/comptes/consentements", {
+      methode: "PUT",
+      corps: { code: "pieces_identite", accorde: true },
+    });
+    setEnregistrementConsentement(false);
+    if (resultat.ok) setConsenti(true);
+    else setEchecConsentement(resultat.echec);
+  }
+
   async function envoyer() {
+    if (!consenti) return;
     if (!fichier || !brut) {
       champ.current?.click();
       return;
@@ -171,7 +210,10 @@ export function PieceDuDossier({
     }>(`/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`, { corps: demande });
     if (!prepare.ok) {
       setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
-      setEchec(prepare.echec);
+      // Autorisation retirée entre-temps, depuis un autre appareil : la case
+      // revient plutôt qu'un refus sans issue.
+      if (prepare.echec.titre === TITRE_CONSENTEMENT_MANQUANT) setConsenti(false);
+      else setEchec(prepare.echec);
       return;
     }
     setAnalysera(prepare.donnees.analyseraLaPiece);
@@ -287,6 +329,10 @@ export function PieceDuDossier({
               variante="secondaire"
               pleineLargeur
               className="md:w-auto"
+              disabled={!consenti}
+              raisonDesactivation={
+                consenti ? undefined : "Coche l'autorisation ci-dessus pour déposer ta pièce."
+              }
               onClick={() => void envoyer()}
             >
               Téléverser sans analyse
@@ -319,6 +365,30 @@ export function PieceDuDossier({
           </p>
           <p className="text-pretty text-13 text-ink-500">
             {mentionPendantEnvoi(analysera)}
+          </p>
+        </section>
+      ) : null}
+
+      {!consenti ? (
+        <section className="flex flex-col gap-3 rounded-lg border border-ink-300 p-4">
+          <h2 className="text-16 font-semibold text-ink-900">
+            Ton autorisation est nécessaire pour déposer une pièce
+          </h2>
+          <p className="text-pretty text-14 text-ink-700">{AUTORISATION_PIECES.siRefuse}</p>
+          <Checkbox
+            libelle="J'autorise l'analyse de mes pièces d'identité"
+            description={AUTORISATION_PIECES.description}
+            checked={false}
+            disabled={enregistrementConsentement}
+            onChangement={(coche) => void autoriser(coche)}
+          />
+          {echecConsentement ? <BlocEchec echec={echecConsentement} /> : null}
+          <p className="text-pretty text-13 text-ink-500">
+            Tu peux la retirer à tout moment dans{" "}
+            <Link href="/consentements" className="text-accent-600 underline">
+              Mes consentements
+            </Link>
+            .
           </p>
         </section>
       ) : null}
@@ -417,15 +487,31 @@ export function PieceDuDossier({
         </p>
       </section>
 
+      {/* La phrase affirmait « Tu as autorisé l'analyse automatique des
+          pièces financières le 11/09/2026 » à tous les candidats : une
+          autorisation et une date inventées. */}
       <p className="text-pretty text-13 text-ink-500">
-        Tes pièces sont chiffrées et supprimées à la clôture du dossier. Tu as autorisé
-        l&apos;analyse automatique des pièces financières le 11/09/2026.
+        Tes pièces sont chiffrées et supprimées à la clôture du dossier.
+        {consenti ? (
+          <>
+            {" "}
+            Tes autorisations se gèrent dans{" "}
+            <Link href="/consentements" className="text-accent-600 underline">
+              Mes consentements
+            </Link>
+            .
+          </>
+        ) : null}
       </p>
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4">
         <Button
           pleineLargeur
           chargement={envoiEnCours(etat)}
+          disabled={!consenti}
+          raisonDesactivation={
+            consenti ? undefined : "Coche l'autorisation ci-dessus pour déposer ta pièce."
+          }
           onClick={() => void envoyer()}
           className="min-h-action"
         >
@@ -623,3 +709,9 @@ function televerser(
     requete.send(fichier);
   });
 }
+
+/** L'autorisation demandée sur place : le texte de « Mes consentements ». */
+const AUTORISATION_PIECES = CONSENTEMENTS.find((c) => c.code === "pieces_identite")!;
+
+/** Reconnaît le refus « consentement manquant » : l'écran ne reçoit pas le code technique. */
+const TITRE_CONSENTEMENT_MANQUANT = ECHECS.consentement_manquant.titre;

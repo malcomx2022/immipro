@@ -196,6 +196,10 @@ describe("C-07 — téléversement", () => {
     expect(quotaEpuise(QUOTA)).toBe(false);
     expect(quotaEpuise({ ...QUOTA, restantes: 0 })).toBe(true);
     expect(titreQuotaEpuise(QUOTA)).toBe("Tes 30 analyses du pack Dossier sont utilisées");
+    // Sans pack, la phrase ne parle plus d'un « pack sans pack » (03/10/2026).
+    expect(titreQuotaEpuise({ restantes: 0, total: 0, pack: "sans pack" })).toBe(
+      "Aucune analyse n'est incluse tant que le dossier n'a pas de pack",
+    );
   });
 
   it("laisse le dépôt ouvert quand le quota est épuisé", () => {

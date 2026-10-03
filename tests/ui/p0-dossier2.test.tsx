@@ -786,3 +786,53 @@ describe("C-11a — Déclaration de dépôt", () => {
     expect(screen.queryByRole("link", { name: "Déclarer mon dépôt" })).toBeNull();
   });
 });
+
+/**
+ * Test de bout en bout du 03/10/2026 : le dépôt n'aboutissait pas, et
+ * l'autorisation de traiter les pièces d'identité ne pouvait pas être
+ * donnée depuis l'écran de dépôt.
+ */
+describe("C-08 — l'autorisation des pièces d'identité se donne sur place", () => {
+  it("sans autorisation, la case est là, décochée, et le dépôt attend", () => {
+    rendrePiece({ piece: passeport, analyse: undefined, autorise: false });
+    const caseAutorisation = screen.getByRole("checkbox", {
+      name: /^J'autorise l'analyse de mes pièces d'identité/,
+    });
+    expect(caseAutorisation).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Ajouter la pièce" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Mes consentements" })).toHaveAttribute(
+      "href",
+      "/consentements",
+    );
+  });
+
+  it("cocher enregistre l'autorisation, et la case ne revient pas", async () => {
+    const appels: { url: string; corps: unknown }[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      appels.push({ url, corps: JSON.parse(String(options?.body)) });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ code: "pieces_identite", accorde: true }),
+      } as Response);
+    });
+    rendrePiece({ piece: passeport, analyse: undefined, autorise: false });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /^J'autorise l'analyse de mes pièces d'identité/ }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("checkbox", { name: /J'autorise l'analyse/ })).toBeNull(),
+    );
+    expect(appels).toEqual([
+      { url: "/api/comptes/consentements", corps: { code: "pieces_identite", accorde: true } },
+    ]);
+    expect(screen.getByRole("button", { name: "Ajouter la pièce" })).toBeEnabled();
+  });
+
+  it("avec l'autorisation, aucune case ; et aucune date d'autorisation inventée", () => {
+    const { container } = rendrePiece({ piece: passeport, analyse: undefined, autorise: true });
+    expect(screen.queryByRole("checkbox", { name: /J'autorise l'analyse/ })).toBeNull();
+    expect(container.textContent).not.toMatch(/11\/09\/2026/u);
+    expect(container.textContent).not.toMatch(/Tu as autorisé/u);
+  });
+});
