@@ -203,6 +203,12 @@ jobs:
         run: npm run smoke:juridique
       - run: echo "- **Textes juridiques** — validation nommée, republication sur variable, versions jamais réécrites" >> "$GITHUB_STEP_SUMMARY"
 
+      # Troisième garde-fou de l'avis L.A : une relecture humaine de la
+      # complétude se demande, reçoit sa réponse, et ne promet rien (S.113).
+      - name: Relecture de la complétude
+        run: npm run smoke:relecture
+      - run: echo "- **Relecture de la complétude** — une demande en attente par dossier, réponse sans promesse, alerte au candidat" >> "$GITHUB_STEP_SUMMARY"
+
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).
       - name: Purge de rétention

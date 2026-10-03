@@ -3,6 +3,8 @@ import { ChecklistRow } from "@/components/ui/ChecklistRow";
 import { CompletenessTier } from "@/components/ui/CompletenessTier";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
+import type { EtatDeLaRelecture } from "@/server/dossiers/relecture-completude";
+import { RelectureDeLaCompletude } from "./RelectureDeLaCompletude";
 import {
   grouperPourCompletude,
   libelleAction,
@@ -32,9 +34,11 @@ import { EnteteDossier } from "../EnteteDossier";
 export interface CompletudeProps {
   dossier: Dossier;
   pieces: readonly Piece[];
+  /** La dernière demande de relecture humaine du dossier (avis L.A). */
+  relecture?: EtatDeLaRelecture;
 }
 
-export function Completude({ dossier, pieces }: CompletudeProps) {
+export function Completude({ dossier, pieces, relecture = { etat: "aucune" } }: CompletudeProps) {
   const id = dossier.id;
 
   const { bloquantes, ensuite, conformes } = grouperPourCompletude(pieces);
@@ -136,6 +140,10 @@ export function Completude({ dossier, pieces }: CompletudeProps) {
       <SourceNote {...mention}>
         Un dossier complet n&apos;est pas un dossier accepté.
       </SourceNote>
+
+      {/* Avis juridique L.A (03/10/2026) : le calcul est automatique, la
+          contestation ne l'est pas. */}
+      <RelectureDeLaCompletude dossierId={id} relecture={relecture} />
 
       <div className="flex flex-col gap-2 border-t border-ink-300 pt-4 md:flex-row md:items-center md:justify-between">
         <p className="text-14 text-ink-700">

@@ -1240,6 +1240,19 @@ distinction, et l'information sur la logique d'un traitement automatisé est
 encore autre chose. **Décision produit provisoire du 20/09/2026 —
 validation juridique obligatoire avant lancement.**
 
+**Tranché le 03/10/2026 par l'avis juridique (protection des données) :
+la pondération n'a pas à être exposée.** Le calcul n'est pas une décision
+automatisée au sens de l'article 22 (aucun effet juridique : la décision
+appartient aux autorités) ; les articles 13 à 15 sont satisfaits par
+l'explication des facteurs restituée à l'export ; la pondération relève du
+savoir-faire de Rêveur Digital. Trois garde-fous conditionnent l'avis, et
+sont tenus (S.113) : la complétude est présentée comme indicative, jamais
+comme prédictive ; l'export et la politique de données disent que la
+pondération n'est pas exposée ; une relecture humaine de l'évaluation peut
+être demandée depuis C-09, et le responsable de la revue y répond. Toute
+évolution du rôle du score — un prérequis affiché comme déterminant, par
+exemple — appelle un nouvel avis.
+
 L'export individuel porte les données fournies par la personne, les
 résultats effectivement utilisés pour son dossier, le palier, le
 dénombrement et une explication intelligible des principaux facteurs. Il
@@ -11133,3 +11146,33 @@ Aucune donnée personnelle de plus n'est transmise au prestataire : le candidat 
 4. **Responsable de la revue manuelle : le superadmin.** Exigences du rôle : disponibilité sous 4 h (délai cible), rigueur sur les pièces d'identité, accès au back-office. Sans IA, chaque pièce du pilote passe par lui.
 
 **Pour ouvrir le pilote**, il reste à payer un pack de bout en bout en bac à sable (notification signée, puis crédit) et à vérifier en production le lien vers le numéro au profil et l'affichage après envoi.
+
+## S.113 — L.A tranché : la pondération n'est pas exposée, sous trois garde-fous
+
+**Avis juridique du 03/10/2026 (protection des données).** La pondération du calcul de complétude n'a pas à être exposée au-delà de l'explication des facteurs déjà restituée à l'export.
+
+- **Pas de décision automatisée** au sens de l'article 22 : le calcul n'a aucun effet juridique, la décision appartient aux autorités.
+- **Transparence (articles 13 à 15) satisfaite** : l'export restitue les données fournies, les résultats utilisés, le palier, le dénombrement, les manques ordonnés et les facteurs.
+- **Savoir-faire de Rêveur Digital** : la pondération relève du secret d'affaires, ce qui est un motif légitime de ne pas la divulguer.
+
+**Les trois garde-fous de l'avis, vérifiés ou mis en place :**
+
+1. **Indicatif, jamais prédictif.** Déjà tenu : C-09 affiche « Ce qui manque au dossier, pas tes chances d'obtenir le visa » et « Un dossier complet n'est pas un dossier accepté ». Les conditions et la politique de données le disent. Le vocabulaire interdit bloque toute promesse, dans le code comme dans les textes saisis.
+2. **L'opacité est dite.** Déjà tenue dans l'export (`LIMITE_DE_LA_RESTITUTION`, liste des données non restituées). Elle est **ajoutée** à la politique de données personnelles : « La pondération interne du calcul n'est pas communiquée… ».
+3. **Contestation humaine.** **Absente jusqu'ici, construite** :
+   - modèle `CompletenessReviewRequest`, avec une seule demande en attente par dossier et une réponse obligatoire une fois traitée, imposées par la base ;
+   - section « Relecture humaine » sur C-09 ;
+   - file « Relectures de la complétude demandées » en B-05, tenue par le responsable de la revue (le superadmin) ;
+   - la réponse passe par le vocabulaire interdit de l'écran candidat, part dans les alertes et est journalisée (`dossier.completude.relecture`) ;
+   - la politique de données mentionne ce droit.
+   - les demandes et leurs réponses figurent dans l'export des données du candidat (`demandesDeRelectureDeLaCompletude`), puisque c'est lui qui les a écrites.
+
+**Conséquences.** L.A quitte le registre des préalables et passe en « tranché » dans le relevé. Toute évolution du rôle du score, par exemple s'il devenait un prérequis affiché comme déterminant, appelle un nouvel avis.
+
+**Vérifications :**
+
+- tests : `tests/relecture-completude.test.ts` et `tests/ui/p0-dossier2.test.tsx` (C-09 : demande, en attente, réponse) ;
+- fumée : `smoke:relecture` en CI (doublon refusé, réponse qui promet refusée, alerte, journal, contrainte de base) ;
+- migrations : `smoke:migrations` confirme l'absence de dérive.
+
+**Note :** la politique de données a changé, mais aucun texte n'était encore publié, donc rien n'est à revalider. La relecture juridique de Q.A portera sur la version qui contient ces deux phrases.

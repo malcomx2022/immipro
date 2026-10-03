@@ -74,6 +74,9 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
           // S.90 — ses demandes de correction de la date de dépôt, et
           // ce qui leur a été répondu : c'est lui qui les a écrites.
           correctionsDeDepot: { orderBy: { createdAt: "asc" } },
+          // Avis L.A — ses demandes de relecture de la complétude, et ce
+          // qui leur a été répondu : c'est lui qui les a écrites.
+          completenessReviews: { orderBy: { createdAt: "asc" } },
           /*
             Les deux décisions que le candidat a prises lui-même, et que
             l'export ne rendait pas : son arbitrage sur une divergence
@@ -183,6 +186,13 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
           demandeeLe: iso(d.createdAt),
           statut: d.status,
           trancheeLe: iso(d.resolvedAt),
+          reponse: d.answer,
+        })),
+        demandesDeRelectureDeLaCompletude: a.completenessReviews.map((d) => ({
+          explication: d.explanation,
+          demandeeLe: iso(d.createdAt),
+          statut: d.status,
+          traiteeLe: iso(d.resolvedAt),
           reponse: d.answer,
         })),
         issue: a.issue,

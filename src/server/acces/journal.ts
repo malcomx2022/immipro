@@ -77,6 +77,7 @@ export type ActionAuditee =
   | "dossier.depot.correction"
   /** Une demande de correction du candidat non retenue — S.90. */
   | "dossier.depot.correction.refus"
+  | "dossier.completude.relecture"
   /**
    * Les textes juridiques — S.101. La modification des variables (avec
    * l'ancienne et la nouvelle valeur), la validation d'un texte (avec son

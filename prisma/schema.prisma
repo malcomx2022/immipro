@@ -345,6 +345,7 @@ model Application {
   notifications Notification[]
   migrations    RuleMigration[]
   correctionsDeDepot DepositCorrectionRequest[]
+  completenessReviews CompletenessReviewRequest[]
   accesses      ConsultantAccess[]
   appointments  Appointment[]
   referrals     PartnerReferral[]
@@ -1518,6 +1519,33 @@ enum DepositCorrectionStatus {
   EN_ATTENTE
   APPLIQUEE
   REFUSEE
+}
+
+/// Relecture humaine de la complétude — avis juridique L.A du 03/10/2026.
+///
+/// La pondération du calcul n'est pas exposée ; l'avis l'admet à condition
+/// que le candidat puisse demander qu'une personne relise son évaluation.
+/// Une seule demande en attente par dossier (index unique partiel). La
+/// réponse est obligatoire dès que la demande est traitée.
+model CompletenessReviewRequest {
+  id            String                   @id @default(uuid())
+  applicationId String
+  application   Application              @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  /// Ce que le candidat dit de l'évaluation — lu par le relecteur.
+  explanation   String
+  status        CompletenessReviewStatus @default(EN_ATTENTE)
+  createdAt     DateTime                 @default(now())
+  resolvedAt    DateTime?
+  resolvedBy    String?
+  /// La réponse faite au candidat, dans ses alertes.
+  answer        String?
+
+  @@index([status, createdAt])
+}
+
+enum CompletenessReviewStatus {
+  EN_ATTENTE
+  TRAITEE
 }
 
 // ═══════════════════════════════════════════════════════════

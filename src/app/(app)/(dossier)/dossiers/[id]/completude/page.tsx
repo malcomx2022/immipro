@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Completude } from "./Completude";
 import { vueDuDossier } from "@/server/lecture/dossiers";
 import { exigerCandidat } from "@/server/securite/page";
+import { etatDeLaRelecture } from "@/server/dossiers/relecture-completude";
 
 /** C-09 — Complétude du dossier. WF-07. */
 export const dynamic = "force-dynamic";
@@ -32,5 +33,11 @@ export default async function PageCompletude({
   const vue = await vueDuDossier(id, acteur.id).catch(() => null);
   if (!vue) notFound();
 
-  return <Completude dossier={vue.dossier} pieces={vue.pieces} />;
+  return (
+    <Completude
+      dossier={vue.dossier}
+      pieces={vue.pieces}
+      relecture={await etatDeLaRelecture(vue.dossier.id)}
+    />
+  );
 }
