@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { espaceReel } from "@/server/paiement/secrets";
+import { fournisseurDe } from "@/domain/payments/rail";
+import type { Devise } from "@/domain/payments/pricing";
 import { notFound } from "next/navigation";
 import { Recapitulatif } from "./Recapitulatif";
 import { MonteeRefusee } from "./MonteeRefusee";
@@ -36,6 +39,14 @@ export const metadata: Metadata = {
   title: "Récapitulatif",
   description: "Vérifie le montant et le moyen de paiement avant de confirmer.",
 };
+
+/**
+ * Encaissement réel sans conditions publiées : le récapitulatif le dit
+ * avant le clic, et le serveur le refuse de toute façon (03/10/2026).
+ */
+async function suspendu(devise: Devise): Promise<boolean> {
+  return espaceReel(fournisseurDe(devise)) && !(await pagesPubliees()).conditions;
+}
 
 export default async function PageRecapitulatif({
   searchParams,
@@ -78,6 +89,7 @@ export default async function PageRecapitulatif({
         montee={offre.detail}
         deviseInitiale={offre.detail.devise}
         publiees={await pagesPubliees()}
+        encaissementSuspendu={await suspendu(offre.detail.devise)}
       />
     );
   }
@@ -99,14 +111,16 @@ export default async function PageRecapitulatif({
     };
   }
 
+  const deviseRetenue: Devise = devise === "EUR" || devise === "XOF" ? devise : tunnel.devise;
   return (
     <Recapitulatif
       tunnel={tunnel}
       achat={achat}
       tarif={tarif}
-      deviseInitiale={devise === "EUR" || devise === "XOF" ? devise : tunnel.devise}
+      deviseInitiale={deviseRetenue}
       supplementaire={supplementaire}
       publiees={await pagesPubliees()}
+      encaissementSuspendu={await suspendu(deviseRetenue)}
     />
   );
 }

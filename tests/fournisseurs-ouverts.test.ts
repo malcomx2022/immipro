@@ -5,7 +5,7 @@ import {
   fournisseursDeclares,
   mentionRailFerme,
 } from "@/domain/payments/rail";
-import { fournisseursActifs } from "@/server/paiement/secrets";
+import { espaceReel, fournisseursActifs } from "@/server/paiement/secrets";
 import { lOuvreur, ouvertureConfiguree } from "@/server/paiement/ouvreurs";
 import { remboursementConfigure } from "@/server/paiement/remboursement";
 import { observer, sonderLesSignatures } from "@/server/exploitation/capacites";
@@ -106,5 +106,20 @@ describe("le serveur suit la déclaration", () => {
     const paiements = par("paiements");
     expect(observer(paiements, sansSecret).configuree).toBe(false);
     expect(sonderLesSignatures(sansSecret)).toBe("ABSENTE");
+  });
+});
+
+describe("espaceReel — l'encaissement réel attend les conditions publiées", () => {
+  it("FedaPay : seul `live` encaisse ; le bac à sable est l'espace par défaut", () => {
+    expect(espaceReel("FEDAPAY", { FEDAPAY_ENVIRONMENT: "live" })).toBe(true);
+    expect(espaceReel("FEDAPAY", { FEDAPAY_ENVIRONMENT: " LIVE " })).toBe(true);
+    expect(espaceReel("FEDAPAY", { FEDAPAY_ENVIRONMENT: "sandbox" })).toBe(false);
+    expect(espaceReel("FEDAPAY", {})).toBe(false);
+  });
+
+  it("Stripe : une clé live, et elle seule", () => {
+    expect(espaceReel("STRIPE", { STRIPE_API_KEY: "sk_live_abc" })).toBe(true);
+    expect(espaceReel("STRIPE", { STRIPE_API_KEY: "rk_live_abc" })).toBe(true);
+    expect(espaceReel("STRIPE", { STRIPE_API_KEY: "sk_test_abc" })).toBe(false);
   });
 });

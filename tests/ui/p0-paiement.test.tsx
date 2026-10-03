@@ -738,3 +738,21 @@ describe("$-01 et $-02 — un rail fermé ne se propose pas", () => {
     );
   });
 });
+
+describe("$-02 — encaissement réel sans conditions publiées", () => {
+  it("le récapitulatif le dit avant le clic, et ne laisse pas payer", () => {
+    render(
+      <Recapitulatif
+        publiees={{}}
+        tunnel={TUNNEL}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={tarifDe({ type: "pack", code: PACKS[0]!.code })!}
+        deviseInitiale="XOF"
+        encaissementSuspendu
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: /^Payer/u })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(/conditions de vente ne sont pas encore publiées/u);
+  });
+});

@@ -1,4 +1,6 @@
 import type { Prisma, Transaction, TransactionStatus } from "@prisma/client";
+import { espaceReel } from "@/server/paiement/secrets";
+import { pagesPubliees } from "@/server/juridique/lecture";
 import { db } from "@/lib/db";
 import { appliquerLaCouverture } from "@/server/acces/couverture";
 import { miseEnEtat } from "@/domain/dossiers/etat";
@@ -328,6 +330,17 @@ export async function ouvrirLeTunnel(
     throw echecDOuverture(fournisseurDe(devise), "aucun_adaptateur", null, {
       detail: "aucun adaptateur branché (clé ou racine d'application absente)",
     });
+  }
+
+  /*
+    Pas d'encaissement réel sans conditions de vente publiées — décision
+    du 03/10/2026. Le candidat coche qu'il les accepte : en espace réel,
+    lui faire payer un texte « pas encore publié » n'est pas tenable. Le
+    bac à sable reste ouvert, pour que les essais continuent. Avant toute
+    écriture : rien ne doit rester en attente d'un paiement impossible.
+  */
+  if (espaceReel(ouvreur.fournisseur) && !(await pagesPubliees()).conditions) {
+    throw echec("paiement_sans_conditions");
   }
 
   const { transaction, reprise } = await creerOuReprendre(userId, achat, devise);

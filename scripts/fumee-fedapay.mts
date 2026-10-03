@@ -325,6 +325,22 @@ try {
     );
   }
 
+  console.log("\nEspace réel sans conditions publiées : aucun encaissement");
+  {
+    const autre = await candidat();
+    process.env.FEDAPAY_ENVIRONMENT = "live";
+    const refus = await ouvrirLeTunnel(autre.userId, ACHAT(autre.applicationId), "XOF").then(
+      () => null,
+      (e: unknown) => (e as { echec?: { code?: string } }).echec?.code ?? String(e),
+    );
+    process.env.FEDAPAY_ENVIRONMENT = "sandbox";
+    verifier(refus === "paiement_sans_conditions", `l'ouverture est refusée (${refus})`);
+    verifier(
+      (await db.transaction.count({ where: { userId: autre.userId } })) === 0,
+      "avant toute écriture, et sans appel au fournisseur",
+    );
+  }
+
   console.log("\nStripe fermé : aucun paiement en euros ne s'ouvre");
   {
     const autre = await candidat();
