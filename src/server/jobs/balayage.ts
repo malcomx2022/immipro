@@ -8,7 +8,7 @@ import {
 } from "@/domain/securite/balayage";
 import { refusAuControle } from "@/domain/dossiers/quarantaine";
 import { recalculerCompletude } from "@/server/acces/dossiers";
-import { solde } from "@/server/acces/quota";
+import { compteur, solde } from "@/server/acces/quota";
 import { autorisationAccordee } from "@/server/acces/consentements";
 import { MENTION_NON_ANALYSEE, type MotifDeNonAnalyse } from "@/domain/dossiers/piece";
 
@@ -174,10 +174,12 @@ async function admettre(version: Version, tache: Tache): Promise<Suite> {
     ferait payer pour un geste qu'il a lui-même fait.
   */
   const autorise = await autorisationAccordee(
-    (await db.document.findUniqueOrThrow({
-      where: { id: version.documentId },
-      select: { application: { select: { userId: true } } },
-    })).application.userId,
+    (
+      await db.document.findUniqueOrThrow({
+        where: { id: version.documentId },
+        select: { application: { select: { userId: true } } },
+      })
+    ).application.userId,
     "pieces_identite",
   );
   if (!autorise) return conserver(version.documentId, tache, "autorisation_retiree");
@@ -187,7 +189,9 @@ async function admettre(version: Version, tache: Tache): Promise<Suite> {
   // consommer la dernière analyse.
   if ((await solde(tache.applicationId)) > 0) return "ANALYSE";
 
-  return conserver(version.documentId, tache, "quota");
+  // Sans pack, il n'y a pas d'analyses épuisées : il n'y en a jamais eu.
+  const { total } = await compteur(tache.applicationId);
+  return conserver(version.documentId, tache, total > 0 ? "quota" : "sans_pack");
 }
 
 /**
