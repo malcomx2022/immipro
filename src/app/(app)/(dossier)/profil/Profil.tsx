@@ -8,7 +8,9 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import {
   CHAMPS_PROFIL,
+  CHAMP_TELEPHONE,
   champsRestants,
+  normaliserTelephone,
   corpsDuProfil,
   libelleAvancementProfil,
   profilComplet,
@@ -35,8 +37,16 @@ import {
  */
 const SECTIONS = ["Identité", "Parcours"] as const;
 
-export function Profil({ initial }: { initial: ProfilCandidat }) {
+export function Profil({
+  initial,
+  telephone: telephoneInitial = "",
+}: {
+  initial: ProfilCandidat;
+  /** Le numéro enregistré sur le compte, vide s'il n'y en a pas. */
+  telephone?: string;
+}) {
   const [profil, setProfil] = useState<ProfilCandidat>(initial);
+  const [telephone, setTelephone] = useState(telephoneInitial);
   const [envoi, setEnvoi] = useState(false);
   const [enregistre, setEnregistre] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -57,9 +67,12 @@ export function Profil({ initial }: { initial: ProfilCandidat }) {
       comptées dans « 4 à renseigner », puis jetées avant l'envoi, et
       l'écran répondait « Profil enregistré. »
     */
+    // Le numéro ne part que s'il est saisi : l'API refuse une chaîne vide
+    // au format, et un champ laissé vide ne doit pas bloquer le reste.
+    const numero = normaliserTelephone(telephone);
     const resultat = await appeler("/api/comptes/profil", {
       methode: "PUT",
-      corps: corpsDuProfil(profil),
+      corps: { ...corpsDuProfil(profil), ...(numero ? { telephone: numero } : {}) },
     });
     setEnvoi(false);
     if (resultat.ok) setEnregistre(true);
@@ -106,6 +119,27 @@ export function Profil({ initial }: { initial: ProfilCandidat }) {
           ))}
         </section>
       ))}
+
+      {/* Le numéro auquel renvoie le récapitulatif de paiement. Hors du
+          décompte : il n'affine pas la checklist. */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-19 font-semibold text-ink-900">Paiement Mobile Money</h2>
+        <Input
+          id="telephone"
+          type="tel"
+          autoComplete="tel"
+          inputMode="tel"
+          libelle={CHAMP_TELEPHONE.libelle}
+          aide={CHAMP_TELEPHONE.aide}
+          erreur={echec?.champs?.telephone}
+          placeholder="+229 01 00 00 00 00"
+          value={telephone}
+          onChange={(e) => {
+            setTelephone(e.target.value);
+            setEnregistre(false);
+          }}
+        />
+      </section>
 
       <p className="text-pretty text-13 text-ink-500">
         Ces informations servent à adapter ta checklist. Elles ne sont jamais

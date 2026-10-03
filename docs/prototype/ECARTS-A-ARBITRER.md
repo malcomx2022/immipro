@@ -11064,3 +11064,45 @@ L'adaptateur rend `procedure_manuelle` sans aucun appel réseau. L'opérateur re
 
 - La valeur tolère les guillemets et un commentaire de fin (`"FEDAPAY"`, `FEDAPAY # pilote`). Selon l'outil qui charge le fichier, ils arrivent tels quels au processus.
 - `/api/health` expose `fournisseursDePaiement` : la variable, la déclaration (`absente`, `lue` ou `illisible`), les fournisseurs ouverts et les noms inconnus. Ce ne sont que des noms, jamais une clé. L'écart se lit désormais de l'extérieur.
+
+## S.110 — Test du paiement en bac à sable : double clic, numéro de téléphone, conditions
+
+**Relevé le 03/10/2026, en production.** Le parcours va jusqu'au widget FedaPay :
+
+- Essentiel, 5 000 F, récapitulatif correct ;
+- widget en fenêtre (modale), 5 208 CFA frais compris, opérateur « Momo Test » ;
+- aucune erreur ;
+- paiement non validé : aucune donnée personnelle n'a été fournie.
+
+### 1. Idempotence — corrigé
+
+`node dist/sandbox-paiement.mjs` échouait sur « même clé → même session ». FedaPay ne documente pas `Idempotency-Key`, et le bac à sable le confirme : même clé, deux transactions. Ce n'est pas un défaut de l'adaptateur, mais une garantie que ce fournisseur ne donne pas.
+
+La plateforme avait sa propre protection : une seconde soumission reprend la transaction locale, puis la session par son identifiant. Il restait une **fenêtre de course**. Deux demandes simultanées, avant que l'identifiant ne soit enregistré, appelaient toutes deux `creer` :
+
+- la seconde renvoyait l'adresse d'une transaction FedaPay orpheline ;
+- un candidat qui réglait les deux voyait le second paiement tenu pour un rejeu, encaissé sans trace.
+
+**Corrections :**
+
+- `ouvrirLeTunnel` : la demande qui perd l'écriture de l'identifiant rend **la session enregistrée** (`retrouver`), jamais la sienne. L'orpheline n'est montrée à personne et ne peut pas être réglée.
+- `appliquerLaNotification` : une confirmation FedaPay qui porte un autre identifiant, sur une référence déjà réglée, n'est plus un rejeu. Elle ouvre un écart (`discrepancy`) qui nomme le second paiement à rembourser. Stripe n'est pas concerné : il confirme sur un identifiant différent de la session.
+- `sandbox-paiement` : pour FedaPay, ce contrôle devient une information (ℹ) et non un échec. Il reste strict pour Stripe, qui documente l'idempotence.
+- `smoke:fedapay` provoque une vraie course : latence à la création, deux créations chez le faux FedaPay. Il vérifie qu'une seule session est rendue, puis qu'un second paiement ouvre un écart sans double crédit. Sur le code d'avant, ces deux vérifications échouent.
+
+### 2. Conditions de paiement « pas encore publiées » — à trancher (produit)
+
+Ce n'est pas un défaut de code. La case renvoie aux conditions, qui ne sont pas publiées tant que Q.A n'est pas validé dans `/textes-juridiques`. La plateforme le dit honnêtement au lieu de faire accepter un texte absent.
+
+**Question.** Faut-il **bloquer tout paiement réel** (`FEDAPAY_ENVIRONMENT=live`) tant que les conditions ne sont pas publiées ? Le bac à sable resterait ouvert pour les essais. Proposition : oui, mais à décider avant de coder.
+
+### 3. « Renseigner mon numéro » menait à un profil sans champ téléphone — corrigé
+
+L'API `PUT /api/comptes/profil` acceptait déjà le numéro, validé au format international (RG-02.3). L'écran ne le proposait pas. Corrections :
+
+- section « Paiement Mobile Money » ajoutée au profil (`id="telephone"`) ;
+- `normaliserTelephone` retire espaces, points, tirets et parenthèses, et lit `00` comme `+`. Aucun indicatif n'est deviné ;
+- le numéro est hors du décompte des champs, puisqu'il n'affine pas la checklist ;
+- le lien du récapitulatif mène à `/profil#telephone`.
+
+**À noter.** Ce numéro n'est pas transmis à FedaPay : le widget demande le sien. Le pré-remplir (`customer.phone_number`, documenté à la création) éviterait une double saisie, mais transmet une donnée personnelle de plus au prestataire. C'est une décision produit et conformité.

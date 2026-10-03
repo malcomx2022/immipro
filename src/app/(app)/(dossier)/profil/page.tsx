@@ -42,5 +42,5 @@ export default async function PageProfil() {
     ...(anglais ? { anglais } : {}),
   };
 
-  return <Profil initial={initial} />;
+  return <Profil initial={initial} telephone={compte?.phone ?? ""} />;
 }
