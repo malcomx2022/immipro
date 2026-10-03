@@ -178,3 +178,17 @@ describe("arbitrage C-09 — aucune note de dossier nulle part", () => {
     }
   });
 });
+
+describe("normaliserTelephone — le format que l'API exige (RG-02.3)", () => {
+  it("retire espaces, points, tirets et parenthèses ; lit 00 comme +", async () => {
+    const { normaliserTelephone } = await import("@/domain/comptes/profil");
+    expect(normaliserTelephone("+229 01 97 00 00 42")).toBe("+2290197000042");
+    expect(normaliserTelephone("00229.01.97.00.00.42")).toBe("+2290197000042");
+    expect(normaliserTelephone("(+225) 07-00-00-00-00")).toBe("+2250700000000");
+  });
+
+  it("ne devine pas l'indicatif d'un numéro local", async () => {
+    const { normaliserTelephone } = await import("@/domain/comptes/profil");
+    expect(normaliserTelephone("01 97 00 00 42")).toBe("0197000042");
+  });
+});

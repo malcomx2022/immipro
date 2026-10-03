@@ -332,7 +332,7 @@ export async function ouvrirLeTunnel(
 
   const { transaction, reprise } = await creerOuReprendre(userId, achat, devise);
 
-  const ouverture = transaction.providerTxId
+  let ouverture = transaction.providerTxId
     ? await ouvreur.retrouver(transaction.providerTxId, transaction.reference, devise)
     : await ouvreur.creer({
         reference: transaction.reference,
@@ -360,7 +360,31 @@ export async function ouvrirLeTunnel(
     );
   }
 
-  await noterLIdentifiantFournisseur(transaction.id, ouverture.session.providerTxId);
+  /*
+    Deux demandes simultanées sur le même achat — 03/10/2026.
+
+    Elles reprennent la même transaction locale, toutes deux sans
+    identifiant fournisseur, et appellent toutes deux `creer`. FedaPay ne
+    documente pas `Idempotency-Key` (l'essai de bac à sable l'a confirmé :
+    même clé, deux transactions) : il y a alors deux sessions chez lui.
+    Une seule est enregistrée ; l'autre renvoyait quand même son adresse,
+    et un candidat qui payait les deux voyait le second paiement tenu pour
+    un rejeu — encaissé, sans trace.
+
+    La demande qui perd l'écriture rend désormais **la session
+    enregistrée**, jamais la sienne : l'orpheline n'est montrée à personne
+    et ne peut pas être réglée.
+  */
+  const enregistree = await noterLIdentifiantFournisseur(
+    transaction.id,
+    ouverture.session.providerTxId,
+  );
+  if (enregistree !== ouverture.session.providerTxId) {
+    ouverture = await ouvreur.retrouver(enregistree, transaction.reference, devise);
+    if (ouverture.issue !== "ouverte") {
+      throw echecDOuverture(ouvreur.fournisseur, ouverture.issue, transaction.reference, ouverture);
+    }
+  }
 
   /*
     Le montant et la devise que le fournisseur a enregistrés sont comparés
@@ -395,7 +419,11 @@ export async function ouvrirLeTunnel(
  * peut être passée et avoir posé le sien. Celui-là fait foi — M.B dit
  * qu'il ne se réécrit jamais, parce qu'un reçu déjà imprimé le cite.
  */
-async function noterLIdentifiantFournisseur(id: string, providerTxId: string): Promise<void> {
+/**
+ * Rend l'identifiant **finalement enregistré** : le nôtre, ou celui qu'une
+ * demande concurrente a posé avant nous (03/10/2026).
+ */
+async function noterLIdentifiantFournisseur(id: string, providerTxId: string): Promise<string> {
   try {
     await db.transaction.updateMany({
       where: { id, providerTxId: null },
@@ -420,6 +448,11 @@ async function noterLIdentifiantFournisseur(id: string, providerTxId: string): P
     });
     throw echec("ouverture_refusee");
   }
+  const lue = await db.transaction.findUniqueOrThrow({
+    where: { id },
+    select: { providerTxId: true },
+  });
+  return lue.providerTxId ?? providerTxId;
 }
 
 /**
@@ -497,6 +530,29 @@ export async function appliquerLaNotification(
   if (!transaction) return { issue: "inconnue" };
 
   const effet = effetDeLaNotification(transaction.status, notification.statut);
+  /*
+    Un second paiement, et non un rejeu — 03/10/2026.
+
+    Chez FedaPay, une transaction garde le même identifiant toute sa vie :
+    une confirmation qui en porte un autre, sur une référence déjà réglée,
+    est un **autre** paiement — une session orpheline réglée elle aussi.
+    Le tenir pour un rejeu encaissait l'argent sans trace. L'écart s'ouvre,
+    avec ce qu'il faut rembourser. (Stripe confirme sur un identifiant
+    différent de la session : la règle ne vaut que pour FedaPay.)
+  */
+  if (
+    effet.type === "rejeu" &&
+    notification.statut === "CONFIRMEE" &&
+    transaction.providerTxId?.startsWith("fedapay:") &&
+    notification.providerTxId !== transaction.providerTxId
+  ) {
+    const raison = `Second paiement confirmé (${notification.providerTxId}) pour la référence ${transaction.reference}, déjà réglée par ${transaction.providerTxId} : à rembourser au tableau de bord FedaPay.`;
+    await db.transaction.updateMany({
+      where: { id: transaction.id, discrepancy: null },
+      data: { discrepancy: raison },
+    });
+    return { issue: "refusee", raison };
+  }
   if (effet.type === "rejeu") return { issue: "rejeu" };
   if (effet.type === "refus") return { issue: "refusee", raison: effet.raison };
 

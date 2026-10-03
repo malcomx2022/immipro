@@ -126,6 +126,42 @@ describe("C-02 — Profil", () => {
     }
   });
 
+  /**
+   * Le numéro Mobile Money — 03/10/2026. « Renseigner mon numéro », sur le
+   * récapitulatif de paiement, menait ici, et rien ne permettait de le
+   * saisir. Il est hors du décompte : il n'affine pas la checklist.
+   */
+  it("propose le numéro Mobile Money, l'envoie au format attendu, sans le compter", async () => {
+    const corps: unknown[] = [];
+    global.fetch = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+      corps.push(JSON.parse(String(options?.body)));
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ enregistre: true }) } as Response);
+    });
+    const { container } = render(<Profil initial={initial} telephone="" />);
+    const champ = screen.getByLabelText("Numéro Mobile Money");
+    expect(champ.id).toBe("telephone");
+    expect(screen.getByText(/Il manque 1 champ/)).toBeDefined();
+
+    fireEvent.change(champ, { target: { value: "+229 01 97 00 00 42" } });
+    expect(screen.getByText(/Il manque 1 champ/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(corps).toHaveLength(1));
+    expect(corps[0]).toMatchObject({ telephone: "+2290197000042" });
+    expect(container.textContent).toContain("+229 pour le Bénin");
+  });
+
+  it("n'envoie pas de numéro quand le champ est vide", async () => {
+    const corps: unknown[] = [];
+    global.fetch = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+      corps.push(JSON.parse(String(options?.body)));
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ enregistre: true }) } as Response);
+    });
+    render(<Profil initial={initial} />);
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(corps).toHaveLength(1));
+    expect(corps[0]).not.toHaveProperty("telephone");
+  });
+
   it("dit que rien n'est transmis à une administration", () => {
     const { container } = render(<Profil initial={initial} />);
     expect(container.textContent).toContain(

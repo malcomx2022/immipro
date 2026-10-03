@@ -91,6 +91,10 @@ const { POST: webhook } = await import("../src/app/api/webhooks/fedapay/route");
 /* FedaPay, tel que sa documentation le décrit — et rien de plus. */
 let prochainId = 516680;
 const creations: Record<string, unknown>[] = [];
+/** Ce que le faux FedaPay a enregistré, pour la lecture d'une transaction. */
+const montants = new Map<number, unknown>();
+/** Latence de la création chez le faux FedaPay : ouvre la fenêtre de course. */
+let latenceCreation = 0;
 const fetchReel = globalThis.fetch;
 globalThis.fetch = (async (entree: string | URL | Request, options?: RequestInit) => {
   const url = String(entree);
@@ -102,8 +106,10 @@ globalThis.fetch = (async (entree: string | URL | Request, options?: RequestInit
     new Response(JSON.stringify(corps), { status: statut, headers: { "content-type": "application/json" } });
   if (chemin === "/transactions" && options?.method === "POST") {
     const corps = JSON.parse(String(options.body)) as Record<string, unknown>;
+    if (latenceCreation > 0) await new Promise((r) => setTimeout(r, latenceCreation));
     creations.push(corps);
     prochainId += 1;
+    montants.set(prochainId, corps.amount);
     // La réponse de création documentée : leur référence, pas nos métadonnées.
     return json(201, {
       "v1/transaction": {
@@ -113,6 +119,14 @@ globalThis.fetch = (async (entree: string | URL | Request, options?: RequestInit
         status: "pending",
         currency_id: 1,
       },
+    });
+  }
+  const lecture = /^\/transactions\/(\d+)$/u.exec(chemin);
+  if (lecture && (options?.method ?? "GET") === "GET") {
+    const id = Number(lecture[1]);
+    if (!montants.has(id)) return json(404, {});
+    return json(200, {
+      "v1/transaction": { id, reference: `trx_fumee_${id}`, amount: montants.get(id), status: "pending", currency_id: 1 },
     });
   }
   const jeton = /^\/transactions\/(\d+)\/token$/u.exec(chemin);
@@ -255,6 +269,59 @@ try {
     verifier(
       (await db.transaction.findUniqueOrThrow({ where: { id: t.id } })).status === t.status,
       "et l'état n'a pas bougé",
+    );
+  }
+
+  console.log("\nDouble clic : deux demandes simultanées, une seule session montrée");
+  {
+    const autre = await candidat();
+    const avant = creations.length;
+    // La transaction locale existe déjà, sans identifiant fournisseur : les
+    // deux demandes la reprennent et appellent toutes deux `creer`.
+    await db.transaction.create({
+      data: {
+        reference: `IMP-FUMEE-${process.pid}`,
+        userId: autre.userId,
+        applicationId: autre.applicationId,
+        packCode: "dossier",
+        amount: 10000,
+        currency: "XOF",
+        provider: "FEDAPAY",
+        status: "INITIEE",
+      },
+    });
+    latenceCreation = 300;
+    const [a, b] = await Promise.all([
+      ouvrirLeTunnel(autre.userId, ACHAT(autre.applicationId), "XOF"),
+      ouvrirLeTunnel(autre.userId, ACHAT(autre.applicationId), "XOF"),
+    ]);
+    latenceCreation = 0;
+    verifier(creations.length - avant === 2, `la course a bien lieu : deux créations chez FedaPay (${creations.length - avant})`);
+    const t = await db.transaction.findFirstOrThrow({ where: { userId: autre.userId } });
+    verifier(
+      (await db.transaction.count({ where: { userId: autre.userId } })) === 1,
+      "une seule transaction locale",
+    );
+    verifier(
+      a.url === b.url && a.url.endsWith(`/${t.providerTxId!.replace("fedapay:", "")}`),
+      `les deux demandes rendent la session enregistrée (${creations.length - avant} création(s) chez FedaPay)`,
+    );
+  }
+
+  console.log("\nSecond paiement sur une référence déjà réglée : un écart, pas un rejeu");
+  {
+    const t = await db.transaction.findUniqueOrThrow({ where: { id: tx.id } });
+    const orpheline = evenement(999001, "approved", { reference: t.reference });
+    const vu = await poster(orpheline, signe(orpheline));
+    verifier(vu.status === 200, `la notification est reçue (${vu.status})`);
+    const apres = await db.transaction.findUniqueOrThrow({ where: { id: tx.id } });
+    verifier(
+      (apres.discrepancy ?? "").includes("fedapay:999001"),
+      "l'écart nomme le second paiement, à rembourser",
+    );
+    verifier(
+      (await db.analysisCredit.count({ where: { applicationId } })) === credits,
+      "et rien n'est crédité deux fois",
     );
   }
 

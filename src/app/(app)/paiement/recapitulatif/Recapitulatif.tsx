@@ -235,8 +235,9 @@ export function Recapitulatif({
           ))}
         </dl>
 
+        {/* Vers le champ lui-même : le profil en a d'autres (03/10/2026). */}
         <Link
-          href="/profil"
+          href="/profil#telephone"
           className="flex min-h-touch items-center self-start rounded-full border border-ink-300 px-3.5 text-14 text-ink-900 hover:bg-ink-100"
         >
           {tunnel.telephone ? "Changer de numéro" : "Renseigner mon numéro"}

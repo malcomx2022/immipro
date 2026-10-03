@@ -124,3 +124,33 @@ export function libelleAvancementProfil(profil: Profil): string {
   const champs = restants > 1 ? `${restants} champs` : "1 champ";
   return `Il manque ${champs}. Chaque champ rempli affine ta checklist.`;
 }
+
+/* ------------------------------------------------------------------ *
+ * Le numéro Mobile Money — 03/10/2026.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Le récapitulatif de paiement renvoyait à « Renseigner mon numéro » vers
+ * ce profil, qui n'avait aucun champ téléphone : l'API l'acceptait
+ * (RG-02.3), l'écran ne le proposait pas.
+ *
+ * Il n'entre pas dans le décompte des champs : il n'affine pas la
+ * checklist, et le compter ferait mentir « Chaque champ rempli affine ta
+ * checklist ».
+ */
+export const CHAMP_TELEPHONE = {
+  libelle: "Numéro Mobile Money",
+  aide: "Indicatif pays compris : +229 pour le Bénin, +225 pour la Côte d'Ivoire.",
+} as const;
+
+/**
+ * Le format que l'API exige (`+` puis 8 à 15 chiffres), obtenu à partir de
+ * ce qu'on tape d'habitude : espaces, points et tirets retirés. « 00 »
+ * initial lu comme « + ». Rien d'autre n'est deviné : pas d'indicatif
+ * ajouté à un numéro local, ce serait choisir le pays à la place de la
+ * personne.
+ */
+export function normaliserTelephone(valeur: string): string {
+  const net = valeur.replace(/[\s.\-()]/gu, "");
+  return net.startsWith("00") ? `+${net.slice(2)}` : net;
+}
