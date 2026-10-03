@@ -56,7 +56,7 @@ const SOURCES = [
  * L.A — le barème interne relève-t-il du droit d'accès ?
  * ------------------------------------------------------------------ */
 
-describe("L.A (sous réserve) — l'export explique sans restituer le barème", () => {
+describe("L.A (tranché) — l'export explique sans restituer le barème", () => {
   /**
    * Décision produit provisoire du 20/09/2026, **soumise à validation
    * juridique avant lancement**. L'article 20 (portabilité) ne couvre que
@@ -594,14 +594,14 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
    * qu'il faut ne pas perdre de vue. Un troisième état la garde visible,
    * et le test exige qu'elle soit nommée dans le relevé.
    */
-  const SOUS_RESERVE = ["L.A", "M.C", "Q.A"];
+  const SOUS_RESERVE = ["M.C", "Q.A"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
    * « pas de taux sans source datée » — a plus besoin d'être tenue qu'une
    * lecture provisoire.
    */
-  const TRANCHES = ["I.B", "I.D", "K.A", "N.A"];
+  const TRANCHES = ["I.B", "I.D", "K.A", "L.A", "N.A"];
 
   const TOUS = [...OUVERTS, ...SOUS_RESERVE, ...TRANCHES];
 

@@ -920,3 +920,53 @@ describe("C-07 — ce que l'écran dit une fois le fichier envoyé", () => {
     expect(screen.getByText(/Il n'a pas été analysé/u)).toBeVisible();
   });
 });
+
+/**
+ * Relecture humaine de la complétude — avis juridique L.A, 03/10/2026.
+ * La pondération n'est pas exposée ; le candidat peut demander qu'une
+ * personne relise son évaluation.
+ */
+describe("C-09 — relecture humaine de la complétude", () => {
+  it("propose la relecture, et l'envoie avec l'explication", async () => {
+    const appels: { url: string; corps: unknown }[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      appels.push({ url, corps: JSON.parse(String(options?.body)) });
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ statut: "EN_ATTENTE" }) } as Response);
+    });
+    render(<Completude dossier={DOSSIER} pieces={PIECES_NL} relecture={{ etat: "aucune" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Demander une relecture" }));
+    fireEvent.change(screen.getByLabelText("Qu'est-ce qui te semble inexact ?"), {
+      target: { value: "Mon relevé bancaire est déposé mais compté comme manquant." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer la demande" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/Ta demande de relecture est enregistrée/u));
+    expect(appels[0]).toEqual({
+      url: `/api/dossiers/${DOSSIER.id}/completude/relecture`,
+      corps: { explication: "Mon relevé bancaire est déposé mais compté comme manquant." },
+    });
+  });
+
+  it("une demande en cours se dit, sans rouvrir le formulaire", () => {
+    render(
+      <Completude
+        dossier={DOSSIER}
+        pieces={PIECES_NL}
+        relecture={{ etat: "en_attente", demandeeLe: "2026-10-03T10:00:00.000Z" }}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Demander une relecture" })).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(/Ta demande de relecture est enregistrée/u);
+  });
+
+  it("une demande traitée montre la réponse du relecteur", () => {
+    render(
+      <Completude
+        dossier={DOSSIER}
+        pieces={PIECES_NL}
+        relecture={{ etat: "traitee", reponse: "Ton relevé est bien pris en compte.", traiteeLe: "2026-10-03T12:00:00.000Z" }}
+      />,
+    );
+    expect(screen.getByText("Ton relevé est bien pris en compte.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Demander une relecture" })).toBeVisible();
+  });
+});

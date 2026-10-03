@@ -290,6 +290,13 @@ async function unCompteComplet() {
       explanation: "La date enregistrée est celle du rendez-vous, pas du dépôt.",
     },
   });
+  // L.A (S.113) : une demande de relecture humaine de la complétude.
+  await db.completenessReviewRequest.create({
+    data: {
+      applicationId: application.id,
+      explanation: "Mon justificatif de ressources est bien déposé, il n'apparaît pas.",
+    },
+  });
   await db.documentVersion.updateMany({
     where: { document: { applicationId: application.id } },
     data: { body: "Lettre de motivation." },

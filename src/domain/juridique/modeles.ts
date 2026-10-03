@@ -273,6 +273,11 @@ const DONNEES_PERSONNELLES: ModeleJuridique = {
       "La lecture des pièces et la rédaction assistée font appel à un prestataire d'intelligence artificielle, sous-traitant d'ImmiPro. Il reçoit le fichier ou le texte concerné, et rien d'autre : ni votre adresse, ni l'adresse du fichier dans notre stockage.",
       "Les pièces d'identité ne sont confiées qu'au prestataire désigné à cet effet. Un autre prestataire n'en reçoit que sur une autorisation écrite d'ImmiPro.",
       "La complétude du dossier est calculée automatiquement à partir des pièces et des règles de la destination. Elle indique ce qui manque ou doit être corrigé. Elle ne produit aucune décision à votre égard, et ne se prononce pas sur la décision de l'administration.",
+      // Avis juridique L.A du 03/10/2026 : la pondération n'est pas
+      // communiquée, et cela se dit ; une relecture humaine peut être
+      // demandée.
+      "La pondération interne du calcul n'est pas communiquée. L'export de vos données en indique les facteurs et l'ordre dans lequel les manques vous sont présentés.",
+      "Vous pouvez demander qu'un membre de l'équipe relise l'évaluation de complétude de votre dossier, depuis l'écran de complétude. La réponse vous est adressée dans vos alertes.",
     ),
     p("{{ia_conservation}}"),
     h("5. Qui reçoit vos données"),
