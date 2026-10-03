@@ -12,7 +12,7 @@ import type { EchecCandidat } from "@/server/http/echecs";
 import type { Tunnel } from "@/server/lecture/paiements";
 import type { Devise } from "@/domain/payments/pricing";
 import { corpsDAchat, type Achat, type Tarif } from "@/domain/payments/achat";
-import { deroulement, mentionDuRail } from "@/domain/payments/rail";
+import { deroulement, mentionDuRail, mentionRailFerme } from "@/domain/payments/rail";
 import { formatMontant } from "@/lib/utils";
 import {
   CODE_MONTEE_DOSSIER,
@@ -98,7 +98,10 @@ export function Recapitulatif({
 
   // La raison vient du domaine, comme sur $-01 : une phrase de refus écrite
   // deux fois est une phrase dont une copie se périme en silence.
-  const obstacle = obstacleAuPaiement(conditions);
+  // Un rail fermé (`PAIEMENT_FOURNISSEURS`) ne se paie pas : l'adresse
+  // peut porter `devise=EUR` pendant le pilote FedaPay (03/10/2026).
+  const railFerme = !tunnel.devisesOuvertes.includes(devise);
+  const obstacle = railFerme ? mentionRailFerme(devise) : obstacleAuPaiement(conditions);
   const montant = formatMontant(montee ? montee.montant : (tarif?.prix[devise] ?? 0), devise);
   const libelle = montee ? LIBELLE_MONTEE : (tarif?.libelle ?? "");
   const autreDevise: Devise = devise === "XOF" ? "EUR" : "XOF";
@@ -275,6 +278,19 @@ export function Recapitulatif({
           comme avant. */}
       <div className="-mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
         {echec ? <BlocEchec echec={echec} annonce /> : null}
+        {railFerme ? (
+          <p role="status" className="text-pretty text-14 text-ink-700">
+            {mentionRailFerme(devise)}{" "}
+            {montee ? null : (
+              <Link
+                href={`/paiement/pack?dossier=${tunnel.dossier.id}`}
+                className="text-accent-600 underline"
+              >
+                Revenir au choix du pack
+              </Link>
+            )}
+          </p>
+        ) : null}
         {/* La case nomme une page que le registre déclare absente, et vers
             laquelle rien ne mène. C'est l'écran où l'on paie : y taire
             l'absence est le pire endroit pour le faire.

@@ -12,6 +12,9 @@ import { formatMontant } from "@/lib/utils";
 import { db } from "@/lib/db";
 import { versionAcceptee } from "@/domain/comptes/acceptation";
 import { pagesPubliees } from "@/server/juridique/lecture";
+import { devisesOuvertes, mentionRailFerme } from "@/domain/payments/rail";
+import { fournisseursActifs } from "@/server/paiement/secrets";
+import { echec } from "@/server/http/echecs";
 
 /**
  * Création d'un paiement — $-02, WF-05.
@@ -48,6 +51,14 @@ export const POST = route({
     devise: z.enum(["XOF", "EUR"]),
   }),
   async traiter({ corps, acteur }) {
+    // Un rail fermé (`PAIEMENT_FOURNISSEURS`) est refusé avant toute
+    // écriture, avec ce qui reste possible — 03/10/2026.
+    if (!devisesOuvertes(fournisseursActifs()).includes(corps.devise)) {
+      throw echec("champs_invalides", {
+        corps: mentionRailFerme(corps.devise),
+        champs: { devise: mentionRailFerme(corps.devise) },
+      });
+    }
     const dossier = await dossierDuCandidat(corps.dossierId, acteur!.id);
     const achat = await preparerLAchat(corps.achat, dossier.id, acteur!.id);
     // La montée garde la devise de l'achat Essentiel (S.88).

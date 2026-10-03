@@ -101,6 +101,13 @@ jobs:
         run: npm run smoke:tunnel
       - run: echo "- **Tunnel de paiement** — ouverture, reprise et refus éprouvés sur base vierge" >> "$GITHUB_STEP_SUMMARY"
 
+      # Le rail FedaPay avec son vrai adaptateur et la vraie route du
+      # webhook, devant des réponses de la forme documentée : notre
+      # référence dans custom_metadata, rien de non signé ne crédite (S.109).
+      - name: Rail FedaPay de bout en bout
+        run: npm run smoke:fedapay
+      - run: echo "- **Rail FedaPay** — adaptateur réel, webhook signé, refus non signés éprouvés" >> "$GITHUB_STEP_SUMMARY"
+
       # Le rattrapage d'un webhook perdu : état retrouvé et appliqué par le
       # même service que les webhooks, course entre les deux, et la
       # frontière qui compte — une absence de réponse n'est pas un refus.

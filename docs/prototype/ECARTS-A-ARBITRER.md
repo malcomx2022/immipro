@@ -10950,3 +10950,93 @@ Un candidat qui n'était jamais passé par « Mes consentements » n'avait donc 
 **3. Défaut corrigé au passage.** Sans pack, le motif disait « tes analyses du pack sont utilisées ». Le titre avait le même défaut, corrigé par S.107. Un motif `sans_pack` est ajouté : « aucune analyse n'est incluse tant que le dossier n'a pas de pack ». Le balayage le choisit quand aucun crédit d'analyse n'a jamais été ouvert sur le dossier.
 
 **Tests.** Domaine : `tests/controle-du-depot.test.ts`. Écran : `tests/ui/p0-dossier2.test.tsx`, avec un envoi complet simulé, le contrôle en cours et le contrôle passé. La fumée `smoke:balayage` passe sur une base jetable.
+
+## S.109 — Confirmation des paiements : le rail FedaPay, de l'interface au crédit
+
+**Demande du 03/10/2026.** Point « Confirmation des paiements » du référentiel avant ouverture. Contexte de production, vérifié par l'exploitant :
+
+- `FEDAPAY_ENVIRONMENT=sandbox` ;
+- `FEDAPAY_API_KEY` et `FEDAPAY_WEBHOOK_SECRET` sont chargées dans le conteneur ;
+- `APP_URL=https://immipro.app` ;
+- les clés Stripe sont vides : le pilote passe par FedaPay seul ;
+- un appel direct à l'API a réussi (transaction de bac à sable #516681).
+
+Ni le webhook signé de bout en bout ni le paiement depuis l'interface n'étaient vérifiés.
+
+### 1. Défaut bloquant : la référence
+
+**Constat.** L'adaptateur envoyait notre référence dans le champ `reference` de `POST /transactions` et attendait de la relire au même endroit. Or :
+
+- la documentation FedaPay de la création, relue le 03/10/2026, ne connaît pas `reference` en entrée ;
+- la réponse porte la référence que FedaPay génère lui-même (`trx_…`) ;
+- les champs marchands documentés sont `custom_metadata` (à la création, puis rendu à la lecture) et `merchant_reference` (à la lecture).
+
+**Effet.**
+
+- `depuisLEntite` comparait `trx_…` à `IMP-…` et rendait `reponse_inattendue` : **aucun paiement ne pouvait s'ouvrir depuis l'interface**.
+- `lireFedaPay` lisait `entity.reference` comme si c'était la nôtre : aucune notification réelle n'aurait retrouvé son paiement.
+- La consultation de réconciliation aurait conclu à l'incohérence.
+
+Le test direct à l'API ne passait pas par l'adaptateur et ne pouvait pas le montrer. Les tests unitaires non plus : leurs échantillons reprenaient l'hypothèse de l'adaptateur. C'est le même mécanisme que pour le défaut de la forme plate (22/09/2026).
+
+**Correction.**
+
+- Notre référence part dans `custom_metadata.reference`.
+- `referenceMarchande` (`server/paiement/notifications.ts`) la relit, avec `merchant_reference` en repli. Elle n'utilise jamais la `reference` de FedaPay.
+- Si la référence revient et n'est pas la nôtre, l'ouverture est refusée.
+- Si elle ne revient pas (la réponse de création n'est pas tenue de rendre les métadonnées), l'identifiant suffit.
+- `appliquerLaNotification` retrouve le paiement par notre référence quand elle est présente, sinon par `providerTxId` (`fedapay:<id>`, unique, posé à l'ouverture).
+
+### 2. Stripe fermé proprement : `PAIEMENT_FOURNISSEURS`
+
+Sans déclaration, rien ne distinguait « Stripe volontairement vide » d'un oubli. L'état de service exigeait les clés des deux rails. Il lisait donc « non configurée » la confirmation et l'ouverture des paiements, alors que FedaPay était prêt. Côté écran, « Payer par carte, en euros » menait à un paiement impossible.
+
+`PAIEMENT_FOURNISSEURS=FEDAPAY` (variable vide = les deux, comme avant ; un nom inconnu est signalé au journal) :
+
+- **état de service :** le secret entrant, la clé sortante et la sonde de signature ne sont exigés que pour les rails ouverts ;
+- **ouverture :** `lOuvreur` ne rend rien pour un rail fermé, même si une clé traîne ;
+- **route :** `POST /api/paiements` refuse une devise fermée avant toute écriture, avec un message qui dit ce qui reste possible ;
+- **écrans :** le choix du pack ne propose que les devises ouvertes. Un compte qui suggère l'euro se voit proposer le franc CFA, avec la mention « Le paiement par carte bancaire, en euros, n'est pas encore ouvert ». Le récapitulatif ouvert en `devise=EUR` bloque le paiement et renvoie au choix du pack. L'écran d'échec ne propose plus « Payer par carte ».
+
+La déclaration est explicite plutôt que déduite des clés présentes : une clé oubliée en production doit se voir à l'état de service, pas fermer un rail en silence.
+
+### 3. INV-7 — vérifié, rien à changer
+
+La signature correspond exactement au SDK officiel FedaPay (`WebhookSignature::verifyHeader`) :
+
+- en-tête `X-FEDAPAY-SIGNATURE: t=…,s=…` ;
+- HMAC-SHA256 de `t.corps` ;
+- tolérance de 300 s ;
+- comparaison en temps constant.
+
+Sans secret configuré, la vérification rend `false` et le journal dit pourquoi (fail-closed). La route est exclue de la limitation de débit, avec la signature exigée en contrepartie.
+
+Changement mineur au passage : la route ne lit plus la session pour un webhook, puisque le fournisseur n'en a pas. C'est ce qui rend la vraie route testable hors de Next.
+
+### 4. Remboursement FedaPay (S.91) — vérifié, rien à changer
+
+L'adaptateur rend `procedure_manuelle` sans aucun appel réseau. L'opérateur rembourse au tableau de bord FedaPay, puis déclare la référence en B-04. La dette ne se solde que par la notification signée `refunded`, que `lireFedaPay` lit sur `entity.status`.
+
+À trancher : avec FedaPay seul, la capacité `remboursement` reste « aucun adaptateur », et `/api/health` reste à 503 pour cette seule raison. C'est conforme à S.91 (« la capacité reste non branchée »). Il faut décider si une procédure manuelle tracée suffit à déclarer l'instance apte à encaisser.
+
+### Vérifications
+
+- `npm run smoke:fedapay` (nouveau, en CI), sur une base jetable :
+  - adaptateur réel devant des réponses de la forme documentée, route réelle du webhook ;
+  - rejet sans signature, avec un autre secret, avec un corps modifié, avec un horodatage périmé, et sans secret configuré ;
+  - crédit unique sur notification signée, rejeu sans double crédit ;
+  - événement sans métadonnées retrouvé par l'identifiant ;
+  - euros refusés sans écriture.
+- `smoke:tunnel`, `smoke:remboursement` et `smoke:reconciliation` passent.
+- Tests ajoutés : `tests/fedapay-reference.test.ts`, `tests/fournisseurs-ouverts.test.ts`, et `tests/ui/p0-paiement.test.tsx` (rail fermé). Les échantillons de `tunnel-ouverture`, `consultation-paiement`, `motif-refus` et `remboursement` ont la forme FedaPay réelle.
+- En production, le 03/10 : `POST /api/webhooks/fedapay` sans signature répond 400 « La notification n'a pas pu être authentifiée ».
+
+### Pour tester en bac à sable, après déploiement
+
+1. **Configuration :**
+   - ajouter `PAIEMENT_FOURNISSEURS=FEDAPAY` dans `.env.app`, puis recréer les conteneurs ;
+   - dans le tableau de bord FedaPay (bac à sable), déclarer le webhook `https://immipro.app/api/webhooks/fedapay` avec au minimum `transaction.approved`, `transaction.declined`, `transaction.canceled` et `transaction.updated` (pour le remboursement) ;
+   - vérifier que le secret de ce webhook est bien `FEDAPAY_WEBHOOK_SECRET`.
+2. **Essai de l'adaptateur :** sur le VPS, `docker compose -f docker-compose.prod.yml run --rm app node dist/sandbox-paiement.mjs`. Il ouvre une vraie session de bac à sable et doit passer, alors qu'il aurait échoué avant cette correction. Il refuse `FEDAPAY_ENVIRONMENT=live`, et ne fait rien sans clé. Le script est maintenant empaqueté dans l'image (`dist/`), comme la graine : l'image n'a ni `tsx` ni les sources.
+3. **Paiement depuis l'interface :** payer un pack en francs CFA avec un numéro de test FedaPay, puis vérifier le crédit, le reçu et la ligne B-04 rapprochée.
+4. **Rejet d'une notification non signée :** déjà constaté (400).

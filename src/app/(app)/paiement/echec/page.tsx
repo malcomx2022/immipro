@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { devisesOuvertes } from "@/domain/payments/rail";
+import { fournisseursActifs } from "@/server/paiement/secrets";
 import { notFound } from "next/navigation";
 import { Echec } from "./Echec";
 import { paiementDuTunnel } from "@/server/lecture/paiements";
@@ -44,5 +46,12 @@ export default async function PageEchec({
   const paiement = await paiementDuTunnel(tx, acteur.id).catch(() => null);
   if (!paiement) notFound();
 
-  return <Echec paiement={paiement} motif={motif ?? null} />;
+  const autre = paiement.devise === "XOF" ? "EUR" : "XOF";
+  return (
+    <Echec
+      paiement={paiement}
+      motif={motif ?? null}
+      autreGrilleOuverte={devisesOuvertes(fournisseursActifs()).includes(autre)}
+    />
+  );
 }

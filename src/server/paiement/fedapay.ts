@@ -48,7 +48,7 @@ import { verifierLUrlHebergee } from "@/domain/paiement/ouverture";
 import { SANS_REPONSE } from "./ouvreur";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
 import type { Consultant, EtatConsulte } from "./consultation";
-import { CAUSES_FEDAPAY, ETATS_FEDAPAY } from "./notifications";
+import { CAUSES_FEDAPAY, ETATS_FEDAPAY, referenceMarchande } from "./notifications";
 import type { Rembourseur } from "./rembourseur";
 
 /** Le domaine, pas l'hôte : l'hôte exact n'a pas pu être vérifié. */
@@ -90,7 +90,21 @@ export const baseDe = (espace: string | undefined): string =>
  */
 const champsDeLEntite = {
   id: z.union([z.string(), z.number()]),
+  /**
+   * La référence **de FedaPay** (`trx_…`), qu'il génère lui-même. Ce
+   * n'est pas la nôtre — voir `referenceMarchande`.
+   */
   reference: z.string().nullish(),
+  /**
+   * Là où voyage notre référence — 03/10/2026.
+   *
+   * `custom_metadata` est le seul champ de la création documentée qui
+   * revienne tel quel (sur la lecture et dans l'événement). Lu en
+   * `unknown` : un objet vide peut revenir sérialisé en tableau, et un
+   * schéma strict refuserait alors toute la transaction.
+   */
+  custom_metadata: z.unknown().optional(),
+  merchant_reference: z.string().nullish(),
   amount: z.number().nullish(),
   /** L'état de la transaction — lu par la consultation (RG-05.4). */
   status: z.string().nullish(),
@@ -218,13 +232,15 @@ export const adaptateurFedaPay = (
     const entite = lu.data;
 
     /*
-      La référence doit revenir telle quelle : c'est elle que
-      `lireFedaPay` lit dans la notification signée pour retrouver le
-      paiement. Si le fournisseur en impose une autre, le webhook
-      arriverait sans savoir quoi confirmer — on refuse avant, plutôt que
-      de laisser un paiement réglé sans dossier crédité.
+      Notre référence, si elle revient, doit être la nôtre : une autre
+      désignerait une transaction qui n'est pas celle qu'on ouvre. Si elle
+      ne revient pas — la réponse de création n'est pas tenue de rendre
+      les métadonnées —, l'identifiant suffit : il est enregistré à
+      l'ouverture, et la notification signée retrouve le paiement par lui.
+      La référence que FedaPay génère (`reference`) n'est jamais comparée.
     */
-    if (entite.reference !== attendue) {
+    const lue = referenceMarchande(entite);
+    if (lue !== null && lue !== attendue) {
       return {
         issue: "reponse_inattendue",
         detail: "la référence interne n'est pas revenue telle quelle",
@@ -274,7 +290,9 @@ export const adaptateurFedaPay = (
           description: demande.intitule,
           amount: demande.montant,
           currency: { iso: demande.devise },
-          reference: demande.reference,
+          // Notre référence voyage ici, pas dans `reference`, que FedaPay
+          // génère lui-même — voir `referenceMarchande`.
+          custom_metadata: { reference: demande.reference },
           callback_url: retourAbsolu(demande.retour),
         },
       });
@@ -382,7 +400,8 @@ export const consultantFedaPay = (cle: string, espace: string | undefined): Cons
         correspond pas n'est pas une panne : c'est un désaccord, et on
         n'applique rien dessus.
       */
-      if (entite.reference && entite.reference !== reference) {
+      const lue = referenceMarchande(entite);
+      if (lue !== null && lue !== reference) {
         return { issue: "incoherent", detail: "la référence rendue n'est pas la nôtre" };
       }
 

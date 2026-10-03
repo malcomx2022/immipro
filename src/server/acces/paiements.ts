@@ -441,7 +441,12 @@ export interface Notification {
   providerEventId: string;
   /** La transaction chez le fournisseur, posée une fois (M.B). */
   providerTxId: string;
-  reference: string;
+  /**
+   * Notre référence, quand le fournisseur la renvoie. FedaPay ne la rend
+   * que dans `custom_metadata` : `null` si elle manque, et le paiement se
+   * retrouve par `providerTxId`, posé à l'ouverture (03/10/2026).
+   */
+  reference: string | null;
   statut: TransactionStatus;
   /** Pourquoi, quand le rail le dit (N.B). */
   cause?: CauseRefus;
@@ -486,9 +491,9 @@ class EtatDejaChange extends Error {}
 export async function appliquerLaNotification(
   notification: Notification,
 ): Promise<IssueNotification> {
-  const transaction = await db.transaction.findUnique({
-    where: { reference: notification.reference },
-  });
+  const transaction = notification.reference
+    ? await db.transaction.findUnique({ where: { reference: notification.reference } })
+    : await db.transaction.findUnique({ where: { providerTxId: notification.providerTxId } });
   if (!transaction) return { issue: "inconnue" };
 
   const effet = effetDeLaNotification(transaction.status, notification.statut);

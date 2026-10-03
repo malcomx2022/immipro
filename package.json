@@ -21,6 +21,7 @@
     "smoke:worker": "node scripts/fumee-worker.mjs",
     "smoke:migrations": "node scripts/migrations.mjs",
     "smoke:tunnel": "tsx scripts/fumee-tunnel.mts",
+    "smoke:fedapay": "tsx scripts/fumee-fedapay.mts",
     "smoke:reconciliation": "tsx scripts/fumee-reconciliation.mts",
     "smoke:consultation": "tsx scripts/fumee-consultation.mts",
     "smoke:remboursement": "tsx scripts/fumee-remboursement.mts",

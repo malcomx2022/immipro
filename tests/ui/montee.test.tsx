@@ -23,6 +23,7 @@ const F = (n: number) => plat(formatMontant(n, "XOF"));
 const TUNNEL: Tunnel = {
   dossier: { id: "nl-1", pays: "Pays-Bas", intitule: "Séjour pour études (MVV + VVR)" },
   devise: "XOF",
+  devisesOuvertes: ["XOF", "EUR"],
   paysConnu: true,
   telephone: "97 •• •• 42",
   dejaOuvert: true,

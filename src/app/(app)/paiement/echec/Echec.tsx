@@ -62,9 +62,16 @@ const estMotif = (valeur: string | null): valeur is MotifEchec =>
 export function Echec({
   paiement,
   motif,
+  autreGrilleOuverte = true,
 }: {
   paiement: PaiementEnCours;
   motif: string | null;
+  /**
+   * L'autre rail est-il ouvert (`PAIEMENT_FOURNISSEURS`) ? Pendant le
+   * pilote FedaPay, « Payer par carte, en euros » menait à un paiement
+   * que rien ne pouvait ouvrir (03/10/2026).
+   */
+  autreGrilleOuverte?: boolean;
 }) {
   /**
    * La cause conservée d'abord, l'adresse ensuite, l'état en dernier.
@@ -187,7 +194,7 @@ export function Echec({
         </section>
       ) : null}
 
-      {reessai ? (
+      {reessai && autreGrilleOuverte ? (
         <section className="flex flex-col gap-2">
           <h2 className="text-14 font-semibold text-ink-900">Autre moyen de paiement</h2>
           <p className="text-pretty text-14 text-ink-700">

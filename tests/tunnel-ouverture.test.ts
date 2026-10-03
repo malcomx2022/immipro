@@ -310,12 +310,19 @@ describe("adaptateur Stripe", () => {
 
 describe("adaptateur FedaPay", () => {
   const XOF = { ...DEMANDE, montant: 5000, devise: "XOF" as const };
+  /*
+    La réponse telle que FedaPay la rend : `reference` est **la sienne**
+    (`trx_…`), et la nôtre revient dans `custom_metadata` — 03/10/2026.
+    Les échantillons portaient notre référence dans `reference`, ce qui
+    faisait passer un adaptateur qu'aucune réponse réelle ne satisfaisait.
+  */
   const transaction = {
     "v1/transaction": {
       id: 42,
-      reference: XOF.reference,
+      reference: "trx_Ab3_1759467600",
       amount: 5000,
       currency: { iso: "XOF" },
+      custom_metadata: { reference: XOF.reference },
     },
   };
   const jeton = { url: "https://process.fedapay.com/abc" };
@@ -346,7 +353,10 @@ describe("adaptateur FedaPay", () => {
 
     const corps = JSON.parse(appels[0]!.options.body as string);
     expect(corps.amount).toBe(5000);
-    expect(corps.reference).toBe(XOF.reference);
+    // Notre référence part dans `custom_metadata` ; `reference` est un
+    // champ que FedaPay génère, et qu'on n'envoie pas.
+    expect(corps.custom_metadata).toEqual({ reference: XOF.reference });
+    expect(corps).not.toHaveProperty("reference");
     expect(corps.callback_url).toBe("https://immipro.test/paiement/attente?tx=IMP-260921-ABCDEF");
     expect((appels[0]!.options.headers as Record<string, string>)["Idempotency-Key"]).toBe(XOF.cle);
   });
@@ -356,8 +366,16 @@ describe("adaptateur FedaPay", () => {
     await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF);
     const corps = JSON.parse(appels[0]!.options.body as string);
 
+    // L'événement porte la transaction entière : leur référence, et nos
+    // métadonnées telles qu'on les a envoyées.
     const relue = lireFedaPay({
-      entity: { id: 42, status: "approved", reference: corps.reference },
+      name: "transaction.approved",
+      entity: {
+        id: 42,
+        status: "approved",
+        reference: "trx_Ab3_1759467600",
+        custom_metadata: corps.custom_metadata,
+      },
     });
     expect(relue?.reference).toBe(XOF.reference);
     expect(relue?.providerTxId).toBe("fedapay:42");
@@ -377,10 +395,13 @@ describe("adaptateur FedaPay", () => {
     });
   });
 
-  it("refuse une transaction dont la référence n'est pas revenue", async () => {
+  it("refuse une transaction qui porte la référence d'un autre paiement", async () => {
     simuler(
       reponse(200, {
-        "v1/transaction": { ...transaction["v1/transaction"], reference: "leur-reference" },
+        "v1/transaction": {
+          ...transaction["v1/transaction"],
+          custom_metadata: { reference: "IMP-AUTRE" },
+        },
       }),
     );
     expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
@@ -419,12 +440,40 @@ describe("adaptateur FedaPay", () => {
    * retarder sur une API et que refuser la bonne est le seul des deux
    * risques qui bloque le rail.
    */
+  /**
+   * La référence de FedaPay n'est jamais la nôtre — 03/10/2026.
+   *
+   * `POST /transactions` ne documente pas `reference` en entrée ; la
+   * réponse porte celle que FedaPay génère. L'adaptateur la comparait à
+   * la nôtre et refusait donc chaque ouverture réelle.
+   */
+  it("ouvre le paiement quand la référence rendue est celle de FedaPay", async () => {
+    simuler(
+      reponse(200, {
+        "v1/transaction": {
+          id: 42,
+          reference: "trx_Ab3_1759467600",
+          amount: 5000,
+          currency: { iso: "XOF" },
+        },
+      }),
+      reponse(200, jeton),
+    );
+    // Sans métadonnées dans la réponse de création, l'identifiant suffit :
+    // il est enregistré à l'ouverture, et la notification le porte.
+    expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toMatchObject({
+      issue: "ouverte",
+      session: { providerTxId: "fedapay:42", montant: 5000 },
+    });
+  });
+
   describe("la forme plate, telle que la documentation la décrit", () => {
     const plate = {
       id: 42,
-      reference: XOF.reference,
+      reference: "trx_Ab3_1759467600",
       amount: 5000,
       currency: { iso: "XOF" },
+      custom_metadata: { reference: XOF.reference },
     };
 
     it("ouvre le paiement, là où l'enveloppe était exigée", async () => {
@@ -449,7 +498,7 @@ describe("adaptateur FedaPay", () => {
      */
     it("accepte une entité qui ne porte que `currency_id`", async () => {
       simuler(
-        reponse(200, { id: 42, reference: XOF.reference, amount: 5000, currency_id: 1 }),
+        reponse(200, { id: 42, reference: "trx_Ab3_1759467600", amount: 5000, currency_id: 1 }),
         reponse(200, jeton),
       );
       const vu = await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF);
@@ -460,7 +509,7 @@ describe("adaptateur FedaPay", () => {
     });
 
     it("refuse toujours une référence qui n'est pas la nôtre", async () => {
-      simuler(reponse(200, { ...plate, reference: "leur-reference" }));
+      simuler(reponse(200, { ...plate, custom_metadata: { reference: "IMP-AUTRE" } }));
       expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
         issue: "reponse_inattendue",
         detail: "la référence interne n'est pas revenue telle quelle",
@@ -468,7 +517,7 @@ describe("adaptateur FedaPay", () => {
     });
 
     it("refuse toujours une entité sans montant", async () => {
-      simuler(reponse(200, { id: 42, reference: XOF.reference, currency: { iso: "XOF" } }));
+      simuler(reponse(200, { id: 42, reference: "trx_Ab3_1759467600", currency: { iso: "XOF" } }));
       expect(await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).creer(XOF)).toEqual({
         issue: "reponse_inattendue",
         detail: "montant absent de la transaction",
@@ -490,7 +539,7 @@ describe("adaptateur FedaPay", () => {
      */
     it("une reprise sur une entité sans code ISO rend la devise locale", async () => {
       simuler(
-        reponse(200, { id: 42, reference: XOF.reference, amount: 5000, currency_id: 1 }),
+        reponse(200, { id: 42, reference: "trx_Ab3_1759467600", amount: 5000, currency_id: 1 }),
         reponse(200, jeton),
       );
       const vu = await adaptateurFedaPay("sk_essai", "sandbox", RETOUR).retrouver(

@@ -1,4 +1,6 @@
 import { db } from "@/lib/db";
+import { deviseProposee, devisesOuvertes } from "@/domain/payments/rail";
+import { fournisseursActifs } from "@/server/paiement/secrets";
 import { echec } from "@/server/http/echecs";
 import { versFiche } from "@/server/acces/regles";
 import { emetteurDuRecu, etatDuRecu, libelleDeLAchat, moyenDe, type EtatRecu } from "@/domain/paiement/recu";
@@ -153,8 +155,13 @@ export async function consultationDuPaiement(
 
 export interface Tunnel {
   dossier: { id: string; pays: string; intitule: string };
-  /** Suggérée par le pays du compte, et basculable à la main. */
+  /**
+   * Suggérée par le pays du compte, et basculable à la main — parmi les
+   * devises dont le rail est ouvert (`PAIEMENT_FOURNISSEURS`).
+   */
   devise: Devise;
+  /** Les devises qu'on peut régler ici. Une seule pendant le pilote FedaPay. */
+  devisesOuvertes: Devise[];
   /** `false` quand le compte n'a pas de pays : la suggestion se dit alors autrement. */
   paysConnu: boolean;
   /** Numéro masqué du compte, ou `null` s'il n'en a pas renseigné. */
@@ -204,6 +211,7 @@ export async function tunnelDuPaiement(dossierId: string, userId: string): Promi
   ]);
 
   const fiche = dossier.visaRule ? versFiche(dossier.visaRule) : null;
+  const ouvertes = devisesOuvertes(fournisseursActifs());
 
   return {
     dossier: {
@@ -211,7 +219,8 @@ export async function tunnelDuPaiement(dossierId: string, userId: string): Promi
       pays: fiche?.pays ?? dossier.visaRule?.countryCode ?? "—",
       intitule: fiche?.intitule ?? "—",
     },
-    devise: deviseParDefaut(compte?.countryCode),
+    devise: deviseProposee(deviseParDefaut(compte?.countryCode), ouvertes),
+    devisesOuvertes: ouvertes,
     paysConnu: Boolean(compte?.countryCode),
     telephone: compte?.phone ? masquerNumero(compte.phone) : null,
     dejaOuvert: packPaye !== null,
