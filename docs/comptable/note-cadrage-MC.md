@@ -1,7 +1,7 @@
 # Note de cadrage — Avis comptable (M.C)
 ## ImmiPro : faut-il une facture en plus du reçu ? Mentions et numérotation
 
-**Date :** 2 octobre 2026
+**Date :** 2 octobre 2026, mise à jour le 3 octobre 2026
 **Objet :** demande d'avis comptable préalable à l'encaissement commercial
 **Référence interne :** M.C
 
@@ -29,6 +29,8 @@ Aucun paiement en F CFA n'est accepté en dessous de 3 000 F CFA.
 **Moyens de paiement**, selon la devise :
 - **F CFA → Mobile Money**, via **FedaPay**. Le produit ne choisit ni ne nomme l'opérateur : le client paie avec celui de son numéro.
 - **Euros → carte bancaire**, via **Stripe**.
+
+**Ce qui est ouvert pour le pilote.** Seul **FedaPay** (Mobile Money, F CFA) est ouvert. Le paiement par carte en euros (Stripe) est **fermé** : un client hors UEMOA se voit proposer la grille en F CFA, payable par Mobile Money. À ce jour, FedaPay fonctionne en **bac à sable** : aucun encaissement réel n'a eu lieu. Par ailleurs, aucun paiement réel ne peut s'ouvrir tant que les conditions générales de vente ne sont pas publiées. Les questions ci-dessous valent pour les deux grilles, en vue de leur ouverture.
 
 **Choix de la grille.** Par défaut, elle suit le pays du client : F CFA pour les pays de l'UEMOA (Bénin, Côte d'Ivoire, Sénégal, Togo, Burkina Faso, Mali, Niger, Guinée-Bissau), euros pour les autres.
 
@@ -103,6 +105,8 @@ Liste exacte des mentions à faire figurer :
 - **Remboursements.** Faut-il un **avoir** à chaque remboursement ? Avec quelle numérotation ?
   - Aujourd'hui, un remboursement n'est réputé fait qu'à réception de la confirmation du prestataire.
   - Les remboursements Mobile Money se font **à la main**, dans le tableau de bord du prestataire, puis sont déclarés dans l'application.
+  - FedaPay ne rembourse que vers **MTN Mobile Money**. Pour un client payé par un autre opérateur, aucun remboursement n'est possible par ce canal : le cas est traité par la direction. Quel traitement comptable pour un remboursement fait hors du prestataire de paiement, si la direction le décide ?
+  - Cette procédure manuelle est acceptée pour le pilote, **jusqu'à 10 dossiers payés**. Au-delà, la décision sera reprise.
   - Il n'existe **aucun remboursement automatique**.
 - **Pack partiellement consommé.** Le produit **n'applique aucun prorata** : une demande de remboursement d'un pack entamé est examinée **au cas par cas**, en revue manuelle. Comment traiter comptablement un remboursement partiel, si la direction en décide ?
 - **Passage d'Essentiel à Dossier.** Le client paie la différence, sous une référence distincte. Facture distincte, ou facture rectificative ?
@@ -122,7 +126,7 @@ Sur demande :
 - les **Conditions générales d'utilisation et de vente** (brouillon en cours de validation juridique), où les prix et les remboursements sont repris du produit ;
 - un **exemple de reçu**, tel qu'il s'affiche dans l'application ;
 - la **grille tarifaire** complète, reproduite au §1 ;
-- le détail des **flux de paiement** : Mobile Money via FedaPay, carte via Stripe, confirmation par notification signée.
+- le détail des **flux de paiement** : Mobile Money via FedaPay, carte via Stripe (fermée pour le pilote), confirmation par notification signée.
 
 ---
 
@@ -134,4 +138,4 @@ Cet avis est **bloquant avant le premier encaissement commercial**. Le pilote fe
 
 ---
 
-*Document préparé le 02/10/2026, corrigé le même jour pour correspondre au fonctionnement réel du produit — Réf. M.C — ImmiPro*
+*Document préparé le 02/10/2026, corrigé le même jour pour correspondre au fonctionnement réel du produit, mis à jour le 03/10/2026 (paiement par carte fermé pour le pilote, remboursement limité à MTN) — Réf. M.C — ImmiPro*
