@@ -154,14 +154,32 @@ export const FOURNISSEURS_CONNUS: readonly FournisseurDePaiement[] = ["FEDAPAY",
 export function fournisseursDeclares(valeur: string | undefined): {
   fournisseurs: readonly FournisseurDePaiement[];
   inconnus: readonly string[];
+  /**
+   * Ce que la déclaration a donné : `absente` (vide ou non posée), `lue`
+   * (au moins un nom reconnu), `illisible` (des noms, aucun reconnu).
+   * Affiché par l'état de service : sans lui, une valeur mal lue ne se
+   * distinguait pas d'une variable absente (03/10/2026).
+   */
+  declaration: "absente" | "lue" | "illisible";
 } {
-  const noms = (valeur ?? "")
+  /*
+    Guillemets et commentaire de fin tolérés — 03/10/2026. Selon l'outil
+    qui charge le fichier d'environnement, `PAIEMENT_FOURNISSEURS="FEDAPAY"`
+    ou `FEDAPAY # pilote` arrivent tels quels au processus ; lus comme des
+    noms inconnus, ils rouvraient les deux rails en silence.
+  */
+  const nette = (valeur ?? "").split("#")[0]!.replace(/["']/gu, "");
+  const noms = nette
     .split(",")
     .map((n) => n.trim().toUpperCase())
     .filter((n) => n !== "");
   const connus = FOURNISSEURS_CONNUS.filter((f) => noms.includes(f));
   const inconnus = noms.filter((n) => !(FOURNISSEURS_CONNUS as readonly string[]).includes(n));
-  return { fournisseurs: connus.length > 0 ? connus : FOURNISSEURS_CONNUS, inconnus };
+  return {
+    fournisseurs: connus.length > 0 ? connus : FOURNISSEURS_CONNUS,
+    inconnus,
+    declaration: noms.length === 0 ? "absente" : connus.length > 0 ? "lue" : "illisible",
+  };
 }
 
 /** Les devises qu'on peut régler, dans l'ordre de la grille. */
