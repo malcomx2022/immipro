@@ -37,7 +37,7 @@ import { leRembourseur } from "@/server/paiement/remboursement";
  */
 
 const fedapay = (id: string, status: string) =>
-  lireFedaPay({ entity: { id, status, reference: "IMP-260920-AAAAAA" } });
+  lireFedaPay({ entity: { id, status, custom_metadata: { reference: "IMP-260920-AAAAAA" } } });
 
 const stripe = (evenement: string, type: string, objet: string) =>
   lireStripe({

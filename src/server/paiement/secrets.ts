@@ -38,6 +38,8 @@
  * se recopie dans un ticket, et un ticket se partage.
  */
 
+import { fournisseursDeclares, type FournisseurDePaiement } from "@/domain/payments/rail";
+
 /** Ce dont chaque fournisseur a besoin, par usage. */
 export const CLES = {
   FEDAPAY: {
@@ -50,6 +52,15 @@ export const CLES = {
     webhook: "STRIPE_WEBHOOK_SECRET",
   },
 } as const;
+
+/**
+ * Les fournisseurs ouverts, déclarés par l'exploitant — 03/10/2026.
+ * Voir `fournisseursDeclares` : absente, la déclaration vaut les deux.
+ */
+export const CLE_FOURNISSEURS = "PAIEMENT_FOURNISSEURS";
+
+/** Les clés d'un fournisseur, par usage. */
+export const clesDe = (fournisseur: FournisseurDePaiement) => CLES[fournisseur];
 
 /** Les clés sortantes, celles sans lesquelles aucune demande ne part. */
 export const CLES_SORTANTES: readonly string[] = [CLES.FEDAPAY.apiKey, CLES.STRIPE.apiKey];
@@ -73,6 +84,29 @@ export const ANCIENS_NOMS: Readonly<Record<string, string>> = {
   FEDAPAY_SECRET_KEY: CLES.FEDAPAY.apiKey,
   STRIPE_SECRET_KEY: CLES.STRIPE.apiKey,
 };
+
+/**
+ * Les fournisseurs ouverts sur cet environnement.
+ *
+ * Un nom inconnu (`fedapy`) est signalé — par son nom, ce n'est pas un
+ * secret — et ignoré. Si plus aucun nom n'est reconnu, la déclaration
+ * vaut les deux rails : l'état de service dira alors ce qui manque, au
+ * lieu qu'une faute de frappe ferme tout le paiement.
+ */
+export function fournisseursActifs(
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): readonly FournisseurDePaiement[] {
+  const { fournisseurs, inconnus } = fournisseursDeclares(environnement[CLE_FOURNISSEURS]);
+  for (const nom of inconnus) {
+    if (deja.has(`fournisseur:${nom}`)) continue;
+    deja.add(`fournisseur:${nom}`);
+    console.warn(
+      `[config] ${CLE_FOURNISSEURS} : fournisseur inconnu « ${nom} », ignoré. ` +
+        `Valeurs reconnues : FEDAPAY, STRIPE.`,
+    );
+  }
+  return fournisseurs;
+}
 
 /** Une fois par nom et par processus : un avertissement répété ne se lit plus. */
 const deja = new Set<string>();

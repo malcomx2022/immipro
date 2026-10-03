@@ -110,18 +110,59 @@ export interface Lue {
   providerEventId: string;
   /** Ce dont on parle : la transaction chez le fournisseur. */
   providerTxId: string;
-  reference: string;
+  /**
+   * Notre référence, quand le fournisseur la renvoie. `null` sinon : le
+   * paiement se retrouve alors par `providerTxId`, posé à l'ouverture.
+   */
+  reference: string | null;
   statut: TransactionStatus;
   /** Pourquoi, quand le rail le dit. Jamais deviné (N.B). */
   cause?: CauseRefus;
 }
 
+/**
+ * Notre référence, telle que FedaPay la renvoie — 03/10/2026.
+ *
+ * L'adaptateur envoyait `reference` à la création et attendait de la
+ * relire au même endroit. Mais `reference` n'est pas un champ de la
+ * création : la documentation de `POST /transactions` ne le connaît pas,
+ * et la réponse porte la référence que FedaPay génère (`trx_…`). La
+ * comparaison échouait donc à chaque ouverture, et aucun paiement ne
+ * pouvait partir de l'interface — ce que seul un appel réel pouvait
+ * montrer, les essais sans réseau rendant la réponse qu'on leur dictait.
+ *
+ * Notre référence part désormais dans `custom_metadata.reference`,
+ * documenté à la création et rendu à la lecture comme dans l'événement.
+ * `merchant_reference`, rendu à la lecture, est accepté en repli.
+ * `null` quand ni l'un ni l'autre ne revient : l'appelant décide alors
+ * sur l'identifiant de transaction, jamais sur la référence de FedaPay.
+ */
+export function referenceMarchande(lue: {
+  custom_metadata?: unknown;
+  merchant_reference?: string | null;
+}): string | null {
+  const meta = lue.custom_metadata;
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const ref = (meta as Record<string, unknown>).reference;
+    if (typeof ref === "string" && ref.trim() !== "") return ref;
+  }
+  const marchande = lue.merchant_reference?.trim();
+  return marchande ? marchande : null;
+}
+
+/*
+  L'événement porte la transaction entière sous `entity`. Sa `reference`
+  est celle que FedaPay génère (`trx_…`) : la nôtre voyage dans
+  `custom_metadata`, et c'est elle qu'on lit (03/10/2026). Le schéma
+  exigeait `entity.reference` comme si c'était la nôtre — aucune
+  notification réelle n'aurait retrouvé son paiement.
+*/
 const schemaFedaPay = z.object({
   entity: z.object({
     id: z.union([z.string(), z.number()]),
     status: z.string(),
-    // Référence interne transmise à la création puis renvoyée telle quelle.
-    reference: z.string().min(1),
+    custom_metadata: z.unknown().optional(),
+    merchant_reference: z.string().nullish(),
   }),
 });
 
@@ -143,7 +184,7 @@ export function lireFedaPay(charge: unknown): Lue | null {
      */
     providerEventId: `fedapay:${lu.data.entity.id}:${etat}`,
     providerTxId: `fedapay:${lu.data.entity.id}`,
-    reference: lu.data.entity.reference,
+    reference: referenceMarchande(lu.data.entity),
     statut,
     ...(cause ? { cause } : {}),
   };

@@ -114,3 +114,34 @@ const graine = await build({
 
 const octetsGraine = Object.values(graine.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
 console.log(`dist/graine-regles.js — ${(octetsGraine / 1024).toFixed(0)} Kio`);
+
+/*
+  L'essai de bac à sable des paiements, lançable depuis l'image — S.109.
+
+  Il ouvre une vraie session chez le fournisseur avec l'adaptateur de la
+  plateforme : c'est la seule vérification qui confronte les champs
+  envoyés à un serveur réel. Comme la graine, il ne pouvait pas tourner
+  dans l'image (ni `tsx`, ni les sources). Il refuse l'espace de
+  production, et s'abstient sans clé :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/sandbox-paiement.mjs
+
+  Format ESM : le script attend au premier niveau.
+*/
+const sandbox = await build({
+  entryPoints: ["scripts/sandbox-paiement.mts"],
+  outfile: "dist/sandbox-paiement.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsSandbox =
+  Object.values(sandbox.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/sandbox-paiement.mjs — ${(octetsSandbox / 1024).toFixed(0)} Kio`);

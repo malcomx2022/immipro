@@ -37,6 +37,7 @@ const reponse = (corps: unknown, statut = 200) =>
 const TUNNEL: Tunnel = {
   dossier: { id: "nl-1", pays: "Pays-Bas", intitule: "Séjour pour études (MVV + VVR)" },
   devise: "XOF",
+  devisesOuvertes: ["XOF", "EUR"],
   paysConnu: true,
   telephone: "97 •• •• 42",
   dejaOuvert: false,
@@ -699,5 +700,41 @@ describe("$-06 — Reçu", () => {
     // cite le composant, et c'est très bien ainsi.
     expect(source).not.toMatch(/import\s*\{[^}]*StatusBadge/);
     expect(LIBELLE_ETAT.paye).toBe("Payé");
+  });
+});
+/**
+ * Le pilote FedaPay seul — 03/10/2026.
+ *
+ * L'euro ne se proposait plus seulement à tort : « Payer par carte » menait
+ * à un paiement que rien ne pouvait ouvrir. Les écrans suivent désormais
+ * les devises ouvertes, lues par le serveur.
+ */
+describe("$-01 et $-02 — un rail fermé ne se propose pas", () => {
+  const PILOTE = { ...TUNNEL, devisesOuvertes: ["XOF" as const] };
+
+  it("le choix du pack ne propose que le franc CFA, et dit pourquoi", () => {
+    render(<ChoixDuPack tunnel={PILOTE} />);
+    expect(screen.getByRole("radio", { name: "Francs CFA" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Euros" })).toBeNull();
+    expect(screen.getByText(/paiement par carte bancaire, en euros, n'est pas encore ouvert/u)).toBeVisible();
+  });
+
+  it("le récapitulatif en euros ne laisse pas payer, et renvoie au choix", () => {
+    render(
+      <Recapitulatif
+        publiees={{}}
+        tunnel={PILOTE}
+        achat={{ type: "pack", code: PACKS[0]!.code }}
+        tarif={tarifDe({ type: "pack", code: PACKS[0]!.code })!}
+        deviseInitiale="EUR"
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: /^Payer/u })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(/n'est pas encore ouvert/u);
+    expect(screen.getByRole("link", { name: "Revenir au choix du pack" })).toHaveAttribute(
+      "href",
+      "/paiement/pack?dossier=nl-1",
+    );
   });
 });

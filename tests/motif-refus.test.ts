@@ -34,7 +34,9 @@ const CAUSES: readonly CauseRefus[] = [
  */
 describe("ce que les rails disent déjà, et qu'on jetait", () => {
   const fedapay = (statut: string) =>
-    lireFedaPay({ entity: { id: 7, status: statut, reference: "IMP-260920-ABCDEF" } });
+    lireFedaPay({
+      entity: { id: 7, status: statut, custom_metadata: { reference: "IMP-260920-ABCDEF" } },
+    });
 
   it("FedaPay distingue trois échecs par son seul statut", () => {
     // L'information était là depuis le début : les trois se lisaient comme

@@ -151,9 +151,11 @@ export function route<C = undefined, Q = undefined>(
               "Ton adresse email n'est pas encore confirmée. Le code t'a été envoyé à l'inscription.",
           });
         }
-      } else if (definition.acces === "public") {
+      } else if (definition.acces === "public" && definition.limite !== "webhook") {
         // Une route publique lit tout de même la session quand elle existe :
         // la page d'accueil montre « mes dossiers » à qui est connecté.
+        // Pas un webhook : le fournisseur n'a pas de session, et son
+        // origine est déjà prouvée par la signature (S.109).
         const magasin = await cookies();
         acteur = await lireSession(magasin.get(COOKIE_SESSION)?.value);
       }

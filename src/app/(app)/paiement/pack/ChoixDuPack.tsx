@@ -7,7 +7,12 @@ import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { PACKS, RECHARGE_ANALYSES, type Devise } from "@/domain/payments/pricing";
 import { obstacleAuRecapitulatif } from "@/domain/paiement/commande";
-import { PRECISION_MOBILE_MONEY, moyenDeLaGrille, railDe } from "@/domain/payments/rail";
+import {
+  PRECISION_MOBILE_MONEY,
+  moyenDeLaGrille,
+  railDe,
+  mentionRailFerme,
+} from "@/domain/payments/rail";
 import type { Tunnel } from "@/server/lecture/paiements";
 import { formatMontant } from "@/lib/utils";
 
@@ -89,7 +94,10 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
             aria-label="Devise d'affichage"
             className="flex gap-2 rounded-full bg-ink-100 p-1"
           >
-            {(["XOF", "EUR"] as const).map((d) => (
+            {/* Seules les devises dont le rail est ouvert se proposent :
+                pendant le pilote FedaPay, l'euro menait à un paiement par
+                carte que rien ne pouvait ouvrir (03/10/2026). */}
+            {tunnel.devisesOuvertes.map((d) => (
               <button
                 key={d}
                 type="button"
@@ -107,9 +115,11 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
           {/* Le pays du compte, et non « le Bénin » écrit en dur : un compte
               sans pays renseigné n'a pas de déduction à annoncer. */}
           <p className="text-13 text-ink-500">
-            {tunnel.paysConnu
-              ? "Devise déduite du pays de ton compte. Tu peux la changer."
-              : "Devise par défaut : ton compte ne porte pas de pays. Tu peux la changer."}
+            {tunnel.devisesOuvertes.length < 2
+              ? mentionRailFerme(devise === "XOF" ? "EUR" : "XOF")
+              : tunnel.paysConnu
+                ? "Devise déduite du pays de ton compte. Tu peux la changer."
+                : "Devise par défaut : ton compte ne porte pas de pays. Tu peux la changer."}
           </p>
         </div>
 

@@ -25,7 +25,13 @@
  * (`defautDIdentifiant`), avant qu'aucun appel ne parte.
  */
 
-import { CLES, CLES_SORTANTES, environnementNormalise } from "./secrets";
+import {
+  CLES,
+  CLES_SORTANTES,
+  clesDe,
+  environnementNormalise,
+  fournisseursActifs,
+} from "./secrets";
 import { remboursementStripe } from "./stripe";
 import { remboursementFedaPay } from "./fedapay";
 import type { Rembourseur } from "./rembourseur";
@@ -69,7 +75,8 @@ export const remboursementConfigure = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean => {
   const lu = environnementNormalise(environnement);
-  return VARIABLES.every((v) => (lu[v] ?? "").trim() !== "");
+  // Les rails ouverts seulement (PAIEMENT_FOURNISSEURS, 03/10/2026).
+  return fournisseursActifs(lu).every((f) => (lu[clesDe(f).apiKey] ?? "").trim() !== "");
 };
 
 /**
@@ -91,5 +98,11 @@ export const remboursementConfigure = (
  * adaptateurs, pour que cette lecture reste une mesure et ne devienne
  * pas une déclaration qu'on oublie de démentir.
  */
-export const remboursementBranche = (): boolean =>
-  remboursementStripe("sonde").operationnel && remboursementFedaPay().operationnel;
+export const remboursementBranche = (
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+): boolean =>
+  fournisseursActifs(environnementNormalise(environnement)).every((f) =>
+    f === "STRIPE"
+      ? remboursementStripe("sonde").operationnel
+      : remboursementFedaPay().operationnel,
+  );

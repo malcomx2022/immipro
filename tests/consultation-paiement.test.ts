@@ -231,9 +231,11 @@ describe("la consultation Stripe retrouve ce que le webhook a perdu", () => {
 describe("la consultation FedaPay, branchée le 22/09/2026", () => {
   const consultant = consultantFedaPay("sk_essai", "sandbox");
   const ID_FEDAPAY = "fedapay:42";
+  // `reference` est celle de FedaPay ; la nôtre revient dans les métadonnées.
   const entite = (reste: Record<string, unknown>) => ({
     id: 42,
-    reference: REFERENCE,
+    reference: "trx_Ab3_1759467600",
+    custom_metadata: { reference: REFERENCE },
     amount: 5000,
     ...reste,
   });
@@ -315,7 +317,9 @@ describe("la consultation FedaPay, branchée le 22/09/2026", () => {
 
   /** Une transaction qui n'est pas la nôtre n'est pas une panne. */
   it("une référence étrangère rend l'incohérence", async () => {
-    simuler(reponse(200, entite({ status: "approved", reference: "IMP-AUTRUI" })));
+    simuler(
+      reponse(200, entite({ status: "approved", custom_metadata: { reference: "IMP-AUTRUI" } })),
+    );
     expect(await consultant.consulter(ID_FEDAPAY, REFERENCE)).toMatchObject({
       issue: "incoherent",
     });
