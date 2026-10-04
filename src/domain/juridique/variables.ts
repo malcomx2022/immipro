@@ -236,7 +236,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "duree_comptable",
     groupe: "donnees",
     libelle: "Durée de conservation comptable",
-    aide: "La durée légale de conservation des reçus et écritures de paiement. Par exemple : 10 ans.",
+    aide: "La durée légale de conservation des reçus, factures, avoirs et écritures de paiement : 10 ans selon l'avis comptable M.C (OHADA et fiscal béninois).",
     nature: "ligne",
   },
   {
@@ -272,7 +272,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "piece_comptable",
     groupe: "conditions",
     libelle: "Pièce comptable émise",
-    aide: "Ce qu'ImmiPro remet après un paiement confirmé, au-delà du reçu, et avec quelles mentions : selon la réponse de l'expert-comptable (préalable M.C).",
+    aide: "Les précisions sur la facture remise après chaque paiement confirmé : facture normalisée et code de certification, régime de TVA de Rêveur Digital (avis comptable M.C du 04/10/2026).",
     nature: "texte",
   },
   {

@@ -29,6 +29,8 @@ export type ActionAuditee =
   /** Remboursement FedaPay fait au tableau de bord, déclaré en B-04 (S.91). */
   | "paiement.remboursement.manuel"
   | "paiement.reconciliation"
+  /** Une facture ou un avoir émis à la confirmation du fournisseur (M.C). */
+  | "facture.emission"
   | "regle.publication"
   /**
    * La remise en ligne d'une fiche que l'échéance avait dépubliée — B-01.

@@ -98,6 +98,15 @@ model User {
   lastName      String?
   phone         String?
   countryCode   String?   @db.Char(2)
+  /// Identité de facturation — avis comptable M.C, 04/10/2026.
+  ///
+  /// Demandée avant le premier paiement réel, et figée sur chaque facture
+  /// au moment de l'émission : la pièce garde le nom et l'adresse du jour
+  /// de la vente, dix ans, même si le compte change ou disparaît. Sur le
+  /// compte, elles partent avec lui (RG-10.4) ; sur la facture, elles
+  /// restent, au titre de l'obligation comptable.
+  billingName    String?
+  billingAddress String?
   locale        String    @default("fr")
   emailVerified DateTime?
   role          Role      @default(CANDIDAT)
@@ -629,6 +638,9 @@ model Transaction {
 
   credits AnalysisCredit[]
   events  PaymentEvent[]
+  /// La facture de la vente et, s'il y a eu remboursement, son avoir —
+  /// une de chaque au plus (M.C).
+  invoices Invoice[]
 
   @@index([status, createdAt])
   @@index([reconciledAt, createdAt])
@@ -1621,4 +1633,89 @@ enum LegalPublicationKind {
   VALIDATION
   /// Une variable employée par un texte déjà validé a changé.
   MISE_A_JOUR_VARIABLES
+}
+
+/// Facture et facture d'avoir — avis comptable M.C du 04/10/2026.
+///
+/// Chaque vente donne lieu à une facture, chaque remboursement à un avoir
+/// qui cite la facture d'origine. La pièce est **figée** à l'émission :
+/// émetteur, client, désignation, montants et somme en lettres y sont
+/// recopiés, pour qu'un changement de variable, de profil ou de grille ne
+/// réécrive jamais une pièce émise. La base refuse qu'on la supprime ou
+/// qu'on en change le contenu ; seules la certification et l'annulation
+/// tracée s'y ajoutent.
+///
+/// Les montants sont en unités mineures (franc CFA, centime d'euro) : la
+/// TVA extraite d'un prix en euros tombe sur des centimes.
+model Invoice {
+  id            String        @id @default(uuid())
+  /// `RD-2026-00001`, `AV-2026-00001`, ou leur pendant `ESSAI-` en bac à sable.
+  number        String        @unique
+  kind          InvoiceKind
+  series        InvoiceSeries
+  fiscalYear    Int
+  rank          Int
+  transactionId String
+  transaction   Transaction   @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  /// La facture qu'un avoir annule. Présente si et seulement si c'est un avoir.
+  originId      String?       @unique
+  origin        Invoice?      @relation("AvoirDeLaFacture", fields: [originId], references: [id], onDelete: Restrict)
+  creditNote    Invoice?      @relation("AvoirDeLaFacture")
+  issuedAt      DateTime      @default(now())
+
+  /// Les lignes de l'émetteur au jour de l'émission. Nulles seulement sur
+  /// une pièce d'essai émise avant la saisie des mentions.
+  emitter       Json?
+  clientName    String?
+  clientAddress String?
+  /// « Particulier » à défaut d'IFU du client.
+  clientQuality String        @default("Particulier")
+  designation   String
+  currency      String        @db.Char(3)
+  amountIncl    Int
+  amountExcl    Int
+  vatAmount     Int
+  /// Nul quand aucune TVA n'est facturée.
+  vatRateBp     Int?
+  vatNote       String
+  amountInWords String
+  paymentMethod String
+
+  /// Rendus par le système de facture normalisée. Aucun adaptateur n'est
+  /// écrit : une pièce réelle ne s'émet pas tant qu'il ne l'est pas.
+  certificationCode String?
+  certifiedAt       DateTime?
+
+  /// Une pièce annulée reste, avec la mention de son annulation : elle ne
+  /// se supprime jamais.
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  @@unique([transactionId, kind])
+  @@unique([series, kind, fiscalYear, rank])
+  @@index([issuedAt])
+}
+
+/// La dernière place prise dans chaque suite, par série, genre et exercice.
+/// Incrémentée dans la même transaction que la pièce : une émission qui
+/// échoue rend sa place, et la suite reste sans trou.
+model InvoiceSequence {
+  series     InvoiceSeries
+  kind       InvoiceKind
+  fiscalYear Int
+  last       Int
+
+  @@id([series, kind, fiscalYear])
+}
+
+enum InvoiceKind {
+  FACTURE
+  AVOIR
+}
+
+enum InvoiceSeries {
+  /// Une vente encaissée pour de vrai.
+  REELLE
+  /// Un paiement de l'espace de test : pièce sans valeur, suite à part.
+  ESSAI
 }

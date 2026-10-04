@@ -28,13 +28,10 @@ import { CODE_MONTEE_DOSSIER, LIBELLE_MONTEE } from "@/domain/payments/montee";
  * régimes comptables — les deux exigences s'excluent, et ce n'est donc pas
  * la même pièce.
  *
- * Savoir si une facture est requise, ce qu'elle doit porter et selon quelle
- * séquence relève d'une expertise comptable, pas du produit : cela dépend
- * du régime, de l'entité qui encaisse et des séries autorisées.
- * **L'expertise est bloquante avant tout encaissement commercial**
- * (`domain/exploitation/prealables`). Si une facture est requise, elle sera
- * un document distinct, avec sa propre numérotation continue ; le reçu
- * restera utile comme preuve immédiate du paiement.
+ * **L'avis comptable du 04/10/2026 a tranché** : une facture est requise
+ * pour chaque vente. Elle est un document distinct (`domain/facturation`),
+ * avec sa propre numérotation continue ; le reçu reste ce qu'il était, la
+ * preuve immédiate du paiement.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */

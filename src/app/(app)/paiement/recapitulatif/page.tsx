@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { espaceReel } from "@/server/paiement/secrets";
+import { suspensionDeLEncaissement } from "@/server/acces/paiements";
 import { fournisseurDe } from "@/domain/payments/rail";
 import type { Devise } from "@/domain/payments/pricing";
 import { notFound } from "next/navigation";
@@ -44,9 +44,9 @@ export const metadata: Metadata = {
  * Encaissement réel sans conditions publiées : le récapitulatif le dit
  * avant le clic, et le serveur le refuse de toute façon (03/10/2026).
  */
-async function suspendu(devise: Devise): Promise<boolean> {
-  return espaceReel(fournisseurDe(devise)) && !(await pagesPubliees()).conditions;
-}
+/** Ce qui suspend le paiement réel de cette devise pour ce candidat — nul en bac à sable. */
+const suspendu = (userId: string, devise: Devise) =>
+  suspensionDeLEncaissement(userId, fournisseurDe(devise));
 
 export default async function PageRecapitulatif({
   searchParams,
@@ -89,7 +89,7 @@ export default async function PageRecapitulatif({
         montee={offre.detail}
         deviseInitiale={offre.detail.devise}
         publiees={await pagesPubliees()}
-        encaissementSuspendu={await suspendu(offre.detail.devise)}
+        suspension={await suspendu(acteur.id, offre.detail.devise)}
       />
     );
   }
@@ -120,7 +120,7 @@ export default async function PageRecapitulatif({
       deviseInitiale={deviseRetenue}
       supplementaire={supplementaire}
       publiees={await pagesPubliees()}
-      encaissementSuspendu={await suspendu(deviseRetenue)}
+      suspension={await suspendu(acteur.id, deviseRetenue)}
     />
   );
 }

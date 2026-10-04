@@ -42,5 +42,11 @@ export default async function PageProfil() {
     ...(anglais ? { anglais } : {}),
   };
 
-  return <Profil initial={initial} telephone={compte?.phone ?? ""} />;
+  return (
+    <Profil
+      initial={initial}
+      telephone={compte?.phone ?? ""}
+      facturation={{ nom: compte?.billingName ?? "", adresse: compte?.billingAddress ?? "" }}
+    />
+  );
 }

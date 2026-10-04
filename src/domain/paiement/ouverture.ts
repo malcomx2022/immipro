@@ -257,3 +257,34 @@ export const OUVERTURE_SANS_PAGE =
  */
 export const MENTION_ENCAISSEMENT_SUSPENDU =
   "Nos conditions de vente ne sont pas encore publiées : aucun paiement ne peut être encaissé avant.";
+
+/**
+ * Pourquoi un paiement réel ne s'ouvre pas, dans l'ordre où on le dit.
+ *
+ * - `conditions` : les conditions de vente ne sont pas publiées (03/10) ;
+ * - `facturation` : la facturation n'est pas en place — avis comptable
+ *   M.C du 04/10/2026, ne pas encaisser avant que le circuit facture +
+ *   avoir fonctionne ;
+ * - `identite` : il manque au candidat son nom ou son adresse de
+ *   facturation, que chaque facture porte.
+ *
+ * Les deux premières ne dépendent pas du candidat, la troisième si : elle
+ * vient en dernier, pour qu'on ne lui demande pas de compléter son profil
+ * pour un paiement qui ne s'ouvrirait de toute façon pas. Le bac à sable
+ * n'est suspendu par rien de tout cela : ses pièces vont dans la série
+ * d'essai.
+ */
+export type SuspensionDuPaiement = "conditions" | "facturation" | "identite";
+
+export function suspensionDuPaiement(etat: {
+  espaceReel: boolean;
+  conditionsPubliees: boolean;
+  facturationEnPlace: boolean;
+  identiteComplete: boolean;
+}): SuspensionDuPaiement | null {
+  if (!etat.espaceReel) return null;
+  if (!etat.conditionsPubliees) return "conditions";
+  if (!etat.facturationEnPlace) return "facturation";
+  if (!etat.identiteComplete) return "identite";
+  return null;
+}

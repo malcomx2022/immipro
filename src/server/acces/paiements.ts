@@ -62,6 +62,9 @@ import {
 import { repartir } from "@/domain/payments/grand-livre";
 import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
+import { etablirLAvoir, etablirLaFacture, etatDeLaFacturation } from "@/server/facturation/emission";
+import { identiteDeFacturation } from "@/domain/facturation/facture";
+import { suspensionDuPaiement, type SuspensionDuPaiement } from "@/domain/paiement/ouverture";
 
 /**
  * Paiements — WF-05, INV-7.
@@ -315,6 +318,29 @@ function echecDOuverture(
  * qu'une source, la notification signée (RG-05.1, INV-7), et l'adresse de
  * retour du navigateur ne passe même pas par ici.
  */
+/**
+ * Ce qui suspend un paiement réel pour ce candidat, chez ce fournisseur —
+ * lu par le refus serveur et par le récapitulatif, qui le dit avant le
+ * clic. Nul en bac à sable : rien ne le suspend.
+ */
+export async function suspensionDeLEncaissement(
+  userId: string,
+  fournisseur: "FEDAPAY" | "STRIPE",
+): Promise<SuspensionDuPaiement | null> {
+  if (!espaceReel(fournisseur)) return null;
+  const [pages, facturation, compte] = await Promise.all([
+    pagesPubliees(),
+    etatDeLaFacturation(),
+    db.user.findUnique({ where: { id: userId }, select: { billingName: true, billingAddress: true } }),
+  ]);
+  return suspensionDuPaiement({
+    espaceReel: true,
+    conditionsPubliees: pages.conditions !== undefined,
+    facturationEnPlace: facturation.obstacles.length === 0,
+    identiteComplete: identiteDeFacturation(compte?.billingName, compte?.billingAddress) !== null,
+  });
+}
+
 export async function ouvrirLeTunnel(
   userId: string,
   achat: Achat,
@@ -339,9 +365,16 @@ export async function ouvrirLeTunnel(
     bac à sable reste ouvert, pour que les essais continuent. Avant toute
     écriture : rien ne doit rester en attente d'un paiement impossible.
   */
-  if (espaceReel(ouvreur.fournisseur) && !(await pagesPubliees()).conditions) {
-    throw echec("paiement_sans_conditions");
-  }
+  /*
+    Et pas d'encaissement réel sans facture — avis comptable M.C du
+    04/10/2026. Chaque vente doit donner lieu à une facture certifiée, au
+    nom et à l'adresse du client : tant que l'une manque, le paiement
+    réel ne s'ouvre pas. Toujours avant la moindre écriture.
+  */
+  const suspension = await suspensionDeLEncaissement(userId, ouvreur.fournisseur);
+  if (suspension === "conditions") throw echec("paiement_sans_conditions");
+  if (suspension === "facturation") throw echec("paiement_sans_facturation");
+  if (suspension === "identite") throw echec("facturation_identite_manquante");
 
   const { transaction, reprise } = await creerOuReprendre(userId, achat, devise);
 
@@ -665,9 +698,22 @@ export async function appliquerLaNotification(
     await libererLaTenue(maj.id).catch(() => undefined);
   }
 
+  /*
+    Un remboursement confirmé s'adosse à un avoir — avis M.C du
+    04/10/2026, « sans avoir, le chiffre d'affaires reste artificiellement
+    gonflé ». Hors de la transition : un avoir qui échoue ne défait pas un
+    remboursement que le fournisseur a confirmé, et la réconciliation le
+    reprend.
+  */
+  if (maj.status === "REMBOURSEE") {
+    await etablirLAvoir(maj.id).catch(() => undefined);
+  }
+
   if (!effet.crediteLePack) return { issue: "appliquee", transaction: maj };
 
   await acheverLeCredit(maj);
+  // Chaque vente donne lieu à une facture (M.C). Même filet que l'avoir.
+  await etablirLaFacture(maj.id).catch(() => undefined);
   return { issue: "creditee", transaction: maj };
 }
 

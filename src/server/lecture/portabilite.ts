@@ -62,7 +62,10 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
     include: {
       profile: true,
       consents: { orderBy: { grantedAt: "asc" } },
-      transactions: { orderBy: { createdAt: "asc" } },
+      transactions: {
+        orderBy: { createdAt: "asc" },
+        include: { invoices: { orderBy: { issuedAt: "asc" } } },
+      },
       notifications: { orderBy: { createdAt: "asc" } },
       applications: {
         orderBy: { createdAt: "asc" },
@@ -122,6 +125,8 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
       prenom: compte.firstName,
       nom: compte.lastName,
       telephone: compte.phone,
+      nomDeFacturation: compte.billingName,
+      adresseDeFacturation: compte.billingAddress,
       pays: compte.countryCode,
       langue: compte.locale,
       inscritLe: iso(compte.createdAt),
@@ -337,6 +342,18 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
       statut: t.status,
       creeLe: iso(t.createdAt),
       confirmeLe: iso(t.confirmedAt),
+      // Ses factures et avoirs (M.C) : ils portent son nom et son adresse.
+      pieces: t.invoices.map((f) => ({
+        numero: f.number,
+        genre: f.kind,
+        serie: f.series,
+        emiseLe: iso(f.issuedAt),
+        nom: f.clientName,
+        adresse: f.clientAddress,
+        designation: f.designation,
+        totalUnitesMineures: f.amountIncl,
+        devise: f.currency,
+      })),
     })),
     alertes: compte.notifications.map((n) => ({
       genre: n.kind,

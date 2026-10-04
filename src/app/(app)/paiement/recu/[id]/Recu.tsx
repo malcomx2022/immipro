@@ -209,6 +209,23 @@ export function Recu({ recu }: { recu: Donnees }) {
       ) : null}
       <p className="text-pretty text-13 text-ink-500">{MENTION_ATTESTATION}</p>
 
+      {/* La facture de la vente, et l'avoir s'il y a eu remboursement —
+          avis M.C. Le reçu atteste du paiement ; la facture, de la vente. */}
+      {recu.pieces.length > 0 ? (
+        <ul className="pas-a-imprimer flex flex-col gap-2">
+          {recu.pieces.map((piece) => (
+            <li key={piece.numero}>
+              <Link
+                href={`/paiement/facture/${encodeURIComponent(piece.numero)}`}
+                className="flex min-h-touch items-center text-14 font-semibold text-accent-600 underline"
+              >
+                {piece.genre === "FACTURE" ? "Voir la facture" : "Voir la facture d'avoir"} {piece.numero}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {echec ? <BlocEchec echec={echec} annonce className="pas-a-imprimer" /> : null}
 
       <div className="pas-a-imprimer flex flex-col gap-3">

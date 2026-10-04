@@ -155,6 +155,11 @@ export async function acheverLaSuppression(
         firstName: null,
         lastName: null,
         phone: null,
+        // L'identité de facturation part avec le compte. Les factures déjà
+        // émises la gardent : elles en ont une copie figée, conservée dix
+        // ans au titre de l'obligation comptable (M.C).
+        billingName: null,
+        billingAddress: null,
         // Le pays de résidence reste une donnée personnelle : sur une base
         // de quelques milliers de comptes, il suffit souvent à restreindre
         // à une poignée de personnes. Ce que la comptabilité demande, la

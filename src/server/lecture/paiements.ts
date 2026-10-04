@@ -47,6 +47,11 @@ export interface Recu {
    * juridiques ; `null` tant qu'elles ne sont pas toutes saisies.
    */
   emetteur: readonly string[] | null;
+  /**
+   * La facture de la vente et, s'il y a lieu, son avoir — M.C. Vide tant
+   * que la notification signée n'a pas confirmé le paiement.
+   */
+  pieces: readonly { numero: string; genre: "FACTURE" | "AVOIR" }[];
 }
 
 /**
@@ -62,6 +67,7 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
     include: {
       user: { select: { email: true } },
       application: { include: { visaRule: true } },
+      invoices: { orderBy: { issuedAt: "asc" }, select: { number: true, kind: true } },
     },
   });
   if (!transaction) throw echec("paiement_introuvable");
@@ -87,6 +93,7 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
         : null,
     adresse: transaction.user.email,
     emetteur: emetteurDuRecu(await valeursDesVariables()),
+    pieces: transaction.invoices.map((f) => ({ numero: f.number, genre: f.kind })),
   };
 }
 

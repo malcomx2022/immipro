@@ -48,6 +48,9 @@ export interface CorpsDuProfil {
   prenom?: string;
   nom?: string;
   telephone?: string;
+  /** Identité de facturation (M.C, 04/10/2026) : figée sur chaque facture. */
+  facturationNom?: string;
+  facturationAdresse?: string;
   pays?: string;
   objectif?: string;
   diplome?: string;
@@ -104,7 +107,7 @@ const mentionnees = <T,>(entrees: { [K in keyof T]?: { valeur: T[K] } }): T =>
 /** Les colonnes que cette écriture touche, et aucune autre. */
 type ColonnesDuCompte = Pick<
   Prisma.UserUpdateInput,
-  "firstName" | "lastName" | "phone" | "countryCode"
+  "firstName" | "lastName" | "phone" | "countryCode" | "billingName" | "billingAddress"
 >;
 type ColonnesDuProfil = Omit<
   Prisma.ProfileUncheckedCreateInput,
@@ -116,6 +119,8 @@ export async function enregistrerLeProfil(userId: string, corps: CorpsDuProfil):
     firstName: texte(corps.prenom),
     lastName: texte(corps.nom),
     phone: texte(corps.telephone),
+    billingName: texte(corps.facturationNom),
+    billingAddress: texte(corps.facturationAdresse),
     countryCode: texte(corps.pays),
   });
   if (Object.keys(compte).length > 0) {
