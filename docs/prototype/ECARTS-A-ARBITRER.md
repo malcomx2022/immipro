@@ -11329,3 +11329,32 @@ Procédure : `docs/exploitation/facturation.md`.
   - B-04 le lendemain : hors du livre du jour, présente parmi les écarts antérieurs, retirée une fois refermée ;
   - le diagnostic : notifications refusées relues, aucune écriture ;
   - le paquet de l'image : sans clé, avec une référence inconnue, sans argument, sans donnée du payeur.
+
+## S.117 — Diagnostic du paiement d'essai du 05/10 : FedaPay a refusé puis approuvé la même transaction
+
+**Résultat du diagnostic** (`IMP-261005-P98AEE`, bac à sable) :
+
+- **16 h 58** : webhooks FedaPay `pending` puis `declined`, appliqués. La transaction passe à ECHOUEE, et c'est correct.
+- **17 h 59** : FedaPay approuve **la même transaction**. La notification est refusée, puisque ECHOUEE est un état abouti. C'est le cas que S.116 traite : l'écart s'ouvre en B-04 (la #206 était en ligne depuis 17 h 48).
+- Le candidat d'essai est débité de 5 000 XOF (bac à sable) sans pack. Le remboursement se fait au tableau de bord FedaPay.
+
+**Ce que cela corrige dans S.116 :**
+
+- **L'hypothèse « autre transaction » était fausse.** C'était la même transaction, sur laquelle le fournisseur a changé d'avis.
+- **Le webhook fonctionne.** Les notifications de 16 h 58 ont passé la vérification de signature, donc l'URL et le secret sont bons.
+- **L'issue de clôture était mal conseillée.** La procédure recommandait « Remboursement à initier », dont l'aide renvoie vers un remboursement depuis la transaction, ce qu'une transaction échouée n'ouvre pas. L'issue correcte est « Écart expliqué, sans correction financière », avec la référence du remboursement en note. Corrigé dans :
+  - `docs/exploitation/diagnostic-paiement.md` ;
+  - le constat du diagnostic ;
+  - le commentaire de `ecartDeConfirmationTardive`.
+- **Le diagnostic ne conclut plus seul à « une autre transaction »** sur un `declined`. Il propose aussi de le relancer plus tard.
+
+**Question ouverte, à trancher avant `FEDAPAY_ENVIRONMENT=live` :**
+
+> Un `declined` suivi d'un `approved` sur la même transaction peut-il se produire en production chez FedaPay, ou est-ce un comportement du bac à sable (« Momo Test ») ?
+
+Personne ne l'a vérifié, et la documentation lue le 22/09 n'en dit rien. Deux réponses possibles :
+
+- **Le bac à sable seul.** Rien à changer : un refus reste définitif, et le cas exceptionnel passe par l'écart et le remboursement manuel.
+- **Possible aussi en production.** Chaque occurrence ferait un candidat débité sans pack, puis un remboursement manuel, sur un rail qui n'a pas d'API de remboursement. L'autre voie serait d'accepter une approbation **signée** sur une transaction refusée **par le fournisseur**, mais jamais sur une transaction expirée par la plateforme, et d'ouvrir alors le pack. INV-7 reste tenu, puisque seule la parole signée du fournisseur fait bouger l'état. La table des transitions change toutefois, et il faut retirer la cause d'échec.
+
+**Qui** : Direction, après réponse du support FedaPay. **Pour le pilote**, le fonctionnement actuel suffit.

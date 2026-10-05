@@ -56,13 +56,16 @@ export function effetDeLaNotification(
  * La table des transitions la refuse, et elle a raison : on ne réécrit pas
  * un état abouti sur la parole d'un message. Mais le refus seul se
  * contentait d'une ligne au journal. Or c'est précisément le cas où le
- * candidat a payé — une seconde transaction chez le fournisseur, un
- * webhook qui arrive après que la réconciliation a lu un refus — et ne
+ * candidat a payé — le bac à sable l'a montré le 05/10 : `declined` à
+ * 16 h 58, puis `approved` à 17 h 59 sur la **même** transaction — et ne
  * reçoit rien, sans que personne le voie en B-04. L'écart s'ouvre donc,
  * avec ce qu'il faut faire. Le pack n'a pas été ouvert et la transaction
  * reste échouée : la somme se rend au tableau de bord du fournisseur,
  * comme pour un second paiement, puis l'écart se referme sur l'issue
- * « Remboursement à initier ».
+ * « Écart expliqué, sans correction financière », la note citant la
+ * référence du remboursement. « Remboursement à initier » ne convient
+ * pas : il renvoie à un remboursement depuis la transaction, qu'une
+ * transaction échouée n'ouvre pas.
  *
  * Rend le constat à écrire, ou `null` si la situation n'est pas celle-là.
  */

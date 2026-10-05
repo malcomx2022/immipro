@@ -109,13 +109,13 @@ export function constatsDuDiagnostic(f: FaitsDuPaiement): string[] {
 
   if (lue && lue.statut === "CONFIRMEE" && ABOUTIE_SANS_SUCCES.has(f.statut)) {
     constats.push(
-      `Le fournisseur dit « ${lue.etat} » pour ${lue.id}, et la plateforme tient la transaction pour ${f.statut === "ECHOUEE" ? "échouée" : "expirée"} : le candidat a été débité sans recevoir son pack. ${f.ecartOuvert ? "L'écart est ouvert en B-04" : "Ouvrir l'écart en B-04 si la confirmation n'y est pas encore"} ; rembourser la somme ${tableau}.`,
+      `Le fournisseur dit « ${lue.etat} » pour ${lue.id}, et la plateforme tient la transaction pour ${f.statut === "ECHOUEE" ? "échouée" : "expirée"} : le candidat a été débité sans recevoir son pack. ${f.ecartOuvert ? `L'écart est ouvert en B-04 : rembourser la somme ${tableau}, puis le refermer sur « Écart expliqué, sans correction financière » en citant la référence du remboursement.` : `Aucun écart n'est ouvert : la confirmation n'a pas atteint la plateforme. Rembourser la somme ${tableau}, puis vérifier le webhook.`}`,
     );
   }
 
   if (lue && lue.statut === "ECHOUEE" && f.statut === "ECHOUEE") {
     constats.push(
-      `Le fournisseur dit « ${lue.etat} » pour ${lue.id} : l'état de la plateforme est fidèle à cette transaction. Si le candidat a vu « Transaction réussie », c'est une autre transaction : la chercher ${tableau} par montant et par heure, et vérifier que son custom_metadata porte ${f.reference}.`,
+      `Le fournisseur dit « ${lue.etat} » pour ${lue.id} : l'état de la plateforme est fidèle à cette transaction. Si le candidat a vu « Transaction réussie », deux cas : le fournisseur peut encore l'approuver plus tard (vu en bac à sable le 05/10, refus puis approbation une heure après) — relancer ce diagnostic plus tard ; ou c'est une autre transaction — la chercher ${tableau} par montant et par heure, et vérifier que son custom_metadata porte ${f.reference}.`,
     );
   }
 
