@@ -162,11 +162,24 @@ describe("C-02 — Profil", () => {
     expect(corps[0]).not.toHaveProperty("telephone");
   });
 
-  it("dit que rien n'est transmis à une administration", () => {
+  it("dit que rien n'est transmis à une administration des visas, et à quoi sert la facturation", () => {
     const { container } = render(<Profil initial={initial} />);
     expect(container.textContent).toContain(
-      "jamais transmises à une administration par ImmiPro",
+      "ImmiPro ne le transmet jamais à une administration chargée des visas",
     );
+    expect(container.textContent).toContain("figurent sur tes factures, conservées dix ans");
+  });
+
+  it("envoie toujours le nom et l'adresse de facturation, vides compris (M.C)", async () => {
+    const corps: Record<string, unknown>[] = [];
+    global.fetch = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+      corps.push(JSON.parse(String(options?.body)));
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ enregistre: true }) } as Response);
+    });
+    render(<Profil initial={initial} facturation={{ nom: "Awa Koffi", adresse: "" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(corps).toHaveLength(1));
+    expect(corps[0]).toMatchObject({ facturationNom: "Awa Koffi", facturationAdresse: "" });
   });
 });
 

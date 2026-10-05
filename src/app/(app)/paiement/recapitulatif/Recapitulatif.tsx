@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { MENTION_ENCAISSEMENT_SUSPENDU } from "@/domain/paiement/ouverture";
+import { MENTION_ENCAISSEMENT_SUSPENDU, type SuspensionDuPaiement } from "@/domain/paiement/ouverture";
+import { MENTION_FACTURATION_EN_ATTENTE, MENTION_IDENTITE_MANQUANTE } from "@/domain/facturation/facture";
 import { useState } from "react";
 import { documentsALire, reserveDeLAcceptation, type Publiees } from "@/domain/comptes/acceptation";
 import { obstacleAuPaiement } from "@/domain/paiement/commande";
@@ -77,13 +78,20 @@ export interface RecapitulatifProps {
   /** Les textes juridiques publiés, lus en base par la page (S.101). */
   publiees: Publiees;
   /**
-   * Le fournisseur de cette devise encaisse pour de vrai, et les
-   * conditions ne sont pas publiées : le paiement ne s'ouvre pas
-   * (décision du 03/10/2026). Le bac à sable n'est pas concerné.
+   * Ce qui suspend le paiement réel de cette devise — conditions de vente
+   * non publiées (03/10), facturation pas en place ou identité de
+   * facturation manquante (M.C, 04/10). Nul en bac à sable.
    */
-  encaissementSuspendu?: boolean;
+  suspension?: SuspensionDuPaiement | null;
 }
 
+
+/** Une phrase par suspension, la même que celle du refus serveur. */
+const MENTION_SUSPENSION: Record<SuspensionDuPaiement, string> = {
+  conditions: MENTION_ENCAISSEMENT_SUSPENDU,
+  facturation: MENTION_FACTURATION_EN_ATTENTE,
+  identite: MENTION_IDENTITE_MANQUANTE,
+};
 
 export function Recapitulatif({
   tunnel,
@@ -93,7 +101,7 @@ export function Recapitulatif({
   montee,
   supplementaire,
   publiees,
-  encaissementSuspendu = false,
+  suspension = null,
 }: RecapitulatifProps) {
   const reserve = reserveDeLAcceptation(["conditions"], publiees);
   const conditionsALire = documentsALire(["conditions"], publiees)[0];
@@ -111,8 +119,8 @@ export function Recapitulatif({
   const railFerme = !tunnel.devisesOuvertes.includes(devise);
   const obstacle = railFerme
     ? mentionRailFerme(devise)
-    : encaissementSuspendu
-      ? MENTION_ENCAISSEMENT_SUSPENDU
+    : suspension
+      ? MENTION_SUSPENSION[suspension]
       : obstacleAuPaiement(conditions);
   const montant = formatMontant(montee ? montee.montant : (tarif?.prix[devise] ?? 0), devise);
   const libelle = montee ? LIBELLE_MONTEE : (tarif?.libelle ?? "");
@@ -291,9 +299,17 @@ export function Recapitulatif({
           comme avant. */}
       <div className="-mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:mx-0 md:w-72 md:flex-none md:self-start md:border-0 md:p-0">
         {echec ? <BlocEchec echec={echec} annonce /> : null}
-        {encaissementSuspendu && !railFerme ? (
+        {suspension && !railFerme ? (
           <p role="status" className="text-pretty text-14 text-ink-700">
-            {MENTION_ENCAISSEMENT_SUSPENDU}
+            {MENTION_SUSPENSION[suspension]}
+            {suspension === "identite" ? (
+              <>
+                {" "}
+                <Link href="/profil#facturation" className="text-accent-600 underline">
+                  Renseigner ma facturation
+                </Link>
+              </>
+            ) : null}
           </p>
         ) : null}
         {railFerme ? (

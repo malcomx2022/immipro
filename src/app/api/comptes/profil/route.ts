@@ -2,6 +2,7 @@ import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { enregistrerLeProfil } from "@/server/acces/profil";
+import { ADRESSE_FACTURATION, NOM_FACTURATION } from "@/domain/facturation/facture";
 
 /**
  * Profil — A-05 et C-02, WF-02 étapes 3 et 4.
@@ -37,6 +38,8 @@ export const GET = route({
         prenom: user?.firstName,
         nom: user?.lastName,
         telephone: user?.phone,
+        facturationNom: user?.billingName,
+        facturationAdresse: user?.billingAddress,
         pays: user?.countryCode,
         emailVerifie: user?.emailVerified !== null,
       },
@@ -62,6 +65,9 @@ export const PUT = route({
         "Indicatif pays compris, sans espaces : +229 pour le Bénin, +225 pour la Côte d'Ivoire.",
       )
       .optional(),
+    // Identité de facturation (M.C) : la chaîne vide efface, comme ailleurs.
+    facturationNom: z.string().trim().max(NOM_FACTURATION.max).optional(),
+    facturationAdresse: z.string().trim().max(ADRESSE_FACTURATION.max).optional(),
     pays: z.string().length(2).optional(),
     objectif: z.string().max(80).optional(),
     diplome: z.string().max(80).optional(),

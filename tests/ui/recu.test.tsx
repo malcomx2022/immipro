@@ -30,6 +30,7 @@ const PAYE: Donnees = {
   dossier: { id: "nl-1", pays: "Pays-Bas", intitule: "Séjour pour études (MVV + VVR)" },
   adresse: "awa@example.bj",
   emetteur: ["Société Fictive de Test, SARL", "Cotonou, Bénin", "RCCM RB/COT/00 B 00000 · IFU 0000000000000", "contact@exemple.test"],
+  pieces: [],
 };
 
 /**
@@ -160,5 +161,33 @@ describe("$-06 — l'émetteur du reçu (02/10/2026)", () => {
     expect(container.querySelector("address")).toBeNull();
     expect(container.textContent).toContain(EMETTEUR_NON_RENSEIGNE);
     expect(container.textContent).not.toMatch(/ImmiPro SAS|immipro\.bj/u);
+  });
+});
+
+describe("$-06 — la facture à côté du reçu (avis M.C)", () => {
+  it("mène à la facture et à l'avoir de la vente", () => {
+    render(
+      <Recu
+        recu={{
+          ...PAYE,
+          etat: "rembourse",
+          rembourseLe: "2026-09-12T10:00:00.000Z",
+          pieces: [
+            { numero: "RD-2026-00001", genre: "FACTURE" },
+            { numero: "AV-2026-00001", genre: "AVOIR" },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Voir la facture RD-2026-00001" })).toHaveAttribute(
+      "href",
+      "/paiement/facture/RD-2026-00001",
+    );
+    expect(screen.getByRole("link", { name: "Voir la facture d'avoir AV-2026-00001" })).toBeInTheDocument();
+  });
+
+  it("ne promet aucune facture tant qu'aucune n'est émise", () => {
+    render(<Recu recu={PAYE} />);
+    expect(screen.queryByRole("link", { name: /Voir la facture/u })).toBeNull();
   });
 });

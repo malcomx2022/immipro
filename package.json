@@ -36,6 +36,7 @@
     "smoke:publication": "tsx scripts/fumee-publication.mts",
     "smoke:juridique": "tsx scripts/fumee-juridique.mts",
     "smoke:relecture": "tsx scripts/fumee-relecture.mts",
+    "smoke:facturation": "tsx scripts/fumee-facturation.mts",
     "smoke:graine": "node scripts/fumee-graine.mjs",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
     "smoke:conservation": "tsx scripts/fumee-conservation.mts",

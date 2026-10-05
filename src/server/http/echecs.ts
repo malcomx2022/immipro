@@ -1,4 +1,8 @@
 import { MENTION_ENCAISSEMENT_SUSPENDU } from "@/domain/paiement/ouverture";
+import {
+  MENTION_FACTURATION_EN_ATTENTE,
+  MENTION_IDENTITE_MANQUANTE,
+} from "@/domain/facturation/facture";
 /**
  * Contrat d'échec de l'API — DOC-12 §16, « Langue des messages d'erreur ».
  *
@@ -71,6 +75,8 @@ export type CodeEchec =
   | "creneau_indisponible"
   | "paiement_indisponible"
   | "paiement_sans_conditions"
+  | "paiement_sans_facturation"
+  | "facturation_identite_manquante"
   | "ouverture_impossible"
   | "ouverture_refusee"
   | "signature_invalide"
@@ -302,6 +308,29 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     action: "Revenir à mon dossier",
     ton: "attente",
   },
+  /**
+   * Un paiement réel tant que la facturation n'est pas en place — avis
+   * comptable M.C du 04/10/2026 : ne pas encaisser avant que le circuit
+   * facture + avoir soit testé de bout en bout. Rien n'est à faire côté
+   * candidat ; l'exploitant lit l'obstacle exact dans `/api/health`.
+   */
+  paiement_sans_facturation: {
+    statut: 503,
+    titre: "Le paiement n'est pas encore ouvert",
+    corps: MENTION_FACTURATION_EN_ATTENTE,
+    conserve: "Rien n'a été débité, et ton dossier reste tel quel.",
+    action: "Revenir à mon dossier",
+    ton: "attente",
+  },
+  /** Chaque facture porte le nom et l'adresse du client (M.C). */
+  facturation_identite_manquante: {
+    statut: 409,
+    titre: "Il manque ton nom ou ton adresse de facturation",
+    corps: MENTION_IDENTITE_MANQUANTE,
+    conserve: "Rien n'a été débité, et ton panier reste tel quel.",
+    action: "Compléter mon profil",
+    ton: "limite",
+  },
   paiement_indisponible: {
     statut: 503,
     titre: "Le paiement ne peut pas être ouvert",
@@ -502,6 +531,8 @@ export const CONSERVE_DU_CANDIDAT: readonly CodeEchec[] = [
   "creneau_indisponible",
   "paiement_indisponible",
   "paiement_sans_conditions",
+  "paiement_sans_facturation",
+  "facturation_identite_manquante",
   "montee_indisponible",
   "ouverture_impossible",
   "ouverture_refusee",

@@ -5,6 +5,7 @@ import { acheverLeCredit, appliquerLaNotification } from "@/server/acces/paiemen
 import { cleDEvenementDeReconciliation } from "@/domain/paiement/ouverture";
 import { leConsultant, type Consultant } from "@/server/paiement/consultation";
 import { libererLesTenuesEchues } from "@/server/acces/consultations";
+import { emettreLesPiecesEnSouffrance } from "@/server/facturation/emission";
 
 /**
  * Réconciliation des paiements — RG-05.4.
@@ -57,6 +58,11 @@ export interface Bilan {
    * et qui viennent de l'être.
    */
   creditsAcheves: number;
+  /**
+   * Factures et avoirs émis après coup : une vente confirmée sans facture,
+   * un remboursement sans avoir (M.C, 04/10/2026).
+   */
+  piecesEmises: number;
 }
 
 /** Le consultant du fournisseur d'une transaction, mis en cache par passe. */
@@ -85,6 +91,7 @@ export async function reconcilierLesPaiements(
     ecartsOuverts: 0,
     creditsAcheves: await acheverLesCreditsEnSouffrance(),
     tenuesLiberees: await libererLesTenuesEchues(maintenant),
+    piecesEmises: 0,
   };
 
   for (const transaction of enAttente) {
@@ -214,6 +221,9 @@ export async function reconcilierLesPaiements(
     }
   }
 
+  // En dernier : les paiements rattrapés ci-dessus ont déjà leur pièce, et
+  // celle-ci reprend ce que les notifications n'ont pas pu émettre.
+  bilan.piecesEmises = await emettreLesPiecesEnSouffrance().catch(() => 0);
   return bilan;
 }
 

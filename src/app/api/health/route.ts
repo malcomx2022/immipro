@@ -9,7 +9,12 @@ import {
 } from "@/domain/exploitation/dependances";
 import { constaterLesDependances } from "@/server/exploitation/capacites";
 import { fournisseursDeclares } from "@/domain/payments/rail";
-import { CLE_FOURNISSEURS, espaceReel } from "@/server/paiement/secrets";
+import { CLE_FOURNISSEURS, espaceReel, fournisseursActifs } from "@/server/paiement/secrets";
+import { etatDeLaFacturation, regimeDeLExploitant } from "@/server/facturation/emission";
+import {
+  surveillanceDeLaFacturation,
+  type SurveillanceDeLaFacturation,
+} from "@/domain/facturation/facture";
 import { lireLesConstats } from "@/server/exploitation/constats";
 import { DELAI_CIBLE_HEURES } from "@/domain/backoffice/revue";
 import { ABANDON_JOURS } from "@/domain/dossiers/inactivite";
@@ -278,6 +283,21 @@ function messageDeLaPurge(purge: EtatDeLaPurge): string {
  * transaction : une recharge sur le même dossier ne fait pas un dossier
  * de plus à rembourser.
  */
+async function lireLaFacturation(): Promise<SurveillanceDeLaFacturation> {
+  const reel = fournisseursActifs(process.env).some((f) => espaceReel(f));
+  try {
+    const etat = await etatDeLaFacturation();
+    return surveillanceDeLaFacturation(etat.obstacles, reel, etat.regime);
+  } catch {
+    // Les variables illisibles : rien n'est supposé en place.
+    return surveillanceDeLaFacturation(
+      ["certification_absente", "emetteur_incomplet", "regime_tva_non_declare"],
+      reel,
+      regimeDeLExploitant(),
+    );
+  }
+}
+
 async function compterLesDossiersPayes(): Promise<number> {
   try {
     const lignes = await db.transaction.findMany({
@@ -330,7 +350,23 @@ export async function GET() {
       ? { ...c, capacite: "IMPLEMENTATION_ABSENTE" as const }
       : c,
   );
-  const etat = etatDesCapacites(constats);
+  const capacites = etatDesCapacites(constats);
+
+  /*
+    La facturation — avis comptable M.C du 04/10/2026. En bac à sable,
+    les ventes reçoivent une facture d'essai et rien ne bloque ; dès que
+    l'espace est réel, une série réelle encore fermée (certification,
+    émetteur, régime de TVA) est une inaptitude, et la ligne dit quoi
+    faire.
+  */
+  const facturation = await lireLaFacturation();
+  const etat = facturation.bloquante
+    ? {
+        ...capacites,
+        aptitude: "INAPTE" as const,
+        bloquantes: [...capacites.bloquantes, "facturation"],
+      }
+    : capacites;
   const intitules = new Map(DEPENDANCES.map((d) => [d.cle, d.intitule]));
 
   /*
@@ -372,6 +408,7 @@ export async function GET() {
         « configuration absente ».
       */
       remboursementManuel,
+      facturation,
       fournisseursDePaiement: (() => {
         const lu = fournisseursDeclares(process.env[CLE_FOURNISSEURS]);
         return {

@@ -208,6 +208,9 @@ jobs:
       - name: Relecture de la complétude
         run: npm run smoke:relecture
       - run: echo "- **Relecture de la complétude** — une demande en attente par dossier, réponse sans promesse, alerte au candidat" >> "$GITHUB_STEP_SUMMARY"
+      - name: Factures et avoirs
+        run: npm run smoke:facturation
+      - run: echo "- **Factures et avoirs** — suite sans trou sous émissions simultanées, avoir adossé à sa facture, pièces immuables, série réelle fermée sans facturation" >> "$GITHUB_STEP_SUMMARY"
 
       # La purge de rétention devant un stockage qui refuse : ce qui se
       # déclare purgé doit avoir réellement quitté le stockage (INV-5).

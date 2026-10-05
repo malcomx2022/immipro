@@ -1845,6 +1845,17 @@ numérotation dépend du régime comptable, de l'entité qui encaisse et
 connaître l'entité juridique reviendrait à la redéfinir ensuite, sur des
 pièces déjà émises.
 
+**Avis comptable reçu le 04/10/2026 (S.114).** La facture est obligatoire
+pour chaque vente, en plus du reçu ; chaque remboursement s'adosse à un
+avoir. Numérotation continue par exercice (`RD-2026-00001`,
+`AV-2026-00001`), mentions obligatoires, conservation dix ans. Le produit
+émet désormais factures et avoirs, et une série d'essai en bac à sable. La
+réserve qui demeure n'est plus une question posée au comptable mais deux
+faits à établir avant l'encaissement réel : l'immatriculation de Rêveur
+Digital au système de facture normalisée, avec ses accès, et son régime de
+TVA, que l'avis laisse « à confirmer ». Tant qu'ils manquent, le paiement
+réel est refusé.
+
 ### Ce que l'application de la décision a trouvé
 
 **Deux arbitrages du même jour ont produit une réserve que rien ne tenait.**
@@ -11176,3 +11187,84 @@ Aucune donnée personnelle de plus n'est transmise au prestataire : le candidat 
 - migrations : `smoke:migrations` confirme l'absence de dérive.
 
 **Note :** la politique de données a changé, mais aucun texte n'était encore publié, donc rien n'est à revalider. La relecture juridique de Q.A portera sur la version qui contient ces deux phrases.
+
+## S.114 — M.C : avis comptable reçu, factures et avoirs émis, encaissement réel fermé sans facturation
+
+**Avis de l'expert-comptable du 04/10/2026.**
+
+- **La facture est obligatoire** pour chaque vente : droit comptable OHADA, CGI béninois, facture normalisée. Le reçu reste un justificatif de paiement complémentaire.
+- **Mentions obligatoires :**
+  - émetteur : dénomination, forme, capital, RCCM, IFU, siège ;
+  - numéro et date ;
+  - client : nom, adresse, « particulier » à défaut d'IFU ;
+  - désignation, prix HT et quantité ;
+  - TVA, total TTC en chiffres et en lettres ;
+  - mode de règlement ;
+  - code de certification.
+- **Numérotation** continue par exercice ; les avoirs ont leur propre suite ; une pièce annulée est conservée.
+- **TVA** à 18 % si Rêveur Digital est assujettie, régime « à confirmer ». Pour le pilote, la TVA béninoise est défendable ; la territorialité est à valider pays par pays avant l'ouverture large.
+- **Avoir** pour chaque remboursement, y compris manuel.
+- **Archivage** dix ans.
+- **Ne pas ouvrir les paiements réels** tant que le circuit facture + avoir n'est pas testé de bout en bout en réel.
+
+**Décisions de la direction (04/10/2026) :**
+
+- les prix de la grille sont **toutes taxes comprises**, et la TVA en est extraite ;
+- le nom et l'adresse de facturation sont **demandés avant le premier paiement réel**, figés sur la facture et conservés dix ans ;
+- le circuit est **construit dès maintenant**.
+
+**Ce qui est construit :**
+
+- **Domaine** (`domain/facturation/`) :
+  - numérotation par série et par exercice, à l'heure de Cotonou ;
+  - TVA extraite d'un prix TTC, euro compté en centimes, somme en toutes lettres ;
+  - mentions de l'émetteur, capital compris ;
+  - identité du client ;
+  - obstacles à la série réelle, avec leur remède.
+- **Base** :
+  - modèles `Invoice` et `InvoiceSequence`, colonnes `billingName` et `billingAddress` sur le compte ;
+  - contraintes : un avoir a une origine, montants cohérents, pièce réelle complète, certification datée, annulation motivée ;
+  - déclencheur `facture_immuable` : ni suppression, ni réécriture.
+- **Émission** (`server/facturation/emission.ts`) :
+  - à la confirmation signée et au remboursement confirmé ;
+  - suite prise dans la transaction de la pièce, une pièce de chaque genre par paiement ;
+  - filet dans la réconciliation.
+- **Série d'essai** en bac à sable (`ESSAI-RD-…`), pour tester le circuit sans consommer la suite réelle.
+- **Encaissement réel fermé** tant que la série réelle l'est. Trois obstacles : certification non branchée (aucun adaptateur, faute d'immatriculation et d'accès), mentions de l'émetteur incomplètes, régime `FACTURATION_TVA` non déclaré. S'y ajoute l'identité de facturation du client. Le refus intervient avant toute écriture, et le récapitulatif le dit avant le clic. `/api/health` expose `facturation` et passe en 503 dès que l'espace est réel.
+- **Candidat** :
+  - section *Facturation* du profil ;
+  - lien du reçu vers la facture et l'avoir ;
+  - page imprimable `/paiement/facture/<numéro>` ;
+  - export des données : identité de facturation et pièces.
+- **Textes juridiques** :
+  - conditions §8 : facture et avoir ;
+  - politique de données : catégorie « Facturation », conservation des factures, avoirs et reçus, nom et adresse gardés après la suppression du compte, une facture émise ne se modifie pas.
+- **Profil** : la phrase « jamais transmises à une administration » devenait fausse pour l'identité de facturation, qui partira avec la facture normalisée. Elle est réécrite.
+- **Garde-fou M.C** : il interdisait le mot « facture » dans tout texte rendu. Il porte désormais sur le reçu seul : son module n'emploie pas le mot, et son écran ne l'emploie que pour mener à la facture.
+
+**Reste, hors code :**
+
+- immatriculation au système de facture normalisée et adaptateur de certification ;
+- régime de TVA ;
+- saisie du capital social ;
+- opérateur Mobile Money sur la facture, à vérifier sur un paiement de bac à sable ;
+- territorialité par pays avant l'ouverture large ;
+- test de bout en bout en réel.
+
+Procédure : `docs/exploitation/facturation.md`.
+
+**Vérifications :**
+
+- tests : `tests/facturation.test.ts` (domaine), ainsi que les tests UI du profil, du reçu et du récapitulatif ;
+- fumée : `smoke:facturation` en CI ; elle couvre :
+  - la suite continue sous six émissions simultanées ;
+  - le double appel ;
+  - l'avoir adossé à sa facture ;
+  - l'immuabilité ;
+  - l'émission par la notification signée ;
+  - le filet de la réconciliation ;
+  - la lecture réservée au client ;
+  - la série réelle fermée ;
+  - la suspension du paiement réel.
+- migrations : `smoke:migrations`.
+

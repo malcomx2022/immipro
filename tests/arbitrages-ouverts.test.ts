@@ -384,17 +384,18 @@ describe("I.D (tranché) — rien ne déclare un balayage qui n'a pas eu lieu", 
  * M.C — reçu ou facture, décidé sous réserve le 20/09
  * ------------------------------------------------------------------ */
 
-describe("M.C (sous réserve) — le document reste un reçu", () => {
+describe("M.C (sous réserve) — le reçu reste un reçu, la facture est une pièce à part", () => {
   /**
-   * Décision produit du 20/09/2026, **soumise à une expertise comptable
-   * avant tout encaissement commercial**. Le produit maintient « reçu » et
-   * ne présente rien comme une facture ; savoir si une facture est requise,
-   * ce qu'elle doit porter et selon quelle séquence dépend du régime, de
-   * l'entité qui encaisse et des séries autorisées.
+   * Décision produit du 20/09/2026, revue le 04/10/2026 sur **avis
+   * comptable** : chaque vente donne lieu à une facture, chaque
+   * remboursement à un avoir, numérotés en continu par exercice. La
+   * réserve qui reste n'est plus une question au comptable mais deux faits
+   * à établir — l'immatriculation au système de facture normalisée et le
+   * régime de TVA — et le registre des préalables les porte.
    *
-   * Le garde-fou détaillé vit dans `tests/prealables.test.ts`, avec le
-   * registre. Ici, ce qui doit rester vrai quoi qu'il arrive : la référence
-   * ne devient pas un numéro de facture par renommage.
+   * Ce qui doit rester vrai quoi qu'il arrive : la référence du reçu ne
+   * devient pas un numéro de facture par renommage, et la facture tient sa
+   * numérotation d'une suite à elle.
    */
   it("la référence de transaction n'est pas renommée en numéro de facture", () => {
     // Commentaires retirés, et le registre des préalables écarté : l'un
@@ -418,6 +419,19 @@ describe("M.C (sous réserve) — le document reste un reçu", () => {
     const acces = lire("src/server/acces/paiements.ts");
     expect(acces).toMatch(/suiteDictable\(6\)/u);
     expect(acces).not.toMatch(/\+\s*1\b.*reference|reference.*\+\+/iu);
+  });
+
+  /**
+   * Et la facture se numérote ailleurs : dans sa propre suite, prise dans
+   * la même transaction que la pièce, pour qu'une émission qui échoue rende
+   * sa place (avis M.C, point 3 : « continue et sans rupture »).
+   */
+  it("la facture prend son rang dans sa propre suite, dans la transaction de la pièce", () => {
+    const emission = sansCommentaires(lire("src/server/facturation/emission.ts"));
+    expect(emission).toMatch(/invoiceSequence\.upsert/u);
+    expect(emission).toMatch(/\$transaction\(async \(tx\) => \{\s*const rang = await prendreUnRang\(tx,/u);
+    const schema = lire("prisma/schema.prisma");
+    expect(schema).toMatch(/model InvoiceSequence \{/u);
   });
 });
 

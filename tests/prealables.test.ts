@@ -32,26 +32,30 @@ const lire = (f: string) => readFileSync(f, "utf8");
 
 describe("le reçu ne se présente pas comme une facture", () => {
   /**
-   * Le mot ne doit apparaître dans aucun texte rendu. Les commentaires sont
-   * retirés d'abord : celui qui explique pourquoi il n'y a pas de facture
-   * emploie forcément le mot — même balayage que le garde-fou du
-   * vocabulaire interdit, et que celui de K.A.
+   * M.C, revu le 04/10/2026 sur avis comptable : chaque vente donne lieu à
+   * une facture, **distincte** du reçu. Le mot « facture » a donc sa place
+   * dans le produit — dans la facturation. Ce qui reste vrai, et que ce
+   * garde-fou tient : le reçu, lui, ne s'appelle pas facture. Son module
+   * n'emploie pas le mot, et son écran ne l'emploie que pour mener à la
+   * facture, qui est une autre pièce avec sa propre numérotation.
    *
-   * Une seule exception, et elle se voit : le registre des préalables porte
-   * la question posée au comptable — « une facture est-elle requise ? » —
-   * qui ne s'écrit pas sans le mot. C'est son objet même, et rien ne la
-   * rend à un candidat.
+   * Les commentaires sont retirés d'abord : celui qui explique la
+   * différence emploie forcément le mot.
    */
-  const REGISTRE = "src/domain/exploitation/prealables.ts";
-
-  it("aucun texte rendu n'emploie le mot", () => {
-    const fautifs = fichiers("src", /\.tsx?$/u)
-      .filter((f) => f !== REGISTRE)
-      .filter((f) => /\bfactur(e|es|ation)\b/iu.test(sansCommentaires(lire(f))));
-    expect(fautifs).toEqual([]);
+  it("le module du reçu n'emploie pas le mot", () => {
+    expect(sansCommentaires(lire("src/domain/paiement/recu.ts"))).not.toMatch(/\bfactur/iu);
   });
 
-  /** Et l'exception reste une exception : le registre ne se rend nulle part. */
+  it("l'écran du reçu ne l'emploie que pour mener à la facture", () => {
+    const ecran = sansCommentaires(lire("src/app/(app)/paiement/recu/[id]/Recu.tsx"))
+      .replace(/\/paiement\/facture\//gu, "")
+      .replace(/"Voir la facture(?: d'avoir)?"/gu, "")
+      // Le genre de la pièce, tel que la base le nomme.
+      .replace(/genre === "FACTURE"/gu, "");
+    expect(ecran).not.toMatch(/\bfactur/iu);
+  });
+
+  /** Le registre ne se rend nulle part, lui non plus. */
   it("le registre des préalables n'est lu par aucun écran", () => {
     const lecteurs = fichiers("src/app", /\.tsx?$/u).filter((f) =>
       lire(f).includes("exploitation/prealables"),

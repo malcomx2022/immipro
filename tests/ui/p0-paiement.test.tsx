@@ -748,11 +748,42 @@ describe("$-02 — encaissement réel sans conditions publiées", () => {
         achat={{ type: "pack", code: PACKS[0]!.code }}
         tarif={tarifDe({ type: "pack", code: PACKS[0]!.code })!}
         deviseInitiale="XOF"
-        encaissementSuspendu
+        suspension="conditions"
       />,
     );
     fireEvent.click(screen.getByRole("checkbox"));
     expect(screen.getByRole("button", { name: /^Payer/u })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent(/conditions de vente ne sont pas encore publiées/u);
+  });
+});
+
+describe("$-02 — encaissement réel sans facturation (avis M.C)", () => {
+  const recap = (suspension: "facturation" | "identite") => (
+    <Recapitulatif
+      publiees={{ conditions: 1 }}
+      tunnel={TUNNEL}
+      achat={{ type: "pack", code: PACKS[0]!.code }}
+      tarif={tarifDe({ type: "pack", code: PACKS[0]!.code })!}
+      deviseInitiale="XOF"
+      suspension={suspension}
+    />
+  );
+
+  it("attend la facturation sans rien demander au candidat", () => {
+    render(recap("facturation"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: /^Payer/u })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(/dès que notre facturation sera en place/u);
+    expect(screen.queryByRole("link", { name: "Renseigner ma facturation" })).toBeNull();
+  });
+
+  it("envoie compléter le nom et l'adresse de facturation, au bon champ", () => {
+    render(recap("identite"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: /^Payer/u })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Renseigner ma facturation" })).toHaveAttribute(
+      "href",
+      "/profil#facturation",
+    );
   });
 });
