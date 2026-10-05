@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import type { Transaction } from "@prisma/client";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
 import { etapeDe, type DetteFedaPay } from "@/domain/paiement/remboursement";
 import {
@@ -317,7 +318,44 @@ export async function paiements(
     orderBy: { createdAt: "desc" },
     include: { user: { select: { email: true } } },
   });
+  return enLignesDePaiement(transactions, maintenant);
+}
 
+/**
+ * Les écarts encore ouverts sur une transaction **d'un jour antérieur** —
+ * B-04, 05/10/2026.
+ *
+ * Le tableau de la journée ne liste que les transactions créées ce
+ * jour-là, et c'est juste pour un livre. Mais un écart s'ouvre souvent
+ * après coup : une confirmation du fournisseur qui arrive sur un paiement
+ * tenu pour échoué, un second paiement sur une référence réglée la veille.
+ * La transaction appartient à la veille, l'écart au présent — et il ne
+ * figurait sur aucun écran : le lendemain, la ligne avait quitté le
+ * tableau, et le compteur « Écarts à traiter » ne le comptait plus.
+ *
+ * Toutes dates confondues, jusqu'à ce que quelqu'un le referme. Les plus
+ * anciens d'abord : ce sont ceux qui attendent depuis le plus longtemps.
+ */
+export async function ecartsAnterieurs(
+  jourIso: string,
+  maintenant = new Date(),
+): Promise<Paiement[]> {
+  const transactions = await db.transaction.findMany({
+    where: {
+      createdAt: { lt: bornesDesJoursCivils(jourIso, jourIso).gte },
+      discrepancy: { not: null },
+      discrepancyResolvedAt: null,
+    },
+    orderBy: { createdAt: "asc" },
+    include: { user: { select: { email: true } } },
+  });
+  return enLignesDePaiement(transactions, maintenant);
+}
+
+async function enLignesDePaiement(
+  transactions: (Transaction & { user: { email: string } })[],
+  maintenant: Date,
+): Promise<Paiement[]> {
   const acteurs = new Map(
     (
       await db.user.findMany({

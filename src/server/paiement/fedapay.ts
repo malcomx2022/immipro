@@ -429,6 +429,92 @@ export const consultantFedaPay = (cle: string, espace: string | undefined): Cons
   };
 };
 
+/**
+ * La transaction telle que FedaPay la décrit, pour le diagnostic — S.116.
+ *
+ * Une lecture seule, sur le même point d'appel que la consultation, mais
+ * qui rend ce que la consultation traduit : l'état brut, la référence
+ * marchande, les dates et le moyen. **Aucune donnée du payeur** — ni
+ * client, ni numéro, ni courriel : le schéma ne lit que les champs
+ * nommés ici, tout le reste est écarté avant de quitter la fonction.
+ *
+ * `mode` est le moyen de paiement choisi par le payeur (par exemple
+ * l'opérateur Mobile Money) ; la facture attend de savoir si FedaPay le
+ * donne (docs/exploitation/facturation.md), et ce diagnostic le montre.
+ */
+export interface ApercuFedaPay {
+  id: string;
+  referenceFedaPay: string | null;
+  referenceMarchande: string | null;
+  etat: string | null;
+  montant: number | null;
+  devise: string | null;
+  mode: string | null;
+  creeeLe: string | null;
+  majLe: string | null;
+  approuveeLe: string | null;
+  refuseeLe: string | null;
+  annuleeLe: string | null;
+}
+
+const date = z.string().nullish();
+const schemaApercu = z.object({
+  ...champsDeLEntite,
+  mode: z.string().nullish(),
+  created_at: date,
+  updated_at: date,
+  approved_at: date,
+  declined_at: date,
+  canceled_at: date,
+});
+const schemaApercuEnveloppe = z
+  .union([
+    schemaApercu,
+    z
+      .object({ "v1/transaction": schemaApercu.optional(), transaction: schemaApercu.optional() })
+      .transform((o) => o["v1/transaction"] ?? o.transaction),
+  ])
+  .transform((lue) => lue ?? null);
+
+export async function lireLaTransactionFedaPay(
+  cle: string,
+  espace: string | undefined,
+  providerTxId: string,
+): Promise<
+  | { issue: "lue"; apercu: ApercuFedaPay }
+  | { issue: "introuvable" }
+  | { issue: "indisponible"; detail: string }
+> {
+  const identifiant = providerTxId.replace(/^fedapay:/u, "");
+  const reponse = await appeler(baseDe(espace), cle, `/transactions/${encodeURIComponent(identifiant)}`, {});
+  if (!reponse) return { issue: "indisponible", detail: "fournisseur injoignable" };
+  if (reponse.statut === 404) return { issue: "introuvable" };
+  if (reponse.statut === 401 || reponse.statut === 403) {
+    return { issue: "indisponible", detail: `réponse ${reponse.statut} : la clé d'API n'est pas acceptée dans cet espace` };
+  }
+  if (reponse.statut >= 400) return { issue: "indisponible", detail: `réponse ${reponse.statut}` };
+  const lu = schemaApercuEnveloppe.safeParse(reponse.charge);
+  if (!lu.success || !lu.data) return { issue: "indisponible", detail: "transaction illisible au schéma" };
+  const t = lu.data;
+  return {
+    issue: "lue",
+    apercu: {
+      id: String(t.id),
+      referenceFedaPay: t.reference ?? null,
+      referenceMarchande: referenceMarchande(t),
+      etat: t.status ?? null,
+      montant: t.amount ?? null,
+      devise: t.currency?.iso ?? null,
+      mode: t.mode ?? null,
+      creeeLe: t.created_at ?? null,
+      majLe: t.updated_at ?? null,
+      approuveeLe: t.approved_at ?? null,
+      refuseeLe: t.declined_at ?? null,
+      annuleeLe: t.canceled_at ?? null,
+    },
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Remboursement sortant — il n'y a pas d'API, et c'est un fait.
  * ------------------------------------------------------------------ */

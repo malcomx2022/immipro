@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Paiements } from "./Paiements";
-import { dettesFedaPay, etatOperateur, paiements } from "@/server/lecture/backoffice";
+import { dettesFedaPay, ecartsAnterieurs, etatOperateur, paiements } from "@/server/lecture/backoffice";
 import { exigerAdmin } from "@/server/securite/page";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { jourCivil } from "@/domain/format/fuseau";
@@ -16,8 +16,9 @@ export const metadata: Metadata = {
 export default async function PagePaiements() {
   await exigerAdmin("/paiements");
   const aujourdhui = jourCivil(new Date());
-  const [lignes, operateur, dettes] = await Promise.all([
+  const [lignes, anterieurs, operateur, dettes] = await Promise.all([
     paiements(aujourdhui),
+    ecartsAnterieurs(aujourdhui),
     etatOperateur(),
     dettesFedaPay(),
   ]);
@@ -25,6 +26,7 @@ export default async function PagePaiements() {
   return (
     <Paiements
       paiements={lignes}
+      ecartsAnterieurs={anterieurs}
       dettesFedaPay={dettes}
       operateur={operateur}
       journee={`Journée du ${jourEnFrancais(aujourdhui)}`}
