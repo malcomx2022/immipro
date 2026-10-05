@@ -171,3 +171,30 @@ const role = await build({
 
 const octetsRole = Object.values(role.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
 console.log(`dist/changer-role.mjs — ${(octetsRole / 1024).toFixed(0)} Kio`);
+
+/*
+  Le diagnostic d'un paiement (S.116), même image et même méthode. Lecture
+  seule — base, journal, fournisseur —, sans donnée du payeur :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/diagnostic-paiement.mjs \
+        --reference IMP-261005-P98AEE
+
+  Format ESM : le script attend au premier niveau.
+*/
+const diagnostic = await build({
+  entryPoints: ["scripts/diagnostic-paiement.mts"],
+  outfile: "dist/diagnostic-paiement.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsDiagnostic =
+  Object.values(diagnostic.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/diagnostic-paiement.mjs — ${(octetsDiagnostic / 1024).toFixed(0)} Kio`);

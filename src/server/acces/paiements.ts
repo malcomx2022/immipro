@@ -33,7 +33,11 @@ import {
   tarifDe,
   type Achat as AchatDuDomaine,
 } from "@/domain/payments/achat";
-import { BAIL_DE_CREDIT_MINUTES, effetDeLaNotification } from "@/server/paiement/cycle";
+import {
+  BAIL_DE_CREDIT_MINUTES,
+  ecartDeConfirmationTardive,
+  effetDeLaNotification,
+} from "@/server/paiement/cycle";
 import { lignesDuGrandLivre, ouvrirDuQuota, sousVerrouDuGrandLivre } from "./quota";
 import { confirmerLaConsultation, libererLaTenue } from "./consultations";
 import { suiteDictable } from "@/server/securite/secret";
@@ -600,7 +604,27 @@ export async function appliquerLaNotification(
     return { issue: "refusee", raison };
   }
   if (effet.type === "rejeu") return { issue: "rejeu" };
-  if (effet.type === "refus") return { issue: "refusee", raison: effet.raison };
+  /*
+    Payé après avoir été tenu pour échoué ou expiré — 05/10/2026. La
+    transition reste refusée, mais l'écart s'ouvre : sans lui, le seul
+    signe d'un candidat débité sans rien recevoir était une ligne de
+    journal que personne ne lit.
+  */
+  if (effet.type === "refus") {
+    const tardive = ecartDeConfirmationTardive(
+      transaction.status,
+      notification.statut,
+      notification.providerTxId,
+    );
+    if (tardive) {
+      await db.transaction.updateMany({
+        where: { id: transaction.id, discrepancy: null },
+        data: { discrepancy: tardive },
+      });
+      return { issue: "refusee", raison: tardive };
+    }
+    return { issue: "refusee", raison: effet.raison };
+  }
 
   let maj: Transaction;
   try {

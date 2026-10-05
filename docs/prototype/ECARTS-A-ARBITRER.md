@@ -11291,3 +11291,41 @@ Procédure : `docs/exploitation/facturation.md`.
 
 - tests : `tests/role-de-compte.test.ts` ;
 - fumée : `smoke:role` en CI. Elle lance le paquet de l'image sur une vraie base et vérifie le refus sans motif, l'attribution, la ligne de journal (auteur, motif, `de` → `vers`), le rejeu sans effet, le refus d'une adresse non vérifiée et d'un compte inconnu, la protection du dernier administrateur, et l'absence de journal sur un refus.
+
+## S.116 — Une confirmation tardive ouvre un écart, B-04 le garde visible, un diagnostic le dit
+
+**Relevé le 05/10/2026** en bac à sable. Le widget FedaPay affichait « Transaction réussie » (numéro de test 64000001). ImmiPro renvoyait vers `/paiement/echec`, et la transaction `IMP-261005-P98AEE` était ECHOUEE, cause REFUS_EMETTEUR. Aucun webhook en base, pack non activé.
+
+**Ce que le code montre :**
+
+- L'état ECHOUEE vient de la **réconciliation**, qui a lu `declined` chez FedaPay pour l'identifiant enregistré. Le paiement réussi est donc vraisemblablement **une autre transaction FedaPay**. À vérifier au tableau de bord : ce n'est pas établi.
+- « Aucun webhook en base » ne prouve pas qu'aucun webhook n'est arrivé. Une notification refusée par le cycle du paiement n'écrit **aucun** `PaymentEvent`, seulement une ligne `paiement.reconciliation` au journal d'audit. Et une signature refusée ne laissait **aucune trace du tout**.
+- **Défaut** : une confirmation arrivant sur une transaction ECHOUEE ou EXPIREE était refusée, à raison, mais seulement journalisée. Le candidat débité sans pack n'apparaissait nulle part en B-04.
+- **Défaut** : B-04 ne liste que les transactions créées le jour même. Un écart ouvert après coup sur une transaction de la veille n'était visible sur aucun écran.
+
+**Ce qui change :**
+
+- **Confirmation tardive** (`server/paiement/cycle.ts`, `ecartDeConfirmationTardive`). La transition reste refusée, mais l'écart s'ouvre, avec l'identifiant du fournisseur et le geste à faire : vérifier l'encaissement au tableau de bord, puis y rembourser. Un rejeu ne réécrit pas le constat.
+- **B-04** (`ecartsAnterieurs`) : une section « Écarts ouverts des jours précédents », toutes dates confondues, chacun avec son formulaire de traitement et la date de sa transaction. Elle reste hors du tableau et des totaux de la journée, qui demeurent un livre du jour.
+- **Diagnostic** : `dist/diagnostic-paiement.mjs --reference …`, en lecture seule. Il affiche :
+  - la transaction ;
+  - ses événements (webhook ou réconciliation) ;
+  - le journal qui la cite ;
+  - la transaction chez FedaPay, limitée à une liste fermée de champs, sans aucune donnée du payeur ;
+  - des constats actionnables, dont la vérification de l'URL et du secret du webhook.
+
+  Procédure : `docs/exploitation/diagnostic-paiement.md`.
+- **Trace d'une signature refusée** : `[webhook:<route>] signature refusée` dans les journaux du service app, sans corps ni en-têtes.
+
+**Reste à faire par l'exploitant** :
+- lancer le diagnostic sur `IMP-261005-P98AEE` ;
+- vérifier au tableau de bord FedaPay (bac à sable) le webhook vers `https://immipro.app/api/webhooks/fedapay` et son secret ;
+- retrouver la transaction réellement approuvée.
+
+**Vérifications :**
+- tests : `tests/diagnostic-paiement.test.ts` ;
+- fumée : `smoke:diagnostic` en CI. Elle couvre :
+  - la confirmation tardive : refusée, écart ouvert, aucun événement, rejeu sans effet ;
+  - B-04 le lendemain : hors du livre du jour, présente parmi les écarts antérieurs, retirée une fois refermée ;
+  - le diagnostic : notifications refusées relues, aucune écriture ;
+  - le paquet de l'image : sans clé, avec une référence inconnue, sans argument, sans donnée du payeur.

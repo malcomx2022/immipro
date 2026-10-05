@@ -131,7 +131,16 @@ export function route<C = undefined, Q = undefined>(
       if (definition.limite === "webhook") {
         corpsBrut = await requeteBrute.text();
         const valide = await definition.signature(requeteBrute, corpsBrut);
-        if (!valide) throw echec("signature_invalide");
+        if (!valide) {
+          /*
+            Une signature refusée ne laisse aucune ligne en base : sans
+            cette trace, « aucun webhook reçu » et « reçu mais refusé »
+            se confondaient au diagnostic (S.116). Ni le corps ni les
+            en-têtes : seulement le fait, et l'heure que le journal porte.
+          */
+          console.warn(`[webhook:${definition.nom}] signature refusée`);
+          throw echec("signature_invalide");
+        }
         destinataireEffectif = "operateur";
       }
 

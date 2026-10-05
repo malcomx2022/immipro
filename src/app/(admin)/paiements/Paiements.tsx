@@ -77,6 +77,12 @@ const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
 });
 const heure = (iso: string) => FORMAT_HEURE.format(new Date(iso)).replace(":", " h ");
 
+interface ProprietesDuTraitement {
+  paiement: Paiement;
+  /** Une transaction d'un jour antérieur porte sa date : l'heure seule se lirait comme d'aujourd'hui. */
+  dateeDuJour?: boolean;
+}
+
 /**
  * Le traitement d'un écart — arbitrage du 21/09/2026.
  *
@@ -88,7 +94,7 @@ const heure = (iso: string) => FORMAT_HEURE.format(new Date(iso)).replace(":", "
  * chacune : « remboursement à initier » est une issue de guichet, pas un
  * virement.
  */
-function TraitementDeLEcart({ paiement }: { paiement: Paiement }) {
+function TraitementDeLEcart({ paiement, dateeDuJour = false }: ProprietesDuTraitement) {
   const router = useRouter();
   const [issue, setIssue] = useState<IssueEcart | "">("");
   const [note, setNote] = useState("");
@@ -123,6 +129,7 @@ function TraitementDeLEcart({ paiement }: { paiement: Paiement }) {
         <span className="font-mono text-14 text-ink-900">{paiement.reference}</span>
         <span className="text-13 text-ink-500">
           {formatMontant(paiement.montant, paiement.devise)} · {paiement.compte}
+          {dateeDuJour ? ` · transaction du ${jourEnFrancais(paiement.recuLe)}` : ""}
         </span>
       </div>
       <p className="text-pretty text-14 text-ink-700">{paiement.ecart?.constat}</p>
@@ -170,6 +177,7 @@ function TraitementDeLEcart({ paiement }: { paiement: Paiement }) {
 
 export function Paiements({
   paiements,
+  ecartsAnterieurs = [],
   dettesFedaPay = [],
   operateur,
   journee,
@@ -177,6 +185,12 @@ export function Paiements({
   aujourdhuiIso,
 }: {
   paiements: readonly Paiement[];
+  /**
+   * Les écarts encore ouverts sur des transactions des jours précédents
+   * (05/10/2026). Hors du tableau et des totaux de la journée — ils
+   * appartiennent à un autre livre —, mais à traiter aujourd'hui.
+   */
+  ecartsAnterieurs?: readonly Paiement[];
   /** Les dettes FedaPay ouvertes, toutes dates confondues (S.91). */
   dettesFedaPay?: readonly DetteFedaPay[];
   /**
@@ -419,6 +433,26 @@ export function Paiements({
                 ))
             : null}
         </div>
+
+        {/* Un écart ouvert après coup sur une transaction de la veille
+            ne figurait nulle part : la ligne avait quitté le tableau du
+            jour, et le compteur ne le comptait plus (05/10/2026). */}
+        {ecartsAnterieurs.length > 0 ? (
+          <section className="flex flex-col gap-3" aria-labelledby="ecarts-anterieurs">
+            <div className="flex flex-col gap-1">
+              <h2 id="ecarts-anterieurs" className="text-16 font-semibold text-ink-900">
+                Écarts ouverts des jours précédents ({ecartsAnterieurs.length})
+              </h2>
+              <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+                Hors du tableau et des totaux de la journée, qui ne couvrent que ses propres
+                transactions. Chacun reste ici jusqu&apos;à ce qu&apos;il soit refermé.
+              </p>
+            </div>
+            {ecartsAnterieurs.map((p) => (
+              <TraitementDeLEcart key={p.reference} paiement={p} dateeDuJour />
+            ))}
+          </section>
+        ) : null}
 
         <RemboursementsFedaPay dettes={dettesFedaPay} />
 

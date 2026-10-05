@@ -49,6 +49,33 @@ export function effetDeLaNotification(
   return { type: "appliquer", vers: annonce, crediteLePack: annonce === "CONFIRMEE" };
 }
 
+/**
+ * Une confirmation qui arrive sur un paiement déjà tenu pour échoué ou
+ * expiré — relevé en bac à sable le 05/10/2026.
+ *
+ * La table des transitions la refuse, et elle a raison : on ne réécrit pas
+ * un état abouti sur la parole d'un message. Mais le refus seul se
+ * contentait d'une ligne au journal. Or c'est précisément le cas où le
+ * candidat a payé — une seconde transaction chez le fournisseur, un
+ * webhook qui arrive après que la réconciliation a lu un refus — et ne
+ * reçoit rien, sans que personne le voie en B-04. L'écart s'ouvre donc,
+ * avec ce qu'il faut faire. Le pack n'a pas été ouvert et la transaction
+ * reste échouée : la somme se rend au tableau de bord du fournisseur,
+ * comme pour un second paiement, puis l'écart se referme sur l'issue
+ * « Remboursement à initier ».
+ *
+ * Rend le constat à écrire, ou `null` si la situation n'est pas celle-là.
+ */
+export function ecartDeConfirmationTardive(
+  actuel: TransactionStatus,
+  annonce: TransactionStatus,
+  providerTxId: string,
+): string | null {
+  if (annonce !== "CONFIRMEE" || (actuel !== "ECHOUEE" && actuel !== "EXPIREE")) return null;
+  const etat = actuel === "ECHOUEE" ? "échouée" : "expirée";
+  return `Paiement confirmé par le fournisseur (${providerTxId}) alors que la transaction était tenue pour ${etat} : aucun pack n'a été ouvert. Vérifier l'encaissement au tableau de bord du fournisseur et, s'il est réel, y rembourser la somme.`;
+}
+
 /** États sur lesquels plus rien n'arrive, hors remboursement. */
 export const ABOUTI: readonly TransactionStatus[] = [
   "CONFIRMEE",
