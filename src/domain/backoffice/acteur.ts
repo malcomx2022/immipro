@@ -59,8 +59,14 @@ const PREFIXE_CANDIDAT = "candidat:";
  * notification de fournisseur. Leur identifiant **est** leur nom — il
  * décrit le traitement qui s'est exécuté — et le rendre autrement
  * inventerait un vocabulaire que rien n'a fixé.
+ *
+ * `console:` s'y range pour la même raison, bien qu'une personne agisse :
+ * un changement de rôle se lance sur le serveur, hors de toute session, et
+ * l'identifiant porte le nom que l'opérateur a déclaré (`console:Awa
+ * Koffi`). Il n'y a pas de compte à résoudre — le premier administrateur
+ * n'en a pas encore —, l'identifiant se lit tel quel (S.115).
  */
-const PROCESSUS = ["systeme:", "webhook:"] as const;
+const PROCESSUS = ["systeme:", "webhook:", "console:"] as const;
 
 const estUnProcessus = (identifiant: string) =>
   PROCESSUS.some((p) => identifiant.startsWith(p));
@@ -130,6 +136,8 @@ export function acteurLisible(
 export function origineDe(identifiant: string): string {
   if (identifiant.startsWith("systeme:")) return "tâche planifiée";
   if (identifiant.startsWith("webhook:")) return "webhook";
+  // Un changement de rôle lancé sur le serveur, par la personne nommée (S.115).
+  if (identifiant.startsWith("console:")) return "console du serveur";
   if (identifiant.startsWith(PREFIXE_CANDIDAT)) return "espace candidat";
   return "back-office";
 }

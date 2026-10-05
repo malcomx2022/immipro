@@ -11268,3 +11268,26 @@ Procédure : `docs/exploitation/facturation.md`.
   - la suspension du paiement réel.
 - migrations : `smoke:migrations`.
 
+
+## S.115 — Un rôle se change depuis la console, avec un motif et une trace au journal
+
+**Relevé le 05/10/2026**, en expliquant comment se connecter en administrateur. Aucun écran ne donne de rôle, et c'est voulu : nommer un administrateur depuis le back-office est le premier geste qu'une session volée ferait. Mais la seule voie était une requête SQL sur la base de production : sans motif, sans auteur, et **sans trace au journal d'audit**, alors que toute autre action sensible y est inscrite (RG-15.1).
+
+**Ce qui change :**
+
+- **Commande** `dist/changer-role.mjs`, livrée dans l'image de production. Elle se lance par `docker compose … run --rm app node dist/changer-role.mjs --email … --role … --par … --motif …`, et en local par `npm run compte:role`.
+- **Règles** (`domain/comptes/role.ts`). La commande refuse :
+  - sans motif (10 à 500 caractères) ni auteur déclaré ;
+  - un compte inconnu, supprimé ou suspendu ;
+  - un rôle élevé sur une adresse non vérifiée ;
+  - le retrait du dernier administrateur.
+
+  Relancée à l'identique, elle ne change rien et n'écrit rien.
+- **Écriture** (`server/comptes/role.ts`) : le changement et la ligne `compte.role` s'écrivent dans une même transaction sérialisable. Le nombre d'administrateurs y est relu, pour que deux retraits simultanés ne laissent pas la plateforme sans personne.
+- **Journal** : l'auteur s'écrit `console:<nom déclaré>`, et l'origine « console du serveur » apparaît en B-06. Il n'y a pas de compte à résoudre : le premier administrateur n'en a pas encore.
+- **Procédure** : `docs/exploitation/administrateurs.md` (rôles, nomination, gestion des comptes en B-03).
+
+**Vérifications :**
+
+- tests : `tests/role-de-compte.test.ts` ;
+- fumée : `smoke:role` en CI. Elle lance le paquet de l'image sur une vraie base et vérifie le refus sans motif, l'attribution, la ligne de journal (auteur, motif, `de` → `vers`), le rejeu sans effet, le refus d'une adresse non vérifiée et d'un compte inconnu, la protection du dernier administrateur, et l'absence de journal sur un refus.

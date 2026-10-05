@@ -21,6 +21,8 @@ export type ActionAuditee =
   | "piece.purge"
   | "dossier.consultation"
   | "compte.suspension"
+  /** Un rôle donné ou retiré depuis la console du serveur (S.115). */
+  | "compte.role"
   | "compte.retablissement"
   | "compte.suppression"
   | "compte.export"
@@ -99,12 +101,20 @@ export interface EcritureAudit {
   details?: Record<string, unknown>;
 }
 
-export async function journaliser(ecriture: EcritureAudit): Promise<void> {
+export async function journaliser(
+  ecriture: EcritureAudit,
+  /**
+   * La transaction de l'écriture qu'on journalise, quand les deux doivent
+   * tenir ou tomber ensemble — un changement de rôle sans sa trace est ce
+   * que S.115 supprime. Par défaut, la base.
+   */
+  client: Pick<typeof db, "auditLog"> = db,
+): Promise<void> {
   const motif = ecriture.motif.trim();
   if (motif.length === 0) {
     throw new Error("RG-15.1 : un accès journalisé porte un motif non vide");
   }
-  await db.auditLog.create({
+  await client.auditLog.create({
     data: {
       actorId: ecriture.acteurId,
       action: ecriture.action,
