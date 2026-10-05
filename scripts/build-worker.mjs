@@ -145,3 +145,29 @@ const sandbox = await build({
 const octetsSandbox =
   Object.values(sandbox.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
 console.log(`dist/sandbox-paiement.mjs — ${(octetsSandbox / 1024).toFixed(0)} Kio`);
+
+/*
+  Le changement de rôle journalisé (S.115), même image et même méthode.
+  Il remplace la requête SQL qu'on lançait à la main, sans motif ni trace :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/changer-role.mjs \
+        --email <adresse> --role ADMIN --par "<votre nom>" --motif "<pourquoi>"
+
+  Format ESM : le script attend au premier niveau.
+*/
+const role = await build({
+  entryPoints: ["scripts/changer-role.mts"],
+  outfile: "dist/changer-role.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsRole = Object.values(role.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/changer-role.mjs — ${(octetsRole / 1024).toFixed(0)} Kio`);
