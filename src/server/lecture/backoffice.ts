@@ -572,6 +572,8 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "compte.suspension": "COMPTE",
   "compte.retablissement": "COMPTE",
   "compte.suppression": "COMPTE",
+  "compte.verification": "COMPTE",
+  "compte.relance": "COMPTE",
   "compte.export": "COMPTE",
   "paiement.remboursement": "PAIEMENT",
   "paiement.remboursement.manuel": "PAIEMENT",

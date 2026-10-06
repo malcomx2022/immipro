@@ -36,6 +36,8 @@ import {
 } from "@/domain/backoffice/revue";
 import {
   ACTIONS_ATTENDUES,
+  ACTIONS_COMPTE,
+  messageDeRelance,
   obstacleALActionCompte,
   actionsPour,
   diagnostiquerRecherche,
@@ -366,11 +368,15 @@ describe("B-03 — comptes", () => {
     const actif = COMPTES.find((c) => c.statut === "ACTIF")!;
     expect(actionsPour(actif).map((a) => a.cle)).toEqual(["suspendre"]);
     const nonVerifie = COMPTES.find((c) => c.statut === "EMAIL_NON_VERIFIE")!;
-    expect(actionsPour(nonVerifie).map((a) => a.cle)).toEqual(["suspendre"]);
+    expect(actionsPour(nonVerifie).map((a) => a.cle)).toEqual([
+      "suspendre",
+      "renvoyer-verification",
+    ]);
     // Une suppression demandée suit son cours : la suspendre en plus ne
-    // ferait que retarder une purge que le candidat a réclamée.
+    // ferait que retarder une purge que le candidat a réclamée. Seule
+    // issue : la reprendre si elle est restée à mi-chemin (S.121).
     const partant = COMPTES.find((c) => c.statut === "SUPPRESSION_DEMANDEE")!;
-    expect(actionsPour(partant)).toEqual([]);
+    expect(actionsPour(partant).map((a) => a.cle)).toEqual(["relancer-suppression"]);
   });
 
   it("un compte suspendu n'a qu'une issue : le rétablir", () => {
@@ -379,16 +385,12 @@ describe("B-03 — comptes", () => {
   });
 
   /**
-   * Les trois actions retirées de l'écran sont nommées, avec ce qui
-   * manque à chacune. Les retirer sans les nommer ferait disparaître le
-   * besoin avec le bouton.
+   * Ce qui n'est pas fait est nommé, avec ce qui manque. Le renvoi du
+   * code et la relance d'une suppression en sont sortis en S.121 : leurs
+   * routes existent, et elles sont dans `ACTIONS_COMPTE`.
    */
   it("ce qui manque est nommé, pas oublié", () => {
-    expect(ACTIONS_ATTENDUES.map((a) => a.cle).sort()).toEqual([
-      "recrediter",
-      "renvoyer-verification",
-      "suppression",
-    ]);
+    expect(ACTIONS_ATTENDUES.map((a) => a.cle)).toEqual(["recrediter"]);
     for (const a of ACTIONS_ATTENDUES) {
       expect(a.manque.length, a.cle).toBeGreaterThan(15);
     }
@@ -396,6 +398,37 @@ describe("B-03 — comptes", () => {
     // commerciale, et elle ne s'invente pas depuis un écran.
     const recredit = ACTIONS_ATTENDUES.find((a) => a.cle === "recrediter")!;
     expect(recredit.manque).toMatch(/commerciale/u);
+  });
+
+  it("une action n'est jamais à la fois offerte et attendue", () => {
+    const offertes = ACTIONS_COMPTE.map((a) => a.libelle);
+    for (const a of ACTIONS_ATTENDUES) expect(offertes).not.toContain(a.libelle);
+  });
+
+  it("le renvoi du code ne s'offre qu'à une adresse non vérifiée", () => {
+    const renvoi = ACTIONS_COMPTE.find((a) => a.cle === "renvoyer-verification")!;
+    expect(renvoi.statuts).toEqual(["EMAIL_NON_VERIFIE"]);
+    expect(renvoi.consequence).toMatch(/dix minutes/u);
+  });
+
+  it("la relance d'une suppression ne s'offre qu'à une suppression demandée", () => {
+    const relance = ACTIONS_COMPTE.find((a) => a.cle === "relancer-suppression")!;
+    expect(relance.statuts).toEqual(["SUPPRESSION_DEMANDEE"]);
+    expect(relance.libelle).toBe("Traiter la demande de suppression");
+  });
+
+  it("la relance dit si le compte est anonymisé, ou ce qui reste à faire", () => {
+    const fini = messageDeRelance({ anonymise: true, dossiers: 2, versions: 5 });
+    expect(fini.achevee).toBe(true);
+    expect(fini.texte).toMatch(/anonymisé, 2 dossiers purgés/u);
+    expect(messageDeRelance({ anonymise: true, dossiers: 1, versions: 1 }).texte).toMatch(
+      /1 dossier purgé\./u,
+    );
+    // Une pièce résiste : ce n'est pas un succès, et le texte dit quoi faire.
+    const reste = messageDeRelance({ anonymise: false, dossiers: 0, versions: 0 });
+    expect(reste.achevee).toBe(false);
+    expect(reste.texte).toMatch(/pas anonymisé/u);
+    expect(reste.texte).toMatch(/relance/u);
   });
 
   /** Le motif part au journal, et une suspension sans motif ne se relit pas. */

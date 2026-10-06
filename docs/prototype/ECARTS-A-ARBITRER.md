@@ -11409,3 +11409,22 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 **Comment.** `/tarifs` reste statique (Q.B, `tests/plan-du-site.test.ts`) et ne lit pas la session. Le lien porte donc `/inscription?suite=%2Fdossiers%2Fnouveau`. L'inscription, déjà rendue à la demande, fait le tri :
 - une personne connectée est renvoyée vers la suite demandée, filtrée par `suiteInterne` (aucune adresse externe), sinon vers son tableau de bord ;
 - un visiteur voit l'inscription, comme avant.
+
+## S.121 — B-03 : deux des trois actions attendues sont branchées, le recrédit reste à décider
+
+**Constat.** B-03 listait trois actions dans `ACTIONS_ATTENDUES`, sans route ni bouton. Deux n'attendaient que du câblage : la fonction serveur existait déjà.
+
+**Fait.**
+- **« Renvoyer l'email de vérification »** : `POST /api/admin/utilisateurs/verification`.
+  - Même émission que l'écran A-03 (`emettreUnCode`, qui annule les codes précédents), même courrier, même validité de dix minutes, limite « sensible ».
+  - Le code n'est jamais rendu ni journalisé.
+  - Action d'audit `compte.verification`, avec un motif d'au moins dix caractères, écrite avant l'envoi.
+  - Si la messagerie ne transmet pas le courrier, la route répond `service_indisponible`, comme côté candidat.
+- **« Traiter la demande de suppression »** : `POST /api/admin/utilisateurs/suppression`.
+  - Elle appelle `acheverLaSuppression`, la fonction que la tâche de nuit reprend déjà (RG-10.4).
+  - Elle est refusée sans `deletionRequestedAt` : seul le candidat demande sa suppression.
+  - Elle est idempotente : un compte déjà anonymisé rend `anonymise: true` sans écriture.
+  - Si une pièce résiste, la réponse le dit (`anonymise: false`), et l'écran aussi.
+  - Action d'audit `compte.relance`.
+
+**Reste à arbitrer.** « Recréditer des analyses » est une décision commerciale : combien, à quelles conditions, à la charge de qui. L'action reste dans `ACTIONS_ATTENDUES`.
