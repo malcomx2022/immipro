@@ -161,12 +161,14 @@ export const CE_QUE_TU_NE_PEUX_PAS_VOIR =
  * reste est nommé plus bas, avec ce qui lui manque.
  */
 export interface ActionCompte {
-  cle: "suspendre" | "retablir";
+  cle: "suspendre" | "retablir" | "renvoyer-verification" | "relancer-suppression";
   libelle: string;
   /** Statuts pour lesquels l'action a un sens. */
   statuts: readonly StatutCompte[];
   /** Ce que l'opérateur doit savoir avant de cliquer. */
   consequence: string;
+  /** Ce que l'écran dit une fois l'action faite — l'état « fait » n'est pas muet. */
+  confirmation: string;
 }
 
 export const ACTIONS_COMPTE: readonly ActionCompte[] = [
@@ -178,6 +180,7 @@ export const ACTIONS_COMPTE: readonly ActionCompte[] = [
     statuts: ["ACTIF", "EMAIL_NON_VERIFIE"],
     consequence:
       "Les sessions ouvertes se ferment immédiatement. Sans cela, la suspension ne prendrait effet qu'à l'expiration du cookie, trente jours plus tard.",
+    confirmation: "Compte suspendu. Les sessions ouvertes sont fermées.",
   },
   {
     cle: "retablir",
@@ -185,8 +188,53 @@ export const ACTIONS_COMPTE: readonly ActionCompte[] = [
     statuts: ["SUSPENDU"],
     consequence:
       "Le compte redevient utilisable à la prochaine connexion. Les sessions fermées par la suspension ne se rouvrent pas.",
+    confirmation: "Compte rétabli. La personne peut se reconnecter.",
+  },
+  {
+    cle: "renvoyer-verification",
+    libelle: "Renvoyer l'email de vérification",
+    // Suspendu, un compte n'a pas à recevoir de code : le rétablir d'abord.
+    statuts: ["EMAIL_NON_VERIFIE"],
+    consequence:
+      "Un nouveau code à six chiffres part à l'adresse du compte, valable dix minutes. Les codes précédents sont annulés. Le code n'est jamais montré ici.",
+    confirmation: "Un nouveau code de vérification est parti à l'adresse du compte.",
+  },
+  {
+    cle: "relancer-suppression",
+    libelle: "Traiter la demande de suppression",
+    statuts: ["SUPPRESSION_DEMANDEE"],
+    consequence:
+      "Reprend la purge des pièces puis l'anonymisation, comme la tâche de nuit. Si le stockage des pièces ne répond toujours pas, le compte reste en suppression demandée et rien n'est anonymisé. Sans danger à rejouer.",
+    confirmation: "Suppression achevée : le compte est anonymisé.",
   },
 ];
+
+/** Ce que le serveur rend à la relance d'une suppression (RG-10.4). */
+export interface BilanRelanceSuppression {
+  anonymise: boolean;
+  dossiers: number;
+  versions: number;
+}
+
+/**
+ * Le message qui suit la relance. Une relance qui n'achève pas n'est pas
+ * un échec de l'écran : le stockage résiste encore, et l'opérateur doit
+ * savoir que rien n'a été anonymisé plutôt que lire un succès.
+ */
+export function messageDeRelance(bilan: BilanRelanceSuppression): {
+  achevee: boolean;
+  texte: string;
+} {
+  if (bilan.anonymise) {
+    const pieces = `${bilan.dossiers} ${bilan.dossiers > 1 ? "dossiers purgés" : "dossier purgé"}`;
+    return { achevee: true, texte: `Suppression achevée : le compte est anonymisé, ${pieces}.` };
+  }
+  return {
+    achevee: false,
+    texte:
+      "Suppression non achevée : une pièce n'a pas pu être supprimée du stockage, donc le compte n'est pas anonymisé. Vérifie que le stockage des pièces répond, puis relance. La reprise de nuit réessaiera aussi.",
+  };
+}
 
 export const actionsPour = (compte: Compte): ActionCompte[] =>
   ACTIONS_COMPTE.filter((a) => a.statuts.includes(compte.statut));
@@ -212,7 +260,9 @@ export function obstacleALActionCompte(motif: string): string | null {
  *
  * Elles étaient à l'écran, en boutons inertes. Les retirer sans les
  * nommer ferait disparaître le besoin avec le bouton ; les garder
- * promettait ce qui n'existe pas. La liste dit ce qui manque à chacune,
+ * promettait ce qui n'existe pas. Le renvoi du code de vérification et la
+ * relance d'une suppression sont sortis de cette liste en S.121 : leurs
+ * routes existent, et elles sont dans `ACTIONS_COMPTE`. La liste dit ce qui manque à chacune,
  * comme `PREALABLES` pour les arbitrages et `DEPENDANCES` pour les
  * services.
  */
@@ -223,14 +273,6 @@ export interface ActionAttendue {
 }
 
 export const ACTIONS_ATTENDUES: readonly ActionAttendue[] = [
-  {
-    cle: "renvoyer-verification",
-    libelle: "Renvoyer l'email de vérification",
-    // Le candidat sait déjà le faire pour lui-même. Le faire à sa place
-    // demande une route, une action auditée de plus, et une messagerie
-    // branchée — `messagerie` est bloquante avant ouverture.
-    manque: "une route, une action auditée, et la messagerie branchée",
-  },
   {
     cle: "recrediter",
     libelle: "Recréditer des analyses",
@@ -243,13 +285,5 @@ export const ACTIONS_ATTENDUES: readonly ActionAttendue[] = [
      * sont des décisions qui ne s'inventent pas depuis un écran.
      */
     manque: "une décision commerciale : combien, à quelles conditions, à la charge de qui",
-  },
-  {
-    cle: "suppression",
-    libelle: "Traiter la demande de suppression",
-    // `acheverLaSuppression` existe et le job la reprend déjà tout seul.
-    // Un bouton serait une relance manuelle, utile le jour où le stockage
-    // objet a laissé une suppression à mi-chemin (RG-10.4).
-    manque: "une route de relance ; la reprise automatique existe déjà",
   },
 ];

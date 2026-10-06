@@ -48,13 +48,13 @@ const rafraichir = vi.fn();
  * requête ne part.
  */
 const appels: { url: string; corps: unknown; methode?: string }[] = [];
-let reponse: { ok: boolean } = { ok: true };
+let reponse: { ok: boolean; donnees?: unknown } = { ok: true };
 vi.mock("@/lib/api", () => ({
   appeler: (url: string, options: { corps?: unknown; methode?: string } = {}) => {
     appels.push({ url, corps: options.corps, methode: options.methode });
     return Promise.resolve(
       reponse.ok
-        ? { ok: true, donnees: { id: "brouillon-de-test", version: 5 } }
+        ? { ok: true, donnees: reponse.donnees ?? { id: "brouillon-de-test", version: 5 } }
         : {
             ok: false,
             echec: {
@@ -740,12 +740,7 @@ describe("B-03 — Utilisateurs", () => {
    */
   it("n'offre plus ce que le produit ne sait pas faire", () => {
     rendre();
-    for (const disparu of [
-      /Renvoyer l'email de vérification/u,
-      /Recréditer des analyses/u,
-      /Traiter la demande de suppression/u,
-      /Exporter la sélection/u,
-    ]) {
+    for (const disparu of [/Recréditer des analyses/u, /Exporter la sélection/u]) {
       expect(screen.queryByRole("button", { name: disparu }), String(disparu)).toBeNull();
     }
   });
@@ -786,6 +781,61 @@ describe("B-03 — Utilisateurs", () => {
       motif: "Compte signalé pour usurpation d'identité.",
     });
     expect(rafraichir).toHaveBeenCalled();
+  });
+
+  const MOTIF = "Le candidat ne retrouve plus son écran de vérification.";
+  const choisirCompte = (nom: string) =>
+    fireEvent.click(screen.getByRole("option", { name: new RegExp(nom, "u") }));
+  const attendre = () =>
+    act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+  it("renvoyer le code de vérification part au serveur et le dit", async () => {
+    appels.length = 0;
+    reponse = { ok: true };
+    rendre();
+    choisirCompte("Sègla Kpadé");
+    const bouton = screen.getByRole("button", { name: "Renvoyer l'email de vérification" });
+    expect(bouton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Motif de la décision"), { target: { value: MOTIF } });
+    fireEvent.click(screen.getByRole("button", { name: "Renvoyer l'email de vérification" }));
+    await attendre();
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.methode).toBe("POST");
+    expect(appels[0]!.url).toBe("/api/admin/utilisateurs/verification");
+    expect(appels[0]!.corps).toMatchObject({ motif: MOTIF });
+    expect(screen.getByRole("status").textContent).toMatch(/nouveau code de vérification est parti/u);
+  });
+
+  it("un renvoi refusé montre l'échec et ne dit pas qu'il est parti", async () => {
+    appels.length = 0;
+    reponse = { ok: false };
+    rendre();
+    choisirCompte("Sègla Kpadé");
+    fireEvent.change(screen.getByLabelText("Motif de la décision"), { target: { value: MOTIF } });
+    fireEvent.click(screen.getByRole("button", { name: "Renvoyer l'email de vérification" }));
+    await attendre();
+    expect(screen.getByText("Le serveur a refusé")).toBeDefined();
+    expect(screen.queryByRole("status")).toBeNull();
+    reponse = { ok: true };
+  });
+
+  it("traiter la suppression part au serveur, et dit quand rien n'est anonymisé", async () => {
+    appels.length = 0;
+    reponse = { ok: true, donnees: { anonymise: false, dossiers: 0, versions: 0 } };
+    rendre();
+    const partant = COMPTES.find((c) => c.statut === "SUPPRESSION_DEMANDEE")!;
+    choisirCompte(partant.nom);
+    fireEvent.change(screen.getByLabelText("Motif de la décision"), { target: { value: MOTIF } });
+    fireEvent.click(screen.getByRole("button", { name: "Traiter la demande de suppression" }));
+    await attendre();
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.url).toBe("/api/admin/utilisateurs/suppression");
+    expect(appels[0]!.corps).toMatchObject({ userId: partant.id, motif: MOTIF });
+    expect(screen.getByRole("status").textContent).toMatch(/pas anonymisé/u);
+    reponse = { ok: true };
   });
 
   it("sans motif, rien ne part", async () => {

@@ -25,6 +25,18 @@ export type ActionAuditee =
   | "compte.role"
   | "compte.retablissement"
   | "compte.suppression"
+  /**
+   * Le code de vérification renvoyé par un administrateur — S.121. Le
+   * code lui-même n'est jamais journalisé : il ouvre le compte.
+   */
+  | "compte.verification"
+  /**
+   * La relance, par un administrateur, d'une suppression restée à
+   * mi-chemin — S.121. Distincte de `compte.suppression`, que la
+   * suppression écrit elle-même à son achèvement sous l'acteur système :
+   * celle-ci dit qui a relancé et pourquoi, l'autre dit que c'est fini.
+   */
+  | "compte.relance"
   | "compte.export"
   | "partage.retrait"
   | "paiement.remboursement"

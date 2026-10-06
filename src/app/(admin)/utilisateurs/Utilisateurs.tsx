@@ -19,9 +19,12 @@ import {
   LIBELLE_STATUT_COMPTE,
   actionsPour,
   diagnostiquerRecherche,
+  messageDeRelance,
   filtrerComptes,
   obstacleALActionCompte,
   resumeComptes,
+  type ActionCompte,
+  type BilanRelanceSuppression,
   type Compte,
   type FiltreCompte,
 } from "@/domain/backoffice/comptes";
@@ -44,6 +47,9 @@ import { cn } from "@/lib/utils";
  * Elle proposait trois boutons — renvoyer l'email de vérification,
  * recréditer des analyses, traiter une demande de suppression — dont
  * aucun n'était relié à quoi que ce soit et dont aucun n'avait de route.
+ * Depuis S.121, deux ont leur route et leur bouton : le renvoi du code
+ * et la relance d'une suppression. Seul le recrédit reste nommé dans
+ * `ACTIONS_ATTENDUES`, parce qu'il attend une décision et non du code.
  * Et elle omettait **la seule action que le produit sait faire** : la
  * suspension, dont la route existe depuis le début, journalise son motif
  * et ferme les sessions ouvertes.
@@ -65,6 +71,8 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
   const [motif, setMotif] = useState("");
   const [envoi, setEnvoi] = useState("");
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  /** Ce que l'écran dit une fois l'action faite : un succès muet ne se distingue pas d'un clic perdu. */
+  const [fait, setFait] = useState<{ texte: string; achevee: boolean } | null>(null);
 
   const visibles = filtrerComptes(comptes, filtre, recherche);
   const retenu = visibles.find((c) => c.id === selection) ?? visibles[0];
@@ -76,22 +84,41 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
     setSelection(cle);
     setMotif("");
     setEchec(null);
+    setFait(null);
   }
 
-  async function agir(cle: "suspendre" | "retablir") {
+  async function agir(action: ActionCompte) {
     if (!retenu || manque) return;
-    setEnvoi(cle);
+    setEnvoi(action.cle);
     setEchec(null);
-    const resultat = await appeler<{ suspendu: boolean; sessionsFermees: number }>(
-      "/api/admin/utilisateurs",
-      { methode: "PUT", corps: { userId: retenu.id, suspendre: cle === "suspendre", motif } },
-    );
+    setFait(null);
+    const corps = { userId: retenu.id, motif };
+    const resultat =
+      action.cle === "renvoyer-verification"
+        ? await appeler<{ envoye: boolean }>("/api/admin/utilisateurs/verification", {
+            methode: "POST",
+            corps,
+          })
+        : action.cle === "relancer-suppression"
+          ? await appeler<BilanRelanceSuppression>("/api/admin/utilisateurs/suppression", {
+              methode: "POST",
+              corps,
+            })
+          : await appeler<{ suspendu: boolean; sessionsFermees: number }>(
+              "/api/admin/utilisateurs",
+              { methode: "PUT", corps: { ...corps, suspendre: action.cle === "suspendre" } },
+            );
     setEnvoi("");
     if (!resultat.ok) {
       setEchec(resultat.echec);
       return;
     }
     setMotif("");
+    if (action.cle === "relancer-suppression") {
+      setFait(messageDeRelance(resultat.donnees as BilanRelanceSuppression));
+    } else {
+      setFait({ texte: action.confirmation, achevee: true });
+    }
     router.refresh();
   }
 
@@ -254,6 +281,17 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                 </div>
 
                 {echec ? <BlocEchec echec={echec} annonce /> : null}
+                {fait ? (
+                  <p
+                    role="status"
+                    className={cn(
+                      "text-pretty rounded-md border p-3 text-14 text-ink-900",
+                      fait.achevee ? "border-ink-300 bg-ink-100" : "border-ink-500 bg-white",
+                    )}
+                  >
+                    {fait.texte}
+                  </p>
+                ) : null}
 
                 {actionsPour(retenu).map((action) => (
                   <div key={action.cle} className="flex flex-col gap-1.5">
@@ -262,9 +300,13 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                       pleineLargeur
                       disabled={manque !== null || envoi !== ""}
                       raisonDesactivation={manque ?? "Envoi en cours."}
-                      onClick={() => agir(action.cle)}
+                      onClick={() => agir(action)}
                     >
-                      {envoi === action.cle ? "Envoi…" : action.libelle}
+                      {envoi === action.cle
+                        ? action.cle === "relancer-suppression"
+                          ? "Traitement…"
+                          : "Envoi…"
+                        : action.libelle}
                     </Button>
                     <span className="text-pretty text-13 text-ink-500">
                       {action.consequence}
