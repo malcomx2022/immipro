@@ -38,6 +38,7 @@
     "smoke:relecture": "tsx scripts/fumee-relecture.mts",
     "smoke:facturation": "tsx scripts/fumee-facturation.mts",
     "smoke:role": "tsx scripts/fumee-role.mts",
+    "smoke:editoriale": "tsx scripts/fumee-editoriale.mts",
     "compte:role": "tsx scripts/changer-role.mts",
     "smoke:diagnostic": "tsx scripts/fumee-diagnostic.mts",
     "paiement:diagnostic": "tsx scripts/diagnostic-paiement.mts",

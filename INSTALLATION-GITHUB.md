@@ -167,5 +167,8 @@ Durcissement minimal avant la première mise en ligne : `ufw` limité aux ports 
 - [ ] Créer le bucket MinIO `immipro-documents` en accès privé
 - [ ] Lancer `npm run seed:rules` et vérifier que la fiche Émirats reste en `DRAFT`
 - [ ] En production, charger le même référentiel depuis l'image, une fois : `docker compose -f docker-compose.prod.yml run --rm app node dist/graine-regles.js`. B-02 publie une règle existante mais n'en crée pas : sans ce chargement, aucune destination n'est ouverte. Le déploiement ne le relance pas, pour ne pas écraser ce que B-02 et la veille ont changé.
+- [ ] En production, charger le guide Pays-Bas et l'article de départ : `docker compose -f docker-compose.prod.yml run --rm app node dist/graine-editoriale.mjs`. Contrairement à `npm run seed:editorial` (qui remet les textes d'origine), cette commande **ne crée que les documents absents** : elle ne réécrit ni un texte retouché en B-08, ni un document retiré, et se relance sans risque.
+- [ ] En production, vérifier les garde-fous SQL après chaque migration : `docker compose -f docker-compose.prod.yml run --rm app node dist/verifier-garde-fous.mjs`. Code de sortie non nul si un garde-fou manque (l'image n'a pas `psql` ; `npm run db:garde-fous` reste la commande de développement). Les essais s'exécutent dans une transaction annulée : rien de durable n'est écrit.
+- [ ] Planifier la sauvegarde de la base sur le VPS : voir `docs/exploitation/sauvegardes.md`
 - [ ] Renseigner les clés FedaPay en bac à sable
 - [ ] Ouvrir une issue par écran du lot P0 de DOC-12

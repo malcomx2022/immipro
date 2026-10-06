@@ -37,6 +37,7 @@
  * bibliothèque. Le dépôt n'a pas de `"type": "module"`, donc `.js` est
  * déjà du CJS — la commande du conteneur reste `node dist/worker.js`.
  */
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
 const EXTERNES = ["@prisma/client", ".prisma/client"];
@@ -198,3 +199,72 @@ const diagnostic = await build({
 const octetsDiagnostic =
   Object.values(diagnostic.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
 console.log(`dist/diagnostic-paiement.mjs — ${(octetsDiagnostic / 1024).toFixed(0)} Kio`);
+
+/*
+  La graine éditoriale (S.120), même image et même méthode : le guide Pays-Bas
+  et l'article de départ, que `npm run seed:editorial` chargeait sans pouvoir
+  tourner dans l'image.
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/graine-editoriale.mjs
+
+  Choix de sécurité : contrairement à la graine de développement, qui remet
+  les textes d'origine, ce paquet **ne crée que les documents absents**. Il ne
+  réécrit ni un texte retouché en B-08, ni l'état d'un document dépublié :
+  on peut le relancer à chaque déploiement sans rien défaire.
+
+  Format ESM : le script attend au premier niveau.
+*/
+const editoriale = await build({
+  entryPoints: ["scripts/graine-editoriale.mts"],
+  outfile: "dist/graine-editoriale.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsEditoriale =
+  Object.values(editoriale.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/graine-editoriale.mjs — ${(octetsEditoriale / 1024).toFixed(0)} Kio`);
+
+/*
+  Les garde-fous SQL depuis l'image (S.120). `scripts/garde-fous.mjs` lance
+  `psql`, absent de l'image : ce paquet embarque le fichier SQL (injecté en
+  constante à la compilation) et l'exécute avec `pg`, lui aussi empaqueté —
+  l'image n'a donc rien de plus à copier.
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/verifier-garde-fous.mjs
+
+  Code de sortie non nul si un garde-fou manque. `pg-native` est optionnel
+  pour `pg` et n'est pas installé : on le déclare externe pour que
+  esbuild n'échoue pas dessus.
+*/
+const gardeFous = await build({
+  entryPoints: ["scripts/verifier-garde-fous.mts"],
+  outfile: "dist/verifier-garde-fous.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  // `pg` est publié en CJS : son `require` de modules Node doit exister en ESM.
+  banner: {
+    js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
+  },
+  external: [...EXTERNES, "pg-native"],
+  define: {
+    __SQL_GARDE_FOUS__: JSON.stringify(readFileSync("scripts/verifier-garde-fous.sql", "utf8")),
+  },
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsGardeFous =
+  Object.values(gardeFous.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/verifier-garde-fous.mjs — ${(octetsGardeFous / 1024).toFixed(0)} Kio`);

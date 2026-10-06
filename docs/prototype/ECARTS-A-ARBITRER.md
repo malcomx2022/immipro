@@ -11428,3 +11428,26 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
   - Action d'audit `compte.relance`.
 
 **Reste à arbitrer.** « Recréditer des analyses » est une décision commerciale : combien, à quelles conditions, à la charge de qui. L'action reste dans `ACTIONS_ATTENDUES`.
+
+## S.120 — Deux commandes d'exploitation de plus tournent depuis l'image
+
+`seed:editorial` et `scripts/garde-fous.mjs` ne pouvaient pas tourner en production : l'image n'a ni `tsx`, ni les sources, ni `psql`. Deux paquets rejoignent `build-worker.mjs`, construits comme `changer-role.mjs` :
+- `dist/graine-editoriale.mjs` ;
+- `dist/verifier-garde-fous.mjs`.
+
+**Arbitrage pris.** La graine de développement remettait les textes d'origine à chaque lancement (`upsert` avec `update`). Lancée en production, elle aurait écrasé une retouche faite en B-08. Le paquet de production ne crée donc que les documents absents, et ne touche à aucun document existant, retiré compris. `npm run seed:editorial` garde son comportement. Pour corriger un texte d'origine en production, on passe par B-08.
+
+**Écarts avec la version `psql`.** Le paquet des garde-fous embarque le SQL et l'exécute avec `pg`, avec le même décompte et les mêmes seuils.
+- Les essais s'exécutent dans une transaction annulée. La base est donc laissée telle quelle, même si l'exécution n'est pas « lecture seule » au sens de PostgreSQL.
+- Une erreur hors d'un essai interrompt la vérification, en code 1.
+
+**Ce qui est éprouvé.** `smoke:editoriale`, branché dans la validation, vérifie que :
+- la graine lancée deux fois ne crée pas de doublon ;
+- une retouche et un document retiré ne sont jamais réécrits ;
+- les garde-fous sortent en 0 sur une base migrée et en 1 sur une base sans tables.
+
+**Reste à faire côté exploitation.** Le runbook `docs/exploitation/sauvegardes.md` documente `backup-postgres.sh`. Restent à vérifier :
+- l'origine des variables du cron ;
+- l'alerte en cas d'échec ;
+- la sauvegarde du stockage objet des pièces ;
+- la restauration de contrôle.
