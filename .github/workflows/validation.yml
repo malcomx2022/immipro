@@ -219,7 +219,7 @@ jobs:
       # garde-fous sort en code non nul sur une base sans migrations.
       - name: Graine éditoriale et garde-fous de l'image
         run: npm run smoke:editoriale
-      - run: echo "- **Graine éditoriale et garde-fous** — paquets de l'image : création seule, retouche de B-08 jamais écrasée, garde-fous rouges sur base non migrée" >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "- **Graine éditoriale et garde-fous** — paquets de l'image, création seule, retouche de B-08 jamais écrasée, garde-fous rouges sur base non migrée" >> "$GITHUB_STEP_SUMMARY"
       - name: Confirmation tardive et diagnostic d'un paiement
         run: npm run smoke:diagnostic
       - run: echo "- **Diagnostic d'un paiement** — une confirmation tardive ouvre un écart visible en B-04 le lendemain, la commande de l'image le dit sans rien écrire ni sortir de donnée du payeur" >> "$GITHUB_STEP_SUMMARY"
