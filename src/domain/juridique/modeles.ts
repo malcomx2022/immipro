@@ -273,6 +273,12 @@ const DONNEES_PERSONNELLES: ModeleJuridique = {
     l(
       "La lecture des pièces et la rédaction assistée font appel à un prestataire d'intelligence artificielle, sous-traitant d'ImmiPro. Il reçoit le fichier ou le texte concerné, et rien d'autre : ni votre adresse, ni l'adresse du fichier dans notre stockage.",
       "Les pièces d'identité ne sont confiées qu'au prestataire désigné à cet effet. Un autre prestataire n'en reçoit que sur une autorisation écrite d'ImmiPro.",
+      // 06/10/2026 : le statut d'une pièce est attribué sans intervention
+      // humaine (le modèle lit, des règles fixes jugent), et une pièce que
+      // le service ne lit pas part en revue humaine. Les deux se disent ;
+      // le délai de revue, cible interne, ne s'affiche pas en engagement.
+      "Le statut de chaque pièce (conforme, à corriger, expirée…) est établi automatiquement, à partir de ce qui en est lu et des règles publiées de la destination. Il indique ce qu'il faut corriger ; il ne se prononce pas sur la décision de l'administration.",
+      "Une pièce que le service ne parvient pas à lire est examinée par un membre de l'équipe.",
       "La complétude du dossier est calculée automatiquement à partir des pièces et des règles de la destination. Elle indique ce qui manque ou doit être corrigé. Elle ne produit aucune décision à votre égard, et ne se prononce pas sur la décision de l'administration.",
       // Avis juridique L.A du 03/10/2026 : la pondération n'est pas
       // communiquée, et cela se dit ; une relecture humaine peut être
