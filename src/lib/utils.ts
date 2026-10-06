@@ -50,8 +50,11 @@ export const cn = (...inputs: ClassValue[]) => merge(clsx(inputs));
  * table de symboles à tenir à jour derrière le référentiel.
  */
 export function formatMontant(valeur: number, devise: string): string {
+  // Un montant entier s'écrit sans décimales (12 €) ; un prorata en euros
+  // porte ses centimes en entier (7,20 €, et non 7,2 €) — RG-15.2.
+  const centimes = devise !== "XOF" && !Number.isInteger(valeur);
   const nombre = new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: centimes ? 2 : 0,
     maximumFractionDigits: devise === "XOF" ? 0 : 2,
   }).format(valeur);
   if (devise === "XOF") return `${nombre} F`;

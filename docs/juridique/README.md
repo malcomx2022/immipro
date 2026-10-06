@@ -35,8 +35,9 @@ Le lien au pied de page, le plan du site, la réserve près des cases d'acceptat
 
 | Sujet | Ce que dit la documentation | Ce que fait le code | À trancher par |
 |---|---|---|---|
-| Remboursement d'un pack entamé | DOC-11 : « règle de proratisation selon les tokens déjà consommés » | Aucun prorata : une consommation partielle part en revue manuelle (`remboursement.ts`) | Direction, puis produit |
 | Opérateurs Mobile Money | DOC-11 nomme MTN MoMo et Moov | Le produit n'en nomme aucun : « l'opérateur de ton numéro, quel qu'il soit » (`rail.ts`) | Produit |
 | Remboursement FedaPay | — | Possible par MTN Mobile Money seulement (S.91) ; rien n'est prévu pour un paiement fait par un autre opérateur | Direction et opérations |
 | Consentements sans effet | `pieces_financieres` et `mesure_audience` sont proposés au candidat | Ils ne commandent rien ; aucune mesure d'audience n'existe | Produit, puis conformité |
 | Registre de langue | L'interface tutoie le candidat | Les brouillons vouvoient, comme un texte contractuel | Direction |
+
+**Tranché depuis.** Remboursement d'un pack entamé — décision de la direction du 06/10/2026 (RG-15.2) : remboursé au prorata des **analyses** restantes (et non des jetons), tant que le dossier n'est ni déclaré déposé ni clos ; au-delà, revue par l'équipe. Le modèle des conditions (section 10) porte la règle en clair, et la variable `remboursement_entame` a été retirée du registre. Calcul : `montantDuRemboursement` dans `src/domain/paiement/remboursement.ts`. Changer le texte du modèle fait passer la page « à revalider » : une nouvelle validation nommée est nécessaire avant publication.

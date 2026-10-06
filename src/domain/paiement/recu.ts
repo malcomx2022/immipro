@@ -150,8 +150,33 @@ export const MENTION_PDF =
  * rapprocher. La date n'existait pas en base tant que rien n'écrivait
  * l'état ; elle y est maintenant, et la phrase la porte.
  */
-export const mentionRembourse = (moment: string): string =>
-  `Ce paiement a été remboursé le ${moment}. Le reçu reste consultable pour ta comptabilité, mais il n'atteste plus d'une somme acquise.`;
+export const mentionRembourse = (
+  moment: string,
+  partiel?: { rendu: string; paye: string },
+): string =>
+  partiel
+    ? `Ce paiement a été remboursé en partie le ${moment} : ${partiel.rendu} sur ${partiel.paye}, au prorata des analyses qui restaient dans ton pack. Le reçu reste consultable pour ta comptabilité, et l'avoir lié à ce paiement porte la somme rendue.`
+    : `Ce paiement a été remboursé le ${moment}. Le reçu reste consultable pour ta comptabilité, mais il n'atteste plus d'une somme acquise.`;
+
+/**
+ * La mention d'un reçu remboursé, partielle quand la somme rendue est
+ * inférieure au prix payé (RG-15.2). La mise en forme des montants est
+ * passée par l'appelant : le domaine ne dépend pas de l'interface.
+ */
+export const mentionRembourseDuRecu = (
+  recu: { montant: number; montantRembourse: number | null; devise: string },
+  moment: string,
+  formater: (valeur: number, devise: string) => string,
+): string =>
+  mentionRembourse(
+    moment,
+    recu.montantRembourse !== null && recu.montantRembourse < recu.montant
+      ? {
+          rendu: formater(recu.montantRembourse, recu.devise),
+          paye: formater(recu.montant, recu.devise),
+        }
+      : undefined,
+  );
 
 /** Pourquoi le renvoi est fermé sur un reçu remboursé (règle de désactivation 3). */
 export const RAISON_RENVOI_FERME =

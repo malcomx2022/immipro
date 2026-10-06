@@ -31,7 +31,13 @@ export interface DemandeDeRemboursement {
   reference: string;
   /** L'identifiant chez le fournisseur, préfixé, déjà vérifié par l'appelant. */
   providerTxId: string;
-  /** En unités majeures, comme la base les stocke. L'adaptateur convertit. */
+  /**
+   * La somme à rendre, en unités majeures — l'unité de `Transaction.amount`.
+   * L'adaptateur convertit. Elle peut porter des centimes en euros : un
+   * pack entamé se rembourse au prorata (RG-15.2), 7,20 € par exemple ; la
+   * conversion arrondit au centime, exact pour toute somme née d'un
+   * nombre entier de centimes.
+   */
   montant: number;
   devise: string;
   /** Dérivée de la référence : deux tentatives portent la même (domaine). */

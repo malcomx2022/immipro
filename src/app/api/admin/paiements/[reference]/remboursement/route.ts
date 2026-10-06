@@ -63,9 +63,12 @@ export const POST = route({
      * l'opérateur pendant que le premier appel est en cours repart avec
      * `deja_en_cours` : aucune seconde demande ne part.
      *
-     * Un pack partiellement consommé ne part pas du tout — il ouvre un
-     * écart, parce que ce que vaut une analyse déjà rendue est une
-     * question commerciale.
+     * Un pack entamé part au prorata des analyses restantes (RG-15.2),
+     * fixé sous le verrou du grand livre au retrait des droits. Sur un
+     * dossier déclaré déposé ou clos, il ne part pas du tout : il ouvre
+     * un écart, et la direction tranche. Entièrement consommé, il n'a
+     * même pas d'obligation — l'ouverture l'a refusé ci-dessus, raison
+     * comprise.
      */
     const envoi = await initierLeRemboursement(ouverture.reference);
 

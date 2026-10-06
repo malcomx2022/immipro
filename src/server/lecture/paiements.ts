@@ -9,6 +9,8 @@ import { deviseParDefaut, estDevise, getPack, type Devise } from "@/domain/payme
 import { destinationsServies } from "@/server/acces/couverture";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
 import { CODES_HORS_PACK, achatDepuisLeCode } from "@/domain/payments/achat";
+import { sommeARendre } from "@/domain/paiement/remboursement";
+import { facteurMineur, versMineur } from "@/domain/facturation/montants";
 
 /**
  * Lecture d'un reçu — $-04 et $-06.
@@ -34,6 +36,12 @@ export interface Recu {
   transactionOperateur: string | null;
   /** Quand la somme est repartie, nul tant qu'elle ne l'est pas (M.B). */
   rembourseLe: string | null;
+  /**
+   * La somme repartie, dans l'unité de `montant` — RG-15.2. Nulle tant
+   * que rien n'est reparti ; inférieure à `montant` pour un pack entamé,
+   * remboursé au prorata des analyses restantes.
+   */
+  montantRembourse: number | null;
   achat: string;
   /** Le code de l'achat, pour relancer le même sur $-05. */
   achatCode: string;
@@ -83,6 +91,12 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
     moyen: moyenDe(transaction.provider),
     transactionOperateur: transaction.providerTxId,
     rembourseLe: transaction.refundedAt?.toISOString() ?? null,
+    montantRembourse: transaction.refundedAt
+      ? sommeARendre(
+          transaction.refundAmount,
+          versMineur(transaction.amount, transaction.currency),
+        ) / facteurMineur(transaction.currency)
+      : null,
     achat: libelleDeLAchat(transaction.packCode),
     achatCode: transaction.packCode,
     montant: transaction.amount,

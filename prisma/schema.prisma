@@ -625,6 +625,20 @@ model Transaction {
   /// pas : l'opérateur qui la voit doit savoir si elle vient de la règle ou
   /// d'un geste, et lequel.
   refundBasis       String?
+  /// Ce qu'on rend, en **unités mineures** — RG-15.2, décision du 06/10/2026.
+  ///
+  /// Le franc pour le XOF, le centime pour l'EUR : un pack entamé se
+  /// rembourse au prorata des analyses restantes, et 12 € × 6 ÷ 10 ne
+  /// tombe pas sur un euro entier. `amount`, lui, reste en unités entières
+  /// de la grille (5 000 F, 12 €) ; la conversion est `versMineur`.
+  ///
+  /// Posée à l'ouverture de l'obligation, recalculée sous le verrou du
+  /// grand livre au retrait des droits, puis figée : c'est elle qui part
+  /// chez le fournisseur et qui fait le montant de l'avoir. Nulle sur les
+  /// lignes antérieures à la règle et sur une dette en revue manuelle :
+  /// nulle se lit « le montant payé », comme avant. La base exige
+  /// 0 < refundAmount ≤ montant payé, et une obligation ouverte.
+  refundAmount      Int?
 
   /// L'achat Essentiel dont part un passage à Dossier — arbitrage S.88.
   ///

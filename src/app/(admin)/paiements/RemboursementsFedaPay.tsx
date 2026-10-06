@@ -78,9 +78,21 @@ function DetteAuTableauDeBord({ dette }: { dette: DetteFedaPay }) {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-mono text-14 text-ink-900">{dette.reference}</span>
         <span className="text-13 text-ink-500">
-          {formatMontant(dette.montant, dette.devise)} · {dette.compte}
+          {formatMontant(dette.montant, dette.devise)} payés · {dette.compte}
         </span>
       </div>
+      {/* La somme exacte à saisir au tableau de bord : un pack entamé se
+          rembourse au prorata des analyses restantes (RG-15.2), et le
+          geste par défaut de FedaPay rend le prix payé. */}
+      <p className="text-14 font-medium text-ink-900">
+        À rembourser : {formatMontant(dette.montantARendre, dette.devise)}
+        {dette.montantARendre < dette.montant ? (
+          <span className="font-normal text-ink-700">
+            {" "}
+            — remboursement partiel, au prorata des analyses restantes
+          </span>
+        ) : null}
+      </p>
       <p className="text-14 font-medium text-ink-900">
         {LIBELLE_ETAPE[dette.etape]}
         {dette.referenceFournisseur ? (
@@ -105,7 +117,7 @@ function DetteAuTableauDeBord({ dette }: { dette: DetteFedaPay }) {
             value={saisie}
             onChange={(e) => setSaisie(e.target.value)}
             erreur={echec?.champs?.referenceFournisseur}
-            aide="Telle que la liste des remboursements du tableau de bord FedaPay l'affiche. Ta déclaration est tracée à ton nom dans le journal d'audit."
+            aide={`Telle que la liste des remboursements du tableau de bord FedaPay l'affiche, pour un remboursement de ${formatMontant(dette.montantARendre, dette.devise)} exactement. Ta déclaration est tracée à ton nom dans le journal d'audit.`}
           />
           <Button
             chargement={envoi}

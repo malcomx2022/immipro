@@ -88,7 +88,13 @@ export async function appliquerLaCouverture(
   prioritaire?: { applicationId: string; transactionId: string },
 ): Promise<Couverture> {
   const achats = await db.transaction.findMany({
-    where: { userId, status: "CONFIRMEE", applicationId: { not: null } },
+    /*
+      Un achat dont le remboursement est décidé ne couvre plus rien —
+      RG-15.2. Un Pro remboursé au prorata compte ses destinations non
+      ouvertes parmi les analyses restantes, donc rendues : les ouvrir
+      ensuite rendrait l'argent et le service à la fois.
+    */
+    where: { userId, status: "CONFIRMEE", applicationId: { not: null }, refundDueAt: null },
     select: { id: true, packCode: true, applicationId: true },
     orderBy: { createdAt: "asc" },
   });

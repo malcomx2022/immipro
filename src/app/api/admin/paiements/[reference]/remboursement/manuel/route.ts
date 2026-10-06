@@ -3,6 +3,7 @@ import { route } from "@/server/http/route";
 import { journaliser } from "@/server/acces/journal";
 import { declarerLeRemboursementManuel } from "@/server/acces/paiements";
 import { db } from "@/lib/db";
+import { formatMineur } from "@/domain/facturation/montants";
 
 /**
  * Déclarer un remboursement FedaPay fait au tableau de bord — B-04, S.91.
@@ -37,14 +38,19 @@ export const POST = route({
     if (declaration.issue === "declaree") {
       const transaction = await db.transaction.findUnique({
         where: { reference: params.reference! },
-        select: { id: true },
+        select: { id: true, currency: true },
       });
+      // Le montant déclaré est la somme figée à l'initiation (RG-15.2) :
+      // un remboursement partiel se relit au journal avec son chiffre.
       await journaliser({
         acteurId: acteur!.id,
         action: "paiement.remboursement.manuel",
         cible: `transaction:${transaction!.id}`,
-        motif: `Remboursement fait au tableau de bord FedaPay, référence ${declaration.referenceFournisseur}.`,
-        details: { referenceFournisseur: declaration.referenceFournisseur },
+        motif: `Remboursement fait au tableau de bord FedaPay, référence ${declaration.referenceFournisseur}, pour ${formatMineur(declaration.montantMineur, transaction!.currency)}.`,
+        details: {
+          referenceFournisseur: declaration.referenceFournisseur,
+          montantMineur: declaration.montantMineur,
+        },
       });
     }
 

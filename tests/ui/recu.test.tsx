@@ -23,6 +23,7 @@ const PAYE: Donnees = {
   moyen: "Mobile Money",
   transactionOperateur: "MP260911.0943",
   rembourseLe: null,
+  montantRembourse: null,
   achat: "Dossier",
   achatCode: "dossier",
   montant: 25_000,
@@ -144,6 +145,28 @@ describe("$-06 — les états où il n'y a pas de reçu", () => {
     expect(container.textContent).toContain("remboursé le 14 septembre 2026, 11 h 12");
     // La date du paiement reste celle du paiement : les deux se lisent.
     expect(container.textContent).toContain("11 septembre 2026, 10 h 43");
+  });
+
+  /**
+   * RG-15.2 — un pack entamé se rembourse au prorata des analyses
+   * restantes. Le total remboursé est la somme revenue, pas le prix payé,
+   * et la mention dit les deux.
+   */
+  it("un remboursement partiel montre la somme rendue, et le prix payé à côté", () => {
+    const { container } = render(
+      <Recu
+        recu={{
+          ...PAYE,
+          etat: "rembourse",
+          rembourseLe: "2026-09-14T10:12:00.000Z",
+          montantRembourse: 15_000,
+        }}
+      />,
+    );
+    const texte = container.textContent?.replace(/\s/gu, " ") ?? "";
+    expect(texte).toContain("Total remboursé15 000 F");
+    expect(texte).toContain("remboursé en partie le 14 septembre 2026, 11 h 12 : 15 000 F sur 25 000 F");
+    expect(texte).toContain("au prorata des analyses qui restaient");
   });
 });
 

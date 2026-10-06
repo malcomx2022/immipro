@@ -140,7 +140,15 @@ let rang = 0;
 
 /** Un candidat, son dossier, et une transaction confirmée et remboursable. */
 async function candidatPaye(
-  options: { analyses?: number; providerTxId?: string | null; fedapay?: boolean } = {},
+  options: {
+    analyses?: number;
+    providerTxId?: string | null;
+    fedapay?: boolean;
+    /** Analyses consommées avant l'ouverture de la dette (RG-15.2). */
+    consommees?: number;
+    /** Le dossier est déclaré déposé avant l'ouverture (RG-15.2). */
+    depose?: boolean;
+  } = {},
 ) {
   rang += 1;
   const user = await db.user.create({
@@ -194,8 +202,16 @@ async function candidatPaye(
       note: "Pack Dossier",
     });
   }
-  await ouvrirUnRemboursement(transaction.id, "Geste de support — essai de fumée");
-  return { user, application, transaction };
+  for (let n = 0; n < (options.consommees ?? 0); n += 1) await debiterUneAnalyse(application.id);
+  if (options.depose) {
+    const maintenant = new Date();
+    await db.application.update({
+      where: { id: application.id },
+      data: { status: "SOUMIS", submittedAt: maintenant, depositedOn: maintenant },
+    });
+  }
+  const ouverture = await ouvrirUnRemboursement(transaction.id, "Geste de support — essai de fumée");
+  return { user, application, transaction, ouverture };
 }
 
 const solde = async (applicationId: string): Promise<number> => {
@@ -377,11 +393,135 @@ try {
     verifier(rembourseur.demandes.length === 0, "et rien ne part vers un paiement étranger");
   }
 
-  // ── 7. Le pack partiellement consommé ───────────────────────────────
-  console.log("\nPack partiellement consommé");
+  // ── 7. Le pack entamé — RG-15.2, décision du 06/10/2026 ───────────
+  console.log("\nPack entamé : remboursé au prorata des analyses restantes (RG-15.2)");
   {
+    /*
+      a. Entamé après l'ouverture : la somme se refixe sous le verrou.
+      Le pack « dossier » de la fumée est payé 29 € pour 30 analyses.
+      Ouverte intacte, la dette porte le prix entier ; une analyse
+      consommée avant l'envoi la fait passer à 29 € × 29 ÷ 30 = 28,0333…
+      € → 28,03 €, arrondi au centime inférieur. C'est cette somme, et
+      non celle de l'ouverture, qui part chez Stripe.
+    */
     const { application, transaction } = await candidatPaye({ analyses: 30 });
+    const ouverte = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(ouverte.refundAmount === 2900, `ouverte intacte, la dette porte le prix entier (${ouverte.refundAmount})`);
     await debiterUneAnalyse(application.id);
+
+    const montants: number[] = [];
+    const rembourseur = rembourseurSimule([acceptee()]);
+    const enregistrer = rembourseur.demander.bind(rembourseur);
+    rembourseur.demander = async (demande) => {
+      montants.push(demande.montant);
+      return enregistrer(demande);
+    };
+    const issue = await initierLeRemboursement(transaction.reference, rembourseur);
+    verifier(issue.issue === "acceptee", `le prorata part sans revue manuelle (${issue.issue})`);
+    verifier(
+      montants.length === 1 && Math.round(montants[0]! * 100) === 2803,
+      `la demande porte 28,03 €, et non 29 € (${montants.join(", ")})`,
+    );
+    const apres = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(apres.refundAmount === 2803, `la somme figée est en centimes (${apres.refundAmount})`);
+    verifier(apres.discrepancy === null, "aucun écart : il n'y a rien à trancher");
+    verifier((await solde(application.id)) === 0, "les 29 analyses restantes sont retirées");
+
+    // Le rejeu ne refixe rien : les droits sont partis avec la somme.
+    await initierLeRemboursement(transaction.reference, rembourseurSimule([acceptee()]));
+    verifier(
+      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } })).refundAmount === 2803,
+      "une reprise ne change pas la somme",
+    );
+
+    // La notification signée solde la dette partielle comme une autre.
+    const retour = await appliquerLaNotification({
+      providerEventId: `stripe:evt_prorata_${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "REMBOURSEE",
+    });
+    const soldee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(
+      retour.issue === "appliquee" && soldee.status === "REMBOURSEE" && soldee.refundedAt !== null,
+      `un remboursement partiel finit REMBOURSEE, daté (${retour.issue})`,
+    );
+    const avoir = await db.invoice.findFirst({ where: { transactionId: transaction.id, kind: "AVOIR" } });
+    const facture = await db.invoice.findFirst({ where: { transactionId: transaction.id, kind: "FACTURE" } });
+    verifier(
+      avoir !== null && facture !== null && avoir.originId === facture.id,
+      "l'avoir est émis et cite la facture d'origine",
+    );
+    verifier(
+      avoir?.amountIncl === 2803 && facture?.amountIncl === 2900,
+      `l'avoir porte la somme rendue, la facture le prix payé (${avoir?.amountIncl} / ${facture?.amountIncl})`,
+    );
+    verifier(
+      avoir?.amountInWords === "vingt-huit euros et trois centimes",
+      `sa somme en lettres suit (${avoir?.amountInWords})`,
+    );
+    verifier(
+      (avoir?.designation ?? "").startsWith("Remboursement partiel de la facture"),
+      "et sa désignation le dit partiel",
+    );
+  }
+  {
+    // b. L'exemple de la décision, en francs : 5 000 F, 10 analyses, 4 consommées.
+    rang += 1;
+    const user = await db.user.create({
+      data: { email: `fumee-r-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    // La règle d'un dossier précédent : seule compte ici la grille.
+    const regle = await db.visaRule.findFirstOrThrow({ select: { id: true } });
+    const application = await db.application.create({
+      data: { userId: user.id, visaRuleId: regle.id, status: "ACTIF" },
+    });
+    const transaction = await db.transaction.create({
+      data: {
+        reference: `IMP-261006-${String(rang).padStart(6, "0")}`,
+        userId: user.id,
+        applicationId: application.id,
+        packCode: "essentiel",
+        amount: 5000,
+        currency: "XOF",
+        provider: "FEDAPAY",
+        status: "CONFIRMEE",
+        confirmedAt: new Date(),
+        providerTxId: `fedapay:${rang}${process.pid}`,
+      },
+    });
+    await ouvrirDuQuota({
+      applicationId: application.id,
+      analyses: 10,
+      motif: "ACHAT_PACK",
+      transactionId: transaction.id,
+      note: "Pack Essentiel",
+    });
+    for (let n = 0; n < 4; n += 1) await debiterUneAnalyse(application.id);
+    const ouverture = await ouvrirUnRemboursement(transaction.id, "Geste de support — prorata");
+    const ouverte = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(ouverture.ouvert && ouverte.refundAmount === 3000, `l'obligation porte 3 000 F (${ouverte.refundAmount})`);
+    const envoi = await initierLeRemboursement(transaction.reference, remboursementFedaPay());
+    verifier(envoi.issue === "procedure_manuelle", `FedaPay : procédure manuelle (${envoi.issue})`);
+    const initiee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(
+      (initiee.discrepancy ?? "")
+        .replace(/\s/gu, " ")
+        .includes("Montant à rembourser : 3 000 F CFA sur 5 000 F CFA payés"),
+      "l'écart dit la somme exacte à rembourser au tableau de bord",
+    );
+    const dette = (await dettesFedaPay()).find((d) => d.reference === transaction.reference);
+    verifier(
+      dette?.montant === 5000 && dette.montantARendre === 3000,
+      `B-04 montre 3 000 F à rendre sur 5 000 F payés (${dette?.montantARendre})`,
+    );
+    verifier((await solde(application.id)) === 0, "les 6 analyses restantes sont retirées");
+  }
+  {
+    // c. Dossier déclaré déposé : la règle d'avant, la revue manuelle.
+    const { application, transaction } = await candidatPaye({ analyses: 30, consommees: 1, depose: true });
+    const ouverte = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(ouverte.refundDueAt !== null && ouverte.refundAmount === null, "l'obligation s'ouvre sans montant fixé");
     const rembourseur = rembourseurSimule([acceptee()]);
 
     const issue = await initierLeRemboursement(transaction.reference, rembourseur);
@@ -392,8 +532,9 @@ try {
     const apres = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
     verifier(apres.refundAttempts === 0, "aucune tentative n'est comptée");
     verifier(
-      (apres.discrepancy ?? "").includes("à trancher à la main"),
-      "l'écart porte la question à un humain",
+      (apres.discrepancy ?? "").includes("déclaré déposé") &&
+        (apres.discrepancy ?? "").includes("À trancher à la main"),
+      "l'écart porte la question à un humain, et dit pourquoi",
     );
     verifier(
       (await db.analysisCredit.count({
@@ -402,6 +543,33 @@ try {
       "et aucun droit n'est retiré : le solde du candidat ne bouge pas",
     );
     verifier((await solde(application.id)) === 29, `le solde reste celui qu'il était (29)`);
+  }
+  {
+    // d. Tout consommé : aucune obligation, et la raison le dit.
+    const { transaction, ouverture } = await candidatPaye({ analyses: 30, consommees: 30 });
+    verifier(
+      !ouverture.ouvert && /ont toutes été consommées/u.test(ouverture.raison),
+      `rien à rendre : l'obligation ne s'ouvre pas (${ouverture.ouvert ? "ouverte" : ouverture.raison})`,
+    );
+    const lue = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    verifier(lue.refundDueAt === null && lue.refundAmount === null, "et rien n'est écrit");
+  }
+  {
+    // e. La base refuse une somme supérieure au paiement, nulle, ou sans obligation.
+    const { transaction } = await candidatPaye({ analyses: 30 });
+    const trop = await db.transaction
+      .update({ where: { id: transaction.id }, data: { refundAmount: 2901 } })
+      .then(() => true, () => false);
+    verifier(!trop, "la base refuse de rendre plus que le paiement");
+    const nulle = await db.transaction
+      .update({ where: { id: transaction.id }, data: { refundAmount: 0 } })
+      .then(() => true, () => false);
+    verifier(!nulle, "et une somme nulle");
+    const { transaction: sansDette } = await candidatPaye({ analyses: 30, consommees: 30 });
+    const orpheline = await db.transaction
+      .update({ where: { id: sansDette.id }, data: { refundAmount: 100 } })
+      .then(() => true, () => false);
+    verifier(!orpheline, "et une somme sans obligation");
   }
 
   // ── 8. La passe reprend ce que le premier envoi n'a pas emporté ─────

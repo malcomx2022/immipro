@@ -67,6 +67,12 @@ export interface Paiement {
   /** Pourquoi un remboursement est dû, quand il l'est (K.C). */
   motifDuRemboursement?: string;
   /**
+   * Ce qui est rendu ou à rendre, dans l'unité de `montant` — RG-15.2.
+   * Présent dès qu'un remboursement est dû ou fait ; inférieur à
+   * `montant` pour un pack entamé, remboursé au prorata.
+   */
+  montantRembourse?: number;
+  /**
    * L'écart, et sa résolution si elle a eu lieu — arbitrage du 21/09/2026.
    *
    * Les deux voyagent ensemble parce que l'un ne se lit pas sans l'autre :
@@ -112,11 +118,24 @@ export interface EtatOperateur {
  */
 export type Totaux = Record<string, number>;
 
-const parDevise = (paiements: readonly Paiement[]): Totaux => {
+const parDevise = (
+  paiements: readonly Paiement[],
+  montant: (p: Paiement) => number = (p) => p.montant,
+): Totaux => {
   const totaux: Totaux = {};
-  for (const p of paiements) totaux[p.devise] = (totaux[p.devise] ?? 0) + p.montant;
+  for (const p of paiements) totaux[p.devise] = arrondiAuCentime((totaux[p.devise] ?? 0) + montant(p));
   return totaux;
 };
+
+/** Un prorata en euros porte des centimes : 7,2 + 0,1 ne doit pas devenir 7,300000000000001. */
+const arrondiAuCentime = (n: number): number => Math.round(n * 100) / 100;
+
+/** Ce que B-04 écrit sous un remboursement partiel, montants déjà mis en forme. */
+export const libelleRemboursementPartiel = (rendu: string, paye: string, verse: boolean): string =>
+  `${rendu} ${verse ? "rendus" : "à rendre"} sur ${paye} payés, au prorata des analyses restantes`;
+
+/** La somme rendue, ou à rendre (RG-15.2) — le prix payé à défaut. */
+export const sommeRendue = (p: Paiement): number => p.montantRembourse ?? p.montant;
 
 /**
  * Ce qu'une carte affiche : une ligne par monnaie, et « 0 » dans la monnaie
@@ -175,9 +194,9 @@ export function agreger(paiements: readonly Paiement[]): Agregats {
     echecs: paiements.filter(estEnEchec).length,
     ecarts: paiements.filter((p) => p.etat === "ECART").length,
     rembourses: rendus.length,
-    rembourse: parDevise(rendus),
+    rembourse: parDevise(rendus, sommeRendue),
     remboursementsDus: dus.length,
-    remboursementDu: parDevise(dus),
+    remboursementDu: parDevise(dus, sommeRendue),
   };
 }
 
@@ -246,6 +265,9 @@ export const COLONNES_GRAND_LIVRE: readonly string[] = [
   "Cause du refus",
   "Constat d'écart",
   "Issue de l'écart",
+  // RG-15.2 : un pack entamé ne rend pas ce qu'il a coûté. Vide quand
+  // aucun remboursement n'est dû ni fait.
+  "Montant remboursé",
 ];
 
 export const ATTESTATION_TOTAL_SUSPENDU =
@@ -345,6 +367,9 @@ export const ligneDuGrandLivre = (p: Paiement): readonly Cellule[] => [
   texte(p.cause ? LIBELLE_CAUSE[p.cause] : ""),
   texte(p.ecart?.constat ?? ""),
   texte(p.ecart?.resolution ? LIBELLE_ISSUE[p.ecart.resolution.issue] : ""),
+  p.montantRembourse === undefined
+    ? vide
+    : nombre(p.montantRembourse, p.devise === "EUR" ? 2 : 0),
 ];
 
 export function exportDuGrandLivre(
