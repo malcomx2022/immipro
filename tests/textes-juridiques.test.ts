@@ -116,6 +116,15 @@ describe("le rendu", () => {
     expect(items).toContain("Stripe, paiements par carte");
   });
 
+  it("la page « Données personnelles » dit que le statut des pièces est automatique, et ce que devient une pièce illisible (06/10/2026)", () => {
+    const rendu = rendre(MODELES["donnees-personnelles"], COMPLETES);
+    const items = rendu.blocs.flatMap((b) => (b.type === "liste" ? b.items : []));
+    expect(items.some((i) => /statut de chaque pièce.*établi automatiquement.*ne se prononce pas sur la décision de l'administration/u.test(i))).toBe(true);
+    expect(items).toContain("Une pièce que le service ne parvient pas à lire est examinée par un membre de l'équipe.");
+    // Le délai de revue est une cible interne : il ne devient pas un engagement publié.
+    expect(items.some((i) => /\b4 ?h|heures/u.test(i))).toBe(false);
+  });
+
   it("la grille des prix est celle que l'écran de paiement facture", () => {
     const grille = variablesDuProduit().grille_des_prix!;
     for (const pack of PACKS) {

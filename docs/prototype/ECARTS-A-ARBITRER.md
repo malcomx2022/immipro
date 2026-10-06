@@ -11380,3 +11380,22 @@ Personne ne l'a vérifié, et la documentation lue le 22/09 n'en dit rien. Deux 
 1. Écrire `AI_PIECES_SOUS_TRAITANT_AUTORISE=openai_compatible` dans `.env.app`.
 2. Recréer `app` et `worker`.
 3. Mettre à jour `/donnees-personnelles` (`docs/IA-fournisseurs.md`, étape 3). Cette étape ne se fait qu'une fois la décision de conformité prise.
+
+## S.119 — « Données personnelles » : statut automatique des pièces et revue humaine
+
+**Relevé le 06/10/2026**, en préparant la mention du nouveau sous-traitant IA (Gemini 3.8 Flash sur Vertex AI). Le texte proposé pour `/donnees-personnelles` affirmait trois choses que le code ne tient pas telles quelles.
+
+- **« Aucune décision n'est prise sur le seul fondement du traitement automatisé. »** Inexact. Le modèle lit la pièce, puis des règles fixes lui attribuent, sans intervention humaine, un statut : conforme, à corriger, expirée… (`domain/dossiers/verification.ts`). Ce statut ne se prononce pas sur la décision de l'administration, mais il est automatique. Le modèle le dit maintenant. La qualification juridique (décision automatisée ou non) revient au juriste.
+- **« Les pièces ne sont transmises à Google que le temps du traitement. »** Elle dépend du contrat Vertex AI et relève de la variable `ia_conservation` (« selon le contrat souscrit »). Le modèle n'est pas modifié sur ce point.
+- **« Examinée sous un délai cible de 4 heures. »** C'est une cible interne. Publiée, elle deviendrait un engagement. Le modèle dit seulement qu'une pièce illisible est examinée par un membre de l'équipe, et un test vérifie qu'aucun délai n'y figure.
+
+**Ce qui change :** deux éléments sont ajoutés à la section 4 du modèle « Données personnelles », avec un test dans `tests/textes-juridiques.test.ts`. Aucune version n'étant encore validée, aucune page publiée ne passe en « à revalider ».
+
+**Reste à saisir dans `/textes-juridiques` avant publication :**
+- `sous_traitants` : Google Cloud (Vertex AI, Gemini 3.8 Flash), lecture des pièces **et** rédaction assistée, point d'accès `europe-west1` (Belgique) ;
+- `transferts` : encadrement et formalités APDP, à rédiger par le juriste ;
+- `ia_conservation` : à recopier du contrat ;
+- `email_donnees` ;
+- toutes les autres variables obligatoires.
+
+Viennent ensuite la relecture et la validation. La rédaction passe aussi par Gemini : Google reçoit donc les réponses à l'entretien et les lettres, pas seulement les pièces.
