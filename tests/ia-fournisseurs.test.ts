@@ -98,6 +98,17 @@ describe("le domaine choisit, et ne devine rien", () => {
     expect(redaction).toMatchObject({ branche: true, raison: null });
   });
 
+  it("une autorisation écrite « oui » est refusée, et l'écran dit quel code écrire (06/10/2026)", () => {
+    expect(piecesAutoriseesChez({ AI_PIECES_SOUS_TRAITANT_AUTORISE: "oui" }, "openai_compatible")).toBe(false);
+    const [lecture] = etatDesFonctions({
+      ...COMPATIBLE,
+      AI_FOURNISSEUR_EXTRACTION: "openai_compatible",
+      AI_PIECES_SOUS_TRAITANT_AUTORISE: "oui",
+    });
+    expect(lecture).toMatchObject({ branche: false });
+    expect(lecture!.raison).toMatch(/vaut « oui ».*code du sous-traitant autorisé, ici openai_compatible/u);
+  });
+
   it("le PDF n'est lu par le fournisseur compatible que sur déclaration", () => {
     expect(litLesPdf({}, "anthropic")).toBe(true);
     expect(litLesPdf({}, "openai_compatible")).toBe(false);

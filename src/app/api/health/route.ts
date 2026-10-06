@@ -8,6 +8,7 @@ import {
   surveillanceRemboursementManuel,
 } from "@/domain/exploitation/dependances";
 import { constaterLesDependances } from "@/server/exploitation/capacites";
+import { etatDesFonctions } from "@/domain/ia/fournisseurs";
 import { fournisseursDeclares } from "@/domain/payments/rail";
 import { CLE_FOURNISSEURS, espaceReel, fournisseursActifs } from "@/server/paiement/secrets";
 import { etatDeLaFacturation, regimeDeLExploitant } from "@/server/facturation/emission";
@@ -351,6 +352,11 @@ export async function GET() {
       : c,
   );
   const capacites = etatDesCapacites(constats);
+  // Seulement pour une fonction non branchée : une raison n'a rien à dire
+  // d'une fonction qui tourne.
+  const raisonsIA = new Map<string, string>(
+    etatDesFonctions(process.env).flatMap((f) => (f.raison ? [[f.fonction, f.raison] as const] : [])),
+  );
 
   /*
     La facturation — avis comptable M.C du 04/10/2026. En bac à sable,
@@ -419,7 +425,7 @@ export async function GET() {
         };
       })(),
       dependances: Object.fromEntries(
-        constats.map((c) => [
+        constats.map((c) => [c, raisonsIA.get(c.cle)] as const).map(([c, raison]) => [
           c.cle,
           {
             intitule: intitules.get(c.cle),
@@ -431,6 +437,14 @@ export async function GET() {
             adaptateur: c.observation.adaptateur,
             configuree: c.observation.configuree,
             sonde: c.observation.sonde,
+            /*
+              Pourquoi la lecture ou la rédaction n'est pas branchée — 06/10.
+              « Configuration absente » ne disait pas laquelle des variables
+              manquait : une autorisation écrite `oui` au lieu du code du
+              sous-traitant se cherchait dans le paquet compilé. La raison
+              est celle de B-07, sans aucune valeur secrète.
+            */
+            ...(raison ? { raison } : {}),
           },
         ]),
       ),
