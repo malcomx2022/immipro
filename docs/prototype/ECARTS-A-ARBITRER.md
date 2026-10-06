@@ -11399,3 +11399,13 @@ Personne ne l'a vérifié, et la documentation lue le 22/09 n'en dit rien. Deux 
 - toutes les autres variables obligatoires.
 
 Viennent ensuite la relecture et la validation. La rédaction passe aussi par Gemini : Google reçoit donc les réponses à l'entretien et les lettres, pas seulement les pièces.
+
+## S.123 — « Choisir un pack » sur /tarifs menait à l'inscription même connecté
+
+Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/2026, dans le cadre de l'autonomie de développement donnée ce jour-là.
+
+**Décision.** Une personne connectée va à l'ouverture de dossier, comme depuis une fiche destination. Le pack se choisit au récapitulatif d'un dossier ouvert.
+
+**Comment.** `/tarifs` reste statique (Q.B, `tests/plan-du-site.test.ts`) et ne lit pas la session. Le lien porte donc `/inscription?suite=%2Fdossiers%2Fnouveau`. L'inscription, déjà rendue à la demande, fait le tri :
+- une personne connectée est renvoyée vers la suite demandée, filtrée par `suiteInterne` (aucune adresse externe), sinon vers son tableau de bord ;
+- un visiteur voit l'inscription, comme avant.

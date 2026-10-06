@@ -96,7 +96,9 @@ export function Tarifs() {
             libelle={pack.libelle}
             prix={prix(pack.prix)}
             action={`Choisir ${pack.libelle}`}
-            href="/inscription"
+            // Connecté, l'inscription renvoie à l'ouverture de dossier,
+            // où le pack se choisit ; la page reste statique (Q.B).
+            href="/inscription?suite=%2Fdossiers%2Fnouveau"
             principal={pack.misEnAvant}
             misEnAvant={pack.misEnAvant}
             justification={pack.justification}
