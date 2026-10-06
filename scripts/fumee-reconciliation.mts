@@ -503,6 +503,49 @@ try {
     );
     verifier(await solde(applicationId) === servi, "et le quota ne bouge pas");
   }
+
+  /*
+    S.122 — la passe lancée à la main (B-04) et celle du worker passent par
+    le même verrou. On en tient un autre exemplaire dans une transaction
+    ouverte : la passe ne doit alors rien faire et rendre `null`, puis
+    redevenir possible dès que le verrou est relâché.
+  */
+  console.log("\nPasse sans recouvrement (verrou consultatif)");
+  {
+    const { reconcilierSansRecouvrement, CLE_DU_VERROU_DE_RECONCILIATION } = await import(
+      "../src/server/jobs/reconciliation"
+    );
+    const libre = await reconcilierSansRecouvrement(new Date(), () => null);
+    verifier(libre !== null, "sans autre passe, elle s'exécute et rend un bilan");
+    verifier(
+      libre !== null && libre.indisponibles === libre.examinees,
+      "sans consultant, toute transaction examinée est comptée indisponible",
+    );
+
+    let relacher: () => void = () => {};
+    const tenu = new Promise<void>((fin) => {
+      relacher = fin;
+    });
+    let verrouPose: () => void = () => {};
+    const pose = new Promise<void>((fin) => {
+      verrouPose = fin;
+    });
+    const autrePasse = db.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${CLE_DU_VERROU_DE_RECONCILIATION}, 0))`;
+        verrouPose();
+        await tenu;
+      },
+      { timeout: 30_000 },
+    );
+    await pose;
+    const bloquee = await reconcilierSansRecouvrement(new Date(), () => null);
+    verifier(bloquee === null, "pendant qu'une autre passe tient le verrou, elle rend null sans rien faire");
+    relacher();
+    await autrePasse;
+    const reprise = await reconcilierSansRecouvrement(new Date(), () => null);
+    verifier(reprise !== null, "le verrou relâché, la passe suivante s'exécute");
+  }
 } finally {
   await db.$disconnect().catch(() => {});
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);

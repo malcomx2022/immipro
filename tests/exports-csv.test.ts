@@ -311,9 +311,8 @@ describe("B-04 — le grand livre ne présente jamais un total partiel", () => {
     expect(nomDuGrandLivre("2026-09-21")).toBe("immipro-grand-livre-2026-09-21.csv");
   });
 
-  it("nomme ce qui manque au rapprochement manuel retiré", () => {
-    expect(COMMANDES_ATTENDUES_B04).toHaveLength(1);
-    expect(COMMANDES_ATTENDUES_B04[0]!.manque).toContain("interrogation");
+  it("le rapprochement manuel est rétabli : plus rien n'est attendu en B-04 (S.122)", () => {
+    expect(COMMANDES_ATTENDUES_B04).toHaveLength(0);
   });
 });
 
@@ -373,10 +372,12 @@ describe("un export n'est jamais plafonné", () => {
  * coup, un export qui échoue à l'écriture du fichier ne laisserait aucune
  * trace — et c'est celui-là qu'on voudrait voir.
  */
-describe("les deux exports sont des accès en gros", () => {
+describe("les trois exports sont des accès en gros", () => {
   const ROUTES = [
     "src/app/api/admin/journal/export/route.ts",
     "src/app/api/admin/paiements/export/route.ts",
+    // S.122 — le détail des appels IA de B-07.
+    "src/app/api/admin/couts-ia/export/route.ts",
   ];
 
   /**

@@ -24,6 +24,7 @@ import {
   type Metrique,
 } from "@/domain/backoffice/couts";
 import { jourEnFrancais } from "@/domain/format/moment";
+import { ExportDesAppels } from "./ExportDesAppels";
 import {
   FOURNISSEURS,
   MENTION_CHOIX_DU_FOURNISSEUR,
@@ -49,13 +50,14 @@ import {
  * s'affichent, et l'histogramme les porte. Le coût se tarife — il attend son
  * tarif, et son absence est nommée plutôt que remplie d'un zéro.
  *
- * ── Les deux commandes retirées ────────────────────────────────────────
+ * ── Une commande rétablie, une commande toujours retirée ───────────────
  *
  * « Modifier les plafonds » et « Exporter le détail des appels » n'étaient
- * reliées à rien. La règle de Q.A vaut ici comme ailleurs. La première pose
- * une question de fond, consignée dans `COMMANDES_ATTENDUES` : un plafond
- * réglable depuis un écran est un plafond qu'on relève le jour où il gêne,
- * c'est-à-dire le jour où il sert.
+ * reliées à rien. La seconde est rétablie (S.122) : `ExportDesAppels` écrit
+ * un vrai fichier, journalisé. La première reste retirée et consignée dans
+ * `COMMANDES_ATTENDUES`, parce qu'elle pose une question de fond : un
+ * plafond réglable depuis un écran est un plafond qu'on relève le jour où
+ * il gêne, c'est-à-dire le jour où il sert.
  */
 export interface CoutsIaProps {
   metriques: readonly Metrique[];
@@ -69,6 +71,8 @@ export interface CoutsIaProps {
   fonctions?: readonly EtatDeLaFonction[];
   /** La consommation par fournisseur et par modèle (S.94). */
   parFournisseur?: readonly ConsommationDuFournisseur[];
+  /** La période proposée à l'export : celle de l'histogramme, jours civils ISO. */
+  periodeExport?: { du: string; au: string };
 }
 
 export function CoutsIa({
@@ -78,6 +82,7 @@ export function CoutsIa({
   tarife,
   fonctions = [],
   parFournisseur = [],
+  periodeExport,
 }: CoutsIaProps) {
   const vide = aucuneMesure(metriques);
   const sansAppel = serieVide(serie);
@@ -119,6 +124,11 @@ export function CoutsIa({
         )}
 
         <FournisseursIA fonctions={fonctions} parFournisseur={parFournisseur} />
+
+        {/* Sans période proposée, pas d'export : le serveur la fournit toujours. */}
+        {periodeExport ? (
+          <ExportDesAppels duParDefaut={periodeExport.du} auParDefaut={periodeExport.au} />
+        ) : null}
 
         <div className="grid grid-cols-5 gap-3">
           {metriques.map((m) => (

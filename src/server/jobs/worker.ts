@@ -15,7 +15,7 @@ import { depublierLesFichesEchues } from "./veille";
 import { declasserLesPiecesEchues } from "./peremption";
 import { envoyerLesRappels } from "./rappels";
 import { relancerLesDepots } from "./suivi-depot";
-import { reconcilierLesPaiements } from "./reconciliation";
+import { reconcilierSansRecouvrement } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
 import { reprendreLesQuarantaines } from "./quarantaine";
@@ -109,7 +109,13 @@ async function main() {
   );
 
   await boss.work(JOBS.RECONCILIATION_PAIEMENT, async () => {
-    const bilan = await reconcilierLesPaiements();
+    // Le même verrou que l'action de B-04 (S.122) : une passe lancée à la
+    // main et celle du quart d'heure ne se recouvrent pas.
+    const bilan = await reconcilierSansRecouvrement();
+    if (bilan === null) {
+      console.info("[reconciliation] passe ignorée : une autre passe est en cours");
+      return;
+    }
     console.info("[reconciliation]", bilan);
   });
 

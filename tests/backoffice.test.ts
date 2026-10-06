@@ -923,7 +923,9 @@ describe("B-07 — coûts IA, livré vide", () => {
   // ── Les commandes retirées ───────────────────────────────────────────
 
   it("nomme ce qui manque à chaque commande retirée", () => {
-    expect(COMMANDES_ATTENDUES).toHaveLength(2);
+    // S.122 : « Exporter le détail des appels » est rétablie, il ne reste
+    // que « Modifier les plafonds », qui attend un arbitrage.
+    expect(COMMANDES_ATTENDUES).toHaveLength(1);
     for (const c of COMMANDES_ATTENDUES) {
       expect(c.manque.length, c.cle).toBeGreaterThan(20);
       expect(c.libelle.length, c.cle).toBeGreaterThan(5);

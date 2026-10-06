@@ -74,6 +74,7 @@ export default async function PageCoutsIa() {
       tarife={devise !== null}
       fonctions={etatDesFonctions(process.env)}
       parFournisseur={parFournisseur}
+      periodeExport={{ du: jourCivil(depuis), au: jourCivil(aujourdhui) }}
     />
   );
 }

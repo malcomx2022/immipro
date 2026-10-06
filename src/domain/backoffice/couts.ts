@@ -589,12 +589,16 @@ export const DOSSIERS_POUR_MESURER = 10;
 // ── Ce que l'écran ne peut pas faire ───────────────────────────────────
 
 /**
- * Les deux commandes qui étaient à l'écran sans être reliées à rien.
+ * Ce que B-07 ne peut pas faire.
  *
- * Même registre qu'`ACTIONS_ATTENDUES` en B-03 : les retirer sans les
- * nommer ferait disparaître le besoin avec le bouton. La différence tient
- * à la première — elle ne manque pas d'une route, elle demande qu'on
- * décide si elle doit exister.
+ * Elles étaient deux, à l'écran sans être reliées à rien. « Exporter le
+ * détail des appels » est rétablie (S.122, `appels-ia.ts`) ; reste
+ * « Modifier les plafonds ».
+ *
+ * Même registre qu'`ACTIONS_ATTENDUES` en B-03 : la retirer sans la
+ * nommer ferait disparaître le besoin avec le bouton. Elle ne manque pas
+ * d'une route, elle demande qu'on décide si elle doit exister — et cette
+ * décision attend l'arbitrage.
  */
 export interface CommandeAttendue {
   cle: string;
@@ -617,11 +621,5 @@ export const COMMANDES_ATTENDUES: readonly CommandeAttendue[] = [
      */
     manque:
       "un arbitrage : lesquels de ces seuils sont des réglages, et lesquels restent des règles de gestion",
-  },
-  {
-    cle: "exporter-appels",
-    libelle: "Exporter le détail des appels",
-    // Comme en B-04 et B-06 : aucun code d'export dans le dépôt.
-    manque: "un écrivain de fichier ; aucun export n'existe dans le produit",
   },
 ];
