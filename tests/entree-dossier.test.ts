@@ -28,7 +28,14 @@ describe("Entrée dans un dossier depuis les pages publiques", () => {
     expect(source).toContain("lienOuvrirUnDossier(");
   });
 
-  it("les deux pages lisent la session côté serveur", () => {
+  it("les tarifs restent statiques : l'inscription renvoie une personne connectée à l'ouverture de dossier (06/10/2026)", () => {
+    expect(readFileSync("src/app/(public)/tarifs/Tarifs.tsx", "utf8")).toContain('href="/inscription?suite=%2Fdossiers%2Fnouveau"');
+    const inscription = readFileSync("src/app/(auth)/inscription/page.tsx", "utf8");
+    expect(inscription).toContain("acteurCourant()");
+    expect(inscription).toMatch(/redirect\(suiteInterne\(/u);
+  });
+
+  it("les pages lisent la session côté serveur", () => {
     for (const chemin of [
       "src/app/(public)/resultats/page.tsx",
       "src/app/(public)/destinations/[slug]/page.tsx",
