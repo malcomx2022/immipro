@@ -304,9 +304,18 @@ export function etatDesFonctions(env: Environnement): readonly EtatDeLaFonction[
     }
     const code = choix.fournisseur;
     const manque = manqueDuFournisseur(env, code);
+    /*
+      La valeur écrite est citée quand elle n'est pas le code — 06/10/2026.
+      `oui` posé en production laissait la lecture non branchée, et rien ne
+      disait que la variable attend le **code** du sous-traitant autorisé :
+      un « oui » ne dit pas lequel, et une autorisation doit le dire.
+    */
+    const ecrite = lire(env, VARIABLE_AUTORISATION_PIECES);
     const interdit =
       fonction === "extraction" && !piecesAutoriseesChez(env, code)
-        ? `les pièces d'identité ne partent chez ${FOURNISSEURS[code].libelle} qu'une fois la sous-traitance tranchée : ${VARIABLE_AUTORISATION_PIECES}=${code}, posée par qui a validé la conformité`
+        ? ecrite === ""
+          ? `les pièces d'identité ne partent chez ${FOURNISSEURS[code].libelle} qu'une fois la sous-traitance tranchée : ${VARIABLE_AUTORISATION_PIECES}=${code}, posée par qui a validé la conformité`
+          : `${VARIABLE_AUTORISATION_PIECES} vaut « ${ecrite} » : elle attend le code du sous-traitant autorisé, ici ${code}, et non une approbation générale`
         : null;
     const raison = manque ?? interdit;
     return {

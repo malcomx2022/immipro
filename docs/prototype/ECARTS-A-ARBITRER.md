@@ -11358,3 +11358,25 @@ Personne ne l'a vérifié, et la documentation lue le 22/09 n'en dit rien. Deux 
 - **Possible aussi en production.** Chaque occurrence ferait un candidat débité sans pack, puis un remboursement manuel, sur un rail qui n'a pas d'API de remboursement. L'autre voie serait d'accepter une approbation **signée** sur une transaction refusée **par le fournisseur**, mais jamais sur une transaction expirée par la plateforme, et d'ouvrir alors le pack. INV-7 reste tenu, puisque seule la parole signée du fournisseur fait bouger l'état. La table des transitions change toutefois, et il faut retirer la cause d'échec.
 
 **Qui** : Direction, après réponse du support FedaPay. **Pour le pilote**, le fonctionnement actuel suffit.
+
+## S.118 — Extraction IA non reconnue en production : l'autorisation attendait un code, pas « oui »
+
+**Relevé le 06/10/2026.** Gemini 3.8 Flash est configuré sur Vertex AI comme fournisseur compatible OpenAI, avec un compte de service, pour la lecture et la rédaction. `/api/health` donnait :
+- `redaction` en `CONFIGUREE_NON_VERIFIEE` ;
+- `extraction` en `NON_CONFIGUREE`.
+
+**Cause : la configuration, pas le code de S.94.** La lecture des pièces a une garde de plus que la rédaction : une pièce d'identité ne part chez un autre sous-traitant qu'Anthropic que si `AI_PIECES_SOUS_TRAITANT_AUTORISE` porte **le code** de ce sous-traitant. En production, la variable valait `oui`. Reproduit avec la configuration relevée : `oui` laisse l'extraction non branchée, `openai_compatible` la branche. Le reste de la configuration est reconnu : URL, modèle, `image_url`, compte de service.
+
+**Pourquoi c'était difficile à voir.** `/api/health` disait « configuration absente » sans dire laquelle. Seul l'écran B-07 donnait la raison, et elle ne citait pas la valeur écrite.
+
+**Ce qui change :**
+- `/api/health` porte une `raison` pour l'extraction et la rédaction quand elles ne sont pas branchées. C'est la même raison que B-07, sans aucune valeur secrète.
+- Quand la variable vaut autre chose que le code, la raison cite la valeur écrite et le code attendu.
+- `.env.example` précise que `oui` n'est pas accepté.
+
+**La garde n'est pas assouplie.** Une autorisation doit nommer le sous-traitant qu'elle vise. Un `oui` resterait valable si le fournisseur changeait, sans que personne ait autorisé le nouveau.
+
+**À faire par l'exploitant :**
+1. Écrire `AI_PIECES_SOUS_TRAITANT_AUTORISE=openai_compatible` dans `.env.app`.
+2. Recréer `app` et `worker`.
+3. Mettre à jour `/donnees-personnelles` (`docs/IA-fournisseurs.md`, étape 3). Cette étape ne se fait qu'une fois la décision de conformité prise.
