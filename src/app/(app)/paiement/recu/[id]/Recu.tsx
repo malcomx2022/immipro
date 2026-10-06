@@ -16,7 +16,7 @@ import {
   LIBELLE_ETAT,
   MENTION_ATTESTATION,
   MENTION_PDF,
-  mentionRembourse,
+  mentionRembourseDuRecu,
   RAISON_RENVOI_FERME,
   SANS_SUITE_CORPS,
   SANS_SUITE_TITRE,
@@ -188,7 +188,13 @@ export function Recu({ recu }: { recu: Donnees }) {
             <span className="text-16 font-semibold text-ink-900">
               {recu.etat === "rembourse" ? "Total remboursé" : "Total payé"}
             </span>
-            <span className="text-24 font-semibold text-ink-900">{montant}</span>
+            {/* Ce qui est revenu, et non ce qui a été payé : un pack entamé
+                se rembourse au prorata (RG-15.2), et la mention le dit. */}
+            <span className="text-24 font-semibold text-ink-900">
+              {recu.etat === "rembourse" && recu.montantRembourse !== null
+                ? formatMontant(recu.montantRembourse, recu.devise)
+                : montant}
+            </span>
           </div>
         </div>
       </article>
@@ -204,7 +210,7 @@ export function Recu({ recu }: { recu: Donnees }) {
       )}
       {recu.etat === "rembourse" ? (
         <p className="text-pretty text-13 text-ink-700">
-          {mentionRembourse(momentEnFrancais(recu.rembourseLe ?? recu.le))}
+          {mentionRembourseDuRecu(recu, momentEnFrancais(recu.rembourseLe ?? recu.le), formatMontant)}
         </p>
       ) : null}
       <p className="text-pretty text-13 text-ink-500">{MENTION_ATTESTATION}</p>

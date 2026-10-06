@@ -158,6 +158,48 @@ try {
   const deux = await db.invoice.findMany({ where: { transactionId: remboursee.id }, orderBy: { issuedAt: "asc" } });
   verifier(avant.issue === "emise" && deux.map((d) => d.kind).join(",") === "FACTURE,AVOIR", "remboursée avant d'être facturée : la facture vient d'abord, puis l'avoir");
 
+  console.log("\nUn remboursement partiel : l'avoir porte la somme rendue (RG-15.2)");
+  // La facture est émise sous un régime assujetti à 18 % ; le régime du
+  // jour change avant l'avoir, qui doit garder celui de la facture.
+  process.env.FACTURATION_TVA = "18";
+  const entamee = await vente();
+  await etablirLaFacture(entamee.id);
+  delete process.env.FACTURATION_TVA;
+  const decidee = new Date(Date.now() - 60_000);
+  await db.transaction.update({
+    where: { id: entamee.id },
+    data: {
+      // Essentiel 5 000 F, 10 analyses, 4 consommées : 3 000 F rendus.
+      refundDueAt: decidee,
+      refundBasis: "Geste de support — fumée du prorata",
+      refundAmount: 3000,
+      status: "REMBOURSEE",
+      refundedAt: new Date(),
+    },
+  });
+  const avoirPartiel = await etablirLAvoir(entamee.id);
+  const pieceEntamee = await db.invoice.findFirstOrThrow({ where: { transactionId: entamee.id, kind: "FACTURE" } });
+  const avoirEntame = await db.invoice.findFirstOrThrow({ where: { transactionId: entamee.id, kind: "AVOIR" } });
+  verifier(avoirPartiel.issue === "emise", `l'avoir partiel s'émet (${JSON.stringify(avoirPartiel)})`);
+  verifier(
+    pieceEntamee.amountIncl === 5000 && avoirEntame.amountIncl === 3000,
+    `la facture garde le prix payé, l'avoir porte la somme rendue (${pieceEntamee.amountIncl} / ${avoirEntame.amountIncl})`,
+  );
+  verifier(
+    avoirEntame.vatRateBp === 1800 &&
+      avoirEntame.amountExcl === 2542 &&
+      avoirEntame.vatAmount === 458 &&
+      avoirEntame.amountExcl + avoirEntame.vatAmount === 3000 &&
+      avoirEntame.vatNote === pieceEntamee.vatNote,
+    `ventilé sous le régime de la facture, et non celui du jour (${avoirEntame.amountExcl} + ${avoirEntame.vatAmount} à ${avoirEntame.vatRateBp})`,
+  );
+  verifier(avoirEntame.amountInWords === "trois mille francs CFA", `somme en lettres du montant rendu (${avoirEntame.amountInWords})`);
+  verifier(
+    avoirEntame.originId === pieceEntamee.id &&
+      avoirEntame.designation.startsWith(`Remboursement partiel de la facture ${pieceEntamee.number}`),
+    "il cite la facture d'origine, et se dit partiel",
+  );
+
   console.log("\nLa base tient l'immuabilité");
   const suppression = await db.invoice.delete({ where: { id: piece.id } }).then(() => true, () => false);
   verifier(!suppression, "une pièce émise ne se supprime pas");

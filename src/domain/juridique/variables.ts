@@ -283,13 +283,6 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     nature: "texte",
   },
   {
-    cle: "remboursement_entame",
-    groupe: "conditions",
-    libelle: "Remboursement d'un pack entamé",
-    aide: "Le produit ne calcule aucun prorata : une consommation partielle part en revue. Écrire la règle retenue.",
-    nature: "texte",
-  },
-  {
     cle: "remboursement_mobile_money",
     groupe: "conditions",
     libelle: "Remboursement Mobile Money",

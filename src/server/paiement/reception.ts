@@ -3,6 +3,8 @@ import { journaliser } from "@/server/acces/journal";
 import { envoyerRecu, envoyerRemboursementConfirme } from "@/server/courrier";
 import { db } from "@/lib/db";
 import { formatMontant } from "@/lib/utils";
+import { sommeARendre } from "@/domain/paiement/remboursement";
+import { facteurMineur, versMineur } from "@/domain/facturation/montants";
 
 /**
  * Réception d'une notification de paiement, commune aux deux rails.
@@ -65,10 +67,17 @@ export async function traiterLaNotification(
           select: { email: true },
         });
         if (user) {
+          // La somme rendue, figée à l'initiation — RG-15.2. Le prix payé
+          // ne s'ajoute que s'il en diffère : un remboursement partiel.
+          const payeMineur = versMineur(transaction.amount, transaction.currency);
+          const rendu = sommeARendre(transaction.refundAmount, payeMineur);
+          const enUnites = (mineur: number) =>
+            formatMontant(mineur / facteurMineur(transaction.currency), transaction.currency);
           await envoyerRemboursementConfirme(
             user.email,
             transaction.reference,
-            formatMontant(transaction.amount, transaction.currency),
+            enUnites(rendu),
+            rendu < payeMineur ? enUnites(payeMineur) : undefined,
           ).catch(() => undefined);
         }
       }

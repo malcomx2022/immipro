@@ -25,6 +25,7 @@ import {
   type ObstacleALaFacturation,
 } from "@/domain/facturation/facture";
 import { libelleDeLAchat } from "@/domain/paiement/recu";
+import { sommeARendre } from "@/domain/paiement/remboursement";
 import { espaceReel } from "@/server/paiement/secrets";
 import { valeursDesVariables } from "@/server/juridique/lecture";
 import { versFiche } from "@/server/acces/regles";
@@ -63,6 +64,14 @@ const estUnDoublon = (erreur: unknown): boolean =>
   erreur !== null &&
   "code" in erreur &&
   (erreur as { code?: unknown }).code === "P2002";
+
+/**
+ * Le régime qu'une pièce émise a appliqué, relu sur son taux : un taux,
+ * c'est une TVA extraite ; aucun, c'est une TVA nulle. Sert à l'avoir,
+ * qui reprend le régime de la facture qu'il corrige.
+ */
+const regimeDeLaPiece = (tauxBp: number | null): Regime =>
+  tauxBp === null ? { declare: true, assujettie: false } : { declare: true, assujettie: true, tauxBp };
 
 /** Le régime déclaré par l'exploitant. */
 export const regimeDeLExploitant = (
@@ -252,6 +261,31 @@ export async function etablirLAvoir(
   const serie = origine.series;
   const exercice = exerciceDe(maintenant);
 
+  /*
+    L'avoir porte **ce qui a été rendu**, et non ce qui a été payé —
+    RG-15.2. Un pack entamé se rembourse au prorata des analyses
+    restantes : un avoir du prix entier annulerait une vente qui a eu lieu
+    pour partie, et ferait baisser le chiffre d'affaires d'une somme que
+    le candidat n'a pas récupérée.
+
+    Ventilé sous **le régime de la facture d'origine** — son taux, ou son
+    absence de taux —, et non celui du jour : un avoir corrige une pièce,
+    il ne la refacture pas. La somme en lettres suit le montant rendu.
+  */
+  const rendu = Math.min(
+    sommeARendre(transaction.refundAmount, origine.amountIncl),
+    origine.amountIncl,
+  );
+  const partiel = rendu < origine.amountIncl;
+  const montants = partiel
+    ? ventiler(rendu, regimeDeLaPiece(origine.vatRateBp))
+    : {
+        ttc: origine.amountIncl,
+        ht: origine.amountExcl,
+        tva: origine.vatAmount,
+        tauxBp: origine.vatRateBp,
+      };
+
   const emettre = () =>
     db.$transaction(async (tx) => {
       const rang = await prendreUnRang(tx, serie, "AVOIR", exercice);
@@ -269,14 +303,18 @@ export async function etablirLAvoir(
           clientName: origine.clientName,
           clientAddress: origine.clientAddress,
           clientQuality: origine.clientQuality,
-          designation: `Remboursement de la facture ${origine.number} — ${origine.designation}`,
+          designation: partiel
+            ? `Remboursement partiel de la facture ${origine.number}, au prorata des analyses restantes — ${origine.designation}`
+            : `Remboursement de la facture ${origine.number} — ${origine.designation}`,
           currency: origine.currency,
-          amountIncl: origine.amountIncl,
-          amountExcl: origine.amountExcl,
-          vatAmount: origine.vatAmount,
-          vatRateBp: origine.vatRateBp,
+          amountIncl: montants.ttc,
+          amountExcl: montants.ht,
+          vatAmount: montants.tva,
+          vatRateBp: montants.tauxBp,
           vatNote: origine.vatNote,
-          amountInWords: origine.amountInWords,
+          amountInWords: partiel
+            ? montantEnLettres(montants.ttc, origine.currency)
+            : origine.amountInWords,
           paymentMethod: origine.paymentMethod,
         },
       });

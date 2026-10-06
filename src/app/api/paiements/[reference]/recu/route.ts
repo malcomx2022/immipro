@@ -2,7 +2,7 @@ import { route } from "@/server/http/route";
 import { echec } from "@/server/http/echecs";
 import { recuDuPaiement } from "@/server/lecture/paiements";
 import { envoyerRecu } from "@/server/courrier";
-import { estAttestable, mentionRembourse } from "@/domain/paiement/recu";
+import { estAttestable, mentionRembourseDuRecu } from "@/domain/paiement/recu";
 import { momentEnFrancais } from "@/domain/format/moment";
 import { formatMontant } from "@/lib/utils";
 
@@ -45,7 +45,11 @@ export const POST = route({
       // refus dit depuis quand — c'est ce qui permet de s'y retrouver quand
       // on a plusieurs paiements sur le même dossier.
       throw echec("recu_indisponible", {
-        corps: mentionRembourse(momentEnFrancais(recu.rembourseLe ?? recu.le)),
+        corps: mentionRembourseDuRecu(
+          recu,
+          momentEnFrancais(recu.rembourseLe ?? recu.le),
+          formatMontant,
+        ),
       });
     }
 

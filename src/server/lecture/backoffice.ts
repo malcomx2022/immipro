@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import type { Transaction } from "@prisma/client";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
-import { etapeDe, type DetteFedaPay } from "@/domain/paiement/remboursement";
+import { etapeDe, sommeARendre, type DetteFedaPay } from "@/domain/paiement/remboursement";
+import { facteurMineur, versMineur } from "@/domain/facturation/montants";
 import {
   acteurLisible,
   compteDeLActeur,
@@ -385,6 +386,12 @@ async function enLignesDePaiement(
     ...(t.providerTxId ? { transaction: t.providerTxId } : {}),
     ...(t.failureCause ? { cause: t.failureCause } : {}),
     ...(t.refundBasis ? { motifDuRemboursement: t.refundBasis } : {}),
+    // Ce qui est rendu, et non ce qui a été payé : un pack entamé se
+    // rembourse au prorata (RG-15.2), et le total « remboursé » de la
+    // journée doit sommer ce qui est réellement reparti.
+    ...(t.refundDueAt || t.status === "REMBOURSEE"
+      ? { montantRembourse: montantRenduEnUnites(t) }
+      : {}),
     recuLe: t.createdAt.toISOString(),
     etat: etatDuRapprochement(t, maintenant),
     // L'écart voyage avec sa résolution : refermer sans relire le constat
@@ -413,6 +420,18 @@ async function enLignesDePaiement(
       : {}),
   }));
 }
+
+/**
+ * La somme rendue, dans l'unité de `Transaction.amount` (unités entières
+ * de la grille, décimales possibles en euros) : `refundAmount` est en
+ * unités mineures, et nul se lit « le montant payé » (RG-15.2).
+ */
+const montantRenduEnUnites = (t: {
+  amount: number;
+  currency: string;
+  refundAmount: number | null;
+}): number =>
+  sommeARendre(t.refundAmount, versMineur(t.amount, t.currency)) / facteurMineur(t.currency);
 
 function etatDuRapprochement(
   t: {
@@ -507,6 +526,7 @@ export async function dettesFedaPay(): Promise<DetteFedaPay[]> {
       reference: true,
       amount: true,
       currency: true,
+      refundAmount: true,
       refundDueAt: true,
       refundRequestedAt: true,
       refundedAt: true,
@@ -520,6 +540,7 @@ export async function dettesFedaPay(): Promise<DetteFedaPay[]> {
     reference: d.reference,
     compte: d.user.email,
     montant: d.amount,
+    montantARendre: montantRenduEnUnites(d),
     devise: d.currency,
     etape: etapeDe({ dueAt: d.refundDueAt, requestedAt: d.refundRequestedAt, refundedAt: d.refundedAt }) ?? "DECIDE",
     motif: d.refundBasis,

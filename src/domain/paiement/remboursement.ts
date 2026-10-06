@@ -18,6 +18,8 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import { formatMineur, versMineur } from "@/domain/facturation/montants";
+
 export type EtapeRemboursement = "DECIDE" | "DEMANDE" | "VERSE";
 
 export const LIBELLE_ETAPE: Record<EtapeRemboursement, string> = {
@@ -248,10 +250,11 @@ export function lireLaReferenceDeRemboursement(saisie: string): LectureDeReferen
  * - **la dette existe et n'est pas soldée** — on ne déclare pas le
  *   remboursement d'une somme que personne ne doit ;
  * - **l'initiation a eu lieu** (`refundAttemptedAt`) — c'est elle qui
- *   retire les droits non consommés (K.C). Déclarer avant rendrait
- *   l'argent en laissant le pack utilisable ; et un pack entamé, envoyé
- *   en revue manuelle, n'est jamais initié : la question commerciale se
- *   tranche avant, pas par ce formulaire ;
+ *   retire les droits non consommés (K.C) et fige la somme à rendre
+ *   (RG-15.2). Déclarer avant rendrait l'argent en laissant le pack
+ *   utilisable ; et un pack envoyé en revue manuelle — dossier déposé ou
+ *   clos — n'est jamais initié : la question se tranche avant, pas par
+ *   ce formulaire ;
  * - **aucune demande n'est déjà déclarée** — la même référence redite est
  *   un rejeu sans effet, une autre est un conflit (voir l'appelant).
  */
@@ -295,7 +298,13 @@ export const MOTIF_DE_REFUS_DE_DECLARATION: Record<DefautDeDeclaration, string> 
 export interface DetteFedaPay {
   reference: string;
   compte: string;
+  /** Le prix payé, en unités entières de la grille, comme `Transaction.amount`. */
   montant: number;
+  /**
+   * Ce qu'il faut rendre, dans la même unité — RG-15.2. Égal à `montant`
+   * sauf pour un pack entamé, remboursé au prorata des analyses restantes.
+   */
+  montantARendre: number;
   devise: string;
   etape: EtapeRemboursement;
   motif: string | null;
@@ -306,16 +315,59 @@ export interface DetteFedaPay {
   referenceFournisseur: string | null;
 }
 
-/** Ce que l'opérateur lit sous une dette FedaPay, selon où elle en est. */
-export function consigneFedaPay(dette: Pick<DetteFedaPay, "etape" | "initiee">): string {
+/**
+ * Ce que l'opérateur lit sous une dette FedaPay, selon où elle en est.
+ *
+ * Un remboursement partiel (RG-15.2) le dit en plus, avec le montant
+ * exact : le geste par défaut au tableau de bord rend le prix payé, et
+ * c'est précisément l'erreur à ne pas faire.
+ */
+export function consigneFedaPay(
+  dette: Pick<DetteFedaPay, "etape" | "initiee"> &
+    Partial<Pick<DetteFedaPay, "montant" | "montantARendre" | "devise">>,
+): string {
   if (dette.etape === "DEMANDE") {
     return "Remboursement déclaré. La somme n'est tenue pour rendue qu'à la notification signée de FedaPay : si elle n'arrive pas, vérifie l'état du remboursement dans son tableau de bord.";
   }
   if (!dette.initiee) {
     return "Le remboursement n'est pas encore initié : les droits non consommés du pack n'ont pas été retirés. S'il a été envoyé en revue manuelle, la question se tranche d'abord dans la file des écarts.";
   }
+  if (
+    dette.montant !== undefined &&
+    dette.montantARendre !== undefined &&
+    dette.devise !== undefined &&
+    dette.montantARendre < dette.montant
+  ) {
+    return `${A_REMBOURSER_A_LA_MAIN} ${consignePartielle(
+      versMineur(dette.montantARendre, dette.devise),
+      versMineur(dette.montant, dette.devise),
+      dette.devise,
+    )}`;
+  }
   return A_REMBOURSER_A_LA_MAIN;
 }
+
+/**
+ * Le montant exact d'un remboursement partiel fait à la main, et ce qu'il
+ * faut faire si le tableau de bord ne permet pas de le saisir : ne rien
+ * rembourser. Un remboursement intégral rendrait plus que dû, et ne se
+ * reprend pas.
+ */
+export const consignePartielle = (aRendreMineur: number, payeMineur: number, devise: string): string =>
+  `Remboursement partiel, au prorata des analyses restantes (RG-15.2) : rembourse exactement ${formatMineur(aRendreMineur, devise)}, et non les ${formatMineur(payeMineur, devise)} payés. Si le tableau de bord ne permet pas de saisir ce montant, ne rembourse rien et signale la dette à la direction : un remboursement intégral ne se reprend pas.`;
+
+/**
+ * La somme à rendre, dite à l'opérateur dans un écart ou une note — avec
+ * le prix payé quand elle en diffère.
+ */
+export const libelleDeLaSommeARendre = (
+  aRendreMineur: number,
+  payeMineur: number,
+  devise: string,
+): string =>
+  aRendreMineur < payeMineur
+    ? `Montant à rembourser : ${formatMineur(aRendreMineur, devise)} sur ${formatMineur(payeMineur, devise)} payés (prorata des analyses restantes, RG-15.2).`
+    : `Montant à rembourser : ${formatMineur(aRendreMineur, devise)}, le prix payé.`;
 
 /**
  * L'identifiant du fournisseur est-il présent, et est-il le sien ?
@@ -366,10 +418,10 @@ export type SuiteDuQuota =
  * un pack utilisable pendant qu'on rend son prix revient à l'offrir.
  *
  * **Une consommation partielle ne se rembourse pas automatiquement en
- * entier.** Le produit ne sait pas ce que vaut une analyse déjà rendue —
- * c'est une question commerciale, pas arithmétique — et trancher à sa
- * place produirait soit un cadeau, soit une retenue qu'aucune condition
- * n'annonce. Le cas passe en revue manuelle.
+ * entier.** Pour une recharge, le cas passe en revue manuelle. Pour un
+ * pack, la direction a tranché le 06/10/2026 : le prorata des analyses
+ * restantes (`montantDuRemboursement`, RG-15.2), qui remplace cette
+ * fonction sur les packs.
  *
  * **Et rien n'est recrédité ni effacé rétroactivement.** Les lignes des
  * analyses consommées restent : le grand livre s'ajoute, il ne se
@@ -382,6 +434,158 @@ export function suiteDuQuota(ouvertes: number, consommees: number): SuiteDuQuota
 
 export const MOTIF_REVUE_PARTIELLE =
   "Une partie du pack a déjà été consommée. Le remboursement intégral n'est pas prononcé automatiquement : à trancher à la main.";
+
+/* ── Le pack entamé — RG-15.2, décision du 06/10/2026 ─────────────────── */
+
+/**
+ * Ce que vaut un pack entamé : la question est tranchée.
+ *
+ * `suiteDuQuota` disait, jusqu'ici, que le produit ne savait pas ce que
+ * vaut une analyse déjà rendue, et envoyait tout pack entamé en revue
+ * manuelle. La direction a répondu le 06/10/2026 : **au prorata des
+ * analyses restantes**, en unité que le candidat voit et achète — les
+ * analyses du pack (`Pack.analyses`), jamais les jetons, qui sont la
+ * contrepartie interne.
+ *
+ *     rendu = prix payé × analyses restantes ÷ analyses du pack
+ *
+ * Quatre issues — intégral, prorata, revue manuelle, rien à rendre —,
+ * et l'ordre des questions est la règle :
+ *
+ * 1. **rien consommé** → le prix entier, quel que soit l'état du dossier.
+ *    C'est le comportement d'avant la règle, et il reste ;
+ * 2. **dossier déclaré déposé, ou clos** → revue manuelle, comme avant :
+ *    le prorata ne s'applique que tant que le travail est en cours ;
+ * 3. **pack servi sur plusieurs dossiers** (un Pro) → revue manuelle. Le
+ *    grand livre ne retire les droits que sur un dossier par
+ *    remboursement (index unique du retrait) : rendre l'argent en laissant
+ *    utilisables les analyses d'un second dossier serait un cadeau
+ *    qu'aucune règle n'annonce ;
+ * 4. **tout consommé** → rien à rendre, et aucune obligation n'est
+ *    ouverte. On le dit, plutôt que d'ouvrir une dette à zéro ;
+ * 5. sinon, **le prorata**.
+ *
+ * La rédaction assistée ne change pas le montant : elle n'ajoute aucune
+ * retenue, et ne fait pas passer le cas en revue (contrairement au
+ * supplément d'une montée, S.92). Seules comptent les analyses débitées
+ * du pack, quelle que soit l'action qui les a débitées.
+ *
+ * Module pur : les montants entrent et sortent en unités mineures.
+ */
+export interface PackARembourser {
+  /** Le prix effectivement payé, en unités mineures. */
+  prixMineur: number;
+  /** `Pack.analyses` : la base du prorata, et non ce qu'un dossier a reçu. */
+  analysesDuPack: number;
+  /** Analyses imputées au pack, nettes des analyses rendues (S.92). */
+  consommees: number;
+  dossierDepose: boolean;
+  dossierClos: boolean;
+  /** Dossiers distincts que l'achat a crédités. */
+  dossiersServis: number;
+}
+
+export type MontantDuRemboursement =
+  | { verdict: "integral"; montant: number }
+  | { verdict: "prorata"; montant: number; restantes: number; analysesDuPack: number }
+  | { verdict: "manuel"; motif: string }
+  | { verdict: "rien_a_rendre"; motif: string };
+
+/**
+ * Les états d'un dossier **clos** : l'issue est déclarée, il est
+ * abandonné, ou archivé. Un dossier suspendu ne l'est pas — il reprend.
+ */
+export const ETATS_CLOS: ReadonlySet<string> = new Set(["ISSUE_DECLAREE", "ABANDONNE", "ARCHIVE"]);
+
+/**
+ * Le prorata, en unités mineures, **arrondi à l'unité inférieure**.
+ *
+ * Pourquoi vers le bas, et non au plus proche :
+ *
+ * - **on ne rend jamais une fraction d'analyse consommée.** Arrondir vers
+ *   le haut, ou au plus proche quand la fraction dépasse la moitié, ferait
+ *   rendre une part de ce qui a servi ; vers le bas, le rendu est toujours
+ *   au plus la valeur exacte des analyses restantes ;
+ * - **l'écart est borné à une unité mineure** — un franc CFA, un centime
+ *   d'euro — et il est le même pour tous, quel que soit le rail ;
+ * - **le calcul est entier de bout en bout.** Prix × restantes est un
+ *   entier ; une seule division, tronquée. Aucun nombre à virgule
+ *   n'intervient, et le même calcul refait par un comptable sur la pièce
+ *   tombe sur le même chiffre.
+ *
+ * Avec la grille actuelle, le cas ne se présente qu'en euros sur Dossier
+ * et Pro (29 € et 59 € ne se divisent pas par 30 et 90) : 29 € × 23 ÷ 30
+ * = 22,2333… € → 22,23 €.
+ */
+export function montantAuProrata(
+  prixMineur: number,
+  restantes: number,
+  analysesDuPack: number,
+): number {
+  if (!Number.isInteger(prixMineur) || prixMineur < 0) {
+    throw new RangeError(`Prix invalide : ${prixMineur}. Un prix est un entier positif d'unités mineures.`);
+  }
+  if (!Number.isInteger(analysesDuPack) || analysesDuPack <= 0) {
+    throw new RangeError(`Un pack sans analyse n'a pas de prorata (${analysesDuPack}).`);
+  }
+  if (!Number.isInteger(restantes) || restantes < 0 || restantes > analysesDuPack) {
+    throw new RangeError(
+      `Analyses restantes invalides : ${restantes} sur ${analysesDuPack}. Elles vont de 0 au nombre d'analyses du pack.`,
+    );
+  }
+  return Math.floor((prixMineur * restantes) / analysesDuPack);
+}
+
+const analyses = (n: number): string => `${n} analyse${n > 1 ? "s" : ""}`;
+
+/**
+ * Le motif d'un remboursement refusé faute de reste, écrit pour suivre
+ * « Aucun remboursement à ouvrir sur ce paiement : » — d'où la minuscule.
+ */
+export const motifRienARendre = (analysesDuPack: number): string =>
+  `les ${analyses(analysesDuPack)} du pack ont toutes été consommées : au prorata des analyses restantes, il ne reste rien à rembourser (RG-15.2). Un remboursement hors de cette règle se décide avec la direction, pas depuis ce geste`;
+
+export function montantDuRemboursement(p: PackARembourser): MontantDuRemboursement {
+  const consommees = Math.max(0, p.consommees);
+  if (consommees === 0) return { verdict: "integral", montant: p.prixMineur };
+
+  const entame = `Pack entamé : ${analyses(consommees)} consommée${consommees > 1 ? "s" : ""} sur ${p.analysesDuPack}.`;
+  if (p.dossierDepose || p.dossierClos) {
+    return {
+      verdict: "manuel",
+      motif: `${entame} Le dossier est ${p.dossierDepose ? "déclaré déposé" : "clos"} : le prorata automatique ne s'applique plus (RG-15.2). À trancher à la main : fixer le montant avec la direction, puis rembourser chez le fournisseur.`,
+    };
+  }
+  if (p.dossiersServis > 1) {
+    return {
+      verdict: "manuel",
+      motif: `${entame} Le pack sert ${p.dossiersServis} dossiers, et un remboursement ne retire les droits que d'un seul : le prorata n'est pas prononcé automatiquement. À trancher à la main.`,
+    };
+  }
+
+  const restantes = Math.max(0, p.analysesDuPack - consommees);
+  if (restantes === 0) return { verdict: "rien_a_rendre", motif: motifRienARendre(p.analysesDuPack) };
+  const montant = montantAuProrata(p.prixMineur, restantes, p.analysesDuPack);
+  // Un prix si petit que le prorata tombe à zéro : rien à rendre non plus.
+  if (montant === 0) return { verdict: "rien_a_rendre", motif: motifRienARendre(p.analysesDuPack) };
+  return { verdict: "prorata", montant, restantes, analysesDuPack: p.analysesDuPack };
+}
+
+/**
+ * La somme à rendre d'une transaction, en unités mineures.
+ *
+ * `refundAmount` nul se lit « le montant payé » : c'était vrai de toutes
+ * les lignes antérieures à RG-15.2, et cela reste vrai d'une dette en
+ * revue manuelle, dont le montant n'est pas encore fixé.
+ */
+export const sommeARendre = (
+  refundAmount: number | null,
+  payeMineur: number,
+): number => refundAmount ?? payeMineur;
+
+/** Rend-on moins que le prix payé ? */
+export const estPartiel = (refundAmount: number | null, payeMineur: number): boolean =>
+  refundAmount !== null && refundAmount < payeMineur;
 
 /** Ce que le candidat lit quand la somme est effectivement revenue. */
 export const CONFIRMATION_AU_CANDIDAT =

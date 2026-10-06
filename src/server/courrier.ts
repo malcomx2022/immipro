@@ -306,6 +306,12 @@ export const envoyerRemboursementConfirme = (
   destinataire: string,
   reference: string,
   montant: string,
+  /**
+   * Le prix payé, quand la somme rendue en diffère — RG-15.2 : un pack
+   * entamé se rembourse au prorata des analyses restantes, et le candidat
+   * doit pouvoir rapprocher les deux chiffres sans écrire au support.
+   */
+  paye?: string,
 ) =>
   expedier({
     destinataire,
@@ -313,7 +319,11 @@ export const envoyerRemboursementConfirme = (
     objet: `Remboursement ImmiPro ${reference}`,
     corps: `${CONFIRMATION_AU_CANDIDAT}
 
-Montant : ${montant}, sous la référence ${reference}, qui ne change pas.${SIGNATURE}`,
+Montant : ${montant}, sous la référence ${reference}, qui ne change pas.${
+      paye
+        ? `\nTu avais payé ${paye} : le remboursement porte sur les analyses qui restaient dans ton pack, au prorata. La facture d'avoir, dans ton espace, porte la somme rendue.`
+        : ""
+    }${SIGNATURE}`,
   });
 
 /**

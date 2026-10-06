@@ -11469,3 +11469,26 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 - L'export est journalisé avant la réponse (`couts-ia.export`).
 
 **Reste à arbitrer.** « Modifier les plafonds » (B-07) demeure retiré : faut-il des seuils réglables depuis l'écran, ou des seuils fixés en règle de gestion (RG-16.1) ?
+
+## S.124 — Le pack entamé se rembourse au prorata des analyses restantes (RG-15.2)
+
+**Décision (direction, 06/10/2026).** Un pack entamé est remboursé au prorata des analyses restantes : prix payé × analyses restantes ÷ analyses du pack, dans la devise du pack.
+- La base est l'analyse, l'unité que le candidat voit et achète, et non le jeton.
+- Le calcul est automatique tant que le dossier n'est ni déclaré déposé ni clos. Au-delà, la demande est examinée par l'équipe.
+- Un pack non entamé est remboursé en entier. Un pack entièrement consommé n'a rien à rendre : aucune obligation n'est ouverte.
+- La rédaction assistée ne change pas le montant.
+
+**Ce que fait le code.**
+- `montantDuRemboursement` (domaine pur) tranche entre intégral, prorata, revue manuelle et rien à rendre. Le montant est en unités mineures, arrondi à l'unité inférieure : on ne rend jamais une fraction d'analyse consommée, et l'écart est d'au plus 1 F ou 1 centime.
+- `Transaction.refundAmount` (unités mineures, nul = prix payé) est bornée en base par deux contraintes. La somme est posée à l'ouverture de l'obligation. Elle est ensuite figée sous le verrou du grand livre, en même temps que le retrait des droits.
+- Stripe reçoit cette somme. FedaPay l'affiche en B-04, dans l'écart et dans la déclaration.
+- L'avoir porte la somme rendue, sous le régime de TVA de la facture d'origine.
+- Le reçu, le courriel, B-04 et le grand livre (colonne « Montant remboursé ») disent ce qui est rendu.
+- La section 10 des conditions énonce la règle, et la variable `remboursement_entame` est retirée.
+
+**Écarts qui restent.**
+1. Un pack entamé servi sur plusieurs dossiers (Pro) part en revue manuelle : un remboursement ne retire les droits que d'un seul dossier.
+2. **FedaPay** : le tableau de bord permet-il un remboursement partiel, et la notification `refunded` arrive-t-elle sur un partiel ? À demander au prestataire, avec la question de S.117. D'ici là, si le montant ne se saisit pas, rien n'est remboursé et la direction est saisie.
+3. **Stripe** : `charge.refunded` est soldé sans comparer `amount_refunded` à la somme due. Un remboursement partiel fait à la main au tableau de bord solderait donc la dette. Le défaut existait avant ce lot, et Stripe est fermé pour le pilote. À corriger avant d'ouvrir ce rail.
+4. L'avoir partiel est à faire confirmer par M.C.
+5. Les conditions sont à revalider par le conseil juridique avant publication : le modèle a changé.

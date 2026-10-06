@@ -18,6 +18,7 @@ import {
   type Totaux,
   type Paiement,
   diagnostiquerLaJournee,
+  libelleRemboursementPartiel,
 } from "@/domain/backoffice/reconciliation";
 import { formatMontant } from "@/lib/utils";
 import { LIBELLE_CAUSE } from "@/domain/paiement/echec";
@@ -456,6 +457,17 @@ export function Paiements({
                           tout refus, panne comprise (N.B). */}
                       {p.motifDuRemboursement ? (
                         <span className="text-13 text-ink-500">{p.motifDuRemboursement}</span>
+                      ) : null}
+                      {/* RG-15.2 — la somme rendue quand elle n'est pas le
+                          prix payé : un pack entamé, au prorata. */}
+                      {p.montantRembourse !== undefined && p.montantRembourse < p.montant ? (
+                        <span className="text-13 text-ink-700">
+                          {libelleRemboursementPartiel(
+                            formatMontant(p.montantRembourse, p.devise),
+                            formatMontant(p.montant, p.devise),
+                            p.etat === "REMBOURSE",
+                          )}
+                        </span>
                       ) : null}
                       {p.cause ? (
                         <span className="text-13 text-ink-500">{LIBELLE_CAUSE[p.cause]}</span>

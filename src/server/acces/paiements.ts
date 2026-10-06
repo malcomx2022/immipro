@@ -10,8 +10,12 @@ import {
   A_REMBOURSER_A_LA_MAIN,
   MOTIF_DE_REFUS_DE_DECLARATION,
   MOTIF_IDENTIFIANT,
+  ETATS_CLOS,
   MOTIF_REVUE_PARTIELLE,
   cleDIdempotence,
+  libelleDeLaSommeARendre,
+  montantDuRemboursement,
+  sommeARendre,
   defautDeDeclaration,
   defautDIdentifiant,
   lireLaReferenceDeRemboursement,
@@ -68,6 +72,7 @@ import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 import { etablirLAvoir, etablirLaFacture, etatDeLaFacturation } from "@/server/facturation/emission";
 import { identiteDeFacturation } from "@/domain/facturation/facture";
+import { facteurMineur, formatMineur, versMineur } from "@/domain/facturation/montants";
 import { suspensionDuPaiement, type SuspensionDuPaiement } from "@/domain/paiement/ouverture";
 
 /**
@@ -898,8 +903,9 @@ export async function acheverLeCredit(transaction: Transaction): Promise<boolean
  *
  * ── Ce qui n'envoie rien du tout ─────────────────────────────────────
  *
- * Un pack partiellement consommé (revue manuelle), un `providerTxId`
- * absent ou portant le préfixe de l'autre rail. Dans les trois cas
+ * Une revue manuelle (un pack entamé hors de la règle du prorata,
+ * RG-15.2), un `providerTxId` absent ou portant le préfixe de l'autre
+ * rail. Dans les trois cas
  * l'écart s'ouvre et aucune tentative n'est comptée : compter une
  * tentative qui n'a pas eu lieu ferait croire à une relance en cours.
  */
@@ -907,7 +913,11 @@ export type IssueDInitiation =
   | IssueDeDemande
   /** Une autre reprise tient la tentative, ou la demande est déjà acceptée. */
   | "deja_en_cours"
-  /** Pack entamé : ce que vaut une analyse rendue n'est pas arithmétique. */
+  /**
+   * Hors de la règle du prorata (RG-15.2) : pack entamé sur un dossier
+   * déclaré déposé ou clos, ou servi sur plusieurs dossiers ; recharge ou
+   * montée entamée. Un humain tranche.
+   */
   | "revue_manuelle"
   /** Identifiant fournisseur absent ou étranger : rien n'est envoyé. */
   | "identifiant_inutilisable"
@@ -936,16 +946,12 @@ export async function initierLeRemboursement(
   });
 
   if (transaction.applicationId && !dejaRetire) {
-    const suite = await suiteDuQuotaDuPack(
-      transaction.applicationId,
-      transaction.id,
-      transaction.packCode,
-    );
+    const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction);
     if (suite.suite === "REVUE_MANUELLE") {
-      // On ne tranche pas ce que vaut une analyse déjà rendue : c'est une
-      // question commerciale. L'écart porte la question à un humain, et
-      // aucune demande ne part.
-      await noterLEcart(transaction.id, suite.motif);
+      // Hors de la règle du prorata (RG-15.2) — dossier déposé ou clos,
+      // pack servi sur plusieurs dossiers, montée entamée : un humain
+      // tranche. L'écart porte la question, et aucune demande ne part.
+      await noterLEcart(transaction.id, motifDeLEcart(suite));
       return { issue: "revue_manuelle", consommees: suite.consommees };
     }
   }
@@ -981,6 +987,15 @@ export async function initierLeRemboursement(
   if (count !== 1) return { issue: "deja_en_cours" };
 
   /*
+    La somme à rendre : celle que l'obligation porte, fixée au retrait des
+    droits ci-dessous si ce passage la fixe. Nulle, elle se lit « le prix
+    payé » — les dettes antérieures à RG-15.2, et celles qui ne portent
+    pas sur un pack d'analyses.
+  */
+  const payeMineur = versMineur(transaction.amount, transaction.currency);
+  let aRendre = sommeARendre(transaction.refundAmount, payeMineur);
+
+  /*
     Les droits partent une fois la tentative réservée, et une seule fois.
 
     Vu en exécutant au lot précédent : deux tentatives retiraient deux
@@ -1010,12 +1025,21 @@ export async function initierLeRemboursement(
         select: { id: true },
       });
       if (retrait) return null;
-      const lue = await suiteDuQuotaDuPack(
-        applicationId,
-        transaction.id,
-        transaction.packCode,
-        tx,
-      );
+      const lue = await suiteDuQuotaDuPack(applicationId, transaction, tx);
+      /*
+        La somme à rendre se fixe ici, dans la même transaction que le
+        retrait — RG-15.2. Recalculée sous le verrou, elle ne peut plus
+        dériver : les droits restants partent avec elle, si bien qu'aucune
+        analyse de ce pack ne peut plus être consommée, et une relecture
+        rendrait le même prorata. C'est cette valeur, et non celle de
+        l'ouverture, qui part chez le fournisseur et fait l'avoir.
+      */
+      if (lue.suite === "RETRAIT_INTEGRAL") {
+        await tx.transaction.updateMany({
+          where: { id: transaction.id, refundRequestedAt: null, refundedAt: null },
+          data: { refundAmount: lue.montant },
+        });
+      }
       if (lue.suite === "RETRAIT_INTEGRAL" && lue.retire > 0) {
         await tx.analysisCredit.createMany({
           data: [
@@ -1034,9 +1058,10 @@ export async function initierLeRemboursement(
       return lue;
     });
     if (suite?.suite === "REVUE_MANUELLE") {
-      await noterLEcart(transaction.id, suite.motif);
+      await noterLEcart(transaction.id, motifDeLEcart(suite));
       return { issue: "revue_manuelle", consommees: suite.consommees };
     }
+    if (suite) aRendre = suite.montant;
   }
 
   const adaptateur =
@@ -1051,7 +1076,9 @@ export async function initierLeRemboursement(
   const reponse = await adaptateur.demander({
     reference: transaction.reference,
     providerTxId: transaction.providerTxId!,
-    montant: transaction.amount,
+    // La somme fixée au retrait (RG-15.2), ramenée à l'unité du contrat ;
+    // l'adaptateur la convertit pour le fournisseur, au centime près.
+    montant: aRendre / facteurMineur(transaction.currency),
     devise: transaction.currency,
     cle: cleDIdempotence(transaction.reference),
   });
@@ -1083,7 +1110,10 @@ export async function initierLeRemboursement(
     relançant.
   */
   if (suite.exigeUnHumain) {
-    await noterLEcart(transaction.id, `${suite.message} (${reponse.detail})`);
+    await noterLEcart(
+      transaction.id,
+      `${suite.message} (${reponse.detail}) ${libelleDeLaSommeARendre(aRendre, payeMineur, transaction.currency)}`,
+    );
   }
   return { issue: reponse.issue, detail: reponse.detail };
 }
@@ -1129,7 +1159,7 @@ export async function declarerLeRemboursementManuel(
   saisie: string,
   acteurId: string,
   maintenant = new Date(),
-): Promise<{ issue: IssueDeDeclaration; referenceFournisseur: string }> {
+): Promise<{ issue: IssueDeDeclaration; referenceFournisseur: string; montantMineur: number }> {
   const lue = lireLaReferenceDeRemboursement(saisie);
   if (!lue.valide) {
     throw echec("champs_invalides", { champs: { referenceFournisseur: lue.message } });
@@ -1140,6 +1170,9 @@ export async function declarerLeRemboursementManuel(
     select: {
       id: true,
       provider: true,
+      amount: true,
+      currency: true,
+      refundAmount: true,
       refundDueAt: true,
       refundedAt: true,
       refundAttemptedAt: true,
@@ -1148,6 +1181,12 @@ export async function declarerLeRemboursementManuel(
     },
   });
   if (!transaction) throw echec("paiement_introuvable");
+
+  /** Ce que l'opérateur déclare avoir rendu : la somme figée à l'initiation (RG-15.2). */
+  const aRendre = sommeARendre(
+    transaction.refundAmount,
+    versMineur(transaction.amount, transaction.currency),
+  );
 
   const defaut = defautDeDeclaration(transaction);
   if (defaut) {
@@ -1159,7 +1198,7 @@ export async function declarerLeRemboursementManuel(
   // Déjà déclarée : la même référence est un rejeu, une autre un conflit.
   if (transaction.refundRequestedAt !== null) {
     if (transaction.refundProviderRef === lue.reference) {
-      return { issue: "deja_declaree", referenceFournisseur: lue.reference };
+      return { issue: "deja_declaree", referenceFournisseur: lue.reference, montantMineur: aRendre };
     }
     throw echec("etat_incompatible", {
       corps: transaction.refundProviderRef
@@ -1194,7 +1233,7 @@ export async function declarerLeRemboursementManuel(
       select: { refundProviderRef: true },
     });
     if (relue?.refundProviderRef === lue.reference) {
-      return { issue: "deja_declaree", referenceFournisseur: lue.reference };
+      return { issue: "deja_declaree", referenceFournisseur: lue.reference, montantMineur: aRendre };
     }
     throw echec("etat_incompatible", {
       corps: "Ce paiement vient de changer d'état pendant ta saisie. Recharge la page et vérifie ce qui a été déclaré.",
@@ -1210,12 +1249,12 @@ export async function declarerLeRemboursementManuel(
     data: {
       discrepancyResolvedAt: maintenant,
       discrepancyOutcome: "ATTENTE_CONFIRMATION",
-      discrepancyNote: `Remboursé au tableau de bord FedaPay, référence ${lue.reference}. La dette reste due jusqu'à la notification signée de FedaPay.`,
+      discrepancyNote: `Remboursé au tableau de bord FedaPay, référence ${lue.reference}, pour ${formatMineur(aRendre, transaction.currency)}. La dette reste due jusqu'à la notification signée de FedaPay.`,
       discrepancyResolvedBy: acteurId,
     },
   });
 
-  return { issue: "declaree", referenceFournisseur: lue.reference };
+  return { issue: "declaree", referenceFournisseur: lue.reference, montantMineur: aRendre };
 }
 
 /**
@@ -1225,6 +1264,16 @@ export async function declarerLeRemboursementManuel(
  * humain : l'écraser avec la suivante ferait perdre la première, qui est
  * en général la plus proche de la cause.
  */
+/**
+ * Le texte de l'écart d'une revue manuelle. Un pack entièrement consommé
+ * entre l'ouverture et l'envoi n'a plus rien à rendre (RG-15.2) : l'écart
+ * le dit, au lieu d'une revue qui n'aurait rien à décider.
+ */
+const motifDeLEcart = (suite: { motif: string; rienARendre?: boolean }): string =>
+  suite.rienARendre
+    ? `Aucune demande n'est partie : ${suite.motif}. L'obligation a été ouverte avant cette dernière consommation ; à refermer à la main avec la direction.`
+    : suite.motif;
+
 async function noterLEcart(transactionId: string, motif: string): Promise<void> {
   await db.transaction.updateMany({
     where: { id: transactionId, discrepancy: null },
@@ -1242,15 +1291,34 @@ async function noterLEcart(transactionId: string, motif: string): Promise<void> 
  * ainsi, un solde n'a pas de couleur.
  */
 type SuiteDuRetrait =
-  | { suite: "RETRAIT_INTEGRAL"; retire: number; octroi: string | null }
-  | { suite: "REVUE_MANUELLE"; motif: string; consommees?: number };
+  /**
+   * Les droits restants se retirent en entier, et `montant` (unités
+   * mineures) part chez le fournisseur : le prix payé, ou son prorata
+   * pour un pack entamé (RG-15.2).
+   */
+  | { suite: "RETRAIT_INTEGRAL"; retire: number; octroi: string | null; montant: number }
+  /**
+   * Rien ne part, un humain tranche. `rienARendre` : le pack est
+   * entièrement consommé, et aucune obligation ne doit s'ouvrir.
+   */
+  | { suite: "REVUE_MANUELLE"; motif: string; consommees?: number; rienARendre?: boolean };
+
+type TransactionARembourser = Pick<Transaction, "id" | "packCode" | "amount" | "currency">;
+
+/** Le pack de la grille qu'un code d'achat désigne, s'il en est un. */
+const packDeLAchat = (packCode: string) => {
+  const achat = achatDepuisLeCode(packCode);
+  return achat.type === "pack" ? getPack(achat.code) : undefined;
+};
 
 async function suiteDuQuotaDuPack(
   applicationId: string,
-  transactionId: string,
-  packCode: string,
+  transaction: TransactionARembourser,
   client: Prisma.TransactionClient | typeof db = db,
 ): Promise<SuiteDuRetrait> {
+  const transactionId = transaction.id;
+  const packCode = transaction.packCode;
+  const prixMineur = versMineur(transaction.amount, transaction.currency);
   /*
     Le remboursement d'un passage à Dossier — décision définitive S.92.
 
@@ -1299,9 +1367,74 @@ async function suiteDuQuotaDuPack(
       redactionUtilisee: debitsDeRedaction + appels > 0,
     });
     return suite.suite === "RETRAIT_INTEGRAL"
-      ? { ...suite, octroi: octroi?.id ?? null }
+      ? { ...suite, octroi: octroi?.id ?? null, montant: prixMineur }
       : { suite: "REVUE_MANUELLE", motif: suite.motif, consommees: octroi?.consommees ?? 0 };
   }
+
+  /*
+    Le pack entamé — RG-15.2, décision du 06/10/2026.
+
+    La consommation se lit par le rejeu FIFO du grand livre, imputée à
+    **l'octroi de ce pack** (S.92) : les analyses d'une recharge achetée
+    avant lui ne l'entament pas, et une analyse rendue n'est pas comptée.
+    Lue sur chaque dossier que le pack a servi — un Pro peut en servir
+    trois —, et sous le verrou du grand livre quand l'appelant le tient.
+  */
+  const pack = packDeLAchat(packCode);
+  if (pack) {
+    const [servis, dossier] = await Promise.all([
+      client.analysisCredit.findMany({
+        where: { transactionId, delta: { gt: 0 } },
+        select: { applicationId: true },
+        distinct: ["applicationId"],
+      }),
+      client.application.findUnique({
+        where: { id: applicationId },
+        select: { submittedAt: true, status: true },
+      }),
+    ]);
+    const dossiers = [...new Set([applicationId, ...servis.map((d) => d.applicationId)])];
+    const parDossier = await Promise.all(
+      dossiers.map(async (id) =>
+        repartir(await lignesDuGrandLivre(id, client)).octrois.filter(
+          (o) => o.transactionId === transactionId && o.reason === "ACHAT_PACK",
+        ),
+      ),
+    );
+    const consommees = parDossier.flat().reduce((n, o) => n + o.consommees, 0);
+    const surCeDossier = parDossier[0] ?? [];
+
+    const verdict = montantDuRemboursement({
+      prixMineur,
+      analysesDuPack: pack.analyses,
+      consommees,
+      dossierDepose: dossier?.submittedAt != null,
+      dossierClos: dossier ? ETATS_CLOS.has(dossier.status) : false,
+      dossiersServis: servis.length,
+    });
+    switch (verdict.verdict) {
+      case "integral":
+      case "prorata":
+        return {
+          suite: "RETRAIT_INTEGRAL",
+          // Ce qui reste du pack sur ce dossier : les analyses consommées
+          // restent consommées, le grand livre ne se réécrit pas.
+          retire: surCeDossier.reduce((n, o) => n + Math.max(0, o.restantes), 0),
+          octroi: surCeDossier[0]?.id ?? null,
+          montant: verdict.montant,
+        };
+      case "manuel":
+        return { suite: "REVUE_MANUELLE", motif: verdict.motif, consommees };
+      case "rien_a_rendre":
+        return { suite: "REVUE_MANUELLE", motif: verdict.motif, consommees, rienARendre: true };
+      default: {
+        const jamais: never = verdict;
+        throw new Error(`Verdict de remboursement non arbitré : ${JSON.stringify(jamais)}`);
+      }
+    }
+  }
+
+  // Une recharge, une consultation : la règle d'avant RG-15.2, inchangée.
   const [octrois, consommations, octroiDuPack] = await Promise.all([
     client.analysisCredit.aggregate({
       where: { applicationId, transactionId, delta: { gt: 0 } },
@@ -1321,7 +1454,7 @@ async function suiteDuQuotaDuPack(
   const consommees = Math.abs(consommations._sum.delta ?? 0);
   const suite = suiteDuQuota(ouvertes, consommees);
   return suite.suite === "RETRAIT_INTEGRAL"
-    ? { ...suite, octroi: octroiDuPack?.id ?? null }
+    ? { ...suite, octroi: octroiDuPack?.id ?? null, montant: prixMineur }
     : {
         suite: "REVUE_MANUELLE",
         motif: `${MOTIF_REVUE_PARTIELLE} ${suite.consommees} analyse(s) consommée(s) sur ${suite.ouvertes}.`,
@@ -1523,11 +1656,15 @@ export async function ouvrirUnRemboursement(
     // demande, qui s'adresse par référence et non par identifiant — la
     // relire serait une seconde requête pour une donnée déjà lue.
     select: {
+      id: true,
       reference: true,
       status: true,
       refundDueAt: true,
       refundedAt: true,
       packCode: true,
+      amount: true,
+      currency: true,
+      applicationId: true,
       // Une montée confirmée et non remboursée qui part de cet achat (S.92).
       montees: {
         where: { status: "CONFIRMEE", refundedAt: null },
@@ -1554,9 +1691,31 @@ export async function ouvrirUnRemboursement(
     return { ouvert: false, raison: "aucun encaissement à rendre" };
   }
 
+  /*
+    Combien on doit — RG-15.2, décision du 06/10/2026.
+
+    Un pack entamé se rembourse au prorata des analyses restantes, tant
+    que le dossier n'est ni déclaré déposé ni clos. Tout consommé, il n'y a
+    rien à rendre : l'obligation ne s'ouvre pas, et la raison le dit — une
+    dette à zéro ne se verse pas, elle encombre B-04.
+
+    Lu ici sans verrou, pour que B-04 montre la somme dès la décision ;
+    l'initiation la relit sous le verrou du grand livre, au moment où les
+    droits partent, et c'est cette seconde lecture qui la fige. Une revue
+    manuelle laisse la colonne nulle : le montant n'est pas fixé.
+  */
+  let refundAmount: number | null = versMineur(transaction.amount, transaction.currency);
+  if (transaction.applicationId) {
+    const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction);
+    if (suite.suite === "REVUE_MANUELLE" && suite.rienARendre) {
+      return { ouvert: false, raison: suite.motif };
+    }
+    refundAmount = suite.suite === "RETRAIT_INTEGRAL" ? suite.montant : null;
+  }
+
   await db.transaction.update({
     where: { id: transactionId },
-    data: { refundDueAt: maintenant, refundBasis: motif },
+    data: { refundDueAt: maintenant, refundBasis: motif, refundAmount },
   });
   return { ouvert: true, reference: transaction.reference };
 }

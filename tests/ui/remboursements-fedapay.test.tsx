@@ -46,6 +46,7 @@ const dette = (autre: Partial<DetteFedaPay> = {}): DetteFedaPay => ({
   reference: "IMP-260918-FEDAPA",
   compte: "awa@example.bj",
   montant: 25_000,
+  montantARendre: 25_000,
   devise: "XOF",
   etape: "DECIDE",
   motif: "Suppression du compte avant la limite d'annulation",
@@ -120,5 +121,22 @@ describe("B-04 — remboursements FedaPay", () => {
     render(<RemboursementsFedaPay dettes={[dette({ initiee: false })]} />);
     expect(screen.getByText(/pas encore initié/u)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Déclarer/u })).toBeNull();
+  });
+
+  /**
+   * RG-15.2 — un pack entamé se rembourse au prorata des analyses
+   * restantes. Le geste par défaut du tableau de bord rend le prix payé :
+   * la ligne doit dire la somme exacte, et quoi faire si elle ne se saisit
+   * pas.
+   */
+  it("partielle, elle dit la somme exacte à rembourser, et non le prix payé", () => {
+    const { container } = render(
+      <RemboursementsFedaPay dettes={[dette({ montant: 5000, montantARendre: 3000 })]} />,
+    );
+    const texte = (container.textContent ?? "").replace(/\s/gu, " ");
+    expect(texte).toContain("5 000 F payés");
+    expect(texte).toContain("À rembourser : 3 000 F — remboursement partiel");
+    expect(texte).toContain("rembourse exactement 3 000 F CFA, et non les 5 000 F CFA payés");
+    expect(texte).toMatch(/ne rembourse rien et signale la dette à la direction/u);
   });
 });

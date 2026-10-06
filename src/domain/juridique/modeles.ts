@@ -198,12 +198,12 @@ const CONDITIONS: ModeleJuridique = {
     h("10. Remboursements"),
     l(
       "Pack non entamé. Le remboursement retire l'intégralité des analyses du pack.",
+      "Pack entamé : remboursé au prorata des analyses restantes, tant que le dossier n'est ni déclaré déposé ni clos ; au-delà, la demande est examinée par l'équipe.",
       "Passage au pack supérieur. Le supplément est remboursé tant que les analyses ajoutées sont intactes et qu'aucune rédaction assistée n'a servi depuis le passage. Sinon, la demande est examinée par l'équipe. Le pack d'origine ne peut être remboursé seul tant que le passage n'a pas été remboursé.",
       "Consultation. Elle s'annule ou se reporte sans frais jusqu'à {{annulation_consultation}} avant le rendez-vous. Au-delà, elle est due.",
       "Ce qui reste acquis. Un remboursement retire les droits non consommés dès qu'il est engagé. Les réponses, textes et versions du candidat ne sont jamais retirés.",
       "Versement. Le remboursement est versé sur le moyen de paiement utilisé. Il n'est tenu pour effectué qu'à la confirmation du prestataire, et peut mettre quelques jours à apparaître selon la banque ou l'opérateur.",
     ),
-    p("{{remboursement_entame}}"),
     p("{{remboursement_mobile_money}}"),
     p("{{remboursement_demande}}"),
     h("11. Consultants"),

@@ -90,7 +90,7 @@ Les prix sont affichés toutes taxes comprises [À TRANCHER — régime de TVA a
 ## 10. Remboursements
 
 - **Pack non entamé.** Le remboursement retire l'intégralité des analyses du pack.
-- **Pack entamé.** La demande est examinée par l'équipe, au cas par cas. [À TRANCHER — la documentation interne mentionne un remboursement au prorata des analyses consommées ; le produit, lui, n'en calcule aucun.]
+- **Pack entamé.** Remboursé au prorata des analyses restantes, tant que le dossier n'est ni déclaré déposé ni clos ; au-delà, la demande est examinée par l'équipe. (Tranché par la direction le 06/10/2026, RG-15.2.)
 - **Passage d'Essentiel à Dossier.** Le supplément est remboursé tant que les 20 analyses ajoutées sont intactes et qu'aucune rédaction assistée n'a servi depuis le passage. Sinon, la demande est examinée par l'équipe. L'Essentiel d'origine ne peut être remboursé seul tant que le passage n'a pas été remboursé.
 - **Consultation.** Elle s'annule ou se reporte sans frais jusqu'à 24 heures avant le rendez-vous. Au-delà, elle est due.
 - **Ce qui reste acquis.** Un remboursement retire les droits non consommés dès qu'il est engagé. Les réponses, textes et versions du candidat ne sont jamais retirés.
@@ -172,7 +172,7 @@ Toute réclamation peut être adressée à [À COMPLÉTER — adresse réellemen
 | Moyen de paiement selon la devise ; prestataires FedaPay et Stripe | `src/domain/payments/rail.ts` (N.A) |
 | Paiement acquis à la seule notification signée | `CLAUDE.md` (INV-7), DOC-11 RG-05.1 à 05.4 |
 | Reçu et non facture | `src/domain/paiement/recu.ts`, préalable M.C |
-| Remboursement : pack non entamé, pack entamé en revue, versement à la confirmation du prestataire | `src/domain/paiement/remboursement.ts` (K.C) |
+| Remboursement : pack non entamé, pack entamé au prorata des analyses restantes (revue au-delà du dépôt ou de la clôture), versement à la confirmation du prestataire | `src/domain/paiement/remboursement.ts` (K.C, RG-15.2) |
 | Remboursement FedaPay par MTN Mobile Money seulement | `remboursement.ts`, S.91 |
 | Version de la règle figée à l'ouverture, choix en cas de changement | `CLAUDE.md` (INV-3), DOC-11 WF-11 |
 | Source et date sur chaque règle ; fiche non relue retirée ; source secondaire jamais affichée | `CLAUDE.md` (INV-4, INV-8), DOC-11 RG-14.1, RG-14.2 |
