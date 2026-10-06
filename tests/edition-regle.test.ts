@@ -411,9 +411,8 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
     ]) {
       expect(inertes(lire(ecran)), ecran).toEqual([]);
     }
-    expect(COMMANDES_ATTENDUES_B04.map((c) => c.libelle)).toEqual([
-      "Lancer le rapprochement",
-    ]);
+    // S.122 : le rapprochement manuel est rétabli, le registre est vide.
+    expect(COMMANDES_ATTENDUES_B04.map((c) => c.libelle)).toEqual([]);
   });
 
   /**
@@ -425,10 +424,8 @@ describe("aucune commande inerte n'apparaît sans être nommée", () => {
     const b07 = "src/app/(admin)/couts-ia/CoutsIa.tsx";
     expect(Object.keys(EN_ATTENTE_DE_BRANCHEMENT)).not.toContain(b07);
     expect(inertes(lire(b07))).toEqual([]);
-    expect(COMMANDES_ATTENDUES.map((c) => c.libelle)).toEqual([
-      "Modifier les plafonds",
-      "Exporter le détail des appels",
-    ]);
+    // S.122 : l'export est rétabli ; « Modifier les plafonds » attend un arbitrage.
+    expect(COMMANDES_ATTENDUES.map((c) => c.libelle)).toEqual(["Modifier les plafonds"]);
   });
 
   /** Chaque entrée dit ce qui lui manque, pas seulement qu'elle manque. */

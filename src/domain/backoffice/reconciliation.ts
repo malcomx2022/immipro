@@ -372,11 +372,87 @@ export function exportDuGrandLivre(
 export const nomDuGrandLivre = (jour: string): string =>
   nomDatable("grand-livre", jour, jour);
 
+// ── Lancer le rapprochement — rétabli, S.122 ───────────────────────────
+
+/**
+ * Le compte rendu d'une passe de rapprochement lancée à la main.
+ *
+ * Le bouton avait été retiré parce que rapprocher demande d'interroger
+ * l'opérateur, et que l'interrogation n'était pas branchée. Elle l'est :
+ * le job de réconciliation consulte FedaPay. Le bouton revient donc, et
+ * il appelle **la même fonction que le worker** — il n'a ni sa propre
+ * logique, ni son propre chemin d'écriture (INV-7) : un état retrouvé
+ * s'applique par le service des webhooks signés, jamais par l'écran.
+ *
+ * Quatre nombres, et ils se somment : les transactions **consultées**
+ * (le fournisseur a répondu) se partagent entre celles dont l'état
+ * retrouvé a été **appliqué** et celles **inchangées** ; les
+ * **indisponibles** sont les autres, celles dont rien n'a été écrit.
+ */
+export interface BilanDeLaPasse {
+  /** Transactions en attente assez anciennes pour être consultées. */
+  examinees: number;
+  /** Parmi elles, celles dont le fournisseur n'a pas répondu. */
+  indisponibles: number;
+  /** États retrouvés chez le fournisseur et appliqués. */
+  rattrapees: number;
+}
+
+export interface ResumeDuRapprochement {
+  /** Transactions pour lesquelles le fournisseur a répondu. */
+  consultees: number;
+  /** Dont l'état retrouvé a été appliqué. */
+  appliquees: number;
+  /** Dont la réponse n'a rien changé : état identique, ou anomalie portée en écart. */
+  inchangees: number;
+  /** Sans réponse : rien n'a été écrit, une absence de réponse n'est pas un refus. */
+  indisponibles: number;
+}
+
+export function resumerLeRapprochement(bilan: BilanDeLaPasse): ResumeDuRapprochement {
+  const indisponibles = Math.min(Math.max(bilan.indisponibles, 0), bilan.examinees);
+  const consultees = bilan.examinees - indisponibles;
+  const appliquees = Math.min(Math.max(bilan.rattrapees, 0), consultees);
+  return { consultees, appliquees, inchangees: consultees - appliquees, indisponibles };
+}
+
+const pluriel = (n: number, un: string, plusieurs: string): string =>
+  `${n} ${n > 1 ? plusieurs : un}`;
+
+/**
+ * Ce que la passe a fait, en une phrase — jamais « terminé » tout court.
+ *
+ * Trois cas se distinguent parce qu'ils appellent trois gestes : rien
+ * n'attendait (rien à faire), personne n'a répondu (la passe n'a rien
+ * prouvé : elle le dit et dit quand elle reviendra), ou le fournisseur a
+ * répondu pour tout ou partie.
+ */
+export function phraseDuRapprochement(resume: ResumeDuRapprochement): string {
+  const total = resume.consultees + resume.indisponibles;
+  if (total === 0) {
+    return "Aucune transaction n'attendait de rapprochement : il n'y avait rien à consulter.";
+  }
+  if (resume.consultees === 0) {
+    return `Le fournisseur n'a répondu pour aucune des ${pluriel(total, "transaction", "transactions")}. Rien n'a été modifié : une absence de réponse n'est pas un refus. Relancez la passe quand l'API répondra ; la passe automatique repasse de toute façon toutes les quinze minutes.`;
+  }
+  const base = `${pluriel(resume.consultees, "transaction consultée", "transactions consultées")} : ${pluriel(resume.appliquees, "état appliqué", "états appliqués")}, ${pluriel(resume.inchangees, "inchangée", "inchangées")}.`;
+  return resume.indisponibles > 0
+    ? `${base} ${pluriel(resume.indisponibles, "transaction sans réponse du fournisseur, laissée", "transactions sans réponse du fournisseur, laissées")} en l'état.`
+    : base;
+}
+
+export const MENTION_RAPPROCHEMENT_MANUEL =
+  "Une passe interroge le fournisseur sur les transactions en attente de plus de dix minutes, comme celle qui tourne seule toutes les quinze minutes. Elle applique l'état retrouvé par le même service que les notifications signées, et ne force aucun paiement.";
+
 /**
  * Ce que B-04 devrait porter et ne porte pas encore.
  *
  * Même registre qu'`ACTIONS_ATTENDUES` en B-03 et `COMMANDES_ATTENDUES`
  * en B-07 : le bouton part, le besoin reste nommé.
+ *
+ * **Vide depuis S.122** : « Lancer le rapprochement » était la seule
+ * entrée, et l'interrogation de l'opérateur qui lui manquait est branchée.
+ * Le registre est gardé — une commande retirée demain s'y nommera.
  */
 export interface CommandeAttendue {
   cle: string;
@@ -384,22 +460,5 @@ export interface CommandeAttendue {
   manque: string;
 }
 
-export const COMMANDES_ATTENDUES_B04: readonly CommandeAttendue[] = [
-  {
-    cle: "rapprochement-manuel",
-    libelle: "Lancer le rapprochement",
-    /**
-     * Le bouton changeait de libellé selon l'état de l'opérateur —
-     * « Lancer » quand il répondait, « Rapprocher à la main » quand il se
-     * taisait — et ne faisait rien dans les deux cas. Le second libellé
-     * était le plus trompeur : il proposait la seule chose qui aurait
-     * servi pendant un incident.
-     *
-     * Rapprocher demande d'interroger l'opérateur, et `interrogation`
-     * n'est pas branchée. Une relance manuelle n'a de sens que le jour où
-     * il y a quelqu'un à relancer.
-     */
-    manque:
-      "l'interrogation de l'opérateur, qui n'est pas branchée : sans elle il n'y a personne à interroger",
-  },
-];
+export const COMMANDES_ATTENDUES_B04: readonly CommandeAttendue[] = [];
+

@@ -40,6 +40,7 @@ import {
 } from "@/domain/backoffice/couts";
 import { moyenDe } from "@/domain/paiement/recu";
 import { bornesDesJoursCivils, jourCivil } from "@/domain/format/fuseau";
+import type { AppelIA } from "@/domain/backoffice/appels-ia";
 import { depuisDateCivile } from "@/domain/dossiers/depot";
 
 /**
@@ -600,6 +601,14 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "paiements.export": "PAIEMENT",
   "journal.export": "COMPTE",
   /**
+   * L'export des appels IA (B-07) et le rapprochement lancé à la main
+   * (B-04) : le premier emporte la consommation entière d'une période, il
+   * se range avec l'administration comme l'export du journal ; le second
+   * est un geste sur les paiements.
+   */
+  "couts-ia.export": "COMPTE",
+  "paiement.rapprochement.manuel": "PAIEMENT",
+  /**
    * B-09 — l'habilitation d'un consultant.
    *
    * Classée avec les comptes : c'est d'une personne qu'il s'agit, de son
@@ -1058,6 +1067,38 @@ export async function consommationParFournisseur(
       };
     })
     .sort((a, b) => b.jetonsEntree + b.jetonsSortie - (a.jetonsEntree + a.jetonsSortie));
+}
+
+/**
+ * Les appels IA d'une période, un par ligne, sans plafond — export de B-07.
+ *
+ * Comme `journalDeLaPeriode` : un export tronqué en silence serait une
+ * attestation fausse, d'où l'absence de plafond — la période est bornée à
+ * la demande (`obstacleALaPeriode`), pas ici. La sélection est
+ * **nominativement pauvre** : ni `userId`, ni `operation`. B-07 n'en montre
+ * aucun, et le fichier ne doit pas en savoir plus que l'écran.
+ */
+export async function appelsDeLaPeriode(periode: { du: string; au: string }): Promise<AppelIA[]> {
+  const lignes = await db.aiUsage.findMany({
+    where: { createdAt: bornesDesJoursCivils(periode.du, periode.au) },
+    select: {
+      createdAt: true,
+      provider: true,
+      model: true,
+      inputTokens: true,
+      outputTokens: true,
+      applicationId: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return lignes.map((l) => ({
+    horodatage: l.createdAt.toISOString(),
+    fournisseur: fournisseurDeLUsage(l.provider),
+    modele: l.model,
+    jetonsEntree: l.inputTokens,
+    jetonsSortie: l.outputTokens,
+    dossierId: l.applicationId,
+  }));
 }
 
 /** Une règle du back-office, par identifiant — B-02. */

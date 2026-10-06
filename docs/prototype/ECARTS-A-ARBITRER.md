@@ -11451,3 +11451,21 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 - l'alerte en cas d'échec ;
 - la sauvegarde du stockage objet des pièces ;
 - la restauration de contrôle.
+
+## S.122 — Deux commandes de back-office rétablies, une reste en attente
+
+**B-04 « Lancer le rapprochement » est rétabli.** L'interrogation de FedaPay est branchée dans le job de réconciliation. Le bouton lance donc une passe à la demande, avec la même fonction que le worker (RG-05.4).
+- Il ne force aucun paiement : l'état retrouvé s'applique par le service des notifications signées (INV-7).
+- Un verrou consultatif PostgreSQL, partagé avec le job du quart d'heure, empêche deux passes simultanées. Si une passe tourne déjà, la route refuse avec un 409 explicite, et le worker saute sa propre passe tant que le verrou est pris.
+- Le compte rendu donne le nombre de transactions consultées, appliquées, inchangées, et sans réponse du fournisseur.
+- Chaque passe est journalisée (`paiement.rapprochement.manuel`).
+
+*Limite connue.* Le verrou vit dans une transaction plafonnée à dix minutes. Une passe plus longue, par exemple une quarantaine de transactions en attente avec un fournisseur lent, ferait expirer la transaction et libérerait le verrou, alors que le travail continue sur une autre connexion. Sans conséquence au volume du pilote. À revoir si la file dépasse quelques dizaines de transactions : un bail en table, ou une passe découpée en lots.
+
+**B-07 « Exporter le détail des appels » est rétabli.** C'est un export CSV d'une période de 366 jours au plus ; une période plus longue est refusée avec la marche à suivre, plutôt que tronquée.
+- Colonnes : fournisseur, modèle, jetons d'entrée et de sortie, coût, jour, référence du dossier.
+- Le coût est recalculé au tarif actuel. Sans tarif, la cellule reste vide, jamais à zéro.
+- Aucune donnée de candidat : ni compte, ni nature d'opération.
+- L'export est journalisé avant la réponse (`couts-ia.export`).
+
+**Reste à arbitrer.** « Modifier les plafonds » (B-07) demeure retiré : faut-il des seuils réglables depuis l'écran, ou des seuils fixés en règle de gestion (RG-16.1) ?

@@ -82,6 +82,8 @@ export type CodeEchec =
   | "signature_invalide"
   | "paiement_introuvable"
   | "recu_indisponible"
+  // Back-office
+  | "rapprochement_en_cours"
   // Contenu éditorial et textes d'une règle
   | "publication_refusee"
   // Infrastructure
@@ -412,6 +414,15 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
       "Rien n'est écrit : la version enregistrée reste celle d'avant, et rien de ce que tu as écrit n'est perdu.",
     action: "Corriger les passages signalés",
     ton: "echec",
+  },
+  rapprochement_en_cours: {
+    statut: 409,
+    titre: "Un rapprochement est déjà en cours",
+    corps:
+      "Une passe interroge déjà le fournisseur, lancée par le job automatique ou par un autre administrateur. En lancer une seconde ferait consulter deux fois les mêmes transactions.",
+    conserve: "Cette demande n'a rien modifié : la passe en cours va à son terme.",
+    action: "Réessayer dans quelques minutes",
+    ton: "limite",
   },
   service_indisponible: {
     statut: 503,

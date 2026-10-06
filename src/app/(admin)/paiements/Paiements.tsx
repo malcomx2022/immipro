@@ -6,6 +6,7 @@ import { MENTION_AUDIT } from "@/domain/backoffice/navigation";
 import {
   LIBELLE_RAPPROCHEMENT,
   MENTION_ECARTS,
+  MENTION_RAPPROCHEMENT_MANUEL,
   MENTION_TOTAL_SUSPENDU,
   agreger,
   nomDuGrandLivre,
@@ -62,13 +63,20 @@ import { RemboursementsFedaPay } from "./RemboursementsFedaPay";
  * paiement est exactement ce qu'il est — et, pendant un incident, la raison
  * de l'absence des totaux à la place des totaux.
  *
- * ── Le rapprochement manuel, lui, est parti ─────────────────────────────
+ * ── Le rapprochement manuel est revenu (S.122) ──────────────────────────
  *
  * Le second bouton proposait « Lancer le rapprochement » ou « Rapprocher à
  * la main » selon l'état de l'opérateur, et rien derrière : aucune route,
- * et `interrogation` n'est pas branchée. C'est la règle de Q.A — ce qui
- * manque est nommé dans `COMMANDES_ATTENDUES_B04`, et l'écran continue de
- * dire ce qu'il dit déjà : le rapprochement automatique reprendra seul.
+ * et l'interrogation n'était pas branchée. Il avait été retiré, son besoin
+ * nommé dans `COMMANDES_ATTENDUES_B04`.
+ *
+ * Le job de réconciliation consulte maintenant FedaPay, et le bouton
+ * revient avec un seul libellé : il n'y a plus deux états de l'opérateur à
+ * distinguer, il y a une passe, et son compte rendu — consultées,
+ * appliquées, inchangées, sans réponse. Le bouton ne force aucun
+ * paiement : il demande au fournisseur, et l'état retrouvé s'applique par
+ * le service des notifications signées (INV-7). Le registre des commandes
+ * attendues est vide.
  */
 const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
   hour: "2-digit",
@@ -239,6 +247,34 @@ export function Paiements({
   const publiable = operateur ? totalPubliable(operateur) : false;
   const [envoiExport, setEnvoiExport] = useState(false);
   const [echecExport, setEchecExport] = useState<EchecCandidat | null>(null);
+  const router = useRouter();
+  const [rapprochementEnCours, setRapprochementEnCours] = useState(false);
+  const [echecRapprochement, setEchecRapprochement] = useState<EchecCandidat | null>(null);
+  const [compteRendu, setCompteRendu] = useState<string | null>(null);
+
+  /**
+   * Une passe de rapprochement, à la demande — S.122.
+   *
+   * Le compte rendu reste affiché jusqu'à la passe suivante : il dit ce
+   * qui vient de se faire, et ne se confond pas avec le tableau qui, lui,
+   * se recharge. Un échec — dont « déjà en cours » — vient du contrat du
+   * serveur, avec ce qui est conservé.
+   */
+  async function rapprocher() {
+    setRapprochementEnCours(true);
+    setEchecRapprochement(null);
+    setCompteRendu(null);
+    const resultat = await appeler<{ phrase: string }>("/api/admin/paiements/rapprochement", {
+      corps: {},
+    });
+    setRapprochementEnCours(false);
+    if (!resultat.ok) {
+      setEchecRapprochement(resultat.echec);
+      return;
+    }
+    setCompteRendu(resultat.donnees.phrase);
+    router.refresh();
+  }
 
   /**
    * L'export part même pendant un incident : ce sont ses totaux que le
@@ -268,19 +304,44 @@ export function Paiements({
               : `${journee} · dernier rapprochement automatique le ${momentEnFrancais(operateur.dernierRapprochement)}`
         }
         actions={
-          <Button
-            variante="secondaire"
-            disabled={envoiExport}
-            raisonDesactivation="Préparation du fichier en cours."
-            onClick={exporter}
-          >
-            {envoiExport ? "Préparation…" : "Exporter le grand livre"}
-          </Button>
+          <>
+            <Button
+              variante="secondaire"
+              chargement={rapprochementEnCours}
+              onClick={() => void rapprocher()}
+            >
+              {rapprochementEnCours ? "Rapprochement en cours…" : "Lancer le rapprochement"}
+            </Button>
+            <Button
+              variante="secondaire"
+              disabled={envoiExport}
+              raisonDesactivation="Préparation du fichier en cours."
+              onClick={exporter}
+            >
+              {envoiExport ? "Préparation…" : "Exporter le grand livre"}
+            </Button>
+          </>
         }
       />
 
       <div className="flex flex-col gap-4 p-6">
         {echecExport ? <BlocEchec echec={echecExport} annonce /> : null}
+        {echecRapprochement ? <BlocEchec echec={echecRapprochement} annonce /> : null}
+        {/*
+          Le compte rendu d'une passe lancée à la main. Région vivante : il
+          apparaît à la suite d'un geste, et le lecteur d'écran doit le dire.
+        */}
+        {compteRendu ? (
+          <p
+            role="status"
+            className="max-w-[80ch] text-pretty rounded-lg border border-ink-300 bg-white p-4 text-14 text-ink-900"
+          >
+            {compteRendu}
+          </p>
+        ) : null}
+        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+          {MENTION_RAPPROCHEMENT_MANUEL}
+        </p>
 
         {incident ? (
           <section className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">

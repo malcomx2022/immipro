@@ -63,6 +63,13 @@ export interface Bilan {
    * un remboursement sans avoir (M.C, 04/10/2026).
    */
   piecesEmises: number;
+  /**
+   * Transactions examinées dont le fournisseur n'a pas répondu — adaptateur
+   * non branché, appel en erreur. Rien n'a été écrit pour elles : une
+   * absence de réponse n'est pas un refus. B-04 en fait le compte rendu de
+   * la passe lancée à la main (S.122).
+   */
+  indisponibles: number;
 }
 
 /** Le consultant du fournisseur d'une transaction, mis en cache par passe. */
@@ -92,6 +99,7 @@ export async function reconcilierLesPaiements(
     creditsAcheves: await acheverLesCreditsEnSouffrance(),
     tenuesLiberees: await libererLesTenuesEchues(maintenant),
     piecesEmises: 0,
+    indisponibles: 0,
   };
 
   for (const transaction of enAttente) {
@@ -107,6 +115,8 @@ export async function reconcilierLesPaiements(
           // dix-neuf autres à examiner.
           .catch(() => ({ issue: "indisponible" as const, detail: "appel en erreur" }))
       : ({ issue: "indisponible", detail: "aucun consultant configuré" } as const);
+
+    if (vu.issue === "indisponible") bilan.indisponibles += 1;
 
     /*
       Un écart de consultation n'est pas l'écart de délai : celui-ci dit
@@ -271,4 +281,46 @@ async function acheverLesCreditsEnSouffrance(): Promise<number> {
     }).catch(() => undefined);
   }
   return acheves;
+}
+
+/**
+ * Une passe, sans jamais en recouvrir une autre — S.122.
+ *
+ * Le worker passe tous les quarts d'heure, et B-04 peut maintenant en
+ * lancer une à la main. Dans le worker, pg-boss n'exécute qu'une tâche à la
+ * fois pour cette file ; mais le processus web et le worker sont deux
+ * processus, et rien ne les empêchait de balayer les mêmes transactions en
+ * même temps — deux consultations du fournisseur pour une seule ligne, deux
+ * passes qui écrivent le même écart. L'état retrouvé reste protégé par
+ * l'idempotence d'`appliquerLaNotification` (rien n'est crédité deux fois),
+ * mais la double consultation coûte un appel au fournisseur et brouille
+ * le compte rendu.
+ *
+ * Un verrou consultatif de transaction, pris en tête et tenu pendant toute
+ * la passe, sérialise donc les deux appelants : **le worker et l'action de
+ * B-04 passent tous les deux par ici**. Il se relâche à la fin de la
+ * transaction, erreur ou arrêt du processus compris — aucun verrou orphelin
+ * ne peut bloquer les passes suivantes.
+ *
+ * Rend `null` quand une autre passe tient le verrou : l'appelant le dit,
+ * plutôt que d'attendre puis de refaire le travail qu'on vient de faire.
+ */
+export const CLE_DU_VERROU_DE_RECONCILIATION = "reconciliation-paiements";
+
+/** Une passe de plus de dix minutes n'est plus une passe : la transaction cède. */
+const DUREE_MAXIMALE_D_UNE_PASSE_MS = 10 * 60 * 1000;
+
+export async function reconcilierSansRecouvrement(
+  maintenant = new Date(),
+  consultantDe?: Annuaire,
+): Promise<Bilan | null> {
+  return db.$transaction(
+    async (tx) => {
+      const verrou = await tx.$queryRaw<{ pris: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtextextended(${CLE_DU_VERROU_DE_RECONCILIATION}, 0)) AS pris`;
+      if (!verrou[0]?.pris) return null;
+      return reconcilierLesPaiements(maintenant, consultantDe);
+    },
+    { timeout: DUREE_MAXIMALE_D_UNE_PASSE_MS, maxWait: 5_000 },
+  );
 }

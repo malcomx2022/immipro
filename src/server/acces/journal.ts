@@ -76,6 +76,14 @@ export type ActionAuditee =
   // qui a emporté quoi.
   | "journal.export"
   | "paiements.export"
+  /** L'export du détail des appels IA d'une période — B-07, S.122. */
+  | "couts-ia.export"
+  /**
+   * Une passe de rapprochement lancée depuis B-04 — S.122. Les passes du
+   * worker s'écrivent `paiement.reconciliation` sous l'acteur système ;
+   * celle-ci porte le nom de l'administrateur qui l'a déclenchée.
+   */
+  | "paiement.rapprochement.manuel"
   // B-09 — l'habilitation d'un consultant et son retrait. RG-12.1 exige la
   // vérification ; ce sont ces lignes qui disent qui l'a faite, quand, et
   // sur quoi elle portait. Un retrait date l'accréditation sans l'effacer,

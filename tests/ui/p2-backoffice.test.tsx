@@ -54,7 +54,14 @@ vi.mock("@/lib/api", () => ({
     appels.push({ url, corps: options.corps, methode: options.methode });
     return Promise.resolve(
       reponse.ok
-        ? { ok: true, donnees: reponse.donnees ?? { id: "brouillon-de-test", version: 5 } }
+        ? {
+            ok: true,
+            donnees:
+              reponse.donnees ??
+              (url.endsWith("/rapprochement")
+                ? { phrase: "3 transactions consultées : 1 état appliqué, 2 inchangées." }
+                : { id: "brouillon-de-test", version: 5 }),
+          }
         : {
             ok: false,
             echec: {
@@ -1012,19 +1019,57 @@ describe("B-04 — Paiements", () => {
     expect(container.textContent).toContain("Le fichier n'a pas pu être préparé");
   });
 
-  /** Aucune route, et `interrogation` n'est pas branchée. */
-  it("ne propose plus un rapprochement manuel qui n'existe pas", () => {
-    render(
-      <Paiements
-        paiements={PAIEMENTS}
-        operateur={OPERATEUR}
-        journee="Journée du 18 septembre 2026"
-        jourIso="2026-09-18"
-        aujourdhuiIso="2026-09-18"
-      />,
-    );
-    expect(screen.queryByRole("button", { name: /rapprochement/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Rapprocher/ })).toBeNull();
+  /**
+   * S.122 — le bouton est revenu : l'interrogation est branchée et la route
+   * existe. Le test clique, comme celui de « Publier » : un bouton relié à
+   * rien passerait un test qui ne lit que le libellé.
+   */
+  describe("Lancer le rapprochement", () => {
+    const rendre = () =>
+      render(
+        <Paiements
+          paiements={PAIEMENTS}
+          operateur={OPERATEUR}
+          journee="Journée du 18 septembre 2026"
+          jourIso="2026-09-18"
+          aujourdhuiIso="2026-09-18"
+        />,
+      );
+
+    it("demande une passe au serveur et en affiche le compte rendu", async () => {
+      appels.length = 0;
+      rafraichir.mockClear();
+      reponse = { ok: true };
+      rendre();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Lancer le rapprochement" }));
+      });
+      expect(appels).toEqual([
+        { url: "/api/admin/paiements/rapprochement", corps: {}, methode: undefined },
+      ]);
+      expect(screen.getByRole("status").textContent).toContain(
+        "3 transactions consultées : 1 état appliqué, 2 inchangées.",
+      );
+      // Le tableau se recharge : l'état retrouvé change des lignes.
+      expect(rafraichir).toHaveBeenCalled();
+    });
+
+    it("affiche le refus du serveur, sans compte rendu", async () => {
+      appels.length = 0;
+      reponse = { ok: false };
+      const { container } = rendre();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Lancer le rapprochement" }));
+      });
+      reponse = { ok: true };
+      expect(container.textContent).toContain("Le serveur a refusé");
+      expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("ne propose plus l'ancien libellé, et ne change pas selon l'état de l'opérateur", () => {
+      rendre();
+      expect(screen.queryByRole("button", { name: /Rapprocher à la main/ })).toBeNull();
+    });
   });
 
   it("garde les paiements en attente, transaction inconnue", () => {
