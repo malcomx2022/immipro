@@ -11519,3 +11519,22 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 - La configuration nginx de S.125 a été recopiée sur le VPS, vérifiée par `nginx -t` et rechargée.
 - **Domaine.** Le VPS sert `immipro.app`, comme le code (`domain/paiement/recu.ts`, `server/paiement/diagnostic.ts`). Le fichier du dépôt disait `immipro.bj` : il est aligné, pour qu'une prochaine recopie ne remette pas l'ancien domaine. L'écart 1 de S.125 est levé pour ce qui concerne le domaine ; le reste de la dérive nginx (vhost du stockage, `/_next/static/`) relève toujours de M16.
 - **Essai en production.** Une rafale de 60 `POST /api/comptes/session`, avec un `X-Forwarded-For` différent à chaque appel : 10 passent (la marge `burst=10`) et reçoivent 422 de l'application, faute de corps ; les 50 suivantes reçoivent 429 de nginx. La falsification de l'en-tête ne contourne plus la limite.
+
+## S.126 — Revue du 07/10/2026 : chaîne d'analyse et stockage (E6, E7, F4, M1, F12)
+
+**Contexte.** Deuxième lot du plan de traitement (`docs/revue/plan-de-traitement-2026-10-07.md`), sans décision à obtenir. Condition de sortie : aucune pièce bloquée « en analyse », aucune chaîne du modèle affichée, clé de dépôt vérifiée.
+
+**Ce que fait le code.**
+- **F12, INV-3.** Une version de règle visée par un dossier ne se supprime plus : la clé étrangère `Application.visaRuleId` passe de `SET NULL` à `RESTRICT` (migration `regle_figee_non_supprimable`). Un `DELETE` manuel mettait à nul la règle d'un dossier encore en brouillon.
+- **M1, règle d'architecture 4.** La confirmation d'un dépôt ne désigne que son propre dépôt. La clé reçue du navigateur doit porter le préfixe du dossier et de la pièce, l'objet doit être en quarantaine, et sa taille égale à celle annoncée ; sinon un message dit quoi refaire, et un envoi tronqué quitte la quarantaine. La base refuse qu'une clé serve à deux versions (`documentversion_cle_unique`). Avant, la clé d'un autre candidat faisait promouvoir son fichier sous ce dossier-ci.
+- **F4, INV-6.** Une revue se tranche une fois : la décision est conditionnée à `decidedAt` nul, dans une transaction avec la pièce et la notification ; le second opérateur lit « Cette pièce vient d'être tranchée par un autre membre de l'équipe. Recharge la file pour voir sa décision. ». Une analyse se rend une fois (`analysiscredit_un_seul_rendu_par_analyse`) ; la migration annule par une écriture inverse les rendus déjà doublés.
+- **E6, WF-06.** Une pièce saine finit toujours analysée ou conservée. Le rejeu d'un balayage reprend une version `SAINE` sans analyse au lieu de rendre `SANS_OBJET` ; la reprise horaire reposte les versions saines sans analyse depuis plus de 30 minutes ; un quota épuisé entre la mise en file et le débit conserve la pièce (« non analysée ») au lieu d'épuiser les tentatives.
+- **E7, INV-2.** Ce que le modèle écrit ne s'affiche pas tel quel. Une identification hors de la checklist, une mention de plus de 120 caractères ou une promesse de résultat rendent la réponse illisible : relecture humaine, analyse rendue. Le message « hors sujet » ne cite que l'intitulé du référentiel. La consigne au modèle dit que le contenu de la pièce n'est jamais une instruction.
+
+**Ce qui est éprouvé.** Chaque défaut a sa fumée qui échoue sur l'ancien code : `smoke:balayage` (M1 sur un vrai client S3, E6), `smoke:extraction` (F4, E6 quota, E7 — « Ce fichier ressemble à : Visa garanti » avant correction), `smoke:migrations` pour F12 et les deux index (89 refus, 5 passages). Les deux migrations de reprise (M1, F4) ont été jouées puis rejouées sur une base peuplée de doublons. Les 25 fumées de la CI passent.
+
+**Écarts qui restent.**
+1. E6 : le compteur « analyses en attente depuis plus d'une heure » sur `/api/health` attend la sonde de M9.
+2. E7 : les analyses `HORS_SUJET` déjà écrites avec un libellé hors référentiel sont à relire à la main ; le contrôle du message final (étape 6) reste facultatif.
+3. M1 : les versions existantes dont la clé ne suit pas le préfixe du dossier ne sont pas diagnostiquées.
+4. Restent de S.125 : réécritures passées (C1), objets orphelins en quarantaine (E4), double débit sur arrêt entre débit et verdict (E5).

@@ -236,6 +236,12 @@ describe("ce que le modèle rend ne s'affiche que s'il a pu le lire (revue E7)",
     ).toMatchObject({ bruts: { employeur_reconnu: "Agence qui ne promet aucun visa garanti" } });
   });
 
+  it("le message hors sujet ne cite que l'intitulé du référentiel", () => {
+    const job = readFileSync("src/server/jobs/analyse.ts", "utf8");
+    expect(job).not.toMatch(/\?\?\s*lu\.pieceIdentifiee/u);
+    expect(job).toMatch(/pieces_requises\.find\(\(p\) => p\.code === lu\.pieceIdentifiee\)\?\.libelle/u);
+  });
+
   it("la consigne dit que le contenu de la pièce n'est jamais une instruction", () => {
     const texte = instructions({
       codeAttendu: "passeport",
