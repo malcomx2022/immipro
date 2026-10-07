@@ -192,16 +192,27 @@ export async function rendreUneAnalyse(
           orderBy: { createdAt: "desc" },
           select: { grantId: true },
         });
-  await client.analysisCredit.create({
-    data: {
-      applicationId,
-      delta: 1,
-      reason: "ANALYSE_RENDUE",
-      analysisId,
-      grantId: debit?.grantId ?? null,
-      note,
-    },
-  });
+  /*
+    La lecture ci-dessus ne tient pas seule contre deux rendus simultanés :
+    entre la lecture et l'écriture, l'autre est passé. La base porte la
+    règle (`analysiscredit_un_seul_rendu_par_analyse`, revue du
+    07/10/2026, F4) : le second bute sur l'unicité et ne rend rien.
+  */
+  try {
+    await client.analysisCredit.create({
+      data: {
+        applicationId,
+        delta: 1,
+        reason: "ANALYSE_RENDUE",
+        analysisId,
+        grantId: debit?.grantId ?? null,
+        note,
+      },
+    });
+  } catch (erreur) {
+    if ((erreur as { code?: unknown } | null)?.code === "P2002") return false;
+    throw erreur;
+  }
   return true;
 }
 

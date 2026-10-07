@@ -332,6 +332,21 @@ SELECT refuse(
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
 
+-- Une analyse ne se rend qu'une fois (07/10/2026, revue F4) ; un rendu de
+-- tentative, sans analyse, n'est pas concerné.
+INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason, "analysisId")
+  VALUES ('ar1','a0',1,'ANALYSE_RENDUE','an1');
+
+SELECT refuse(
+  'INV-6 · un second rendu de la même analyse',
+  $q$INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason, "analysisId")
+     VALUES ('ar2','a0',1,'ANALYSE_RENDUE','an1')$q$);
+
+SELECT passe(
+  'INV-6 · deux rendus de tentative, sans analyse',
+  $q$INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason)
+     VALUES ('ar3','a0',1,'ANALYSE_RENDUE'), ('ar4','a0',1,'ANALYSE_RENDUE')$q$);
+
 -- Une version s'analyse une fois (07/10/2026, revue E5) : un rejeu de la
 -- file ne débite pas une seconde lecture et n'écrit pas un second verdict.
 SELECT refuse(

@@ -97,17 +97,24 @@ export async function trancherLaRevue(
   const document = revue.analysis.version.document;
   const rendu = recrediteLeQuota(tranche.decision);
 
-  await journaliser({
-    acteurId: operateur.id,
-    action: "revue.decision",
-    cible: `document:${document.id}`,
-    motif: tranche.motif,
-    details: { decision: tranche.decision },
-  });
+  /*
+    Une revue se tranche une fois — revue du 07/10/2026, F4.
 
-  await db.$transaction([
-    db.manualReview.update({
-      where: { id: revue.id },
+    La garde `decidedAt` ci-dessus lit l'état avant d'écrire. Deux
+    opérateurs qui tranchent la même pièce dans la même seconde la
+    passaient tous deux : deux décisions, deux avis au candidat, et deux
+    analyses rendues. L'écriture est donc conditionnée à `decidedAt` nul,
+    et c'est elle qui départage ; le perdant ne laisse rien.
+
+    La décision, l'état de la pièce et l'avis tombent ensemble. L'avis
+    part avec la décision et jamais sans elle : annoncer ce que la
+    transaction n'aurait pas retenu enverrait le candidat lire un état
+    qui n'existe pas. Le corps est le message de l'opérateur tel quel —
+    c'est lui que le candidat doit lire, et le résumer le trahirait.
+  */
+  await db.$transaction(async (tx) => {
+    const { count } = await tx.manualReview.updateMany({
+      where: { id: revue.id, decidedAt: null },
       data: {
         reviewerId: operateur.id,
         decision: tranche.decision,
@@ -115,31 +122,39 @@ export async function trancherLaRevue(
         creditRefunded: rendu,
         decidedAt: new Date(),
       },
-    }),
-    db.document.update({
+    });
+    if (count === 0) {
+      throw echec("etat_incompatible", {
+        corps:
+          "Cette pièce vient d'être tranchée par un autre membre de l'équipe. Recharge la file pour voir sa décision.",
+      });
+    }
+    await tx.document.update({
       where: { id: document.id },
       data: {
         status: tranche.decision,
         feedback: tranche.message,
         analyzedAt: new Date(),
       },
-    }),
-  ]);
+    });
+    await tx.notification.create({
+      data: {
+        userId: document.application.userId,
+        applicationId: document.applicationId,
+        kind: "ANALYSE",
+        title: TITRE_DE_LA_DECISION[tranche.decision],
+        body: tranche.message,
+      },
+    });
+  });
 
-  /*
-    L'avis part après l'écriture, et non avant : annoncer une décision que
-    la transaction n'aurait pas retenue enverrait le candidat lire un état
-    qui n'existe pas. Le corps est le message de l'opérateur tel quel —
-    c'est lui que le candidat doit lire, et le résumer le trahirait.
-  */
-  await db.notification.create({
-    data: {
-      userId: document.application.userId,
-      applicationId: document.applicationId,
-      kind: "ANALYSE",
-      title: TITRE_DE_LA_DECISION[tranche.decision],
-      body: tranche.message,
-    },
+  // Au journal, la décision retenue, et elle seule.
+  await journaliser({
+    acteurId: operateur.id,
+    action: "revue.decision",
+    cible: `document:${document.id}`,
+    motif: tranche.motif,
+    details: { decision: tranche.decision },
   });
 
   if (rendu) {

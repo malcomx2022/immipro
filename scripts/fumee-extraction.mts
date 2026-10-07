@@ -1061,6 +1061,50 @@ try {
     désormais hors de `next/headers`, et cette fumée compte ce qui est
     réellement écrit.
   */
+  /*
+    Revue du 07/10/2026, F4. La garde `decidedAt` lisait avant d'écrire :
+    deux opérateurs qui tranchaient la même pièce dans la même seconde
+    passaient tous deux — deux décisions, deux avis, deux rendus.
+  */
+  console.log("\nDeux décisions simultanées sur la même revue : une seule passe (F4)");
+  {
+    reponseDuService = { statut: 401, corps: '{"type":"error","error":{"type":"authentication_error"}}' };
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+    const analyse = await analyseDe(p.version.id);
+    const revue = await db.manualReview.findFirstOrThrow({ where: { analysisId: analyse!.id } });
+    const avisAvant = await db.notification.count({ where: { applicationId: p.application.id } });
+    const operateurs = await Promise.all(
+      [1, 2].map((n) =>
+        db.user.create({
+          data: { email: `fumee-f4-${n}-${process.pid}@exemple.test`, role: "ADMIN" },
+        }),
+      ),
+    );
+    const MESSAGE =
+      "La photo est trop sombre pour lire la date d'expiration. Reprends-la près d'une fenêtre, sans flash, en cadrant la page entière.";
+
+    const issues = await Promise.allSettled(
+      operateurs.map((o) =>
+        trancherLaRevue(
+          revue.id,
+          { id: o.id },
+          { decision: "ILLISIBLE", message: MESSAGE, motif: "Relecture simultanée" },
+        ),
+      ),
+    );
+    const reussies = issues.filter((i) => i.status === "fulfilled").length;
+    verifier(reussies === 1, `une seule décision est retenue (${reussies} sur 2)`);
+    verifier(
+      (await db.notification.count({ where: { applicationId: p.application.id } })) === avisAvant + 1,
+      "un seul avis part au candidat",
+    );
+    const rendus = await db.analysisCredit.count({
+      where: { analysisId: analyse!.id, reason: "ANALYSE_RENDUE" },
+    });
+    verifier(rendus <= 1, `l'analyse n'est rendue qu'une fois au plus (${rendus})`);
+  }
+
   console.log("\nLa décision d'une revue manuelle parvient au candidat");
   {
     reponseDuService = { statut: 401, corps: '{"type":"error","error":{"type":"authentication_error"}}' };
