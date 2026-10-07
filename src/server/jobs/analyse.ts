@@ -23,6 +23,8 @@ import {
   type DemandeDeLecture,
 } from "@/domain/dossiers/extraction";
 import { lExtracteur, type Extracteur } from "@/server/dossiers/extracteur";
+import { EchecHttp } from "@/server/http/echecs";
+import { conserverFauteDeQuota } from "./balayage";
 
 /**
  * Analyse d'une pièce — WF-06.
@@ -262,7 +264,23 @@ export async function analyserUnePiece(
   // gratuite à chaque interruption, et l'invariant dit « jamais de
   // dépassement silencieux », pas « le plus souvent ».
   // L'octroi entamé est gardé : un rendu y retourne (S.92).
-  const debit = consomme ? await debiterUneAnalyse(tache.applicationId) : null;
+  /*
+    Le quota a pu s'épuiser entre la promotion et ce débit : une autre
+    pièce ou la rédaction assistée a pris la dernière analyse. Le débit
+    lève `quota_epuise`, et le job échouait sept fois avant que la file
+    l'abandonne, la pièce restant « en analyse ». Elle est conservée, comme
+    à la promotion (revue du 07/10/2026, E6).
+  */
+  let debit: Awaited<ReturnType<typeof debiterUneAnalyse>> | null = null;
+  if (consomme) {
+    try {
+      debit = await debiterUneAnalyse(tache.applicationId);
+    } catch (erreur) {
+      if (!(erreur instanceof EchecHttp) || erreur.echec.code !== "quota_epuise") throw erreur;
+      await conserverFauteDeQuota(document.id, tache);
+      return "TERMINEE";
+    }
+  }
   const entame = debit?.octroi ?? null;
 
   const lu = await extraire(
@@ -379,12 +397,17 @@ export async function analyserUnePiece(
     reclasser le fichier, l'autre laisse chercher. Le repli sur les
     champs nuls reste dans `evaluerConditions` — il attrape le fichier
     qui ne ressemble à rien de la liste.
+
+    Seul l'intitulé du référentiel s'affiche, jamais ce que le modèle a
+    écrit : `lireLaReponse` refuse déjà un code hors checklist, et un
+    code sans intitulé ne nomme aucune ligne où reclasser (revue E7).
   */
-  if (lu.pieceIdentifiee !== null && lu.pieceIdentifiee !== document.code) {
-    const attendue =
-      regles?.pieces_requises.find((p) => p.code === lu.pieceIdentifiee)?.libelle ??
-      lu.pieceIdentifiee;
-    return acheverHorsSujet(tache, version.id, document.id, application.userId, attendue, {
+  const intituleReconnu =
+    lu.pieceIdentifiee !== null && lu.pieceIdentifiee !== document.code
+      ? regles?.pieces_requises.find((p) => p.code === lu.pieceIdentifiee)?.libelle
+      : undefined;
+  if (intituleReconnu !== undefined) {
+    return acheverHorsSujet(tache, version.id, document.id, application.userId, intituleReconnu, {
       consomme,
       ligne: debit?.ligne ?? null,
       entame,

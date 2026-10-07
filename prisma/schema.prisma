@@ -299,8 +299,12 @@ model Application {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Snapshot de la règle au moment de l'ouverture (INV-3).
+  ///
+  /// `Restrict` : une version qu'un dossier a figée ne se supprime pas.
+  /// La valeur par défaut, `SetNull`, laissait un dossier en brouillon
+  /// perdre sa règle sans trace (revue du 07/10/2026, F12).
   visaRuleId String?
-  visaRule   VisaRule? @relation(fields: [visaRuleId], references: [id])
+  visaRule   VisaRule? @relation(fields: [visaRuleId], references: [id], onDelete: Restrict)
 
   status ApplicationStatus @default(BROUILLON)
 

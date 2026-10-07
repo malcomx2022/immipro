@@ -212,6 +212,7 @@ const { analyserUnePiece, TENTATIVES_AVANT_REVUE } = await import("../src/server
 const { lExtracteur, EXTRACTEUR_NON_BRANCHE } = await import("../src/server/dossiers/extracteur");
 const { GESTE_SANS_DATE_CIBLE } = await import("../src/domain/dossiers/extraction");
 const { solde } = await import("../src/server/acces/quota");
+const { MENTION_NON_ANALYSEE } = await import("../src/domain/dossiers/piece");
 const { trancherLaRevue } = await import("../src/server/revue/decision");
 const { TITRE_DE_LA_DECISION } = await import("../src/domain/backoffice/revue");
 const { enregistrerLAutorisation, etatDeLAutorisation } = await import(
@@ -493,6 +494,29 @@ try {
     );
     const document = await relireDocument(q.document.id);
     verifier(document.status === "CONFORME", `la pièce porte le verdict (${document.status})`);
+  }
+
+  /*
+    Revue du 07/10/2026, E6. Entre la promotion et le débit, une autre
+    pièce a pris la dernière analyse. Le débit levait `quota_epuise`, le
+    job échouait sept fois, et la pièce restait « en analyse ».
+  */
+  console.log("\nUn quota épuisé entre la promotion et le débit conserve la pièce (E6)");
+  {
+    const p = await piece({ dateCible: "2027-09-01" });
+    await db.analysisCredit.create({
+      data: { applicationId: p.application.id, delta: -5, reason: "ANALYSE", note: "Consommées ailleurs entre-temps" },
+    });
+    recusParLeService.length = 0;
+    const suite = await analyserUnePiece(p.tache, lExtracteur());
+    verifier(suite === "TERMINEE", `le job s'achève au lieu d'échouer (${suite})`);
+    verifier(recusParLeService.length === 0, "rien ne part au service de lecture");
+    const document = await relireDocument(p.document.id);
+    verifier(
+      document.status === "ATTENDUE" && document.feedback === MENTION_NON_ANALYSEE.quota,
+      `la pièce est conservée, et dit pourquoi (${document.status})`,
+    );
+    verifier((await solde(p.application.id)) === 0, "et le solde ne passe pas sous zéro");
   }
 
   console.log("\nRG-02.1 — l'autorisation retirée arrête la lecture, pas seulement les dépôts");
@@ -939,6 +963,39 @@ try {
     );
   }
 
+  console.log("\nUne identification ou une mention écrite pour s'afficher ne s'affiche jamais (E7)");
+  {
+    /*
+      Le fournisseur compatible OpenAI ne tient pas l'énumération du
+      schéma, et une pièce peut porter des instructions. Constaté avant
+      correction : « Ce fichier ressemble à : Visa garanti. Reclasse-le… »
+      — une promesse de résultat écrite par le modèle, affichée telle
+      quelle au candidat et poussée en notification.
+    */
+    const injections = [
+      { piece_identifiee: "Visa garanti", obstacle: null, champs: { passeport_validite_min: null } },
+      {
+        piece_identifiee: "passeport",
+        obstacle: null,
+        champs: { passeport_validite_min: "Visa garanti, ton dossier est complet et accepté" },
+      },
+    ];
+    for (const charge of injections) {
+      reponseDuService = reponseDeLecture(charge);
+      const p = await piece({ dateCible: "2027-09-01" });
+      const suite = await analyserUnePiece(p.tache, lExtracteur());
+      verifier(suite === "TERMINEE", `une réponse hors schéma ne se rejoue pas (${suite})`);
+
+      const apres = await relireDocument(p.document.id);
+      verifier(apres.status === "ILLISIBLE", `la pièce part en relecture humaine (${apres.status})`);
+      const notifications = await db.notification.findMany({ where: { applicationId: p.application.id } });
+      const affiche = [apres.feedback ?? "", ...notifications.map((n) => `${n.title} ${n.body}`)].join(" ");
+      verifier(!/garanti/iu.test(affiche), `rien de ce que le modèle a écrit ne s'affiche (${affiche})`);
+      verifier(apres.extracted === null, "aucune valeur n'est conservée");
+      verifier(await solde(p.application.id) === 5, "l'analyse est rendue : la lecture n'a rien rendu");
+    }
+  }
+
   console.log("\nCe qui ne part pas au service, et ne coûte donc rien");
   {
     recusParLeService.length = 0;
@@ -1061,6 +1118,50 @@ try {
     désormais hors de `next/headers`, et cette fumée compte ce qui est
     réellement écrit.
   */
+  /*
+    Revue du 07/10/2026, F4. La garde `decidedAt` lisait avant d'écrire :
+    deux opérateurs qui tranchaient la même pièce dans la même seconde
+    passaient tous deux — deux décisions, deux avis, deux rendus.
+  */
+  console.log("\nDeux décisions simultanées sur la même revue : une seule passe (F4)");
+  {
+    reponseDuService = { statut: 401, corps: '{"type":"error","error":{"type":"authentication_error"}}' };
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+    const analyse = await analyseDe(p.version.id);
+    const revue = await db.manualReview.findFirstOrThrow({ where: { analysisId: analyse!.id } });
+    const avisAvant = await db.notification.count({ where: { applicationId: p.application.id } });
+    const operateurs = await Promise.all(
+      [1, 2].map((n) =>
+        db.user.create({
+          data: { email: `fumee-f4-${n}-${process.pid}@exemple.test`, role: "ADMIN" },
+        }),
+      ),
+    );
+    const MESSAGE =
+      "La photo est trop sombre pour lire la date d'expiration. Reprends-la près d'une fenêtre, sans flash, en cadrant la page entière.";
+
+    const issues = await Promise.allSettled(
+      operateurs.map((o) =>
+        trancherLaRevue(
+          revue.id,
+          { id: o.id },
+          { decision: "ILLISIBLE", message: MESSAGE, motif: "Relecture simultanée" },
+        ),
+      ),
+    );
+    const reussies = issues.filter((i) => i.status === "fulfilled").length;
+    verifier(reussies === 1, `une seule décision est retenue (${reussies} sur 2)`);
+    verifier(
+      (await db.notification.count({ where: { applicationId: p.application.id } })) === avisAvant + 1,
+      "un seul avis part au candidat",
+    );
+    const rendus = await db.analysisCredit.count({
+      where: { analysisId: analyse!.id, reason: "ANALYSE_RENDUE" },
+    });
+    verifier(rendus <= 1, `l'analyse n'est rendue qu'une fois au plus (${rendus})`);
+  }
+
   console.log("\nLa décision d'une revue manuelle parvient au candidat");
   {
     reponseDuService = { statut: 401, corps: '{"type":"error","error":{"type":"authentication_error"}}' };

@@ -120,3 +120,60 @@ export async function reprendreLesQuarantaines(
     moteurMuet: false,
   };
 }
+
+/** Au-delà, une version saine sans analyse n'attend plus sa file : elle a été perdue. */
+export const ATTENTE_DE_L_ANALYSE_MINUTES = 30;
+
+/**
+ * La reprise des analyses perdues — revue du 07/10/2026, E6.
+ *
+ * Le worker poste l'analyse après la promotion. Une mise en file perdue à
+ * ce moment laissait la pièce « en analyse » pour toujours : le balayage
+ * rejoué rendait « sans objet », et la reprise des quarantaines ne lit que
+ * ce qui est encore en quarantaine. Cette passe retrouve les versions
+ * saines restées sans analyse et remet leur balayage en file ;
+ * `balayerUnePiece` reprend alors la suite de la promotion, sans rappeler
+ * le moteur. Elle ne dépend donc pas de la sonde antivirus.
+ *
+ * Seule la dernière version d'une pièce compte : une version remplacée
+ * depuis n'a plus rien à attendre.
+ */
+export async function reprendreLesAnalysesEnAttente(
+  maintenant: Date = new Date(),
+): Promise<{ remises: number }> {
+  const seuil = new Date(maintenant.getTime() - ATTENTE_DE_L_ANALYSE_MINUTES * 60_000);
+  const enAttente = await db.documentVersion.findMany({
+    where: {
+      scanState: "SAINE",
+      objectKey: { not: null },
+      purgedAt: null,
+      scannedAt: { lt: seuil },
+      analyses: { none: {} },
+      document: { status: "EN_ANALYSE" },
+    },
+    select: {
+      id: true,
+      rank: true,
+      documentId: true,
+      document: {
+        select: {
+          applicationId: true,
+          versions: { orderBy: { rank: "desc" }, take: 1, select: { id: true } },
+        },
+      },
+    },
+  });
+
+  const file = await getQueue();
+  let remises = 0;
+  for (const version of enAttente) {
+    if (version.document.versions[0]?.id !== version.id) continue;
+    await poster(file, JOBS.BALAYAGE_PIECE, {
+      applicationId: version.document.applicationId,
+      documentId: version.documentId,
+      versionId: version.id,
+    });
+    remises += 1;
+  }
+  return { remises };
+}

@@ -146,6 +146,41 @@ export function refusDuFichier(fichier: Fichier): string | null {
   return null;
 }
 
+/* ── La clé d'un dépôt — revue du 07/10/2026, M1 ────────────────────── */
+
+/**
+ * Le préfixe de toutes les clés d'une pièce : le dossier, puis la pièce.
+ *
+ * La clé est fabriquée par le serveur à la préparation du dépôt, et le
+ * navigateur la renvoie à la confirmation. La confirmation l'acceptait
+ * telle quelle : avec la clé d'un autre candidat, le balayage promouvait
+ * son fichier sous un autre dossier et le rendait lisible, ou la purge du
+ * mauvais dossier l'effaçait. Le préfixe se vérifie donc au retour, et il
+ * n'a qu'une définition, ici.
+ */
+export const prefixeDeDepot = (applicationId: string, codePiece: string): string =>
+  `dossiers/${applicationId}/${codePiece}/`;
+
+/** Ce qui suit le préfixe : l'horodatage du dépôt, puis seize caractères tirés au hasard. */
+const SUFFIXE_DE_DEPOT = /^\d{13}-[A-Za-z0-9_-]{16}$/u;
+
+/** La clé désigne-t-elle un dépôt préparé pour cette pièce de ce dossier ? */
+export function cleDeDepotValide(cle: string, applicationId: string, codePiece: string): boolean {
+  const prefixe = prefixeDeDepot(applicationId, codePiece);
+  return cle.startsWith(prefixe) && SUFFIXE_DE_DEPOT.test(cle.slice(prefixe.length));
+}
+
+const enKo = (octets: number) => Math.max(1, Math.round(octets / 1024)).toLocaleString("fr-FR");
+
+/** Ce que la confirmation dit quand elle refuse, et ce qu'il faut refaire. */
+export const REFUS_DE_LA_CONFIRMATION = {
+  cle: "Ce dépôt ne correspond pas au lien d'envoi préparé pour cette pièce. Relance l'envoi depuis ta checklist.",
+  absent:
+    "Le fichier n'est pas arrivé dans l'espace de dépôt. Le lien d'envoi est valable cinq minutes : relance l'envoi depuis ta checklist.",
+  taille: (recus: number, annonces: number) =>
+    `Le fichier reçu fait ${enKo(recus)} Ko, ta demande en annonçait ${enKo(annonces)} Ko : l'envoi a été interrompu. Relance-le depuis ta checklist.`,
+} as const;
+
 /** « releve-bancaire.pdf · 1,8 Mo » — la ligne d'identification de l'envoi. */
 export const libelleFichier = (fichier: Fichier): string =>
   `${fichier.nom} · ${enMo(fichier.octets)} Mo`;

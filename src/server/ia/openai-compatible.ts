@@ -310,7 +310,7 @@ export async function lireDesOctetsCompatible(
   } catch {
     return echoue("reponse_illisible", "la réponse n'est pas du JSON");
   }
-  const relue = lireLaReponse(charge, demande.champs);
+  const relue = lireLaReponse(charge, demande.champs, demande.codesDeLaChecklist);
   if ("cause" in relue) return echoue(relue.cause, "la réponse n'a pas la forme annoncée au schéma");
   if (relue.obstacle !== null) return echoue(relue.obstacle, "le modèle signale un obstacle à la lecture");
 

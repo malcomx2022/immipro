@@ -107,6 +107,18 @@ export async function balayerUnePiece(
     include: inclusDuDocument,
   });
   if (!version || !version.objectKey) return "SANS_OBJET";
+  /*
+    Saine, mais jamais analysée — revue du 07/10/2026, E6.
+
+    Le worker poste l'analyse après la promotion. Si cette mise en file
+    échoue, la file rejoue le balayage ; il rendait « sans objet » sur une
+    version déjà saine, et la pièce restait « en analyse » pour toujours.
+    Le rejeu reprend donc la suite de la promotion, sans rappeler le
+    moteur : le verdict est acquis, seule l'analyse manque.
+  */
+  if (version.scanState === "SAINE" && (await analyseEnAttente(version))) {
+    return suiteApresPromotion(version, tache);
+  }
   // Déjà décidée : une reprise de file ne rebalaie pas, et surtout ne
   // redescend pas une version saine en quarantaine.
   if (version.scanState !== "EN_QUARANTAINE") return "SANS_OBJET";
@@ -162,7 +174,34 @@ async function admettre(version: Version, tache: Tache): Promise<Suite> {
       ...SOLDE_DE_LATTENTE,
     },
   });
+  return suiteApresPromotion(version, tache);
+}
 
+/**
+ * Une version saine attend son analyse : aucune analyse écrite, la pièce
+ * toujours « en analyse », et aucune version plus récente déposée depuis.
+ */
+async function analyseEnAttente(version: Version): Promise<boolean> {
+  if (version.document.status !== "EN_ANALYSE") return false;
+  const [analyses, plusRecente] = await Promise.all([
+    db.documentAnalysis.count({ where: { versionId: version.id } }),
+    db.documentVersion.count({
+      where: { documentId: version.documentId, rank: { gt: version.rank } },
+    }),
+  ]);
+  return analyses === 0 && plusRecente === 0;
+}
+
+/**
+ * Ce qui suit la promotion : l'analyse, ou la conservation sans analyse.
+ *
+ * Partagée par la promotion et par sa reprise (E6) : deux décisions du
+ * même fait finiraient par diverger.
+ */
+async function suiteApresPromotion(
+  version: Pick<Version, "documentId">,
+  tache: Tache,
+): Promise<Suite> {
   /*
     RG-02.1 — l'autorisation d'analyse est révocable, et un retrait arrête
     la lecture à venir, pas seulement les dépôts suivants. Elle se relit
@@ -192,6 +231,16 @@ async function admettre(version: Version, tache: Tache): Promise<Suite> {
   // Sans pack, il n'y a pas d'analyses épuisées : il n'y en a jamais eu.
   const { total } = await compteur(tache.applicationId);
   return conserver(version.documentId, tache, total > 0 ? "quota" : "sans_pack");
+}
+
+/**
+ * Le quota s'est épuisé entre la promotion et le débit : une autre pièce,
+ * ou la rédaction assistée, a pris la dernière analyse. La pièce est
+ * conservée comme si le quota avait manqué à la promotion (E6).
+ */
+export async function conserverFauteDeQuota(documentId: string, tache: Tache): Promise<void> {
+  const { total } = await compteur(tache.applicationId);
+  await conserver(documentId, tache, total > 0 ? "quota" : "sans_pack");
 }
 
 /**

@@ -112,6 +112,13 @@ SELECT refuse(
 INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
   VALUES ('v3','d1',3,'minio/y','abc');
 
+-- Une clé d'objet ne sert qu'à une version (07/10/2026, revue M1) : deux
+-- versions sur le même objet le rendent lisible depuis deux dossiers.
+SELECT refuse(
+  'M1 · une seconde version sur la clé d''objet d''une autre',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
+     VALUES ('v3b','d1',30,'minio/y','abc-autre')$q$);
+
 SELECT refuse(
   'RG-06.2 · deux versions de même empreinte sur une même pièce',
   $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
@@ -289,6 +296,12 @@ SELECT refuse(
   'INV-3 · une version qu''un dossier référence ne se réécrit pas, même jamais datée',
   $q$UPDATE "VisaRule" SET rules = '{"libelle":"autre"}' WHERE id = 'vr13'$q$);
 
+-- Et elle ne se supprime pas (07/10/2026, revue F12) : la clé étrangère
+-- mettait à nul la règle d'un dossier encore en brouillon.
+SELECT refuse(
+  'INV-3 · une version qu''un dossier en brouillon a figée ne se supprime pas',
+  $q$DELETE FROM "VisaRule" WHERE id = 'vr13'$q$);
+
 INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
     rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
   VALUES ('vr14','NL','etudes','ETUDES',102,'2026-01-01','{}','https://x','OFFICIEL',
@@ -318,6 +331,21 @@ SELECT refuse(
 
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
+
+-- Une analyse ne se rend qu'une fois (07/10/2026, revue F4) ; un rendu de
+-- tentative, sans analyse, n'est pas concerné.
+INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason, "analysisId")
+  VALUES ('ar1','a0',1,'ANALYSE_RENDUE','an1');
+
+SELECT refuse(
+  'INV-6 · un second rendu de la même analyse',
+  $q$INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason, "analysisId")
+     VALUES ('ar2','a0',1,'ANALYSE_RENDUE','an1')$q$);
+
+SELECT passe(
+  'INV-6 · deux rendus de tentative, sans analyse',
+  $q$INSERT INTO "AnalysisCredit" (id, "applicationId", delta, reason)
+     VALUES ('ar3','a0',1,'ANALYSE_RENDUE'), ('ar4','a0',1,'ANALYSE_RENDUE')$q$);
 
 -- Une version s'analyse une fois (07/10/2026, revue E5) : un rejeu de la
 -- file ne débite pas une seconde lecture et n'écrit pas un second verdict.

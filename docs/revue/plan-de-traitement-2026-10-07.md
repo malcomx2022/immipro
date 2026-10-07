@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 07/10/2026.** Le lot 1 (S.125) est livré : C1, E1, E4 et E5. Tout le reste est à faire.
+**État au 07/10/2026.** Les lots S.125 (C1, E1, E4, E5) et S.126 (E6, E7, F4, M1, F12) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -107,7 +107,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | Lot | Points | Effort | Décisions | Condition de sortie |
 |---|---|---|---|---|
 | **S.125 — livré** | C1, E1, E4, E5 | — | — | Version figée intouchable, débit compté par la vraie adresse, purge des deux zones, une analyse par version |
-| S.126 — chaîne d'analyse et stockage | E6, E7, F4, M1, F12 | M+M+S+M+S | Sans décision | Aucune pièce bloquée « en analyse », aucune chaîne du modèle affichée, clé de dépôt vérifiée |
+| **S.126 — livré** | E6, E7, F4, M1, F12 | M+M+S+M+S | Sans décision | Aucune pièce bloquée « en analyse », aucune chaîne du modèle affichée, clé de dépôt vérifiée |
 | S.127 — comptes | M3, M2, N1 | S+M+S | D-3, D-22 (M3 sans décision) | Compteurs d'essais atomiques, pas d'énumération, case « Rester connecté » honorée |
 | S.128 — paiements I | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
 | S.129 — paiements II | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
@@ -145,7 +145,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### C1 — INV-3 : une version mise en vigueur peut être réécrite en place
 
-**État : livré en S.125** (tous les défauts liés compris, sauf le diagnostic des réécritures passées, à faire relire par la veille). F12 reste à faire.
+**État : livré en S.125** (tous les défauts liés compris, sauf le diagnostic des réécritures passées, à faire relire par la veille). F12 est livré en S.126.
 
 **Constat vérifié.** `src/server/jobs/veille.ts:33-36` repasse en `DRAFT` une version publiée dont la relecture est dépassée, sans toucher `publishedAt`. `VersionDeRegle` (`src/domain/backoffice/regle.ts:155-159`) n'a que `{id, version, statut}`. `destinationDeLEnregistrement` prend le premier `DRAFT` (l.207-208) et `src/server/regles/edition.ts:238-251` fait un `update` en place. `exigerUnEnregistrementAffichable` ne regarde que `PUBLISHED` (l.122).
 
@@ -182,6 +182,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 ---
 
 #### F12 — `Application.visaRuleId` en `ON DELETE SET NULL`
+
+**État : livré en S.126.** Le garde-fou refuse la suppression d'une règle visée par un dossier `BROUILLON`.
 
 **Constat vérifié.** `20260918000000_socle/migration.sql:559` ; Prisma applique `SetNull` par défaut. La contrainte « pas de dossier hors brouillon sans règle » protège déjà les autres statuts. Aucun code ne supprime de `VisaRule` : le risque vient d'un SQL manuel.
 
@@ -227,6 +229,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### E6 — Une pièce `SAINE` n'est jamais analysée si la mise en file échoue
 
+**État : livré en S.126**, étapes 1 à 4. Reste l'étape 5 : le compteur de `/api/health`, à poser avec la sonde de M9.
+
 **Constat vérifié.** `src/server/jobs/worker.ts:51-54` affirme que le rejeu répare le cas. Or au rejeu, `balayerUnePiece` rend `SANS_OBJET` dès que la version n'est plus en quarantaine (`balayage.ts:112`), et `reprendreLesQuarantaines` ne lit que `EN_QUARANTAINE` (`quarantaine.ts:79-84`). La pièce reste `EN_ANALYSE`.
 
 **Même symptôme non relevé.** Si `debiterUneAnalyse` lève `quota_epuise` dans le job (une autre pièce a pris la dernière analyse), le job échoue sept fois et la pièce reste « en analyse ».
@@ -256,6 +260,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### E7 — Sortie du modèle non validée, texte libre affiché au candidat
 
+**État : livré en S.126**, étapes 1 à 5. Reste l'étape 6 (contrôle du message final), que les étapes 1 et 2 rendent redondante sur les deux canaux constatés.
+
 **Constat vérifié.** `lireLaReponse` accepte n'importe quelle chaîne pour `piece_identifiee` (`src/domain/dossiers/extraction.ts:411-414`, rendue l.438), alors que `schemaDeLaLecture` annonce une énumération. Côté compatible OpenAI, `strict: false` (`openai-compatible.ts:283`). `analyse.ts:360-364` se replie sur la chaîne brute, affichée dans « Ce fichier ressemble à : … » (l.483). **Second canal non relevé** : la valeur brute d'un champ « texte » est citée dans le message « à corriger » (`verification.ts:450-457`). `instructions()` n'a aucune consigne contre l'injection.
 
 **Règle.** INV-1, INV-2, RG-06.1, RG-06.3, RG-08.6.
@@ -284,6 +290,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### F4 — Recrédit en double d'une analyse
 
+**État : livré en S.126.** Le rendu double est attrapé par l'index unique partiel (`P2002` rend faux) plutôt que par le verrou du grand livre : la base départage, comme pour E5.
+
 **Constat vérifié.** `rendreUneAnalyse` fait `findFirst` puis `create` (`src/server/acces/quota.ts:176-199`), hors de `sousVerrouDuGrandLivre`. En amont, `trancherLaRevue` lit `decidedAt` (`src/server/revue/decision.ts:84-86`) puis met à jour sans condition : deux opérateurs tranchent tous les deux.
 
 **Règle.** INV-6, RG-06.3, B-05.
@@ -303,6 +311,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 ---
 
 #### M1 — Clé d'objet libre à la confirmation du dépôt
+
+**État : livré en S.126.** Reste le diagnostic des versions existantes dont la clé ne suit pas le préfixe du dossier.
 
 **Constat vérifié.** `PUT …/depot` reçoit `cle: z.string().min(1)` (`route.ts:117`) et `enregistrerLaVersion` l'écrit telle quelle (`src/server/acces/pieces.ts:176-196`). Aucune vérification de préfixe, d'existence ni de taille ; aucune unicité sur `objectKey`. Avec la clé d'un tiers (horodatage plus 12 octets aléatoires, `secret.ts:142-143`) : si l'objet est en quarantaine, le balayage de l'attaquant promeut le fichier de la victime et le lui rend lisible ; s'il est promu, la purge ou la suppression du compte de l'attaquant efface le fichier de la victime.
 
@@ -1368,9 +1378,9 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 |---|---|---|
 | S.125 (livrée) | `20261007150000_version_figee_immuable` | Date de mise en vigueur des versions figées ; déclencheur `regle_figee_immuable` |
 | S.125 (livrée) | `20261007160000_une_analyse_par_version` | Rendu des lectures écrites en double ; index unique `documentanalysis_une_par_version` |
-| S.126 | `cle_d_objet_unique` | Index unique sur `DocumentVersion.objectKey` |
-| S.126 | `un_seul_rendu_par_analyse` | Dédoublonnage des rendus, index unique partiel |
-| S.126 | `regle_figee_non_supprimable` | `Application.visaRuleId` en `ON DELETE RESTRICT` |
+| S.126 (livrée) | `20261008090000_regle_figee_non_supprimable` | `Application.visaRuleId` en `ON DELETE RESTRICT` |
+| S.126 (livrée) | `20261008091000_cle_d_objet_unique` | Arrêt sur doublon existant ; index unique partiel `documentversion_cle_unique` |
+| S.126 (livrée) | `20261008092000_un_seul_rendu_par_analyse` | Dédoublonnage des rendus, index unique partiel `analysiscredit_un_seul_rendu_par_analyse` |
 | S.128 | `analyses_vendues_figees` | `Transaction.packAnalyses`, `packDestinations`, reprise, contrainte |
 | S.129 | `remboursement_suppose_une_obligation` | Reprise des remboursements sans obligation, contrainte |
 | S.130 | `contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
@@ -1381,9 +1391,12 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après le lot 1
+## 7. Ce qui reste ouvert après les lots S.125 et S.126
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
 - **E5** : un arrêt entre le débit et le verdict débite encore deux fois au rejeu ; le fermer demande de rattacher le débit à la version.
 - **E1** : la configuration nginx du dépôt n'est pas déployée par la CI ; elle doit être recopiée sur le VPS et rechargée (`nginx -t && systemctl reload nginx`), puis vérifiée par une rafale de requêtes au `X-Forwarded-For` forgé.
+- **E6** : le compteur « analyses en attente depuis plus d'une heure » sur `/api/health` (étape 5), avec la sonde de M9.
+- **E7** : relire à la main les analyses `HORS_SUJET` et les notifications « Ce fichier ressemble à : » dont le libellé n'appartient pas au référentiel ; l'étape 6 (contrôle du message final) reste facultative.
+- **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.

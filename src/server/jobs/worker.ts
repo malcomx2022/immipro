@@ -18,7 +18,7 @@ import { relancerLesDepots } from "./suivi-depot";
 import { reconcilierSansRecouvrement } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
-import { reprendreLesQuarantaines } from "./quarantaine";
+import { reprendreLesAnalysesEnAttente, reprendreLesQuarantaines } from "./quarantaine";
 import { propagerLaPublication, doitRejouer } from "./divergence";
 import {
   traiterLesBrouillonsInactifs,
@@ -151,6 +151,12 @@ async function main() {
   });
 
   await boss.work(JOBS.REPRISE_QUARANTAINE, async () => {
+    /*
+      Les analyses perdues d'abord, et sans condition : elles ne demandent
+      pas le moteur, seulement la file (revue du 07/10/2026, E6).
+    */
+    const analyses = await reprendreLesAnalysesEnAttente();
+    if (analyses.remises > 0) console.info("[quarantaine] analyses reprises", analyses);
     const bilan = await reprendreLesQuarantaines();
     /*
       `moteurMuet` n'est pas une panne de la passe : c'est le cas où

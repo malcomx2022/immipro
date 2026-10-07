@@ -6,6 +6,7 @@ import {
   createHash,
   type ScryptOptions,
 } from "node:crypto";
+import { prefixeDeDepot } from "@/domain/dossiers/televersement";
 
 /**
  * Empreintes et secrets à usage unique.
@@ -140,4 +141,4 @@ export const empreinteRapide = (valeur: string): string =>
  * autre candidat en incrémentant la sienne.
  */
 export const cleObjet = (applicationId: string, documentCode: string): string =>
-  `dossiers/${applicationId}/${documentCode}/${Date.now()}-${jeton(12)}`;
+  `${prefixeDeDepot(applicationId, documentCode)}${Date.now()}-${jeton(12)}`;
