@@ -11492,3 +11492,24 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 3. **Stripe** : `charge.refunded` est soldé sans comparer `amount_refunded` à la somme due. Un remboursement partiel fait à la main au tableau de bord solderait donc la dette. Le défaut existait avant ce lot, et Stripe est fermé pour le pilote. À corriger avant d'ouvrir ce rail.
 4. L'avoir partiel est à faire confirmer par M.C.
 5. Les conditions sont à revalider par le conseil juridique avant publication : le modèle a changé.
+
+## S.125 — Revue du 07/10/2026 : les quatre défauts à corriger avant tout le reste (C1, E1, E4, E5)
+
+**Contexte.** Une revue complète du projet a été faite le 07/10/2026 (`docs/revue/revue-2026-10-07.md`), puis un plan de traitement point par point (`docs/revue/plan-de-traitement-2026-10-07.md`). Ce lot traite les quatre constats que la revue plaçait « avant toute chose ». Les autres sont découpés en lots S.126 et suivants, avec les décisions qu'ils attendent.
+
+**Ce que fait le code.**
+- **C1, INV-3.** Une version que l'échéance de relecture repasse en `DRAFT` reste celle des dossiers qui l'ont figée. Le domaine distingue désormais `estUnBrouillon` (jamais mis en vigueur) et `estEnVigueur` (mis en vigueur, pas remplacé), par la date de mise en vigueur et non par le statut.
+  - B-02 ouvre la version suivante au lieu de réécrire la version dépubliée, et son écran ne l'appelle plus « brouillon ».
+  - Un relevé « à jour » ne remet en ligne qu'une version déjà mise en vigueur. Une v2 jamais publiée, née avec l'échéance dépassée de la v1, se publie par B-02 et nulle part ailleurs.
+  - La migration `version_figee_immuable` date les versions figées restées sans date, et le déclencheur `regle_figee_immuable` refuse en base toute réécriture de leur contenu, de leur source ou de leur date de mise en vigueur, y compris par la graine.
+- **E1, règle d'architecture 5.** La clé de comptage des routes publiques prend le dernier élément de `X-Forwarded-For`, celui que nginx ajoute. Nginx écrase désormais cet en-tête, pose ses en-têtes au niveau du serveur, répond 429, et limite enfin les vraies routes de comptes (`/api/auth/` ne correspondait à rien). Sa zone reste plus large que la limite de l'application, pour ne pas fermer la porte aux candidats derrière un même NAT d'opérateur.
+- **E4, INV-5.** La purge supprime l'objet dans les deux zones de stockage. Une pièce jamais sortie de quarantaine se déclarait purgée et laissait ses octets dans le stockage.
+- **E5, INV-6.** Une version de pièce s'analyse une fois. Le job s'arrête en tête s'il trouve une analyse, écrit son verdict, le lien du débit, l'état de la pièce et la notification dans une seule transaction, et la base départage deux exécutions simultanées (`documentanalysis_une_par_version`). La migration rend aux candidats les lectures déjà écrites en double.
+
+**Ce qui est éprouvé.** Chaque défaut a son test ou sa fumée qui échoue sur l'ancien code : `smoke:publication` (C1), `tests/api-socle.test.ts` et un essai réel derrière nginx (E1), `smoke:purge` (E4), `smoke:extraction` (E5). `smoke:migrations` compte 86 refus et 4 passages.
+
+**Écarts qui restent.**
+1. La configuration nginx n'est pas déployée par la CI : elle est à recopier sur le VPS et à recharger. Le domaine qu'elle sert (`immipro.bj`) diffère de celui du code (`immipro.app`) : voir M16 dans le plan.
+2. Les réécritures passées d'une version dépubliée ne se détectent pas après coup : à relire avec la veille.
+3. Les objets déjà orphelins en quarantaine ont perdu leur clé en base ; un inventaire par préfixe de dossier reste à faire.
+4. Un arrêt du worker entre le débit et le verdict débite encore deux fois au rejeu.
