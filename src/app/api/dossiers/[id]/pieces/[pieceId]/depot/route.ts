@@ -7,6 +7,7 @@ import {
   dateDePeremption,
   enregistrerLaVersion,
   exigerConsentementPieces,
+  exigerUnDepotConforme,
   pieceDuDossier,
   preparerLeDepot,
   refusDeLaDemande,
@@ -120,7 +121,20 @@ export const PUT = route({
     exigerModifiable(dossier);
     const piece = await pieceDuDossier(params.pieceId!, dossier.id, acteur!.id);
 
-    const version = await enregistrerLaVersion(piece.id, { cle: corps.cle, demande: corps });
+    await exigerUnDepotConforme(corps.cle, corps.octets, dossier.id, piece);
+    /*
+      Deux confirmations du même dépôt (double clic, réponse perdue puis
+      renvoyée) butent sur l'unicité de la clé ou de l'empreinte : la
+      pièce est déjà en place, ce n'est pas une panne.
+    */
+    const version = await enregistrerLaVersion(piece.id, { cle: corps.cle, demande: corps }).catch(
+      (erreur: unknown) => {
+        if ((erreur as { code?: unknown } | null)?.code === "P2002") {
+          throw echec("piece_deja_deposee");
+        }
+        throw erreur;
+      },
+    );
 
     await db.document.update({
       where: { id: piece.id },

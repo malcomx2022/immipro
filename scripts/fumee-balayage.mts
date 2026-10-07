@@ -231,6 +231,9 @@ const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
 );
 const { constaterLesDependances } = await import("../src/server/exploitation/capacites");
 const { sonderLesServices } = await import("../src/server/exploitation/sondes");
+const { exigerUnDepotConforme } = await import("../src/server/acces/pieces");
+const { cleObjet } = await import("../src/server/securite/secret");
+const { REFUS_DE_LA_CONFIRMATION } = await import("../src/domain/dossiers/televersement");
 
 let rang = 0;
 
@@ -957,6 +960,57 @@ try {
     } finally {
       await client.end();
     }
+  }
+
+  /*
+    Revue du 07/10/2026, M1. La confirmation d'un dépôt écrivait la clé
+    que le navigateur renvoyait. Avec la clé d'un autre candidat, le
+    balayage promouvait son fichier sous ce dossier-ci et le rendait
+    lisible ; la purge de ce dossier-ci l'effaçait ensuite.
+  */
+  console.log("\nUne confirmation ne désigne que le dépôt de sa pièce (M1)");
+  {
+    const refusDe = async (appel: Promise<unknown>): Promise<string> =>
+      appel.then(
+        () => "acceptée",
+        (e: unknown) => String((e as { echec?: { corps?: unknown } }).echec?.corps ?? e),
+      );
+
+    const mien = await piece();
+    const autre = await piece();
+    const cleDeLAutre = cleObjet(autre.application.id, "passeport");
+    seau(SEAU_QUARANTAINE).set(cleDeLAutre, Buffer.from("%PDF pièce d'un autre candidat"));
+    verifier(
+      (await refusDe(exigerUnDepotConforme(cleDeLAutre, 30, mien.application.id, { code: "passeport" }))) ===
+        REFUS_DE_LA_CONFIRMATION.cle,
+      "la clé d'un autre dossier est refusée",
+    );
+    verifier(seau(SEAU_QUARANTAINE).has(cleDeLAutre), "et son fichier n'est pas touché");
+
+    const absente = cleObjet(mien.application.id, "passeport");
+    verifier(
+      (await refusDe(exigerUnDepotConforme(absente, 30, mien.application.id, { code: "passeport" }))) ===
+        REFUS_DE_LA_CONFIRMATION.absent,
+      "un dépôt qui n'est jamais arrivé est refusé",
+    );
+
+    const tronquee = cleObjet(mien.application.id, "passeport");
+    seau(SEAU_QUARANTAINE).set(tronquee, Buffer.alloc(10, 1));
+    verifier(
+      (await refusDe(exigerUnDepotConforme(tronquee, 2048, mien.application.id, { code: "passeport" }))).startsWith(
+        "Le fichier reçu fait",
+      ),
+      "un envoi tronqué est refusé, avec les deux tailles",
+    );
+    verifier(!seau(SEAU_QUARANTAINE).has(tronquee), "et l'objet tronqué quitte la quarantaine");
+
+    const conforme = cleObjet(mien.application.id, "passeport");
+    seau(SEAU_QUARANTAINE).set(conforme, Buffer.alloc(2048, 1));
+    verifier(
+      (await refusDe(exigerUnDepotConforme(conforme, 2048, mien.application.id, { code: "passeport" }))) ===
+        "acceptée",
+      "le dépôt préparé pour cette pièce, arrivé entier, passe",
+    );
   }
 
   console.log("\nLes garde-fous de la base refusent ce qu'aucun code ne doit écrire");

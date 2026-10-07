@@ -112,6 +112,13 @@ SELECT refuse(
 INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
   VALUES ('v3','d1',3,'minio/y','abc');
 
+-- Une clé d'objet ne sert qu'à une version (07/10/2026, revue M1) : deux
+-- versions sur le même objet le rendent lisible depuis deux dossiers.
+SELECT refuse(
+  'M1 · une seconde version sur la clé d''objet d''une autre',
+  $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
+     VALUES ('v3b','d1',30,'minio/y','abc-autre')$q$);
+
 SELECT refuse(
   'RG-06.2 · deux versions de même empreinte sur une même pièce',
   $q$INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)

@@ -3,9 +3,20 @@ import { db } from "@/lib/db";
 import { decalerDeMois } from "@/domain/format/mois";
 import { echec } from "@/server/http/echecs";
 import { autorisationAccordee } from "@/server/acces/consentements";
-import { presignedGet, presignedPut, TTL_PRESIGNE_SECONDES } from "@/lib/storage";
+import {
+  presignedGet,
+  presignedPut,
+  removeQuarantaine,
+  tailleEnQuarantaine,
+  TTL_PRESIGNE_SECONDES,
+} from "@/lib/storage";
 import { cleObjet } from "@/server/securite/secret";
-import { refusDuFichier, TAILLE_MAXI_MO } from "@/domain/dossiers/televersement";
+import {
+  cleDeDepotValide,
+  REFUS_DE_LA_CONFIRMATION,
+  refusDuFichier,
+  TAILLE_MAXI_MO,
+} from "@/domain/dossiers/televersement";
 import { consultable, mentionApercu } from "@/domain/dossiers/quarantaine";
 import {
   ATTENTE_AU_CONTROLE,
@@ -172,6 +183,42 @@ export function raisonSansApercu(version: DocumentVersion, maintenant = new Date
  */
 export const estUneCause = (valeur: string | null): valeur is CauseDIndisponibilite =>
   valeur !== null && valeur in ATTENTE_AU_CONTROLE;
+
+/**
+ * La confirmation désigne le dépôt préparé pour cette pièce, et il est
+ * arrivé entier — règle d'architecture 4, INV-5 (revue du 07/10/2026, M1).
+ *
+ * La clé venait du navigateur et s'écrivait telle quelle. Avec celle d'un
+ * autre candidat, le balayage promouvait son fichier sous ce dossier-ci et
+ * le rendait lisible ; une fois promu, la purge de ce dossier-ci l'effaçait.
+ * Trois vérifications, de la moins chère à la plus chère :
+ *
+ * - la clé porte le préfixe de ce dossier et de cette pièce, et la forme
+ *   que `cleObjet` fabrique ;
+ * - l'objet existe en quarantaine — un lien expiré n'a rien déposé ;
+ * - sa taille est celle que la demande annonçait — un envoi interrompu se
+ *   refuse, et l'objet tronqué part de la quarantaine.
+ */
+export async function exigerUnDepotConforme(
+  cle: string,
+  octetsAnnonces: number,
+  applicationId: string,
+  piece: Pick<Document, "code">,
+): Promise<void> {
+  if (!cleDeDepotValide(cle, applicationId, piece.code)) {
+    throw echec("fichier_refuse", { corps: REFUS_DE_LA_CONFIRMATION.cle });
+  }
+  const recus = await tailleEnQuarantaine(cle);
+  if (recus === null) {
+    throw echec("fichier_refuse", { corps: REFUS_DE_LA_CONFIRMATION.absent });
+  }
+  if (recus !== octetsAnnonces) {
+    await removeQuarantaine(cle);
+    throw echec("fichier_refuse", {
+      corps: REFUS_DE_LA_CONFIRMATION.taille(recus, octetsAnnonces),
+    });
+  }
+}
 
 export async function enregistrerLaVersion(
   documentId: string,
