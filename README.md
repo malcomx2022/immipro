@@ -175,6 +175,7 @@ Règle : `domain/` ne connaît ni Prisma, ni Next, ni le réseau. Tout ce qui es
 | `docs/BRAND.md` | Usage de la marque |
 | `docs/visa-rules.md` | Référentiel réglementaire et veille |
 | `docs/IA-fournisseurs.md` | Fournisseurs d'IA : Anthropic par défaut, API compatible OpenAI au choix ; activation et garde des pièces (S.94) |
+| `docs/revue/` | Revue complète du 07/10/2026 et son plan de traitement, point par point et lot par lot |
 
 ---
 

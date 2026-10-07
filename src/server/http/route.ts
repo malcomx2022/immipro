@@ -6,7 +6,7 @@ import "./messages-zod";
 import type { Role } from "@prisma/client";
 import { EchecHttp, echec } from "./echecs";
 import { json, reponseEchec, type OptionsReponse, type Public } from "./reponse";
-import { cleDAppel, consommer, type NomRegle } from "./limites";
+import { adresseDeLAppelant, cleDAppel, consommer, type NomRegle } from "./limites";
 import { COOKIE_SESSION, lireSession, type Acteur } from "@/server/securite/session";
 
 /**
@@ -172,10 +172,7 @@ export function route<C = undefined, Q = undefined>(
       // ── Débit ───────────────────────────────────────────────
       if (definition.limite !== "webhook") {
         const entetes = await headers();
-        const adresse =
-          entetes.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-          entetes.get("x-real-ip") ??
-          "inconnue";
+        const adresse = adresseDeLAppelant(entetes);
         const verdict = consommer(
           cleDAppel(definition.nom, acteur?.id ?? null, adresse),
           definition.limite,

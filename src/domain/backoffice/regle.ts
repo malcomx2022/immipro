@@ -156,7 +156,40 @@ export interface VersionDeRegle {
   id: string;
   version: number;
   statut: StatutDeVersion;
+  /**
+   * Date de mise en vigueur, nulle tant que la version n'a jamais été
+   * publiée. C'est elle, et non `statut`, qui dit si des dossiers ont pu
+   * figer cette version (INV-3) : RG-14.1 repasse en `DRAFT` une version
+   * en vigueur dont la relecture est dépassée, sans la retirer à ceux qui
+   * l'ont figée.
+   */
+  publieeLe: Date | null;
 }
+
+/**
+ * Un brouillon, au sens où l'on peut écrire dedans : une version qui n'a
+ * jamais été mise en vigueur.
+ *
+ * ── Le statut seul confondait deux lignes ───────────────────────────
+ *
+ * Le job de veille (RG-14.1) repasse en `DRAFT` une version publiée dont
+ * la relecture est dépassée. Elle disparaît de l'affichage, mais elle
+ * reste celle que des dossiers ont figée. Choisie comme « brouillon » par
+ * son seul statut, elle était réécrite en place par B-02 : les dossiers
+ * ouverts dessus lisaient d'un coup une autre checklist — ce qu'INV-3
+ * interdit (revue du 07/10/2026, C1).
+ */
+export const estUnBrouillon = (v: VersionDeRegle): boolean =>
+  v.statut === "DRAFT" && v.publieeLe === null;
+
+/**
+ * Une version en vigueur pour les dossiers qui l'ont figée : mise en
+ * vigueur un jour, et pas encore remplacée. Elle peut être `DRAFT` —
+ * retirée de l'affichage par l'échéance de relecture — sans cesser de
+ * l'être.
+ */
+export const estEnVigueur = (v: VersionDeRegle): boolean =>
+  v.publieeLe !== null && v.statut !== "ARCHIVED";
 
 /**
  * La ligne qu'un enregistrement écrit — ou celle qu'il faut ouvrir.
@@ -204,7 +237,7 @@ export type Destination =
 export function destinationDeLEnregistrement(
   versions: readonly VersionDeRegle[],
 ): Destination | null {
-  const brouillon = versions.find((v) => v.statut === "DRAFT");
+  const brouillon = versions.find(estUnBrouillon);
   if (brouillon) return { quoi: "brouillon", id: brouillon.id, version: brouillon.version };
 
   /*
@@ -212,8 +245,12 @@ export function destinationDeLEnregistrement(
     version archivée peut porter un numéro supérieur — elle a été mise en
     vigueur puis remplacée —, et repartir d'elle ressusciterait un texte
     que la publication a retiré.
+
+    En vigueur ne veut pas dire affichée : une version que l'échéance de
+    relecture a retirée de l'affichage reste celle des dossiers, et c'est
+    d'elle que la suivante doit partir.
   */
-  const source = versions.find((v) => v.statut === "PUBLISHED") ?? versions[0];
+  const source = versions.find(estEnVigueur) ?? versions[0];
   if (!source) return null;
 
   // Le rang, lui, suit le plus haut numéro : deux versions ne peuvent pas

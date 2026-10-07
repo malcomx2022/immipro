@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { decalerDeMois } from "@/domain/format/mois";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { etatApresPurge } from "@/domain/dossiers/conservation";
-import { removeObject } from "@/lib/storage";
+import { supprimerPartout } from "@/lib/storage";
 import { journaliser } from "@/server/acces/journal";
 import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
 import { CONSERVATION_ANNEES } from "@/domain/backoffice/audit";
@@ -171,8 +171,9 @@ export async function purgerLesPiecesEchues(
       if (!version.objectKey) continue;
       try {
         // Une clé absente ne lève pas — `DELETE` rend 204. Ce qui passe
-        // par le `catch` est une panne, et rien d'autre.
-        await removeObject(version.objectKey);
+        // par le `catch` est une panne, et rien d'autre. Les deux zones :
+        // une pièce jamais sortie de quarantaine y a encore ses octets.
+        await supprimerPartout(version.objectKey);
         bilan.objetsSupprimes += 1;
       } catch {
         resistent.add(version.id);

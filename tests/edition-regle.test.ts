@@ -7,10 +7,15 @@ import {
   visaRulesSchema,
   type VisaRulesPayload,
 } from "@/domain/rules/schema";
-import { exigerUnEnregistrementAffichable } from "@/server/regles/edition";
+import {
+  exigerUnEnregistrementAffichable,
+  exigerUneVersionJamaisPubliee,
+} from "@/server/regles/edition";
 import {
   SUITE_DU_REFUS_EN_VIGUEUR,
   destinationDeLEnregistrement,
+  estEnVigueur,
+  estUnBrouillon,
   refusDuReferentiel,
 } from "@/domain/backoffice/regle";
 import { EchecHttp } from "@/server/http/echecs";
@@ -811,11 +816,18 @@ describe("le vocabulaire n'est refusé que là où le candidat lira", () => {
  * publication archive l'ancienne.
  */
 describe("l'enregistrement de B-02 ne touche jamais la version en vigueur", () => {
-  const v = (id: string, version: number, statut: "DRAFT" | "PUBLISHED" | "ARCHIVED") => ({
-    id,
-    version,
-    statut,
-  });
+  const MISE_EN_VIGUEUR = new Date("2026-06-01T00:00:00Z");
+  /**
+   * Par défaut, une version publiée ou archivée a été mise en vigueur et un
+   * brouillon jamais. Le quatrième argument décrit l'autre cas : une
+   * version que l'échéance de relecture a repassée en `DRAFT`.
+   */
+  const v = (
+    id: string,
+    version: number,
+    statut: "DRAFT" | "PUBLISHED" | "ARCHIVED",
+    publieeLe: Date | null = statut === "DRAFT" ? null : MISE_EN_VIGUEUR,
+  ) => ({ id, version, statut, publieeLe });
 
   it("écrit le brouillon quand il en existe un", () => {
     expect(destinationDeLEnregistrement([v("b", 2, "DRAFT"), v("p", 1, "PUBLISHED")])).toEqual({
@@ -851,6 +863,86 @@ describe("l'enregistrement de B-02 ne touche jamais la version en vigueur", () =
 
   it("ne décide rien sans version", () => {
     expect(destinationDeLEnregistrement([])).toBeNull();
+  });
+
+  /**
+   * Revue du 07/10/2026, C1 — le défaut reproduit.
+   *
+   * Le job de veille (RG-14.1) repasse en `DRAFT` une version en vigueur
+   * dont la relecture est dépassée. Elle reste celle des dossiers qui
+   * l'ont figée. Choisie comme brouillon par son seul statut, elle était
+   * réécrite en place : leur checklist changeait d'un coup.
+   */
+  it("une version dépubliée par l'échéance n'est pas un brouillon : la suivante s'ouvre", () => {
+    expect(destinationDeLEnregistrement([v("v1", 1, "DRAFT", MISE_EN_VIGUEUR)])).toEqual({
+      quoi: "a_ouvrir",
+      depuis: "v1",
+      version: 2,
+    });
+  });
+
+  it("le vrai brouillon est écrit, quel que soit l'ordre des lignes", () => {
+    const vigueur = v("v1", 1, "DRAFT", MISE_EN_VIGUEUR);
+    const brouillon = v("v2", 2, "DRAFT");
+    for (const versions of [
+      [vigueur, brouillon],
+      [brouillon, vigueur],
+    ]) {
+      expect(destinationDeLEnregistrement(versions)).toEqual({
+        quoi: "brouillon",
+        id: "v2",
+        version: 2,
+      });
+    }
+  });
+
+  it("la suivante part de la version dépubliée, pas d'une archivée plus haute", () => {
+    expect(
+      destinationDeLEnregistrement([
+        v("archivee", 3, "ARCHIVED"),
+        v("depubliee", 2, "DRAFT", MISE_EN_VIGUEUR),
+      ]),
+    ).toEqual({ quoi: "a_ouvrir", depuis: "depubliee", version: 4 });
+  });
+
+  it("en vigueur et brouillon se lisent par la mise en vigueur, pas par le statut", () => {
+    expect(estUnBrouillon(v("b", 2, "DRAFT"))).toBe(true);
+    expect(estUnBrouillon(v("d", 1, "DRAFT", MISE_EN_VIGUEUR))).toBe(false);
+    expect(estUnBrouillon(v("p", 1, "PUBLISHED"))).toBe(false);
+    expect(estEnVigueur(v("d", 1, "DRAFT", MISE_EN_VIGUEUR))).toBe(true);
+    expect(estEnVigueur(v("p", 1, "PUBLISHED"))).toBe(true);
+    expect(estEnVigueur(v("a", 1, "ARCHIVED"))).toBe(false);
+    expect(estEnVigueur(v("b", 2, "DRAFT"))).toBe(false);
+  });
+
+  /** La dernière ligne d'INV-3, opposée à la ligne qu'on va écrire. */
+  it("le serveur refuse d'écrire dans une version qui a été mise en vigueur", () => {
+    expect(() => exigerUneVersionJamaisPubliee(v("b", 2, "DRAFT"))).not.toThrow();
+    for (const figee of [
+      v("d", 1, "DRAFT", MISE_EN_VIGUEUR),
+      v("p", 1, "PUBLISHED"),
+      v("a", 1, "ARCHIVED"),
+    ]) {
+      let refus: unknown;
+      try {
+        exigerUneVersionJamaisPubliee(figee);
+      } catch (erreur) {
+        refus = erreur;
+      }
+      expect(refus).toBeInstanceOf(EchecHttp);
+      expect((refus as EchecHttp).echec.code).toBe("etat_incompatible");
+      expect((refus as EchecHttp).echec.corps).toContain("la version suivante s'ouvrira");
+    }
+  });
+
+  it("le serveur et l'écran lisent la même chose", () => {
+    const edition = sansCommentaires(lire("src/server/regles/edition.ts"));
+    expect(edition).toContain("destinationDeLEnregistrement(versions.map(versionDe))");
+    expect(edition).toContain("exigerUneVersionJamaisPubliee(versionDe(source))");
+    const lecture = sansCommentaires(lire("src/server/lecture/backoffice.ts"));
+    expect(lecture).toContain("lues.find(estEnVigueur)");
+    expect(lecture).toContain("lues.find(estUnBrouillon)");
+    expect(lecture).not.toMatch(/versions\.find\(\(v\) => v\.status === "DRAFT"\)/u);
   });
 
   /** Et le serveur écrit ce qu'elle dit, jamais la ligne de l'adresse. */

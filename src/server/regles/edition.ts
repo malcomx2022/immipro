@@ -1,3 +1,4 @@
+import type { VisaRule } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import {
@@ -10,12 +11,14 @@ import {
 import {
   SUITE_DU_REFUS_EN_VIGUEUR,
   destinationDeLEnregistrement,
+  estUnBrouillon,
   messageDeRefus,
   messageDeRefusPayload,
   verifierPayloadCandidat,
   verifierTextesCandidat,
   type ChampCandidat,
   type Regle,
+  type VersionDeRegle,
 } from "@/domain/backoffice/regle";
 
 /**
@@ -133,6 +136,38 @@ export function exigerUnEnregistrementAffichable(
   });
 }
 
+/** Une ligne de `VisaRule`, lue comme le domaine la juge. */
+export const versionDe = (
+  ligne: Pick<VisaRule, "id" | "version" | "status" | "publishedAt">,
+): VersionDeRegle => ({
+  id: ligne.id,
+  version: ligne.version,
+  statut: ligne.status,
+  publieeLe: ligne.publishedAt,
+});
+
+/**
+ * INV-3 — on n'écrit que dans une version qui n'a jamais été mise en
+ * vigueur.
+ *
+ * ── Le statut laissait passer la version que les dossiers ont figée ──
+ *
+ * Le job de veille (RG-14.1) repasse en `DRAFT` une version publiée dont
+ * la relecture est dépassée. `destinationDeLEnregistrement` la prenait
+ * alors pour un brouillon, et l'enregistrement la réécrivait en place : les
+ * dossiers ouverts dessus lisaient d'un coup une autre checklist (revue du
+ * 07/10/2026, C1). La destination ne la choisit plus ; cette garde
+ * l'affirme sur la ligne qu'on s'apprête à écrire, et la base le refuse
+ * aussi (`regle_figee_immuable`).
+ */
+export function exigerUneVersionJamaisPubliee(version: VersionDeRegle): void {
+  if (estUnBrouillon(version)) return;
+  throw echec("etat_incompatible", {
+    corps:
+      "Cette version a été mise en vigueur et des dossiers l'ont peut-être figée : elle ne se réécrit pas. Enregistre de nouveau, la version suivante s'ouvrira.",
+  });
+}
+
 /**
  * Les métadonnées qu'un éditeur complet renseigne, quand il en renseigne.
  * La branche `textes` n'en porte aucune : l'écran ne les montre pas, il ne
@@ -200,9 +235,7 @@ export async function enregistrerLesTextes(
     where: { countryCode: cible.countryCode, visaType: cible.visaType },
     orderBy: { version: "desc" },
   });
-  const destination = destinationDeLEnregistrement(
-    versions.map((v) => ({ id: v.id, version: v.version, statut: v.status })),
-  );
+  const destination = destinationDeLEnregistrement(versions.map(versionDe));
   if (!destination) throw echec("introuvable");
 
   /*
@@ -236,7 +269,9 @@ export async function enregistrerLesTextes(
   }
 
   if (destination.quoi === "brouillon") {
-    // INV-3, dernière ligne : on n'écrit jamais dans ce que le candidat lit.
+    // INV-3, dernière ligne : on n'écrit jamais dans une version qu'un
+    // dossier a pu figer, ni dans ce que le candidat lit.
+    exigerUneVersionJamaisPubliee(versionDe(source));
     exigerUnEnregistrementAffichable(source, ecrit);
     const maj = await db.visaRule.update({
       where: { id: destination.id },

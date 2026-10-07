@@ -175,9 +175,24 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
   it("seule une fiche dépubliée par l'échéance est republiée", () => {
     const put = route.slice(route.indexOf("export async function consignerLeReleve"));
     expect(put).toMatch(
-      /const republier =\s*fiche\.status === "DRAFT" && fiche\.nextReviewAt < jour/u,
+      /const republier =\s*fiche\.status === "DRAFT" &&\s*fiche\.publishedAt !== null &&\s*fiche\.effectiveTo === null &&\s*fiche\.nextReviewAt < jour/u,
     );
     expect(put).toMatch(/\.\.\.\(republier \? \{ status: "PUBLISHED" as const \} : \{\}\)/u);
+  });
+
+  /**
+   * Revue du 07/10/2026, C1. La version suivante s'ouvre en recopiant
+   * l'échéance de celle dont elle part : une v2 ouverte depuis une v1
+   * échue naît échue. Avec le statut seul, un relevé « à jour » la mettait
+   * en vigueur sans `publierLaRegle` — sans archivage, sans divergence,
+   * sans second opérateur. Un brouillon qui n'a jamais été publié ne
+   * revient jamais en ligne par un relevé.
+   */
+  it("un brouillon jamais publié n'est jamais mis en ligne par un relevé", () => {
+    const put = route.slice(route.indexOf("export async function consignerLeReleve"));
+    const condition = put.slice(put.indexOf("const republier ="), put.indexOf("const maj ="));
+    expect(condition).toContain("fiche.publishedAt !== null");
+    expect(condition).toContain("fiche.effectiveTo === null");
   });
 
   it("une version archivée ne se relit pas", () => {

@@ -69,6 +69,8 @@ const seau = (nom: string) => seaux.get(nom) ?? new Map<string, Buffer>();
 
 /** Le stockage refuse toute suppression tant que ceci est vrai. */
 let refuserLesSuppressions = false;
+/** Le stockage refuse les suppressions de ce seau-là seulement. */
+let refuserDansLeSeau: string | null = null;
 
 const stockage = createServer((requete: IncomingMessage, reponse: ServerResponse) => {
   const morceaux: Buffer[] = [];
@@ -84,7 +86,8 @@ const stockage = createServer((requete: IncomingMessage, reponse: ServerResponse
 
     const chemin = decodeURIComponent(brut!).replace(/^\//u, "");
     const separation = chemin.indexOf("/");
-    const objets = seau(separation === -1 ? chemin : chemin.slice(0, separation));
+    const nomDuSeau = separation === -1 ? chemin : chemin.slice(0, separation);
+    const objets = seau(nomDuSeau);
     const cle = separation === -1 ? "" : chemin.slice(separation + 1);
 
     switch (requete.method) {
@@ -94,7 +97,7 @@ const stockage = createServer((requete: IncomingMessage, reponse: ServerResponse
         return reponse.end();
       }
       case "DELETE": {
-        if (refuserLesSuppressions) {
+        if (refuserLesSuppressions || refuserDansLeSeau === nomDuSeau) {
           reponse.writeHead(500, { "Content-Type": "application/xml" });
           return reponse.end("<Error><Code>InternalError</Code></Error>");
         }
@@ -402,6 +405,75 @@ try {
     verifier(
       bilan.objetsEnEchec === 0,
       `et aucun échec n'est compté (${bilan.objetsEnEchec})`,
+    );
+  }
+
+  /*
+    Revue du 07/10/2026, E4. Une pièce dont le balayage n'a jamais conclu
+    a ses octets en quarantaine. La purge ne supprimait que dans la zone
+    de confiance : `DELETE` y rendait 204 sur une clé absente, la version
+    se déclarait purgée, et la pièce d'identité restait dans le stockage,
+    orpheline.
+  */
+  console.log("\nUne pièce restée en quarantaine part aussi (E4)");
+  {
+    refuserLesSuppressions = false;
+    const d = await dossierEchu();
+    const cle = d.cles[0]!;
+    const octets = seau(SEAU_CONFIANCE).get(cle)!;
+    seau(SEAU_CONFIANCE).delete(cle);
+    seau(SEAU_QUARANTAINE).set(cle, octets);
+    await db.documentVersion.updateMany({
+      where: { objectKey: cle },
+      data: { scanState: "EN_QUARANTAINE", scannedAt: null },
+    });
+
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.dossiers === 1, `le dossier est purgé (${bilan.dossiers})`);
+    verifier(
+      !seau(SEAU_QUARANTAINE).has(cle),
+      "et la pièce a quitté la quarantaine — INV-5",
+    );
+  }
+
+  console.log("\nUn double laissé par une promotion interrompue part des deux côtés");
+  {
+    refuserLesSuppressions = false;
+    const d = await dossierEchu();
+    const cle = d.cles[0]!;
+    // Copiée en confiance, pas encore supprimée de la quarantaine.
+    seau(SEAU_QUARANTAINE).set(cle, seau(SEAU_CONFIANCE).get(cle)!);
+
+    await purgerLesPiecesEchues();
+    verifier(
+      !enStockage(cle) && !seau(SEAU_QUARANTAINE).has(cle),
+      "aucune des deux copies ne survit",
+    );
+  }
+
+  console.log("\nUn refus de la seule quarantaine garde la clé");
+  {
+    refuserLesSuppressions = false;
+    const d = await dossierEchu();
+    const cle = d.cles[0]!;
+    seau(SEAU_QUARANTAINE).set(cle, seau(SEAU_CONFIANCE).get(cle)!);
+    refuserDansLeSeau = SEAU_QUARANTAINE;
+
+    const bilan = await purgerLesPiecesEchues();
+    refuserDansLeSeau = null;
+    verifier(bilan.objetsEnEchec === 1, `l'échec est compté (${bilan.objetsEnEchec})`);
+    const version = await db.documentVersion.findFirstOrThrow({
+      where: { document: { applicationId: d.application.id } },
+    });
+    verifier(
+      version.objectKey === cle && version.purgedAt === null,
+      "la version garde sa clé : la copie restante se retrouve à la passe suivante",
+    );
+
+    const reprise = await purgerLesPiecesEchues();
+    verifier(
+      reprise.dossiers === 1 && !seau(SEAU_QUARANTAINE).has(cle),
+      "et la passe suivante l'emporte",
     );
   }
 

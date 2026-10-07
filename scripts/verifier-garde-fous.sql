@@ -252,6 +252,58 @@ SELECT refuse(
      VALUES ('vr11','NL','etudes','ETUDES',99,'2026-01-01','2026-06-01','2026-09-01','{}','https://x','OFFICIEL',
        '2026-01-01','veilleur','2026-04-01','ARCHIVED', now())$q$);
 
+-- Une version qu'un dossier a pu figer ne se réécrit pas (07/10/2026,
+-- revue C1). L'échéance de relecture la repasse en DRAFT sans la retirer
+-- aux dossiers : son statut change, son contenu non.
+INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+    "publishedAt", rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy",
+    "nextReviewAt", status, "updatedAt")
+  VALUES ('vr12','NL','etudes','ETUDES',100,'2026-01-01','2026-01-01','{}','https://x','OFFICIEL',
+    '2026-01-01','veilleur','2026-04-01','PUBLISHED', now());
+
+SELECT passe(
+  'RG-14.1 · l''échéance de relecture retire de l''affichage une version en vigueur',
+  $q$UPDATE "VisaRule" SET status = 'DRAFT', "verifiedAt" = now(), "nextReviewAt" = now()
+     WHERE id = 'vr12'$q$);
+
+SELECT refuse(
+  'INV-3 · le contenu d''une version mise en vigueur ne se réécrit pas, même dépubliée',
+  $q$UPDATE "VisaRule" SET rules = '{"libelle":"autre"}' WHERE id = 'vr12'$q$);
+
+SELECT refuse(
+  'INV-3 · la source d''une version mise en vigueur ne change pas',
+  $q$UPDATE "VisaRule" SET "sourceUrl" = 'https://ailleurs' WHERE id = 'vr12'$q$);
+
+SELECT refuse(
+  'INV-3 · la date de mise en vigueur ne s''efface pas',
+  $q$UPDATE "VisaRule" SET "publishedAt" = NULL WHERE id = 'vr12'$q$);
+
+INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+    rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
+  VALUES ('vr13','NL','etudes','ETUDES',101,'2026-01-01','{}','https://x','OFFICIEL',
+    '2026-01-01','veilleur','2026-04-01','DRAFT', now());
+INSERT INTO "Application" (id, "userId", status, "visaRuleId", "updatedAt")
+  VALUES ('a20','u1','BROUILLON','vr13', now());
+
+SELECT refuse(
+  'INV-3 · une version qu''un dossier référence ne se réécrit pas, même jamais datée',
+  $q$UPDATE "VisaRule" SET rules = '{"libelle":"autre"}' WHERE id = 'vr13'$q$);
+
+INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+    rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
+  VALUES ('vr14','NL','etudes','ETUDES',102,'2026-01-01','{}','https://x','OFFICIEL',
+    '2026-01-01','veilleur','2026-04-01','DRAFT', now());
+
+SELECT passe(
+  'WF-14 · un brouillon jamais mis en vigueur s''écrit',
+  $q$UPDATE "VisaRule" SET rules = '{"libelle":"suivante"}', "sourceUrl" = 'https://y'
+     WHERE id = 'vr14'$q$);
+
+SELECT passe(
+  'WF-14 · la publication d''un brouillon pose sa date de mise en vigueur',
+  $q$UPDATE "VisaRule" SET status = 'PUBLISHED', "publishedAt" = now(), "effectiveFrom" = now()
+     WHERE id = 'vr14'$q$);
+
 SELECT refuse(
   'WF-11 · une divergence tranchée avant que le candidat en soit prévenu',
   $q$INSERT INTO "RuleMigration" (id, "applicationId", "fromRuleId", "toRuleId", impact, diff,
@@ -266,6 +318,13 @@ SELECT refuse(
 
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
+
+-- Une version s'analyse une fois (07/10/2026, revue E5) : un rejeu de la
+-- file ne débite pas une seconde lecture et n'écrit pas un second verdict.
+SELECT refuse(
+  'INV-6 · une seconde analyse sur la même version',
+  $q$INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
+     VALUES ('an2','v3','CONFORME','Titre','Corps actionnable de la remarque.')$q$);
 
 SELECT refuse(
   'RG-06.3 · une revue décidée sans message au candidat',

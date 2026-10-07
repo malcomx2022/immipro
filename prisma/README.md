@@ -18,6 +18,7 @@ script nomme celui qui passerait.
 | Invariant | Ce qui devient impossible |
 |---|---|
 | INV-3 | Un dossier au-delà du brouillon sans version de règle figée |
+| INV-3 | Réécrire le contenu, la source ou la date de mise en vigueur d'une version qu'un dossier a pu figer, même repassée en `DRAFT` par l'échéance de relecture (déclencheur `regle_figee_immuable`) |
 | INV-4 / RG-14.2 | Publier une règle de source `SECONDAIRE` |
 | INV-5 | Une version « purgée » qui garde sa clé d'objet |
 | INV-6 | Une écriture de quota à zéro, ou une analyse qui crédite |
@@ -108,6 +109,12 @@ npm run db:deploy           # appliquer les migrations existantes
 npm run seed:rules          # référentiel de départ
 npm run db:garde-fous       # vérifier que les contraintes refusent bien
 ```
+
+**Corriger le référentiel livré.** Une version mise en vigueur ne se
+réécrit pas : `regle_figee_immuable` refuse de changer son contenu, même par
+la graine. Pour corriger une règle de `seed/visa-rules.data.ts`, on ajoute
+la version suivante, avec un numéro plus haut ; la graine archive alors
+celle qu'elle remplace, et les dossiers ouverts gardent la leur (INV-3).
 
 `tests/schema-domaine.test.ts` compare les enums du schéma aux unions du
 domaine, sans base ni client généré. Les deux vocabulaires sont écrits deux

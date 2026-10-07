@@ -264,8 +264,14 @@ describe("RG-10.4 — aucune passe n'écrit à un compte qui a demandé l'oubli"
       "postée par le dépôt lui-même, et par la reprise de quarantaine du même dépôt",
   };
 
+  /*
+    `db.` ou `tx.` : une passe qui écrit sa notification dans une
+    transaction écrit au candidat tout autant (le verdict d'analyse le
+    fait depuis le 07/10/2026). Ne chercher que `db.` la ferait sortir
+    du recensement sans que rien ne change pour le candidat.
+  */
   const ECRIVAINS = fichiers("src/server/jobs").filter((f) =>
-    /db\.notification\.create(Many)?\s*\(/u.test(sansCommentaires(lire(f))),
+    /\b(?:db|tx)\.notification\.create(Many)?\s*\(/u.test(sansCommentaires(lire(f))),
   );
 
   it("il y a des passes à vérifier", () => {

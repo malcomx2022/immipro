@@ -321,6 +321,22 @@ describe("la quarantaine est une zone, pas une convention de nommage", () => {
     expect(corps.indexOf("copyObject")).toBeLessThan(corps.indexOf("removeObject"));
   });
 
+  /**
+   * Revue du 07/10/2026, E4. La purge ne supprimait que dans la zone de
+   * confiance : une pièce jamais sortie de quarantaine se déclarait
+   * purgée, perdait sa clé, et ses octets restaient dans le stockage.
+   */
+  it("la purge efface dans les deux zones", () => {
+    const stockage = lire("src/lib/storage.ts");
+    const corps = /export async function supprimerPartout[\s\S]*?\n\}/u.exec(stockage)![0];
+    expect(corps).toContain("removeObject(confiance(), key)");
+    expect(corps).toContain("removeObject(quarantaine(), key)");
+    const purge = lire("src/server/jobs/purge.ts");
+    expect(purge).toContain("await supprimerPartout(version.objectKey)");
+    // Plus aucune suppression qui ne viserait qu'une zone.
+    expect(stockage).not.toMatch(/export const removeObject\b/u);
+  });
+
   it("la clé de dépôt est déclarée au fichier d'exemple, sans valeur secrète", () => {
     const exemple = lire(".env.example");
     expect(exemple).toContain("MINIO_BUCKET_QUARANTAINE=");

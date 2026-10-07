@@ -172,8 +172,13 @@ export async function rendreUneAnalyse(
   note: string,
   /** L'octroi entamé par le débit, quand l'appelant le tient (S.92). */
   grantId?: string | null,
+  /**
+   * La transaction de l'appelant, quand le rendu doit tomber avec ce qu'il
+   * écrit : le verdict d'une analyse et son rendu ne se séparent pas.
+   */
+  client: Prisma.TransactionClient | typeof db = db,
 ): Promise<boolean> {
-  const dejaRendue = await db.analysisCredit.findFirst({
+  const dejaRendue = await client.analysisCredit.findFirst({
     where: { applicationId, analysisId, reason: "ANALYSE_RENDUE" },
     select: { id: true },
   });
@@ -182,12 +187,12 @@ export async function rendreUneAnalyse(
   const debit =
     grantId !== undefined
       ? { grantId }
-      : await db.analysisCredit.findFirst({
+      : await client.analysisCredit.findFirst({
           where: { applicationId, analysisId, reason: "ANALYSE" },
           orderBy: { createdAt: "desc" },
           select: { grantId: true },
         });
-  await db.analysisCredit.create({
+  await client.analysisCredit.create({
     data: {
       applicationId,
       delta: 1,

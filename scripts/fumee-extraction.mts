@@ -445,6 +445,56 @@ try {
     );
   }
 
+  /*
+    Revue du 07/10/2026, E5. La file rejoue un job dont l'acquittement
+    s'est perdu. Le job ne regardait pas si la version avait déjà son
+    verdict : le rejeu débitait une seconde analyse, rappelait le modèle,
+    écrivait un second verdict et envoyait une seconde notification.
+  */
+  console.log("\nUne analyse rejouée ne débite ni ne notifie deux fois (E5)");
+  {
+    reponseDuService = reponseDeLecture({
+      piece_identifiee: "passeport",
+      obstacle: null,
+      champs: { passeport_validite_min: "2029-03-01" },
+    });
+    const compter = async (applicationId: string, versionId: string) => ({
+      solde: await solde(applicationId),
+      analyses: await db.documentAnalysis.count({ where: { versionId } }),
+      notifications: await db.notification.count({ where: { applicationId, kind: "ANALYSE" } }),
+    });
+
+    const p = await piece({ dateCible: "2027-09-01" });
+    recusParLeService.length = 0;
+    await analyserUnePiece(p.tache, lExtracteur());
+    const rejeu = await analyserUnePiece(p.tache, lExtracteur());
+    const apres = await compter(p.application.id, p.version.id);
+    verifier(rejeu === "TERMINEE", `le rejeu s'achève sans rien refaire (${rejeu})`);
+    verifier(recusParLeService.length === 1, `un seul appel au service (${recusParLeService.length})`);
+    verifier(
+      apres.solde === 4 && apres.analyses === 1 && apres.notifications === 1,
+      `une analyse débitée, un verdict, une notification (${JSON.stringify(apres)})`,
+    );
+
+    /* Deux exécutions simultanées : la base départage, l'analyse en trop est rendue. */
+    const q = await piece({ dateCible: "2027-09-01" });
+    const issues = await Promise.all([
+      analyserUnePiece(q.tache, lExtracteur()),
+      analyserUnePiece(q.tache, lExtracteur()),
+    ]);
+    const simultanees = await compter(q.application.id, q.version.id);
+    verifier(
+      issues.every((i) => i === "TERMINEE"),
+      `les deux exécutions s'achèvent (${issues.join(", ")})`,
+    );
+    verifier(
+      simultanees.solde === 4 && simultanees.analyses === 1 && simultanees.notifications === 1,
+      `le candidat paie une lecture, pas deux (${JSON.stringify(simultanees)})`,
+    );
+    const document = await relireDocument(q.document.id);
+    verifier(document.status === "CONFORME", `la pièce porte le verdict (${document.status})`);
+  }
+
   console.log("\nRG-02.1 — l'autorisation retirée arrête la lecture, pas seulement les dépôts");
   {
     /*

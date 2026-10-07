@@ -196,5 +196,26 @@ export async function promouvoir(key: string): Promise<void> {
 /** Destruction d'un fichier écarté au contrôle. */
 export const removeQuarantaine = (key: string) => connexion().removeObject(quarantaine(), key);
 
-/** Suppression définitive — appelée par la purge de rétention (INV-5). */
-export const removeObject = (key: string) => connexion().removeObject(confiance(), key);
+/**
+ * Suppression définitive, dans les deux zones — la purge de rétention (INV-5).
+ *
+ * ── Elle ne visait que la zone de confiance ─────────────────────────
+ *
+ * Une pièce dont le balayage n'a jamais conclu — moteur en panne, fichier
+ * hors limites, réponse hors contrat — a ses octets **en quarantaine**. La
+ * purge supprimait la clé dans la zone de confiance, où elle n'était pas :
+ * `DELETE` rend 204 sur une clé absente, la version se déclarait purgée et
+ * perdait sa clé, et la pièce d'identité restait dans le stockage, orpheline
+ * et introuvable depuis la base (revue du 07/10/2026, E4). Une promotion
+ * interrompue entre sa copie et sa suppression laisse aussi un double.
+ *
+ * Les deux zones sont donc vidées, sans regarder l'état du balayage : une
+ * clé absente n'est pas un échec, et c'est la seule lecture qui ne dépend
+ * pas d'une colonne qu'un incident a pu laisser fausse. Le premier refus
+ * lève, et la version garde sa clé pour la passe suivante.
+ */
+export async function supprimerPartout(key: string): Promise<void> {
+  const client = connexion();
+  await client.removeObject(confiance(), key);
+  await client.removeObject(quarantaine(), key);
+}
