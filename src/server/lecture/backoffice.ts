@@ -11,6 +11,8 @@ import {
 } from "@/domain/backoffice/acteur";
 import { echec } from "@/server/http/echecs";
 import { payload } from "@/server/acces/regles";
+import { versionDe } from "@/server/regles/edition";
+import { estEnVigueur, estUnBrouillon } from "@/domain/backoffice/regle";
 import { editorialDe, EDITORIAL } from "@/lib/contenu/destinations";
 import {
   HORIZON_VEILLE_JOURS,
@@ -1172,8 +1174,20 @@ export async function editionDeLaRegle(id: string): Promise<VueEditionRegle | nu
     orderBy: { version: "desc" },
   });
 
-  const enVigueur = versions.find((v) => v.status === "PUBLISHED") ?? cible;
-  const existant = versions.find((v) => v.status === "DRAFT");
+  /*
+    En vigueur et brouillon se lisent par la date de mise en vigueur, pas
+    par le statut : une version que l'échéance de relecture a retirée de
+    l'affichage est `DRAFT` et reste celle des dossiers qui l'ont figée.
+    Lue comme un brouillon, elle s'affichait sous ce nom et ses dossiers
+    étaient comptés « sous la nouvelle règle » (revue du 07/10/2026, C1).
+    La même lecture que l'enregistrement, pour que l'écran annonce la
+    ligne que le `PUT` écrira.
+  */
+  const lues = versions.map(versionDe);
+  const enVigueurLue = lues.find(estEnVigueur);
+  const existantLu = lues.find(estUnBrouillon);
+  const enVigueur = versions.find((v) => v.id === enVigueurLue?.id) ?? cible;
+  const existant = versions.find((v) => v.id === existantLu?.id);
   /*
     Faute de brouillon, la version en vigueur sert de **point de départ** :
     c'est d'elle que la suivante sera copiée, et c'est donc elle qu'il faut

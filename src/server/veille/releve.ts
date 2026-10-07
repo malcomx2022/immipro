@@ -159,9 +159,26 @@ export async function consignerLeReleve(
     };
   }
 
-  // Le retour en brouillon par échéance est réversible : c'est ce que
-  // la relecture vient de lever. Un brouillon en préparation, non.
-  const republier = fiche.status === "DRAFT" && fiche.nextReviewAt < jour;
+  /*
+    Le retour en brouillon par échéance est réversible : c'est ce que la
+    relecture vient de lever. Un brouillon en préparation, non.
+
+    ── Et le statut seul ne les distinguait pas ───────────────────────
+
+    La condition lisait `DRAFT` et une échéance passée. Or la version
+    suivante s'ouvre en recopiant l'échéance de celle dont elle part : une
+    v2 ouverte depuis une v1 échue naît échue. Un relevé « à jour » sur
+    elle la mettait en `PUBLISHED` sans `publierLaRegle` — rien
+    d'archivé, aucune date de mise en vigueur, aucune divergence envoyée
+    aux dossiers, ni second opérateur ni contrôle du vocabulaire (revue du
+    07/10/2026, C1). Seule une version déjà mise en vigueur, et pas encore
+    remplacée, revient en ligne ici. Un brouillon se publie par B-02.
+  */
+  const republier =
+    fiche.status === "DRAFT" &&
+    fiche.publishedAt !== null &&
+    fiche.effectiveTo === null &&
+    fiche.nextReviewAt < jour;
 
   const maj = await db.visaRule.update({
     where: { id: fiche.id },

@@ -1576,6 +1576,91 @@ try {
       "le dossier garde la sienne : publier ne migre personne (INV-3)",
     );
   }
+  /*
+    ── Une version dépubliée par l'échéance reste figée — revue C1 ─────
+
+    RG-14.1 repasse en `DRAFT` une version en vigueur dont la relecture
+    est dépassée. Elle reste celle des dossiers qui l'ont figée. Choisie
+    comme brouillon par son seul statut, B-02 la réécrivait en place ; et
+    la version suivante, qui recopie son échéance dépassée, était remise
+    en ligne par un simple relevé, sans `publierLaRegle`.
+  */
+  console.log("\nUne version dépubliée par l'échéance n'est ni réécrite ni remplacée par un relevé (C1)");
+  {
+    const v1 = await db.visaRule.create({
+      data: {
+        countryCode: "NL",
+        visaType: "etudes_depubliee",
+        category: "ETUDES",
+        version: 1,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: RULES as never,
+        sourceUrl: brute.sourceUrl,
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"),
+        verifiedBy: REDACTEUR.email,
+        nextReviewAt: new Date("2026-03-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const { application } = await dossierPret(v1.id);
+    const libelleGele = payload(v1).libelle;
+
+    await depublierLesFichesEchues(new Date("2026-09-22"));
+    const depubliee = await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } });
+    verifier(depubliee.status === "DRAFT", "l'échéance a retiré la v1 de l'affichage");
+
+    const vue = (await editionDeLaRegle(v1.id))!;
+    verifier(!vue.brouillonExistant, "B-02 ne la prend pas pour un brouillon");
+    verifier(vue.versionAEcrire === 2, `et annonce la version qui s'ouvrira (${vue.versionAEcrire})`);
+
+    const ecrit = await enregistrerLesTextes(
+      v1.id,
+      {
+        champ: "textes",
+        libelleCandidat: "Études aux Pays-Bas (2027)",
+        reserveCandidat: "Une réserve reformulée",
+      },
+      { email: REDACTEUR.email },
+    );
+    verifier(ecrit.versionOuverte && ecrit.id !== v1.id, "l'enregistrement ouvre la v2");
+    verifier(
+      payload(await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } })).libelle === libelleGele,
+      "la version dépubliée que le dossier a figée n'a pas bougé — INV-3",
+    );
+
+    const parLaBase = await db.visaRule
+      .update({ where: { id: v1.id }, data: { rules: { libelle: "réécrite" } as never } })
+      .then(() => "écrite")
+      .catch((e: unknown) => String(e));
+    verifier(
+      parLaBase.includes("INV-3"),
+      `et la base refuse de la réécrire par un autre chemin (${
+        parLaBase.includes("INV-3") ? "refus INV-3" : parLaBase.slice(0, 80)
+      })`,
+    );
+
+    const releve = await consignerLeReleve(ecrit.id, "A_JOUR", undefined, REDACTEUR);
+    const v2 = await db.visaRule.findUniqueOrThrow({ where: { id: ecrit.id } });
+    verifier(
+      !releve.republiee && v2.status === "DRAFT" && v2.publishedAt === null,
+      `un relevé ne met pas en ligne un brouillon jamais publié (${v2.status})`,
+    );
+
+    const publiee = await publierLaRegle(ecrit.id, AUTRE, "Relevé de la source du jour");
+    verifier(publiee.archivee === v1.id, "c'est la publication qui remplace la v1, en l'archivant");
+    verifier(publiee.divergenceMiseEnFile, "et la divergence part vers les dossiers");
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: application.id } })).visaRuleId ===
+        v1.id,
+      "le dossier garde la v1 jusqu'à ce qu'il tranche (INV-3)",
+    );
+
+    // Le relevé a écrit sa ligne dans `SourceCheck`. Le bloc WF-14 qui
+    // suit part d'une table vide : on lui rend l'état qu'il décrit.
+    await db.sourceCheck.deleteMany({ where: { sourceUrl: v2.sourceUrl } });
+  }
   console.log("\nWF-11 — le dossier mis en pause est retrouvé par la publication suivante");
   {
     /*
