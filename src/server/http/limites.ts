@@ -114,3 +114,46 @@ export function reinitialiser(): void {
  */
 export const cleDAppel = (route: string, acteurId: string | null, adresse: string): string =>
   `${route}|${acteurId ?? `ip:${adresse}`}`;
+
+/** Ce que la fonction lit des en-têtes : `Headers` ou ce qui y ressemble. */
+interface EntetesLisibles {
+  get(nom: string): string | null;
+}
+
+/** Au-delà, ce n'est plus une adresse IPv4 ou IPv6. */
+const LONGUEUR_MAXI_ADRESSE = 45;
+
+/**
+ * L'adresse de l'appelant, pour la clé de comptage — règle d'architecture 5.
+ *
+ * ── Le premier élément était celui que l'appelant écrit ─────────────
+ *
+ * `X-Forwarded-For` est une liste : chaque proxy **ajoute** l'adresse qu'il
+ * voit à la valeur reçue. Le premier élément est donc celui que le client
+ * a envoyé, et il peut y écrire ce qu'il veut. Nginx étant configuré avec
+ * `$proxy_add_x_forwarded_for`, la clé `ip:<adresse>` des routes publiques
+ * — connexion, inscription, mot de passe oublié — était choisie par
+ * l'appelant : une adresse différente à chaque appel, et le régime
+ * `sensible` ne comptait plus rien (revue du 07/10/2026, E1).
+ *
+ * ── Un seul saut de confiance ───────────────────────────────────────
+ *
+ * L'application n'est joignable que par nginx, sur le même hôte : le
+ * conteneur n'est publié qu'en `127.0.0.1:3000`. Le **dernier** élément est
+ * celui que nginx a ajouté, l'adresse réelle du socket. C'est juste avec
+ * un nginx qui ajoute comme avec un nginx qui écrase, et en développement,
+ * où Next pose lui-même l'adresse du socket. Le jour où un CDN se place
+ * devant nginx, c'est nginx qui se règle (`set_real_ip_from`), pas ce code.
+ *
+ * `x-real-ip` reste un repli, quand la liste est absente.
+ */
+export function adresseDeLAppelant(entetes: EntetesLisibles): string {
+  const liste = (entetes.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((element) => element.trim())
+    .filter((element) => element.length > 0);
+  const brute = liste.at(-1) ?? entetes.get("x-real-ip")?.trim() ?? "";
+  // Une adresse IPv4 vue par une pile IPv6 porte ce préfixe : c'est la même.
+  const adresse = brute.replace(/^::ffff:/iu, "").slice(0, LONGUEUR_MAXI_ADRESSE);
+  return adresse.length > 0 ? adresse : "inconnue";
+}

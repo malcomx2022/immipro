@@ -11,7 +11,14 @@ import {
   pourOperateur,
   type CodeEchec,
 } from "@/server/http/echecs";
-import { decider, REGLES, cleDAppel, consommer, reinitialiser } from "@/server/http/limites";
+import {
+  adresseDeLAppelant,
+  decider,
+  REGLES,
+  cleDAppel,
+  consommer,
+  reinitialiser,
+} from "@/server/http/limites";
 import { signatureValide, lireEntete, TOLERANCE_SECONDES } from "@/server/paiement/signature";
 import { createHmac } from "node:crypto";
 import { effetDeLaNotification, aExpirer, aReconcilier } from "@/server/paiement/cycle";
@@ -207,6 +214,48 @@ describe("limitation de débit", () => {
 
   it("le régime de lecture est plus large que le régime sensible", () => {
     expect(REGLES.lecture.appels).toBeGreaterThan(REGLES.sensible.appels);
+  });
+});
+
+/**
+ * Revue du 07/10/2026, E1. `X-Forwarded-For` est une liste à laquelle
+ * chaque proxy **ajoute** : le premier élément est celui que l'appelant a
+ * écrit. Le lire faisait choisir la clé de comptage par l'appelant, sur
+ * toutes les routes publiques.
+ */
+describe("l'adresse de l'appelant est celle que nginx a vue", () => {
+  beforeEach(reinitialiser);
+  const entetes = (valeurs: Record<string, string>) => new Headers(valeurs);
+
+  it("prend le dernier élément, celui que nginx ajoute — le défaut reproduit", () => {
+    expect(adresseDeLAppelant(entetes({ "x-forwarded-for": "6.6.6.6, 41.1.2.3" }))).toBe(
+      "41.1.2.3",
+    );
+  });
+
+  it("une adresse seule, un repli, et l'absence nommée", () => {
+    expect(adresseDeLAppelant(entetes({ "x-forwarded-for": "41.1.2.3" }))).toBe("41.1.2.3");
+    expect(adresseDeLAppelant(entetes({ "x-real-ip": "41.1.2.4" }))).toBe("41.1.2.4");
+    expect(adresseDeLAppelant(entetes({}))).toBe("inconnue");
+    expect(adresseDeLAppelant(entetes({ "x-forwarded-for": "a, , " }))).toBe("a");
+    expect(adresseDeLAppelant(entetes({ "x-forwarded-for": "::ffff:41.1.2.3" }))).toBe("41.1.2.3");
+  });
+
+  it("une adresse forgée à chaque appel ne rouvre plus le compteur", () => {
+    let dernier = { autorise: true };
+    for (let i = 0; i < 11; i += 1) {
+      const adresse = adresseDeLAppelant(
+        entetes({ "x-forwarded-for": `10.0.0.${i}, 41.1.2.3` }),
+      );
+      dernier = consommer(cleDAppel("comptes.connexion", null, adresse), "sensible", 1_000 + i);
+    }
+    expect(dernier.autorise).toBe(false);
+  });
+
+  it("le composeur lit l'adresse par cette fonction, et plus par le premier élément", () => {
+    const route = readFileSync("src/server/http/route.ts", "utf8");
+    expect(route).toContain("adresseDeLAppelant(entetes)");
+    expect(route).not.toMatch(/split\(","\)\[0\]/u);
   });
 });
 
