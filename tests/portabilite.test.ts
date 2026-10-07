@@ -204,7 +204,8 @@ describe("archive d'un dossier", () => {
     expect(lire(".env.example")).not.toMatch(/MINIO_PRESIGNED_TTL_SECONDS/u);
     // L'accès aux pièces relit celle du stockage plutôt que d'en poser une.
     const pieces = sansCommentaires(lire("src/server/acces/pieces.ts"));
-    expect(pieces).toMatch(/TTL_PRESIGNE_SECONDES.*from "@\/lib\/storage"/u);
+    // `[^;]*` et non `.*` : l'import tient sur plusieurs lignes depuis S.126.
+    expect(pieces).toMatch(/TTL_PRESIGNE_SECONDES[^;]*from "@\/lib\/storage"/u);
     expect(pieces).not.toMatch(/const TTL_PRESIGNE_SECONDES\s*=/u);
     // Cinq minutes, dans les trois : la constante, l'API, la phrase.
     expect(TTL_PRESIGNE_SECONDES).toBe(5 * 60);
