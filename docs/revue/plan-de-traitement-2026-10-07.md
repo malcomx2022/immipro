@@ -91,7 +91,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 |
 | D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 |
 | D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 |
-| D-29 | Domaines servis (`immipro.app`, `immipro.bj`) ; `nginx -T` du VPS ; méthode certbot | Exploitant, direction | M16 |
+| D-29 | ~~Domaines servis~~ : `immipro.app`, tranché le 07/10/2026 (S.125 bis). Restent `nginx -T` du VPS et la méthode certbot | Exploitant | M16 |
 | D-30 | Node 24 ou Node 22 ? | Direction | M19 étape 0, M15 |
 | D-31 | Version d'API Stripe à figer | Exploitant | M19 étape 1 |
 | D-32 | Découpage de `paiements.ts` après le bloc paiements | Direction technique | M20 |
