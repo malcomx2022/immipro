@@ -289,6 +289,12 @@ SELECT refuse(
   'INV-3 · une version qu''un dossier référence ne se réécrit pas, même jamais datée',
   $q$UPDATE "VisaRule" SET rules = '{"libelle":"autre"}' WHERE id = 'vr13'$q$);
 
+-- Et elle ne se supprime pas (07/10/2026, revue F12) : la clé étrangère
+-- mettait à nul la règle d'un dossier encore en brouillon.
+SELECT refuse(
+  'INV-3 · une version qu''un dossier en brouillon a figée ne se supprime pas',
+  $q$DELETE FROM "VisaRule" WHERE id = 'vr13'$q$);
+
 INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
     rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status, "updatedAt")
   VALUES ('vr14','NL','etudes','ETUDES',102,'2026-01-01','{}','https://x','OFFICIEL',
