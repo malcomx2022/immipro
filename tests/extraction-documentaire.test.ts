@@ -351,7 +351,8 @@ describe("tout verdict de pièce se dit au candidat", () => {
         VERDICTS.some((v) => source.includes(`status: "${v}"`)) ||
         /status: (?:verdict\.verdict|tranche\.decision)/u.test(source);
       expect(poseUnVerdict, fichier).toBe(true);
-      expect(source, fichier).toContain("db.notification.create");
+      // Dans une transaction (`tx.`) ou non : l'avis part avec le verdict.
+      expect(source, fichier).toMatch(/\b(?:db|tx)\.notification\.create/u);
     }
   });
 

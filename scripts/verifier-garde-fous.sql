@@ -319,6 +319,13 @@ SELECT refuse(
 INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
   VALUES ('an1','v3','A_CORRIGER','Titre','Corps actionnable de la remarque.');
 
+-- Une version s'analyse une fois (07/10/2026, revue E5) : un rejeu de la
+-- file ne débite pas une seconde lecture et n'écrit pas un second verdict.
+SELECT refuse(
+  'INV-6 · une seconde analyse sur la même version',
+  $q$INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
+     VALUES ('an2','v3','CONFORME','Titre','Corps actionnable de la remarque.')$q$);
+
 SELECT refuse(
   'RG-06.3 · une revue décidée sans message au candidat',
   $q$INSERT INTO "ManualReview" (id, "analysisId", reason, decision, "decidedAt")

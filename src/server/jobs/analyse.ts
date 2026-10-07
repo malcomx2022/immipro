@@ -1,4 +1,4 @@
-import type { ReviewReason } from "@prisma/client";
+import type { Prisma, ReviewReason } from "@prisma/client";
 import { db } from "@/lib/db";
 import { noterLesJetons } from "@/server/ia/appel";
 import { payload } from "@/server/acces/regles";
@@ -143,9 +143,10 @@ async function verdictPrecedent(
   const verdict = precedente?.analyses[0]?.verdict ?? null;
   /*
     `HORS_SUJET` n'est pas dans les verdicts du domaine : il est écrit par
-    le chemin de reclassement, qui ne débite pas non plus. Une reprise
-    après lui est donc payante — le candidat a déposé le mauvais fichier,
-    la lecture a bien eu lieu et elle a bien rendu quelque chose.
+    le chemin de reclassement, après une lecture débitée comme les autres.
+    Une reprise après lui est donc payante — le candidat a déposé le
+    mauvais fichier, la lecture a bien eu lieu et elle a bien rendu
+    quelque chose.
   */
   return verdict === "CONFORME" || verdict === "A_CORRIGER" || verdict === "ILLISIBLE"
     ? verdict
@@ -158,13 +159,31 @@ export async function analyserUnePiece(
 ): Promise<Suite> {
   const version = await db.documentVersion.findUnique({
     where: { id: tache.versionId },
-    include: { document: { include: { application: { include: { visaRule: true } } } } },
+    include: {
+      document: { include: { application: { include: { visaRule: true } } } },
+      analyses: { take: 1, select: { id: true } },
+    },
   });
   if (!version || !version.objectKey) return "TERMINEE";
   // I.D — aucun fichier non balayé n'est transmis à l'extraction. Le job
   // n'est mis en file qu'après promotion ; la condition est là pour le jour
   // où un autre appelant l'oubliera.
   if (!transmissibleALAnalyse(version.scanState)) return "TERMINEE";
+
+  /*
+    Une version s'analyse une fois — INV-6, revue du 07/10/2026, E5.
+
+    La file rejoue un job dont l'acquittement s'est perdu : worker arrêté
+    après l'écriture du verdict, base indisponible le temps de recalculer
+    la complétude. Sans cette garde, le rejeu débitait une seconde
+    analyse, rappelait le modèle, écrivait un second verdict et envoyait
+    une seconde notification — le candidat payait deux fois sans que
+    personne ne le voie. Avant le débit et avant toute lecture : un rejeu
+    ne coûte rien. Deux exécutions simultanées passent toutes deux ici ;
+    c'est l'unicité en base (`documentanalysis_une_par_version`) qui
+    départage, dans `consignerUneFois`.
+  */
+  if (version.analyses.length > 0) return "TERMINEE";
 
   const document = version.document;
   const application = document.application;
@@ -293,57 +312,61 @@ export async function analyserUnePiece(
     // Aucune lecture : la pièce ne peut pas être déclarée conforme, et elle
     // ne peut pas être déclarée non conforme non plus. Elle part en revue
     // humaine, et l'analyse est rendue — elle n'a rien rendu.
-    const analyse = await db.documentAnalysis.create({
-      data: {
-        versionId: version.id,
-        verdict: "ILLISIBLE",
-        title: "Cette pièce demande une relecture",
-        body: MESSAGE_AU_CANDIDAT[lu.cause],
-        engineLog: `${MOTIF_DE_NON_LECTURE[lu.cause]} — ${lu.detail}`,
-        inputTokens: lu.jetonsEntree,
-        outputTokens: lu.jetonsSortie,
-        // Rien n'a été pris sur ce chemin : ni par le débit quand la
-        // reprise est gratuite, ni après le rendu ci-dessous.
-        creditConsumed: false,
-      },
-    });
-    await db.manualReview.create({
-      data: { analysisId: analyse.id, reason: motifDeRevue(lu.cause) },
-    });
-    await db.document.update({
-      where: { id: document.id },
-      data: { status: "ILLISIBLE", feedback: analyse.body, analyzedAt: new Date() },
-    });
-    await solderLesTentatives(version.id, version.analysisAttempts);
-    if (consomme) {
-      await rendreUneAnalyse(
-        tache.applicationId,
-        analyse.id,
-        "Lecture automatique sans résultat",
-        entame,
-      );
-    }
-    /*
-      Et le candidat l'apprend — comme pour les trois autres verdicts.
+    const consignee = await consignerUneFois(tache, consomme, entame, async (tx) => {
+      const analyse = await tx.documentAnalysis.create({
+        data: {
+          versionId: version.id,
+          verdict: "ILLISIBLE",
+          title: "Cette pièce demande une relecture",
+          body: MESSAGE_AU_CANDIDAT[lu.cause],
+          engineLog: `${MOTIF_DE_NON_LECTURE[lu.cause]} — ${lu.detail}`,
+          inputTokens: lu.jetonsEntree,
+          outputTokens: lu.jetonsSortie,
+          // Rien n'a été pris sur ce chemin : ni par le débit quand la
+          // reprise est gratuite, ni après le rendu ci-dessous.
+          creditConsumed: false,
+        },
+      });
+      await tx.manualReview.create({
+        data: { analysisId: analyse.id, reason: motifDeRevue(lu.cause) },
+      });
+      await tx.document.update({
+        where: { id: document.id },
+        data: { status: "ILLISIBLE", feedback: analyse.body, analyzedAt: new Date() },
+      });
+      await solderLesTentatives(version.id, version.analysisAttempts, tx);
+      if (consomme) {
+        await rendreUneAnalyse(
+          tache.applicationId,
+          analyse.id,
+          "Lecture automatique sans résultat",
+          entame,
+          tx,
+        );
+      }
+      /*
+        Et le candidat l'apprend — comme pour les trois autres verdicts.
 
-      Celui-ci n'en produisait aucun, alors qu'il ouvre la seule attente
-      du produit qui dépend d'une personne : la pièce part en revue, et
-      rien ne dit quand elle en reviendra. Le silence y coûtait donc plus
-      qu'ailleurs, et c'est là qu'il était.
+        Celui-ci n'en produisait aucun, alors qu'il ouvre la seule attente
+        du produit qui dépend d'une personne : la pièce part en revue, et
+        rien ne dit quand elle en reviendra. Le silence y coûtait donc plus
+        qu'ailleurs, et c'est là qu'il était.
 
-      Le corps est celui de l'analyse, pas un second texte : deux
-      formulations du même fait finiraient par se contredire, et celle
-      que le candidat lit dans sa checklist est celle-là.
-    */
-    await db.notification.create({
-      data: {
-        userId: application.userId,
-        applicationId: tache.applicationId,
-        kind: "ANALYSE",
-        title: analyse.title,
-        body: analyse.body,
-      },
+        Le corps est celui de l'analyse, pas un second texte : deux
+        formulations du même fait finiraient par se contredire, et celle
+        que le candidat lit dans sa checklist est celle-là.
+      */
+      await tx.notification.create({
+        data: {
+          userId: application.userId,
+          applicationId: tache.applicationId,
+          kind: "ANALYSE",
+          title: analyse.title,
+          body: analyse.body,
+        },
+      });
     });
+    if (!consignee) return "TERMINEE";
     await recalculerCompletude(tache.applicationId);
     return "TERMINEE";
   }
@@ -361,7 +384,11 @@ export async function analyserUnePiece(
     const attendue =
       regles?.pieces_requises.find((p) => p.code === lu.pieceIdentifiee)?.libelle ??
       lu.pieceIdentifiee;
-    return acheverHorsSujet(tache, version.id, document.id, application.userId, attendue);
+    return acheverHorsSujet(tache, version.id, document.id, application.userId, attendue, {
+      consomme,
+      ligne: debit?.ligne ?? null,
+      entame,
+    });
   }
 
   /*
@@ -375,76 +402,78 @@ export async function analyserUnePiece(
   const mesures = mesurer(conditions, lu.bruts, repere);
   const verdict = evaluerConditions(conditions, mesures.champs, mesures.reserves);
 
-  const analyse = await db.documentAnalysis.create({
-    data: {
-      versionId: version.id,
-      verdict: verdict.verdict,
-      /*
-        Ce que cette analyse a réellement coûté, et non ce que son verdict
-        laisse deviner : le schéma le dit — « recalculer la règle à la
-        lecture la ferait diverger du grand livre de crédits ». La colonne
-        portait sa valeur par défaut sur ce chemin, c'est-à-dire `true`,
-        y compris pour une reprise gratuite.
-      */
-      creditConsumed: consomme,
-      // Les **faits bruts**, et non les mesures : la date lue reste utile
-      // le jour où la date cible est renseignée, et c'est elle qu'un
-      // opérateur relit. Une durée calculée ne se relit pas sur la pièce.
-      fields: lu.bruts as never,
-      title: verdict.titre,
-      body: verdict.corps,
-      inputTokens: lu.jetonsEntree,
-      outputTokens: lu.jetonsSortie,
-    },
-  });
-  /*
-    Le débit nomme l'analyse qu'il a payée (S.92) : une revue qui la rend
-    plus tard retrouve ainsi l'octroi entamé, au lieu d'un rendu sans lien
-    qu'il faudrait deviner.
-  */
-  if (debit) {
-    await db.analysisCredit.updateMany({
-      where: { id: debit.ligne, analysisId: null },
-      data: { analysisId: analyse.id },
+  const consignee = await consignerUneFois(tache, consomme, entame, async (tx) => {
+    const analyse = await tx.documentAnalysis.create({
+      data: {
+        versionId: version.id,
+        verdict: verdict.verdict,
+        /*
+          Ce que cette analyse a réellement coûté, et non ce que son verdict
+          laisse deviner : le schéma le dit — « recalculer la règle à la
+          lecture la ferait diverger du grand livre de crédits ». La colonne
+          portait sa valeur par défaut sur ce chemin, c'est-à-dire `true`,
+          y compris pour une reprise gratuite.
+        */
+        creditConsumed: consomme,
+        // Les **faits bruts**, et non les mesures : la date lue reste utile
+        // le jour où la date cible est renseignée, et c'est elle qu'un
+        // opérateur relit. Une durée calculée ne se relit pas sur la pièce.
+        fields: lu.bruts as never,
+        title: verdict.titre,
+        body: verdict.corps,
+        inputTokens: lu.jetonsEntree,
+        outputTokens: lu.jetonsSortie,
+      },
     });
-  }
+    /*
+      Le débit nomme l'analyse qu'il a payée (S.92) : une revue qui la rend
+      plus tard retrouve ainsi l'octroi entamé, au lieu d'un rendu sans lien
+      qu'il faudrait deviner.
+    */
+    if (debit) {
+      await tx.analysisCredit.updateMany({
+        where: { id: debit.ligne, analysisId: null },
+        data: { analysisId: analyse.id },
+      });
+    }
 
-  await db.document.update({
-    where: { id: document.id },
-    data: {
-      status: verdict.verdict,
-      feedback: verdict.corps,
-      finding: verdict.constat,
-      extracted: lu.bruts as never,
-      analyzedAt: new Date(),
-      // Le remède suit l'état réel : une pièce déjà déposée se **remplace**,
-      // elle ne s'ajoute pas. « Ajouter » sur une ligne où un fichier existe
-      // déjà fait croire qu'il manque, et fait chercher ce qu'on a déjà
-      // envoyé. C'est le remède qui commande le libellé du bouton.
-      //
-      // Une pièce seulement **sous réserve** n'a rien à se reprocher : le
-      // geste attendu porte sur le dossier, et proposer de remplacer le
-      // fichier enverrait refaire ce qui est déjà bon.
-      ...(verdict.verdict === "A_CORRIGER" &&
-      verdict.echecs.length > 0 &&
-      document.remedy === "TELEVERSER"
-        ? { remedy: "REMPLACER" as const }
-        : {}),
-    },
-  });
+    await tx.document.update({
+      where: { id: document.id },
+      data: {
+        status: verdict.verdict,
+        feedback: verdict.corps,
+        finding: verdict.constat,
+        extracted: lu.bruts as never,
+        analyzedAt: new Date(),
+        // Le remède suit l'état réel : une pièce déjà déposée se **remplace**,
+        // elle ne s'ajoute pas. « Ajouter » sur une ligne où un fichier existe
+        // déjà fait croire qu'il manque, et fait chercher ce qu'on a déjà
+        // envoyé. C'est le remède qui commande le libellé du bouton.
+        //
+        // Une pièce seulement **sous réserve** n'a rien à se reprocher : le
+        // geste attendu porte sur le dossier, et proposer de remplacer le
+        // fichier enverrait refaire ce qui est déjà bon.
+        ...(verdict.verdict === "A_CORRIGER" &&
+        verdict.echecs.length > 0 &&
+        document.remedy === "TELEVERSER"
+          ? { remedy: "REMPLACER" as const }
+          : {}),
+      },
+    });
 
-  await db.notification.create({
-    data: {
-      userId: application.userId,
-      applicationId: tache.applicationId,
-      kind: "ANALYSE",
-      title: verdict.titre,
-      body: verdict.corps,
-    },
+    await tx.notification.create({
+      data: {
+        userId: application.userId,
+        applicationId: tache.applicationId,
+        kind: "ANALYSE",
+        title: verdict.titre,
+        body: verdict.corps,
+      },
+    });
   });
+  if (!consignee) return "TERMINEE";
 
   await recalculerCompletude(tache.applicationId);
-  void analyse;
   return "TERMINEE";
 }
 
@@ -457,9 +486,13 @@ export async function analyserUnePiece(
  * à solder — la contrainte lie le compteur à sa date, et une remise à
  * zéro doit effacer les deux ensemble.
  */
-async function solderLesTentatives(versionId: string, tentatives: number): Promise<void> {
+async function solderLesTentatives(
+  versionId: string,
+  tentatives: number,
+  client: Prisma.TransactionClient | typeof db = db,
+): Promise<void> {
   if (tentatives === 0) return;
-  await db.documentVersion.update({
+  await client.documentVersion.update({
     where: { id: versionId },
     data: { analysisAttempts: 0, analysisLastAttemptAt: null },
   });
@@ -478,27 +511,85 @@ async function acheverHorsSujet(
   documentId: string,
   userId: string,
   intituleReconnu: string,
+  /*
+    Ce que la lecture a coûté. Le chemin écrivait `creditConsumed` à sa
+    valeur par défaut, `true`, y compris sur une reprise gratuite, et ne
+    reliait pas le débit à l'analyse : une revue qui la rendrait plus
+    tard ne retrouvait pas l'octroi entamé (S.92).
+  */
+  cout: { consomme: boolean; ligne: string | null; entame: string | null },
 ): Promise<Suite> {
   const titre = "Ce document ne correspond pas à la pièce attendue";
   const corps = `Ce fichier ressemble à : ${intituleReconnu}. Reclasse-le dans cette ligne de la checklist, puis dépose ici la pièce attendue.`;
 
-  await db.documentAnalysis.create({
-    data: { versionId, verdict: "HORS_SUJET", title: titre, body: corps },
+  const consignee = await consignerUneFois(tache, cout.consomme, cout.entame, async (tx) => {
+    const analyse = await tx.documentAnalysis.create({
+      data: {
+        versionId,
+        verdict: "HORS_SUJET",
+        title: titre,
+        body: corps,
+        creditConsumed: cout.consomme,
+      },
+    });
+    if (cout.ligne) {
+      await tx.analysisCredit.updateMany({
+        where: { id: cout.ligne, analysisId: null },
+        data: { analysisId: analyse.id },
+      });
+    }
+    await tx.document.update({
+      where: { id: documentId },
+      data: { status: "HORS_SUJET", feedback: corps, analyzedAt: new Date() },
+    });
+    await tx.notification.create({
+      data: {
+        userId,
+        applicationId: tache.applicationId,
+        kind: "ANALYSE",
+        title: titre,
+        body: corps,
+      },
+    });
   });
-  await db.document.update({
-    where: { id: documentId },
-    data: { status: "HORS_SUJET", feedback: corps, analyzedAt: new Date() },
-  });
-  await db.notification.create({
-    data: {
-      userId,
-      applicationId: tache.applicationId,
-      kind: "ANALYSE",
-      title: titre,
-      body: corps,
-    },
-  });
+  if (!consignee) return "TERMINEE";
   await recalculerCompletude(tache.applicationId);
   return "TERMINEE";
 }
 
+/**
+ * Écrit le verdict d'une version, une fois — INV-6, revue du 07/10/2026, E5.
+ *
+ * Le verdict, le lien du débit, l'état de la pièce et la notification
+ * tombent ensemble ou pas du tout. Écrits l'un après l'autre, un arrêt
+ * entre deux laissait une analyse sans notification, ou une pièce
+ * toujours « en analyse » avec un verdict que la garde du rejeu voyait :
+ * plus rien ne la faisait avancer.
+ *
+ * Deux exécutions simultanées de la même version passent toutes deux la
+ * garde de tête. La seconde bute sur l'unicité de la version en base
+ * (`documentanalysis_une_par_version`) : rien de ce qu'elle écrivait ne
+ * reste, et l'analyse qu'elle avait débitée est rendue — le candidat a
+ * payé une lecture, pas deux. Rend `false` dans ce cas.
+ */
+async function consignerUneFois(
+  tache: Tache,
+  consomme: boolean,
+  entame: string | null,
+  ecrire: (tx: Prisma.TransactionClient) => Promise<void>,
+): Promise<boolean> {
+  try {
+    await db.$transaction(ecrire);
+    return true;
+  } catch (erreur) {
+    if ((erreur as { code?: unknown } | null)?.code !== "P2002") throw erreur;
+    if (consomme) {
+      await rendreUneTentative(
+        tache.applicationId,
+        "Lecture en double : la pièce était déjà analysée par une autre tâche",
+        entame,
+      );
+    }
+    return false;
+  }
+}
