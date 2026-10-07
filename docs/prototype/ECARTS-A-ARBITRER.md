@@ -11513,3 +11513,9 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 2. Les réécritures passées d'une version dépubliée ne se détectent pas après coup : à relire avec la veille.
 3. Les objets déjà orphelins en quarantaine ont perdu leur clé en base ; un inventaire par préfixe de dossier reste à faire.
 4. Un arrêt du worker entre le débit et le verdict débite encore deux fois au rejeu.
+
+### S.125 bis — Nginx déployé sur le VPS, domaine `immipro.app` (07/10/2026)
+
+- La configuration nginx de S.125 a été recopiée sur le VPS, vérifiée par `nginx -t` et rechargée.
+- **Domaine.** Le VPS sert `immipro.app`, comme le code (`domain/paiement/recu.ts`, `server/paiement/diagnostic.ts`). Le fichier du dépôt disait `immipro.bj` : il est aligné, pour qu'une prochaine recopie ne remette pas l'ancien domaine. L'écart 1 de S.125 est levé pour ce qui concerne le domaine ; le reste de la dérive nginx (vhost du stockage, `/_next/static/`) relève toujours de M16.
+- **Essai en production.** Une rafale de 60 `POST /api/comptes/session`, avec un `X-Forwarded-For` différent à chaque appel : 10 passent (la marge `burst=10`) et reçoivent 422 de l'application, faute de corps ; les 50 suivantes reçoivent 429 de nginx. La falsification de l'en-tête ne contourne plus la limite.
