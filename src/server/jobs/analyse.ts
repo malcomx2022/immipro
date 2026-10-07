@@ -397,12 +397,17 @@ export async function analyserUnePiece(
     reclasser le fichier, l'autre laisse chercher. Le repli sur les
     champs nuls reste dans `evaluerConditions` — il attrape le fichier
     qui ne ressemble à rien de la liste.
+
+    Seul l'intitulé du référentiel s'affiche, jamais ce que le modèle a
+    écrit : `lireLaReponse` refuse déjà un code hors checklist, et un
+    code sans intitulé ne nomme aucune ligne où reclasser (revue E7).
   */
-  if (lu.pieceIdentifiee !== null && lu.pieceIdentifiee !== document.code) {
-    const attendue =
-      regles?.pieces_requises.find((p) => p.code === lu.pieceIdentifiee)?.libelle ??
-      lu.pieceIdentifiee;
-    return acheverHorsSujet(tache, version.id, document.id, application.userId, attendue, {
+  const intituleReconnu =
+    lu.pieceIdentifiee !== null && lu.pieceIdentifiee !== document.code
+      ? regles?.pieces_requises.find((p) => p.code === lu.pieceIdentifiee)?.libelle
+      : undefined;
+  if (intituleReconnu !== undefined) {
+    return acheverHorsSujet(tache, version.id, document.id, application.userId, intituleReconnu, {
       consomme,
       ligne: debit?.ligne ?? null,
       entame,

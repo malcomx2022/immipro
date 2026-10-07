@@ -257,7 +257,7 @@ export async function lireDesOctets(
     return echoue("reponse_illisible", "la réponse n'est pas du JSON");
   }
 
-  const relue = lireLaReponse(charge, demande.champs);
+  const relue = lireLaReponse(charge, demande.champs, demande.codesDeLaChecklist);
   if ("cause" in relue) {
     return echoue(relue.cause, "la réponse n'a pas la forme annoncée au schéma");
   }

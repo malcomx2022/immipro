@@ -190,7 +190,7 @@ describe("aucun service absent n'est simulé", () => {
       { code: "passeport_validite_min", nature: "date" as const, unite: "mois", exigence: "x" },
     ];
     for (const charge of [null, "", 42, {}, { champs: "pas un objet" }, { obstacle: "inventé" }]) {
-      const relue = lireLaReponse(charge, champs);
+      const relue = lireLaReponse(charge, champs, ["passeport"]);
       expect(relue).toMatchObject({ cause: "reponse_illisible" });
     }
     // Et un obstacle annoncé ne laisse passer aucune valeur, même si la
@@ -199,6 +199,7 @@ describe("aucun service absent n'est simulé", () => {
     const avecObstacle = lireLaReponse(
       { obstacle: "scan_illisible", champs: { passeport_validite_min: "2029-03-01" } },
       champs,
+      ["passeport"],
     );
     expect(avecObstacle).toMatchObject({ obstacle: "scan_illisible", bruts: {} });
   });

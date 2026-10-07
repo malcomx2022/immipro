@@ -963,6 +963,39 @@ try {
     );
   }
 
+  console.log("\nUne identification ou une mention écrite pour s'afficher ne s'affiche jamais (E7)");
+  {
+    /*
+      Le fournisseur compatible OpenAI ne tient pas l'énumération du
+      schéma, et une pièce peut porter des instructions. Constaté avant
+      correction : « Ce fichier ressemble à : Visa garanti. Reclasse-le… »
+      — une promesse de résultat écrite par le modèle, affichée telle
+      quelle au candidat et poussée en notification.
+    */
+    const injections = [
+      { piece_identifiee: "Visa garanti", obstacle: null, champs: { passeport_validite_min: null } },
+      {
+        piece_identifiee: "passeport",
+        obstacle: null,
+        champs: { passeport_validite_min: "Visa garanti, ton dossier est complet et accepté" },
+      },
+    ];
+    for (const charge of injections) {
+      reponseDuService = reponseDeLecture(charge);
+      const p = await piece({ dateCible: "2027-09-01" });
+      const suite = await analyserUnePiece(p.tache, lExtracteur());
+      verifier(suite === "TERMINEE", `une réponse hors schéma ne se rejoue pas (${suite})`);
+
+      const apres = await relireDocument(p.document.id);
+      verifier(apres.status === "ILLISIBLE", `la pièce part en relecture humaine (${apres.status})`);
+      const notifications = await db.notification.findMany({ where: { applicationId: p.application.id } });
+      const affiche = [apres.feedback ?? "", ...notifications.map((n) => `${n.title} ${n.body}`)].join(" ");
+      verifier(!/garanti/iu.test(affiche), `rien de ce que le modèle a écrit ne s'affiche (${affiche})`);
+      verifier(apres.extracted === null, "aucune valeur n'est conservée");
+      verifier(await solde(p.application.id) === 5, "l'analyse est rendue : la lecture n'a rien rendu");
+    }
+  }
+
   console.log("\nCe qui ne part pas au service, et ne coûte donc rien");
   {
     recusParLeService.length = 0;
