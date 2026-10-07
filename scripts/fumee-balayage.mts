@@ -232,6 +232,7 @@ const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
 const { constaterLesDependances } = await import("../src/server/exploitation/capacites");
 const { sonderLesServices } = await import("../src/server/exploitation/sondes");
 const { exigerUnDepotConforme } = await import("../src/server/acces/pieces");
+const { reprendreLesAnalysesEnAttente } = await import("../src/server/jobs/quarantaine");
 const { cleObjet } = await import("../src/server/securite/secret");
 const { REFUS_DE_LA_CONFIRMATION } = await import("../src/domain/dossiers/televersement");
 
@@ -755,15 +756,67 @@ try {
     const p = await piece({ avecQuota: true });
     await balayerUnePiece(p.tache, leBalayeur());
 
+    /*
+      Revue du 07/10/2026, E6. Sans analyse écrite, le rejeu reprend la
+      suite de la promotion : c'est ce qui rattrape une mise en file
+      d'analyse perdue. Il ne rappelle pas le moteur — le verdict est
+      acquis.
+    */
     recusParLeMoteur.length = 0;
-    const suite = await balayerUnePiece(p.tache, leBalayeur());
-    verifier(suite === "SANS_OBJET", `le rejeu ne décide rien (${suite})`);
+    const reprise = await balayerUnePiece(p.tache, leBalayeur());
+    verifier(reprise === "ANALYSE", `sans analyse, le rejeu la redemande (${reprise})`);
     verifier(recusParLeMoteur.length === 0, "et n'appelle pas le moteur une seconde fois");
+
+    // L'analyse est écrite : le rejeu n'a plus rien à faire.
+    await db.documentAnalysis.create({
+      data: { versionId: p.tache.versionId, verdict: "CONFORME", title: "Lu", body: "Pièce lue." },
+    });
+    await db.document.update({ where: { id: p.tache.documentId }, data: { status: "CONFORME" } });
+    const suite = await balayerUnePiece(p.tache, leBalayeur());
+    verifier(suite === "SANS_OBJET", `une fois analysée, le rejeu ne décide rien (${suite})`);
+    verifier(recusParLeMoteur.length === 0, "et le moteur n'est toujours pas rappelé");
 
     const version = await relire(p.tache.versionId);
     verifier(
       version.scanState === "SAINE",
       `une version saine ne redescend pas en quarantaine (${version.scanState})`,
+    );
+  }
+
+  console.log("\nUne analyse perdue à la mise en file est reprise dans l'heure (E6)");
+  {
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    const perdue = await piece({ avecQuota: true });
+    await balayerUnePiece(perdue.tache, leBalayeur());
+    const servie = await piece({ avecQuota: true });
+    await balayerUnePiece(servie.tache, leBalayeur());
+    await db.documentAnalysis.create({
+      data: { versionId: servie.tache.versionId, verdict: "CONFORME", title: "Lu", body: "Pièce lue." },
+    });
+    await db.document.update({ where: { id: servie.tache.documentId }, data: { status: "CONFORME" } });
+    // Saines depuis une heure, sans que l'analyse de la première soit jamais partie.
+    await db.documentVersion.updateMany({
+      where: { id: { in: [perdue.tache.versionId, servie.tache.versionId] } },
+      data: { scannedAt: new Date(Date.now() - 60 * 60_000) },
+    });
+
+    const bilan = await reprendreLesAnalysesEnAttente();
+    verifier(bilan.remises >= 1, `la passe remet la pièce en file (${bilan.remises})`);
+    const enFile = async (versionId: string) =>
+      Number(
+        (
+          await db.$queryRawUnsafe<{ n: bigint }[]>(
+            `SELECT count(*) AS n FROM pgboss.job WHERE name = $1 AND data->>'versionId' = $2`,
+            JOBS.BALAYAGE_PIECE,
+            versionId,
+          )
+        )[0]!.n,
+      );
+    verifier((await enFile(perdue.tache.versionId)) === 1, "la pièce perdue a son balayage en file");
+    verifier((await enFile(servie.tache.versionId)) === 0, "une pièce déjà analysée est laissée");
+    verifier(
+      (await balayerUnePiece(perdue.tache, leBalayeur())) === "ANALYSE",
+      "et ce balayage redemande l'analyse",
     );
   }
 

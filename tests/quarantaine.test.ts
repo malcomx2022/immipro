@@ -344,6 +344,37 @@ describe("la quarantaine est une zone, pas une convention de nommage", () => {
   });
 });
 
+/**
+ * Revue du 07/10/2026, E6. Une version saine dont l'analyse n'a jamais été
+ * mise en file restait « en analyse » pour toujours : le rejeu du balayage
+ * rendait « sans objet », et la reprise ne lisait que la quarantaine.
+ * `smoke:balayage` et `smoke:extraction` l'exécutent sur une base réelle.
+ */
+describe("une pièce saine finit toujours par être analysée ou conservée", () => {
+  it("le rejeu d'un balayage reprend une version saine jamais analysée, avant de renoncer", () => {
+    const balayage = lire("src/server/jobs/balayage.ts");
+    const reprise = balayage.indexOf('version.scanState === "SAINE" && (await analyseEnAttente(version))');
+    expect(reprise).toBeGreaterThan(-1);
+    expect(reprise).toBeLessThan(balayage.indexOf('if (version.scanState !== "EN_QUARANTAINE") return "SANS_OBJET"'));
+    // La promotion et sa reprise décident par la même fonction.
+    expect([...balayage.matchAll(/return suiteApresPromotion\(version, tache\)/gu)]).toHaveLength(2);
+  });
+
+  it("la passe horaire retrouve les analyses perdues, sans attendre le moteur", () => {
+    const worker = lire("src/server/jobs/worker.ts");
+    const passe = worker.slice(worker.indexOf("JOBS.REPRISE_QUARANTAINE"));
+    expect(passe.indexOf("reprendreLesAnalysesEnAttente()")).toBeGreaterThan(-1);
+    expect(passe.indexOf("reprendreLesAnalysesEnAttente()")).toBeLessThan(
+      passe.indexOf("reprendreLesQuarantaines()"),
+    );
+  });
+
+  it("un quota épuisé au débit conserve la pièce au lieu de faire échouer le job", () => {
+    const analyse = lire("src/server/jobs/analyse.ts");
+    expect(analyse).toMatch(/erreur\.echec\.code !== "quota_epuise"\) throw erreur;\s*await conserverFauteDeQuota\(/u);
+  });
+});
+
 describe("le balayage précède l'analyse, et rien ne les inverse", () => {
   it("le worker enchaîne, et n'analyse que ce qui a été promu", () => {
     const worker = lire("src/server/jobs/worker.ts");
