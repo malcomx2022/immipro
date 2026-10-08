@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12) et S.137 (M8, M9, M10) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10) et S.138 (M7, F1, F2, M16) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -67,7 +67,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-2 | Un CDN ou un proxy sera-t-il placé devant nginx ? | Exploitant | Confirme E1 (livré) |
 | D-3 | Garde-t-on le décompte « il te reste N essais » d'A-02, au prix d'un compteur en mémoire des adresses sans compte ? | Direction produit | M2 — **tranchée le 08/10/2026 : option B**, décompte gardé, compteur par empreinte |
 | D-4 | La surveillance externe a-t-elle besoin du détail de `/api/health` ? | Exploitant | M10 — **tranchée le 08/10/2026** : un anonyme lit `{ status, db }` ; le détail, un administrateur ou `ETAT_DE_SERVICE_JETON` |
-| D-5 | Renomme-t-on le cookie en `__Host-immipro_session` (texte Cookies à revalider, déconnexion générale une fois) ? | Direction, conseil juridique | F1 (partie cookie) |
+| D-5 | Renomme-t-on le cookie en `__Host-immipro_session` (texte Cookies à revalider, déconnexion générale une fois) ? | Direction, conseil juridique | F1 (partie cookie) — **tranchée le 08/10/2026** : reporté |
 | D-6 | Un encaissement d'un autre montant ou d'une autre devise est-il refusé puis remboursé, même s'il est supérieur au prix ? | Direction | E2 — **tranchée le 08/10/2026** : tout écart refuse, même au-dessus du prix |
 | D-7 | Chez FedaPay, `entity.amount` est-il hors frais ? Un remboursement partiel est-il possible et notifié avec son montant ? | Prestataire FedaPay | E2, E3 — **tranchée le 08/10/2026** : `entity.amount` est hors frais (5 000 sur IMP-261005-P98AEE) ; la notification de remboursement FedaPay n'est pas lue avec un montant (question encore ouverte auprès de FedaPay) : elle s'applique sans comparaison, la déclaration manuelle restant la garde |
 | D-8 | Un remboursement constaté sans obligation ouverte ouvre-t-il un écart, sans retrait automatique des droits ? | Direction | E3 — **tranchée le 08/10/2026** : écart, sans retrait automatique ni avoir |
@@ -91,7 +91,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 — **tranchée le 08/10/2026** : Backblaze B2 hors du VPS, clé privée dans un coffre hors ligne, Healthchecks.io |
 | D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 — **tranchée le 08/10/2026** : 30 jours, comme la base ; texte proposé pour `securite_complements` |
 | D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 — **tranchée le 08/10/2026** : 8 Go, rotation dans le compose |
-| D-29 | ~~Domaines servis~~ : `immipro.app`, tranché le 07/10/2026 (S.125 bis). Restent `nginx -T` du VPS et la méthode certbot | Exploitant | M16 |
+| D-29 | ~~Domaines servis~~ : `immipro.app`, tranché le 07/10/2026 (S.125 bis). Restent `nginx -T` du VPS et la méthode certbot | Exploitant | M16 — **tranchée le 08/10/2026** : un certificat par webroot, `www` redirigé en 301 ; `nginx -T` reste à relever sur le VPS |
 | D-30 | Node 24 ou Node 22 ? | Direction | M19 étape 0, M15 — **tranchée le 08/10/2026** : Node 24 LTS |
 | D-31 | Version d'API Stripe à figer | Exploitant | M19 étape 1 |
 | D-32 | Découpage de `paiements.ts` après le bloc paiements | Direction technique | M20 |
@@ -119,7 +119,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.135 — livré** | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
 | **S.136 — livré** | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
 | **S.137 — livré** | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
-| S.138 — rédaction et en-têtes | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
+| **S.138 — livré** | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
 | S.139 — interface III | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
 | S.140 — facturation et montants | F5, M18 | S+S | D-13, D-14 | Date de la prestation, unités nommées |
 | S.141 — arbitrages | M6, F11 | S+M | D-1, D-24 | Texte d'INV-6 aligné sur le code, historiques immuables |
@@ -415,6 +415,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### M7 — INV-2 : le texte rédigé par l'IA échappe au vocabulaire interdit
 
+**État : livré en S.138**, point 5 compris. Écart : « ton visa est garanti » ne correspondait à aucun motif de la portée « partout » ; `visa-garanti` reconnaît désormais la forme verbale (`est`, `sera`). Les messages d'issue vivent dans `domain/redaction/issues.ts`.
+
 **Constat vérifié.** `src/app/api/dossiers/[id]/redaction/[type]/version/route.ts:186-202` enregistre `produit.texte` sans contrôle ; les adaptateurs ne vérifient que la longueur. Deux défauts liés : `Redaction.tsx:179-194` ignore `produite: false` (le candidat n'apprend pas l'échec), et les remarques de relecture s'affichent sans contrôle.
 
 **Règle.** INV-2 (portée « partout » : documents générés), RG-08.1, RG-08.6, INV-6.
@@ -607,6 +609,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### F1 — Pas de CSP ni de `Permissions-Policy`, cookie sans `__Host-`
 
+**État : livré en S.138** pour la CSP et `Permissions-Policy` ; `__Host-` reporté (D-5). Reste la passe manuelle en préproduction.
+
 **Constat vérifié.** `next.config.mjs:7-16` ne pose que trois en-têtes, en doublon avec nginx. Aucun `dangerouslySetInnerHTML`. Le navigateur ne charge aucun script ni police tiers. Les paiements sont des navigations. Deux usages du stockage présigné côté client : le `PUT` de dépôt (`PieceDuDossier.tsx:772`) et l'`<iframe>` d'aperçu B-05 (`RevueDesPieces.tsx:195`).
 
 **Choix techniques.**
@@ -644,6 +648,8 @@ En développement : `'unsafe-eval'`, `ws:`, origine du stockage déduite de `MIN
 ---
 
 #### F2 — CSRF : aucune vérification d'`Origin`
+
+**État : livré en S.138**, sans le point 4 optionnel (`content-type`). Vérifié sur un serveur démarré : `Origin: https://evil.example` → 403, sans `Origin` → 422.
 
 **Constat vérifié.** `src/server/http/route.ts:123-186` ne lit jamais `Origin`. La protection repose sur `SameSite=Lax`. `lireCorps` (`route.ts:220-236`) parse le JSON sans regarder `content-type`. Un `fetch` en `text/plain` depuis une origine de même site, comme le sous-domaine du stockage, passerait donc avec le cookie (hypothèse : suppose un contenu actif servi depuis le stockage). La connexion et l'inscription sont exposées à la connexion forcée sur le compte d'un attaquant.
 
@@ -1308,6 +1314,8 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### M16 — Dérive de la configuration nginx
 
+**État : livré en S.138** (D-29). `nginx -t` en CI par `scripts/verifier-nginx.sh`. `/_next/static/` n'a plus de `location` : Next pose lui-même son `Cache-Control`. Reste à relever `nginx -T` sur le VPS avant de remplacer la configuration servie.
+
 **Déjà livré par E1 (lot 1).** En-têtes proxy au niveau du serveur, `X-Forwarded-For $remote_addr`, `limit_req_status 429`, limite recalée sur les routes publiques de comptes.
 
 **Ce qui reste.**
@@ -1450,7 +1458,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.137
+## 7. Ce qui reste ouvert après les lots S.125 à S.138
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1476,3 +1484,6 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M11** : les formulaires du back-office (ticket séparé, comme prévu) ; et le champ « Établissement visé » de C-05, saisi mais jamais envoyé, à trancher (l'envoyer ou le retirer).
 - **M10** : renseigner `ETAT_DE_SERVICE_JETON` dans `.env.app` si une surveillance externe doit lire le détail de `/api/health` ; sans lui, seul un administrateur connecté le lit.
 - **M8 (D-23)** : après le déploiement de S.137, la première reprise horaire propage la version en vigueur de chaque procédure qui a un prédécesseur ; relire `[reprise-divergence]` dans le journal du worker et les alertes parties.
+- **M16** : sur le VPS, relever `sudo nginx -T`, installer `nginx/immipro.conf` et `nginx/stockage.conf`, étendre le certificat à `stockage.immipro.app` par webroot et vérifier `certbot renew --dry-run` (`INSTALLATION-GITHUB.md`, « nginx et certificats »).
+- **F1** : passe manuelle en préproduction, console ouverte (dépôt, aperçu B-05, paiement FedaPay aller-retour, exports CSV, « Mes données », simulateur, appareil photo Android). D-5 (`__Host-`) reste ouvert.
+- **M7** : relire en lecture seule les versions déjà produites par le modèle (`changeNote` de première version) contre la liste « partout » ; aucune réécriture.

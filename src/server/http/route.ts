@@ -5,6 +5,7 @@ import type { ZodType } from "zod";
 import "./messages-zod";
 import type { Role } from "@prisma/client";
 import { EchecHttp, echec } from "./echecs";
+import { origineAdmise } from "./origine";
 import { json, reponseEchec, type OptionsReponse, type Public } from "./reponse";
 import { adresseDeLAppelant, cleDAppel, consommer, type NomRegle } from "./limites";
 import { COOKIE_SESSION, lireSession, type Acteur } from "@/server/securite/session";
@@ -142,6 +143,23 @@ export function route<C = undefined, Q = undefined>(
           throw echec("signature_invalide");
         }
         destinataireEffectif = "operateur";
+      }
+
+      // ── Origine du navigateur ───────────────────────────────
+      // Revue F2 : une requête qui modifie et vient d'une autre origine est
+      // refusée avant que la session soit lue. Un webhook en est exempté :
+      // son origine se prouve par la signature, pas par le navigateur.
+      if (
+        definition.limite !== "webhook" &&
+        !origineAdmise({
+          methode: requeteBrute.method,
+          origine: requeteBrute.headers.get("origin"),
+          secFetchSite: requeteBrute.headers.get("sec-fetch-site"),
+          hote: requeteBrute.headers.get("host"),
+          appUrl: process.env.APP_URL,
+        })
+      ) {
+        throw echec("origine_refusee");
       }
 
       // ── Acteur ──────────────────────────────────────────────

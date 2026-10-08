@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { appeler } from "@/lib/api";
-import type { EchecCandidat } from "@/server/http/echecs";
+import type { EchecCandidat } from "@/domain/echecs/catalogue";
+import { issueDeLaRelecture } from "@/domain/redaction/issues";
 
 /**
  * Le seul geste de R-04 qui déclenche quelque chose — WF-08 étape 4.
@@ -23,13 +24,13 @@ export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: s
   const router = useRouter();
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
-  const [sansAvis, setSansAvis] = useState(false);
+  const [sansAvis, setSansAvis] = useState<EchecCandidat | null>(null);
 
   async function lancer() {
     setEnvoi(true);
     setEchec(null);
-    setSansAvis(false);
-    const resultat = await appeler<{ relue: boolean; disponible: boolean }>(
+    setSansAvis(null);
+    const resultat = await appeler<{ relue: boolean; disponible: boolean; motif?: string | null }>(
       `/api/dossiers/${dossierId}/redaction/${type}/relecture`,
       { corps: {} },
     );
@@ -46,7 +47,8 @@ export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: s
     */
     if (!resultat.donnees.relue) {
       setEnvoi(false);
-      setSansAvis(true);
+      // Rien rendu, ou une remarque écartée parce qu'elle promettait (M7).
+      setSansAvis(issueDeLaRelecture(resultat.donnees));
       return;
     }
     router.refresh();
@@ -63,17 +65,7 @@ export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: s
       <Button onClick={lancer} chargement={envoi} pleineLargeur className="md:w-auto">
         {envoi ? "Analyse en cours…" : "Lancer l'analyse"}
       </Button>
-      {sansAvis ? (
-        <BlocEchec
-          echec={{
-            titre: "L'analyse n'a pas abouti",
-            corps: "Le service n'a rien rendu cette fois. Ton texte n'a pas été analysé.",
-            conserve: "Aucune analyse n'a été décomptée de ton quota, et ta version est intacte.",
-            action: "Réessayer",
-            ton: "attente",
-          }}
-        />
-      ) : null}
+      {sansAvis ? <BlocEchec echec={sansAvis} /> : null}
       {echec ? <BlocEchec echec={echec} /> : null}
     </div>
   );

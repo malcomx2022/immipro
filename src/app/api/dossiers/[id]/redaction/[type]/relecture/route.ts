@@ -1,4 +1,5 @@
 import { route } from "@/server/http/route";
+import { MOTIF_FORMULATION_REFUSEE, refusDesRemarques } from "@/domain/redaction/commande";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
@@ -133,6 +134,19 @@ export const POST = route({
       );
       console.warn(`[relecture] ${MOTIF_DAPPEL[avis.cause]} — ${avis.detail}`);
       return { relue: false, disponible: true, remarques: null };
+    }
+
+    /*
+      Une remarque qui promet un résultat écarte toute la relecture (revue
+      M7) : elle s'affiche au candidat, et INV-2 vaut pour tout ce qui est
+      généré. L'analyse est rendue, la version reste non relue, et l'écran
+      dit pourquoi.
+    */
+    const faute = refusDesRemarques(avis.remarques);
+    if (faute) {
+      await rendreUneTentative(params.id!, "Relecture écartée : formulation refusée", debit.octroi);
+      console.warn(`[relecture] relecture écartée — ${faute.code} « ${faute.extrait} »`);
+      return { relue: false, disponible: true, remarques: null, motif: MOTIF_FORMULATION_REFUSEE };
     }
 
     /*
