@@ -13,6 +13,17 @@ name: Validation
 
 on:
   workflow_call:
+    # Transmis par les deux appelants — revue du 07/10/2026, E9. Ils
+    # n'étaient déclarés nulle part : l'étape du bac à sable s'abstenait
+    # toujours, en CI comme avant un déploiement. Facultatifs : sans eux,
+    # elle s'abstient et le dit.
+    secrets:
+      STRIPE_SANDBOX_API_KEY: { required: false }
+      FEDAPAY_SANDBOX_API_KEY: { required: false }
+
+# Lire le dépôt, rien d'autre.
+permissions:
+  contents: read
 
 jobs:
   valider:
@@ -38,8 +49,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://immipro:immipro@localhost:5432/immipro
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 20, cache: npm }
       - name: Entête du résumé
         run: |
@@ -65,6 +76,13 @@ jobs:
       - name: Audit des dépendances
         run: npm run check:audit
       - run: echo "- **Audit des dépendances** — \`npm run check:audit\`, élevées et critiques bloquantes" >> "$GITHUB_STEP_SUMMARY"
+
+      # Les scripts exécutés sur le VPS, dont celui du déploiement : une
+      # erreur de shell s'y découvre sinon en production, au pire moment.
+      # `shellcheck` est fourni par l'image du runner.
+      - name: Scripts shell
+        run: shellcheck scripts/*.sh
+      - run: echo "- **Scripts shell** — \`shellcheck scripts/*.sh\`" >> "$GITHUB_STEP_SUMMARY"
 
       # La construction fait partie de la porte : un projet dont les tests
       # passent mais qui ne construit pas n'est pas déployable. Elle produit

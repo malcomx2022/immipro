@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) et S.131 (E11, audit, M17) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17) et S.132 (E9) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -87,7 +87,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 — **tranchée le 08/10/2026 : cookie oublié à la fermeture du navigateur, 24 h au plus en base** |
 | D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) |
 | D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 |
-| D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 |
+| D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 — **tranchée le 08/10/2026** : `ssh` natif vérifié par `VPS_KNOWN_HOSTS`, compose et script recopiés à chaque déploiement |
 | D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 |
 | D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 |
 | D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 |
@@ -113,7 +113,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.129 — livré** | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
 | **S.130 — livré** | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
 | **S.131 — livré** | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
-| S.132 — exploitation I | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
+| **S.132 — livré** | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
 | S.133 — exploitation II | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
 | S.134 — exploitation III | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
 | S.135 — interface I | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
@@ -1172,6 +1172,11 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### E9 — Déploiement : empreinte d'hôte, garde-fous après migration, retour arrière
 
+**État : livré en S.132** (D-25 : option A, compose recopié). Écarts au texte ci-dessous :
+- le compose reçu attend dans `.deploiement/arrivee/` et ne remplace celui en service qu'à la bascule ; le retour arrière remet aussi le compose précédent ;
+- un déploiement qui porte une migration s'arrête si `BACKUP_GPG_RECIPIENT` manque (`.env.sauvegarde`) ;
+- `verifier-garde-fous.sql` ne laisse pas `refuse()` ni `passe()` derrière lui, même interrompu : par le paquet `pg`, la requête multiple est annulée d'un bloc, et par `psql`, le `DROP` final s'exécute quoi qu'il arrive. Vérifié sur une base vierge non migrée et sur une base peuplée : aucun déplacement dans `pg_temp` n'est nécessaire.
+
 **Constat vérifié.** `deploy.yml:88` : `appleboy/ssh-action@v1` sans `fingerprint`. Lignes 97-100 : `pull`, `migrate deploy`, `up -d`, `image prune`, sans garde-fous ni sonde. Aucun bloc `permissions:` dans `ci.yml` ni `validation.yml`. Pas de Dependabot.
 
 **Correction.**
@@ -1416,7 +1421,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.131
+## 7. Ce qui reste ouvert après les lots S.125 à S.132
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1430,3 +1435,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **E3** : à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.
 - **Audit** : l'exception `deepmerge-ts` (D-34) est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15) ; les quatre modérées de `minio` restent affichées.
 - **M17** : une base de développement où la graine a tourné avant S.131 garde ses relevés de veille de démonstration, sans dommage ; ceux d'une veille réelle effacés par les passes antérieures ne se retrouvent pas.
+- **E9** : avant le premier déploiement par la CI, renseigner `VPS_KNOWN_HOSTS` (relevé depuis la console du fournisseur) et `.env.sauvegarde` sur le VPS, puis faire les trois répétitions de `docs/exploitation/deploiement.md` à la main. Sans `VPS_KNOWN_HOSTS`, le job `deploy` échoue, et il le dit.

@@ -9,6 +9,14 @@ on:
   push:
     branches: [main, develop]
 
+# Lire le dépôt, rien d'autre — revue du 07/10/2026, E9.
+permissions:
+  contents: read
+
 jobs:
   valider:
     uses: ./.github/workflows/validation.yml
+    # Absents d'une proposition venue d'un fork : l'étape s'abstient alors.
+    secrets:
+      STRIPE_SANDBOX_API_KEY: ${{ secrets.STRIPE_SANDBOX_API_KEY }}
+      FEDAPAY_SANDBOX_API_KEY: ${{ secrets.FEDAPAY_SANDBOX_API_KEY }}

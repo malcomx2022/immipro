@@ -116,6 +116,18 @@ la graine. Pour corriger une règle de `seed/visa-rules.data.ts`, on ajoute
 la version suivante, avec un numéro plus haut ; la graine archive alors
 celle qu'elle remplace, et les dossiers ouverts gardent la leur (INV-3).
 
+**Une migration est additive.** Le déploiement (`scripts/deployer.sh`)
+migre avant de basculer, et revient à l'image précédente si la nouvelle ne
+répond pas ; il ne revient jamais sur le schéma. L'image en service doit
+donc tourner sur le schéma de la suivante : on ajoute une colonne nullable
+ou dotée d'une valeur par défaut, une table, un index, une contrainte que
+les données existantes respectent. On ne renomme pas, on ne supprime pas, on
+ne rend pas obligatoire une colonne que l'ancienne image n'écrit pas, dans
+la même livraison que le code qui s'en passe. Un retrait se fait en deux
+livraisons : le code cesse de lire, puis la migration retire. Si une
+migration doit faire autrement, la PR le dit dans « Impact sur les données »
+et prévoit la restauration (`docs/exploitation/deploiement.md`).
+
 `tests/schema-domaine.test.ts` compare les enums du schéma aux unions du
 domaine, sans base ni client généré. Les deux vocabulaires sont écrits deux
 fois ; ce test échoue le jour où l'un bouge sans l'autre.
