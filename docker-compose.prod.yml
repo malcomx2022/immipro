@@ -1,9 +1,30 @@
 # Production VPS. Rien n'est exposé hors du réseau Docker sauf l'application,
 # en loopback, derrière Nginx.
+#
+# Revue du 07/10/2026, M15 (D-28 : VPS de 8 Go, rotation dans ce fichier) :
+#
+# - **journaux** : chaque service tourne ses journaux (`local`, 10 Mo × 5).
+#   Sans rotation, un service bavard remplissait le disque et faisait
+#   tomber la base avec lui ;
+# - **mémoire** : chaque service a une limite. Environ 6,3 Go au total, ce
+#   qui laisse le système, nginx et la marge des pointes sur 8 Go. Un
+#   service qui s'emballe est tué seul au lieu d'affamer les autres ;
+# - **sondes** : `docker compose ps` dit `healthy` ou `unhealthy` pour
+#   chaque service, et non plus seulement « Up » ;
+# - **images épinglées par empreinte** : un tag seul change sous les pieds
+#   d'un `pull`. Dependabot tient les empreintes à jour.
+x-journaux: &journaux
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     restart: unless-stopped
+    logging: *journaux
+    mem_limit: 1g
     env_file: .env.db
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -42,9 +63,18 @@ services:
   # `garage.toml` porte un secret RPC : le dépôt ne contient qu'un modèle
   # (secret à remplacer), le serveur porte le vrai fichier (600).
   minio:
-    image: dxflrs/garage:v2.4.1
+    image: dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
     restart: unless-stopped
+    logging: *journaux
+    mem_limit: 512m
     command: ["/garage", "server"]
+    # L'image n'a pas de shell : la sonde appelle le binaire directement.
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     # Publié en loopback pour le vhost nginx du stockage public
     # (https://stockage.immipro.app) — jamais exposé sur Internet.
     ports:
@@ -58,7 +88,23 @@ services:
   app:
     image: ghcr.io/${GH_OWNER}/immipro:${TAG}
     restart: unless-stopped
+    logging: *journaux
+    mem_limit: 768m
     env_file: .env.app
+    # Le tas de V8 sous la limite du conteneur : passé 512 Mo, Node ramasse
+    # au lieu d'être tué par le noyau sans un mot au journal.
+    environment:
+      NODE_OPTIONS: --max-old-space-size=512
+    # Une sonde de **vie**, sans base : `/robots.txt` répond tant que le
+    # serveur tourne. `/api/health` dit l'aptitude et la base, et répond 503
+    # sans panne quand l'instance est inapte (S.132) : il ne doit pas faire
+    # déclarer le conteneur malade.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/robots.txt"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres: { condition: service_healthy }
     ports:
@@ -80,8 +126,25 @@ services:
   worker:
     image: ghcr.io/${GH_OWNER}/immipro:${TAG}
     restart: unless-stopped
+    logging: *journaux
+    mem_limit: 768m
     command: ["node", "--enable-source-maps", "dist/worker.js"]
     env_file: .env.app
+    environment:
+      NODE_OPTIONS: --max-old-space-size=512
+    # Le temps de finir le travail en cours avant le SIGKILL : une purge ou
+    # un remboursement interrompu au milieu se reprend, mais autant ne pas
+    # l'interrompre à chaque déploiement.
+    stop_grace_period: 30s
+    # Le battement (`src/server/jobs/battement.ts`) : toutes les 30 s, le
+    # worker interroge la base puis réécrit ce fichier. Plus vieux que 90 s,
+    # le worker est figé ou ne joint plus la base.
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /tmp/worker-battement) )) -lt 90"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
       postgres: { condition: service_healthy }
     networks: [internal]
@@ -109,8 +172,11 @@ services:
   # les pièces en quarantaine, il ne doit pas arrêter la purge ni les
   # paiements.
   clamav:
-    image: clamav/clamav:1.5
+    image: clamav/clamav:1.5@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
     restart: unless-stopped
+    logging: *journaux
+    # Les signatures en mémoire (~1,5 Go), le double pendant un rechargement.
+    mem_limit: 3g
     # La limite du flux suit celle du balayeur (`TAILLE_MAXI_BALAYAGE_OCTETS`,
     # 32 Mo). Au-dessous, un fichier accepté par le balayeur serait refusé
     # par le démon, et resterait en quarantaine à chaque reprise. L'image
@@ -124,6 +190,8 @@ services:
   antivirus:
     image: ghcr.io/${GH_OWNER}/immipro:${TAG}
     restart: unless-stopped
+    logging: *journaux
+    mem_limit: 256m
     command: ["node", "--enable-source-maps", "dist/passerelle-antivirus.js"]
     environment:
       CLAMD_HOST: clamav

@@ -9,6 +9,7 @@
  */
 import { getQueue, JOBS, poster } from "@/lib/queue";
 import { sonderLesServices } from "@/server/exploitation/sondes";
+import { demarrerLeBattement } from "./battement";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
@@ -321,6 +322,10 @@ async function main() {
   // l'instance sans constat pendant jusqu'à soixante minutes après un
   // déploiement, c'est-à-dire exactement quand on la regarde.
   console.info("[sondes]", await sonderLesServices());
+
+  // La sonde du conteneur lit ce battement (M15) : un worker figé cesse de
+  // battre, et `docker compose ps` le dit `unhealthy`.
+  demarrerLeBattement();
 
   console.log("worker démarré");
 }

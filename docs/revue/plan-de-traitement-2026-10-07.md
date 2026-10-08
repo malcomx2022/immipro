@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9) et S.133 (E10) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10) et S.134 (M19 étape 0, M15) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -90,9 +90,9 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 — **tranchée le 08/10/2026** : `ssh` natif vérifié par `VPS_KNOWN_HOSTS`, compose et script recopiés à chaque déploiement |
 | D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 — **tranchée le 08/10/2026** : Backblaze B2 hors du VPS, clé privée dans un coffre hors ligne, Healthchecks.io |
 | D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 — **tranchée le 08/10/2026** : 30 jours, comme la base ; texte proposé pour `securite_complements` |
-| D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 |
+| D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 — **tranchée le 08/10/2026** : 8 Go, rotation dans le compose |
 | D-29 | ~~Domaines servis~~ : `immipro.app`, tranché le 07/10/2026 (S.125 bis). Restent `nginx -T` du VPS et la méthode certbot | Exploitant | M16 |
-| D-30 | Node 24 ou Node 22 ? | Direction | M19 étape 0, M15 |
+| D-30 | Node 24 ou Node 22 ? | Direction | M19 étape 0, M15 — **tranchée le 08/10/2026** : Node 24 LTS |
 | D-31 | Version d'API Stripe à figer | Exploitant | M19 étape 1 |
 | D-32 | Découpage de `paiements.ts` après le bloc paiements | Direction technique | M20 |
 | D-33 | B-08 entre-t-il dans l'inventaire de DOC-12 ? Garde-t-on `docs/prototype/exports/` ? | Produit, direction | F10 |
@@ -115,7 +115,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.131 — livré** | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
 | **S.132 — livré** | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
 | **S.133 — livré** | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
-| S.134 — exploitation III | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
+| **S.134 — livré** | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
 | S.135 — interface I | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
 | S.136 — interface II | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
 | S.137 — reprises du worker | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
@@ -1267,6 +1267,11 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### M15 — Production : limites mémoire, sondes de santé, journaux, épinglage
 
+**État : livré en S.134** (D-28 : 8 Go, rotation dans le compose). Écarts au texte ci-dessous :
+- le worker reçoit aussi `NODE_OPTIONS=--max-old-space-size=512` ;
+- la CLI Prisma vit dans `/opt/prisma-cli`, trouvée par le PATH, et `tests/image-production.test.ts` la tient égale au verrou racine ;
+- `smoke:worker --image` vérifie aussi que les commandes des sondes fonctionnent dans l'image.
+
 **Constat vérifié.** Ni `mem_limit` ni `logging` dans `docker-compose.prod.yml` ; pas de `healthcheck` pour `app`, `worker` et Garage ; images non épinglées par empreinte ; `npm install -g prisma@6` non reproductible (`Dockerfile:58`).
 
 **Correction.**
@@ -1329,7 +1334,7 @@ Un lot par étape, chacun avec la porte complète et `smoke:worker --image`.
 
 | Étape | Contenu | Ce qui casse |
 |---|---|---|
-| 0 | Node 24 LTS (ou 22.12+) : `.nvmrc`, `Dockerfile`, `setup-node`, `engines`, cible esbuild, `@types/node` | A priori rien |
+| 0 | Node 24 LTS (ou 22.12+) : `.nvmrc`, `Dockerfile`, `setup-node`, `engines`, cible esbuild, `@types/node` | **Livrée en S.134** (D-30). A cassé deux fichiers de tests sous jsdom : `fetch` de Node 24 refuse l'`AbortSignal` de jsdom ; ils tournent désormais sous l'environnement `node` |
 | 1 | Retirer `stripe`, poser `Stripe-Version` dans `appeler()`, correctifs (`next` 15.5.27, `nodemailer`, `postcss`, `tsx`, `prettier`, `smtp-server`) | Rien |
 | 2 | ESLint en configuration plate (`eslint.config.mjs` avec `FlatCompat`), `.eslintrc.json` supprimé | Règles sur des fichiers que `next lint` ne lisait pas, si le périmètre s'élargit |
 | 3 | Next 16 : `middleware.ts` devient `proxy.ts`, Turbopack par défaut, `next lint` disparaît | `tests/suite-connexion.test.ts:45`, sortie `standalone` à revérifier |
@@ -1427,7 +1432,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.133
+## 7. Ce qui reste ouvert après les lots S.125 à S.134
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1449,3 +1454,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
   - le contrôle Healthchecks.io.
 
   Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.
+- **M15** : après le premier déploiement de S.134, vérifier sur le VPS que les six services sont `healthy` et que les limites apparaissent dans `docker stats`.

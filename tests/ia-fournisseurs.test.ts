@@ -1,3 +1,9 @@
+// @vitest-environment node
+//
+// Code serveur, éprouvé contre un vrai serveur HTTP local : il tourne sous
+// Node, pas sous jsdom. Sous jsdom, `AbortSignal` est celui de jsdom, et le
+// `fetch` de Node 24 le refuse (« Expected signal to be an instance of
+// AbortSignal ») — revue du 07/10/2026, M19 étape 0.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { readFileSync, readdirSync, statSync } from "node:fs";
