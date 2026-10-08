@@ -32,6 +32,17 @@ if (!source) {
   process.exit(1);
 }
 
+/**
+ * Les clés étrangères qui se passent d'index, chacune avec son motif. Une
+ * clé ajoutée ici se justifie dans la diff ; une exception dont la clé a
+ * reçu son index fait échouer la porte, pour qu'elle ne survive pas à sa
+ * raison.
+ */
+const CLES_SANS_INDEX = {
+  "Transaction.sourceTransactionId":
+    "Une vente n'est jamais supprimée (grand livre) : la restriction ne se vérifie pas. La montée se lit par l'index partiel transaction_une_montee_par_achat.",
+};
+
 const nomBase = `immipro_migrations_${process.pid}`;
 const administration = new URL(source);
 administration.pathname = "/postgres";
@@ -122,6 +133,45 @@ try {
   if (gardes.status !== 0) {
     console.log(`\n${`${gardes.stdout ?? ""}${gardes.stderr ?? ""}`.trim()}\n`);
   }
+
+  // ── 4. Toute clé étrangère est indexée ─────────────────────────────
+  /*
+    Revue du 07/10/2026, E11. PostgreSQL n'indexe pas une clé étrangère de
+    lui-même : sans index qui la porte en tête, une lecture par compte ou
+    par dossier parcourt la table, et une suppression en cascade aussi. Un
+    index partiel ne compte pas — il ne sert que son prédicat.
+  */
+  console.log("\nClés étrangères indexées");
+  const sansIndex = (
+    await executer(
+      cible,
+      `SELECT c.conrelid::regclass::text AS "table",
+              (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+                 FROM unnest(c.conkey) WITH ORDINALITY k(attnum, ord)
+                 JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum) AS colonnes
+         FROM pg_constraint c
+        WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_index i
+             WHERE i.indrelid = c.conrelid AND i.indpred IS NULL
+               AND (i.indkey::int2[])[0:array_length(c.conkey, 1) - 1] @> c.conkey
+               AND (i.indkey::int2[])[0:array_length(c.conkey, 1) - 1] <@ c.conkey)`,
+    )
+  ).rows.map((r) => `${r.table.replaceAll('"', "")}.${r.colonnes}`);
+  const nonIndexees = sansIndex.filter((cle) => !(cle in CLES_SANS_INDEX));
+  verifier(
+    nonIndexees.length === 0,
+    nonIndexees.length === 0
+      ? `toute clé étrangère a un index qui la porte en tête (${Object.keys(CLES_SANS_INDEX).length} exception(s) motivée(s))`
+      : `clé(s) étrangère(s) sans index : ${nonIndexees.join(", ")}`,
+  );
+  const perimees = Object.keys(CLES_SANS_INDEX).filter((cle) => !sansIndex.includes(cle));
+  verifier(
+    perimees.length === 0,
+    perimees.length === 0
+      ? "chaque exception désigne encore une clé sans index"
+      : `exception(s) devenue(s) sans objet, à retirer : ${perimees.join(", ")}`,
+  );
 } finally {
   await executer(administration, `DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
 }

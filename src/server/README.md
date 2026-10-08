@@ -1641,7 +1641,8 @@ npm run smoke:migrations  # la base reconstruite depuis zéro, garde-fous compri
 npm run db:garde-fous     # 62 écritures interdites, essayées une par une
 npm run smoke:worker      # le paquet du worker, exécuté pour de bon
 npm run seed:rules        # les quatre règles de référence
-npm run seed:demo         # une candidate, un veilleur, un administrateur
+npm run check:audit       # aucune vulnérabilité élevée ou critique sans motif
+SEED_DEMO_BASE=immipro npm run seed:demo   # une candidate, un veilleur, un administrateur
 ```
 
 `db:garde-fous` échoue désormais quand une contrainte manque : le fichier
@@ -1653,9 +1654,28 @@ perdait au milieu de soixante autres.
 avec un dossier en cours et un brouillon, des pièces dans plusieurs états,
 une analyse, une alerte et un consultant habilité — plus un compte par rôle,
 parce que la seule façon de vérifier le moindre privilège est d'ouvrir les
-écrans avec chacun et de constater ce qui se ferme. Il refuse de tourner en
-production : un jeu de démonstration écrit dans une base réelle y laisse un
-compte au mot de passe connu.
+écrans avec chacun et de constater ce qui se ferme.
+
+Il n'écrit que sur une base **locale** (`localhost`, `127.0.0.1`, `::1` ou le
+service `postgres` du compose), **nommée** par `SEED_DEMO_BASE`, et **sans
+facture de série réelle** — revue du 07/10/2026, M17. Il ne refusait
+qu'avec `NODE_ENV=production`, que `npm run seed:demo` ne pose pas ; un
+tunnel vers la production se présente comme local, d'où la troisième
+condition. Le mot de passe des trois comptes est tiré à chaque passe et
+affiché une fois (ou lu dans `DEMO_MOT_DE_PASSE`, dix caractères au moins).
+Les adresses sont sur `immipro.test` (RFC 2606), et la veille garde son
+historique : un relevé n'est créé que pour une source qui n'en a aucun
+(INV-8).
+
+`check:audit` lit `npm audit --omit=dev` et échoue sur toute vulnérabilité
+élevée ou critique qu'aucune entrée de `audit-exceptions.json` n'accepte
+(avis GHSA, paquet, motif, date ; cinq au plus). Une exception dont l'avis
+n'est plus signalé fait échouer la porte. Les modérées s'affichent sans
+bloquer. Le registre npm doit être joignable.
+
+`smoke:migrations` vérifie aussi que toute clé étrangère a un index non
+partiel qui la porte en tête (E11) ; les exceptions motivées sont dans le
+script.
 
 `tests/api-invariants.test.ts` relit les routes **comme un texte** : composeur
 obligatoire, dispense de débit réservée aux webhooks signés, aucun barème

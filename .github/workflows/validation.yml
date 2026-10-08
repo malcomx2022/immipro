@@ -57,6 +57,15 @@ jobs:
         run: npm run check
       - run: echo "- **Tests, types, lint, vocabulaire** — \`npm run check\`" >> "$GITHUB_STEP_SUMMARY"
 
+      # Ce qui part en production, au regard des avis publiés : toute
+      # vulnérabilité élevée ou critique bloque, sauf acceptation motivée
+      # et datée dans `audit-exceptions.json` (cinq au plus). Les modérées
+      # s'affichent sans bloquer ; elles se traitent avec la montée des
+      # dépendances.
+      - name: Audit des dépendances
+        run: npm run check:audit
+      - run: echo "- **Audit des dépendances** — \`npm run check:audit\`, élevées et critiques bloquantes" >> "$GITHUB_STEP_SUMMARY"
+
       # La construction fait partie de la porte : un projet dont les tests
       # passent mais qui ne construit pas n'est pas déployable. Elle produit
       # les deux artefacts — la sortie `standalone` et `dist/worker.js`.

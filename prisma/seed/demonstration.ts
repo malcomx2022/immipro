@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { empreinte } from "../../src/server/securite/secret";
 import { checklistDepuis, echeancesDepuis } from "../../src/server/acces/dossiers";
@@ -8,6 +9,11 @@ import {
   coutMicrosDesJetons,
   tarifDepuisEnvironnement,
 } from "../../src/domain/backoffice/couts";
+import {
+  peutEcrireLaDemonstration,
+  sourcesSansReleve,
+} from "../../src/domain/exploitation/demonstration";
+import { LONGUEUR_MINIMALE } from "../../src/domain/comptes/mot-de-passe";
 
 /**
  * Jeu de démonstration — développement seulement.
@@ -18,13 +24,28 @@ import {
  * test ne remplace — les défauts trouvés à l'œil sur les lots précédents
  * l'ont tous été ainsi.
  *
- * **Il refuse de tourner en production.** Un jeu de démonstration écrit dans
- * une base réelle y laisse un compte avec un mot de passe connu.
+ * **Il n'écrit que sur une base locale, nommée, sans facture réelle** —
+ * revue du 07/10/2026, M17. Un jeu de démonstration écrit dans une base
+ * réelle y laisse des comptes au mot de passe connu de qui l'a lancé. Il
+ * ne refusait qu'avec `NODE_ENV=production`, que `npm run seed:demo` ne
+ * pose pas. La décision vit dans `domain/exploitation/demonstration.ts`.
+ *
+ *     SEED_DEMO_BASE=immipro npm run seed:demo
+ *
+ * Le mot de passe est tiré à chaque passage et affiché une fois, ou lu dans
+ * `DEMO_MOT_DE_PASSE` pour qui veut le garder d'une passe à l'autre. Il
+ * n'est plus écrit dans le dépôt.
  */
 const prisma = new PrismaClient();
 
-const MOT_DE_PASSE = "demonstration-2026";
-const EMAIL = "aline.dossou@email.com";
+/** Un domaine réservé (RFC 2606) : aucun courrier de démonstration ne part chez quelqu'un. */
+const EMAIL = "aline.dossou@immipro.test";
+/**
+ * L'adresse des passes antérieures au 08/10/2026, sur un domaine réel. Elle
+ * est retirée avec le reste du jeu : la référence de la vente de
+ * démonstration est unique, et une base de développement la porte encore.
+ */
+const ANCIENNE_ADRESSE = "aline.dossou@email.com";
 const PARTENAIRE_DEMO = "Cabinet Adjovi & Associés";
 
 /**
@@ -40,10 +61,36 @@ const OPERATEURS = [
   { email: "admin@immipro.test", role: "ADMIN" as const, prenom: "Mireille" },
 ];
 
-async function main() {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Le jeu de démonstration ne s'écrit pas en production.");
+/** Assez long pour passer la règle d'inscription (A-04), et différent à chaque passe. */
+function motDePasse(): string {
+  const fourni = process.env.DEMO_MOT_DE_PASSE;
+  if (fourni !== undefined) {
+    if (fourni.length < LONGUEUR_MINIMALE) {
+      throw new Error(
+        `DEMO_MOT_DE_PASSE compte ${fourni.length} caractère(s) ; il en faut au moins ${LONGUEUR_MINIMALE}, comme à l'inscription.`,
+      );
+    }
+    return fourni;
   }
+  return randomBytes(12).toString("base64url");
+}
+
+async function main() {
+  const url = process.env.DATABASE_URL;
+  const confirmation = process.env.SEED_DEMO_BASE;
+  // Hôte et nom d'abord, sans rien lire : une base qui n'est pas locale
+  // n'est pas même interrogée. Les factures réelles ensuite, une fois la
+  // base jointe — un tunnel vers la production se présente comme local.
+  const avant = peutEcrireLaDemonstration(url, confirmation, 0);
+  if (!avant.ecrire) throw new Error(avant.raison);
+  const decision = peutEcrireLaDemonstration(
+    url,
+    confirmation,
+    await prisma.invoice.count({ where: { series: "REELLE" } }),
+  );
+  if (!decision.ecrire) throw new Error(decision.raison);
+
+  const secret = motDePasse();
 
   const regle = await prisma.visaRule.findFirst({
     where: { countryCode: "NL", visaType: "etudes_mvv_vvr", status: "PUBLISHED" },
@@ -60,21 +107,21 @@ async function main() {
   // au candidat sur C-11. Le jeu de démonstration les retire donc à part —
   // ce qu'un vrai effacement de compte ne fera pas : RG-10.4 anonymise les
   // métadonnées, il ne les supprime pas.
-  const ancien = await prisma.user.findUnique({ where: { email: EMAIL } });
-  if (ancien) {
+  for (const ancien of await prisma.user.findMany({
+    where: { email: { in: [EMAIL, ANCIENNE_ADRESSE] } },
+  })) {
     await prisma.analysisCredit.deleteMany({ where: { application: { userId: ancien.id } } });
     await prisma.transaction.deleteMany({ where: { userId: ancien.id } });
     await prisma.user.delete({ where: { id: ancien.id } });
   }
   await prisma.consultant.deleteMany({ where: { firm: "Visser Immigration Advies" } });
   await prisma.partner.deleteMany({ where: { name: PARTENAIRE_DEMO } });
-  await prisma.sourceCheck.deleteMany({});
   await prisma.auditLog.deleteMany({ where: { actorId: "systeme:demonstration" } });
 
   const candidate = await prisma.user.create({
     data: {
       email: EMAIL,
-      passwordHash: await empreinte(MOT_DE_PASSE),
+      passwordHash: await empreinte(secret),
       firstName: "Aline",
       lastName: "Dossou",
       phone: "+22997000042",
@@ -131,6 +178,11 @@ async function main() {
       providerTxId: "fedapay:demonstration-1",
       status: "CONFIRMEE",
       confirmedAt: new Date(),
+      // Comme une vente réelle : ce que le pack vend est figé sur la vente
+      // (S.128), et la contrepartie constatée à l'ouverture du quota (S.130).
+      packAnalyses: pack.analyses,
+      packDestinations: pack.destinations,
+      creditedAt: new Date(),
     },
   });
   await prisma.analysisCredit.create({
@@ -300,11 +352,22 @@ async function main() {
     },
   });
 
+  /*
+    Un relevé de veille par source qui n'en a aucun, pour que B-01 et la
+    date de vérification aient quelque chose à montrer. L'historique de la
+    veille porte la date de vérification de chaque information (INV-8) :
+    la graine l'effaçait en entier à chaque passe, relevés réels compris.
+  */
+  const sources = [regle.sourceUrl, brouillonRegle.sourceUrl];
+  const dejaRelevees = await prisma.sourceCheck.findMany({
+    where: { sourceUrl: { in: sources } },
+    select: { sourceUrl: true },
+  });
   await prisma.sourceCheck.createMany({
-    data: [
-      { sourceUrl: regle.sourceUrl, reachable: true },
-      { sourceUrl: brouillonRegle.sourceUrl, reachable: true },
-    ],
+    data: sourcesSansReleve(
+      sources,
+      dejaRelevees.map((r) => r.sourceUrl),
+    ).map((sourceUrl) => ({ sourceUrl, reachable: true })),
   });
 
   await prisma.auditLog.create({
@@ -321,18 +384,25 @@ async function main() {
     await prisma.user.create({
       data: {
         email: operateur.email,
-        passwordHash: await empreinte(MOT_DE_PASSE),
+        passwordHash: await empreinte(secret),
         firstName: operateur.prenom,
         role: operateur.role,
         emailVerified: new Date(),
       },
     });
-    console.log(`✓ ${operateur.role.toLowerCase()} ${operateur.email} / ${MOT_DE_PASSE}`);
+    console.log(`✓ ${operateur.role.toLowerCase()} ${operateur.email}`);
   }
 
-  console.log(`✓ candidate ${EMAIL} / ${MOT_DE_PASSE}`);
+  console.log(`✓ candidate ${EMAIL}`);
   console.log(`✓ dossier actif ${dossier.id}`);
   console.log(`✓ consultant ${consultant.name}`);
+  // Une fois, pour les trois comptes, et nulle part ailleurs : il n'est
+  // écrit ni dans le dépôt ni en base, seulement son empreinte.
+  console.log(
+    process.env.DEMO_MOT_DE_PASSE !== undefined
+      ? `\nMot de passe des trois comptes : celui de DEMO_MOT_DE_PASSE (base « ${decision.base} »).`
+      : `\nMot de passe des trois comptes, tiré pour cette passe (base « ${decision.base} ») : ${secret}`,
+  );
 }
 
 main()
