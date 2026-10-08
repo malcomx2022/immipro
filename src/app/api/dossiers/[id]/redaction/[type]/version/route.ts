@@ -3,14 +3,10 @@ import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
-import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
-import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
 import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
-import { leRedacteur } from "@/server/redaction/service";
+import { mettreEnForme } from "@/server/redaction/mise-en-forme";
 import { compterMotsTexte } from "@/domain/redaction/versions";
-import { MOTIF_DAPPEL } from "@/domain/ia/appel";
-import { noterLesJetons } from "@/server/redaction/usage";
 import {
   MOTIF_PREMIERE_VERSION,
   MOTIF_REECRITURE,
@@ -139,67 +135,17 @@ export const POST = route({
       return { produite: false, disponible: false, rang: null };
     }
 
-    /**
-     * Le débit précède l'appel, comme dans l'analyse d'une pièce : débiter
-     * après laisserait une mise en forme gratuite à chaque interruption, et
-     * INV-6 dit « jamais de dépassement silencieux », pas « le plus
-     * souvent ». Ici l'échec reste imprévisible — le service est branché,
-     * et c'est l'appel qui peut ne pas aboutir.
-     */
-    const debit = await debiterUneAnalyse(params.id!, undefined, {
-      note: `${NOTE_REDACTION_ASSISTEE} — Mise en forme (${piece.type})`,
-    });
-
-    const produit = await leRedacteur()({
-      // La pièce et la destination sont nommées : ce qui écrit pour le
-      // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
-      piece: piece.libelle,
-      objet: piece.objet,
-      // Le pays vient de la règle figée à l'ouverture (INV-3), pas de la
-      // règle publiée aujourd'hui : les attendus d'une pièce sont ceux de
-      // la procédure sur laquelle le dossier a été ouvert.
-      pays: piece.pays,
-      reponses,
-      questions: piece.questions.map((q, rang) => ({
-        rang,
-        section: q.section,
-        intitule: q.intitule,
-      })),
-    });
-
     /*
-      Les jetons consommés sont enregistrés **quoi qu'il advienne** —
-      INV-6. Un appel interrompu au plafond a coûté ; ne pas l'écrire en
-      ferait un appel gratuit dans B-07, qui recalcule des coûts à partir
-      de ces nombres. C'est aussi la correction d'un `costMicros: 0` posé
-      en dur ici, quand l'analyse d'une pièce, elle, le calculait.
+      Débit, appel, jetons, contrôle du texte : `mettreEnForme` (revue M7).
+      Un texte qui promet un résultat est écarté et l'analyse rendue ;
+      `motif` dit à l'écran pourquoi rien n'a été écrit.
     */
-    await noterLesJetons(
-      acteur!.id,
-      params.id!,
-      `redaction:${piece.type}`,
-      produit.jetonsEntree,
-      produit.jetonsSortie,
-      produit.appel,
-    );
-
-    if (produit.etat === "SANS_TEXTE") {
-      /**
-       * Le service était branché et n'a rien rendu. La version n'est pas
-       * créée et l'analyse est rendue — elle n'a rien rendu, exactement
-       * comme une pièce illisible en WF-06. Sans ce retour, un candidat
-       * paierait l'échec d'un appel.
-       */
-      await rendreUneTentative(
-        params.id!,
-        `Mise en forme non aboutie (${produit.cause}) : aucun texte rendu`,
-        debit.octroi,
-      );
-      console.warn(`[redaction] ${MOTIF_DAPPEL[produit.cause]} — ${produit.detail}`);
-      return { produite: false, disponible: true, rang: null };
+    const issue = await mettreEnForme(params.id!, acteur!.id, piece, reponses);
+    if (!issue.produite) {
+      return { produite: false, disponible: true, rang: null, motif: issue.motif };
     }
 
-    return creer(piece.documentId, dernier + 1, produit.texte, MOTIF_PREMIERE_VERSION);
+    return creer(piece.documentId, dernier + 1, issue.texte, MOTIF_PREMIERE_VERSION);
   },
 });
 

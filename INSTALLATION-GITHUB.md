@@ -66,12 +66,54 @@ MINIO_ENDPOINT=minio                              # le serveur, sur le réseau D
 MINIO_PUBLIC_URL=https://stockage.<votre-domaine> # le navigateur, en https
 ```
 
-Côté VPS : un enregistrement DNS pour ce sous-domaine, un vhost nginx en
-HTTPS qui relaie vers `127.0.0.1:9000` **en préservant l'en-tête `Host`**
+Côté VPS : un enregistrement DNS pour ce sous-domaine, le vhost
+`nginx/stockage.conf` du dépôt (section suivante), qui relaie en HTTPS vers
+`127.0.0.1:9000` **en préservant l'en-tête `Host`**
 (la signature SigV4 porte l'hôte), le port 9000 de Garage publié en
 boucle locale seulement, et une règle CORS qui n'autorise que l'origine
 du site (`PUT`, `GET`, préliminaire `OPTIONS`). Sans `MINIO_PUBLIC_URL`
 en production, le dépôt d'une pièce refuse avec un message qui la nomme.
+
+### nginx et certificats (revue M16, D-29)
+
+Trois noms, un certificat, renouvelé par **webroot** : `immipro.app` (le
+site), `www.immipro.app` (redirigé en 301 vers le domaine nu) et
+`stockage.immipro.app` (les pièces). `APP_URL=https://immipro.app`.
+
+Les fichiers servis sont ceux du dépôt, `nginx/immipro.conf` et
+`nginx/stockage.conf` ; la CI leur fait passer `nginx -t`
+(`scripts/verifier-nginx.sh`). Avant de remplacer une configuration déjà en
+service, relever ce qu'elle contient (`sudo nginx -T > ~/nginx-avant.txt`) et
+reporter dans le dépôt ce qui y manquerait : le serveur ne doit plus porter
+que ce que le dépôt décrit.
+
+```bash
+# Une fois : DNS (A ou AAAA) pour les trois noms vers le VPS, et le dossier du défi.
+sudo mkdir -p /var/www/certbot
+
+# Le VPS sert déjà immipro.app avec un certificat à ce nom : installer les
+# fichiers, recharger, puis étendre le certificat au stockage par webroot.
+sudo cp nginx/immipro.conf nginx/stockage.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/immipro.conf /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/stockage.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/certbot --cert-name immipro.app --expand \
+  -d immipro.app -d www.immipro.app -d stockage.immipro.app \
+  --deploy-hook "systemctl reload nginx"
+sudo certbot renew --dry-run
+```
+
+Sur un VPS neuf, sans aucun certificat, les serveurs `443` ne se chargent
+pas encore : émettre le premier certificat avec nginx arrêté
+(`sudo certbot certonly --standalone --cert-name immipro.app -d immipro.app
+-d www.immipro.app -d stockage.immipro.app`), installer les fichiers,
+démarrer nginx, puis passer le renouvellement en webroot
+(`sudo certbot reconfigure --cert-name immipro.app --webroot -w /var/www/certbot
+--deploy-hook "systemctl reload nginx"`) et vérifier par `certbot renew --dry-run`.
+
+Le renouvellement passe ensuite par le minuteur de certbot, sans arrêt de
+service. `certbot --nginx` n'est pas employé : il réécrit les fichiers de
+`/etc/nginx`, et la configuration servie dériverait de celle du dépôt.
 
 ### Brancher la messagerie et l'antivirus (pilote fermé)
 

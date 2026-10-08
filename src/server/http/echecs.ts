@@ -157,6 +157,7 @@ export const INTERROMPENT_UNE_SAISIE: readonly CodeEchec[] = [
   "champs_invalides",
   "authentification_requise",
   "trop_de_requetes",
+  "origine_refusee",
   "consentement_manquant",
   "quota_epuise",
   "redaction_non_couverte",

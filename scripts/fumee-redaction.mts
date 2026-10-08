@@ -153,6 +153,7 @@ const { instructionsDeRedaction } = await import("../src/domain/redaction/comman
 const { etatDeLaRelecture, resumeSelonLEtat } = await import("../src/domain/redaction/relecture");
 const { solde } = await import("../src/server/acces/quota");
 const { noterLesJetons } = await import("../src/server/redaction/usage");
+const { mettreEnForme } = await import("../src/server/redaction/mise-en-forme");
 
 const REGLE = {
   libelle: "Permis d'études",
@@ -320,6 +321,36 @@ try {
       produit.etat === "ECRITE" && produit.jetonsEntree === 3200 && produit.jetonsSortie === 780,
       "les jetons sont mesurés, pas supposés",
     );
+  }
+
+  console.log("\nUn texte qui promet ne devient pas une version (revue M7)");
+  {
+    const p = await piece({ avecTexte: false });
+    const avant = await solde(p.application.id);
+    const PIECE = {
+      type: "lettre-motivation",
+      libelle: MATIERE.piece,
+      objet: MATIERE.objet,
+      pays: MATIERE.pays,
+      questions: [{ section: "PARCOURS", intitule: "Quel est ton parcours ?" }],
+    } as never;
+    const versions = () => db.documentVersion.count({ where: { documentId: p.document.id } });
+
+    reponseDuService = messageDe(`${LETTRE}\n\nAvec ce parcours, mon visa est garanti.`, 3000, 700);
+    const ecartee = await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses);
+    verifier(
+      !ecartee.produite && ecartee.motif === "formulation_refusee",
+      `le texte est écarté, et le motif nommé (${JSON.stringify(ecartee)})`,
+    );
+    verifier((await solde(p.application.id)) === avant, "l'analyse est rendue : rien n'est décompté");
+    verifier((await versions()) === 0, "aucune version n'est créée");
+    const jetons = await db.aiUsage.count({ where: { applicationId: p.application.id } });
+    verifier(jetons === 1, "les jetons consommés restent écrits (INV-6)");
+
+    reponseDuService = messageDe(`${LETTRE}\n\nImmiPro ne garantit pas l'obtention du visa, et je le sais.`, 3000, 700);
+    const gardee = await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses);
+    verifier(gardee.produite, "une négation passe : elle ne promet rien");
+    verifier((await solde(p.application.id)) === avant - 1, "et cette mise en forme-là est décomptée");
   }
 
   console.log("\nUn texte tronqué n'est pas une version");

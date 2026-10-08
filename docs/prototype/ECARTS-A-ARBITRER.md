@@ -11890,3 +11890,32 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 1. Le corps public garde `db` (D-4) : la sonde du déploiement l'exige, sans jeton.
 2. `ETAT_DE_SERVICE_JETON` est à renseigner sur le VPS si une surveillance externe doit lire le détail.
 3. Après le premier déploiement, relire le bilan `[reprise-divergence]` : le rejeu de D-23 peut prévenir des dossiers d'une publication ancienne qui ne l'avaient jamais été.
+
+## S.138 — Revue du 07/10/2026 : rédaction et en-têtes (M7, F1, F2, M16)
+
+**Contexte.** Quatorzième lot du plan de traitement. Décisions du 08/10/2026 :
+- **D-5** : le renommage du cookie en `__Host-immipro_session` est reporté ;
+- **D-29** : un certificat pour `immipro.app`, `www` et `stockage`, renouvelé par webroot ; `www` redirigé en 301 vers le domaine nu.
+
+**Ce que fait le code.**
+- **M7.** Le texte rendu par le modèle devenait une version sans contrôle.
+  - `refusDuTexteRedige` (liste « partout » : une lettre peut citer « 85 % au baccalauréat ») écarte le texte. `mettreEnForme` (nouveau, `server/redaction/`) rend alors l'analyse et répond `motif: "formulation_refusee"`.
+  - Une remarque de relecture qui promet écarte toute la relecture.
+  - R-03 et R-04 disent pourquoi rien n'a été écrit (`domain/redaction/issues.ts`) ; `produite: false` était ignoré.
+  - La consigne tient les réponses pour des données, pas des consignes.
+  - Le motif `visa-garanti` reconnaît la forme verbale.
+- **F1.** CSP posée par le middleware (l'origine du stockage est lue à l'exécution) ; `Permissions-Policy` par `next.config.mjs`. `'unsafe-inline'` plutôt qu'un nonce, pour garder les pages publiques statiques.
+- **F2.** `origineAdmise` dans le composeur, avant la session, webhooks exemptés ; échec `origine_refusee` (403).
+- **M16.** `nginx/immipro.conf` réécrit : `www` en 301, défi webroot sur le port 80, HSTS seul côté nginx (les en-têtes de l'application sont ceux de Next), `/api/health` sans journal ; plus de `location` vers une route inexistante ni de zone inutilisée, plus d'`add_header` qui effaçait HSTS sous `/_next/static/`. `nginx/stockage.conf` (nouveau) : `GET PUT OPTIONS`, 11 Mo, sans tampon, `Host` transmis, sans `X-Frame-Options` pour l'aperçu B-05. `nginx -t` en CI.
+
+**Ce qui est éprouvé.**
+- `smoke:redaction` : un texte qui promet est écarté, l'analyse rendue, aucune version créée, les jetons écrits ; une négation passe. Sans le contrôle, le texte devenait une version.
+- `tests/redaction-commande.test.ts`, `tests/politique-de-contenu.test.ts`, `tests/origine.test.ts` (dont le composeur : 403 sans session lue, échoue sur l'ancien code) et `tests/nginx-configuration.test.ts` (7 échecs sur l'ancienne configuration).
+- Sur un serveur démarré : la CSP porte le stockage, un `POST` d'une autre origine répond 403, le même sans `Origin` 422.
+
+**Écarts qui restent.**
+1. D-5 : `__Host-` reporté ; le cookie garde son nom.
+2. F2, point 4 optionnel (exiger `content-type: application/json`) non fait.
+3. `nginx -T` du VPS à relever avant de remplacer la configuration servie ; installation et extension du certificat à faire à la main.
+4. L'identifiant des invitations de calendrier garde `@immipro.bj` (`domain/consultants/agenda.ts`) : le changer ferait traiter les invitations déjà envoyées comme des rendez-vous différents.
+5. Les versions déjà produites par le modèle n'ont pas été relues contre la liste ; à faire en lecture seule.

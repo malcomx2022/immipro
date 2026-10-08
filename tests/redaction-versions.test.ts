@@ -293,29 +293,43 @@ describe("la route des versions ne fait pas payer une absence", () => {
    * d'avance qu'il ne répondrait pas. Ce qui est prévisible se vérifie
    * avant le débit.
    */
+  /*
+    Le débit, l'appel et le contrôle du texte vivent dans `mettreEnForme`
+    depuis la revue M7 : la route l'appelle, après ses gardes.
+  */
+  const miseEnForme = sansCommentaires(readFileSync("src/server/redaction/mise-en-forme.ts", "utf8"));
+
   it("ne débite rien quand le service est connu absent", () => {
     const garde = code.indexOf("if (!redactionConfiguree())");
-    const debit = code.indexOf("debiterUneAnalyse(");
+    const appel = code.indexOf("mettreEnForme(");
     expect(garde).toBeGreaterThan(0);
-    expect(garde).toBeLessThan(debit);
+    expect(garde).toBeLessThan(appel);
+    expect(code).not.toContain("debiterUneAnalyse(");
   });
 
   /** INV-6 : le débit précède l'appel, jamais l'inverse. */
   it("débite avant d'appeler, quand le service est là", () => {
-    expect(code.indexOf("debiterUneAnalyse(")).toBeLessThan(
-      code.indexOf("leRedacteur()("),
-    );
+    const debit = miseEnForme.indexOf("debiterUneAnalyse(");
+    expect(debit).toBeGreaterThan(0);
+    expect(debit).toBeLessThan(miseEnForme.indexOf("await redacteur("));
+  });
+
+  /** INV-2 : un texte qui promet n'est pas rendu, et l'analyse est rendue. */
+  it("contrôle le texte avant de le rendre, et rend l'analyse s'il est écarté", () => {
+    const controle = miseEnForme.indexOf("refusDuTexteRedige(produit.texte)");
+    expect(controle).toBeGreaterThan(miseEnForme.indexOf("await redacteur("));
+    expect(miseEnForme.slice(controle)).toMatch(/rendreUneTentative\([\s\S]*?formulation refusée/u);
   });
 
   /**
    * La réécriture et la restauration sont le texte du candidat : aucun
-   * modèle, aucun quota. Elles sortent de la fonction avant le débit.
+   * modèle, aucun quota. Elles sortent de la fonction avant la mise en forme.
    */
   it("ne débite ni la réécriture ni la restauration", () => {
-    const debit = code.indexOf("debiterUneAnalyse(");
+    const appel = code.indexOf("mettreEnForme(");
     for (const geste of ['geste === "reecriture"', 'geste === "restauration"']) {
       expect(code.indexOf(geste), geste).toBeGreaterThan(0);
-      expect(code.indexOf(geste), geste).toBeLessThan(debit);
+      expect(code.indexOf(geste), geste).toBeLessThan(appel);
     }
   });
 

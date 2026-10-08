@@ -59,6 +59,7 @@ export type CodeEchec =
   | "droits_insuffisants"
   | "introuvable"
   | "trop_de_requetes"
+  | "origine_refusee"
   // Consentement et quota
   | "consentement_manquant"
   | "quota_epuise"
@@ -170,6 +171,19 @@ export const ECHECS: Record<CodeEchec, Omit<Echec, "code">> = {
     conserve: "Rien n'a été perdu de ce que tu as saisi.",
     action: "Réessayer dans une minute",
     ton: "attente",
+  },
+  /*
+    Revue du 07/10/2026, F2 : une requête qui modifie quelque chose et
+    vient d'une autre origine que la plateforme. Le cookie y est joint par
+    le navigateur ; la demande, elle, n'a pas été faite depuis ImmiPro.
+  */
+  origine_refusee: {
+    statut: 403,
+    titre: "Cette demande ne vient pas d'ImmiPro",
+    corps: "Elle a été envoyée depuis une autre page que la plateforme. Ouvre ImmiPro directement et recommence.",
+    conserve: "Ce que tu as saisi reste à l'écran.",
+    action: "Recharger la page",
+    ton: "echec",
   },
   consentement_manquant: {
     statut: 403,

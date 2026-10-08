@@ -377,13 +377,11 @@ describe("S.92 — le remboursement automatique du supplément", () => {
   });
 
   it("les débits de rédaction portent leur trace, écrite avant l'appel", () => {
-    for (const route of ["version", "relecture"]) {
-      const code = readFileSync(
-        `src/app/api/dossiers/[id]/redaction/[type]/${route}/route.ts`,
-        "utf8",
-      );
-      expect(code, route).toMatch(/debiterUneAnalyse\(params\.id!, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u);
-    }
+    // La mise en forme débite dans `mettreEnForme` depuis la revue M7.
+    const relecture = readFileSync("src/app/api/dossiers/[id]/redaction/[type]/relecture/route.ts", "utf8");
+    const miseEnForme = readFileSync("src/server/redaction/mise-en-forme.ts", "utf8");
+    expect(relecture).toMatch(/debiterUneAnalyse\(params\.id!, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u);
+    expect(miseEnForme).toMatch(/debiterUneAnalyse\(dossierId, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u);
     expect(NOTE_REDACTION_ASSISTEE).toBe("Rédaction assistée");
   });
 });

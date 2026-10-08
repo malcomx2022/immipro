@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
+import { issueDeLaMiseEnForme } from "@/domain/redaction/issues";
 import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { useGroupeRadio } from "@/components/ui/useGroupeRadio";
@@ -187,7 +188,7 @@ export function Redaction({
   ): Promise<void> {
     setEnvoi(cle);
     setEchec(null);
-    const resultat = await appeler<{ produite: boolean; disponible: boolean }>(
+    const resultat = await appeler<{ produite: boolean; disponible: boolean; motif?: string | null }>(
       `/api/dossiers/${dossier.id}/redaction/${piece.type}/version`,
       { methode: "POST", corps },
     );
@@ -198,10 +199,19 @@ export function Redaction({
     }
     /**
      * `produite: false` n'est pas un échec du serveur : la demande a
-     * abouti, et aucun texte n'a été écrit parce que le service qui
-     * l'écrit n'est pas là. Le rechargement remet l'écran dans l'état que
-     * le serveur connaît, lequel dira lui-même ce qui manque.
+     * abouti, et aucun texte n'a été écrit. Service absent : le
+     * rechargement remet l'écran dans l'état que le serveur connaît, lequel
+     * dira lui-même ce qui manque. Service branché : l'écran dit pourquoi
+     * — pas de réponse, ou un texte écarté parce qu'il promettait (M7).
+     * Il l'ignorait, et le candidat ne savait pas si son geste avait compté.
      */
+    if (!resultat.donnees.produite) {
+      const issue = issueDeLaMiseEnForme(resultat.donnees);
+      if (issue) {
+        setEchec(issue);
+        return;
+      }
+    }
     router.refresh();
   }
 

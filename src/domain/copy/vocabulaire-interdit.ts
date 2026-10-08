@@ -30,7 +30,9 @@ export const INTERDITS_PARTOUT: readonly MotifInterdit[] = [
   { code: "probabilite", motif: /probabilit[ée]\s+(de\s+)?(succ[èe]s|r[ée]ussite|acceptation|obtention)/iu, raison: "INV-1 — pas de prédiction d'acceptation" },
   { code: "taux-acceptation", motif: /taux\s+d['’]acceptation/iu, raison: "INV-1 — un taux passé se lit comme une promesse" },
   { code: "garantie-obtention", motif: /garantie?\s+d['’]obtention/iu, raison: "INV-2 — aucune promesse de résultat" },
-  { code: "visa-garanti", motif: /visa\s+(garanti|assur[ée])/iu, raison: "INV-2 — aucune promesse de résultat" },
+  // « visa garanti », mais aussi « mon visa est garanti » ou « le visa sera
+  // assuré » : la forme verbale disait la même promesse et passait (M7).
+  { code: "visa-garanti", motif: /visa\s+(?:(?:est|sera)\s+)?(garanti|assur[ée])/iu, raison: "INV-2 — aucune promesse de résultat" },
   { code: "reussite-garantie", motif: /r[ée]ussite\s+garantie/iu, raison: "INV-2 — aucune promesse de résultat" },
   { code: "sans-risque", motif: /sans\s+risque\s+de\s+refus/iu, raison: "INV-2 — le refus reste possible, toujours" },
   { code: "on-soccupe-de-tout", motif: /on\s+s['’]occupe\s+de\s+tout/iu, raison: "INV-1 — la plateforme prépare, elle ne se substitue pas" },
