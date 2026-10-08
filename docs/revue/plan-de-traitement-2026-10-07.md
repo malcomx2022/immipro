@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) et S.130 (F6, E3 étape 5, F3) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) et S.131 (E11, audit, M17) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -96,7 +96,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-31 | Version d'API Stripe à figer | Exploitant | M19 étape 1 |
 | D-32 | Découpage de `paiements.ts` après le bloc paiements | Direction technique | M20 |
 | D-33 | B-08 entre-t-il dans l'inventaire de DOC-12 ? Garde-t-on `docs/prototype/exports/` ? | Produit, direction | F10 |
-| D-34 | Override `deepmerge-ts` ou risque accepté ? | Direction technique | Audit |
+| D-34 | Override `deepmerge-ts` ou risque accepté ? | Direction technique | Audit — **tranchée le 08/10/2026** : risque accepté, motivé et daté dans `audit-exceptions.json`, à revoir à la montée de Prisma |
 
 ---
 
@@ -112,7 +112,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.128 — livré** | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
 | **S.129 — livré** | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
 | **S.130 — livré** | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
-| S.131 — données | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
+| **S.131 — livré** | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
 | S.132 — exploitation I | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
 | S.133 — exploitation II | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
 | S.134 — exploitation III | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
@@ -1229,6 +1229,8 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### E11 — Index manquants
 
+**État : livré en S.131.** Onze index et non neuf : le garde-fou de `smoke:migrations`, lu sur la base reconstruite, a trouvé deux clés de plus, `DepositCorrectionRequest.applicationId` et `CompletenessReviewRequest.applicationId`, que seul un index unique partiel portait. Une exception motivée : `Transaction.sourceTransactionId` (une vente n'est jamais supprimée).
+
 **Constat vérifié** (schéma et 42 migrations croisés, index partiels compris). Clés étrangères sans index dont elles sont la première colonne : `Transaction.userId`, `Transaction.applicationId`, `AiUsage.userId`, `DocumentAnalysis.versionId`, `Notification.applicationId`, `RuleMigration.fromRuleId`. Plus `AnalysisCredit.transactionId` (index partiel seulement), `AuditLog.createdAt` et `AiUsage.createdAt`.
 
 **Correction.**
@@ -1292,6 +1294,8 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 ---
 
 #### M17 — Graine de démonstration
+
+**État : livré en S.131.** La vente de démonstration porte aussi ce qu'une vente réelle porte depuis S.128 et S.130 (pack figé, contrepartie constatée), et l'adresse des passes antérieures est retirée avec le reste du jeu.
 
 **Constat vérifié.** `prisma/seed/demonstration.ts:26` : mot de passe en dur, réutilisé et affiché. Ligne 44 : refus seulement si `NODE_ENV === "production"`, que `npm run seed:demo` ne pose pas. Ligne 71 : `sourceCheck.deleteMany({})` efface tout l'historique de veille (INV-8). Ligne 27 : adresse sur `email.com`, un domaine réel.
 
@@ -1366,6 +1370,8 @@ Un lot par étape, chacun avec la porte complète et `smoke:worker --image`.
 
 #### Audit des dépendances — 11 vulnérabilités de `npm audit --omit=dev`
 
+**État : livré en S.131** (D-34 : risque accepté). Le script est `scripts/audit.mts` (`npm run check:audit`), le jugement `src/domain/exploitation/audit.ts`. Deux avis propres à `next` (cache SSG/ISR, < 15.5.27) sont apparus depuis la revue : Next passe en 15.5.27, correctif dans la plage. Restent quatre modérées (`minio`), affichées sans bloquer.
+
 **Correction de la revue.** Trois entrées sont des dépendances directes (`next`, `minio`, `prisma`), signalées à cause de leurs sous-dépendances.
 
 | Paquet | Gravité | Chemin | Traitement |
@@ -1403,14 +1409,14 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 | S.128 (livrée) | `20261008101000_tranche_de_la_revue` | `refundDecidedAt`, `refundDecidedBy`, contrainte ; index de retrait par transaction et par dossier |
 | S.129 (livrée) | `20261008110000_remboursement_suppose_une_obligation` | Reprise des remboursements sans obligation, contrainte |
 | S.130 (livrée) | `20261008120000_contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
-| S.131 | `index_des_cles_etrangeres` | Neuf index |
+| S.131 (livrée) | `20261008130000_index_des_cles_etrangeres` | Onze index de clés étrangères et de date |
 | S.137 | `divergence_a_propager` | `VisaRule.divergenceDueAt`, index, contrainte |
 | S.140 | `date_de_la_prestation` | `Invoice.performedAt`, reprise, déclencheur `facture_immuable` étendu (si M.C retient l'option a) |
 | S.141 | `historiques_immuables` | Déclencheurs sur les historiques (si D-24 est oui) |
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.130
+## 7. Ce qui reste ouvert après les lots S.125 à S.131
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1422,3 +1428,5 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.
 - **M4** : lister les dettes déjà bloquées en revue (obligation ouverte, `refundAmount` nul, non demandée, non rendue) et les trancher en B-04 ; une tranche à zéro n'envoie aucun message au candidat.
 - **E3** : à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.
+- **Audit** : l'exception `deepmerge-ts` (D-34) est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15) ; les quatre modérées de `minio` restent affichées.
+- **M17** : une base de développement où la graine a tourné avant S.131 garde ses relevés de veille de démonstration, sans dommage ; ceux d'une veille réelle effacés par les passes antérieures ne se retrouvent pas.

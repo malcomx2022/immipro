@@ -1,0 +1,18 @@
+{
+  "_lisez-moi": [
+    "Vulnérabilités élevées ou critiques acceptées par `npm run check:audit` (scripts/audit.mts).",
+    "Une entrée vaut pour un avis précis (GHSA) sur un paquet précis, et rien d'autre.",
+    "Elle apparaît dans la diff et exige un motif écrit et une date : c'est le prix de l'échappatoire.",
+    "Une entrée dont l'avis n'est plus signalé fait échouer l'audit : on la retire avec la dépendance.",
+    "Au-delà de cinq entrées, ce n'est plus une exception, c'est une dette : la porte refuse."
+  ],
+  "exceptions": [
+    {
+      "avis": "GHSA-ggr8-5vv4-36mx",
+      "paquet": "deepmerge-ts",
+      "chemin": "prisma › @prisma/config › deepmerge-ts",
+      "motif": "D-34, risque accepté. Épuisement de pile sur un graphe d'objets récursif. deepmerge-ts n'est atteint que par le CLI Prisma, qui fusionne nos propres fichiers de configuration au lancement d'une commande (generate, migrate) : aucune donnée d'utilisateur ni d'attaquant ne l'atteint, et le client Prisma de l'application ne l'embarque pas. @prisma/config 6.19.3 l'épingle en 7.1.5 ; forcer la 8 imposerait au CLI une majeure qu'il n'a pas validée. À revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15).",
+      "date": "2026-10-08"
+    }
+  ]
+}

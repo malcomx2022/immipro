@@ -11666,3 +11666,24 @@ Après correction, tous ces scénarios passent. `tests/reception-paiement.test.t
 **Écarts qui restent.**
 1. Si la réservation du reçu elle-même échoue (base indisponible juste après le crédit), le reçu n'est pas repris automatiquement. Le candidat peut le renvoyer depuis $-06.
 2. Les ventes confirmées avant la migration et sans contrepartie seront examinées à la première passe : un écart s'ouvrira pour celles qui n'ont rien à ouvrir.
+
+## S.131 — Revue du 07/10/2026 : données (E11, audit, M17)
+
+**Contexte.** Septième lot du plan de traitement. Une décision, D-34, tranchée le 08/10/2026 : le défaut de `deepmerge-ts`, atteint seulement par le CLI Prisma, est un risque accepté, motivé et daté.
+
+**Ce que fait le code.**
+- **E11.** La migration `index_des_cles_etrangeres` pose onze index. Neuf portent des clés étrangères qu'aucun index non partiel ne portait en tête : ventes par compte et par dossier, analyses par version, notifications par dossier, crédits par vente, consommation IA par compte, migrations de règle par règle d'origine, demandes de correction de dépôt et de relecture par dossier. Deux portent des dates : le journal d'audit et la consommation IA. `smoke:migrations` refuse désormais toute clé étrangère sans index. Une seule exception motivée, `Transaction.sourceTransactionId`, est inscrite dans le script, et une exception devenue sans objet fait échouer la porte.
+- **Audit.** Le verrou passe à `sharp` 0.35.5 et `source-map-js` 1.2.2. Un override donne à Next le `postcss` du projet, dont la plage passe en `^8.5.28`. Next passe en 15.5.27 pour deux avis apparus depuis la revue. `npm run check:audit`, branché dans `validation.yml`, échoue sur toute vulnérabilité élevée ou critique sans entrée dans `audit-exceptions.json`. Chaque entrée porte un avis GHSA, un paquet, un motif et une date, cinq au plus. Une entrée dont l'avis n'est plus signalé fait échouer la porte.
+- **M17.** La graine n'écrit que sur une base à la fois locale, nommée par `SEED_DEMO_BASE` et sans facture de série réelle. La décision vit dans `domain/exploitation/demonstration.ts`. Le mot de passe est tiré à chaque passe, ou lu dans `DEMO_MOT_DE_PASSE`, et affiché une fois. La veille garde son historique (INV-8). Les adresses sont sur `immipro.test`.
+
+**Ce qui est éprouvé.** Tous les défauts ont été rejoués avant correction :
+- `smoke:migrations` sur l'ancien schéma : neuf clés étrangères sans index ;
+- `check:audit` sur l'ancien verrou : quatre avis élevés (`postcss` deux fois, `sharp`, `source-map-js`) ;
+- `seed:demo` sur une base jetable : écriture sans confirmation, mot de passe fixe affiché, un relevé de veille réel effacé.
+
+Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-demonstration.test.ts` tiennent les deux fonctions pures, et le second relit la graine elle-même.
+
+**Écarts qui restent.**
+1. L'exception `deepmerge-ts` est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15).
+2. Les quatre modérées de `minio` (`stream-json`, `query-string`, `decode-uri-component`) restent affichées. Le correctif proposé par npm est un retour à minio 7.
+3. Les relevés de veille réels effacés par les passes antérieures de la graine ne se retrouvent pas.

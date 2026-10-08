@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:copy": "tsx scripts/check-forbidden-copy.ts",
+    "check:audit": "tsx scripts/audit.mts",
     "check": "npm run lint && npm run typecheck && npm run test && npm run check:copy",
     "seed:rules": "tsx prisma/seed/visa-rules.ts",
     "worker": "tsx src/server/jobs/worker.ts",
@@ -85,7 +86,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.0.0",
     "jsdom": "^25.0.1",
-    "postcss": "^8.4.0",
+    "postcss": "^8.5.28",
     "prettier": "^3.3.0",
     "prisma": "^6.0.0",
     "smtp-server": "^3.19.13",
@@ -93,5 +94,10 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "$postcss"
+    }
   }
 }

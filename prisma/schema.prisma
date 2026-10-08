@@ -699,6 +699,8 @@ model Transaction {
   @@index([discrepancyResolvedAt])
   @@index([refundRequestedAt, refundedAt])
   @@index([status, creditedAt])
+  @@index([userId, status])
+  @@index([applicationId, status])
 }
 
 /// L'issue d'un écart de réconciliation — arbitrage du 21/09/2026.
@@ -762,6 +764,8 @@ model AiUsage {
   createdAt     DateTime     @default(now())
 
   @@index([applicationId, createdAt])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 /// Le dernier constat d'un service extérieur — I.C, 22/09/2026.
@@ -796,6 +800,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([target, createdAt])
+  @@index([createdAt])
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -925,6 +930,7 @@ model DocumentAnalysis {
   review ManualReview?
 
   @@index([verdict, analyzedAt])
+  @@index([versionId, analyzedAt])
 }
 
 enum ReviewReason {
@@ -1008,6 +1014,7 @@ model AnalysisCredit {
 
   @@index([applicationId, createdAt])
   @@index([grantId])
+  @@index([transactionId])
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1134,6 +1141,7 @@ model Notification {
   @@index([userId, readAt, createdAt])
   @@index([createdAt])
   @@index([emailStatus])
+  @@index([applicationId, kind, createdAt])
 }
 
 /// Le courrier d'une notification — S.87.
@@ -1187,6 +1195,7 @@ model RuleMigration {
   @@index([decision, createdAt])
   /// La reprise cherche les dossiers concernés et pas encore prévenus.
   @@index([toRuleId, alertedAt])
+  @@index([fromRuleId])
 }
 
 /// Relevé d'une source de veille (B-01, WF-14).
@@ -1577,6 +1586,7 @@ model DepositCorrectionRequest {
   answer        String?
 
   @@index([status, createdAt])
+  @@index([applicationId, createdAt])
 }
 
 enum DepositCorrectionStatus {
@@ -1605,6 +1615,7 @@ model CompletenessReviewRequest {
   answer        String?
 
   @@index([status, createdAt])
+  @@index([applicationId, createdAt])
 }
 
 enum CompletenessReviewStatus {

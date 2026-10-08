@@ -86,10 +86,15 @@ describe("un partenaire sans activation n'existe pour personne", () => {
 });
 
 describe("le jeu de démonstration n'est pas un partenaire réel", () => {
+  /**
+   * Revue du 07/10/2026, M17 : `NODE_ENV` n'était pas posé par
+   * `npm run seed:demo`. La graine n'écrit plus que sur une base locale,
+   * nommée et sans facture réelle (`tests/seed-demonstration.test.ts`).
+   */
   it("il refuse de s'écrire en production", () => {
     const seed = lire("prisma/seed/demonstration.ts");
-    expect(seed).toMatch(/process\.env\.NODE_ENV === "production"/u);
-    expect(seed).toMatch(/throw new Error/u);
+    expect(seed).toMatch(/peutEcrireLaDemonstration\(/u);
+    expect(seed).toMatch(/if \(!decision\.ecrire\) throw new Error/u);
   });
 
   /**
