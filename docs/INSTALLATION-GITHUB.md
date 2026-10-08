@@ -32,6 +32,11 @@ Réglages → Secrets and variables → Actions :
 | `VPS_HOST` | adresse du VPS Infomaniak |
 | `VPS_USER` | utilisateur de déploiement, non root |
 | `VPS_SSH_KEY` | clé privée dédiée au déploiement |
+| `VPS_KNOWN_HOSTS` | ligne `known_hosts` de l'hôte, relevée depuis la console du fournisseur — le déploiement refuse un hôte inconnu |
+| `VPS_PORT` | facultatif, 22 par défaut |
+| `STRIPE_SANDBOX_API_KEY`, `FEDAPAY_SANDBOX_API_KEY` | facultatifs, clés de bac à sable pour l'étape `sandbox:paiement` |
+
+Le déploiement passe par `ssh` et `scp` natifs, recopie `docker-compose.prod.yml` et `scripts/deployer.sh`, puis lance ce dernier : `docs/exploitation/deploiement.md`.
 
 Créer l'environnement `production` et y exiger une approbation manuelle : le déploiement passe alors par une validation explicite.
 
@@ -43,8 +48,10 @@ Créer l'environnement `production` et y exiger une approbation manuelle : le d�
 ssh <user>@<vps>
 sudo mkdir -p /srv/immipro && sudo chown $USER /srv/immipro
 cd /srv/immipro
-# copier docker-compose.prod.yml et créer .env.app, .env.db, .env.minio
-# à partir de .env.example — ces fichiers ne sont jamais versionnés
+# créer .env.app, .env.db, .env.minio à partir de .env.example, et
+# .env.sauvegarde (BACKUP_GPG_RECIPIENT) — ces fichiers ne sont jamais
+# versionnés. docker-compose.prod.yml et scripts/deployer.sh sont recopiés
+# par chaque déploiement (docs/exploitation/deploiement.md).
 docker login ghcr.io -u <votre-compte>
 ```
 

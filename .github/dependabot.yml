@@ -1,0 +1,44 @@
+# Mises à jour proposées — revue du 07/10/2026, E9.
+#
+# Les actions sont épinglées par empreinte (SHA) : sans Dependabot, une
+# empreinte ne bouge plus jamais, correctifs de sécurité compris. Il les
+# tient à jour, avec le commentaire de version.
+#
+# Les mineures et correctifs arrivent groupés, une proposition par
+# écosystème et par semaine : chacune passe la porte complète comme
+# n'importe quelle autre. Les majeures sont ignorées ici : elles suivent
+# l'ordre de montée de M19 (Node, Next, Prisma, pg-boss, vitest…), un lot
+# par étape, et non au fil des sorties.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      npm-mineures:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]

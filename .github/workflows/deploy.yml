@@ -9,13 +9,24 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+# Aucun droit par défaut : chaque job déclare ce qu'il lui faut — revue du
+# 07/10/2026, E9.
+permissions: {}
+
 jobs:
   # La porte, avant tout le reste. Elle vivait dans un workflow séparé qui
   # tournait *en parallèle* de la construction : une image pouvait donc
   # partir sur GHCR pendant que les tests viraient au rouge, et le VPS la
   # tirait. `needs: valider` supprime cette course.
   valider:
+    permissions: { contents: read }
     uses: ./.github/workflows/validation.yml
+    # Les clés de bac à sable, pour que l'étape `sandbox:paiement` ouvre
+    # pour de bon au lieu de s'abstenir. Nommées une à une, pas `inherit` :
+    # la porte ne voit pas la clé de production.
+    secrets:
+      STRIPE_SANDBOX_API_KEY: ${{ secrets.STRIPE_SANDBOX_API_KEY }}
+      FEDAPAY_SANDBOX_API_KEY: ${{ secrets.FEDAPAY_SANDBOX_API_KEY }}
 
   build:
     needs: valider
@@ -26,13 +37,13 @@ jobs:
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 20 }
       - id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -49,7 +60,7 @@ jobs:
       # paquet, et les commandes sont ensuite exécutées depuis l'image, pas
       # depuis l'arbre de travail.
       - name: Construire l'image candidate
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           load: true
@@ -79,22 +90,65 @@ jobs:
             echo "- **Poussée** — \`$depot:${{ steps.meta.outputs.tag }}\`, l'empreinte éprouvée ci-dessus"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # D-25, option A : `ssh` et `scp` natifs. L'hôte est vérifié contre
+  # `VPS_KNOWN_HOSTS` (la ligne relevée depuis la console du fournisseur,
+  # jamais par un premier `ssh-keyscan` qui croirait n'importe quel
+  # serveur) ; aucune action tierce ne manipule la clé de production.
+  #
+  # Le compose et le script sont recopiés à chaque déploiement : le VPS
+  # exécute ce que dit le dépôt. Les fichiers secrets (`.env.*`,
+  # `garage.toml`) ne sont jamais touchés. Tout le reste — tirage,
+  # sauvegarde, migration, garde-fous, sonde, retour arrière — est dans
+  # `scripts/deployer.sh`, qui se lance aussi à la main.
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    permissions: { contents: read }
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Clé et empreinte de l'hôte
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VPS_KNOWN_HOSTS" ]; then
+            echo "::error::VPS_KNOWN_HOSTS est vide : y reporter la ligne de l'hôte relevée depuis la console du fournisseur (docs/exploitation/deploiement.md)."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploiement
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploiement ~/.ssh/known_hosts
+          {
+            echo "Host vps"
+            echo "  HostName $VPS_HOST"
+            echo "  User $VPS_USER"
+            echo "  Port $VPS_PORT"
+            echo "  IdentityFile ~/.ssh/deploiement"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  BatchMode yes"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Recopier le compose et le script
+        run: |
+          set -euo pipefail
+          ssh vps 'mkdir -p /srv/immipro/scripts /srv/immipro/.deploiement/arrivee'
+          scp docker-compose.prod.yml vps:/srv/immipro/.deploiement/arrivee/docker-compose.prod.yml
+          scp scripts/deployer.sh vps:/srv/immipro/scripts/deployer.sh
+          ssh vps 'chmod 755 /srv/immipro/scripts/deployer.sh'
+
       - name: Déployer sur le VPS
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd /srv/immipro
-            export TAG=${{ needs.build.outputs.tag }}
-            export GH_OWNER=${{ github.repository_owner }}
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml run --rm app npx prisma migrate deploy
-            docker compose -f docker-compose.prod.yml up -d
-            docker image prune -f
+        run: ssh vps "/srv/immipro/scripts/deployer.sh ${{ needs.build.outputs.tag }} ${{ github.repository_owner }}"
+
+      - name: Effacer la clé
+        if: always()
+        run: rm -f ~/.ssh/deploiement

@@ -11687,3 +11687,49 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 1. L'exception `deepmerge-ts` est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15).
 2. Les quatre modérées de `minio` (`stream-json`, `query-string`, `decode-uri-component`) restent affichées. Le correctif proposé par npm est un retour à minio 7.
 3. Les relevés de veille réels effacés par les passes antérieures de la graine ne se retrouvent pas.
+
+## S.132 — Revue du 07/10/2026 : exploitation I (E9)
+
+**Contexte.** Huitième lot du plan de traitement. Une décision, D-25, tranchée le 08/10/2026 : le déploiement passe par `ssh` et `scp` natifs, avec l'hôte vérifié par `VPS_KNOWN_HOSTS`, et il recopie le compose et le script à chaque fois.
+
+**Ce que fait le code.**
+- **`scripts/deployer.sh`**, exécuté sur le VPS, enchaîne les étapes dans cet ordre :
+  1. tirer l'image ;
+  2. si une migration attend, sauvegarder la base, chiffrée, dans `sauvegardes/avant-<tag>.dump.gpg` ; sans destinataire GPG, le script s'arrête avant de migrer ;
+  3. migrer depuis la nouvelle image ;
+  4. vérifier les garde-fous depuis la nouvelle image, avant la bascule ;
+  5. basculer avec le compose reçu ;
+  6. sonder : la base doit répondre, le code doit être 200 si l'instance répondait 200 avant, et le worker doit avoir démarré ;
+  7. en cas d'échec, relancer une fois, puis revenir au tag et au compose précédents.
+
+  Le tag en service est écrit dans `.env` et dans `.deploiement/tag-courant`. Un verrou empêche deux déploiements simultanés.
+- **`deploy.yml`.**
+  - Plus aucune action tierce avec la clé de production.
+  - `StrictHostKeyChecking yes` contre `VPS_KNOWN_HOSTS`.
+  - Recopie de `docker-compose.prod.yml` et de `scripts/deployer.sh`.
+  - `permissions: {}` par défaut.
+- **`ci.yml` et `validation.yml`.**
+  - `permissions: contents: read`.
+  - Les secrets du bac à sable sont déclarés et transmis nommément, sans `inherit`.
+  - `shellcheck scripts/*.sh` est ajouté à la porte.
+- **Actions** épinglées par SHA (empreintes revérifiées le 08/10/2026) ; `.github/dependabot.yml` pour les actions, npm, Docker et le compose, avec les majeures laissées à M19.
+- **Documentation.** `docs/exploitation/deploiement.md` décrit les étapes, la restauration manuelle et les répétitions ; la règle « migrations additives » est ajoutée dans `prisma/README.md`.
+
+**Ce qui est éprouvé.**
+- `tests/deployer.test.ts` exécute le vrai script avec de faux `docker`, `curl` et `gpg`, sur onze scénarios :
+  - le parcours nominal, dans l'ordre ;
+  - le compose installé, et le précédent gardé ;
+  - une instance inapte, qui reste déployable ;
+  - une migration sans destinataire GPG : rien ne bouge ;
+  - une migration avec sauvegarde, faite avant de migrer ;
+  - un tag absent, une migration qui échoue, des garde-fous qui ne tiennent pas : pas de bascule ;
+  - une version qui ne répond pas : relance, puis retour au tag et au compose précédents ;
+  - le retour impossible sans tag connu ;
+  - un tag illisible.
+- `tests/workflows.test.ts` relit les workflows. Sur les anciens fichiers, 8 essais sur 10 échouent.
+- `shellcheck` et `actionlint` passent.
+
+**Écarts qui restent.**
+1. Avant le premier déploiement par la CI, renseigner `VPS_KNOWN_HOSTS` et `.env.sauvegarde`, et faire à la main les trois répétitions de `docs/exploitation/deploiement.md` sur le VPS. Sans `VPS_KNOWN_HOSTS`, le job `deploy` échoue en le disant.
+2. La base ne revient jamais en arrière : la restauration depuis `sauvegardes/avant-<tag>.dump.gpg` est manuelle, et la clé privée GPG n'est pas sur le VPS.
+3. Le `Dockerfile` installe encore le CLI Prisma par `npm install -g` (M15).
