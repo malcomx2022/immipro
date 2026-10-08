@@ -11594,3 +11594,52 @@ Après correction :
 1. Une tranche à zéro n'envoie aucun message au candidat. La dette disparaît de B-04, et seuls l'écart et le journal en gardent la trace.
 2. Les dettes déjà bloquées en revue manuelle avant ce lot sont à lister et à trancher en B-04.
 3. Le reste des lots de paiement (E2, E3, F6, F3) attend D-6 à D-10.
+
+## S.129 — Revue du 07/10/2026 : paiements II (E2, E3 étapes 1 à 4)
+
+**Contexte.** Cinquième lot du plan de traitement. Décisions du 08/10/2026 :
+- D-6 : tout écart d'encaissement refuse, même au-dessus du prix.
+- D-7 : FedaPay rend `entity.amount` hors frais. Le diagnostic sur IMP-261005-P98AEE donne 5 000 pour un widget à 5 208 F frais compris.
+- D-8 : un remboursement sans obligation ouvre un écart, sans retrait de droits ni avoir.
+- D-9 : un nouveau constat rouvre un écart refermé, et l'ancien va au journal.
+- D-10 : un remboursement supérieur au dû ouvre un écart à trancher avec le comptable.
+
+**Ce que fait le code.**
+- **E2, INV-7.** Les notifications et les consultations lisent le montant encaissé et la devise :
+  - FedaPay : `entity.amount` et `currency.iso`, ou seulement le montant quand il ne rend que `currency_id` ;
+  - Stripe : `amount_total` ou `amount_received`. Une session terminée mais non payée n'est plus une confirmation.
+
+  `appliquerLaNotification` compare en unités mineures. Si l'encaissement diffère, rien ne s'écrit (ni événement, ni état, ni crédit, ni facture) et un écart dit les deux montants. La réconciliation compare de la même façon.
+- **E3, INV-7.** `verdictDuRemboursementAnnonce` décide d'un `refunded` selon six cas :
+
+  | Cas | Effet |
+  |---|---|
+  | Aucune obligation | Écart (D-8) |
+  | Obligation non initiée | Écart, la revue se tranche (M4) |
+  | Montant non dit (FedaPay) | Le remboursement s'applique |
+  | Montant égal au dû | Le remboursement s'applique |
+  | Montant partiel | Écart ; le cumul suivant appliquera |
+  | Montant supérieur au dû | Écart (D-10) |
+
+  Stripe lit `amount_refunded`. Un supplément sur une transaction déjà remboursée ouvre un écart au lieu d'un rejeu muet. L'adaptateur Stripe ne rembourse plus un paiement déjà remboursé chez lui. En base, un remboursement suppose désormais une obligation (`transaction_rembourse_suppose_une_obligation`), avec reprise des lignes existantes.
+- **D-9.** Tous les écarts du paiement passent par `noterLEcart` :
+  - un écart ouvert garde son premier constat ;
+  - un écart refermé se rouvre sur un constat nouveau, et l'ancien constat avec sa résolution part au journal (`paiement.ecart.rouvert`) ;
+  - un constat identique ne rouvre rien.
+
+  Conséquence voulue : sur FedaPay, la tranche d'une revue (M4) referme l'écart, puis le geste au tableau de bord le rouvre jusqu'à la déclaration.
+
+**Ce qui est éprouvé.** Rejoués sur l'ancien code avant correction :
+- `smoke:fedapay` : une confirmation à 10 000 F sur un pack à 15 000 F passait CONFIRMEE, avec analyses et facture.
+- `smoke:remboursement` :
+  - un remboursement sans obligation soldait la dette avec un avoir du prix entier ;
+  - un partiel et un excédent soldaient la dette ;
+  - un supplément passait en rejeu muet ;
+  - un second écart se perdait.
+
+Après correction, chaque scénario ouvre l'écart attendu, et le cumul entier solde la dette. `smoke:reconciliation` couvre une consultation qui rend un autre montant. Côté essais d'unité : la matrice des six cas, la lecture des montants des deux rails, la comparaison, et la garde Stripe « déjà remboursé ». `smoke:migrations` gagne trois garde-fous : un remboursement sans obligation, une somme à rendre supérieure au paiement, une somme sans obligation.
+
+**Écarts qui restent.**
+1. Le rattrapage par la réconciliation des dettes initiées dont la notification s'est perdue (E3, étape 5) est prévu en S.130.
+2. Il reste à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`. Sinon, `charge.refunded` ne retrouve pas son paiement, comme avant ce lot.
+3. On ne sait pas encore si FedaPay notifie un remboursement partiel avec son montant : c'est la seconde moitié de D-7, à poser à FedaPay. D'ici là, la notification `refunded` de FedaPay n'est pas lue avec un montant et s'applique sans comparaison ; la déclaration manuelle (S.91) reste la garde.

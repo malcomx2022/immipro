@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) et S.129 (E2, E3 étapes 1 à 4) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -68,11 +68,11 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-3 | Garde-t-on le décompte « il te reste N essais » d'A-02, au prix d'un compteur en mémoire des adresses sans compte ? | Direction produit | M2 — **tranchée le 08/10/2026 : option B**, décompte gardé, compteur par empreinte |
 | D-4 | La surveillance externe a-t-elle besoin du détail de `/api/health` ? | Exploitant | M10 |
 | D-5 | Renomme-t-on le cookie en `__Host-immipro_session` (texte Cookies à revalider, déconnexion générale une fois) ? | Direction, conseil juridique | F1 (partie cookie) |
-| D-6 | Un encaissement d'un autre montant ou d'une autre devise est-il refusé puis remboursé, même s'il est supérieur au prix ? | Direction | E2 |
-| D-7 | Chez FedaPay, `entity.amount` est-il hors frais ? Un remboursement partiel est-il possible et notifié avec son montant ? | Prestataire FedaPay | E2, E3 |
-| D-8 | Un remboursement constaté sans obligation ouverte ouvre-t-il un écart, sans retrait automatique des droits ? | Direction | E3 |
-| D-9 | Un second écart sur une transaction dont le premier est refermé doit-il réécrire la colonne d'écart, l'historique restant au journal ? | Responsable technique | E2, E3 |
-| D-10 | Que faire d'un remboursement supérieur au dû ? | M.C | E3 |
+| D-6 | Un encaissement d'un autre montant ou d'une autre devise est-il refusé puis remboursé, même s'il est supérieur au prix ? | Direction | E2 — **tranchée le 08/10/2026** : tout écart refuse, même au-dessus du prix |
+| D-7 | Chez FedaPay, `entity.amount` est-il hors frais ? Un remboursement partiel est-il possible et notifié avec son montant ? | Prestataire FedaPay | E2, E3 — **tranchée le 08/10/2026** : `entity.amount` est hors frais (5 000 sur IMP-261005-P98AEE) ; la notification de remboursement FedaPay n'est pas lue avec un montant (question encore ouverte auprès de FedaPay) : elle s'applique sans comparaison, la déclaration manuelle restant la garde |
+| D-8 | Un remboursement constaté sans obligation ouverte ouvre-t-il un écart, sans retrait automatique des droits ? | Direction | E3 — **tranchée le 08/10/2026** : écart, sans retrait automatique ni avoir |
+| D-9 | Un second écart sur une transaction dont le premier est refermé doit-il réécrire la colonne d'écart, l'historique restant au journal ? | Responsable technique | E2, E3 — **tranchée le 08/10/2026** : le nouveau constat rouvre l'écart, l'ancien et sa résolution vont au journal |
+| D-10 | Que faire d'un remboursement supérieur au dû ? | M.C | E3 — **tranchée le 08/10/2026** : écart, pas de solde automatique, à trancher avec le comptable |
 | D-11 | Une revue manuelle peut-elle conclure à zéro, et comment l'obligation se referme-t-elle ? Un pack Pro servi sur plusieurs dossiers retire-t-il les droits de tous ? | Direction | M4 — **tranchée le 08/10/2026** : zéro est possible et le candidat garde ses analyses ; un Pro remboursé perd ses analyses restantes sur tous les dossiers servis |
 | D-12 | Les analyses du pack sont-elles celles vendues à l'achat ? (confirmation de lecture de RG-15.2) | Direction | M5 — **tranchée le 08/10/2026** : la base est celle vendue à l'achat, figée sur la transaction |
 | D-13 | Renomme-t-on les montants de `Transaction` par `@map`, sans migration de données ? | Responsable technique | M18 |
@@ -110,7 +110,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.126 — livré** | E6, E7, F4, M1, F12 | M+M+S+M+S | Sans décision | Aucune pièce bloquée « en analyse », aucune chaîne du modèle affichée, clé de dépôt vérifiée |
 | **S.127 — livré** | M3, M2, N1 | S+M+S | D-3, D-22 (M3 sans décision) | Compteurs d'essais atomiques, pas d'énumération, case « Rester connecté » honorée |
 | **S.128 — livré** | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
-| S.129 — paiements II | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
+| **S.129 — livré** | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
 | S.130 — paiements III | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
 | S.131 — données | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
 | S.132 — exploitation I | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
@@ -668,6 +668,8 @@ En développement : `'unsafe-eval'`, `ws:`, origine du stockage déduite de `MIN
 
 #### E2 — Montant et devise du webhook jamais comparés
 
+**État : livré en S.129** (D-6, D-7). Le diagnostic de l'étape 6 a été lancé : FedaPay rend 5 000, hors frais.
+
 **Constat vérifié.** `Lue` (`src/server/paiement/notifications.ts:102-121`) et `Notification` (`src/server/acces/paiements.ts:527-541`) ne portent ni montant ni devise. `appliquerLaNotification` passe à CONFIRMEE et crédite sur le seul statut. La facture prend `versMineur(transaction.amount, …)` (`facturation/emission.ts:176`). Les consultants (`consultation.ts:40-52`, `stripe.ts:191-208`) ne rendent pas le montant non plus, alors que `champsDeLEntite` de FedaPay le lit déjà (`fedapay.ts:108-121`).
 
 **Conséquence non vue par la revue.** `scripts/fumee-fedapay.mts:148` envoie `amount: 10000` pour un pack « dossier » à 15 000 F. Le scénario nominal échouera après la correction : il se corrige dans le même lot.
@@ -699,6 +701,8 @@ En développement : `'unsafe-eval'`, `ws:`, origine du stockage déduite de `MIN
 ---
 
 #### E3 — `refunded` reçu sans obligation, ou partiel
+
+**État : étapes 1 à 4 et migration livrées en S.129** (D-8, D-10). Reste l'étape 5 (rattrapage par la réconciliation), prévue en S.130. Les écarts passent tous par `noterLEcart`, qui rouvre un écart refermé (D-9).
 
 **Constat vérifié.** `SUITES.CONFIRMEE = ["REMBOURSEE"]` (`cycle.ts:20`) ne regarde ni `refundDueAt` ni le montant. `appliquerLaNotification` pose `refundedAt` puis appelle `etablirLAvoir`, qui vaut le prix entier quand `refundAmount` est nul (`emission.ts:275-279`). Le seul retrait au grand livre est dans `initierLeRemboursement`. `charge.refunded` vaut REMBOURSEE sans lire `amount_refunded` (`notifications.ts:99`).
 
@@ -1393,7 +1397,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 | S.126 (livrée) | `20261008092000_un_seul_rendu_par_analyse` | Dédoublonnage des rendus, index unique partiel `analysiscredit_un_seul_rendu_par_analyse` |
 | S.128 (livrée) | `20261008100000_analyses_vendues_figees` | `Transaction.packAnalyses`, `packDestinations`, reprise, contrainte |
 | S.128 (livrée) | `20261008101000_tranche_de_la_revue` | `refundDecidedAt`, `refundDecidedBy`, contrainte ; index de retrait par transaction et par dossier |
-| S.129 | `remboursement_suppose_une_obligation` | Reprise des remboursements sans obligation, contrainte |
+| S.129 (livrée) | `20261008110000_remboursement_suppose_une_obligation` | Reprise des remboursements sans obligation, contrainte |
 | S.130 | `contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
 | S.131 | `index_des_cles_etrangeres` | Neuf index |
 | S.137 | `divergence_a_propager` | `VisaRule.divergenceDueAt`, index, contrainte |
@@ -1402,7 +1406,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.128
+## 7. Ce qui reste ouvert après les lots S.125 à S.129
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1413,3 +1417,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.
 - **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.
 - **M4** : lister les dettes déjà bloquées en revue (obligation ouverte, `refundAmount` nul, non demandée, non rendue) et les trancher en B-04 ; une tranche à zéro n'envoie aucun message au candidat.
+- **E3** : le rattrapage par la réconciliation des dettes initiées dont la notification s'est perdue (étape 5, S.130) ; à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.
