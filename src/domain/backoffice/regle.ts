@@ -371,6 +371,14 @@ export const AIDE_LIBELLE_CANDIDAT =
 export const AIDE_MOTIF = "Consigné au journal d'audit avec ton identifiant.";
 
 /**
+ * La publication est faite, la mise en file de la divergence non (revue du
+ * 07/10/2026, M8). La dette est en base, et la reprise horaire la propage :
+ * l'écran le dit au lieu de répondre en échec à un geste qui a eu lieu.
+ */
+export const MENTION_DIVERGENCE_DIFFEREE =
+  "La publication est faite. Les alertes aux dossiers concernés partent dans l'heure.";
+
+/**
  * Vérification du payload complet d'une règle — quatrième point
  * d'application de la liste unique.
  *

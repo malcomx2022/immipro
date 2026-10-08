@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7) et S.136 (E8, M11, M12) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12) et S.137 (M8, M9, M10) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -66,7 +66,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-1 | INV-6 se lit-il « quota d'analyses, jetons mesurés et surveillés » ? La réponse réécrit CLAUDE.md et DOC-11 | Direction | M6 |
 | D-2 | Un CDN ou un proxy sera-t-il placé devant nginx ? | Exploitant | Confirme E1 (livré) |
 | D-3 | Garde-t-on le décompte « il te reste N essais » d'A-02, au prix d'un compteur en mémoire des adresses sans compte ? | Direction produit | M2 — **tranchée le 08/10/2026 : option B**, décompte gardé, compteur par empreinte |
-| D-4 | La surveillance externe a-t-elle besoin du détail de `/api/health` ? | Exploitant | M10 |
+| D-4 | La surveillance externe a-t-elle besoin du détail de `/api/health` ? | Exploitant | M10 — **tranchée le 08/10/2026** : un anonyme lit `{ status, db }` ; le détail, un administrateur ou `ETAT_DE_SERVICE_JETON` |
 | D-5 | Renomme-t-on le cookie en `__Host-immipro_session` (texte Cookies à revalider, déconnexion générale une fois) ? | Direction, conseil juridique | F1 (partie cookie) |
 | D-6 | Un encaissement d'un autre montant ou d'une autre devise est-il refusé puis remboursé, même s'il est supérieur au prix ? | Direction | E2 — **tranchée le 08/10/2026** : tout écart refuse, même au-dessus du prix |
 | D-7 | Chez FedaPay, `entity.amount` est-il hors frais ? Un remboursement partiel est-il possible et notifié avec son montant ? | Prestataire FedaPay | E2, E3 — **tranchée le 08/10/2026** : `entity.amount` est hors frais (5 000 sur IMP-261005-P98AEE) ; la notification de remboursement FedaPay n'est pas lue avec un montant (question encore ouverte auprès de FedaPay) : elle s'applique sans comparaison, la déclaration manuelle restant la garde |
@@ -85,7 +85,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-20 | Regroupe-t-on des largeurs voisines (760 vers 720, 560 et 480 vers 520, 68ch et 75ch vers 70ch) ? | Design | F7 — **tranchée le 08/10/2026** : un jeton par valeur, aucun regroupement |
 | D-21 | La mention de nouvel onglet est-elle visible ou réservée aux lecteurs d'écran ? | Design | F8 — **tranchée le 08/10/2026** : réservée aux lecteurs d'écran |
 | D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 — **tranchée le 08/10/2026 : cookie oublié à la fermeture du navigateur, 24 h au plus en base** |
-| D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) |
+| D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) — **tranchée le 08/10/2026** : oui, par la migration, via la reprise horaire |
 | D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 |
 | D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 — **tranchée le 08/10/2026** : `ssh` natif vérifié par `VPS_KNOWN_HOSTS`, compose et script recopiés à chaque déploiement |
 | D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 — **tranchée le 08/10/2026** : Backblaze B2 hors du VPS, clé privée dans un coffre hors ligne, Healthchecks.io |
@@ -118,7 +118,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.134 — livré** | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
 | **S.135 — livré** | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
 | **S.136 — livré** | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
-| S.137 — reprises du worker | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
+| **S.137 — livré** | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
 | S.138 — rédaction et en-têtes | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
 | S.139 — interface III | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
 | S.140 — facturation et montants | F5, M18 | S+S | D-13, D-14 | Date de la prestation, unités nommées |
@@ -369,6 +369,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### M8 — Publication d'une règle : la divergence est postée hors transaction
 
+**État : livré en S.137** (D-23 : rejeu par la migration). En plus du plan : un verrou consultatif par version (`propagerSansRecouvrement`), parce que le job posté et la reprise horaire peuvent désormais se croiser et auraient envoyé deux fois l'alerte critique.
+
 **Constat vérifié, effet pire que prévu.** `publierLaRegle` fait la transaction (`publication.ts:139-159`), le journal, puis `poster` (l.180-185). Si `poster` lève, la route répond 5xx alors que la publication est faite. Un nouvel essai ne trouve plus de prédécesseur : la divergence est perdue pour toujours.
 
 **Règle.** WF-11, RG-11.2, RG-11.3, WF-14 étape 6.
@@ -393,6 +395,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 ---
 
 #### M9 — Arrêt propre du worker et jobs en échec
+
+**État : livré en S.137.** La sonde des échecs lit `pgboss.job` et `pgboss.archive` (pg-boss archive aussi les échecs). Le délai du compose passe de 30 s (S.134) à 45 s.
 
 **Constat vérifié.** Aucun gestionnaire `SIGTERM` ni `boss.stop` dans `src/server/jobs/worker.ts` ; pas de `stop_grace_period` pour le worker en production ; aucune lecture des jobs en échec.
 
@@ -577,6 +581,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 ---
 
 #### M10 — `/api/health` public, sans limitation, hors composeur
+
+**État : livré en S.137** (D-4). Écart au plan : le corps public garde `db` en plus de `status` ; la sonde de `scripts/deployer.sh` exige `"db":"up"` et n'a pas de jeton.
 
 **Constat vérifié.** `src/app/api/health/route.ts:315` exporte un `GET` écrit à la main. Le corps expose les fournisseurs de paiement, le nombre de dossiers FedaPay payés, les obstacles de facturation, les raisons de non-branchement IA, et les files de revue, de quarantaine, de purge. Aucun secret. `tests/api-invariants.test.ts:64` l'exempte. Aucun consommateur en code ou en CI ; seul `INSTALLATION-GITHUB.md` le lit.
 
@@ -1444,7 +1450,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.136
+## 7. Ce qui reste ouvert après les lots S.125 à S.137
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1468,3 +1474,5 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
   Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.
 - **M15** : après le premier déploiement de S.134, vérifier sur le VPS que les six services sont `healthy` et que les limites apparaissent dans `docker stats`.
 - **M11** : les formulaires du back-office (ticket séparé, comme prévu) ; et le champ « Établissement visé » de C-05, saisi mais jamais envoyé, à trancher (l'envoyer ou le retirer).
+- **M10** : renseigner `ETAT_DE_SERVICE_JETON` dans `.env.app` si une surveillance externe doit lire le détail de `/api/health` ; sans lui, seul un administrateur connecté le lit.
+- **M8 (D-23)** : après le déploiement de S.137, la première reprise horaire propage la version en vigueur de chaque procédure qui a un prédécesseur ; relire `[reprise-divergence]` dans le journal du worker et les alertes parties.

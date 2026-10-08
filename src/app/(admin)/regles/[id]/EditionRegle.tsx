@@ -10,6 +10,7 @@ import type { EchecCandidat } from "@/server/http/echecs";
 import {
   AIDE_LIBELLE_CANDIDAT,
   AIDE_MOTIF,
+  MENTION_DIVERGENCE_DIFFEREE,
   CHAMPS_CANDIDAT,
   LIBELLE_NIVEAU,
   MENTION_SANS_MIGRATION,
@@ -125,6 +126,8 @@ export function EditionRegle({
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   /** Ce qui s'est réellement produit, et rien d'autre. */
   const [fait, setFait] = useState<null | "enregistre" | "publie">(null);
+  // La propagation part à la reprise horaire plutôt que tout de suite (M8).
+  const [differee, setDifferee] = useState(false);
 
   const fautes = verifierTextesCandidat(textes);
   const textesRecevables = publiable(textes);
@@ -174,7 +177,11 @@ export function EditionRegle({
       setEnvoi("");
       return;
     }
-    const resultat = await appeler<{ publiee: string }>(`/api/admin/regles/${ecrite}`, {
+    const resultat = await appeler<{
+      publiee: string;
+      divergenceAPropager: boolean;
+      divergenceMiseEnFile: boolean;
+    }>(`/api/admin/regles/${ecrite}`, {
       corps: { motif },
     });
     setEnvoi("");
@@ -185,6 +192,7 @@ export function EditionRegle({
       setEchec(resultat.echec);
       return;
     }
+    setDifferee(resultat.donnees.divergenceAPropager && !resultat.donnees.divergenceMiseEnFile);
     setFait("publie");
     router.refresh();
   }
@@ -418,6 +426,7 @@ export function EditionRegle({
               Version {brouillon.version} publiée. Elle devient la référence des
               nouveaux dossiers ; les {effet.dossiersConcernes} dossiers existants
               gardent la leur, et la publication est au journal d&apos;audit.
+              {differee ? ` ${MENTION_DIVERGENCE_DIFFEREE}` : null}
             </p>
           ) : null}
           {fait === "enregistre" ? (

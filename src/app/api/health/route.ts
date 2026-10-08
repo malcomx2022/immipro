@@ -1,4 +1,8 @@
 import { db } from "@/lib/db";
+import { route } from "@/server/http/route";
+import { lecteurExploitant } from "@/server/exploitation/lecteur";
+import { corpsPublic } from "@/domain/exploitation/etat-public";
+import { messageDesTachesEnEchec, sonderLesTachesEnEchec } from "@/server/exploitation/taches";
 import {
   DEPENDANCES,
   LIBELLE_CAPACITE,
@@ -53,8 +57,49 @@ import { ABANDON_JOURS } from "@/domain/dossiers/inactivite";
  * IA peut manquer tant que la revue humaine tient son délai. Un écran de
  * back-office ne surveille que ceux qui l'ouvrent ; une adresse d'état se
  * surveille depuis l'extérieur.
+ *
+ * ── Qui lit quoi (revue du 07/10/2026, M10 ; D-4) ───────────────────
+ *
+ * La route passe par le composeur, comme toutes les autres : limitée en
+ * lecture, et sa session lue. Un lecteur anonyme reçoit `{ status, db }` ;
+ * le détail ci-dessous est réservé à un administrateur connecté ou à
+ * `Authorization: Bearer <ETAT_DE_SERVICE_JETON>`. Le code HTTP est le même
+ * pour tous : 200 en service, 503 sinon.
  */
 export const dynamic = "force-dynamic";
+
+/**
+ * Une divergence encore à propager deux heures après sa publication a
+ * manqué deux reprises horaires (revue M8) : ce n'est plus un délai, c'est
+ * un incident.
+ */
+const RETARD_DIVERGENCE_HEURES = 2;
+
+interface EtatDesDivergences {
+  lisible: boolean;
+  enRetard: number;
+  depuisHeures: number;
+}
+
+async function sonderLesDivergences(): Promise<EtatDesDivergences> {
+  const limite = new Date(Date.now() - RETARD_DIVERGENCE_HEURES * 3_600_000);
+  try {
+    const [enRetard, plusAncienne] = await Promise.all([
+      db.visaRule.count({ where: { divergenceDueAt: { lt: limite } } }),
+      db.visaRule.findFirst({
+        where: { divergenceDueAt: { lt: limite } },
+        orderBy: { divergenceDueAt: "asc" },
+        select: { divergenceDueAt: true },
+      }),
+    ]);
+    const depuisHeures = plusAncienne?.divergenceDueAt
+      ? Math.floor((Date.now() - plusAncienne.divergenceDueAt.getTime()) / 3_600_000)
+      : 0;
+    return { lisible: true, enRetard, depuisHeures };
+  } catch {
+    return { lisible: false, enRetard: 0, depuisHeures: 0 };
+  }
+}
 
 /** `SELECT 1` : la base répond, ou elle ne répond pas. Rien d'autre. */
 async function sonderLaBase(): Promise<"up" | "down"> {
@@ -312,8 +357,23 @@ async function compterLesDossiersPayes(): Promise<number> {
   }
 }
 
-export async function GET() {
-  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes] = await Promise.all([
+export const GET = route({
+  nom: "exploitation.etat",
+  acces: "public",
+  limite: "lecture",
+  traiter: async ({ acteur, requeteBrute }) => {
+    const { corps, enService } = await etatDeService();
+    const lecteur = lecteurExploitant(acteur, requeteBrute.headers.get("authorization"));
+    return Response.json(lecteur ? corps : corpsPublic(corps), {
+      status: enService ? 200 : 503,
+      // Un état de service mis en cache n'en est plus un.
+      headers: { "Cache-Control": "no-store" },
+    });
+  },
+});
+
+async function etatDeService() {
+  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes, divergences, taches] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
@@ -334,6 +394,8 @@ export async function GET() {
     */
     lireLesConstats(),
     compterLesDossiersPayes(),
+    sonderLesDivergences(),
+    sonderLesTachesEnEchec(),
   ]);
 
   /*
@@ -385,8 +447,9 @@ export async function GET() {
   */
   const enService = base === "up" && etat.aptitude !== "INAPTE";
 
-  return Response.json(
-    {
+  return {
+    enService,
+    corps: {
       status: enService ? (etat.aptitude === "PILOTE" ? "pilote" : "ok") : "indisponible",
       aptitude: etat.aptitude,
       db: base,
@@ -484,7 +547,19 @@ export async function GET() {
           ? messageDeSurveillance(file, DELAI_CIBLE_HEURES)
           : "La file de revue n'a pas pu être lue.",
       },
+      // Revue M8 : une divergence que deux reprises n'ont pas propagée.
+      divergences: {
+        lisible: divergences.lisible,
+        enRetard: divergences.enRetard,
+        depuisHeures: divergences.depuisHeures,
+        message: !divergences.lisible
+          ? "Les divergences à propager n'ont pas pu être lues."
+          : divergences.enRetard === 0
+            ? "Aucune divergence en attente de propagation."
+            : `${divergences.enRetard} version(s) publiée(s) dont les dossiers ne sont pas encore prévenus, la plus ancienne depuis ${divergences.depuisHeures} h.`,
+      },
+      // Revue M9 : ce que pg-boss a abandonné, file par file.
+      taches: { ...taches, message: messageDesTachesEnEchec(taches) },
     },
-    { status: enService ? 200 : 503 },
-  );
+  };
 }

@@ -11862,3 +11862,31 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 1. L'échec du back-office donne la trace sous `EtatDEcran`, pas dans un `BlocEchec` : son titre doit rester le `h1` que vise le lien d'évitement.
 2. Les formulaires du back-office restent à faire, dans un ticket séparé.
 3. Le champ « Établissement visé » de C-05 est saisi mais n'a jamais été envoyé au serveur. M11 lui a seulement donné un `name` ; reste à l'envoyer ou à le retirer.
+
+## S.137 — Revue du 07/10/2026 : reprises du worker (M8, M9, M10)
+
+**Contexte.** Treizième lot du plan de traitement. Deux décisions, tranchées le 08/10/2026 :
+- **D-4** : un lecteur anonyme de `/api/health` lit `{ status, db }` ; le détail est réservé à un administrateur connecté ou à `Authorization: Bearer <ETAT_DE_SERVICE_JETON>` ;
+- **D-23** : la propagation des divergences est rejouée une fois, au déploiement.
+
+**Ce que fait le code.**
+- **M8.** `publierLaRegle` faisait sa transaction puis postait la propagation : un `poster` qui levait faisait répondre 5xx à une publication faite, et la divergence était perdue pour toujours.
+  - `VisaRule.divergenceDueAt` (migration `divergence_a_propager`, index, contrainte `regle_divergence_sur_version_en_vigueur`) s'écrit dans la transaction de la publication.
+  - La mise en file passe dans un `try` : la réponse dit `divergenceAPropager` et `divergenceMiseEnFile`, et B-02 écrit « La publication est faite. Les alertes aux dossiers concernés partent dans l'heure. »
+  - La passe complète efface la colonne. `JOBS.REPRISE_DIVERGENCE` (à la 25e minute) reprend toute colonne échue depuis plus de quinze minutes.
+  - Un verrou consultatif par version (`propagerSansRecouvrement`) empêche le job et la reprise de prévenir deux fois.
+  - D-23 : la migration marque, échue d'une heure, la version en vigueur de chaque procédure qui a un prédécesseur.
+  - `/api/health` compte les divergences en attente depuis plus de deux heures.
+- **M9.** `arreterProprement` : sur `SIGTERM` ou `SIGINT`, `boss.stop` laisse finir les tâches (30 s au plus), le journal dit « worker arrêté », sortie 0, second signal ignoré. Le compose donne 45 s. `sonderLesTachesEnEchec` lit les échecs des dernières 24 h, par file, dans l'état de service.
+- **M10.** `/api/health` passe par le composeur (public, limité en lecture). Le code HTTP est le même pour tous.
+
+**Ce qui est éprouvé.**
+- `smoke:publication` : file qui refuse le job → publication faite, dette en base ; la reprise propage, efface la dette, n'écrit qu'une alerte ; deux passes simultanées ne préviennent qu'une fois. Sur l'ancien code, la publication lève et aucune dette n'est écrite.
+- `smoke:worker --base` : `SIGTERM` → sortie 0 et « worker arrêté » ; l'ancien worker est tué (code null).
+- `tests/divergence-due.test.ts`, `tests/etat-de-service-public.test.ts`, `tests/arret-du-worker.test.ts`, `tests/couverture-des-taches.test.ts` (chaque file a son `boss.work`, chaque module de `jobs/` est éprouvé, une exception motivée) ; `tests/api-invariants.test.ts` n'exempte plus `/api/health`.
+- Garde-fous SQL : une divergence sur une version jamais mise en vigueur est refusée.
+
+**Écarts qui restent.**
+1. Le corps public garde `db` (D-4) : la sonde du déploiement l'exige, sans jeton.
+2. `ETAT_DE_SERVICE_JETON` est à renseigner sur le VPS si une surveillance externe doit lire le détail.
+3. Après le premier déploiement, relire le bilan `[reprise-divergence]` : le rejeu de D-23 peut prévenir des dossiers d'une publication ancienne qui ne l'avaient jamais été.

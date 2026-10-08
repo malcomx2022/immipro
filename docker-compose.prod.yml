@@ -134,8 +134,10 @@ services:
       NODE_OPTIONS: --max-old-space-size=512
     # Le temps de finir le travail en cours avant le SIGKILL : une purge ou
     # un remboursement interrompu au milieu se reprend, mais autant ne pas
-    # l'interrompre à chaque déploiement.
-    stop_grace_period: 30s
+    # l'interrompre à chaque déploiement. Le worker s'accorde trente secondes
+    # pour finir (`src/server/jobs/arret.ts`, revue M9) : le délai du compose
+    # doit les dépasser, sans quoi le SIGKILL coupe l'arrêt propre lui-même.
+    stop_grace_period: 45s
     # Le battement (`src/server/jobs/battement.ts`) : toutes les 30 s, le
     # worker interroge la base puis réécrit ce fichier. Plus vieux que 90 s,
     # le worker est figé ou ne joint plus la base.

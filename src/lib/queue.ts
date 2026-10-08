@@ -70,6 +70,16 @@ export const JOBS = {
    * qu'un opérateur la voie dans B-04.
    */
   RELANCE_REMBOURSEMENT: "paiement.relance",
+
+  /**
+   * Reprise des divergences restées à propager — revue du 07/10/2026, M8.
+   *
+   * La propagation n'avait qu'une occasion : le job posté à la
+   * publication. Une mise en file perdue perdait la divergence pour
+   * toujours. La publication écrit désormais sa dette en base
+   * (`VisaRule.divergenceDueAt`), et cette passe horaire la reprend.
+   */
+  REPRISE_DIVERGENCE: "regle.reprise-divergence",
 } as const;
 
 /**

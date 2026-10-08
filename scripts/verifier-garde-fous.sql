@@ -317,6 +317,21 @@ SELECT passe(
   $q$UPDATE "VisaRule" SET status = 'PUBLISHED', "publishedAt" = now(), "effectiveFrom" = now()
      WHERE id = 'vr14'$q$);
 
+-- Une divergence à propager n'existe que sur une version mise en vigueur
+-- (07/10/2026, revue M8) : un brouillon n'a remplacé aucune version.
+SELECT refuse(
+  'WF-11 · une divergence à propager sur une version jamais mise en vigueur',
+  $q$INSERT INTO "VisaRule" (id, "countryCode", "visaType", category, version, "effectiveFrom",
+       rules, "sourceUrl", "sourceTier", "verifiedAt", "verifiedBy", "nextReviewAt", status,
+       "updatedAt", "divergenceDueAt")
+     VALUES ('vr15','NL','etudes','ETUDES',103,'2026-01-01','{}','https://x','OFFICIEL',
+       '2026-01-01','veilleur','2026-04-01','DRAFT', now(), now())$q$);
+
+SELECT passe(
+  'WF-11 · la divergence d''une version en vigueur s''écrit, puis s''efface une fois propagée',
+  $q$UPDATE "VisaRule" SET "divergenceDueAt" = now() WHERE id = 'vr14';
+     UPDATE "VisaRule" SET "divergenceDueAt" = NULL WHERE id = 'vr14'$q$);
+
 SELECT refuse(
   'WF-11 · une divergence tranchée avant que le candidat en soit prévenu',
   $q$INSERT INTO "RuleMigration" (id, "applicationId", "fromRuleId", "toRuleId", impact, diff,

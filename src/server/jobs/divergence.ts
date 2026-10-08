@@ -316,6 +316,102 @@ export async function propagerLaPublication(
     }
   }
 
+  /*
+    La passe est complète : la dette posée à la publication s'efface (revue
+    du 07/10/2026, M8). Incomplète, elle reste, et la file ou la reprise
+    horaire repasse. `updateMany` : une colonne déjà nulle n'est pas une
+    erreur, et la version n'a pas à être relue.
+  */
+  const complet: Bilan = { ...bilan, incidents };
+  if (!doitRejouer(complet)) {
+    await db.visaRule.updateMany({
+      where: { id: nouvelle.id, divergenceDueAt: { not: null } },
+      data: { divergenceDueAt: null },
+    });
+  }
+  return complet;
+}
+
+/**
+ * Une seule passe à la fois pour une même version — revue M8.
+ *
+ * Deux chemins mènent désormais à la propagation : le job posté à la
+ * publication, qui se rejoue avec un délai croissant, et la reprise
+ * horaire. Deux passes simultanées liraient le même `alertedAt` nul et
+ * enverraient deux fois l'alerte critique. Le verrou est celui de la
+ * réconciliation : consultatif, pris dans une transaction, relâché avec
+ * elle. `null` : une autre passe tient la version, et c'est elle qui
+ * conclut.
+ */
+const DUREE_MAXIMALE_D_UNE_PROPAGATION_MS = 10 * 60_000;
+
+export async function propagerSansRecouvrement(
+  nouvelleId: string,
+  maintenant: Date = new Date(),
+): Promise<Bilan | null> {
+  return db.$transaction(
+    async (tx) => {
+      const verrou = await tx.$queryRaw<{ pris: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtextextended(${`divergence:${nouvelleId}`}, 0)) AS pris`;
+      if (!verrou[0]?.pris) return null;
+      return propagerLaPublication(nouvelleId, maintenant);
+    },
+    { timeout: DUREE_MAXIMALE_D_UNE_PROPAGATION_MS, maxWait: 5_000 },
+  );
+}
+
+/**
+ * Le délai laissé au job posté à la publication avant que la reprise ne
+ * s'en mêle : il part dans la seconde, et quinze minutes couvrent ses
+ * premières reprises.
+ */
+export const DELAI_AVANT_REPRISE_MS = 15 * 60_000;
+
+export interface BilanDeReprise {
+  /** Versions dont la propagation était échue. */
+  versions: number;
+  /** Propagations conclues : la dette est effacée. */
+  completes: number;
+  /** Une autre passe tenait la version. */
+  occupees: number;
+  /** Encore incomplètes : elles repasseront. */
+  aReprendre: number;
+  incidents: readonly string[];
+}
+
+/**
+ * Reprise des divergences restées à propager — revue du 07/10/2026, M8.
+ *
+ * La publication écrit `divergenceDueAt` dans sa transaction ; la passe
+ * l'efface quand elle a prévenu tous les dossiers. Une colonne encore
+ * posée quinze minutes plus tard veut dire que la mise en file a échoué,
+ * que la file a épuisé ses reprises, ou — une fois, au déploiement de
+ * cette correction (D-23) — qu'une divergence a été perdue avant elle.
+ */
+export async function reprendreLesDivergences(
+  maintenant: Date = new Date(),
+): Promise<BilanDeReprise> {
+  const echues = await db.visaRule.findMany({
+    where: { divergenceDueAt: { lte: new Date(maintenant.getTime() - DELAI_AVANT_REPRISE_MS) } },
+    select: { id: true },
+    orderBy: { divergenceDueAt: "asc" },
+  });
+  const bilan = { versions: echues.length, completes: 0, occupees: 0, aReprendre: 0 };
+  const incidents: string[] = [];
+  for (const { id } of echues) {
+    try {
+      const passe = await propagerSansRecouvrement(id, maintenant);
+      if (passe === null) bilan.occupees += 1;
+      else if (doitRejouer(passe)) {
+        bilan.aReprendre += 1;
+        incidents.push(`${id} : ${passe.aReprendre} dossier(s) non alerté(s)`);
+      } else bilan.completes += 1;
+    } catch (erreur) {
+      // Une version qui échoue n'emporte pas les autres.
+      bilan.aReprendre += 1;
+      incidents.push(`${id} : ${cause(erreur)}`);
+    }
+  }
   return { ...bilan, incidents };
 }
 
