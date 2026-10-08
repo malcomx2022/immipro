@@ -15,31 +15,22 @@
  * de quelqu'un en se trompant volontairement — d'où un blocage court, qui
  * gêne l'attaque sans enfermer la personne dehors.
  *
- * ── Question ouverte : le décompte annoncé dit si l'adresse existe ───
+ * ── Le décompte ne dit pas si l'adresse existe (D-3, 08/10/2026) ─────
  *
- * La première règle ci-dessus — « le serveur doit rendre le même message
- * dans les deux cas » — n'est pas tenue par le décompte. Mesuré au
- * **premier** essai, une adresse inconnue rend « il te reste 5 essais » et
- * une adresse connue « il te reste 4 » : le compteur de l'une est
- * incrémenté avant que la phrase soit composée, l'autre n'en a pas. Un seul
- * essai suffit donc à savoir si une adresse a un compte ici — ce que tout
- * cet écran existe pour taire.
+ * La première règle ci-dessus n'était pas tenue par le décompte : au
+ * **premier** essai, une adresse inconnue rendait « il te reste 5 essais »
+ * et une adresse connue « il te reste 4 », faute de compteur pour la
+ * première. Un seul essai disait donc si une adresse avait un compte ici
+ * (revue du 07/10/2026, M2).
  *
- * Le temps de réponse, lui, a été aligné (24/09/2026) : l'empreinte est
+ * Le produit a tranché pour garder le décompte vivant — « une personne qui
+ * se trompe de mot de passe a besoin de le savoir avant d'être dehors » —
+ * et pour compter les échecs des adresses **sans compte**, sous une
+ * empreinte salée, en mémoire (`server/acces/echecs-sans-compte.ts`). Les
+ * mêmes fonctions décident pour les deux : même phrase, même blocage.
+ *
+ * Le temps de réponse, lui, a été aligné le 24/09/2026 : l'empreinte est
  * calculée avant toute branche, blocage compris.
- *
- * Deux biens s'y opposent, et ce n'est pas au code de choisir :
- *
- * - **garder le décompte vivant** est la raison écrite plus bas, « une
- *   personne qui se trompe de mot de passe a besoin de le savoir avant
- *   d'être dehors » ;
- * - **le rendre identique** demande soit de ne plus annoncer qu'une règle
- *   fixe — « après cinq essais, le compte se bloque quinze minutes » —,
- *   soit de compter les échecs d'adresses **sans compte**, c'est-à-dire de
- *   stocker l'adresse de qui n'est pas client, ce qui a son propre prix.
- *
- * Et même alors, le message du blocage ne se produit que pour un compte
- * réel : la parité complète suppose la seconde branche.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */

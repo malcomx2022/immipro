@@ -134,7 +134,9 @@ const { recalculerCompletude, ouvrirDossier, checklistDepuis } = await import(
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
 type Ouvreur = Parameters<typeof ouvrirLeTunnel>[3];
 const { REGLES_DE_REFERENCE } = await import("../prisma/seed/visa-rules.data");
-const { connecter } = await import("../src/server/acces/comptes");
+const { connecter, emettreUnCode, consommerUnCode, ESSAIS_PAR_CODE } = await import(
+  "../src/server/acces/comptes"
+);
 const { empreinte } = await import("../src/server/securite/secret");
 const { enregistrerLeProfil } = await import("../src/server/acces/profil");
 const { corpsDuProfil, CHAMPS_PROFIL } = await import("../src/domain/comptes/profil");
@@ -1019,20 +1021,108 @@ try {
       bloquee > inconnue / 10,
       `un compte bloqué ne se reconnaît pas au chronomètre (${bloquee.toFixed(0)} ms)`,
     );
+  }
 
+  console.log("\nLe premier refus ne dit pas si l'adresse a un compte (M2, D-3)");
+  {
     /*
-      Le **message**, lui, distingue encore les deux, et ce lot ne le
-      corrige pas : mesuré au premier essai, une adresse inconnue rend
-      « il te reste 5 essais » et une adresse connue « il te reste 4 ».
-      Un seul essai suffit donc à savoir si une adresse a un compte.
-
-      La raison du décompte est écrite dans le domaine — « une personne qui
-      se trompe de mot de passe a besoin de le savoir avant d'être dehors,
-      pas après » — et la parité textuelle demanderait de compter les
-      échecs d'adresses qui n'ont pas de compte. Deux biens s'y opposent, et
-      trancher appartient au produit : la question est posée dans
-      `domain/comptes/connexion`, à côté de la règle qu'elle met en tension.
+      Mesuré avant correction, au premier essai : « Il te reste 5 essais »
+      pour une adresse inconnue, « 4 » pour une adresse connue. Un seul
+      appel disait donc qui est client ici. Le produit a gardé le décompte
+      et fait compter les adresses sans compte (option B) : même phrase,
+      même blocage au cinquième échec.
     */
+    const rang = `${process.pid}`;
+    await db.user.create({
+      data: {
+        email: `parite-connu-${rang}@exemple.test`,
+        role: "CANDIDAT",
+        passwordHash: await empreinte("motdepassejuste"),
+      },
+    });
+    const connue = `parite-connu-${rang}@exemple.test`;
+    const inconnue = `parite-inconnu-${rang}@exemple.test`;
+    for (let essai = 1; essai <= ESSAIS_AVANT_BLOCAGE; essai += 1) {
+      const a = await connecter(connue, "mauvaismotdepasse");
+      const b = await connecter(inconnue, "mauvaismotdepasse");
+      const aMsg = a.ouverte ? "" : a.message;
+      const bMsg = b.ouverte ? "" : b.message;
+      verifier(aMsg === bMsg, `essai ${essai} : même phrase (« ${aMsg} » / « ${bMsg} »)`);
+    }
+    const sixiemeConnue = await connecter(connue, "mauvaismotdepasse");
+    const sixiemeInconnue = await connecter(inconnue, "mauvaismotdepasse");
+    verifier(
+      !sixiemeConnue.ouverte && sixiemeConnue.verdict.bloque &&
+        !sixiemeInconnue.ouverte && sixiemeInconnue.verdict.bloque,
+      "les deux adresses sont bloquées après cinq échecs",
+    );
+    // La casse ne remet pas le compteur à zéro.
+    const enMajuscules = await connecter(inconnue.toUpperCase(), "mauvaismotdepasse");
+    verifier(
+      !enMajuscules.ouverte && enMajuscules.verdict.bloque,
+      "l'adresse saisie en majuscules reste bloquée",
+    );
+  }
+
+  console.log("\nLes compteurs d'essais tiennent sous des appels simultanés (M3)");
+  {
+    /*
+      Constaté avant correction : `consommerUnCode` comparait `attempts` lu
+      puis incrémentait à part, et `connecter` écrivait `failedLogins + 1`
+      sur une valeur lue avant scrypt. Des appels simultanés lisaient tous
+      zéro : la borne de cinq essais ne bornait rien.
+    */
+    const rang = `${process.pid}`;
+    const titulaire = await db.user.create({
+      data: { email: `codes-${rang}@exemple.test`, role: "CANDIDAT" },
+    });
+    const juste = await emettreUnCode(titulaire.id, "VERIFICATION_EMAIL");
+    const faux = juste === "000000" ? "111111" : "000000";
+    const reponses = await Promise.all(
+      Array.from({ length: 20 }, () => consommerUnCode(titulaire.id, "VERIFICATION_EMAIL", faux)),
+    );
+    const secret = await db.authSecret.findFirstOrThrow({
+      where: { userId: titulaire.id, kind: "VERIFICATION_EMAIL" },
+      orderBy: { createdAt: "desc" },
+    });
+    verifier(reponses.every((r) => r === false), "vingt codes faux sont refusés");
+    verifier(
+      secret.attempts === ESSAIS_PAR_CODE,
+      `vingt essais simultanés en comptent exactement ${ESSAIS_PAR_CODE} (${secret.attempts})`,
+    );
+    verifier(
+      !(await consommerUnCode(titulaire.id, "VERIFICATION_EMAIL", juste)),
+      "le bon code, ensuite, est refusé : ses essais sont épuisés",
+    );
+
+    const second = await emettreUnCode(titulaire.id, "VERIFICATION_EMAIL");
+    const doubles = await Promise.all([
+      consommerUnCode(titulaire.id, "VERIFICATION_EMAIL", second),
+      consommerUnCode(titulaire.id, "VERIFICATION_EMAIL", second),
+    ]);
+    verifier(
+      doubles.filter(Boolean).length === 1,
+      `deux codes justes envoyés ensemble ne réussissent qu'une fois (${doubles.join(", ")})`,
+    );
+
+    const cible = await db.user.create({
+      data: {
+        email: `rafale-${rang}@exemple.test`,
+        role: "CANDIDAT",
+        passwordHash: await empreinte("motdepassejuste"),
+      },
+    });
+    await Promise.all(
+      Array.from({ length: 8 }, () => connecter(cible.email, "mauvaismotdepasse")),
+    );
+    const apres = await db.user.findUniqueOrThrow({ where: { id: cible.id } });
+    verifier(
+      apres.failedLogins >= ESSAIS_AVANT_BLOCAGE,
+      `huit connexions fausses simultanées comptent huit échecs (${apres.failedLogins})`,
+    );
+    verifier(apres.lockedUntil !== null, "et le compte est bloqué");
+    const justeApres = await connecter(cible.email, "motdepassejuste");
+    verifier(!justeApres.ouverte, "le bon mot de passe n'ouvre pas un compte bloqué");
   }
 
   // ── C-02 : l'enregistrement du profil n'efface plus ce qu'on ne lui
@@ -1049,6 +1139,42 @@ try {
     relisant la ligne après coup — et parce que l'écriture était derrière
     `next/headers`, donc hors de portée de tout essai.
   */
+  console.log("\n« Rester connecté » décide de la durée de la session (N1, D-22)");
+  {
+    /*
+      La case n'était jamais envoyée : toute session durait trente jours,
+      y compris sur le poste partagé où l'écran disait de la laisser
+      décochée.
+    */
+    const { ouvrirSession, attributsCookie, DUREE_JOURS, DUREE_NON_MEMORISEE_HEURES } =
+      await import("../src/server/securite/session");
+    const titulaire = await db.user.create({
+      data: { email: `session-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const avant = Date.now();
+    const courte = await ouvrirSession(titulaire.id, null, false);
+    const longue = await ouvrirSession(titulaire.id, null, true);
+    const heures = (d: Date) => (d.getTime() - avant) / 3_600_000;
+    const enBase = await db.session.findMany({ where: { userId: titulaire.id } });
+    verifier(enBase.length === 2, "les deux sessions sont en base");
+    verifier(
+      Math.abs(heures(courte.expireLe) - DUREE_NON_MEMORISEE_HEURES) < 0.1,
+      `non mémorisée : ${DUREE_NON_MEMORISEE_HEURES} h en base (${heures(courte.expireLe).toFixed(2)} h)`,
+    );
+    verifier(
+      !("expires" in attributsCookie(courte.cookieExpireLe)),
+      "non mémorisée : le cookie n'a pas d'échéance, le navigateur l'oublie à sa fermeture",
+    );
+    verifier(
+      Math.abs(heures(longue.expireLe) - DUREE_JOURS * 24) < 0.1,
+      `mémorisée : ${DUREE_JOURS} jours, en base comme dans le cookie`,
+    );
+    verifier(
+      attributsCookie(longue.cookieExpireLe).expires?.getTime() === longue.expireLe.getTime(),
+      "mémorisée : le cookie expire avec la session",
+    );
+  }
+
   console.log("\nC-02 — enregistrer son profil n'efface pas ce qu'on n'a pas envoyé");
   {
     const compte = await db.user.create({

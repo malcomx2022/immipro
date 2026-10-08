@@ -152,6 +152,41 @@ describe("A-02 — Connexion", () => {
     expect(screen.getByText(/cybercafé qui n'est pas le tien/)).toBeDefined();
   });
 
+  /*
+    La case n'était jamais envoyée : l'écran tenait son état, le corps ne
+    portait que l'adresse et le mot de passe, et toute session durait
+    trente jours (revue du 07/10/2026, N1).
+  */
+  it("envoie « Rester connecté » au serveur, décochée comme cochée", async () => {
+    for (const cocher of [false, true]) {
+      const corps: unknown[] = [];
+      global.fetch = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+        corps.push(JSON.parse(options?.body as string));
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ compte: { emailVerifie: true } }),
+        } as Response);
+      });
+      const { unmount } = render(<Connexion />);
+      fireEvent.change(screen.getByLabelText("Adresse email"), {
+        target: { value: "aline.dossou@email.com" },
+      });
+      fireEvent.change(screen.getByLabelText("Mot de passe"), {
+        target: { value: "un mot de passe assez long" },
+      });
+      if (cocher) fireEvent.click(screen.getByRole("checkbox", { name: /Rester connecté/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+      await waitFor(() => expect(corps).toHaveLength(1));
+      expect(corps[0]).toEqual({
+        email: "aline.dossou@email.com",
+        motDePasse: "un mot de passe assez long",
+        resterConnecte: cocher,
+      });
+      unmount();
+    }
+  });
+
   it("n'annonce aucune note chiffrée de dossier (arbitrage C-09)", () => {
     const { container } = render(<Connexion />);
     const texte = container.textContent ?? "";
