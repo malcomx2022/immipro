@@ -722,6 +722,21 @@ SELECT passe(
        'TENU', now() + interval '8 days', now() + interval '10 minutes'
        FROM "Application" a, "Consultant" c LIMIT 1$q$);
 
+-- Ce que le pack vendait, figé à la vente (08/10/2026, revue M5, D-12) :
+-- le nombre d'analyses ne va pas sans le nombre de destinations, et un
+-- pack vend au moins une analyse pour au moins une destination.
+SELECT refuse(
+  'RG-15.2 · des analyses vendues sans leurs destinations',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", "packAnalyses", amount,
+       currency, provider, status)
+     VALUES ('tm5a','IMP-261008-MCNQAA','u1','dossier',30,15000,'XOF','FEDAPAY','INITIEE')$q$);
+
+SELECT refuse(
+  'RG-15.2 · un pack vendu pour zéro analyse',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", "packAnalyses",
+       "packDestinations", amount, currency, provider, status)
+     VALUES ('tm5b','IMP-261008-MCNQAB','u1','dossier',0,1,15000,'XOF','FEDAPAY','INITIEE')$q$);
+
 -- ── Le remboursement sortant — arbitrage du 22/09/2026 ─────────────────
 
 -- Une transaction confirmée dont le remboursement est décidé, et le

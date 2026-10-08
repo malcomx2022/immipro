@@ -572,6 +572,237 @@ try {
     verifier(!orpheline, "et une somme sans obligation");
   }
 
+  console.log("\nLa base du prorata est celle de la vente (M5, D-12)");
+  {
+    /*
+      Le dénominateur se lisait sur la grille du jour. Reproduit avant
+      correction : un Dossier vendu pour 30 analyses, 25 consommées, et la
+      grille passée à 20 en cours de processus — le prorata lisait 20 − 25
+      et concluait « rien à rendre », alors que 5 analyses payées restaient.
+    */
+    const { getPack } = await import("../src/domain/payments/pricing");
+    const grille = getPack("dossier")!;
+    const venduPour = grille.analyses;
+    rang += 1;
+    const user = await db.user.create({
+      data: { email: `fumee-r-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const regle = await db.visaRule.findFirstOrThrow({ select: { id: true } });
+    const application = await db.application.create({
+      data: { userId: user.id, visaRuleId: regle.id, status: "ACTIF" },
+    });
+    const transaction = await db.transaction.create({
+      data: {
+        reference: `IMP-261008-${String(rang).padStart(6, "0")}`,
+        userId: user.id,
+        applicationId: application.id,
+        packCode: "dossier",
+        packAnalyses: venduPour,
+        packDestinations: 1,
+        amount: 15000,
+        currency: "XOF",
+        provider: "FEDAPAY",
+        status: "CONFIRMEE",
+        confirmedAt: new Date(),
+        providerTxId: `fedapay:${rang}${process.pid}`,
+      },
+    });
+    await ouvrirDuQuota({
+      applicationId: application.id,
+      analyses: venduPour,
+      motif: "ACHAT_PACK",
+      transactionId: transaction.id,
+      note: "Pack Dossier",
+    });
+    for (let n = 0; n < 25; n += 1) await debiterUneAnalyse(application.id);
+    grille.analyses = 20;
+    try {
+      const ouverture = await ouvrirUnRemboursement(transaction.id, "Geste de support — grille révisée");
+      const lue = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+      verifier(
+        ouverture.ouvert && lue.refundAmount === 2500,
+        `15 000 × 5 ÷ 30 = 2 500 F, et non « rien à rendre » (${ouverture.ouvert ? lue.refundAmount : ouverture.raison})`,
+      );
+    } finally {
+      grille.analyses = venduPour;
+    }
+  }
+
+  console.log("\nUne revue manuelle se tranche : somme, zéro, Pro sur trois dossiers (M4, D-11)");
+  {
+    /*
+      Avant correction, une revue manuelle n'avait pas d'issue : la somme
+      ne s'écrivait nulle part, la déclaration FedaPay refusait une dette
+      jamais initiée (« non_initiee »), et la notification aurait produit un
+      avoir du prix entier.
+    */
+    const module = (await import("../src/server/acces/paiements")) as Record<string, unknown>;
+    const trancher = module.trancherLaRevueManuelle as
+      | ((
+          reference: string,
+          saisie: string,
+          motif: string,
+          acteurId: string,
+          maintenant?: Date,
+          rembourseur?: unknown,
+        ) => Promise<{ issue: string; envoi?: string }>)
+      | undefined;
+    verifier(typeof trancher === "function", "une action tranche la revue manuelle");
+    const admin = await db.user.create({
+      data: { email: `fumee-tranche-${process.pid}@exemple.test`, role: "ADMIN" },
+    });
+    const code = async (geste: () => Promise<unknown>): Promise<string> => {
+      try {
+        await geste();
+        return "aucun";
+      } catch (erreur) {
+        return erreur instanceof EchecHttp ? erreur.echec.code : `inattendu: ${String(erreur)}`;
+      }
+    };
+
+    // a. Une somme : 4 000 F sur 15 000, dossier déclaré déposé.
+    const a = await candidatPaye({ analyses: 30, consommees: 1, depose: true, fedapay: true });
+    await db.transaction.update({ where: { id: a.transaction.id }, data: { amount: 15000 } });
+    const revue = await initierLeRemboursement(a.transaction.reference, remboursementFedaPay());
+    verifier(revue.issue === "revue_manuelle", `la dette part en revue (${revue.issue})`);
+    verifier(
+      (await code(() =>
+        declarerLeRemboursementManuel(a.transaction.reference, "9901", admin.id),
+      )) === "etat_incompatible",
+      "sans tranche, la déclaration reste refusée : rien n'a été initié",
+    );
+    if (trancher) {
+      verifier(
+        (await code(() => trancher(a.transaction.reference, "15001", "Décision de la direction du 08/10", admin.id))) ===
+          "champs_invalides",
+        "une somme supérieure au prix payé est refusée",
+      );
+      const tranche = await trancher(
+        a.transaction.reference,
+        "4 000",
+        "Décision de la direction du 08/10",
+        admin.id,
+        new Date(),
+        remboursementFedaPay(),
+      );
+      verifier(
+        tranche.issue === "decidee" && tranche.envoi === "procedure_manuelle",
+        `la tranche fait partir la demande (${tranche.issue}, ${tranche.envoi})`,
+      );
+      const decidee = await db.transaction.findUniqueOrThrow({ where: { id: a.transaction.id } });
+      verifier(decidee.refundAmount === 4000, `la somme décidée est figée (${decidee.refundAmount})`);
+      verifier(
+        decidee.refundDecidedBy === admin.id && decidee.refundDecidedAt !== null,
+        "la décision porte qui l'a prise et quand",
+      );
+      verifier(
+        decidee.discrepancyOutcome === "REMBOURSEMENT_A_INITIER" &&
+          (decidee.discrepancyNote ?? "").includes("Décision de la direction du 08/10"),
+        "l'écart se referme sur la décision, motif cité",
+      );
+      verifier((await solde(a.application.id)) === 0, "les 29 analyses restantes sont retirées");
+      verifier(
+        (await code(() => trancher(a.transaction.reference, "3000", "Seconde décision, refusée", admin.id))) ===
+          "etat_incompatible",
+        "une revue tranchée ne se retranche pas",
+      );
+      const declaration = await declarerLeRemboursementManuel(a.transaction.reference, "9901", admin.id);
+      verifier(declaration.issue === "declaree", `la déclaration passe ensuite (${declaration.issue})`);
+      await appliquerLaNotification({
+        providerEventId: `fedapay:evt_tranche_${process.pid}`,
+        providerTxId: a.transaction.providerTxId!,
+        reference: a.transaction.reference,
+        statut: "REMBOURSEE",
+      });
+      const avoir = await db.invoice.findFirst({
+        where: { transactionId: a.transaction.id, kind: "AVOIR" },
+      });
+      verifier(avoir?.amountIncl === 4000, `l'avoir porte 4 000 F, et non le prix entier (${avoir?.amountIncl})`);
+
+      // b. Zéro : l'obligation se referme, le candidat garde ses analyses.
+      const b = await candidatPaye({ analyses: 30, consommees: 1, depose: true });
+      await initierLeRemboursement(b.transaction.reference, rembourseurSimule([acceptee()]));
+      const zero = await trancher(b.transaction.reference, "0", "Rien à rendre, décision du 08/10", admin.id);
+      const refermee = await db.transaction.findUniqueOrThrow({ where: { id: b.transaction.id } });
+      verifier(zero.issue === "refermee", `zéro referme la demande (${zero.issue})`);
+      verifier(
+        refermee.refundDueAt === null && refermee.refundAmount === null && refermee.status === "CONFIRMEE",
+        "plus d'obligation, et rien n'est déclaré rendu (INV-7)",
+      );
+      verifier(
+        refermee.discrepancyOutcome === "EXPLIQUE_SANS_CORRECTION" &&
+          (refermee.discrepancyNote ?? "").includes("Geste de support"),
+        "l'écart garde ce que la dette était et pourquoi elle se referme",
+      );
+      verifier((await solde(b.application.id)) === 29, "le candidat garde ses 29 analyses");
+      const apresZero = await initierLeRemboursement(b.transaction.reference, rembourseurSimule([acceptee()]));
+      verifier(apresZero.issue === "sans_objet", `plus rien ne part (${apresZero.issue})`);
+
+      // c. Un Pro sur trois dossiers : les analyses restantes partent des trois.
+      rang += 1;
+      const user = await db.user.create({
+        data: { email: `fumee-r-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+      });
+      const regle = await db.visaRule.findFirstOrThrow({ select: { id: true } });
+      const dossiers = await Promise.all(
+        [0, 1, 2].map(() =>
+          db.application.create({ data: { userId: user.id, visaRuleId: regle.id, status: "ACTIF" } }),
+        ),
+      );
+      const pro = await db.transaction.create({
+        data: {
+          reference: `IMP-261008-${String(rang).padStart(6, "0")}`,
+          userId: user.id,
+          applicationId: dossiers[0]!.id,
+          packCode: "pro",
+          packAnalyses: 90,
+          packDestinations: 3,
+          amount: 59,
+          currency: "EUR",
+          provider: "STRIPE",
+          status: "CONFIRMEE",
+          confirmedAt: new Date(),
+          providerTxId: `stripe:cs_pro_${rang}_${process.pid}`,
+        },
+      });
+      for (const d of dossiers) {
+        await ouvrirDuQuota({
+          applicationId: d.id,
+          analyses: 30,
+          motif: "ACHAT_PACK",
+          transactionId: pro.id,
+          note: "Pack Dossier Pro",
+        });
+      }
+      await debiterUneAnalyse(dossiers[1]!.id);
+      await ouvrirUnRemboursement(pro.id, "Geste de support — Pro sur trois dossiers");
+      const enRevue = await initierLeRemboursement(pro.reference, rembourseurSimule([acceptee()]));
+      verifier(enRevue.issue === "revue_manuelle", `un Pro servi trois fois part en revue (${enRevue.issue})`);
+      const rembourseur = rembourseurSimule([acceptee()]);
+      const proTranche = await trancher(
+        pro.reference,
+        "40,00",
+        "Décision de la direction : 40 € sur 59",
+        admin.id,
+        new Date(),
+        rembourseur,
+      );
+      verifier(
+        proTranche.issue === "decidee" && proTranche.envoi === "acceptee",
+        `la demande part chez Stripe (${proTranche.issue}, ${proTranche.envoi})`,
+      );
+      const soldes = await Promise.all(dossiers.map((d) => solde(d.id)));
+      verifier(
+        soldes.every((n) => n === 0),
+        `les analyses restantes partent des trois dossiers (${soldes.join(", ")})`,
+      );
+      verifier(
+        (await db.analysisCredit.count({ where: { transactionId: pro.id, reason: "REMBOURSEMENT" } })) === 3,
+        "un retrait par dossier servi",
+      );
+    }
+  }
+
   // ── 8. La passe reprend ce que le premier envoi n'a pas emporté ─────
   console.log("\nLa passe reprend une dette restée décidée");
   {

@@ -22,6 +22,7 @@ import {
   suiteDeLaTentative,
   suiteDuQuota,
   type IssueDeDemande,
+  lireLeMontantTranche,
 } from "@/domain/paiement/remboursement";
 import { leRembourseur } from "@/server/paiement/remboursement";
 import type { Rembourseur } from "@/server/paiement/rembourseur";
@@ -42,7 +43,12 @@ import {
   ecartDeConfirmationTardive,
   effetDeLaNotification,
 } from "@/server/paiement/cycle";
-import { lignesDuGrandLivre, ouvrirDuQuota, sousVerrouDuGrandLivre } from "./quota";
+import {
+  lignesDuGrandLivre,
+  ouvrirDuQuota,
+  sousVerrouDesGrandsLivres,
+  sousVerrouDuGrandLivre,
+} from "./quota";
 import { confirmerLaConsultation, libererLaTenue } from "./consultations";
 import { suiteDictable } from "@/server/securite/secret";
 import { fournisseurDe } from "@/domain/payments/rail";
@@ -163,6 +169,16 @@ export function montantDe(achat: Achat, devise: Devise): { montant: number; libe
 }
 
 /**
+ * Ce que le pack vend, figé sur la transaction — RG-15.2, revue du
+ * 07/10/2026, M5 (décision D-12). Le prorata et la part par destination
+ * se lisent ensuite sur la vente, jamais sur la grille du jour.
+ */
+const analysesVendues = (achat: Achat) => {
+  const pack = achat.type === "pack" ? getPack(achat.code) : undefined;
+  return pack ? { packAnalyses: pack.analyses, packDestinations: pack.destinations } : {};
+};
+
+/**
  * Création, ou reprise de la transaction en cours.
  *
  * La devise ne change plus une fois la transaction créée (WF-05, cas
@@ -217,6 +233,7 @@ export async function creerOuReprendre(
       // La conversion est celle du domaine, exhaustive, et son inverse
       // (`achatDepuisLeCode`) vit à côté d'elle.
       packCode: codeEnregistre(achat),
+      ...analysesVendues(achat),
       amount: montant,
       currency: devise,
       // N.A — le rail suit la devise, et la règle vit dans le domaine :
@@ -945,7 +962,13 @@ export async function initierLeRemboursement(
     select: { id: true },
   });
 
-  if (transaction.applicationId && !dejaRetire) {
+  /*
+    Une revue tranchée (M4, D-11) ne se réévalue pas : la somme est celle
+    que la direction a fixée, et c'est elle qui part.
+  */
+  const tranchee = transaction.refundDecidedAt !== null;
+
+  if (transaction.applicationId && !dejaRetire && !tranchee) {
     const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction);
     if (suite.suite === "REVUE_MANUELLE") {
       // Hors de la règle du prorata (RG-15.2) — dossier déposé ou clos,
@@ -1005,7 +1028,7 @@ export async function initierLeRemboursement(
     migration ferme le reste — celui qui viendrait d'un appelant qu'on
     n'a pas écrit.
   */
-  if (transaction.applicationId && !dejaRetire) {
+  if (transaction.applicationId && !dejaRetire && !tranchee) {
     const applicationId = transaction.applicationId;
     /*
       Réévalué **sous le verrou du grand livre** (S.92), et le retrait
@@ -1303,7 +1326,10 @@ type SuiteDuRetrait =
    */
   | { suite: "REVUE_MANUELLE"; motif: string; consommees?: number; rienARendre?: boolean };
 
-type TransactionARembourser = Pick<Transaction, "id" | "packCode" | "amount" | "currency">;
+type TransactionARembourser = Pick<
+  Transaction,
+  "id" | "packCode" | "packAnalyses" | "amount" | "currency"
+>;
 
 /** Le pack de la grille qu'un code d'achat désigne, s'il en est un. */
 const packDeLAchat = (packCode: string) => {
@@ -1380,8 +1406,14 @@ async function suiteDuQuotaDuPack(
     Lue sur chaque dossier que le pack a servi — un Pro peut en servir
     trois —, et sous le verrou du grand livre quand l'appelant le tient.
   */
-  const pack = packDeLAchat(packCode);
-  if (pack) {
+  /*
+    Le dénominateur est celui de la vente (M5, D-12) : une grille révisée
+    ne change pas ce qui a été vendu, et un pack retiré de la grille garde
+    la règle du prorata. La grille ne sert de repli qu'aux ventes
+    antérieures à la colonne, que la migration a reprises.
+  */
+  const analysesDuPack = transaction.packAnalyses ?? packDeLAchat(packCode)?.analyses;
+  if (analysesDuPack !== undefined) {
     const [servis, dossier] = await Promise.all([
       client.analysisCredit.findMany({
         where: { transactionId, delta: { gt: 0 } },
@@ -1406,7 +1438,7 @@ async function suiteDuQuotaDuPack(
 
     const verdict = montantDuRemboursement({
       prixMineur,
-      analysesDuPack: pack.analyses,
+      analysesDuPack,
       consommees,
       dossierDepose: dossier?.submittedAt != null,
       dossierClos: dossier ? ETATS_CLOS.has(dossier.status) : false,
@@ -1501,6 +1533,173 @@ export async function resoudreLEcart(
 }
 
 /**
+ * Trancher la revue manuelle d'un remboursement — RG-15.2, revue du
+ * 07/10/2026, M4 (décision D-11 du 08/10/2026).
+ *
+ * Hors de la règle du prorata — dossier déclaré déposé ou clos, pack
+ * servi sur plusieurs dossiers, recharge ou montée entamée —, l'initiation
+ * ouvre un écart et n'envoie rien : la somme se fixe avec la direction.
+ * Rien ne permettait de l'écrire. `refundAmount` restait nul, aucun droit
+ * n'était retiré, et la déclaration d'un remboursement FedaPay refusait
+ * une dette jamais initiée : la revue n'avait pas d'issue.
+ *
+ * ── Deux issues ──────────────────────────────────────────────────────
+ *
+ * **Une somme** : elle est figée sur la transaction avec qui l'a décidée et
+ * quand, les analyses restantes du pack partent de **chaque** dossier qu'il
+ * a servi (D-11), et la demande part par `initierLeRemboursement`, qui lit
+ * la décision au lieu de réévaluer le pack.
+ *
+ * **Zéro** (D-11) : rien n'est à rendre. L'obligation se referme sans
+ * versement ni avoir, et le candidat garde ses analyses. Ce n'est pas un
+ * remboursement déclaré fait — `status` et `refundedAt` ne bougent pas,
+ * INV-7 tient — : c'est une dette qui n'existe plus. L'écart garde la
+ * trace de ce qu'elle était et de qui l'a refermée, et le journal la
+ * décision.
+ *
+ * Dans les deux cas l'écart se referme, avec une note qui cite la décision.
+ * Tout se tient sous le verrou des grands livres de chaque dossier servi,
+ * et la revue est réévaluée dessous : une dette que le prorata couvre de
+ * nouveau ne se tranche pas à la main.
+ */
+export type IssueDeLaTranche =
+  | { issue: "refermee" }
+  | { issue: "decidee"; envoi: IssueDInitiation };
+
+const REFUS_DE_LA_TRANCHE = {
+  sans_revue:
+    "Ce paiement n'a pas de remboursement en attente de décision : la somme est déjà fixée, déjà demandée ou déjà rendue. Recharge la page pour voir où il en est.",
+  deja_retiree:
+    "Les droits de ce remboursement sont déjà retirés : la somme est fixée. Relance l'envoi depuis la ligne du paiement au lieu de la trancher.",
+  hors_revue:
+    "Ce remboursement relève de nouveau de la règle du prorata : la somme se calcule d'elle-même. Relance l'envoi depuis la ligne du paiement au lieu de la trancher.",
+  concurrence:
+    "Ce remboursement vient d'être tranché par un autre membre de l'équipe. Recharge la page pour voir sa décision.",
+} as const;
+
+export async function trancherLaRevueManuelle(
+  reference: string,
+  saisie: string,
+  motif: string,
+  acteurId: string,
+  maintenant = new Date(),
+  rembourseur?: Rembourseur | null,
+): Promise<IssueDeLaTranche> {
+  const transaction = await db.transaction.findUnique({ where: { reference } });
+  if (!transaction) throw echec("paiement_introuvable");
+  const applicationId = transaction.applicationId;
+  if (
+    !applicationId ||
+    !transaction.refundDueAt ||
+    transaction.refundedAt ||
+    transaction.refundRequestedAt ||
+    transaction.refundDecidedAt
+  ) {
+    throw echec("etat_incompatible", { corps: REFUS_DE_LA_TRANCHE.sans_revue });
+  }
+
+  const payeMineur = versMineur(transaction.amount, transaction.currency);
+  const lu = lireLeMontantTranche(saisie, payeMineur, transaction.currency);
+  if ("refus" in lu) throw echec("champs_invalides", { champs: { montant: lu.refus } });
+  const montant = lu.montantMineur;
+
+  // Les dossiers que l'achat a servis : la décision retire ses analyses de
+  // chacun (D-11). Aucun ne s'ajoute pendant la tranche — une obligation
+  // ouverte suspend la couverture (`appliquerLaCouverture`).
+  const servis = await db.analysisCredit.findMany({
+    where: { transactionId: transaction.id, delta: { gt: 0 } },
+    select: { applicationId: true },
+    distinct: ["applicationId"],
+  });
+  const dossiers = [...new Set([applicationId, ...servis.map((d) => d.applicationId)])];
+
+  const ouverteLe = transaction.refundDueAt;
+  const note =
+    montant === 0
+      ? `Revue tranchée à 0 : rien n'est rendu, le candidat garde ses analyses. Obligation ouverte le ${ouverteLe.toISOString().slice(0, 10)} pour : ${transaction.refundBasis ?? "motif non renseigné"}. Décision : ${motif.trim()}`
+      : `Revue tranchée : ${formatMineur(montant, transaction.currency)} sur ${formatMineur(payeMineur, transaction.currency)} payés. Décision : ${motif.trim()}`;
+
+  const conclusion = await sousVerrouDesGrandsLivres(dossiers, async (tx) => {
+    const retrait = await tx.analysisCredit.findFirst({
+      where: { transactionId: transaction.id, reason: "REMBOURSEMENT" },
+      select: { id: true },
+    });
+    if (retrait) return "deja_retiree" as const;
+    const suite = await suiteDuQuotaDuPack(applicationId, transaction, tx);
+    if (suite.suite !== "REVUE_MANUELLE") return "hors_revue" as const;
+
+    const enAttente = {
+      id: transaction.id,
+      refundDueAt: { not: null },
+      refundRequestedAt: null,
+      refundedAt: null,
+      refundDecidedAt: null,
+    };
+    const resolution = {
+      discrepancy: transaction.discrepancy ?? suite.motif,
+      discrepancyOutcome:
+        montant === 0
+          ? ("EXPLIQUE_SANS_CORRECTION" as const)
+          : ("REMBOURSEMENT_A_INITIER" as const),
+      discrepancyNote: note,
+      discrepancyResolvedAt: maintenant,
+      discrepancyResolvedBy: acteurId,
+    };
+
+    if (montant === 0) {
+      const { count } = await tx.transaction.updateMany({
+        where: enAttente,
+        data: {
+          refundDueAt: null,
+          refundBasis: null,
+          refundAmount: null,
+          refundAttemptedAt: null,
+          ...resolution,
+        },
+      });
+      return count === 1 ? ("refermee" as const) : ("concurrence" as const);
+    }
+
+    const { count } = await tx.transaction.updateMany({
+      where: enAttente,
+      data: {
+        refundAmount: montant,
+        refundDecidedAt: maintenant,
+        refundDecidedBy: acteurId,
+        ...resolution,
+      },
+    });
+    if (count !== 1) return "concurrence" as const;
+
+    for (const id of dossiers) {
+      const octrois = repartir(await lignesDuGrandLivre(id, tx)).octrois.filter(
+        (o) => o.transactionId === transaction.id,
+      );
+      const restantes = octrois.reduce((n, o) => n + Math.max(0, o.restantes), 0);
+      if (restantes === 0) continue;
+      await tx.analysisCredit.create({
+        data: {
+          applicationId: id,
+          delta: -restantes,
+          reason: "REMBOURSEMENT",
+          transactionId: transaction.id,
+          grantId: octrois.find((o) => o.restantes > 0)?.id ?? null,
+          note: `Droits retirés à la tranche du remboursement de ${reference}.`,
+        },
+      });
+    }
+    return "decidee" as const;
+  });
+
+  if (conclusion === "refermee") return { issue: "refermee" };
+  if (conclusion !== "decidee") {
+    throw echec("etat_incompatible", { corps: REFUS_DE_LA_TRANCHE[conclusion] });
+  }
+  const envoi = await initierLeRemboursement(reference, rembourseur);
+  return { issue: "decidee", envoi: envoi.issue };
+}
+
+/**
  * Violation de contrainte d'unicité, reconnue sans importer le client
  * Prisma : `P2002` est le code, et c'est tout ce dont on a besoin ici.
  */
@@ -1587,8 +1786,9 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
       return;
 
     case "pack": {
-      const pack = getPack(achat.code);
-      if (!pack) return;
+      // Un pack retiré de la grille entre la vente et la confirmation reste
+      // dû : ce qui a été vendu est sur la transaction (M5, D-12).
+      if (!getPack(achat.code) && transaction.packAnalyses === null) return;
       /*
         Le dossier peut déjà être prêt : rien n'interdit d'acheter un
         second pack une fois la checklist complète, et c'est même le cas
@@ -1662,6 +1862,7 @@ export async function ouvrirUnRemboursement(
       refundDueAt: true,
       refundedAt: true,
       packCode: true,
+      packAnalyses: true,
       amount: true,
       currency: true,
       applicationId: true,

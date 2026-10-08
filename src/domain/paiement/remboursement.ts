@@ -18,7 +18,7 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-import { formatMineur, versMineur } from "@/domain/facturation/montants";
+import { facteurMineur, formatMineur, versMineur } from "@/domain/facturation/montants";
 
 export type EtapeRemboursement = "DECIDE" | "DEMANDE" | "VERSE";
 
@@ -690,3 +690,58 @@ export function suiteDeLaDette(dette: DetteARelancer, maintenant: Date): SuiteDe
  */
 export const MOTIF_RELANCES_EPUISEES = (tentatives: number): string =>
   `La demande de remboursement n'est pas passée après ${tentatives} envois. La somme reste due et la relance automatique s'arrête : à reprendre à la main auprès du fournisseur.`;
+
+/* ── La tranche d'une revue manuelle — revue du 07/10/2026, M4 ────────── */
+
+/**
+ * Le montant qu'une revue manuelle décide de rendre (décision D-11 du
+ * 08/10/2026).
+ *
+ * Une revue manuelle laissait `refundAmount` nul, et aucune voie du
+ * produit ne permettait d'y écrire la somme arrêtée avec la direction : la
+ * dette restait en B-04, sans montant, sans demande, sans droits retirés.
+ * La saisie se lit ici, une fois, pour l'écran comme pour la route.
+ *
+ * **Zéro est une réponse** (D-11) : rien n'est à rendre, la demande se
+ * referme et le candidat garde ses analyses. **Le prix payé est la borne** :
+ * on ne rend pas plus que ce qui a été encaissé.
+ */
+export type MontantTranche = { montantMineur: number } | { refus: string };
+
+export function lireLeMontantTranche(
+  saisie: string,
+  payeMineur: number,
+  devise: string,
+): MontantTranche {
+  const brut = saisie.replace(/[\s  ]/gu, "").replace(",", ".");
+  if (brut === "") {
+    return { refus: "Indique le montant à rembourser, ou 0 si rien n'est à rendre." };
+  }
+  const facteur = facteurMineur(devise);
+  const forme = facteur === 1 ? /^\d+$/u : /^\d+(\.\d{1,2})?$/u;
+  if (!forme.test(brut)) {
+    return {
+      refus:
+        facteur === 1 && /^\d+[.]\d+$/u.test(brut)
+          ? "Le franc CFA n'a pas de centimes : écris un montant entier, par exemple 4000."
+          : `Écris un montant en chiffres, par exemple ${facteur === 1 ? "4000" : "12,50"}.`,
+    };
+  }
+  const [entiers, decimales = ""] = brut.split(".");
+  const montantMineur =
+    facteur === 1 ? Number(entiers) : Number(entiers) * facteur + Number(decimales.padEnd(2, "0"));
+  if (montantMineur > payeMineur) {
+    return {
+      refus: `Le montant dépasse le prix payé (${formatMineur(payeMineur, devise)}) : on ne rend pas plus que ce qui a été encaissé.`,
+    };
+  }
+  return { montantMineur };
+}
+
+/** Ce que la tranche va faire, dit avant le clic. */
+export function suiteDeLaTranche(montantMineur: number, payeMineur: number, devise: string): string {
+  if (montantMineur === 0) {
+    return "Aucune somme ne part : la demande de remboursement se referme, et le candidat garde ses analyses restantes.";
+  }
+  return `La demande part chez le fournisseur pour ${formatMineur(montantMineur, devise)} sur ${formatMineur(payeMineur, devise)} payés, et les analyses restantes du pack sont retirées de chaque dossier qu'il sert.`;
+}

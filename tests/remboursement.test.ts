@@ -389,7 +389,10 @@ describe("S.92 — le remboursement du supplément se rejoue sans se contredire"
     expect(suiteDuRemboursementDeLaMontee({ octroi, redactionUtilisee: false }).suite).toBe(
       "REVUE_MANUELLE",
     );
-    expect(initier).toMatch(/if \(transaction\.applicationId && !dejaRetire\) \{\s*const suite = await suiteDuQuotaDuPack/u);
+    // Ni après une tranche de la direction (M4, D-11) : la somme décidée part.
+    expect(initier).toMatch(
+      /if \(transaction\.applicationId && !dejaRetire && !tranchee\) \{\s*const suite = await suiteDuQuotaDuPack/u,
+    );
   });
 
   it("le retrait se décide et s'écrit sous le verrou du grand livre, imputé à l'octroi", () => {

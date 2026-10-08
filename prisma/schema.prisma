@@ -497,6 +497,18 @@ model Transaction {
   applicationId String?
   application   Application?      @relation(fields: [applicationId], references: [id])
   packCode      String
+  /// Ce que le pack vendait, figé à la vente — RG-15.2, revue du
+  /// 07/10/2026, M5 (décision D-12).
+  ///
+  /// Le prorata d'un remboursement et la part de chaque destination se
+  /// lisaient sur la grille du jour : une grille révisée changeait la somme
+  /// due sur une vente passée, et un pack retiré de la grille retombait sur
+  /// la règle des recharges. Comme `Application.visaRuleId` fige la règle
+  /// d'un dossier (INV-3), ces deux colonnes figent ce qui a été vendu.
+  /// Nulles hors des packs, et l'une ne va pas sans l'autre : la base
+  /// l'exige.
+  packAnalyses     Int?
+  packDestinations Int?
   amount        Int
   currency      String            @db.Char(3)
   provider      PaymentProvider
@@ -643,6 +655,17 @@ model Transaction {
   /// nulle se lit « le montant payé », comme avant. La base exige
   /// 0 < refundAmount ≤ montant payé, et une obligation ouverte.
   refundAmount      Int?
+  /// La revue manuelle tranchée — revue du 07/10/2026, M4 (décision D-11).
+  ///
+  /// Hors de la règle du prorata (dossier déposé ou clos, pack servi sur
+  /// plusieurs dossiers, recharge ou montée entamée), la somme se fixe à la
+  /// main. Rien ne l'écrivait : la dette restait sans montant ni demande.
+  /// Posées ensemble par `trancherLaRevueManuelle`, avec `refundAmount` :
+  /// l'initiation lit alors la décision au lieu de la réévaluer, et la
+  /// demande part. Une tranche à zéro referme l'obligation et ne pose pas
+  /// ces colonnes : il n'y a plus rien à envoyer.
+  refundDecidedAt   DateTime?
+  refundDecidedBy   String?
 
   /// L'achat Essentiel dont part un passage à Dossier — arbitrage S.88.
   ///

@@ -333,13 +333,14 @@ export async function couvertureDuPaiement(
 ): Promise<{ destinations: number; servies: number } | null> {
   const transaction = await db.transaction.findFirst({
     where: { reference, userId, status: "CONFIRMEE" },
-    select: { id: true, packCode: true },
+    select: { id: true, packCode: true, packDestinations: true },
   });
   if (!transaction) return null;
 
-  const pack = getPack(transaction.packCode);
-  if (!pack) return null;
+  // Ce qui a été vendu, et la grille en repli pour une vente antérieure (M5).
+  const destinations = transaction.packDestinations ?? getPack(transaction.packCode)?.destinations;
+  if (destinations === undefined) return null;
 
   const servies = await destinationsServies(transaction.id);
-  return { destinations: pack.destinations, servies: servies.length };
+  return { destinations, servies: servies.length };
 }

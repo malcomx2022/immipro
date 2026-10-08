@@ -100,6 +100,28 @@ export async function sousVerrouDuGrandLivre<T>(
   });
 }
 
+/**
+ * Le verrou de plusieurs grands livres, pris dans un ordre fixe — revue du
+ * 07/10/2026, M4.
+ *
+ * Un pack Pro sert jusqu'à trois dossiers, et la tranche d'une revue
+ * manuelle retire ses analyses restantes de chacun (D-11). Chaque dossier
+ * se verrouille comme pour un débit ; l'ordre trié écarte l'interblocage
+ * entre deux tranches qui viseraient les mêmes dossiers.
+ */
+export async function sousVerrouDesGrandsLivres<T>(
+  applicationIds: readonly string[],
+  travail: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const ordonnes = [...new Set(applicationIds)].sort();
+  return db.$transaction(async (tx) => {
+    for (const id of ordonnes) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`grand-livre:${id}`}, 0))`;
+    }
+    return travail(tx);
+  });
+}
+
 /** Les lignes du grand livre d'un dossier, telles que le domaine les rejoue. */
 export async function lignesDuGrandLivre(
   applicationId: string,

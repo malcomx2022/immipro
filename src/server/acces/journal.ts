@@ -42,6 +42,8 @@ export type ActionAuditee =
   | "paiement.remboursement"
   /** Remboursement FedaPay fait au tableau de bord, déclaré en B-04 (S.91). */
   | "paiement.remboursement.manuel"
+  /** Revue manuelle d'un remboursement tranchée en B-04 (M4, D-11). */
+  | "paiement.remboursement.tranche"
   | "paiement.reconciliation"
   /** Une facture ou un avoir émis à la confirmation du fournisseur (M.C). */
   | "facture.emission"
