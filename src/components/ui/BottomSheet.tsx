@@ -113,9 +113,9 @@ export function BottomSheet({
         aria-labelledby={idTitre}
         tabIndex={-1}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col gap-3 overflow-y-auto rounded-t-lg bg-white p-4 pb-6 shadow-e3 outline-none",
+          "absolute inset-x-0 bottom-0 flex max-h-feuille flex-col gap-3 overflow-y-auto rounded-t-lg bg-white p-4 pb-6 shadow-e3 outline-none",
           ancrage === "adaptatif" &&
-            "md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-[600px] md:max-w-[calc(100vw-4rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg md:p-6",
+            "md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-dialogue md:max-w-ecran md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg md:p-6",
           className,
         )}
       >

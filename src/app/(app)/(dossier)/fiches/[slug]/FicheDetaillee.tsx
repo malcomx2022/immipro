@@ -50,7 +50,7 @@ export function FicheDetaillee({ fiche }: { fiche: FicheDestination }) {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <div className="flex items-center gap-3.5">
         <span
           aria-hidden="true"

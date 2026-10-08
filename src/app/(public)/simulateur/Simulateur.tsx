@@ -62,8 +62,8 @@ export function Simulateur() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:flex-row md:gap-12 md:px-12 md:py-10">
-      <div className="flex flex-1 flex-col gap-6 md:max-w-[640px]">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 py-6 md:flex-row md:gap-12 md:px-12 md:py-10">
+      <div className="flex flex-1 flex-col gap-6 md:max-w-decision">
         <div className="flex items-center gap-3">
           {/* À la première question, « Retour » ramène à l'accueil : un
               bouton qui ne fait rien vaut moins qu'un bouton qui sort. */}

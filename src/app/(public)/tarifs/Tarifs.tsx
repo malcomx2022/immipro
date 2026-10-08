@@ -38,8 +38,8 @@ export function Tarifs() {
     montants[devise] === 0 ? "Gratuit" : formatMontant(montants[devise], devise);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
-      <div className="flex flex-col gap-4 md:max-w-[640px]">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
+      <div className="flex flex-col gap-4 md:max-w-decision">
         <h1
           id="contenu"
           tabIndex={-1}

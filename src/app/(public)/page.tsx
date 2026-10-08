@@ -57,8 +57,8 @@ export default async function Accueil() {
   const { destinations, intitule, mention } = await destinationsEnVedette();
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-12 px-4 py-8 md:px-12 md:py-12">
-      <section className="flex flex-col gap-6 md:max-w-[640px]">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-12 px-4 py-8 md:px-12 md:py-12">
+      <section className="flex flex-col gap-6 md:max-w-decision">
         <h1
           id="contenu"
           tabIndex={-1}

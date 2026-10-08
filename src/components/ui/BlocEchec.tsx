@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import type { Ton } from "@/server/http/echecs";
+import type { Ton } from "@/domain/echecs/catalogue";
 import type { EchecRecu } from "@/lib/api";
 
 /**

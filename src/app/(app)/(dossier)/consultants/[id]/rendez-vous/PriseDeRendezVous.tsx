@@ -198,7 +198,7 @@ export function PriseDeRendezVous({
     const faite = reservation;
     const retenu: Creneau = { debut: faite.debut, disponible: false };
     return (
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
         {entete}
 
         <div className="flex flex-col gap-2">
@@ -280,7 +280,7 @@ export function PriseDeRendezVous({
 
   if (etape === "CRENEAUX") {
     return (
-      <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
         {entete}
 
         <div className="flex flex-col gap-2">
@@ -301,7 +301,7 @@ export function PriseDeRendezVous({
             <h2 className="text-16 font-semibold text-ink-900">
               Les créneaux ne peuvent pas être affichés maintenant
             </h2>
-            <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+            <p className="max-w-lecture text-pretty text-14 text-ink-700">
               {MESSAGE_HORS_LIGNE}
             </p>
             <Button variante="secondaire" onClick={() => setHorsLigne(!navigator.onLine)}>
@@ -333,7 +333,7 @@ export function PriseDeRendezVous({
               ))}
             </div>
 
-            <aside className="flex w-full flex-col gap-2 rounded-lg bg-ink-100 p-4 md:w-[300px] md:flex-none">
+            <aside className="flex w-full flex-col gap-2 rounded-lg bg-ink-100 p-4 md:w-aside md:flex-none">
               <h2 className="text-14 font-semibold text-ink-900">{consultant.nom}</h2>
               <p className="text-13 text-ink-700">{consultant.cabinet}</p>
               <dl className="flex flex-col pt-1">
@@ -376,7 +376,7 @@ export function PriseDeRendezVous({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       {entete}
 
       <div className="flex flex-col gap-2">

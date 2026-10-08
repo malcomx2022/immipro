@@ -59,7 +59,7 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
   const langues = languesDisponibles(consultants, destination);
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${dossier.id}`}
@@ -84,7 +84,7 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
       {vide ? (
         <section className="flex flex-col items-start gap-3 rounded-lg bg-ink-100 p-5">
           <h2 className="text-pretty text-19 font-semibold text-ink-900">{vide.titre}</h2>
-          <p className="max-w-[70ch] text-pretty text-16 text-ink-700">
+          <p className="max-w-lecture text-pretty text-16 text-ink-700">
             {vide.explication}
           </p>
           {/*
@@ -94,7 +94,7 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
             l'annuaire filtre précisément sur elle. L'avis n'avait pas
             d'événement à attendre. Le registre des habilitations le dit.
           */}
-          <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+          <p className="max-w-lecture text-pretty text-14 text-ink-700">
             {HABILITATION_NON_PRONONCEE}
           </p>
           <LienBouton href={`/dossiers/${dossier.id}`} variante="secondaire">
@@ -165,7 +165,7 @@ export function Annuaire({ dossier, consultants, destination }: AnnuaireProps) {
         </>
       )}
 
-      <p className="max-w-[75ch] text-pretty text-13 text-ink-500">
+      <p className="max-w-lecture-75 text-pretty text-13 text-ink-500">
         {MENTION_HABILITATION}
       </p>
 

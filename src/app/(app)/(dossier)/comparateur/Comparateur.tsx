@@ -30,7 +30,7 @@ export function Comparateur({
   if (fiches.length === 0) return <SansDestination />;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"
@@ -45,7 +45,7 @@ export function Comparateur({
       </div>
 
       <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-        <table className="w-full min-w-[640px] border-collapse text-left">
+        <table className="w-full min-w-tableau border-collapse text-left">
           <caption className="sr-only">
             Exigences publiées de trois destinations, critère par critère
           </caption>
@@ -149,7 +149,7 @@ function titre(combien: number): string {
  */
 function SansDestination() {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 py-10 md:px-8">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-4 px-4 py-10 md:px-8">
       <h1
         id="contenu"
         tabIndex={-1}

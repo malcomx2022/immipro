@@ -154,7 +154,7 @@ describe("T-06 — suivi de l'offre", () => {
     });
 
     render(<Services dossier={DOSSIER} offres={[OFFRE]} autorisation="accordee" />);
-    fireEvent.click(screen.getByRole("link", { name: "Ouvrir le site du partenaire" }));
+    fireEvent.click(screen.getByRole("link", { name: "Ouvrir le site du partenaire (s'ouvre dans un nouvel onglet)" }));
 
     await waitFor(() => expect(appels).toHaveLength(1));
     expect(appels[0]).toContain("/api/dossiers/nl-4471/partenaires/ref-1");
@@ -169,7 +169,7 @@ describe("T-06 — suivi de l'offre", () => {
     const ouvrir = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<Services dossier={DOSSIER} offres={[OFFRE]} autorisation="accordee" />);
-    fireEvent.click(screen.getByRole("link", { name: "Ouvrir le site du partenaire" }));
+    fireEvent.click(screen.getByRole("link", { name: "Ouvrir le site du partenaire (s'ouvre dans un nouvel onglet)" }));
 
     expect(fetchEspion).toHaveBeenCalled();
     expect(ouvrir).not.toHaveBeenCalled();

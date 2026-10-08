@@ -25,6 +25,12 @@ Références : `docs/prototype/ImmiPro Fondations.dc.html`,
 ## Contraintes
 
 - Jetons Tailwind uniquement : aucune couleur, aucun espacement, aucun rayon en dur.
+- Aucune largeur en dur non plus (`max-w-[640px]`, `w-[340px]`…) : les largeurs
+  de mise en page ont un nom dans `tailwind.config.ts` (`max-w-decision`,
+  `w-panneau`, `grid-cols-revue`…), et `tests/jetons-de-mise-en-page.test.ts`
+  refuse toute valeur arbitraire numérique (revue du 07/10/2026, F7).
+- Un lien qui ouvre un nouvel onglet passe par `LienNouvelOnglet`, qui
+  l'annonce aux lecteurs d'écran (F8, D-21).
 - L'échelle de tailles est fermée à neuf crans (`text-13` … `text-44`). `text-sm`,
   `text-lg` et les autres n'existent pas.
 - Cible tactile 44 px minimum, 48 px pour les boutons, 52 px pour l'action

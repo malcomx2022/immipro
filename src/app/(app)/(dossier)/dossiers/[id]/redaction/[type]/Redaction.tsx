@@ -230,7 +230,7 @@ export function Redaction({
     const dernier = index === total - 1;
 
     return (
-      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+      <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
         <EnteteDossier
           dossier={dossier}
           retour={`/dossiers/${dossier.id}/redaction`}
@@ -374,7 +374,7 @@ export function Redaction({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${dossier.id}/redaction`}
@@ -430,7 +430,7 @@ export function Redaction({
               <h3 className="text-pretty text-19 font-semibold text-ink-900">
                 {message.titre}
               </h3>
-              <p className="max-w-[68ch] text-pretty text-14 text-ink-700">
+              <p className="max-w-redaction text-pretty text-14 text-ink-700">
                 {message.corps}
               </p>
               {etat === "MISE_EN_FORME_RESERVEE" && message.action ? (
@@ -486,9 +486,9 @@ export function Redaction({
               value={brouillon}
               onChange={(e) => setBrouillon(e.target.value)}
               aria-describedby="texte-aide"
-              className={cn(CHAMP_CONTROLE, "h-auto max-w-[68ch] py-3 leading-relaxed")}
+              className={cn(CHAMP_CONTROLE, "h-auto max-w-redaction py-3 leading-relaxed")}
             />
-            <p id="texte-aide" className="max-w-[68ch] text-pretty text-13 text-ink-500">
+            <p id="texte-aide" className="max-w-redaction text-pretty text-13 text-ink-500">
               {MENTION_AIDE_A_LA_REDACTION}
             </p>
             <div className="flex flex-col items-start gap-2 pt-1 sm:flex-row sm:items-center">
@@ -520,7 +520,7 @@ export function Redaction({
             réorganiser.
           */}
           {suggestion && suggestionVisible && courante ? (
-            <div className="flex max-w-[68ch] flex-col items-start gap-2 rounded-md border-l-6 border-accent-500 bg-accent-50 p-3.5">
+            <div className="flex max-w-redaction flex-col items-start gap-2 rounded-md border-l-6 border-accent-500 bg-accent-50 p-3.5">
               <p className="text-13 font-semibold text-accent-700">
                 {suggestion.section
                   ? `Suggestion — paragraphe « ${suggestion.section} »`
@@ -541,7 +541,7 @@ export function Redaction({
 
         <section
           className={cn(
-            "flex-col gap-3 md:flex md:w-[320px] md:flex-none",
+            "flex-col gap-3 md:flex md:w-versions md:flex-none",
             vue === "EDITEUR" ? "hidden" : "flex",
           )}
         >

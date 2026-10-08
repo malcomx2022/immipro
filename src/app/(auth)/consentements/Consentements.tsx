@@ -102,8 +102,8 @@ export function Consentements() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
-      <div className="flex min-w-0 flex-col gap-5 md:w-[560px] md:flex-none">
+    <div className="mx-auto flex w-full max-w-comptes flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
+      <div className="flex min-w-0 flex-col gap-5 md:w-formulaire-large md:flex-none">
         {/* Le lien s'appelait « Mon profil » et menait à l'écran de
             connexion : servi, donc invisible au test des liens morts, et
             faux pour quiconque est déjà connecté. */}

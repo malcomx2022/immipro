@@ -39,7 +39,7 @@ export default async function PageArticle({
   if (!article) notFound();
 
   return (
-    <article className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:py-10">
+    <article className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:py-10">
       <p className="font-mono text-13 uppercase tracking-wider text-ink-500">
         {article.rubrique} · {article.dureeLecture}
       </p>

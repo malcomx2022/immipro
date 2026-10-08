@@ -1144,7 +1144,7 @@ describe("T-06 — Services partenaires", () => {
 
   it("signale la nature commerciale du lien avant d'y envoyer", () => {
     rendre();
-    const lien = screen.getByRole("link", { name: "Ouvrir le site du partenaire" });
+    const lien = screen.getByRole("link", { name: "Ouvrir le site du partenaire (s'ouvre dans un nouvel onglet)" });
     expect(lien.getAttribute("href")).toBe("https://exemple.invalid/assurance");
     expect(lien.getAttribute("rel")).toContain("sponsored");
     expect(lien.getAttribute("target")).toBe("_blank");
@@ -1193,7 +1193,7 @@ describe("T-06 — Services partenaires", () => {
       try {
         const { container } = rendre();
         await act(async () => {
-          screen.getByRole("link", { name: "Ouvrir le site du partenaire" }).click();
+          screen.getByRole("link", { name: "Ouvrir le site du partenaire (s'ouvre dans un nouvel onglet)" }).click();
         });
         return { ouvertures: ouvre.mock.calls.length, texte: container.textContent ?? "" };
       } finally {

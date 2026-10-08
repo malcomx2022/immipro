@@ -97,7 +97,7 @@ export function Profil({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <h1
         id="contenu"
         tabIndex={-1}

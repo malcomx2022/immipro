@@ -109,7 +109,7 @@ export default async function PageConfirme({
   const suite = recu.dossier ? `/dossiers/${recu.dossier.id}` : "/tableau-de-bord";
 
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-etroit flex-col gap-6 px-4 pb-8 md:py-8">
       <div className="flex flex-col items-center gap-5 text-center">
         <Image
           src="/illustrations/paiement-confirme.svg"

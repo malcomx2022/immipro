@@ -117,7 +117,7 @@ export function Relecture({
   const relue = etat === "RELUE" || etat === "RELUE_SANS_REMARQUE";
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${id}/redaction/${type}`}
@@ -132,7 +132,7 @@ export function Relecture({
         >
           Relecture de ta lettre
         </h1>
-        <p className="max-w-[80ch] text-pretty text-16 text-ink-700">
+        <p className="max-w-lecture-large text-pretty text-16 text-ink-700">
           {resumeSelonLEtat(etat, toutes, recoupements.effectues.length > 0)}
         </p>
       </div>

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { CONSENTEMENTS } from "@/domain/comptes/consentements";
 import { appeler } from "@/lib/api";
-import { ECHECS, type EchecCandidat } from "@/server/http/echecs";
+import { ECHECS, type EchecCandidat } from "@/domain/echecs/catalogue";
 import { SOCLE_BOUTON, VARIANTES_BOUTON } from "@/components/ui/bouton-styles";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -297,7 +297,7 @@ export function PieceDuDossier({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${dossier.id}`}
@@ -619,7 +619,7 @@ function Analyse({
   const lignes = analyse.champs;
 
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${dossier.id}`}

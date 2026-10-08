@@ -80,7 +80,7 @@ export function SuppressionDuCompte({
 
   if (fait) {
     return (
-      <div className="mx-auto flex w-full max-w-[560px] flex-col gap-4 px-4 py-6 md:px-8 md:py-10">
+      <div className="mx-auto flex w-full max-w-reglages flex-col gap-4 px-4 py-6 md:px-8 md:py-10">
         <h1
           id="contenu"
           tabIndex={-1}
@@ -108,7 +108,7 @@ export function SuppressionDuCompte({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
+    <div className="mx-auto flex w-full max-w-reglages flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"

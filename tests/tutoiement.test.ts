@@ -44,6 +44,16 @@ const SURFACES = [
   "src/domain",
   "src/lib/contenu",
   "src/server/courrier.ts",
+  /*
+    Les fichiers à la racine de `src/app` — revue du 07/10/2026, F9. La
+    description par défaut de `layout.tsx`, celle que reprennent les
+    moteurs et les aperçus de partage, vouvoyait sans que rien ne la lise.
+    Tout fichier ajouté à la racine (une page d'erreur, un `not-found`) est
+    lu d'office.
+  */
+  ...readdirSync("src/app")
+    .filter((nom) => /\.tsx?$/u.test(nom))
+    .map((nom) => `src/app/${nom}`),
 ];
 
 /**

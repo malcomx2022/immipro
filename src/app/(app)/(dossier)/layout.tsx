@@ -43,7 +43,7 @@ export default async function GabaritDossier({
 
       <nav
         aria-label="Navigation de l'espace candidat"
-        className="pas-a-imprimer hidden flex-none flex-col gap-7 border-r border-ink-300 p-5 md:flex md:w-[264px]"
+        className="pas-a-imprimer hidden flex-none flex-col gap-7 border-r border-ink-300 p-5 md:flex md:w-nav"
       >
         <Link href="/tableau-de-bord" className="inline-flex items-center">
           <Image

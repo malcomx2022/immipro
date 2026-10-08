@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { LienBouton } from "@/components/ui/LienBouton";
+import { MENTION_NOUVEL_ONGLET } from "@/components/ui/LienNouvelOnglet";
 import { Card } from "@/components/ui/Card";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { Offre } from "@/server/lecture/partenaires";
@@ -53,7 +54,7 @@ export interface ServicesProps {
 
 export function Services({ dossier, offres, autorisation }: ServicesProps) {
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${dossier.id}`}
@@ -233,6 +234,7 @@ function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string
         }}
       >
         {mots.action}
+        <span className="sr-only">{MENTION_NOUVEL_ONGLET}</span>
       </LienBouton>
 
       {empechement?.quoi === "refus" ? (

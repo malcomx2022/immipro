@@ -424,12 +424,12 @@ export function Paiements({
         {compteRendu ? (
           <p
             role="status"
-            className="max-w-[80ch] text-pretty rounded-lg border border-ink-300 bg-white p-4 text-14 text-ink-900"
+            className="max-w-lecture-large text-pretty rounded-lg border border-ink-300 bg-white p-4 text-14 text-ink-900"
           >
             {compteRendu}
           </p>
         ) : null}
-        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+        <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
           {MENTION_RAPPROCHEMENT_MANUEL}
         </p>
 
@@ -438,7 +438,7 @@ export function Paiements({
             <h2 className="text-16 font-semibold text-ink-900">
               L&apos;API {operateur?.operateur} ne répond plus
             </h2>
-            <p className="max-w-[80ch] text-pretty text-14 text-ink-700">{incident}</p>
+            <p className="max-w-lecture-large text-pretty text-14 text-ink-700">{incident}</p>
           </section>
         ) : null}
 
@@ -506,7 +506,7 @@ export function Paiements({
         {journeeVide ? (
           <div className="flex flex-col gap-1 rounded-lg border border-ink-300 bg-white p-6">
             <p className="text-16 font-semibold text-ink-900">{journeeVide.message}</p>
-            <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+            <p className="max-w-lecture text-pretty text-14 text-ink-700">
               {journeeVide.precision}
             </p>
           </div>
@@ -605,7 +605,7 @@ export function Paiements({
               <h2 id="ecarts-anterieurs" className="text-16 font-semibold text-ink-900">
                 Écarts ouverts des jours précédents ({ecartsAnterieurs.length})
               </h2>
-              <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+              <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
                 Hors du tableau et des totaux de la journée, qui ne couvrent que ses propres
                 transactions. Chacun reste ici jusqu&apos;à ce qu&apos;il soit refermé.
               </p>

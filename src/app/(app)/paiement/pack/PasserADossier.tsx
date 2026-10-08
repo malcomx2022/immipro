@@ -36,7 +36,7 @@ export function PasserADossier({ tunnel, detail }: { tunnel: Tunnel; detail: Det
   const prixRecharge = formatMontant(RECHARGE_ANALYSES.prix[devise], devise);
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <Link href={`/dossiers/${id}`} className="text-14 font-semibold text-ink-900">
         Retour au dossier
       </Link>

@@ -149,8 +149,8 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
             <h2 className="text-16 font-semibold text-ink-900">
               {collecte?.injoignable?.source} n&apos;a pas répondu
             </h2>
-            <p className="max-w-[80ch] text-pretty text-14 text-ink-700">{incident}</p>
-            <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+            <p className="max-w-lecture-large text-pretty text-14 text-ink-700">{incident}</p>
+            <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
               {MENTION_SOURCE_MUETTE_SANS_EFFET}
             </p>
           </section>
@@ -171,7 +171,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
               type="search"
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
-              className="h-10 w-[220px] rounded-md border border-ink-300 bg-white px-3 text-14 text-ink-900"
+              className="h-10 w-filtre rounded-md border border-ink-300 bg-white px-3 text-14 text-ink-900"
             />
           </label>
         </div>
@@ -185,7 +185,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
               selection={retenue?.id ?? null}
               onSelection={setSelection}
               entete={
-                <div className="grid grid-cols-[2.5rem_1fr_10rem_6rem_8rem_7rem] gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
+                <div className="grid grid-cols-veille gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
                   <span>Pays</span>
                   <span>Procédure</span>
                   <span>Niveau de source</span>
@@ -196,7 +196,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
               }
               vide={collecte ? <FileVide collecte={collecte} /> : <SansCollecte />}
               rendu={(fiche) => (
-                <div className="grid grid-cols-[2.5rem_1fr_10rem_6rem_8rem_7rem] items-center gap-3">
+                <div className="grid grid-cols-veille items-center gap-3">
                   <span className="font-mono text-13 text-ink-700">{fiche.code}</span>
                   <span className="truncate text-ink-900">{fiche.procedure}</span>
                   <span className="flex min-w-0 flex-col">
@@ -229,7 +229,7 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
           </div>
 
           {retenue ? (
-            <aside className="flex w-[340px] flex-none flex-col gap-3 rounded-lg border border-ink-300 bg-white p-4">
+            <aside className="flex w-panneau flex-none flex-col gap-3 rounded-lg border border-ink-300 bg-white p-4">
               <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
                 Comparaison N / N+1
               </h2>
@@ -352,14 +352,14 @@ function FileVide({ collecte }: { collecte: Collecte }) {
         trouve la plupart du temps. Le relevé est le geste du veilleur
         (WF-14 étape 2), et la phrase dit maintenant ce qu'il a relevé.
       */}
-      <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+      <p className="max-w-lecture text-pretty text-14 text-ink-700">
         {resumeFileVide(collecte, moment)}
       </p>
       {/* Aucun lien : le back-office n'a pas d'index des règles, et l'état
           vide est le seul écran où le veilleur n'a rien d'autre à cliquer.
           Il dit donc par où une fiche revient, plutôt que d'offrir une
           porte qui répond 404. */}
-      <p className="max-w-[70ch] text-pretty text-13 text-ink-500">
+      <p className="max-w-lecture text-pretty text-13 text-ink-500">
         {SANS_INDEX_DES_REGLES}
       </p>
     </div>

@@ -12,6 +12,7 @@ import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
+import { LienNouvelOnglet } from "@/components/ui/LienNouvelOnglet";
 import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
@@ -79,8 +80,8 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
       : "Renseigne ton nom et ton adresse email.";
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
-      <div className="flex flex-col gap-5 md:w-[520px] md:flex-none">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
+      <div className="flex flex-col gap-5 md:w-formulaire md:flex-none">
         <div className="flex flex-col gap-2">
           <h1
             id="contenu"
@@ -148,9 +149,9 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
               {aLire.map((d, i) => (
                 <span key={d.adresse}>
                   {i > 0 ? " et " : ""}
-                  <Link href={d.adresse} className="text-accent-600 underline" target="_blank">
+                  <LienNouvelOnglet href={d.adresse} className="text-accent-600 underline">
                     {d.nom}
-                  </Link>
+                  </LienNouvelOnglet>
                 </span>
               ))}
               .
