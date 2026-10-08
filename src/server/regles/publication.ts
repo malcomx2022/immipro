@@ -47,6 +47,13 @@ export interface Publicateur {
 export interface Publication {
   publiee: string;
   archivee: string | null;
+  /** Des dossiers de versions antérieures sont à prévenir (WF-11). */
+  divergenceAPropager: boolean;
+  /**
+   * La propagation est partie en file tout de suite. Faux alors qu'il y a
+   * une divergence : la mise en file a échoué, et la reprise horaire la
+   * fera à partir de `VisaRule.divergenceDueAt` (revue M8).
+   */
   divergenceMiseEnFile: boolean;
 }
 
@@ -154,6 +161,15 @@ export async function publierLaRegle(
         // relecture garde la date où elle est entrée en vigueur : c'est
         // elle qui ordonne la succession, pas la dernière remise en ligne.
         publishedAt: regle.publishedAt ?? aujourdhui,
+        /*
+          La dette de propagation s'écrit **avec** la publication (revue du
+          07/10/2026, M8). Postée après coup et seulement là, elle se
+          perdait avec la mise en file : la publication était faite, la
+          route répondait 5xx, et un nouvel essai ne trouvait plus de
+          prédécesseur. La passe la remet à nul quand elle est complète ;
+          d'ici là, la reprise horaire la retrouve.
+        */
+        ...(veille ? { divergenceDueAt: aujourdhui } : {}),
       },
     }),
   ]);
@@ -177,16 +193,28 @@ export async function publierLaRegle(
   // WF-11 : la divergence est calculée par un job, pas ici. Une
   // publication ne doit pas attendre le parcours de tous les dossiers
   // rattachés, ni échouer parce que l'un d'eux pose problème.
+  //
+  // Ni échouer parce que la file ne répond pas : la publication est faite,
+  // et la dette est en base. La réponse dit seulement que la propagation
+  // part à la reprise plutôt que tout de suite, et B-02 l'écrit.
+  let divergenceMiseEnFile = false;
   if (veille) {
-    const file = await getQueue();
-    // La réponse annonce `divergenceMiseEnFile` : elle ne doit pas
-    // l'annoncer si rien n'a été mis en file.
-    await poster(file, JOBS.DIVERGENCE_REGLEMENTAIRE, { nouvelleId: regle.id });
+    try {
+      const file = await getQueue();
+      await poster(file, JOBS.DIVERGENCE_REGLEMENTAIRE, { nouvelleId: regle.id });
+      divergenceMiseEnFile = true;
+    } catch (erreur) {
+      console.error("[publication] divergence non mise en file, reprise horaire", {
+        regle: regle.id,
+        cause: erreur instanceof Error ? erreur.message : String(erreur),
+      });
+    }
   }
 
   return {
     publiee: regle.id,
     archivee: veille?.id ?? null,
-    divergenceMiseEnFile: veille !== null,
+    divergenceAPropager: veille !== null,
+    divergenceMiseEnFile,
   };
 }

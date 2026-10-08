@@ -61,7 +61,8 @@ describe("toutes les routes passent par le composeur", () => {
     expect(ROUTES.length).toBeGreaterThan(20);
   });
 
-  it.each(ROUTES.filter((f) => f !== "src/app/api/health/route.ts"))(
+  // Sans exemption : `/api/health` y passe aussi depuis la revue M10.
+  it.each(ROUTES)(
     "%s déclare son accès et son régime de débit",
     (fichier) => {
       const source = lire(fichier);
@@ -180,6 +181,8 @@ describe("INV-4 — le filtrage est dans la requête", () => {
       "il passe par `filtrePourCandidat`, et lit en plus les versions écartées pour dire pourquoi",
     "src/server/lecture/alertes.ts":
       "il passe par `filtrePourCandidat` pour décider ce qu'une migration bloquée annonce",
+    "src/app/api/health/route.ts":
+      "l'état de service compte les divergences encore à propager (revue M8) : un nombre et une ancienneté, aucune règle servie",
     "src/server/veille/releve.ts":
       "le relevé de WF-14 lit la fiche que le veilleur consulte, brouillon compris : c'est le sien, pas celui d'un candidat",
   };

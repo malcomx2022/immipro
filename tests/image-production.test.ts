@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FICHIER_DU_BATTEMENT } from "@/server/jobs/battement";
+import { DELAI_D_ARRET_MS } from "@/server/jobs/arret";
 
 /**
  * L'image et le compose de production — revue du 07/10/2026, M15 et M19
@@ -109,7 +110,9 @@ describe("le compose de production — M15, D-28", () => {
 
   it("la sonde du worker lit le fichier que le worker réécrit", () => {
     expect(service("worker")).toContain(`stat -c %Y ${FICHIER_DU_BATTEMENT}`);
-    expect(service("worker")).toMatch(/stop_grace_period: 30s/u);
+    // Revue M9 : le délai du compose dépasse celui que le worker s'accorde.
+    const grace = Number(/stop_grace_period: (\d+)s/u.exec(service("worker"))![1]);
+    expect(grace * 1000).toBeGreaterThan(DELAI_D_ARRET_MS);
   });
 
   it("le tas de Node reste sous la limite du conteneur", () => {

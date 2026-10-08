@@ -59,6 +59,12 @@ model VisaRule {
   /// suivante ne trouvait plus de prédécesseur, n'archivait rien, et ne
   /// prévenait aucun dossier.
   publishedAt   DateTime?
+  /// La propagation de cette version aux dossiers des versions antérieures
+  /// reste à faire depuis cette date (WF-11 ; revue du 07/10/2026, M8).
+  /// Posée dans la transaction de la publication, remise à nul quand la
+  /// passe est complète : une mise en file perdue ne perd plus la
+  /// divergence, la reprise horaire la retrouve ici.
+  divergenceDueAt DateTime?
   notes         String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -72,6 +78,8 @@ model VisaRule {
   @@index([status, nextReviewAt])
   /// La publication cherche le prédécesseur : mis en vigueur, jamais remplacé.
   @@index([countryCode, visaType, publishedAt])
+  /// La reprise horaire cherche les divergences échues.
+  @@index([divergenceDueAt])
 }
 
 // ═══════════════════════════════════════════════════════════

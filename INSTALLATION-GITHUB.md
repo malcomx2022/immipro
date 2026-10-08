@@ -92,6 +92,20 @@ fichier d'essai EICAR au démarrage puis toutes les heures : l'état de
 service (`/api/health`) passe le balayage à `OPERATIONNELLE` quand le
 fichier est reconnu.
 
+**État de service.** `/api/health` répond à tous avec le même code (200 en
+service, 503 sinon), mais un lecteur anonyme ne lit que `{ "status", "db" }`.
+Le détail — capacités, files, facturation, divergences, tâches en échec —
+est réservé à un administrateur connecté, ou à une surveillance qui envoie
+`Authorization: Bearer <jeton>` :
+
+```bash
+ETAT_DE_SERVICE_JETON=<une valeur longue et aléatoire, par ex. openssl rand -hex 32>
+```
+
+Laisser la variable vide ferme cette voie. Les lignes ci-dessous qui
+parlent de ce que `/api/health` « passe à `OPERATIONNELLE` » se lisent donc
+connecté en administrateur, ou avec le jeton.
+
 **Messagerie.** Un compte chez un fournisseur SMTP transactionnel, avec un
 domaine d'envoi authentifié (SPF, DKIM, DMARC) — sans quoi les courriels de
 vérification finissent en indésirables. Puis, dans `.env.app` :

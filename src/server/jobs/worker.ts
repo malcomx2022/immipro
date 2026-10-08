@@ -10,6 +10,7 @@
 import { getQueue, JOBS, poster } from "@/lib/queue";
 import { sonderLesServices } from "@/server/exploitation/sondes";
 import { demarrerLeBattement } from "./battement";
+import { arreterProprement } from "./arret";
 import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
 import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
 import { depublierLesFichesEchues } from "./veille";
@@ -20,7 +21,7 @@ import { reconcilierSansRecouvrement } from "./reconciliation";
 import { analyserUnePiece } from "./analyse";
 import { balayerUnePiece } from "./balayage";
 import { reprendreLesAnalysesEnAttente, reprendreLesQuarantaines } from "./quarantaine";
-import { propagerLaPublication, doitRejouer } from "./divergence";
+import { propagerSansRecouvrement, doitRejouer, reprendreLesDivergences } from "./divergence";
 import {
   traiterLesBrouillonsInactifs,
   doitRejouer as doitRejouerLInactivite,
@@ -39,6 +40,8 @@ async function main() {
   // `src/lib/queue.ts`). pg-boss 10 refuse de travailler ou de planifier
   // sur une file inconnue, et le worker mourait ici sans rien traiter.
   const boss = await getQueue();
+  // Avant tout `work` : un arrêt demandé pendant le démarrage est entendu.
+  arreterProprement(boss);
 
   // I.D — le balayage précède l'analyse, et c'est le worker qui les
   // enchaîne. La promotion vers le stockage de confiance a lieu dans
@@ -92,7 +95,16 @@ async function main() {
       // versions antérieures, et compare chaque dossier depuis la sienne.
       // Les jobs déjà en file le portent encore, et il est simplement
       // ignoré.
-      const bilan = await propagerLaPublication(job.data.nouvelleId);
+      const bilan = await propagerSansRecouvrement(job.data.nouvelleId);
+      /*
+        Une autre passe tient la version — la reprise horaire, ou un
+        rejeu de ce même job (revue M8). Elle conclura, et si elle échoue,
+        la dette reste en base et la reprise suivante repasse.
+      */
+      if (bilan === null) {
+        console.info("[divergence] passe ignorée : une autre passe tient la version", job.data.nouvelleId);
+        return;
+      }
       console.info("[divergence]", bilan);
       /*
         Un dossier qui n'a pas pu être prévenu fait rejouer la passe —
@@ -179,6 +191,15 @@ async function main() {
     if (bilan.relancees > 0 || bilan.abandonnees > 0) console.info("[relances]", bilan);
     if (doitRejouerLesRelances(bilan)) {
       throw new Error(`Remboursements non relancés : ${bilan.incidents.join(" | ")}`);
+    }
+  });
+
+  await boss.work(JOBS.REPRISE_DIVERGENCE, async () => {
+    const bilan = await reprendreLesDivergences();
+    // Silencieuse les heures où rien n'est dû, comme les relances.
+    if (bilan.versions > 0) console.info("[reprise-divergence]", bilan);
+    if (bilan.aReprendre > 0) {
+      throw new Error(`Divergences encore à propager : ${bilan.incidents.join(" | ")}`);
     }
   });
 
@@ -317,6 +338,16 @@ async function main() {
     n'apporte rien qu'un risque de contention.
   */
   await boss.schedule(JOBS.RELANCE_REMBOURSEMENT, "7,22,37,52 * * * *");
+
+  /*
+    La reprise des divergences, toutes les heures — revue M8.
+
+    « Les alertes partent dans l'heure » : c'est ce que B-02 écrit quand la
+    mise en file a échoué. À la vingt-cinquième minute, après la sonde des
+    services (heure pile) qui dit si la messagerie répond : l'alerte
+    critique part par courrier.
+  */
+  await boss.schedule(JOBS.REPRISE_DIVERGENCE, "25 * * * *");
 
   // Et une fois tout de suite : attendre l'heure ronde laisserait
   // l'instance sans constat pendant jusqu'à soixante minutes après un

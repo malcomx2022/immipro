@@ -72,7 +72,8 @@ if (migration.status !== 0) {
 const { db } = await import("../src/lib/db");
 const { getQueue } = await import("../src/lib/queue");
 const { publierLaRegle } = await import("../src/server/regles/publication");
-const { propagerLaPublication } = await import("../src/server/jobs/divergence");
+const { propagerLaPublication, propagerSansRecouvrement, reprendreLesDivergences, DELAI_AVANT_REPRISE_MS } =
+  await import("../src/server/jobs/divergence");
 const { depublierLesFichesEchues } = await import("../src/server/jobs/veille");
 const { recalculerCompletude } = await import("../src/server/acces/dossiers");
 const { versDossier } = await import("../src/server/vue/dossier");
@@ -2194,6 +2195,96 @@ try {
       maigre.intitule === "Destinations couvertes",
       `un classement que deux dossiers alimentent ne s'annonce pas (« ${maigre.intitule} »)`,
     );
+  }
+
+  console.log("\nWF-11 — une mise en file perdue ne perd plus la divergence (revue M8)");
+  {
+    const regle = (version: number, payload: unknown, statut: "PUBLISHED" | "DRAFT") =>
+      db.visaRule.create({
+        data: {
+          countryCode: "AE", visaType: "emploi_reprise_m8", category: "EMPLOI", version,
+          effectiveFrom: new Date("2026-01-01"), rules: payload as never,
+          sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+          verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+          nextReviewAt: new Date("2027-01-01"), status: statut,
+          publishedAt: statut === "PUBLISHED" ? new Date("2026-01-01") : null,
+        },
+      });
+    const v1 = await regle(1, brute.rules, "PUBLISHED");
+    const p = await dossierPret(v1.id);
+    const v2 = await regle(2, avecSeuil(ACTUEL + 1500), "DRAFT");
+
+    // La mise en file échoue : `send` rend `null`, ce que pg-boss fait sur
+    // une file inconnue, et `poster` lève — comme sur une base qui coupe
+    // entre la transaction et la mise en file.
+    const file = await getQueue();
+    const envoi = file.send.bind(file);
+    file.send = (async () => null) as typeof file.send;
+    let publiee: Awaited<ReturnType<typeof publierLaRegle>> | null = null;
+    let levee = "";
+    try {
+      publiee = await publierLaRegle(v2.id, AUTRE, "Seuil relevé, file coupée");
+    } catch (erreur) {
+      levee = codeDe(erreur);
+    }
+    file.send = envoi;
+    verifier(publiee !== null, `la publication répond, elle est faite (${levee || "sans erreur"})`);
+    verifier(
+      publiee?.divergenceAPropager === true && publiee.divergenceMiseEnFile === false,
+      "et la réponse dit que la propagation partira à la reprise",
+    );
+    const posee = await db.visaRule.findUniqueOrThrow({ where: { id: v2.id } });
+    verifier(posee.status === "PUBLISHED", "la version est en vigueur");
+    verifier(posee.divergenceDueAt !== null, "la dette de propagation est en base");
+
+    const tot = await reprendreLesDivergences(new Date());
+    const encore = await db.visaRule.findUniqueOrThrow({ where: { id: v2.id } });
+    verifier(
+      encore.divergenceDueAt !== null && tot.incidents.every((i) => !i.startsWith(v2.id)),
+      "avant quinze minutes, la reprise laisse la main au job",
+    );
+
+    const plusTard = new Date(Date.now() + DELAI_AVANT_REPRISE_MS + 60_000);
+    const reprise = await reprendreLesDivergences(plusTard);
+    verifier(reprise.aReprendre === 0, `la reprise propage (${JSON.stringify(reprise)})`);
+    const apres = await db.visaRule.findUniqueOrThrow({ where: { id: v2.id } });
+    verifier(apres.divergenceDueAt === null, "la passe complète efface la dette");
+    const dossier = await db.application.findUniqueOrThrow({ where: { id: p.application.id } });
+    verifier(dossier.status === "SUSPENDU", `le dossier est prévenu et mis en pause (${dossier.status})`);
+    const alertes = () =>
+      db.notification.count({ where: { applicationId: p.application.id, kind: "REGLEMENTATION" } });
+    verifier((await alertes()) === 1, "une alerte, une seule");
+
+    const seconde = await reprendreLesDivergences(plusTard);
+    verifier(seconde.versions === 0, `la reprise suivante ne retrouve plus rien (${seconde.versions})`);
+    const rejeu = await propagerSansRecouvrement(v2.id, plusTard);
+    verifier(rejeu?.dejaAlertes === 1 && rejeu.alertes === 0, "un rejeu saute le dossier déjà prévenu");
+    verifier((await alertes()) === 1, "et n'écrit aucune seconde alerte");
+  }
+
+  console.log("\nWF-11 — deux passes simultanées ne préviennent qu'une fois (revue M8)");
+  {
+    const regle = (version: number, payload: unknown, statut: "PUBLISHED" | "DRAFT") =>
+      db.visaRule.create({
+        data: {
+          countryCode: "AE", visaType: "emploi_verrou_m8", category: "EMPLOI", version,
+          effectiveFrom: new Date("2026-01-01"), rules: payload as never,
+          sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+          verifiedAt: new Date(), verifiedBy: REDACTEUR.email,
+          nextReviewAt: new Date("2027-01-01"), status: statut,
+          publishedAt: statut === "PUBLISHED" ? new Date("2026-01-01") : null,
+        },
+      });
+    const v1 = await regle(1, brute.rules, "PUBLISHED");
+    const p = await dossierPret(v1.id);
+    const v2 = await regle(2, avecSeuil(ACTUEL + 1500), "DRAFT");
+    await publierLaRegle(v2.id, AUTRE, "Seuil relevé, deux passes");
+    const [a, b] = await Promise.all([propagerSansRecouvrement(v2.id), propagerSansRecouvrement(v2.id)]);
+    verifier((a === null) !== (b === null), "une passe tient la version, l'autre s'efface");
+    const alertes = await db.notification.count({
+      where: { applicationId: p.application.id, kind: "REGLEMENTATION" },
+    });
+    verifier(alertes === 1, `une alerte, une seule (${alertes})`);
   }
 
 } catch (erreur) {

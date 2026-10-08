@@ -183,8 +183,16 @@ describe("l'écran ne dit plus rien que le serveur n'ait répondu", () => {
       `id` mettrait alors en vigueur celle qu'on quitte.
     */
     expect(ecran).toMatch(
-      /appeler<\{ publiee: string \}>\(\s*`\/api\/admin\/regles\/\$\{ecrite\}`/u,
+      // Le type de réponse porte aussi la divergence différée (revue M8).
+      /appeler<\{\s*publiee: string;[^>]*\}>\(\s*`\/api\/admin\/regles\/\$\{ecrite\}`/u,
     );
+  });
+
+  it("une propagation différée se dit : la publication est faite, les alertes suivent (revue M8)", () => {
+    expect(ecran).toMatch(
+      /setDifferee\(resultat\.donnees\.divergenceAPropager && !resultat\.donnees\.divergenceMiseEnFile\)/u,
+    );
+    expect(ecran).toMatch(/differee \? ` \$\{MENTION_DIVERGENCE_DIFFEREE\}`/u);
   });
 
   /**

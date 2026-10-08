@@ -451,9 +451,13 @@ if (process.argv.includes("--base")) {
     }
     verifier(frais(), `${tour} : le worker bat (${BATTEMENT} réécrit après le démarrage)`);
 
+    let codeDeSortie = null;
     if (!arrete) {
       enfant.kill("SIGTERM");
-      await new Promise((suite) => enfant.once("exit", suite));
+      codeDeSortie = await new Promise((suite) => enfant.once("exit", (code) => suite(code)));
+      // Revue M9 : un arrêt demandé se termine proprement, et le dit.
+      verifier(codeDeSortie === 0, `${tour} : SIGTERM, le worker sort en 0 (${codeDeSortie})`);
+      verifier(lire().includes("worker arrêté"), `${tour} : il annonce son arrêt`);
     }
 
     verifier(sortie.includes("worker démarré"), `${tour} : le worker annonce son démarrage`);
