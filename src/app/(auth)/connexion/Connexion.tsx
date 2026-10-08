@@ -39,7 +39,7 @@ export function Connexion() {
     setEchec(null);
     const resultat = await appeler<{ compte: { emailVerifie: boolean } }>(
       "/api/comptes/session",
-      { corps: { email: email.trim(), motDePasse } },
+      { corps: { email: email.trim(), motDePasse, resterConnecte: rester } },
     );
     if (resultat.ok) {
       // La suite est lue au moment de l'envoi, pas au rendu : `useSearchParams`

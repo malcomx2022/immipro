@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 07/10/2026.** Les lots S.125 (C1, E1, E4, E5) et S.126 (E6, E7, F4, M1, F12) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) et S.127 (M3, M2, N1) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -65,7 +65,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 |---|---|---|---|
 | D-1 | INV-6 se lit-il « quota d'analyses, jetons mesurés et surveillés » ? La réponse réécrit CLAUDE.md et DOC-11 | Direction | M6 |
 | D-2 | Un CDN ou un proxy sera-t-il placé devant nginx ? | Exploitant | Confirme E1 (livré) |
-| D-3 | Garde-t-on le décompte « il te reste N essais » d'A-02, au prix d'un compteur en mémoire des adresses sans compte ? | Direction produit | M2 |
+| D-3 | Garde-t-on le décompte « il te reste N essais » d'A-02, au prix d'un compteur en mémoire des adresses sans compte ? | Direction produit | M2 — **tranchée le 08/10/2026 : option B**, décompte gardé, compteur par empreinte |
 | D-4 | La surveillance externe a-t-elle besoin du détail de `/api/health` ? | Exploitant | M10 |
 | D-5 | Renomme-t-on le cookie en `__Host-immipro_session` (texte Cookies à revalider, déconnexion générale une fois) ? | Direction, conseil juridique | F1 (partie cookie) |
 | D-6 | Un encaissement d'un autre montant ou d'une autre devise est-il refusé puis remboursé, même s'il est supérieur au prix ? | Direction | E2 |
@@ -84,7 +84,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-19 | Accepte-t-on des pages publiques revalidées toutes les 5 minutes pour servir les liens juridiques dans le HTML ? | Produit, responsable technique | M14 |
 | D-20 | Regroupe-t-on des largeurs voisines (760 vers 720, 560 et 480 vers 520, 68ch et 75ch vers 70ch) ? | Design | F7 (second commit) |
 | D-21 | La mention de nouvel onglet est-elle visible ou réservée aux lecteurs d'écran ? | Design | F8 |
-| D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 |
+| D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 — **tranchée le 08/10/2026 : cookie oublié à la fermeture du navigateur, 24 h au plus en base** |
 | D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) |
 | D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 |
 | D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 |
@@ -108,7 +108,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 |---|---|---|---|---|
 | **S.125 — livré** | C1, E1, E4, E5 | — | — | Version figée intouchable, débit compté par la vraie adresse, purge des deux zones, une analyse par version |
 | **S.126 — livré** | E6, E7, F4, M1, F12 | M+M+S+M+S | Sans décision | Aucune pièce bloquée « en analyse », aucune chaîne du modèle affichée, clé de dépôt vérifiée |
-| S.127 — comptes | M3, M2, N1 | S+M+S | D-3, D-22 (M3 sans décision) | Compteurs d'essais atomiques, pas d'énumération, case « Rester connecté » honorée |
+| **S.127 — livré** | M3, M2, N1 | S+M+S | D-3, D-22 (M3 sans décision) | Compteurs d'essais atomiques, pas d'énumération, case « Rester connecté » honorée |
 | S.128 — paiements I | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
 | S.129 — paiements II | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
 | S.130 — paiements III | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
@@ -516,6 +516,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### M2 — Énumération d'adresses par le décompte d'essais
 
+**État : livré en S.127**, option B (D-3). Le blocage d'une adresse sans compte n'envoie aucun courriel, faute de titulaire.
+
 **Constat vérifié.** `src/server/acces/comptes.ts:129-147` : une adresse connue incrémente `failedLogins` avant de composer la phrase, une adresse inconnue repart de zéro. Au premier essai, `domain/comptes/connexion.ts:93-102` rend « Il te reste 5 essais » pour une inconnue et « 4 » pour une connue. Le blocage, seul cas en `ton: "limite"`, n'arrive qu'à un compte réel. C'est déjà consigné comme question ouverte (`connexion.ts:18-42`, `tests/comptes.test.ts`, `fumee-transitions.mts:1022-1035`).
 
 **Précision sur la revue.** Supprimer le champ `essaisRestants` ne suffit pas. A-02 n'affiche que `echec.corps` (`Connexion.tsx:53-56`), et c'est cette phrase qui porte le décompte.
@@ -550,6 +552,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 ---
 
 #### M3 — Courses sur les compteurs d'essais (codes et connexion)
+
+**État : livré en S.127.** En plus du plan : un mot de passe juste ne lève pas un blocage posé pendant sa vérification (remise à zéro conditionnée à l'absence de blocage en cours).
 
 **Constat vérifié.** `consommerUnCode` (`src/server/acces/comptes.ts:215-225`) compare `attempts` lu puis incrémente à part : des requêtes parallèles dépassent les cinq essais d'un code à six chiffres. La consommation (l.228) n'est pas conditionnée à `consumedAt: null` : deux codes justes simultanés passent tous les deux.
 
@@ -1123,6 +1127,8 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### N1 — La case « Rester connecté » n'est jamais envoyée (constat nouveau)
 
+**État : livré en S.127**, première option (D-22) : cookie sans échéance, 24 h en base. L'inscription ouvre toujours une session mémorisée.
+
 **Constat vérifié.** `Connexion.tsx:32` tient l'état `rester`, et l'écran explique quand la décocher (l.134). Mais le corps envoyé ne contient que `{ email, motDePasse }`, et le schéma de `src/app/api/comptes/session/route.ts:29` n'a pas de champ pour elle. La case n'a donc aucun effet : la session dure toujours 30 jours.
 
 **Règle.** WF-02, A-02. Le texte de l'écran promet un comportement que le code ne tient pas, sur un public qui se connecte depuis des postes partagés (commentaire de `session.ts`).
@@ -1391,7 +1397,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 et S.126
+## 7. Ce qui reste ouvert après les lots S.125 à S.127
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1400,3 +1406,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **E6** : le compteur « analyses en attente depuis plus d'une heure » sur `/api/health` (étape 5), avec la sonde de M9.
 - **E7** : relire à la main les analyses `HORS_SUJET` et les notifications « Ce fichier ressemble à : » dont le libellé n'appartient pas au référentiel ; l'étape 6 (contrôle du message final) reste facultative.
 - **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.
+- **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.

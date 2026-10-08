@@ -3,9 +3,11 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { correspond, empreinte, aRecalculer, empreinteRapide, codeANChiffres } from "@/server/securite/secret";
 import { fermerToutesLesSessions } from "@/server/securite/session";
+import { lireEchecsSansCompte, noterEchecSansCompte } from "@/server/acces/echecs-sans-compte";
 import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
 import { LONGUEUR_CODE, VALIDITE_MINUTES } from "@/domain/comptes/code-verification";
 import {
+  ESSAIS_AVANT_BLOCAGE,
   aBloquer,
   finDuBlocage,
   libelleEchec,
@@ -117,38 +119,57 @@ export async function connecter(
     ? await correspond(motDePasse, user.passwordHash)
     : await correspond(motDePasse, LEURRE);
 
-  const verdictAvant = verdictDeConnexion(
-    user?.failedLogins ?? 0,
-    user?.lockedUntil ?? null,
-    maintenant,
-  );
+  /*
+    Une adresse sans compte a son compteur, tenu en mémoire sous une
+    empreinte (D-3, option B) : sans lui, le premier refus disait « 5 essais »
+    pour elle et « 4 » pour un compte réel, et le blocage n'arrivait qu'à un
+    compte réel (revue du 07/10/2026, M2).
+  */
+  const sansCompte = user ? null : lireEchecsSansCompte(email, maintenant);
+  const verdictAvant = user
+    ? verdictDeConnexion(user.failedLogins, user.lockedUntil, maintenant)
+    : verdictDeConnexion(sansCompte!.echecs, sansCompte!.bloqueJusqua, maintenant);
   if (verdictAvant.bloque) {
     return { ouverte: false, verdict: verdictAvant, message: libelleEchec(verdictAvant) };
   }
 
   if (!user || !juste || user.suspendedAt) {
     if (user) {
-      const echecs = user.failedLogins + 1;
-      await db.user.update({
+      /*
+        L'incrément se fait en base, et le blocage se décide sur la valeur
+        qu'elle rend (revue du 07/10/2026, M3). On écrivait
+        `user.failedLogins + 1`, lu avant les deux cents millisecondes de
+        scrypt : huit essais lancés ensemble lisaient tous zéro, écrivaient
+        tous un, et le blocage par compte ne tombait jamais.
+      */
+      const { failedLogins: echecs } = await db.user.update({
         where: { id: user.id },
-        data: {
-          failedLogins: echecs,
-          lockedUntil: aBloquer(echecs) ? finDuBlocage(maintenant) : null,
-        },
+        data: { failedLogins: { increment: 1 } },
+        select: { failedLogins: true },
       });
-      const apres = verdictDeConnexion(
-        echecs,
-        aBloquer(echecs) ? finDuBlocage(maintenant) : null,
-        maintenant,
-      );
+      const bloqueJusqua = aBloquer(echecs) ? finDuBlocage(maintenant) : null;
+      if (bloqueJusqua) {
+        await db.user.update({ where: { id: user.id }, data: { lockedUntil: bloqueJusqua } });
+      }
+      const apres = verdictDeConnexion(echecs, bloqueJusqua, maintenant);
       return { ouverte: false, verdict: apres, message: libelleEchec(apres) };
     }
-    const apres = verdictDeConnexion(0, null, maintenant);
+    const note = noterEchecSansCompte(email, maintenant);
+    const apres = verdictDeConnexion(note.echecs, note.bloqueJusqua, maintenant);
     return { ouverte: false, verdict: apres, message: libelleEchec(apres) };
   }
 
-  await db.user.update({
-    where: { id: user.id },
+  /*
+    La remise à zéro est conditionnée à l'absence de blocage en cours : un
+    mot de passe juste glissé dans une rafale qui a bloqué le compte entre
+    la lecture et cet instant n'ouvre pas la session, et n'efface pas le
+    blocage posé par les essais qui l'accompagnaient (M3).
+  */
+  const ouverte = await db.user.updateMany({
+    where: {
+      id: user.id,
+      OR: [{ lockedUntil: null }, { lockedUntil: { lte: maintenant } }],
+    },
     data: {
       failedLogins: 0,
       lockedUntil: null,
@@ -159,6 +180,18 @@ export async function connecter(
         : {}),
     },
   });
+  if (ouverte.count === 0) {
+    const relu = await db.user.findUnique({
+      where: { id: user.id },
+      select: { failedLogins: true, lockedUntil: true },
+    });
+    const verdict = verdictDeConnexion(
+      relu?.failedLogins ?? ESSAIS_AVANT_BLOCAGE,
+      relu?.lockedUntil ?? finDuBlocage(maintenant),
+      maintenant,
+    );
+    return { ouverte: false, verdict, message: libelleEchec(verdict) };
+  }
   return { ouverte: true, user };
 }
 
@@ -206,27 +239,44 @@ export const ESSAIS_PAR_CODE = 5;
  * Vérification d'un code. Le compteur d'essais est incrémenté avant la
  * comparaison : un processus interrompu au mauvais moment doit laisser
  * l'essai compté, jamais l'inverse.
+ *
+ * L'essai se prend en base, sous condition, et non sur une valeur lue
+ * (revue du 07/10/2026, M3). Le code comparait `attempts` lu puis
+ * incrémentait à part : vingt essais lancés ensemble lisaient tous zéro et
+ * passaient tous, et la borne de cinq essais sur un code à six chiffres ne
+ * bornait plus rien. Et la consommation n'était pas conditionnée : deux
+ * codes justes envoyés ensemble réussissaient tous les deux.
  */
 export async function consommerUnCode(
   userId: string,
   kind: "VERIFICATION_EMAIL" | "REINITIALISATION_MOT_DE_PASSE",
   code: string,
 ): Promise<boolean> {
+  const maintenant = new Date();
   const secret = await db.authSecret.findFirst({
-    where: { userId, kind, consumedAt: null, expiresAt: { gt: new Date() } },
+    where: { userId, kind, consumedAt: null, expiresAt: { gt: maintenant } },
     orderBy: { createdAt: "desc" },
+    select: { id: true, secretHash: true },
   });
   if (!secret) return false;
-  if (secret.attempts >= ESSAIS_PAR_CODE) return false;
 
-  await db.authSecret.update({
-    where: { id: secret.id },
+  const essai = await db.authSecret.updateMany({
+    where: {
+      id: secret.id,
+      consumedAt: null,
+      expiresAt: { gt: maintenant },
+      attempts: { lt: ESSAIS_PAR_CODE },
+    },
     data: { attempts: { increment: 1 } },
   });
+  if (essai.count === 0) return false;
   if (secret.secretHash !== empreinteRapide(code)) return false;
 
-  await db.authSecret.update({ where: { id: secret.id }, data: { consumedAt: new Date() } });
-  return true;
+  const consomme = await db.authSecret.updateMany({
+    where: { id: secret.id, consumedAt: null },
+    data: { consumedAt: new Date() },
+  });
+  return consomme.count === 1;
 }
 
 /**

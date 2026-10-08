@@ -63,7 +63,7 @@ export const POST = route({
     await envoyerCodeDeVerification(user.email, code);
 
     const session = await ouvrirSession(user.id);
-    (await cookies()).set(COOKIE_SESSION, session.valeur, attributsCookie(session.expireLe));
+    (await cookies()).set(COOKIE_SESSION, session.valeur, attributsCookie(session.cookieExpireLe));
     return { etape: "verification" };
   },
 });

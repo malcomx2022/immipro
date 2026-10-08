@@ -16,6 +16,19 @@ import { empreinteRapide, jeton } from "./secret";
 export const DUREE_JOURS = 30;
 export const INACTIVITE_JOURS = 7;
 
+/**
+ * Session non mémorisée — A-02, « Rester connecté » décoché (décision D-22,
+ * 08/10/2026). Le cookie n'a pas d'échéance : le navigateur l'oublie à sa
+ * fermeture. Et la ligne en base expire au bout de 24 heures quoi qu'il
+ * arrive, parce qu'un navigateur qui restaure ses onglets restaure aussi
+ * ses cookies de session : sur un poste de cybercafé jamais fermé, seule
+ * l'échéance serveur protège la personne suivante.
+ *
+ * La case n'était jamais envoyée (revue du 07/10/2026, N1) : toute session
+ * durait trente jours, y compris celle que l'écran disait de ne pas garder.
+ */
+export const DUREE_NON_MEMORISEE_HEURES = 24;
+
 export const COOKIE_SESSION = "immipro_session";
 
 const JOUR = 24 * 60 * 60 * 1000;
@@ -34,15 +47,25 @@ export interface Acteur {
 export interface SessionOuverte {
   /** Valeur à poser dans le cookie. Elle n'est jamais stockée telle quelle. */
   valeur: string;
+  /** Échéance en base, toujours posée. */
   expireLe: Date;
+  /** Échéance du cookie ; `null` pour un cookie que le navigateur oublie à sa fermeture. */
+  cookieExpireLe: Date | null;
 }
 
+/**
+ * `memoriser` vaut vrai par défaut : l'inscription ouvre une session
+ * mémorisée, comme avant, et seule la connexion porte la case.
+ */
 export async function ouvrirSession(
   userId: string,
   userAgent?: string | null,
+  memoriser = true,
 ): Promise<SessionOuverte> {
   const valeur = jeton();
-  const expireLe = new Date(Date.now() + DUREE_JOURS * JOUR);
+  const expireLe = new Date(
+    Date.now() + (memoriser ? DUREE_JOURS * JOUR : DUREE_NON_MEMORISEE_HEURES * 60 * 60 * 1000),
+  );
   await db.session.create({
     data: {
       tokenHash: empreinteRapide(valeur),
@@ -51,7 +74,7 @@ export async function ouvrirSession(
       userAgent: userAgent?.slice(0, 200) ?? null,
     },
   });
-  return { valeur, expireLe };
+  return { valeur, expireLe, cookieExpireLe: memoriser ? expireLe : null };
 }
 
 /**
@@ -116,13 +139,16 @@ export async function fermerToutesLesSessions(userId: string): Promise<number> {
  * fournisseur de paiement sont des navigations GET, `strict` les ferait
  * arriver déconnecté sur $-04. `secure` hors développement seulement, sinon
  * le cookie ne se pose pas sur `http://localhost`.
+ *
+ * Sans échéance, le cookie est un cookie de session du navigateur : il
+ * disparaît à la fermeture (D-22).
  */
-export const attributsCookie = (expireLe: Date) => ({
+export const attributsCookie = (expireLe: Date | null) => ({
   httpOnly: true,
   sameSite: "lax" as const,
   secure: process.env.NODE_ENV === "production",
   path: "/",
-  expires: expireLe,
+  ...(expireLe ? { expires: expireLe } : {}),
 });
 
 export const attributsSuppression = () => ({
