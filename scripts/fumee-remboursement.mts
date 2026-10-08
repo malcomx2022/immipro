@@ -68,6 +68,26 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const {
   initierLeRemboursement,
   ouvrirUnRemboursement,
@@ -148,6 +168,8 @@ async function candidatPaye(
     consommees?: number;
     /** Le dossier est déclaré déposé avant l'ouverture (RG-15.2). */
     depose?: boolean;
+    /** Aucune obligation n'est ouverte : un paiement simplement confirmé (E3). */
+    sansObligation?: boolean;
   } = {},
 ) {
   rang += 1;
@@ -210,7 +232,9 @@ async function candidatPaye(
       data: { status: "SOUMIS", submittedAt: maintenant, depositedOn: maintenant },
     });
   }
-  const ouverture = await ouvrirUnRemboursement(transaction.id, "Geste de support — essai de fumée");
+  const ouverture = options.sansObligation
+    ? { ouvert: false as const, raison: "aucune obligation demandée" }
+    : await ouvrirUnRemboursement(transaction.id, "Geste de support — essai de fumée");
   return { user, application, transaction, ouverture };
 }
 
@@ -282,6 +306,7 @@ try {
       providerTxId: apres.providerTxId!,
       reference: apres.reference,
       statut: "REMBOURSEE",
+      ...sansMontant,
     });
     verifier(suite.issue !== "refusee", `la notification s'applique (${suite.issue})`);
 
@@ -440,6 +465,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "REMBOURSEE",
+      ...sansMontant,
     });
     const soldee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
     verifier(
@@ -695,10 +721,22 @@ try {
         decidee.refundDecidedBy === admin.id && decidee.refundDecidedAt !== null,
         "la décision porte qui l'a prise et quand",
       );
+      /*
+        L'écart s'est refermé sur la décision, puis rouvert par le geste
+        FedaPay à faire au tableau de bord (D-9) : la décision et sa note
+        sont au journal, le geste attend l'opérateur.
+      */
+      const fermeture = await db.auditLog.findFirst({
+        where: { action: "paiement.ecart.rouvert", target: `transaction:${a.transaction.id}` },
+      });
       verifier(
-        decidee.discrepancyOutcome === "REMBOURSEMENT_A_INITIER" &&
-          (decidee.discrepancyNote ?? "").includes("Décision de la direction du 08/10"),
-        "l'écart se referme sur la décision, motif cité",
+        JSON.stringify(fermeture?.metadata ?? {}).includes("REMBOURSEMENT_A_INITIER") &&
+          JSON.stringify(fermeture?.metadata ?? {}).includes("Décision de la direction du 08/10"),
+        "l'écart s'est refermé sur la décision, motif cité, et le journal le garde",
+      );
+      verifier(
+        decidee.discrepancy?.startsWith(A_REMBOURSER_A_LA_MAIN) === true && decidee.discrepancyResolvedAt === null,
+        "puis il se rouvre sur le geste à faire au tableau de bord FedaPay",
       );
       verifier((await solde(a.application.id)) === 0, "les 29 analyses restantes sont retirées");
       verifier(
@@ -713,6 +751,7 @@ try {
         providerTxId: a.transaction.providerTxId!,
         reference: a.transaction.reference,
         statut: "REMBOURSEE",
+        ...sansMontant,
       });
       const avoir = await db.invoice.findFirst({
         where: { transactionId: a.transaction.id, kind: "AVOIR" },
@@ -801,6 +840,150 @@ try {
         "un retrait par dossier servi",
       );
     }
+  }
+
+  console.log("\nUn remboursement annoncé ne solde que la dette qu'il rembourse (E3, D-8, D-10)");
+  {
+    const rembourse = (t: { providerTxId: string | null; reference: string }, cle: string, mineur: number | null) =>
+      appliquerLaNotification({
+        providerEventId: `stripe:evt_${cle}_${process.pid}`,
+        providerTxId: t.providerTxId!,
+        reference: t.reference,
+        statut: "REMBOURSEE",
+        montantMineur: null,
+        devise: null,
+        rembourseMineur: mineur,
+      });
+
+    /*
+      a. Sans obligation : un geste au tableau de bord. Reproduit avant
+      correction : REMBOURSEE, avoir du prix entier, analyses laissées au
+      candidat.
+    */
+    const a = await candidatPaye({ analyses: 30, sansObligation: true });
+    const sansDette = await rembourse(a.transaction, "sans_dette", 2900);
+    const lueA = await db.transaction.findUniqueOrThrow({ where: { id: a.transaction.id } });
+    verifier(sansDette.issue === "refusee", `rien n'est soldé (${sansDette.issue})`);
+    verifier(lueA.status === "CONFIRMEE" && lueA.refundedAt === null, `la transaction reste confirmée (${lueA.status})`);
+    verifier(
+      (lueA.discrepancy ?? "").includes("aucun remboursement n'était décidé"),
+      "un écart dit ce qu'il faut faire",
+    );
+    verifier(
+      (await db.invoice.count({ where: { transactionId: a.transaction.id, kind: "AVOIR" } })) === 0,
+      "aucun avoir n'est émis",
+    );
+    verifier((await solde(a.application.id)) === 30, "les analyses ne sont pas retirées");
+
+    // b. Partiel puis complet : Stripe annonce un cumul.
+    const b = await candidatPaye({ analyses: 30 });
+    await initierLeRemboursement(b.transaction.reference, rembourseurSimule([acceptee()]));
+    const partiel = await rembourse(b.transaction, "partiel", 500);
+    const lueB = await db.transaction.findUniqueOrThrow({ where: { id: b.transaction.id } });
+    verifier(partiel.issue === "refusee" && lueB.status === "CONFIRMEE", `5,00 € sur 29,00 € ne solde rien (${partiel.issue})`);
+    verifier((lueB.discrepancy ?? "").includes("Remboursement partiel constaté"), "l'écart dit le partiel");
+    const complet = await rembourse(b.transaction, "complet", 2900);
+    const soldeeB = await db.transaction.findUniqueOrThrow({ where: { id: b.transaction.id } });
+    verifier(complet.issue === "appliquee" && soldeeB.status === "REMBOURSEE", `le cumul entier solde la dette (${complet.issue})`);
+    verifier(
+      (await db.invoice.findFirst({ where: { transactionId: b.transaction.id, kind: "AVOIR" } }))?.amountIncl === 2900,
+      "l'avoir porte la somme rendue",
+    );
+
+    // L'opérateur referme l'écart du partiel : la dette est soldée.
+    const operateur = await db.user.create({
+      data: { email: `fumee-e3-${process.pid}@exemple.test`, role: "ADMIN" },
+    });
+    const { resoudreLEcart } = await import("../src/server/acces/paiements");
+    await resoudreLEcart(
+      b.transaction.reference,
+      { issue: "EXPLIQUE_SANS_CORRECTION", note: "Partiel puis complet, dette soldée par la notification." },
+      operateur.id,
+    );
+
+    // c. Plus que dû, puis un supplément sur une transaction déjà remboursée (D-10).
+    const c = await candidatPaye({ analyses: 30 });
+    await initierLeRemboursement(c.transaction.reference, rembourseurSimule([acceptee()]));
+    const trop = await rembourse(c.transaction, "trop", 3500);
+    const lueC = await db.transaction.findUniqueOrThrow({ where: { id: c.transaction.id } });
+    verifier(trop.issue === "refusee" && lueC.status === "CONFIRMEE", `35,00 € pour 29,00 € dus ne solde rien (${trop.issue})`);
+    verifier((lueC.discrepancy ?? "").includes("supérieur au dû"), "l'écart dit l'excédent, à trancher avec le comptable");
+    const supplement = await rembourse(soldeeB, "supplement", 3400);
+    const apresSupplement = await db.transaction.findUniqueOrThrow({ where: { id: b.transaction.id } });
+    verifier(supplement.issue === "refusee", `un supplément sur une transaction remboursée n'est plus un rejeu muet (${supplement.issue})`);
+    verifier(
+      (apresSupplement.discrepancy ?? "").includes("Remboursement supplémentaire constaté") &&
+        apresSupplement.discrepancyResolvedAt === null,
+      "il rouvre l'écart refermé",
+    );
+  }
+
+  console.log("\nUn second écart rouvre la ligne, et l'ancien part au journal (D-9)");
+  {
+    /*
+      Reproduit avant correction : un second constat, sur un écart refermé,
+      se perdait sans trace (`discrepancy: null` en condition).
+    */
+    const { resoudreLEcart } = await import("../src/server/acces/paiements");
+    const admin = await db.user.create({
+      data: { email: `fumee-ecart-${process.pid}@exemple.test`, role: "ADMIN" },
+    });
+    const d = await candidatPaye({ analyses: 30, sansObligation: true });
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_d9a_${process.pid}`,
+      providerTxId: d.transaction.providerTxId!,
+      reference: d.transaction.reference,
+      statut: "REMBOURSEE",
+      montantMineur: null,
+      devise: null,
+      rembourseMineur: 2900,
+    });
+    const premier = (await db.transaction.findUniqueOrThrow({ where: { id: d.transaction.id } })).discrepancy;
+    await resoudreLEcart(
+      d.transaction.reference,
+      { issue: "EXPLIQUE_SANS_CORRECTION", note: "Geste vérifié avec le support, rien à corriger." },
+      admin.id,
+    );
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_d9b_${process.pid}`,
+      providerTxId: d.transaction.providerTxId!,
+      reference: d.transaction.reference,
+      statut: "REMBOURSEE",
+      montantMineur: null,
+      devise: null,
+      rembourseMineur: 3100,
+    });
+    const rouverte = await db.transaction.findUniqueOrThrow({ where: { id: d.transaction.id } });
+    verifier(
+      rouverte.discrepancy !== premier && rouverte.discrepancyResolvedAt === null,
+      "le nouveau constat rouvre l'écart",
+    );
+    const trace = await db.auditLog.findFirst({
+      where: { action: "paiement.ecart.rouvert", target: `transaction:${d.transaction.id}` },
+    });
+    verifier(
+      trace !== null && JSON.stringify(trace.metadata ?? {}).includes("Geste vérifié avec le support"),
+      "l'écart refermé et sa résolution sont au journal",
+    );
+    // Le même constat redit ne rouvre rien.
+    await resoudreLEcart(
+      d.transaction.reference,
+      { issue: "EXPLIQUE_SANS_CORRECTION", note: "Second geste vérifié, rien à corriger." },
+      admin.id,
+    );
+    await appliquerLaNotification({
+      providerEventId: `stripe:evt_d9c_${process.pid}`,
+      providerTxId: d.transaction.providerTxId!,
+      reference: d.transaction.reference,
+      statut: "REMBOURSEE",
+      montantMineur: null,
+      devise: null,
+      rembourseMineur: 3100,
+    });
+    verifier(
+      (await db.transaction.findUniqueOrThrow({ where: { id: d.transaction.id } })).discrepancyResolvedAt !== null,
+      "un constat identique ne rouvre pas l'écart",
+    );
   }
 
   // ── 8. La passe reprend ce que le premier envoi n'a pas emporté ─────
@@ -1138,6 +1321,7 @@ try {
         providerTxId: declaree.providerTxId!,
         reference: declaree.reference,
         statut: "REMBOURSEE",
+        ...sansMontant,
       });
       verifier(suite.issue !== "refusee", `la notification signée s'applique (${suite.issue})`);
       const soldee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });

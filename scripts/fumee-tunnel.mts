@@ -69,6 +69,26 @@ if (migration.status !== 0) {
   du module.
 */
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const { ouvrirLeTunnel, appliquerLaNotification } = await import("../src/server/acces/paiements");
 const { ouvrirDossier } = await import("../src/server/acces/dossiers");
 const { solde } = await import("../src/server/acces/quota");
@@ -409,6 +429,7 @@ try {
       providerTxId: identifiant,
       reference: ouvert.reference,
       statut: "CONFIRMEE" as const,
+      ...(await encaisse(ouvert.reference)),
     };
     const issue = await appliquerLaNotification(notification);
     verifier(issue.issue === "creditee", `la notification crédite (${issue.issue})`);
@@ -516,6 +537,7 @@ try {
       providerTxId: sansCreneau.providerTxId!,
       reference: ouvert.reference,
       statut: "CONFIRMEE" as const,
+      ...(await encaisse(ouvert.reference)),
     });
     verifier(issue.issue === "creditee", `la notification s'applique (${issue.issue})`);
     verifier(
@@ -559,6 +581,7 @@ try {
       providerTxId: achat.providerTxId!,
       reference: ouvert.reference,
       statut: "CONFIRMEE" as const,
+      ...(await encaisse(ouvert.reference)),
     });
 
     const vise = await solde(applicationId);
@@ -758,6 +781,7 @@ try {
       providerTxId: identifiant,
       reference: ouvert.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(ouvert.reference)),
     });
     verifier(issue.issue === "creditee", `la notification crédite (${issue.issue})`);
 
@@ -777,8 +801,8 @@ try {
     verifier(etat !== null, "l'état de l'opérateur cesse d'être introuvable");
     verifier(etat?.disponible === true, "et il répond");
     verifier(etat ? totalPubliable(etat) : false, "le total du jour est publiable");
-    const encaisse = agreger(lignes).encaisse;
-    verifier((encaisse.EUR ?? 0) > 0, `la caisse du jour n'est plus vide (${JSON.stringify(encaisse)})`);
+    const caisse = agreger(lignes).encaisse;
+    verifier((caisse.EUR ?? 0) > 0, `la caisse du jour n'est plus vide (${JSON.stringify(caisse)})`);
 
     /*
       Et le symétrique : trois heures sans le moindre achat ne font pas une

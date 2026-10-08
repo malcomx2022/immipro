@@ -45,6 +45,13 @@ export type EtatConsulte =
       providerTxId: string;
       /** Seulement ce que le fournisseur a dit. Jamais déduite (N.B). */
       cause?: CauseRefus;
+      /**
+       * Ce qui a été encaissé, en unités mineures, et la devise — E2. Un
+       * webhook perdu se rattrape par ici : la réconciliation compare le
+       * montant comme la notification signée.
+       */
+      montantMineur: number | null;
+      devise: string | null;
     }
   | { issue: "sans_paiement" }
   | { issue: "introuvable" }

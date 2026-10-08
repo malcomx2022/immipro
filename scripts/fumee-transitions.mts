@@ -121,6 +121,26 @@ process.env.SMTP_URL = `smtp://127.0.0.1:${portSmtp}`;
 process.env.SMTP_FROM = "ne-pas-repondre@immipro.test";
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const { declarerLeDepot, cloturerLeDossier } = await import("../src/server/dossiers/parcours");
 const { jourCivil } = await import("../src/domain/format/fuseau");
 const { arbitrerLaDivergence } = await import("../src/server/dossiers/migration");
@@ -647,6 +667,7 @@ try {
       providerTxId: ligne.providerTxId!,
       reference: ouvert.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(ouvert.reference)),
     });
     verifier(issue.issue === "creditee", `la notification crédite (${issue.issue})`);
 

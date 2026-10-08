@@ -63,6 +63,26 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const { etablirLaFacture, etablirLAvoir, emettreLesPiecesEnSouffrance } = await import(
   "../src/server/facturation/emission"
 );
@@ -108,7 +128,10 @@ try {
         providerTxId: statut === "INITIEE" ? null : `fedapay:${process.pid}${compteur}`,
         status: statut,
         ...(statut !== "INITIEE" ? { confirmedAt: new Date() } : {}),
-        ...(statut === "REMBOURSEE" ? { refundedAt: new Date() } : {}),
+        // Un remboursement suppose une obligation (E3) : la base l'exige.
+        ...(statut === "REMBOURSEE"
+          ? { refundDueAt: new Date(), refundBasis: "Geste de support — fumée", refundedAt: new Date() }
+          : {}),
       },
     });
   };
@@ -148,7 +171,15 @@ try {
   verifier(suite.last === 8, `la suite n'a pas consommé de place pour le perdant (${suite.last})`);
 
   console.log("\nUn avoir pour chaque remboursement");
-  await db.transaction.update({ where: { id: premiere.id }, data: { status: "REMBOURSEE", refundedAt: new Date() } });
+  await db.transaction.update({
+    where: { id: premiere.id },
+    data: {
+      status: "REMBOURSEE",
+      refundDueAt: new Date(),
+      refundBasis: "Geste de support — fumée",
+      refundedAt: new Date(),
+    },
+  });
   const avoir = await etablirLAvoir(premiere.id);
   verifier(avoir.issue === "emise" && avoir.numero === `ESSAI-AV-${annee}-00001`, `l'avoir a sa propre suite (${JSON.stringify(avoir)})`);
   const avoirLu = await db.invoice.findFirstOrThrow({ where: { transactionId: premiere.id, kind: "AVOIR" } });
@@ -226,14 +257,26 @@ try {
     providerTxId: `fedapay:notif${process.pid}`,
     reference: ouverte.reference,
     statut: "CONFIRMEE",
+    ...(await encaisse(ouverte.reference)),
   });
   const apres = await db.invoice.findMany({ where: { transactionId: ouverte.id } });
   verifier(confirmation.issue === "creditee" && apres.length === 1 && apres[0]!.kind === "FACTURE", `la confirmation émet la facture (${confirmation.issue})`);
+  // Un remboursement décidé et initié : seul celui-là se solde (E3, D-8).
+  await db.transaction.update({
+    where: { id: ouverte.id },
+    data: {
+      refundDueAt: new Date(),
+      refundBasis: "Geste de support — fumée",
+      refundAttemptedAt: new Date(),
+      refundAttempts: 1,
+    },
+  });
   const retour = await appliquerLaNotification({
     providerEventId: `fedapay:notif${process.pid}:refunded`,
     providerTxId: `fedapay:notif${process.pid}`,
     reference: ouverte.reference,
     statut: "REMBOURSEE",
+    ...sansMontant,
   });
   const avoirs = await db.invoice.count({ where: { transactionId: ouverte.id, kind: "AVOIR" } });
   verifier(avoirs === 1, `le remboursement confirmé émet l'avoir (${retour.issue})`);

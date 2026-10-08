@@ -68,11 +68,20 @@ describe("la consultation Stripe retrouve ce que le webhook a perdu", () => {
   const consultant = consultantStripe("sk_essai");
 
   it("un paiement confirmé", async () => {
-    simuler(reponse(200, session({ payment_status: "paid", status: "complete" })));
+    simuler(
+      reponse(
+        200,
+        session({ payment_status: "paid", status: "complete", amount_total: 2900, currency: "eur" }),
+      ),
+    );
+    // Le montant encaissé revient avec l'état : la réconciliation le
+    // compare comme la notification signée (E2).
     expect(await consultant.consulter(ID, REFERENCE)).toEqual({
       issue: "connu",
       statut: "CONFIRMEE",
       providerTxId: "stripe:cs_test_1",
+      montantMineur: 2900,
+      devise: "EUR",
     });
   });
 
@@ -130,7 +139,13 @@ describe("la consultation Stripe retrouve ce que le webhook a perdu", () => {
       ),
     );
     const vu = await consultant.consulter(ID, REFERENCE);
-    expect(vu).toEqual({ issue: "connu", statut: "ECHOUEE", providerTxId: "stripe:cs_test_1" });
+    expect(vu).toEqual({
+      issue: "connu",
+      statut: "ECHOUEE",
+      providerTxId: "stripe:cs_test_1",
+      montantMineur: null,
+      devise: null,
+    });
   });
 
   /**

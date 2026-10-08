@@ -177,6 +177,11 @@ export async function reconcilierLesPaiements(
         reference: transaction.reference,
         statut: vu.statut,
         ...(vu.cause ? { cause: vu.cause } : {}),
+        // Comparé comme sur la notification signée (E2) : un webhook perdu
+        // ne se rattrape pas sur un montant que personne n'a vérifié.
+        montantMineur: vu.montantMineur,
+        devise: vu.devise,
+        rembourseMineur: null,
       });
       if (issue.issue === "creditee" || issue.issue === "appliquee") {
         bilan.rattrapees += 1;

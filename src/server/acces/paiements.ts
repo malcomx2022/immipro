@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { appliquerLaCouverture } from "@/server/acces/couverture";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { echec } from "@/server/http/echecs";
+import { journaliser } from "@/server/acces/journal";
 import { ecartOuvert, type Resolution } from "@/domain/backoffice/ecart";
 import {
   A_REMBOURSER_A_LA_MAIN,
@@ -42,6 +43,7 @@ import {
   BAIL_DE_CREDIT_MINUTES,
   ecartDeConfirmationTardive,
   effetDeLaNotification,
+  verdictDuRemboursementAnnonce,
 } from "@/server/paiement/cycle";
 import {
   lignesDuGrandLivre,
@@ -55,6 +57,8 @@ import { fournisseurDe } from "@/domain/payments/rail";
 import {
   cheminDeRetour,
   cleDOuverture,
+  encaissementConcorde,
+  motifDEncaissementDivergent,
   motifDeDivergence,
   ouvertureConcorde,
   ouvertureReessayable,
@@ -555,6 +559,16 @@ export interface Notification {
   statut: TransactionStatus;
   /** Pourquoi, quand le rail le dit (N.B). */
   cause?: CauseRefus;
+  /**
+   * Ce que le fournisseur dit avoir encaissé, en unités mineures, et dans
+   * quelle devise — revue du 07/10/2026, E2 (décision D-6). Obligatoires,
+   * pour que le compilateur nomme chaque appelant : une confirmation sans
+   * montant ne crédite rien.
+   */
+  montantMineur: number | null;
+  devise: string | null;
+  /** Le cumul remboursé, quand le rail le dit (E3, décisions D-8 et D-10). */
+  rembourseMineur: number | null;
 }
 
 export type IssueNotification =
@@ -619,10 +633,24 @@ export async function appliquerLaNotification(
     notification.providerTxId !== transaction.providerTxId
   ) {
     const raison = `Second paiement confirmé (${notification.providerTxId}) pour la référence ${transaction.reference}, déjà réglée par ${transaction.providerTxId} : à rembourser au tableau de bord FedaPay.`;
-    await db.transaction.updateMany({
-      where: { id: transaction.id, discrepancy: null },
-      data: { discrepancy: raison },
-    });
+    await noterLEcart(transaction.id, raison);
+    return { issue: "refusee", raison };
+  }
+  /*
+    Un remboursement supplémentaire, et non un rejeu — E3, D-10. Une
+    transaction déjà remboursée qui reçoit un cumul supérieur au dû a été
+    remboursée une seconde fois chez le fournisseur : le rejeu muet le
+    cachait.
+  */
+  if (
+    effet.type === "rejeu" &&
+    notification.statut === "REMBOURSEE" &&
+    notification.rembourseMineur !== null &&
+    notification.rembourseMineur >
+      sommeARendre(transaction.refundAmount, versMineur(transaction.amount, transaction.currency))
+  ) {
+    const raison = `Remboursement supplémentaire constaté pour ${transaction.reference}, déjà remboursée : ${formatMineur(notification.rembourseMineur, transaction.currency)} rendus au total pour ${formatMineur(sommeARendre(transaction.refundAmount, versMineur(transaction.amount, transaction.currency)), transaction.currency)} dus. À trancher avec le comptable.`;
+    await noterLEcart(transaction.id, raison);
     return { issue: "refusee", raison };
   }
   if (effet.type === "rejeu") return { issue: "rejeu" };
@@ -639,13 +667,42 @@ export async function appliquerLaNotification(
       notification.providerTxId,
     );
     if (tardive) {
-      await db.transaction.updateMany({
-        where: { id: transaction.id, discrepancy: null },
-        data: { discrepancy: tardive },
-      });
+      await noterLEcart(transaction.id, tardive);
       return { issue: "refusee", raison: tardive };
     }
     return { issue: "refusee", raison: effet.raison };
+  }
+
+  /*
+    L'encaissement confirmé doit être celui qu'on a décidé — INV-7, revue
+    du 07/10/2026, E2 (décision D-6). Rien ne s'écrit sinon : ni
+    événement, ni état, ni crédit, ni facture. L'écart dit quoi faire, et
+    la transaction suit la règle d'expiration de la plateforme.
+  */
+  if (effet.vers === "CONFIRMEE") {
+    const attendu = versMineur(transaction.amount, transaction.currency);
+    if (!encaissementConcorde(attendu, transaction.currency, notification)) {
+      const raison = motifDEncaissementDivergent(
+        notification.providerTxId,
+        notification,
+        attendu,
+        transaction.currency,
+      );
+      await noterLEcart(transaction.id, raison);
+      return { issue: "refusee", raison };
+    }
+  }
+
+  /*
+    Un remboursement ne se solde que s'il correspond à une dette initiée
+    et à sa somme — E3 (décisions D-8 et D-10).
+  */
+  if (effet.vers === "REMBOURSEE") {
+    const verdict = verdictDuRemboursementAnnonce(transaction, notification.rembourseMineur);
+    if (verdict.issue === "ecart") {
+      await noterLEcart(transaction.id, verdict.constat);
+      return { issue: "refusee", raison: verdict.constat };
+    }
   }
 
   let maj: Transaction;
@@ -1297,11 +1354,74 @@ const motifDeLEcart = (suite: { motif: string; rienARendre?: boolean }): string 
     ? `Aucune demande n'est partie : ${suite.motif}. L'obligation a été ouverte avant cette dernière consommation ; à refermer à la main avec la direction.`
     : suite.motif;
 
+/**
+ * Noter un écart sur une transaction — et le rouvrir s'il était refermé
+ * (décision D-9 du 08/10/2026).
+ *
+ * Trois cas :
+ *
+ * - **aucun écart** : le constat s'écrit ;
+ * - **un écart ouvert** : le premier constat reste — c'est celui que
+ *   l'opérateur est en train de traiter, et le remplacer lui ferait
+ *   refermer un désaccord qu'il n'a pas lu ;
+ * - **un écart refermé** : le second constat se perdait sans trace. Il
+ *   remplace désormais le premier et rouvre l'écart ; le constat refermé
+ *   et sa résolution partent au journal, rien ne se perd. Un constat
+ *   identique à celui qui vient d'être refermé ne rouvre rien : une passe
+ *   de réconciliation qui le redit n'apporte rien de neuf.
+ *
+ * Le remplacement est conditionné à ce qu'on vient de lire : deux
+ * constats simultanés ne rouvrent pas deux fois.
+ */
 async function noterLEcart(transactionId: string, motif: string): Promise<void> {
-  await db.transaction.updateMany({
+  const ecrit = await db.transaction.updateMany({
     where: { id: transactionId, discrepancy: null },
     data: { discrepancy: motif },
   });
+  if (ecrit.count === 1) return;
+
+  const actuel = await db.transaction.findUnique({
+    where: { id: transactionId },
+    select: {
+      reference: true,
+      discrepancy: true,
+      discrepancyOutcome: true,
+      discrepancyNote: true,
+      discrepancyResolvedAt: true,
+      discrepancyResolvedBy: true,
+    },
+  });
+  if (!actuel?.discrepancy || !actuel.discrepancyResolvedAt) return;
+  if (actuel.discrepancy === motif) return;
+
+  const rouvert = await db.transaction.updateMany({
+    where: {
+      id: transactionId,
+      discrepancy: actuel.discrepancy,
+      discrepancyResolvedAt: actuel.discrepancyResolvedAt,
+    },
+    data: {
+      discrepancy: motif,
+      discrepancyOutcome: null,
+      discrepancyNote: null,
+      discrepancyResolvedAt: null,
+      discrepancyResolvedBy: null,
+    },
+  });
+  if (rouvert.count !== 1) return;
+  await journaliser({
+    acteurId: "systeme:paiements",
+    action: "paiement.ecart.rouvert",
+    cible: `transaction:${transactionId}`,
+    motif: `Nouvel écart sur ${actuel.reference}, dont l'écart précédent était refermé : ${motif}`,
+    details: {
+      constatPrecedent: actuel.discrepancy,
+      issuePrecedente: actuel.discrepancyOutcome,
+      notePrecedente: actuel.discrepancyNote,
+      refermeLe: actuel.discrepancyResolvedAt.toISOString(),
+      refermePar: actuel.discrepancyResolvedBy,
+    },
+  }).catch(() => undefined);
 }
 
 /**

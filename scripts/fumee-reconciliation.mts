@@ -60,6 +60,26 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const { reconcilierLesPaiements } = await import("../src/server/jobs/reconciliation");
 const { appliquerLaNotification, acheverLeCredit } = await import(
   "../src/server/acces/paiements"
@@ -165,6 +185,7 @@ try {
     const consultant = consultantSimule(transaction.reference, {
       issue: "connu",
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
       providerTxId: transaction.providerTxId!,
     });
     const bilan = await reconcilierLesPaiements(new Date(), () => consultant);
@@ -195,6 +216,35 @@ try {
   }
 
   // ── 2. Elle retrouve un refus ───────────────────────────────────────
+  console.log("\nElle retrouve un paiement d'un autre montant : rien ne s'ouvre (E2, D-6)");
+  {
+    /*
+      Un webhook perdu se rattrape par la consultation : le montant s'y
+      compare comme sur la notification signée. Avant correction, la passe
+      créditait un pack sur un encaissement qu'elle ne lisait pas.
+    */
+    const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 15 });
+    const decide = await encaisse(transaction.reference);
+    const consultant = consultantSimule(transaction.reference, {
+      issue: "connu",
+      statut: "CONFIRMEE",
+      providerTxId: transaction.providerTxId!,
+      montantMineur: (decide.montantMineur ?? 0) - 100,
+      devise: decide.devise,
+    });
+    await reconcilierLesPaiements(new Date(), () => consultant);
+    const apres = await relire(transaction.id);
+    verifier(apres.status !== "CONFIRMEE", `le paiement n'est pas confirmé (${apres.status})`);
+    verifier(
+      (await db.analysisCredit.count({ where: { applicationId } })) === 0,
+      "aucune analyse n'est ouverte",
+    );
+    verifier(
+      (apres.discrepancy ?? "").includes("alors que la plateforme avait décidé"),
+      "l'écart dit les deux montants",
+    );
+  }
+
   console.log("\nElle retrouve un refus");
   {
     const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 15 });
@@ -202,6 +252,7 @@ try {
       consultantSimule(transaction.reference, {
         issue: "connu",
         statut: "ECHOUEE",
+        ...sansMontant,
         providerTxId: transaction.providerTxId!,
         cause: "SOLDE_INSUFFISANT",
       }),
@@ -283,6 +334,7 @@ try {
       consultantSimule(transaction.reference, {
         issue: "connu",
         statut: "EN_ATTENTE",
+        ...sansMontant,
         providerTxId: transaction.providerTxId!,
       }),
     );
@@ -299,6 +351,7 @@ try {
     const consultant = consultantSimule(transaction.reference, {
       issue: "connu",
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
       providerTxId: transaction.providerTxId!,
     });
 
@@ -314,6 +367,7 @@ try {
         providerTxId: transaction.providerTxId!,
         reference: transaction.reference,
         statut: "CONFIRMEE",
+        ...(await encaisse(transaction.reference)),
       }),
       reconcilierLesPaiements(new Date(), () => consultant),
     ]);
@@ -402,6 +456,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
     });
     verifier(rejeu.issue === "rejeu", `le rejeu du webhook n'y change rien (${rejeu.issue})`);
     verifier(await solde(applicationId) === 0, "et n'ouvre toujours rien");

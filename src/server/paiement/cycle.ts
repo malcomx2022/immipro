@@ -1,4 +1,6 @@
 import type { TransactionStatus } from "@prisma/client";
+import { formatMineur, versMineur } from "@/domain/facturation/montants";
+import { sommeARendre } from "@/domain/paiement/remboursement";
 
 /**
  * Cycle de vie d'un paiement — DOC-11 §2.3.
@@ -120,3 +122,69 @@ export const aExpirer = (creeeLe: Date, maintenant: Date): boolean =>
 
 export const aReconcilier = (creeeLe: Date, maintenant: Date): boolean =>
   maintenant.getTime() - creeeLe.getTime() > DELAI_RECONCILIATION_MINUTES * 60 * 1000;
+
+/**
+ * Ce que vaut un remboursement annoncé par le fournisseur — INV-7, revue
+ * du 07/10/2026, E3 (décisions D-8 et D-10 du 08/10/2026).
+ *
+ * `CONFIRMEE → REMBOURSEE` passait sur le seul statut. Un geste fait au
+ * tableau de bord, sans obligation chez nous, soldait donc une dette qui
+ * n'existait pas : avoir du prix entier, droits laissés au candidat. Et
+ * un remboursement partiel ou excédentaire soldait la dette comme s'il
+ * était exact.
+ *
+ * | Cas                                           | Effet                 |
+ * |-----------------------------------------------|-----------------------|
+ * | Aucune obligation (D-8)                       | écart, rien ne bouge  |
+ * | Obligation non initiée (revue manuelle, M4)   | écart, rien ne bouge  |
+ * | Initiée, montant non dit (FedaPay)            | appliquer             |
+ * | Montant égal au dû                            | appliquer             |
+ * | Montant inférieur au dû (partiel)             | écart ; le cumul suivant appliquera |
+ * | Montant supérieur au dû (D-10)                | écart, à trancher avec M.C |
+ *
+ * Le dû est la somme figée sur l'obligation, ou le prix payé quand elle
+ * n'en porte pas (`sommeARendre`). Pur : l'appelant écrit l'écart.
+ */
+export type VerdictDuRemboursement = { issue: "appliquer" } | { issue: "ecart"; constat: string };
+
+export function verdictDuRemboursementAnnonce(
+  t: {
+    reference: string;
+    amount: number;
+    currency: string;
+    refundDueAt: Date | null;
+    refundAttemptedAt: Date | null;
+    refundRequestedAt: Date | null;
+    refundAmount: number | null;
+  },
+  rembourseMineur: number | null,
+): VerdictDuRemboursement {
+  const paye = versMineur(t.amount, t.currency);
+  const du = sommeARendre(t.refundAmount, paye);
+  const annonce =
+    rembourseMineur === null ? "" : ` pour ${formatMineur(rembourseMineur, t.currency)}`;
+
+  if (t.refundDueAt === null) {
+    return {
+      issue: "ecart",
+      constat: `Remboursement annoncé par le fournisseur${annonce} alors qu'aucun remboursement n'était décidé pour ${t.reference} : la transaction reste confirmée, les analyses ne sont pas retirées et aucun avoir n'est émis. Si le geste est voulu, ouvrir le remboursement depuis la ligne du paiement puis l'initier : la passe suivante soldera la dette.`,
+    };
+  }
+  if (t.refundAttemptedAt === null && t.refundRequestedAt === null) {
+    return {
+      issue: "ecart",
+      constat: `Remboursement annoncé par le fournisseur${annonce} pour ${t.reference}, alors que la demande n'a pas été initiée par la plateforme : la somme est encore en revue. Trancher la revue en B-04 avant de solder la dette.`,
+    };
+  }
+  if (rembourseMineur === null || rembourseMineur === du) return { issue: "appliquer" };
+  if (rembourseMineur < du) {
+    return {
+      issue: "ecart",
+      constat: `Remboursement partiel constaté pour ${t.reference} : ${formatMineur(rembourseMineur, t.currency)} rendus sur ${formatMineur(du, t.currency)} dus. La dette n'est pas soldée ; elle le sera quand le fournisseur annoncera la somme entière.`,
+    };
+  }
+  return {
+    issue: "ecart",
+    constat: `Remboursement supérieur au dû constaté pour ${t.reference} : ${formatMineur(rembourseMineur, t.currency)} rendus pour ${formatMineur(du, t.currency)} dus. La dette n'est pas soldée et aucun avoir n'est émis : à trancher avec le comptable.`,
+  };
+}

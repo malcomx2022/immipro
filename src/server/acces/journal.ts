@@ -45,6 +45,11 @@ export type ActionAuditee =
   /** Revue manuelle d'un remboursement tranchée en B-04 (M4, D-11). */
   | "paiement.remboursement.tranche"
   | "paiement.reconciliation"
+  /**
+   * Un second constat sur une transaction dont l'écart était refermé —
+   * décision D-9. Le constat précédent et sa résolution partent ici.
+   */
+  | "paiement.ecart.rouvert"
   /** Une facture ou un avoir émis à la confirmation du fournisseur (M.C). */
   | "facture.emission"
   | "regle.publication"
