@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+// Composant serveur asynchrone depuis la revue M14 (D-19) : jsdom ne le
+// rend pas. Il est éprouvé seul, dans `tests/liens-juridiques.test.tsx`.
+vi.mock("@/components/juridique/LiensJuridiques", () => ({ LiensJuridiques: () => null }));
 import { SkipLink } from "@/components/layout/SkipLink";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -62,5 +65,52 @@ describe("Footer", () => {
       expect(colonne.querySelectorAll("a").length).toBeGreaterThan(0);
     }
     expect(screen.getByRole("navigation", { name: "Destinations" })).toBeDefined();
+  });
+});
+
+/**
+ * La navigation publique sous 768 px — revue du 07/10/2026, M13 (D-18).
+ * Elle était masquée : il fallait descendre au pied de page.
+ */
+describe("Header — le menu mobile", () => {
+  it("un bouton « Menu », fermé, qui annonce un dialogue", () => {
+    render(<Header />);
+    const menu = screen.getByRole("button", { name: "Menu" });
+    expect(menu).toHaveAttribute("aria-haspopup", "dialog");
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(menu.className).toContain("md:hidden");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("ouvre une feuille avec les trois entrées, l'inscription et une sortie", () => {
+    render(<Header />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const feuille = screen.getByRole("dialog", { name: "Menu" });
+    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute("aria-expanded", "true");
+    const liens = within(within(feuille).getByRole("navigation")).getAllByRole("link");
+    expect(liens.map((l) => l.textContent)).toEqual(["Destinations", "Tarifs", "Guides pays"]);
+    expect(within(feuille).getByRole("link", { name: "Créer un compte" })).toHaveAttribute("href", "/inscription");
+    expect(within(feuille).getByRole("button", { name: "Fermer le menu" })).toBeDefined();
+  });
+
+  it("Échap ferme et rend le focus au bouton", () => {
+    render(<Header />);
+    const menu = screen.getByRole("button", { name: "Menu" });
+    menu.focus();
+    fireEvent.click(menu);
+    expect(screen.getByRole("dialog")).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it("« Fermer le menu » et le choix d'un lien ferment la feuille", () => {
+    render(<Header />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fermer le menu" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("link", { name: "Créer un compte" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

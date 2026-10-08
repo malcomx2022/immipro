@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LienDeNavigation } from "./LienDeNavigation";
+import { MenuPublic } from "./MenuPublic";
 
 /**
  * Barre haute du gabarit acquisition — sections P et A.
@@ -71,6 +72,9 @@ export function Header({ className }: HeaderProps) {
         >
           Créer un compte
         </Link>
+        {/* Sous 768 px, la navigation et l'inscription passent dans un menu
+            (M13, D-18). Les liens sont ceux d'ici : une seule liste. */}
+        <MenuPublic liens={NAVIGATION} />
       </div>
     </header>
   );

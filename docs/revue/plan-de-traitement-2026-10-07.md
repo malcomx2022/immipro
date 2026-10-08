@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10) et S.138 (M7, F1, F2, M16) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16) et S.139 (M13, M14) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -80,8 +80,8 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-15 | Textes des pages introuvable, erreur et hors ligne ; emploi d'`erreur.svg` | Design, produit | E8 — **tranchée le 08/10/2026** : les textes du tableau E8 ; `erreur.svg` sur l'échec, `hors-ligne.svg` hors connexion, aucune image sur l'introuvable |
 | D-16 | La suppression de compte part-elle sur la touche Entrée ? | Produit | M11 — **tranchée le 08/10/2026** : non, geste explicite sur son bouton |
 | D-17 | Correspondances de section de la navigation (`/services` et `/consultants` sous « Dossiers ») | Produit | M12 — **tranchée le 08/10/2026** : `/dossiers`, `/fiches`, `/services` et `/consultants` sous « Dossiers » |
-| D-18 | Ajoute-t-on un bouton « Menu » au gabarit mobile, d'abord dans le prototype ? | Design | M13 |
-| D-19 | Accepte-t-on des pages publiques revalidées toutes les 5 minutes pour servir les liens juridiques dans le HTML ? | Produit, responsable technique | M14 |
+| D-18 | Ajoute-t-on un bouton « Menu » au gabarit mobile, d'abord dans le prototype ? | Design | M13 — **tranchée le 08/10/2026** : oui, menu en feuille ; l'écart au prototype est consigné pour report |
+| D-19 | Accepte-t-on des pages publiques revalidées toutes les 5 minutes pour servir les liens juridiques dans le HTML ? | Produit, responsable technique | M14 — **tranchée le 08/10/2026** : oui (option A) |
 | D-20 | Regroupe-t-on des largeurs voisines (760 vers 720, 560 et 480 vers 520, 68ch et 75ch vers 70ch) ? | Design | F7 — **tranchée le 08/10/2026** : un jeton par valeur, aucun regroupement |
 | D-21 | La mention de nouvel onglet est-elle visible ou réservée aux lecteurs d'écran ? | Design | F8 — **tranchée le 08/10/2026** : réservée aux lecteurs d'écran |
 | D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 — **tranchée le 08/10/2026 : cookie oublié à la fermeture du navigateur, 24 h au plus en base** |
@@ -120,7 +120,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.136 — livré** | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
 | **S.137 — livré** | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
 | **S.138 — livré** | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
-| S.139 — interface III | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
+| **S.139 — livré** | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
 | S.140 — facturation et montants | F5, M18 | S+S | D-13, D-14 | Date de la prestation, unités nommées |
 | S.141 — arbitrages | M6, F11 | S+M | D-1, D-24 | Texte d'INV-6 aligné sur le code, historiques immuables |
 | Ensuite | M19 étapes 1 à 9, M20, F10 | L | D-30 à D-33 | Un lot par étape |
@@ -1036,6 +1036,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 
 #### M13 — Navigation publique sur mobile
 
+**État : livré en S.139** (D-18). Le menu porte aussi « Connexion ». Le prototype 390 px reste sans menu : l'écart est à reporter par le design.
+
 **Constat vérifié.** `Header.tsx:47` et `62-67` masquent la navigation et « Créer un compte » sous 768 px. Les liens restent au pied de page. Le prototype 390 px n'a pas de menu.
 
 **Correction (après décision).**
@@ -1051,6 +1053,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 ---
 
 #### M14 — Liens juridiques du pied de page chargés côté client
+
+**État : livré en S.139** (D-19, option A). Vérifié par un `next build` sans base : `/tarifs`, `/simulateur`, `/comment-ca-marche` et `/_not-found` revalidées à 300 s.
 
 **Constat vérifié.** `LiensJuridiques.tsx:1,26-35` : `fetch` dans `useEffect`, `null` jusqu'à la réponse, sur toutes les pages publiques.
 
@@ -1458,7 +1462,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.138
+## 7. Ce qui reste ouvert après les lots S.125 à S.139
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1487,3 +1491,5 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M16** : sur le VPS, relever `sudo nginx -T`, installer `nginx/immipro.conf` et `nginx/stockage.conf`, étendre le certificat à `stockage.immipro.app` par webroot et vérifier `certbot renew --dry-run` (`INSTALLATION-GITHUB.md`, « nginx et certificats »).
 - **F1** : passe manuelle en préproduction, console ouverte (dépôt, aperçu B-05, paiement FedaPay aller-retour, exports CSV, « Mes données », simulateur, appareil photo Android). D-5 (`__Host-`) reste ouvert.
 - **M7** : relire en lecture seule les versions déjà produites par le modèle (`changeNote` de première version) contre la liste « partout » ; aucune réécriture.
+- **M13** : reporter le menu mobile dans le prototype 390 px (DOC-12 §6.5), où il manque.
+- **M14** : le cache des liens juridiques vit sur le disque du conteneur `app` ; à partager le jour d'un passage à plusieurs instances.

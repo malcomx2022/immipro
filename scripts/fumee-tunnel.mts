@@ -792,7 +792,14 @@ try {
       "un seul instant pour le reçu et pour le rapprochement",
     );
 
-    const jour = ligne.createdAt.toISOString().slice(0, 10);
+    /*
+      Le jour civil à Cotonou, celui que le lecteur borne — et non le jour
+      UTC. Entre 23 h et minuit UTC, les deux diffèrent : la fumée lisait
+      la veille et ne trouvait pas la ligne (constaté le 08/10/2026 à 23 h
+      UTC, sur `main` comme sur la branche).
+    */
+    const { jourCivil } = await import("../src/domain/format/fuseau");
+    const jour = jourCivil(ligne.createdAt);
     const lignes = await paiements(jour);
     const lue = lignes.find((l) => l.reference === ouvert.reference);
     verifier(lue?.etat === "RAPPROCHE", `la ligne se lit rapprochée (${String(lue?.etat)})`);
