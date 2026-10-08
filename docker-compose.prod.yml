@@ -109,7 +109,7 @@ services:
   # les pièces en quarantaine, il ne doit pas arrêter la purge ni les
   # paiements.
   clamav:
-    image: clamav/clamav:1.4
+    image: clamav/clamav:1.5
     restart: unless-stopped
     # La limite du flux suit celle du balayeur (`TAILLE_MAXI_BALAYAGE_OCTETS`,
     # 32 Mo). Au-dessous, un fichier accepté par le balayeur serait refusé
