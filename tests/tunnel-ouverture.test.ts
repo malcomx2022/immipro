@@ -21,6 +21,7 @@ import {
   type CauseDEchecDOuverture,
 } from "@/domain/paiement/ouverture";
 import { lireFedaPay, lireStripe } from "@/server/paiement/notifications";
+import { encaissementConcorde, motifDEncaissementDivergent } from "@/domain/paiement/ouverture";
 
 /**
  * L'ouverture d'un paiement chez le fournisseur — WF-05 étapes 2 et 3.
@@ -700,5 +701,54 @@ describe("l'ouverture échouée dit ce qui l'a empêchée", () => {
     for (const issue of ["injoignable", "reponse_inattendue", "refusee", "creee_sans_url"]) {
       expect(source).toMatch(new RegExp(`issue: "${issue}"[^}]*\\} & Constat`, "u"));
     }
+  });
+});
+
+/**
+ * L'encaissement confirmé est celui qu'on a décidé — revue du 07/10/2026,
+ * E2 (décision D-6). `smoke:fedapay` le joue de bout en bout.
+ */
+describe("une confirmation ne crédite que le montant décidé (E2)", () => {
+  const stripe = (type: string, objet: Record<string, unknown>) => ({
+    id: "evt_1",
+    type,
+    data: { object: { id: "cs_1", metadata: { reference: "IMP-261008-BBBBBB" }, ...objet } },
+  });
+
+  it("la session terminée et payée porte son montant", () => {
+    expect(
+      lireStripe(stripe("checkout.session.completed", { amount_total: 2900, currency: "eur", payment_status: "paid" })),
+    ).toMatchObject({ statut: "CONFIRMEE", montantMineur: 2900, devise: "EUR" });
+    expect(
+      lireStripe(stripe("payment_intent.succeeded", { amount_received: 2900, currency: "eur" })),
+    ).toMatchObject({ statut: "CONFIRMEE", montantMineur: 2900 });
+  });
+
+  it("une session terminée sans être payée n'est pas une confirmation", () => {
+    expect(
+      lireStripe(stripe("checkout.session.completed", { amount_total: 2900, currency: "eur", payment_status: "unpaid" })),
+    ).toMatchObject({ statut: "EN_ATTENTE", montantMineur: null });
+  });
+
+  it("la charge remboursée porte le cumul rendu (E3)", () => {
+    expect(
+      lireStripe(stripe("charge.refunded", { amount_refunded: 500, currency: "eur" })),
+    ).toMatchObject({ statut: "REMBOURSEE", rembourseMineur: 500 });
+  });
+
+  it("le montant et la devise se comparent en unités mineures", () => {
+    expect(encaissementConcorde(2900, "EUR", { montantMineur: 2900, devise: "EUR" })).toBe(true);
+    expect(encaissementConcorde(2900, "EUR", { montantMineur: 290, devise: "EUR" })).toBe(false);
+    expect(encaissementConcorde(15000, "XOF", { montantMineur: 15000, devise: "EUR" })).toBe(false);
+    expect(encaissementConcorde(15000, "XOF", { montantMineur: 15000, devise: null })).toBe(true);
+    expect(encaissementConcorde(2900, "EUR", { montantMineur: null, devise: "EUR" })).toBe(false);
+    // Au-dessus du prix aussi : la direction refuse tout écart (D-6).
+    expect(encaissementConcorde(15000, "XOF", { montantMineur: 20000, devise: "XOF" })).toBe(false);
+  });
+
+  it("le constat dit les deux montants et le geste à faire", () => {
+    const motif = motifDEncaissementDivergent("fedapay:1", { montantMineur: 10000, devise: "XOF" }, 15000, "XOF");
+    expect(motif.replace(/\s/gu, " ")).toContain("pour 10 000 F CFA, alors que la plateforme avait décidé 15 000 F CFA");
+    expect(motif).toContain("rembourser la somme");
   });
 });

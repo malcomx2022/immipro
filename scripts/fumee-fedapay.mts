@@ -137,7 +137,12 @@ globalThis.fetch = (async (entree: string | URL | Request, options?: RequestInit
 }) as typeof fetch;
 
 /** Un événement tel que FedaPay l'envoie : la transaction entière sous `entity`. */
-const evenement = (id: number, statut: string, meta?: Record<string, unknown>) =>
+const evenement = (
+  id: number,
+  statut: string,
+  meta?: Record<string, unknown>,
+  montant?: number,
+) =>
   JSON.stringify({
     name: `transaction.${statut}`,
     object: "transaction",
@@ -145,7 +150,11 @@ const evenement = (id: number, statut: string, meta?: Record<string, unknown>) =
       id,
       reference: `trx_fumee_${id}`,
       status: statut,
-      amount: 10000,
+      // Le montant que la plateforme a demandé à la création, hors frais
+      // (D-7) : c'est celui que FedaPay rend. Il était fixé à 10 000 pour
+      // un pack à 15 000, et passait parce que personne ne le comparait.
+      amount: montant ?? (montants.get(id) as number | undefined) ?? 10000,
+      currency: { iso: "XOF" },
       ...(meta ? { custom_metadata: meta } : {}),
     },
   });
@@ -244,6 +253,32 @@ try {
     (await db.analysisCredit.count({ where: { applicationId } })) === credits,
     "… et ne crédite pas deux fois",
   );
+
+  console.log("\nMontant notifié différent : rien ne s'ouvre, un écart s'ouvre (E2, D-6)");
+  {
+    /*
+      Reproduit avant correction : une confirmation à 10 000 F sur un pack
+      à 15 000 F passait CONFIRMEE, ouvrait les analyses et émettait une
+      facture de 15 000 F.
+    */
+    const autre = await candidat();
+    await ouvrirLeTunnel(autre.userId, ACHAT(autre.applicationId), "XOF");
+    const t0 = await db.transaction.findFirstOrThrow({ where: { userId: autre.userId } });
+    const corps = evenement(prochainId, "approved", { reference: t0.reference }, 10000);
+    const vu = await poster(corps, signe(corps));
+    verifier(vu.status < 500, `la notification est reçue (${vu.status})`);
+    const t = await db.transaction.findUniqueOrThrow({ where: { id: t0.id } });
+    verifier(t.status === t0.status, `l'état ne bouge pas (${t.status})`);
+    verifier(
+      (await db.analysisCredit.count({ where: { applicationId: autre.applicationId } })) === 0,
+      "aucune analyse n'est ouverte",
+    );
+    verifier((await db.invoice.count({ where: { transactionId: t.id } })) === 0, "aucune facture n'est émise");
+    verifier(
+      (t.discrepancy ?? "").replace(/\s/gu, " ").includes("pour 10 000 F CFA, alors que la plateforme avait décidé 15 000 F CFA"),
+      `l'écart dit les deux montants (${t.discrepancy})`,
+    );
+  }
 
   console.log("\nÉvénement sans nos métadonnées : retrouvé par l'identifiant");
   {

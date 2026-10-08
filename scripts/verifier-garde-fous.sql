@@ -594,8 +594,9 @@ SELECT refuse(
 SELECT refuse(
   'M.B · un remboursement sans date',
   $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
-       provider, status, "confirmedAt")
-     VALUES ('t5','IMP-260920-EEEEEE','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now())$q$);
+       provider, status, "confirmedAt", "refundDueAt", "refundBasis")
+     VALUES ('t5','IMP-260920-EEEEEE','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now(),
+       now(), 'Geste de support')$q$);
 
 SELECT refuse(
   'M.B · une date de remboursement sur un paiement encore acquis',
@@ -606,8 +607,34 @@ SELECT refuse(
 SELECT refuse(
   'M.B · un remboursement sans encaissement préalable',
   $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
-       provider, status, "refundedAt")
-     VALUES ('t7','IMP-260920-GGGGGG','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now())$q$);
+       provider, status, "refundedAt", "refundDueAt", "refundBasis")
+     VALUES ('t7','IMP-260920-GGGGGG','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',now(),
+       now(), 'Geste de support')$q$);
+
+-- Un remboursement suppose une obligation (08/10/2026, revue E3, D-8) : un
+-- geste fait au tableau de bord ne solde pas une dette qui n'existe pas.
+SELECT refuse(
+  'E3 · un remboursement sans obligation préalable',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundedAt")
+     VALUES ('t7b','IMP-261008-EEEEEB','u1','essentiel',5000,'XOF','FEDAPAY','REMBOURSEE',
+       now() - interval '1 day', now())$q$);
+
+-- La somme à rendre (RG-15.2) : jamais plus que le paiement, jamais sans
+-- obligation.
+SELECT refuse(
+  'RG-15.2 · une somme à rendre supérieure au paiement',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundDueAt", "refundBasis", "refundAmount")
+     VALUES ('t7c','IMP-261008-EEEEEC','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), now(), 'Geste de support', 5001)$q$);
+
+SELECT refuse(
+  'RG-15.2 · une somme à rendre sans obligation',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "confirmedAt", "refundAmount")
+     VALUES ('t7d','IMP-261008-EEEEED','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
+       now(), 3000)$q$);
 
 -- ── K.C · le remboursement dû ─────────────────────────────────────────────
 SELECT refuse(

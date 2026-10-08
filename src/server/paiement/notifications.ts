@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { TransactionStatus } from "@prisma/client";
 import type { CauseRefus } from "@/domain/paiement/echec";
+import { versMineur } from "@/domain/facturation/montants";
 
 /**
  * Lecture des notifications des deux rails.
@@ -118,6 +119,25 @@ export interface Lue {
   statut: TransactionStatus;
   /** Pourquoi, quand le rail le dit. Jamais deviné (N.B). */
   cause?: CauseRefus;
+  /**
+   * Ce que le fournisseur dit avoir encaissé, en unités mineures — revue
+   * du 07/10/2026, E2.
+   *
+   * Une confirmation créditait sur le seul statut : un paiement de
+   * 10 000 F ouvrait un pack vendu 15 000 F. `null` quand la notification
+   * ne le porte pas — un échec, une attente — ; une confirmation sans
+   * montant ne concorde pas (`encaissementConcorde`).
+   */
+  montantMineur: number | null;
+  /** La devise ISO, en capitales. `null` quand le rail ne la nomme pas. */
+  devise: string | null;
+  /**
+   * Le cumul remboursé, en unités mineures, quand le rail le dit — revue
+   * du 07/10/2026, E3. Stripe le porte sur `charge.refunded`
+   * (`amount_refunded`) ; FedaPay ne le dit pas, et `null` laisse
+   * s'appliquer un remboursement que la plateforme a elle-même initié.
+   */
+  rembourseMineur: number | null;
 }
 
 /**
@@ -163,6 +183,15 @@ const schemaFedaPay = z.object({
     status: z.string(),
     custom_metadata: z.unknown().optional(),
     merchant_reference: z.string().nullish(),
+    /*
+      Le montant, hors frais : vérifié le 08/10/2026 sur IMP-261005-P98AEE,
+      `entity.amount` vaut 5 000 pour un Essentiel dont le widget affichait
+      5 208 F frais compris (décision D-7). Facultatif, comme la devise :
+      un `declined` sans montant lisible reste un refus lisible.
+    */
+    amount: z.number().nullish(),
+    currency: z.object({ iso: z.string() }).nullish(),
+    currency_id: z.union([z.string(), z.number()]).nullish(),
   }),
 });
 
@@ -187,7 +216,29 @@ export function lireFedaPay(charge: unknown): Lue | null {
     reference: referenceMarchande(lu.data.entity),
     statut,
     ...(cause ? { cause } : {}),
+    ...encaissementFedaPay(lu.data.entity),
+    rembourseMineur: null,
   };
+}
+
+/**
+ * Le montant FedaPay, ramené en unités mineures.
+ *
+ * FedaPay parle en unités entières de la devise. Le rail ne sert que le
+ * franc CFA (N.A), dont l'unité mineure est le franc : une devise rendue
+ * par son seul `currency_id`, sans code ISO, se compare donc en francs, et
+ * reste `null` — seul le montant est alors comparé.
+ */
+export function encaissementFedaPay(entite: {
+  amount?: number | null;
+  currency?: { iso: string } | null;
+}): { montantMineur: number | null; devise: string | null } {
+  const devise = entite.currency?.iso ? entite.currency.iso.toUpperCase() : null;
+  const montant = entite.amount;
+  if (montant === null || montant === undefined || !Number.isFinite(montant)) {
+    return { montantMineur: null, devise };
+  }
+  return { montantMineur: versMineur(montant, devise ?? "XOF"), devise };
 }
 
 const schemaStripe = z.object({
@@ -210,6 +261,17 @@ const schemaStripe = z.object({
       last_payment_error: z
         .object({ code: z.string().optional(), decline_code: z.string().optional() })
         .optional(),
+      /*
+        Ce qui a été encaissé ou rendu — revue du 07/10/2026, E2 et E3.
+        Stripe parle déjà en unités mineures. La session porte
+        `amount_total` et `payment_status`, l'intention `amount_received`,
+        la charge remboursée `amount_refunded` (cumulé).
+      */
+      amount_total: z.number().nullish(),
+      amount_received: z.number().nullish(),
+      amount_refunded: z.number().nullish(),
+      currency: z.string().nullish(),
+      payment_status: z.string().nullish(),
     }),
   }),
 });
@@ -217,8 +279,21 @@ const schemaStripe = z.object({
 export function lireStripe(charge: unknown): Lue | null {
   const lu = schemaStripe.safeParse(charge);
   if (!lu.success) return null;
-  const statut = ETATS_STRIPE[lu.data.type];
-  if (!statut) return null;
+  const objet = lu.data.data.object;
+  const annonce = ETATS_STRIPE[lu.data.type];
+  if (!annonce) return null;
+  /*
+    Une session terminée n'est pas forcément payée : un moyen différé la
+    termine avec `payment_status: "unpaid"`, et le paiement arrive ou non
+    plus tard. Seul `paid` confirme (E2) ; le reste est une attente.
+  */
+  const statut: TransactionStatus =
+    lu.data.type === "checkout.session.completed" &&
+    objet.payment_status !== undefined &&
+    objet.payment_status !== null &&
+    objet.payment_status !== "paid"
+      ? "EN_ATTENTE"
+      : annonce;
 
   const erreur = lu.data.data.object.last_payment_error;
   const code = erreur?.decline_code ?? erreur?.code;
@@ -231,9 +306,13 @@ export function lireStripe(charge: unknown): Lue | null {
     // Stripe, lui, numérote ses événements : `evt_…` est exactement la clé
     // que l'idempotence demande, et il en émet un par notification.
     providerEventId: `stripe:${lu.data.id}`,
-    providerTxId: `stripe:${lu.data.data.object.id}`,
-    reference: lu.data.data.object.metadata.reference,
+    providerTxId: `stripe:${objet.id}`,
+    reference: objet.metadata.reference,
     statut,
     ...(cause ? { cause } : {}),
+    montantMineur:
+      statut === "CONFIRMEE" ? (objet.amount_total ?? objet.amount_received ?? null) : null,
+    devise: objet.currency ? objet.currency.toUpperCase() : null,
+    rembourseMineur: statut === "REMBOURSEE" ? (objet.amount_refunded ?? null) : null,
   };
 }

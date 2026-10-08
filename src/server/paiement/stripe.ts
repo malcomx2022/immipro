@@ -192,6 +192,9 @@ const schemaConsultation = z.object({
   id: z.string().min(1),
   payment_status: z.string().nullish(),
   status: z.string().nullish(),
+  // Ce que la session a encaissé, en unités mineures — E2.
+  amount_total: z.number().nullish(),
+  currency: z.string().nullish(),
   metadata: z.object({ reference: z.string().nullish() }).nullish(),
   payment_intent: z
     .union([
@@ -201,6 +204,14 @@ const schemaConsultation = z.object({
         status: z.string().nullish(),
         last_payment_error: z
           .object({ code: z.string().optional(), decline_code: z.string().optional() })
+          .nullish(),
+        /*
+          La charge, développée par le remboursement seulement : son
+          `amount_refunded` dit si le paiement a déjà été remboursé chez
+          Stripe (E3).
+        */
+        latest_charge: z
+          .union([z.string(), z.object({ amount_refunded: z.number().nullish() })])
           .nullish(),
       }),
     ])
@@ -274,8 +285,15 @@ export const consultantStripe = (cle: string): Consultant => ({
 
     // Payé, c'est payé : la session le dit sans ambiguïté, et c'est le
     // cas qui compte — un webhook perdu sur un paiement réussi.
+    const sansMontant = { montantMineur: null, devise: null };
     if (lu.data.payment_status === "paid") {
-      return { issue: "connu", statut: "CONFIRMEE", providerTxId: `stripe:${lu.data.id}` };
+      return {
+        issue: "connu",
+        statut: "CONFIRMEE",
+        providerTxId: `stripe:${lu.data.id}`,
+        montantMineur: lu.data.amount_total ?? null,
+        devise: lu.data.currency ? lu.data.currency.toUpperCase() : null,
+      };
     }
 
     if (intention?.status) {
@@ -299,9 +317,24 @@ export const consultantStripe = (cle: string): Consultant => ({
           statut: "ECHOUEE",
           providerTxId: `stripe:${lu.data.id}`,
           ...(code && CAUSES_STRIPE[code] ? { cause: CAUSES_STRIPE[code] } : {}),
+          ...sansMontant,
         };
       }
-      return { issue: "connu", statut: traduit, providerTxId: `stripe:${lu.data.id}` };
+      /*
+        Une intention réussie dont la session n'est pas encore « paid » :
+        le montant de la session est celui qu'elle encaisse.
+      */
+      return {
+        issue: "connu",
+        statut: traduit,
+        providerTxId: `stripe:${lu.data.id}`,
+        ...(traduit === "CONFIRMEE"
+          ? {
+              montantMineur: lu.data.amount_total ?? null,
+              devise: lu.data.currency ? lu.data.currency.toUpperCase() : null,
+            }
+          : sansMontant),
+      };
     }
 
     // Session expirée sans paiement : le fournisseur la connaît, rien
@@ -376,7 +409,7 @@ export const remboursementStripe = (cle: string): Rembourseur => ({
     const identifiant = demande.providerTxId.replace(/^stripe:/u, "");
     const session = await appeler(
       cle,
-      `/checkout/sessions/${encodeURIComponent(identifiant)}`,
+      `/checkout/sessions/${encodeURIComponent(identifiant)}?expand[]=payment_intent.latest_charge`,
       {},
     );
     if (!session) return { issue: "temporaire", detail: "session injoignable" };
@@ -408,6 +441,25 @@ export const remboursementStripe = (cle: string): Rembourseur => ({
       return {
         issue: "refusee_definitivement",
         detail: "la session ne porte aucune intention de paiement : rien n'a été encaissé",
+      };
+    }
+
+    /*
+      Déjà remboursé chez Stripe — revue du 07/10/2026, E3. Un geste fait
+      au tableau de bord, ou une demande précédente dont la réponse s'est
+      perdue, a déjà rendu de l'argent : en demander encore rembourserait
+      deux fois. Rien ne part ; la notification signée `charge.refunded`
+      soldera la dette si la somme est la bonne, et ouvrira un écart sinon.
+    */
+    const charge =
+      typeof lue.data.payment_intent === "object" && lue.data.payment_intent !== null
+        ? lue.data.payment_intent.latest_charge
+        : null;
+    const dejaRendu = typeof charge === "object" && charge !== null ? (charge.amount_refunded ?? 0) : 0;
+    if (dejaRendu > 0) {
+      return {
+        issue: "refusee_definitivement",
+        detail: "le paiement est déjà remboursé chez Stripe : ne pas relancer, la notification signée soldera la dette si la somme est la bonne",
       };
     }
 

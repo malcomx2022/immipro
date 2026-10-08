@@ -48,7 +48,12 @@ import { verifierLUrlHebergee } from "@/domain/paiement/ouverture";
 import { SANS_REPONSE } from "./ouvreur";
 import type { DemandeDOuverture, Ouverture, Ouvreur } from "./ouvreur";
 import type { Consultant, EtatConsulte } from "./consultation";
-import { CAUSES_FEDAPAY, ETATS_FEDAPAY, referenceMarchande } from "./notifications";
+import {
+  CAUSES_FEDAPAY,
+  ETATS_FEDAPAY,
+  encaissementFedaPay,
+  referenceMarchande,
+} from "./notifications";
 import type { Rembourseur } from "./rembourseur";
 
 /** Le domaine, pas l'hôte : l'hôte exact n'a pas pu être vérifié. */
@@ -424,6 +429,8 @@ export const consultantFedaPay = (cle: string, espace: string | undefined): Cons
         statut,
         providerTxId: `fedapay:${entite.id}`,
         ...(cause ? { cause } : {}),
+        // Le montant hors frais (D-7), comparé comme sur la notification (E2).
+        ...encaissementFedaPay(entite),
       };
     },
   };

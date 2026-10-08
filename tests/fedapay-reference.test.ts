@@ -52,3 +52,36 @@ describe("lireFedaPay — l'événement tel que FedaPay l'envoie", () => {
     expect(lue?.providerTxId).toBe("fedapay:516681");
   });
 });
+
+/**
+ * Le montant que FedaPay notifie — revue du 07/10/2026, E2 (D-7 : hors
+ * frais, vérifié le 08/10/2026 sur IMP-261005-P98AEE).
+ */
+describe("le montant de la notification FedaPay", () => {
+  const entite = (reste: Record<string, unknown>) => ({
+    entity: { id: 42, status: "approved", custom_metadata: { reference: "IMP-261008-AAAAAA" }, ...reste },
+  });
+
+  it("le montant se lit en francs, avec sa devise", () => {
+    expect(lireFedaPay(entite({ amount: 15000, currency: { iso: "XOF" } }))).toMatchObject({
+      montantMineur: 15000,
+      devise: "XOF",
+      rembourseMineur: null,
+    });
+  });
+
+  it("une devise rendue par son seul identifiant reste inconnue, le montant se lit", () => {
+    expect(lireFedaPay(entite({ amount: 15000, currency_id: 1 }))).toMatchObject({
+      montantMineur: 15000,
+      devise: null,
+    });
+  });
+
+  it("un refus sans montant lisible reste un refus lisible", () => {
+    expect(lireFedaPay({ entity: { id: 43, status: "declined" } })).toMatchObject({
+      statut: "ECHOUEE",
+      montantMineur: null,
+      devise: null,
+    });
+  });
+});

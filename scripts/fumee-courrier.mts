@@ -97,6 +97,26 @@ process.env.SMTP_URL = `smtp://127.0.0.1:${portSmtp}`;
 process.env.SMTP_FROM = "ne-pas-repondre@immipro.test";
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const { traiterLaNotification } = await import("../src/server/paiement/reception");
 const { leTransport, TRANSPORT_JOURNAL, sonderLeCourrier, expedier } = await import(
   "../src/server/courrier"
@@ -236,6 +256,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE" as const,
+      ...(await encaisse(transaction.reference)),
     };
 
     const { valeur: premier } = await sousEcoute(() =>
@@ -342,6 +363,9 @@ try {
         // Le garde-fou l'exige, et il a raison : une obligation de
         // rembourser sans motif ne se relit pas.
         refundBasis: "Essai de fumée — courrier de remboursement",
+        // Initié : seul un remboursement décidé et demandé se solde (E3).
+        refundAttemptedAt: new Date(),
+        refundAttempts: 1,
       },
     });
 
@@ -351,6 +375,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "REMBOURSEE" as const,
+      ...sansMontant,
     };
 
     const { valeur: premier } = await sousEcoute(() =>

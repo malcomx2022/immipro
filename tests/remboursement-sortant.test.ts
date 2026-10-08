@@ -203,6 +203,25 @@ describe("l'adaptateur Stripe, contre les réponses du fournisseur", () => {
    * frontière d'INV-7, et l'adaptateur n'a aucun moyen de la franchir :
    * il ne sait rendre qu'« il a pris la demande ».
    */
+  /*
+    Déjà remboursé chez Stripe (E3) : un geste au tableau de bord, ou une
+    demande précédente, a déjà rendu de l'argent. Rien ne part, et la
+    session est lue avec sa charge pour le savoir.
+  */
+  it("un paiement déjà remboursé chez Stripe ne se rembourse pas une seconde fois", async () => {
+    const appels = simuler(
+      reponse(
+        200,
+        session({ payment_intent: { id: "pi_essai", latest_charge: { amount_refunded: 500 } } }),
+      ),
+      reponse(200, { id: "re_x", status: "succeeded" }),
+    );
+    const issue = await adaptateur.demander(DEMANDE);
+    expect(issue).toMatchObject({ issue: "refusee_definitivement" });
+    expect(appels).toHaveLength(1);
+    expect(appels[0]?.url).toContain("expand[]=payment_intent.latest_charge");
+  });
+
   it("« succeeded » reste une demande acceptée, jamais un versement", async () => {
     simuler(reponse(200, session()), reponse(200, { id: "re_2", status: "succeeded" }));
     const issue = await adaptateur.demander(DEMANDE);

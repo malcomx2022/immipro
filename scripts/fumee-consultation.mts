@@ -57,6 +57,26 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const {
   tenirLeCreneau,
   rattacherLePaiement,
@@ -228,6 +248,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
     });
     verifier(issue.issue === "creditee", `la notification est appliquée (${issue.issue})`);
 
@@ -295,6 +316,7 @@ try {
       reference: transaction.reference,
       statut: "ECHOUEE",
       cause: "SOLDE_INSUFFISANT",
+      ...sansMontant,
     });
 
     verifier(
@@ -423,6 +445,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
     });
     const apres = await consultationDuPaiement(transaction.reference, c.userId);
     verifier(apres?.confirme === true, "la confirmation se lit une fois la notification passée");
@@ -697,6 +720,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
     });
 
     verifier(courriers.length === 1, `un courrier part (${courriers.length})`);
@@ -728,6 +752,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
     });
     verifier(courriers.length === 1, `un rejeu ne renvoie rien (${courriers.length})`);
     verifier(
@@ -762,6 +787,7 @@ try {
       providerTxId: transaction.providerTxId!,
       reference: transaction.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(transaction.reference)),
     });
 
     const rdv = await db.appointment.findUniqueOrThrow({ where: { reference: tenue.reference } });

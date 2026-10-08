@@ -68,6 +68,26 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const {
   ouvrirLeTunnel,
   appliquerLaNotification,
@@ -194,6 +214,7 @@ async function confirmer(reference: string) {
     providerTxId: t.providerTxId!,
     reference,
     statut: "CONFIRMEE",
+    ...(await encaisse(reference)),
   });
 }
 
@@ -344,6 +365,7 @@ try {
       providerTxId: t.providerTxId!,
       reference: t.reference,
       statut: "CONFIRMEE",
+      ...(await encaisse(t.reference)),
     });
     await confirmer(ouverte.reference);
     await Promise.all([acheverLeCredit(t), acheverLeCredit(t)]);
@@ -468,6 +490,7 @@ try {
       providerTxId: t.providerTxId!,
       reference: t.reference,
       statut: "REMBOURSEE",
+      ...sansMontant,
     });
     const ouverture = await ouvrirUnRemboursement(essentiel.id, "Geste de support — essai de fumée");
     verifier(ouverture.ouvert, `l'Essentiel s'ouvre au remboursement (${JSON.stringify(ouverture)})`);

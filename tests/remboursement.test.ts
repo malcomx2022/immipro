@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { lireFedaPay, lireStripe } from "@/server/paiement/notifications";
-import { effetDeLaNotification } from "@/server/paiement/cycle";
+import { effetDeLaNotification, verdictDuRemboursementAnnonce } from "@/server/paiement/cycle";
 import {
   agreger,
   DEVISE_DE_REFERENCE,
@@ -409,5 +409,86 @@ describe("S.92 — le remboursement du supplément se rejoue sans se contredire"
     const debit = /export async function debiterUneAnalyse[\s\S]*?\n\}$/mu.exec(quota)![0];
     expect(debit).toMatch(/sousVerrouDuGrandLivre/u);
     expect(debit).toMatch(/const grantId = octroiAEntamer\(lignes\)/u);
+  });
+});
+
+/**
+ * Un remboursement annoncé ne solde que la dette qu'il rembourse — revue
+ * du 07/10/2026, E3 (décisions D-8 et D-10). Les six cas de la matrice.
+ */
+describe("E3 — ce que vaut un remboursement annoncé", () => {
+  const base = {
+    reference: "IMP-261008-CCCCCC",
+    amount: 29,
+    currency: "EUR",
+    refundDueAt: new Date("2026-10-08T10:00:00Z"),
+    refundAttemptedAt: new Date("2026-10-08T10:01:00Z"),
+    refundRequestedAt: new Date("2026-10-08T10:01:00Z"),
+    refundAmount: 2900,
+  };
+
+  it("sans obligation : écart, rien ne bouge (D-8)", () => {
+    const v = verdictDuRemboursementAnnonce({ ...base, refundDueAt: null, refundAttemptedAt: null, refundRequestedAt: null, refundAmount: null }, 2900);
+    expect(v).toMatchObject({ issue: "ecart" });
+    expect("constat" in v && v.constat).toMatch(/aucun remboursement n'était décidé/u);
+  });
+
+  it("obligation non initiée (revue manuelle) : écart", () => {
+    const v = verdictDuRemboursementAnnonce({ ...base, refundAttemptedAt: null, refundRequestedAt: null, refundAmount: null }, 2900);
+    expect("constat" in v && v.constat).toMatch(/Trancher la revue/u);
+  });
+
+  it("initiée, montant non dit (FedaPay) : appliquer", () => {
+    expect(verdictDuRemboursementAnnonce(base, null)).toEqual({ issue: "appliquer" });
+  });
+
+  it("montant égal au dû : appliquer", () => {
+    expect(verdictDuRemboursementAnnonce(base, 2900)).toEqual({ issue: "appliquer" });
+    // Le dû est la somme figée, pas le prix : un prorata de 28,03 € se solde à 28,03 €.
+    expect(verdictDuRemboursementAnnonce({ ...base, refundAmount: 2803 }, 2803)).toEqual({ issue: "appliquer" });
+  });
+
+  it("partiel : écart, le cumul suivant appliquera", () => {
+    const v = verdictDuRemboursementAnnonce(base, 500);
+    expect("constat" in v && v.constat).toMatch(/Remboursement partiel constaté/u);
+  });
+
+  it("plus que dû : écart à trancher avec le comptable (D-10)", () => {
+    const v = verdictDuRemboursementAnnonce(base, 3500);
+    expect("constat" in v && v.constat).toMatch(/supérieur au dû.*comptable/u);
+  });
+
+  it("un supplément sur une transaction remboursée n'est plus un rejeu muet", () => {
+    const source = readFileSync("src/server/acces/paiements.ts", "utf8");
+    expect(source).toMatch(/Remboursement supplémentaire constaté/u);
+  });
+});
+
+/**
+ * Un second écart rouvre une ligne refermée — décision D-9.
+ */
+describe("D-9 — un nouveau constat rouvre l'écart, l'ancien part au journal", () => {
+  const source = readFileSync("src/server/acces/paiements.ts", "utf8");
+  const noter = source.slice(source.indexOf("async function noterLEcart"), source.indexOf("async function noterLEcart") + 2600);
+
+  it("un constat refermé est remplacé, sa résolution remise à nul, sous condition", () => {
+    expect(noter).toMatch(/discrepancyResolvedAt: actuel\.discrepancyResolvedAt/u);
+    expect(noter).toMatch(/discrepancyResolvedAt: null/u);
+  });
+
+  it("l'ancien constat et sa résolution vont au journal", () => {
+    expect(noter).toMatch(/action: "paiement\.ecart\.rouvert"/u);
+    expect(noter).toMatch(/constatPrecedent: actuel\.discrepancy/u);
+  });
+
+  it("un écart ouvert garde son premier constat, et un constat identique ne rouvre rien", () => {
+    expect(noter).toMatch(/if \(!actuel\?\.discrepancy \|\| !actuel\.discrepancyResolvedAt\) return;/u);
+    expect(noter).toMatch(/if \(actuel\.discrepancy === motif\) return;/u);
+  });
+
+  it("les écarts du paiement passent tous par là", () => {
+    const appliquer = source.slice(source.indexOf("export async function appliquerLaNotification"));
+    const corps = appliquer.slice(0, appliquer.indexOf("\n}\n"));
+    expect(corps).not.toMatch(/data: \{ discrepancy:/u);
   });
 });

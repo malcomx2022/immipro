@@ -58,6 +58,26 @@ if (migration.status !== 0 || paquet.status !== 0) {
 
 process.env.DATABASE_URL = cible.toString();
 const { db } = await import("../src/lib/db");
+
+/**
+ * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
+ * plateforme, en unités mineures (revue du 07/10/2026, E2). Une
+ * confirmation sans montant ne crédite plus rien.
+ */
+const encaisse = async (reference: string) => {
+  const { versMineur } = await import("../src/domain/facturation/montants");
+  const t = await db.transaction.findUniqueOrThrow({
+    where: { reference },
+    select: { amount: true, currency: true },
+  });
+  return {
+    montantMineur: versMineur(t.amount, t.currency),
+    devise: t.currency,
+    rembourseMineur: null,
+  };
+};
+/** Une notification qui ne dit rien de l'argent : un échec, une attente, un remboursement FedaPay. */
+const sansMontant = { montantMineur: null, devise: null, rembourseMineur: null };
 const { traiterLaNotification } = await import("../src/server/paiement/reception");
 const { ecartsAnterieurs, paiements } = await import("../src/server/lecture/backoffice");
 const { diagnostiquerLePaiement } = await import("../src/server/paiement/diagnostic");
@@ -105,7 +125,7 @@ try {
 
   console.log("\nLa confirmation tardive");
   const issue = await traiterLaNotification(
-    { providerEventId: `${providerTxId}:approved`, providerTxId, reference, statut: "CONFIRMEE" },
+    { providerEventId: `${providerTxId}:approved`, providerTxId, reference, statut: "CONFIRMEE", ...(await encaisse(reference)) },
     "fedapay",
   );
   const apres = await db.transaction.findUniqueOrThrow({ where: { reference } });
@@ -117,7 +137,7 @@ try {
   verifier((await db.paymentEvent.count()) === 0, "aucun événement de paiement n'est écrit pour une notification refusée");
   const premier = apres.discrepancy;
   await traiterLaNotification(
-    { providerEventId: `${providerTxId}:approved`, providerTxId, reference, statut: "CONFIRMEE" },
+    { providerEventId: `${providerTxId}:approved`, providerTxId, reference, statut: "CONFIRMEE", ...(await encaisse(reference)) },
     "fedapay",
   );
   verifier(

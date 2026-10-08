@@ -12,6 +12,8 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import { formatMineur } from "@/domain/facturation/montants";
+
 /**
  * La clé d'idempotence d'une ouverture.
  *
@@ -117,6 +119,49 @@ export const motifDeDivergence = (
 ): string =>
   `Ouverture refusée : le fournisseur a enregistré ${rendu.montant} ${rendu.devise}, ` +
   `la plateforme avait décidé ${attendu.montant} ${attendu.devise}.`;
+
+/**
+ * L'encaissement confirmé est-il celui qu'on a décidé ? — INV-7, revue du
+ * 07/10/2026, E2 (décisions D-6 et D-7 du 08/10/2026).
+ *
+ * Une confirmation créditait sur le seul statut : un paiement de 10 000 F
+ * ouvrait un pack vendu 15 000 F, et la facture portait 15 000 F. La
+ * direction a tranché : tout écart refuse, même au-dessus du prix — rien
+ * ne s'ouvre, l'écart s'ouvre, et l'opérateur rembourse l'encaissement
+ * réel au tableau de bord.
+ *
+ * Comparaison en unités mineures. La devise ne se compare que si le
+ * fournisseur la nomme (FedaPay peut ne rendre qu'un `currency_id`). Un
+ * montant absent ne concorde pas : on ne crédite pas ce qu'on n'a pas lu.
+ * FedaPay rend son montant hors frais (vérifié le 08/10/2026, D-7).
+ */
+export interface Encaissement {
+  montantMineur: number | null;
+  devise: string | null;
+}
+
+export const encaissementConcorde = (
+  attenduMineur: number,
+  deviseAttendue: string,
+  constat: Encaissement,
+): boolean =>
+  constat.montantMineur !== null &&
+  constat.montantMineur === attenduMineur &&
+  (constat.devise === null || constat.devise.toUpperCase() === deviseAttendue.toUpperCase());
+
+/** Le constat écrit à l'écart quand l'encaissement ne concorde pas. Jamais au candidat. */
+export function motifDEncaissementDivergent(
+  providerTxId: string,
+  constat: Encaissement,
+  attenduMineur: number,
+  deviseAttendue: string,
+): string {
+  const recu =
+    constat.montantMineur === null
+      ? "sans en indiquer le montant"
+      : `pour ${formatMineur(constat.montantMineur, constat.devise ?? deviseAttendue)}`;
+  return `Paiement confirmé par le fournisseur (${providerTxId}) ${recu}, alors que la plateforme avait décidé ${formatMineur(attenduMineur, deviseAttendue)} : rien n'a été ouvert ni facturé. Vérifier l'encaissement au tableau de bord du fournisseur et, s'il est réel, y rembourser la somme.`;
+}
 
 /**
  * Ce que le retour du navigateur vaut : rien.

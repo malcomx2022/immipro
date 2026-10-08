@@ -613,6 +613,7 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "paiement.remboursement.manuel": "PAIEMENT",
   "paiement.remboursement.tranche": "PAIEMENT",
   "paiement.reconciliation": "PAIEMENT",
+  "paiement.ecart.rouvert": "PAIEMENT",
   "regle.publication": "REGLE",
   "regle.republication": "REGLE",
   "contenu.publication": "REGLE",
