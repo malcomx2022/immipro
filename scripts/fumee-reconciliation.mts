@@ -475,6 +475,141 @@ try {
     verifier(await solde(applicationId) === ouvert, "et ne crédite pas deux fois");
   }
 
+  console.log("\nUn achat sans contrepartie ouvrable est constaté une fois, avec un écart (F6)");
+  {
+    /*
+      Reproduit avant correction : un pack absent de la grille ne
+      s'ouvrait pas, mais l'achèvement rendait « vrai » — chaque passe le
+      comptait achevé et écrivait une ligne de journal fausse.
+    */
+    const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 5 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date(), packCode: "pack-retire" },
+    });
+    const journal = () =>
+      db.auditLog.count({
+        where: { action: "paiement.reconciliation", target: `transaction:${transaction.reference}` },
+      });
+    const premiere = await reconcilierLesPaiements(new Date(), () => null);
+    const seconde = await reconcilierLesPaiements(new Date(), () => null);
+    const apres = await relire(transaction.id);
+    verifier(
+      premiere.creditsAcheves === 0 && seconde.creditsAcheves === 0,
+      `aucune passe ne se dit achevée (${premiere.creditsAcheves}, ${seconde.creditsAcheves})`,
+    );
+    verifier((await journal()) === 0, "aucune ligne de journal fausse");
+    verifier(await solde(applicationId) === 0, "rien n'est ouvert");
+    verifier(apres.creditedAt !== null, "la contrepartie est constatée");
+    verifier(
+      (apres.discrepancy ?? "").includes("sans contrepartie ouvrable"),
+      `un écart dit quoi faire (${apres.discrepancy})`,
+    );
+  }
+
+  console.log("\nAu-delà de deux cents ventes, un crédit interrompu est rattrapé (F6)");
+  {
+    /*
+      Reproduit avant correction : le filet lisait les deux cents plus
+      anciennes ventes confirmées ; la deux cent unième, récente et sans
+      contrepartie, n'entrait jamais dans la fenêtre.
+    */
+    const { applicationId: dossierDesVentes } = await transactionEnAttente({ ilYAMinutes: 5 });
+    const proprietaire = (await db.application.findUniqueOrThrow({ where: { id: dossierDesVentes } })).userId;
+    const avant = new Date(Date.now() - 3 * 86_400_000);
+    const anciennes = Array.from({ length: 200 }, (_, i) => ({
+      id: `ancienne-${process.pid}-${i}`,
+      reference: `IMP-ANC-${process.pid}-${i}`,
+      userId: proprietaire,
+      applicationId: dossierDesVentes,
+      packCode: "recharge",
+      amount: 2000,
+      currency: "XOF",
+      provider: "FEDAPAY" as const,
+      status: "CONFIRMEE" as const,
+      confirmedAt: new Date(avant.getTime() + i * 1000),
+      reconciledAt: new Date(avant.getTime() + i * 1000),
+      creditedAt: new Date(avant.getTime() + i * 1000),
+    }));
+    await db.transaction.createMany({ data: anciennes });
+    await db.analysisCredit.createMany({
+      data: anciennes.map((t) => ({
+        applicationId: dossierDesVentes,
+        delta: 1,
+        reason: "RECHARGE" as const,
+        transactionId: t.id,
+      })),
+    });
+    const { transaction, applicationId } = await transactionEnAttente({ ilYAMinutes: 5 });
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "CONFIRMEE", confirmedAt: new Date(), packCode: "essentiel" },
+    });
+    const passe = await reconcilierLesPaiements(new Date(), () => null);
+    verifier(passe.creditsAcheves >= 1, `la passe achève au moins la récente (${passe.creditsAcheves})`);
+    verifier(await solde(applicationId) > 0, "la deux cent unième vente est créditée à la première passe");
+  }
+
+  console.log("\nUn remboursement dont la notification s'est perdue est soldé par la passe (E3, étape 5)");
+  {
+    /*
+      Reproduit avant correction : une dette initiée attendait une
+      notification perdue, et la passe ne la consultait pas — la dette
+      restait due en B-04 alors que l'argent était rendu.
+    */
+    const dette = async (rembourse: number) => {
+      const { transaction } = await transactionEnAttente({ ilYAMinutes: 5 });
+      const maintenant = new Date();
+      await db.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          status: "CONFIRMEE",
+          confirmedAt: new Date(maintenant.getTime() - 60_000),
+          creditedAt: new Date(maintenant.getTime() - 60_000),
+          refundDueAt: maintenant,
+          refundBasis: "Geste de support — fumée de rattrapage",
+          refundAmount: 2900,
+          refundAttemptedAt: maintenant,
+          refundAttempts: 1,
+          refundRequestedAt: maintenant,
+        },
+      });
+      const consultant = consultantSimule(transaction.reference, {
+        issue: "connu",
+        statut: "CONFIRMEE",
+        providerTxId: transaction.providerTxId!,
+        montantMineur: 2900,
+        devise: "EUR",
+        rembourseMineur: rembourse,
+      });
+      return { transaction, consultant };
+    };
+
+    const complete = await dette(2900);
+    const bilan = await reconcilierLesPaiements(new Date(), () => complete.consultant);
+    const soldee = await relire(complete.transaction.id);
+    verifier(
+      soldee.status === "REMBOURSEE" && soldee.refundedAt !== null,
+      `la dette est soldée sur la parole du fournisseur (${soldee.status})`,
+    );
+    verifier(bilan.remboursementsRattrapes >= 1, `le bilan le compte (${bilan.remboursementsRattrapes})`);
+    verifier(
+      (await db.invoice.count({ where: { transactionId: complete.transaction.id, kind: "AVOIR" } })) === 1,
+      "et l'avoir est émis",
+    );
+    const rejouee = await reconcilierLesPaiements(new Date(), () => complete.consultant);
+    verifier(rejouee.remboursementsRattrapes === 0, "une seconde passe ne la solde pas deux fois");
+
+    const partielle = await dette(500);
+    await reconcilierLesPaiements(new Date(), () => partielle.consultant);
+    const enEcart = await relire(partielle.transaction.id);
+    verifier(enEcart.status === "CONFIRMEE", `un partiel ne solde rien (${enEcart.status})`);
+    verifier(
+      (enEcart.discrepancy ?? "").includes("Remboursement partiel constaté"),
+      "il ouvre l'écart du partiel, comme la notification",
+    );
+  }
+
   // ── 8 bis. Deux achèvements simultanés du même paiement ────────────
   /*
     La lecture de la contrepartie rend l'achèvement rejouable ; elle ne le

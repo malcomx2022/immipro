@@ -1,11 +1,12 @@
 import { db } from "@/lib/db";
-import { aExpirer, aReconcilier } from "@/server/paiement/cycle";
+import { BAIL_DE_CREDIT_MINUTES, aExpirer, aReconcilier } from "@/server/paiement/cycle";
 import { journaliser } from "@/server/acces/journal";
 import { acheverLeCredit, appliquerLaNotification } from "@/server/acces/paiements";
 import { cleDEvenementDeReconciliation } from "@/domain/paiement/ouverture";
 import { leConsultant, type Consultant } from "@/server/paiement/consultation";
 import { libererLesTenuesEchues } from "@/server/acces/consultations";
 import { emettreLesPiecesEnSouffrance } from "@/server/facturation/emission";
+import { reprendreLesRecus } from "@/server/paiement/recu";
 
 /**
  * Réconciliation des paiements — RG-05.4.
@@ -59,6 +60,13 @@ export interface Bilan {
    */
   creditsAcheves: number;
   /**
+   * Remboursements initiés dont la notification s'était perdue, soldés
+   * (ou mis en écart) sur la parole du fournisseur consulté — E3, étape 5.
+   */
+  remboursementsRattrapes: number;
+  /** Reçus restés en attente et partis à cette passe — F3. */
+  recusRepris: number;
+  /**
    * Factures et avoirs émis après coup : une vente confirmée sans facture,
    * un remboursement sans avoir (M.C, 04/10/2026).
    */
@@ -97,6 +105,8 @@ export async function reconcilierLesPaiements(
     expirees: 0,
     ecartsOuverts: 0,
     creditsAcheves: await acheverLesCreditsEnSouffrance(),
+    remboursementsRattrapes: 0,
+    recusRepris: 0,
     tenuesLiberees: await libererLesTenuesEchues(maintenant),
     piecesEmises: 0,
     indisponibles: 0,
@@ -238,8 +248,72 @@ export async function reconcilierLesPaiements(
 
   // En dernier : les paiements rattrapés ci-dessus ont déjà leur pièce, et
   // celle-ci reprend ce que les notifications n'ont pas pu émettre.
+  bilan.remboursementsRattrapes = await rattraperLesRemboursements(consultantDe).catch(() => 0);
+  bilan.recusRepris = await reprendreLesRecus(maintenant).catch(() => 0);
   bilan.piecesEmises = await emettreLesPiecesEnSouffrance().catch(() => 0);
   return bilan;
+}
+
+/**
+ * Le remboursement dont la notification s'est perdue — RG-05.4, INV-7,
+ * revue du 07/10/2026, E3 (étape 5).
+ *
+ * Une dette initiée attendait sa notification signée pour se solder. Si
+ * elle se perdait, rien ne la rattrapait : la passe ne lisait que les
+ * paiements en attente, et une transaction confirmée dont le
+ * remboursement était parti lui restait invisible. La dette restait due en
+ * B-04, alors que l'argent était rendu.
+ *
+ * La passe consulte donc aussi les dettes **initiées** et non soldées, et
+ * applique ce que le fournisseur dit par le même service que les
+ * notifications : le verdict d'E3 (somme due, partiel, excédent) vaut ici
+ * comme ailleurs. Une dette non initiée n'est pas consultée : elle attend
+ * une décision, pas le fournisseur.
+ */
+async function rattraperLesRemboursements(consultantDe: Annuaire): Promise<number> {
+  const dettes = await db.transaction.findMany({
+    where: {
+      status: "CONFIRMEE",
+      refundDueAt: { not: null },
+      refundedAt: null,
+      OR: [{ refundAttemptedAt: { not: null } }, { refundRequestedAt: { not: null } }],
+    },
+    orderBy: { refundDueAt: "asc" },
+    take: 100,
+  });
+
+  let rattrapes = 0;
+  for (const dette of dettes) {
+    const consultant = consultantDe(dette.provider);
+    if (!consultant) continue;
+    const vu = await consultant
+      .consulter(dette.providerTxId, dette.reference)
+      .catch(() => ({ issue: "indisponible" as const, detail: "appel en erreur" }));
+    if (vu.issue !== "connu") continue;
+    const rembourseMineur = vu.rembourseMineur ?? null;
+    if (vu.statut !== "REMBOURSEE" && !(rembourseMineur !== null && rembourseMineur > 0)) continue;
+
+    const issue = await appliquerLaNotification({
+      // Le cumul fait partie de la clé : un partiel puis le complet sont
+      // deux constats, une même lecture rejouée n'en fait qu'un.
+      providerEventId: `${cleDEvenementDeReconciliation(dette.reference, "REMBOURSEE")}:${rembourseMineur ?? "total"}`,
+      providerTxId: vu.providerTxId,
+      reference: dette.reference,
+      statut: "REMBOURSEE",
+      montantMineur: null,
+      devise: null,
+      rembourseMineur,
+    }).catch(() => null);
+    if (issue?.issue !== "appliquee") continue;
+    rattrapes += 1;
+    await journaliser({
+      acteurId: "systeme:reconciliation",
+      action: "paiement.reconciliation",
+      cible: `transaction:${dette.reference}`,
+      motif: "Remboursement retrouvé chez le fournisseur : la notification s'était perdue (RG-05.4)",
+    }).catch(() => undefined);
+  }
+  return rattrapes;
 }
 
 /**
@@ -265,8 +339,20 @@ export async function reconcilierLesPaiements(
  * tout seul.
  */
 async function acheverLesCreditsEnSouffrance(): Promise<number> {
+  /*
+    Seulement les ventes dont la contrepartie n'est pas constatée (F6). La
+    requête lisait les deux cents plus anciennes ventes confirmées, sans
+    filtre : passé deux cents ventes, un crédit interrompu récent n'entrait
+    jamais dans la fenêtre. Un bail en cours n'est pas repris : l'appelant
+    qui le tient est encore là.
+  */
+  const perime = new Date(Date.now() - BAIL_DE_CREDIT_MINUTES * 60_000);
   const confirmees = await db.transaction.findMany({
-    where: { status: "CONFIRMEE" },
+    where: {
+      status: "CONFIRMEE",
+      creditedAt: null,
+      OR: [{ creditingAt: null }, { creditingAt: { lt: perime } }],
+    },
     orderBy: { confirmedAt: "asc" },
     take: 200,
   });

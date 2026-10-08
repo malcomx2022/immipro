@@ -52,6 +52,12 @@ export type EtatConsulte =
        */
       montantMineur: number | null;
       devise: string | null;
+      /**
+       * Le cumul déjà remboursé chez le fournisseur, en unités mineures,
+       * quand il le dit (Stripe, par la charge) — E3, étape 5. Une dette
+       * dont la notification s'est perdue se solde par ici.
+       */
+      rembourseMineur?: number | null;
     }
   | { issue: "sans_paiement" }
   | { issue: "introuvable" }
