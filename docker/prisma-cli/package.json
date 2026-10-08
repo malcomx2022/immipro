@@ -1,0 +1,8 @@
+{
+  "name": "immipro-prisma-cli",
+  "private": true,
+  "description": "La CLI Prisma de l'image de production, à version exacte : celle du verrou racine (M15).",
+  "dependencies": {
+    "prisma": "6.19.3"
+  }
+}

@@ -1,11 +1,15 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS deps
+#
+# Node 24 LTS (D-30, M19 étape 0), épinglé par empreinte (M15) : un tag
+# seul change sous les pieds d'une reconstruction. Dependabot tient
+# l'empreinte à jour (`.github/dependabot.yml`, écosystème docker).
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS deps
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -15,7 +19,18 @@ COPY . .
 # deux — c'est ainsi que le worker s'est retrouvé absent de l'image.
 RUN npx prisma generate && npm run build
 
-FROM node:20-alpine AS runner
+# La CLI Prisma des migrations, dans son propre étage — revue du
+# 07/10/2026, M15. `npm install -g prisma@6` prenait la dernière 6.x du jour
+# de la construction : deux images du même commit pouvaient migrer avec deux
+# CLI différentes. La version est désormais celle du verrou
+# `docker/prisma-cli/package-lock.json`, égale à celle du verrou racine
+# (tests/image-production.test.ts y veille).
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS prisma-cli
+WORKDIR /opt/prisma-cli
+COPY docker/prisma-cli/package.json docker/prisma-cli/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -51,11 +66,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
 # `standalone` de Next ne les embarque pas.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# La CLI Prisma pour les migrations : elle n'est pas dans l'image (le
-# `standalone` ne trace pas la CLI) et `npx prisma` seul téléchargerait la
-# 7, qui refuse le `url` du schéma au style v6 (P1012). Épinglée en v6,
-# comme package.json (`prisma: ^6.0.0`).
-RUN npm install -g prisma@6
+# La CLI Prisma pour les migrations : le `standalone` ne la trace pas, et
+# `npx prisma` seul téléchargerait la 7, qui refuse le `url` du schéma au
+# style v6 (P1012). Elle vient de l'étage `prisma-cli`, à version exacte,
+# et se trouve par le PATH (`npx prisma migrate deploy`, `prisma --version`).
+COPY --from=prisma-cli /opt/prisma-cli /opt/prisma-cli
+ENV PATH=/opt/prisma-cli/node_modules/.bin:$PATH
 
 USER nextjs
 EXPOSE 3000

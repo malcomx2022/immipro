@@ -62,12 +62,19 @@ import {
   openSync,
   readFileSync,
   rmSync,
+  statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const RACINE = process.cwd();
 const COMPOSE = join(RACINE, "docker-compose.prod.yml");
+/** Le battement du worker (M15) : `src/server/jobs/battement.ts`. */
+const BATTEMENT = "/tmp/worker-battement";
+/** La version de la CLI Prisma que l'image doit porter : celle du verrou racine (M15). */
+const PRISMA_ATTENDU = JSON.parse(readFileSync(join(RACINE, "package-lock.json"), "utf8")).packages[
+  "node_modules/prisma"
+].version;
 
 /** Port fermé : la connexion doit être refusée tout de suite. */
 const URL_SANS_BASE = "postgresql://fumee:fumee@127.0.0.1:59999/fumee";
@@ -233,6 +240,34 @@ if (!argImage) {
     démarre reste debout : on le lance, on attend, on regarde s'il est
     encore là.
   */
+  /*
+    M15 : la CLI Prisma de l'image est celle du verrou, et les sondes du
+    compose trouvent leurs outils dans l'image. Une sonde dont la commande
+    n'existe pas dans le conteneur le déclare malade pour toujours.
+  */
+  console.log("\nOutils de l'image (M15)");
+  const cli = spawnSync("docker", ["run", "--rm", "--network", "none", "--entrypoint", "prisma", tag, "--version"], {
+    encoding: "utf8",
+    timeout: 120_000,
+  });
+  const versionCli = /^prisma\s*:\s*(\S+)/mu.exec(cli.stdout ?? "")?.[1] ?? "absente";
+  verifier(versionCli === PRISMA_ATTENDU, `CLI Prisma de l'image : ${versionCli} (verrou : ${PRISMA_ATTENDU})`);
+  const sonde = (commande) =>
+    spawnSync("docker", ["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-c", commande], {
+      encoding: "utf8",
+      timeout: 60_000,
+    }).status;
+  const sondeDuWorker = 'test $(( $(date +%s) - $(stat -c %Y /tmp/worker-battement) )) -lt 90';
+  verifier(sonde("command -v wget >/dev/null") === 0, "wget est dans l'image (sonde du service app)");
+  verifier(
+    sonde(`touch /tmp/worker-battement && ${sondeDuWorker}`) === 0,
+    "sonde du worker : un battement frais est sain",
+  );
+  verifier(
+    sonde(`touch -t 202001010000 /tmp/worker-battement && ${sondeDuWorker}`) !== 0,
+    "sonde du worker : un battement vieux est malade",
+  );
+
   console.log("\nCommande par défaut de l'image (service app)");
   /*
     Sans `--rm` : un conteneur qui s'arrête tout de suite serait effacé
@@ -400,11 +435,21 @@ if (process.argv.includes("--base")) {
     });
 
     const lire = () => (existsSync(journal) ? readFileSync(journal, "utf8") : "");
-    const limite = Date.now() + 90_000;
+    const depart = Date.now();
+    const limite = depart + 90_000;
     while (Date.now() < limite && !arrete && !lire().includes("worker démarré")) {
       await new Promise((suite) => setTimeout(suite, 200));
     }
     const sortie = lire();
+
+    // Le premier battement suit le démarrage : la sonde du compose
+    // (`docker-compose.prod.yml`) lit ce fichier, il doit être frais.
+    const frais = () => existsSync(BATTEMENT) && statSync(BATTEMENT).mtimeMs >= depart - 1000;
+    const limiteBattement = Date.now() + 60_000;
+    while (!arrete && Date.now() < limiteBattement && !frais()) {
+      await new Promise((suite) => setTimeout(suite, 200));
+    }
+    verifier(frais(), `${tour} : le worker bat (${BATTEMENT} réécrit après le démarrage)`);
 
     if (!arrete) {
       enfant.kill("SIGTERM");

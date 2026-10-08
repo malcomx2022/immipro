@@ -11778,3 +11778,33 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 3. L'image ne porte aucune commande pour lancer la purge à la main : après une restauration, l'application attend le passage de 3 h 30 avant de rouvrir.
 4. L'archive des pièces est complète chaque nuit : sur B2, le volume vaut environ 30 fois le seau. C'est acceptable au pilote, à revoir avec la croissance (copie incrémentale).
 5. `dependabot.yml` n'ignore pas les majeures des actions GitHub : `checkout` v7 et `setup-buildx` v4 sont arrivés hors de l'ordre de M19.
+
+## S.134 — Revue du 07/10/2026 : exploitation III (M19 étape 0, M15)
+
+**Contexte.** Dixième lot du plan de traitement. Deux décisions, tranchées le 08/10/2026 :
+- **D-30** : passer à Node 24 LTS ;
+- **D-28** : le VPS a 8 Go, et la rotation des journaux se fait dans le compose.
+
+**Ce que fait le code.**
+- **Node 24** remplace Node 20, en fin de vie depuis le 30/04/2026, à tous les endroits qui fixent la version : `.nvmrc`, les quatre étages du `Dockerfile` (épinglés par empreinte), `setup-node` en CI et au déploiement, `engines`, la cible esbuild des paquets, `@types/node`.
+- **Le compose de production** :
+  - rotation des journaux sur chaque service ;
+  - limite mémoire par service, environ 6,3 Go au total ;
+  - tas Node à 512 Mo pour `app` et `worker` ;
+  - sondes : `app` (sonde de vie sur `/robots.txt`, pas `/api/health`, qui répond 503 sans panne), `worker` (battement) et Garage (`/garage status`) ;
+  - délai d'arrêt de 30 s pour le worker ;
+  - images tierces épinglées par empreinte.
+- **Le battement du worker** (`src/server/jobs/battement.ts`) : toutes les 30 s, un `SELECT 1` puis l'écriture de `/tmp/worker-battement`. La sonde du compose déclare le worker malade au-delà de 90 s.
+- **La CLI Prisma de l'image** vient d'un étage dédié, à la version exacte de `docker/prisma-cli/package-lock.json`, égale au verrou racine. Fini `npm install -g prisma@6`, qui prenait la dernière 6.x du jour de la construction.
+
+**Ce qui est éprouvé.**
+- Toute la suite de tests tourne sous Node 24 (3 196 tests). Ce passage a révélé un vrai défaut : sous jsdom, le `fetch` de Node 24 refuse l'`AbortSignal` de jsdom, et 17 essais des fournisseurs IA échouaient. Ces deux fichiers éprouvent du code serveur, et tournent désormais sous l'environnement `node`. La production n'est pas concernée, elle n'a pas de jsdom.
+- L'image a été construite localement :
+  - `smoke:worker --image` : CLI Prisma 6.19.3, égale au verrou ; `wget` présent ; la sonde du worker saine sur un battement frais et malade sur un battement vieux ; worker, app et passerelle démarrent ;
+  - `smoke:worker --base` sous Node 24 : le worker bat après chaque démarrage.
+- `tests/image-production.test.ts` relit le Dockerfile, le compose et la CI. Sur les anciens fichiers, 10 essais sur 11 échouent.
+
+**Écarts qui restent.**
+1. Après le premier déploiement, vérifier sur le VPS que les six services sont `healthy` et que les limites apparaissent dans `docker stats`.
+2. Le compose de développement (`docker-compose.yml`) utilise toujours `minio/minio`, retiré de Docker Hub. Cela reste hors de ce lot.
+3. Un changement de version de Prisma au verrou racine fera échouer `tests/image-production.test.ts` tant que `docker/prisma-cli` n'est pas aligné. C'est voulu.

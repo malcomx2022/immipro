@@ -35,7 +35,7 @@ npm run seed:rules              # référentiel vague 1
 npm run dev                     # http://localhost:3000
 ```
 
-Node 20 LTS (`.nvmrc`).
+Node 24 LTS (`.nvmrc`, D-30 du 08/10/2026).
 
 ### Le worker
 
