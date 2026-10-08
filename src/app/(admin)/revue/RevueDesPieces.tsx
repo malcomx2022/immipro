@@ -158,7 +158,7 @@ export function RevueDesPieces({
             selection={retenue?.id ?? null}
             onSelection={choisir}
             entete={
-              <div className="grid grid-cols-[1fr_1.4fr_6rem_1fr] gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
+              <div className="grid grid-cols-revue gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
                 <span>Pièce</span>
                 <span>Dossier</span>
                 <span>Attente</span>
@@ -166,7 +166,7 @@ export function RevueDesPieces({
               </div>
             }
             rendu={(piece) => (
-              <div className="grid grid-cols-[1fr_1.4fr_6rem_1fr] items-center gap-3">
+              <div className="grid grid-cols-revue items-center gap-3">
                 <span className="truncate text-ink-900">{piece.piece}</span>
                 <span className="truncate text-ink-700">{piece.dossier}</span>
                 <span
@@ -183,7 +183,7 @@ export function RevueDesPieces({
         </div>
 
         {retenue ? (
-          <aside className="flex w-[420px] flex-none flex-col gap-4">
+          <aside className="flex w-panneau-large flex-none flex-col gap-4">
             <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-4">
               <h2 className="text-16 font-semibold text-ink-900">{retenue.piece}</h2>
               <p className="text-13 text-ink-500">
@@ -355,7 +355,7 @@ function FileVide() {
         <h2 className="text-19 font-semibold text-ink-900">
           Aucune pièce en attente de revue
         </h2>
-        <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+        <p className="max-w-lecture text-pretty text-14 text-ink-700">
           Les pièces en échec d&apos;analyse d&apos;hier ont toutes été traitées. Les
           nouvelles arrivent ici dans les minutes qui suivent l&apos;échec.
         </p>

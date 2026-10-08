@@ -452,7 +452,8 @@ describe("ce que le client dit d'une réponse illisible", () => {
    */
   it("aucun code du contrat n'est déclaré sans être levé quelque part", () => {
     const corpus = sources("src")
-      .filter((f) => f !== "src/server/http/echecs.ts")
+      // Le catalogue déclare les codes (F8) ; le module serveur les reprend.
+      .filter((f) => f !== "src/server/http/echecs.ts" && f !== "src/domain/echecs/catalogue.ts")
       .map((f) => readFileSync(f, "utf8"))
       .join("\n");
     const jamaisLeves = (Object.keys(ECHECS) as CodeEchec[]).filter(

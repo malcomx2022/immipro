@@ -64,8 +64,8 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
     formatMontant(montants[devise], devise);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 pb-8 md:flex-row md:gap-12 md:px-12 md:py-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-5 md:max-w-[640px]">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 pb-8 md:flex-row md:gap-12 md:px-12 md:py-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-5 md:max-w-decision">
         <Link
           href={`/dossiers/${tunnel.dossier.id}`}
           className="text-14 font-semibold text-ink-900"

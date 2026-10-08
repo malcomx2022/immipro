@@ -127,7 +127,7 @@ export function Contenus({ documents }: { documents: readonly LigneDocument[] })
         ) : null}
 
         <div className="overflow-x-auto rounded-lg border border-ink-300 bg-white">
-          <table className="w-full min-w-[840px] border-collapse text-14">
+          <table className="w-full min-w-tableau-large border-collapse text-14">
             <thead>
               <tr className="border-b border-ink-300 text-left text-13 text-ink-500">
                 <th scope="col" className="px-3 py-2 font-medium">Titre</th>

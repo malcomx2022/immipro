@@ -71,7 +71,7 @@ export function Recu({ recu }: { recu: Donnees }) {
   if (!estAttestable(recu.etat)) {
     const attente = recu.etat === "en_cours";
     return (
-      <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
+      <div className="mx-auto flex w-full max-w-etroit flex-col gap-6 px-4 pb-8 md:py-8">
         <h1
           id="contenu"
           tabIndex={-1}
@@ -97,7 +97,7 @@ export function Recu({ recu }: { recu: Donnees }) {
   }
 
   return (
-    <div className="a-imprimer mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
+    <div className="a-imprimer mx-auto flex w-full max-w-etroit flex-col gap-6 px-4 pb-8 md:py-8">
       <h1
         id="contenu"
         tabIndex={-1}

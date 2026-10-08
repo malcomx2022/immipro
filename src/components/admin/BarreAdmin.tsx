@@ -31,7 +31,7 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
 
       <nav
         aria-label="Navigation du back-office"
-        className="flex w-[232px] flex-none flex-col gap-6 border-r border-ink-300 bg-white p-4"
+        className="flex w-nav-admin flex-none flex-col gap-6 border-r border-ink-300 bg-white p-4"
       >
         <Link href="/veille" className="inline-flex items-center px-2">
           <Image

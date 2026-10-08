@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   // résolvent sur l'origine du déploiement, jamais sur une supposition.
   metadataBase: origineDuSite(process.env.APP_URL),
   title: { default: "ImmiPro", template: "%s — ImmiPro" },
-  description: "Préparez votre dossier d'immigration, pièce par pièce.",
+  description: "Prépare ton dossier d'immigration, pièce par pièce.",
   icons: { icon: "/favicon.svg", apple: "/apple-touch-icon.png" },
   openGraph: { images: ["/brand/og-image-1200x630.png"], locale: "fr_FR" },
 };

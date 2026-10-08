@@ -345,7 +345,7 @@ export function EditionRegle({
           </section>
         </div>
 
-        <aside className="flex w-[340px] flex-none flex-col gap-4">
+        <aside className="flex w-panneau flex-none flex-col gap-4">
           <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-4">
             <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
               Différences avec la version {enVigueur.version}

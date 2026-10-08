@@ -79,7 +79,7 @@ export function Consultants({ consultants, destinations }: ConsultantsProps) {
 
       {echec ? <BlocEchec echec={echec} /> : null}
 
-      <p className="max-w-[80ch] text-pretty text-13 text-ink-700">
+      <p className="max-w-lecture-large text-pretty text-13 text-ink-700">
         {RAPPEL_VERIFICATION}
       </p>
 
@@ -196,7 +196,7 @@ function FicheConsultant({
           libelle="Juridiction"
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
-          classNameChamp="md:w-[200px]"
+          classNameChamp="md:w-filtre-etroit"
           options={destinations.map((d) => ({ valeur: d.code, libelle: d.pays }))}
         />
         <Input

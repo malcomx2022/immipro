@@ -56,7 +56,7 @@ export function ExportDesAppels({ duParDefaut, auParDefaut }: { duParDefaut: str
         <h2 id="export-appels" className="text-16 font-semibold text-ink-900">
           Exporter le détail des appels
         </h2>
-        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+        <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
           Un fichier CSV, une ligne par appel : fournisseur, modèle, jetons d&apos;entrée et de
           sortie, coût, moment, référence du dossier. Période de {JOURS_MAXIMUM} jours au plus.
         </p>
@@ -91,7 +91,7 @@ export function ExportDesAppels({ duParDefaut, auParDefaut }: { duParDefaut: str
 
       {echec ? <BlocEchec echec={echec} annonce /> : null}
 
-      <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+      <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
         {MENTION_SANS_DONNEE_CANDIDAT_EXPORT} {MENTION_COUT_RECALCULE}
       </p>
     </section>

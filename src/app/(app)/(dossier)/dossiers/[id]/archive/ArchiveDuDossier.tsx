@@ -68,7 +68,7 @@ export function ArchiveDuDossier({ archive }: { archive: Archive }) {
   }
 
   return (
-    <div className="a-imprimer mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="a-imprimer mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <Link
         href={`/dossiers/${dossier.id}`}
         className="pas-a-imprimer flex min-h-touch items-center text-14 text-accent-600"

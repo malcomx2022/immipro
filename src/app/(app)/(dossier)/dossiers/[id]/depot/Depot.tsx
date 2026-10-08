@@ -75,7 +75,7 @@ export function Depot({ dossier, aujourdhui, ouvertLe }: DepotProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier
         dossier={dossier}
         retour={`/dossiers/${dossier.id}`}

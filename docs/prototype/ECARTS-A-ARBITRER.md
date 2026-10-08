@@ -11808,3 +11808,28 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 1. Après le premier déploiement, vérifier sur le VPS que les six services sont `healthy` et que les limites apparaissent dans `docker stats`.
 2. Le compose de développement (`docker-compose.yml`) utilise toujours `minio/minio`, retiré de Docker Hub. Cela reste hors de ce lot.
 3. Un changement de version de Prisma au verrou racine fera échouer `tests/image-production.test.ts` tant que `docker/prisma-cli` n'est pas aligné. C'est voulu.
+
+## S.135 — Revue du 07/10/2026 : interface I (F8, F9, F7)
+
+**Contexte.** Onzième lot du plan de traitement. Deux décisions de design, tranchées le 08/10/2026 :
+- **D-21** : la mention de nouvel onglet est réservée aux lecteurs d'écran ;
+- **D-20** : un jeton par valeur, sans aucun regroupement.
+
+**Ce que fait le code.**
+- **F8.**
+  - `LienNouvelOnglet`, un nouveau composant, pose `target="_blank"`, `rel="noopener"` et la mention « (s'ouvre dans un nouvel onglet) » réservée aux lecteurs d'écran. Il est utilisé à l'inscription et au récapitulatif de paiement. Le lien partenaire de `Services` garde son `rel` propre et reçoit la même mention.
+  - `Echec.tsx` perd son `"use client"` inutile.
+  - Le catalogue des échecs (`Ton`, `CodeEchec`, `Echec`, `ECHECS`, `EchecCandidat`) passe dans `domain/echecs/catalogue.ts`. `server/http/echecs.ts` le réexporte, si bien que ses importateurs ne changent pas. `lib/api.ts`, la pièce d'un dossier et `BlocEchec` l'importent désormais du domaine.
+- **F9.** La description par défaut tutoie : « Prépare ton dossier d'immigration, pièce par pièce. »
+- **F7.** Les 131 valeurs arbitraires (`max-w-[640px]`…) deviennent des jetons de `tailwind.config.ts`, remplacés valeur pour valeur dans 63 fichiers.
+
+**Ce qui est éprouvé.**
+- `tests/frontiere-client.test.ts` refuse toute valeur importée de `@/server/` côté client ; il échoue sur l'ancien `lib/api.ts` et sur `PieceDuDossier`.
+- `tests/ui/lien-nouvel-onglet.test.tsx` vérifie le nom accessible et le `rel`, et refuse tout `target="_blank"` sans mention.
+- `tests/tutoiement.test.ts` lit les fichiers à la racine de `src/app` et voyait le vouvoiement.
+- `tests/jetons-de-mise-en-page.test.ts` refuse toute valeur arbitraire numérique ; il échoue sur l'ancien code.
+- **Aucun changement visuel** : Tailwind, avec la configuration du dépôt, génère des règles CSS strictement identiques pour les 33 paires d'anciennes et de nouvelles classes.
+
+**Écarts qui restent.**
+1. Un éventuel regroupement des largeurs se décide écran par écran, en changeant la valeur du jeton.
+2. Les autres valeurs arbitraires non numériques (aucune aujourd'hui) ne sont pas couvertes par le garde-fou.

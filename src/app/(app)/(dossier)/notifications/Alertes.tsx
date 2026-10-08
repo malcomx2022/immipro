@@ -109,7 +109,7 @@ export function Alertes({ alertes, nonLues: nonLuesServeur, total, maintenant, d
   const coupe = mentionDeLaCoupe(alertes.length, total);
 
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1
           id="contenu"

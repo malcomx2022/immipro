@@ -65,7 +65,7 @@ export function Echeancier({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier dossier={dossier} retour={`/dossiers/${id}`} libelleRetour="Checklist" />
 
       <div className="flex flex-col gap-2">
@@ -142,7 +142,7 @@ export function Echeancier({
           été prouvé, et elle dit toujours que rien ne part par SMS —
           DOC-11 §346 le prévoit, aucun fournisseur n'est branché.
         */}
-        <div className="flex max-w-[60ch] flex-col gap-1">
+        <div className="flex max-w-lecture-courte flex-col gap-1">
           <p className="text-pretty text-14 text-ink-700">{rappels}</p>
           <Link
             href={`/compte/rappels?retour=${encodeURIComponent(`/dossiers/${id}/echeancier`)}`}
@@ -217,7 +217,7 @@ function LigneEcheance({
 /** Un brouillon n'a pas d'échéancier : il lui manque la date de départ visée. */
 function SansEcheancier({ dossierId }: { dossierId: string }) {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 py-8">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-4 px-4 py-8">
       <h1
         id="contenu"
         tabIndex={-1}

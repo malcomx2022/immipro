@@ -66,7 +66,7 @@ export default async function PageDestination({
   const connecte = (await acteurCourant()) !== null;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 py-6 md:flex-row md:gap-12 md:px-12 md:py-10">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-8 px-4 py-6 md:flex-row md:gap-12 md:px-12 md:py-10">
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <Link href="/resultats" className="text-14 font-semibold text-ink-900">
           Résultats

@@ -145,7 +145,7 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
               type="search"
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
-              className="h-10 w-[240px] rounded-md border border-ink-300 bg-white px-3 text-14 text-ink-900"
+              className="h-10 w-recherche rounded-md border border-ink-300 bg-white px-3 text-14 text-ink-900"
             />
           </label>
         </div>
@@ -159,7 +159,7 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
               selection={retenu?.id ?? null}
               onSelection={choisir}
               entete={
-                <div className="grid grid-cols-[1.6fr_8rem_4rem_7rem_9rem] gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
+                <div className="grid grid-cols-utilisateurs gap-3 bg-ink-100 px-3 py-2 text-13 font-medium text-ink-700">
                   <span>Compte</span>
                   <span>Inscrit le</span>
                   <span>Dossiers</span>
@@ -177,7 +177,7 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                 ) : undefined
               }
               rendu={(compte) => (
-                <div className="grid grid-cols-[1.6fr_8rem_4rem_7rem_9rem] items-center gap-3">
+                <div className="grid grid-cols-utilisateurs items-center gap-3">
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-ink-900">{compte.nom}</span>
                     <span className="truncate text-13 text-ink-500">{compte.email}</span>
@@ -194,7 +194,7 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
           </div>
 
           {retenu ? (
-            <aside className="flex w-[340px] flex-none flex-col gap-4">
+            <aside className="flex w-panneau flex-none flex-col gap-4">
               <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-4">
                 <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
                   Compte sélectionné
@@ -340,7 +340,7 @@ function RechercheVide({
       </h2>
       {diagnostic.critere ? (
         <>
-          <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+          <p className="max-w-lecture text-pretty text-14 text-ink-700">
             {diagnostic.critere.explication}
           </p>
           <div className="flex gap-2 pt-1">

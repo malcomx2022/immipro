@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { LienBouton } from "@/components/ui/LienBouton";
@@ -131,7 +129,7 @@ export function Echec({
       : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-etroit flex-col gap-6 px-4 pb-8 md:py-8">
       <div className="flex flex-col items-center gap-5 text-center">
         <Image
           src="/illustrations/paiement-echoue.svg"

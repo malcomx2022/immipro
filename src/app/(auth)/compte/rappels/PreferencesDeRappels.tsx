@@ -89,7 +89,7 @@ export function PreferencesDeRappels({ initial, canal, dernier, retour }: Prefer
   const idEmailTexte = `${prefixe}-email-texte`;
 
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
+    <div className="mx-auto flex w-full max-w-reglages flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
       <Link href={retour} className="text-14 font-semibold text-ink-900">
         {retour === "/consentements" ? "Mon compte" : "Revenir à l'échéancier"}
       </Link>

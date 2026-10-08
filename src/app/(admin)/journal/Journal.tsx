@@ -203,11 +203,11 @@ export function Journal({
                 {vide.message}
               </h2>
               {vide.suivante ? (
-                <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+                <p className="max-w-lecture text-pretty text-14 text-ink-700">
                   {vide.suivante.message}
                 </p>
               ) : (
-                <p className="max-w-[70ch] text-pretty text-14 text-ink-700">
+                <p className="max-w-lecture text-pretty text-14 text-ink-700">
                   Le journal ne comble jamais une période vide : s&apos;il n&apos;affiche
                   rien, il ne s&apos;est rien passé.
                 </p>

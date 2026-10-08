@@ -99,11 +99,11 @@ export function Faisabilite({
         <h2 className="text-pretty text-19 font-semibold text-ink-900">
           {titreDuVerdict(verdict)}
         </h2>
-        <p className="max-w-[80ch] text-pretty text-14 text-ink-700">
+        <p className="max-w-lecture-large text-pretty text-14 text-ink-700">
           {corpsDuVerdict(verdict)}
         </p>
         {proposition ? (
-          <p className="max-w-[80ch] text-pretty text-14 font-medium text-ink-900">
+          <p className="max-w-lecture-large text-pretty text-14 font-medium text-ink-900">
             {phraseDeReplanification(proposition)}
           </p>
         ) : null}

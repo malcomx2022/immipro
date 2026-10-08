@@ -53,7 +53,55 @@ export default {
       // boutons, 52 px pour l'action principale mobile, 60 px pour une ligne
       // de choix du simulateur (DOC-12, Fondations §6).
       minHeight: { touch: "44px", bouton: "48px", action: "52px", option: "60px" },
-      minWidth: { touch: "44px" },
+      // Largeurs de mise en page — revue du 07/10/2026, F7 (D-20 : un jeton
+      // par valeur, sans regroupement). Cent trente et une valeurs
+      // arbitraires (`max-w-[640px]`…) vivaient dans les écrans ; elles ont
+      // un nom ici, à la valeur près, et `tests/jetons-de-mise-en-page.test.ts`
+      // refuse qu'une nouvelle revienne. Un regroupement (760 vers 720, 68ch
+      // vers 70ch…) se décide écran par écran, en changeant la valeur ici.
+      maxWidth: {
+        gabarit: "1120px",
+        comptes: "1000px",
+        dossier: "880px",
+        texte: "760px",
+        colonne: "720px",
+        decision: "640px",
+        reglages: "560px",
+        etroit: "520px",
+        connexion: "480px",
+        "lecture-large": "80ch",
+        "lecture-75": "75ch",
+        lecture: "70ch",
+        redaction: "68ch",
+        "lecture-courte": "60ch",
+        ecran: "calc(100vw - 4rem)",
+      },
+      width: {
+        nav: "264px",
+        "nav-admin": "232px",
+        formulaire: "520px",
+        "formulaire-large": "560px",
+        dialogue: "600px",
+        panneau: "340px",
+        "panneau-large": "420px",
+        aside: "300px",
+        filtre: "220px",
+        "filtre-etroit": "200px",
+        // La colonne des versions d'une rédaction ; la recherche de B-03.
+        versions: "320px",
+        recherche: "240px",
+      },
+      minWidth: { touch: "44px", tableau: "640px", "tableau-large": "840px" },
+      maxHeight: { feuille: "85vh" },
+      gridTemplateColumns: {
+        // Les tableaux du back-office, en largeur de bureau.
+        // B-05, revue des pièces : pièce, dossier, attente, motif.
+        revue: "1fr 1.4fr 6rem 1fr",
+        // B-01, file de veille : pays, procédure, niveau de source, vérifiée le…
+        veille: "2.5rem 1fr 10rem 6rem 8rem 7rem",
+        // B-03, utilisateurs : compte, inscrit le, dossiers, pack, statut.
+        utilisateurs: "1.6fr 8rem 4rem 7rem 9rem",
+      },
       // 22 px : case à cocher. 13 (52 px) : largeur de l'interrupteur et
       // action principale mobile. 18 (72 px) : hauteur d'une ligne de
       // checklist. Trois crans qui manquent aux valeurs natives de Tailwind.

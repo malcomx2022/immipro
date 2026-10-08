@@ -1,9 +1,5 @@
-import {
-  ECHECS,
-  type CodeEchec,
-  type EchecCandidat,
-  type EchecOperateur,
-} from "@/server/http/echecs";
+import { ECHECS, type CodeEchec, type EchecCandidat } from "@/domain/echecs/catalogue";
+import type { EchecOperateur } from "@/server/http/echecs";
 
 /**
  * Appel de l'API depuis un écran.

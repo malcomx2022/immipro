@@ -5,6 +5,7 @@ export {
   type ButtonVariante,
 } from "./bouton-styles";
 export { LienBouton, type LienBoutonProps } from "./LienBouton";
+export { LienNouvelOnglet, MENTION_NOUVEL_ONGLET, type LienNouvelOngletProps } from "./LienNouvelOnglet";
 export { Input, type InputProps } from "./Input";
 export { Select, type SelectProps, type SelectOption } from "./Select";
 export { RadioGroup, type RadioGroupProps, type RadioOption } from "./RadioGroup";

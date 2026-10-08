@@ -9,7 +9,7 @@ import { LienBouton } from "@/components/ui/LienBouton";
  */
 export function MonteeRefusee({ dossierId, message }: { dossierId: string; message: string }) {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 py-6 md:px-8 md:py-10">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-5 px-4 py-6 md:px-8 md:py-10">
       <h1
         id="contenu"
         tabIndex={-1}

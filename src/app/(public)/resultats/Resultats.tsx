@@ -92,7 +92,7 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
   if (etat.phase === "vide") return <Vide />;
   if (etat.phase === "echec") {
     return (
-      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 py-10 md:px-12">
+      <div className="mx-auto flex w-full max-w-decision flex-col gap-5 px-4 py-10 md:px-12">
         <h1
           id="contenu"
           tabIndex={-1}
@@ -115,7 +115,7 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
   const mention = mentionDuClassement([...retenues, ...ecartees]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"
@@ -284,7 +284,7 @@ function mentionDuClassement(affichees: readonly { mention?: Mention }[]): Menti
 /** Le squelette reprend la structure des cartes, il ne la remplace pas. */
 function Chargement() {
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-7 px-4 py-6 md:px-12 md:py-10">
       <h1
         id="contenu"
         tabIndex={-1}
@@ -314,7 +314,7 @@ function Chargement() {
 /** Rien à classer : l'écran dit quoi faire, il ne se contente pas d'être vide. */
 function Vide() {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col items-start gap-5 px-4 py-12 md:px-12">
+    <div className="mx-auto flex w-full max-w-decision flex-col items-start gap-5 px-4 py-12 md:px-12">
       <Image
         src="/illustrations/empty-resultats.svg"
         alt=""

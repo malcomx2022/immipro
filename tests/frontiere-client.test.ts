@@ -69,4 +69,35 @@ describe("frontière client", () => {
     }
     expect(fautes).toEqual([]);
   });
+
+  /**
+   * L'autre sens — revue du 07/10/2026, F8. Un module client qui importe
+   * une **valeur** de `src/server` embarque le code serveur dans le paquet
+   * du navigateur, ou casse le jour où ce code touche Prisma. `lib/api.ts`
+   * et la pièce d'un dossier importaient `ECHECS` depuis
+   * `server/http/echecs.ts` ; le catalogue vit désormais dans le domaine.
+   * Un type, lui, s'efface à la compilation et reste permis.
+   */
+  it("aucun module client n'importe de valeur de src/server", () => {
+    const clients = fichiers("src")
+      .filter((f) => !f.startsWith(join("src", "server")))
+      .filter((f) => estClient(f) || f.startsWith(join("src", "lib")));
+    const fautes: string[] = [];
+    for (const f of clients) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/import\s+(type\s+)?(\{[^}]*\}|[\w*][^;]*?)\s+from\s+["']@\/server\/([^"']+)["']/g)) {
+        const [, toutType, importes = "", module = ""] = m;
+        if (toutType) continue;
+        const valeurs = importes.startsWith("{")
+          ? importes
+              .slice(1, -1)
+              .split(",")
+              .map((x) => x.trim())
+              .filter((x) => x && !x.startsWith("type "))
+          : [importes.trim()];
+        if (valeurs.length > 0) fautes.push(`${f} importe ${valeurs.join(", ")} de @/server/${module}`);
+      }
+    }
+    expect(fautes).toEqual([]);
+  });
 });

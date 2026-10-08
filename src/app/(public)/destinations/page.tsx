@@ -43,7 +43,7 @@ export default async function PageDestinations() {
   const triees = [...fiches].sort((a, b) => a.pays.localeCompare(b.pays, "fr"));
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:py-10">
+    <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:py-10">
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"

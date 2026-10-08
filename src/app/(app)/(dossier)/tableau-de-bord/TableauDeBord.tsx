@@ -48,7 +48,7 @@ export function TableauDeBord({ dossiers, prenom, aArbitrer }: TableauDeBordProp
   if (dossiers.length === 0) return <SansDossier />;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <div className="flex flex-col gap-1">
         <h1
           id="contenu"
@@ -156,7 +156,7 @@ export function TableauDeBord({ dossiers, prenom, aArbitrer }: TableauDeBordProp
 /** État vide : il dit par où commencer, pas seulement qu'il n'y a rien. */
 function SansDossier() {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 py-8">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-8">
       <div className="flex justify-center">
         <Image
           src="/illustrations/empty-dossier.svg"

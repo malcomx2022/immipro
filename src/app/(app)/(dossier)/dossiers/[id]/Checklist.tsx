@@ -47,7 +47,7 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
   const mention = dossier.destination.mention;
 
   return (
-    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-dossier flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <EnteteDossier dossier={dossier} />
 
       <div className="flex flex-col gap-2">

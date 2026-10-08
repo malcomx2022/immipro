@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10) et S.134 (M19 étape 0, M15) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15) et S.135 (F8, F9, F7) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -82,8 +82,8 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-17 | Correspondances de section de la navigation (`/services` et `/consultants` sous « Dossiers ») | Produit | M12 |
 | D-18 | Ajoute-t-on un bouton « Menu » au gabarit mobile, d'abord dans le prototype ? | Design | M13 |
 | D-19 | Accepte-t-on des pages publiques revalidées toutes les 5 minutes pour servir les liens juridiques dans le HTML ? | Produit, responsable technique | M14 |
-| D-20 | Regroupe-t-on des largeurs voisines (760 vers 720, 560 et 480 vers 520, 68ch et 75ch vers 70ch) ? | Design | F7 (second commit) |
-| D-21 | La mention de nouvel onglet est-elle visible ou réservée aux lecteurs d'écran ? | Design | F8 |
+| D-20 | Regroupe-t-on des largeurs voisines (760 vers 720, 560 et 480 vers 520, 68ch et 75ch vers 70ch) ? | Design | F7 — **tranchée le 08/10/2026** : un jeton par valeur, aucun regroupement |
+| D-21 | La mention de nouvel onglet est-elle visible ou réservée aux lecteurs d'écran ? | Design | F8 — **tranchée le 08/10/2026** : réservée aux lecteurs d'écran |
 | D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 — **tranchée le 08/10/2026 : cookie oublié à la fermeture du navigateur, 24 h au plus en base** |
 | D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) |
 | D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 |
@@ -116,7 +116,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.132 — livré** | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
 | **S.133 — livré** | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
 | **S.134 — livré** | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
-| S.135 — interface I | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
+| **S.135 — livré** | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
 | S.136 — interface II | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
 | S.137 — reprises du worker | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
 | S.138 — rédaction et en-têtes | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
@@ -1060,6 +1060,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 
 #### F7 — Largeurs arbitraires à déclarer en jetons
 
+**État : livré en S.135** (D-20 : un jeton par valeur, pas de second commit). Écart au tableau ci-dessous : 320px et 240px ne deviennent pas `w-80` et `w-60`, qui sont en rem et suivraient la taille de police de l'utilisateur. Ils reçoivent leurs propres jetons, `w-versions` et `w-recherche`, en px. Tailwind génère pour les 33 paires d'anciennes et de nouvelles classes exactement les mêmes règles CSS.
+
 **Constat vérifié.** 131 valeurs arbitraires : 107 `max-w`, 15 `w`, 6 `grid-cols`, 2 `min-w`, 1 `max-h`. Aucun garde-fou ne les interdit.
 
 **Règle.** CLAUDE.md règle 3 ; README du prototype « Gabarits ».
@@ -1112,6 +1114,8 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### F8 — Nouveaux onglets, `"use client"` inutile, catalogue d'échecs côté serveur
 
+**État : livré en S.135** (D-21 : mention réservée aux lecteurs d'écran). `BlocEchec` n'importait qu'un type ; seuls `PieceDuDossier` et `lib/api.ts` importaient la valeur. Le garde-fou de `tests/frontiere-client.test.ts` refuse désormais toute valeur de `@/server/` dans un module client ou dans `src/lib`.
+
 **Constat vérifié.** `Inscription.tsx:151` et `Recapitulatif.tsx:340` ouvrent un nouvel onglet sans `rel` ni annonce ; `Services.tsx:227-228` a son `rel` mais aucune annonce. `Echec.tsx:1` est en `"use client"` sans nécessité. `PieceDuDossier.tsx:12` **et** `src/lib/api.ts:1-6` importent la valeur `ECHECS` depuis `src/server`.
 
 **Correction.**
@@ -1128,6 +1132,8 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 ---
 
 #### F9 — Vouvoiement dans la description par défaut
+
+**État : livré en S.135.** `tests/tutoiement.test.ts` lit d'office tout fichier à la racine de `src/app`.
 
 **Constat vérifié.** `src/app/layout.tsx:10` : « Préparez votre dossier d'immigration, pièce par pièce. » `tests/tutoiement.test.ts` ne le voit pas : `SURFACES` (l.39-47) ne couvre pas les fichiers à la racine de `src/app`.
 
@@ -1432,7 +1438,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.134
+## 7. Ce qui reste ouvert après les lots S.125 à S.135
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.

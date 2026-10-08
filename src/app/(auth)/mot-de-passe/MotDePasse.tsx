@@ -100,8 +100,8 @@ function Etapes() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
-      <div className="flex flex-col gap-5 md:w-[520px] md:flex-none">
+    <div className="mx-auto flex w-full max-w-comptes flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
+      <div className="flex flex-col gap-5 md:w-formulaire md:flex-none">
         <Link href="/connexion" className="text-14 font-semibold text-ink-900">
           Connexion
         </Link>
@@ -239,7 +239,7 @@ function Entete({ titre, texte }: { titre: string; texte: string }) {
 
 function Squelette() {
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-4 py-6 md:px-12">
+    <div className="mx-auto w-full max-w-comptes px-4 py-6 md:px-12">
       <h1
         id="contenu"
         tabIndex={-1}

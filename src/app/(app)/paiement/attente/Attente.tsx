@@ -164,7 +164,7 @@ export function Attente({ attente, consultation = null }: AttenteProps) {
   const rail = railDe(attente.devise);
 
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col gap-6 px-4 pb-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-etroit flex-col gap-6 px-4 pb-8 md:py-8">
       <p className="font-mono text-13 uppercase tracking-wider text-ink-500">
         Paiement {attente.moyen} · {montant}
       </p>

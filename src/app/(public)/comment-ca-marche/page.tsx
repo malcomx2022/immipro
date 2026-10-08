@@ -70,7 +70,7 @@ const ETAPES: readonly { titre: string; texte: string }[] = [
 
 export default function CommentCaMarche() {
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8 px-4 py-8 md:px-12 md:py-12">
+    <div className="mx-auto flex w-full max-w-texte flex-col gap-8 px-4 py-8 md:px-12 md:py-12">
       <header className="flex flex-col gap-3">
         <h1
           id="contenu"

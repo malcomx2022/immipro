@@ -45,7 +45,7 @@ export default async function PageGuide({
   if (!guide) notFound();
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 py-6 md:flex-row-reverse md:gap-12 md:px-12 md:py-10">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-8 px-4 py-6 md:flex-row-reverse md:gap-12 md:px-12 md:py-10">
       {/* Un guide sans intertitre n'a pas de sommaire : une colonne vide
           occuperait un quart de l'écran pour ne rien dire. */}
       {guide.sommaire.length > 0 ? (

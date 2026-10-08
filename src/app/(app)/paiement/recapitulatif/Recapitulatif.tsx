@@ -9,6 +9,7 @@ import { obstacleAuPaiement } from "@/domain/paiement/commande";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { LienNouvelOnglet } from "@/components/ui/LienNouvelOnglet";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import type { Tunnel } from "@/server/lecture/paiements";
@@ -154,8 +155,8 @@ export function Recapitulatif({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 pb-8 md:flex-row md:gap-12 md:px-12 md:py-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-5 md:max-w-[640px]">
+    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-6 px-4 pb-8 md:flex-row md:gap-12 md:px-12 md:py-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-5 md:max-w-decision">
         <Link
           href={`/paiement/pack?dossier=${tunnel.dossier.id}`}
           className="text-14 font-semibold text-ink-900"
@@ -337,9 +338,9 @@ export function Recapitulatif({
         {conditionsALire ? (
           <p className="text-pretty text-13 text-ink-500">
             À lire avant de cocher :{" "}
-            <Link href={conditionsALire.adresse} className="text-accent-600 underline" target="_blank">
+            <LienNouvelOnglet href={conditionsALire.adresse} className="text-accent-600 underline">
               {conditionsALire.nom}
-            </Link>
+            </LienNouvelOnglet>
             .
           </p>
         ) : null}

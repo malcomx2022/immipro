@@ -122,7 +122,7 @@ export function OuvertureDossier({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"
@@ -219,7 +219,7 @@ export function OuvertureDossier({
  */
 function SansDestination() {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 py-10 md:px-8">
+    <div className="mx-auto flex w-full max-w-decision flex-col gap-4 px-4 py-10 md:px-8">
       <h1
         id="contenu"
         tabIndex={-1}

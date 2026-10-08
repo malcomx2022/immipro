@@ -53,7 +53,7 @@ export default async function PageImpression({
   const courante = versionCourante(await versionsDeLaPiece(piece.documentId));
 
   return (
-    <div className="a-imprimer mx-auto flex w-full max-w-[720px] flex-col gap-5 px-4 py-6 md:px-8 md:py-10">
+    <div className="a-imprimer mx-auto flex w-full max-w-colonne flex-col gap-5 px-4 py-6 md:px-8 md:py-10">
       <Link
         href={`/dossiers/${id}/redaction/${type}`}
         className="pas-a-imprimer flex min-h-touch items-center text-14 text-accent-700 underline"
@@ -94,7 +94,7 @@ export default async function PageImpression({
               {/* `whitespace-pre-line` : les retours à la ligne du candidat
                   sont les siens, et les recoller en un bloc changerait son
                   texte. */}
-              <p className="max-w-[68ch] whitespace-pre-line text-pretty text-16 leading-relaxed text-ink-900">
+              <p className="max-w-redaction whitespace-pre-line text-pretty text-16 leading-relaxed text-ink-900">
                 {paragraphe.texte}
               </p>
             </section>
@@ -103,7 +103,7 @@ export default async function PageImpression({
           {/* RG-08.1 — la mention s'imprime avec le texte. Un document qui
               sort de la plateforme doit dire ce qu'il est, et c'est ici
               qu'il le dit à qui n'a pas vu l'écran. */}
-          <p className="max-w-[68ch] text-pretty border-t border-ink-300 pt-3 text-13 italic text-ink-700">
+          <p className="max-w-redaction text-pretty border-t border-ink-300 pt-3 text-13 italic text-ink-700">
             {MENTION_AIDE_A_LA_REDACTION}
           </p>
         </>
@@ -116,7 +116,7 @@ export default async function PageImpression({
           >
             {piece.libelle}
           </h1>
-          <p className="max-w-[68ch] text-pretty text-16 text-ink-700">
+          <p className="max-w-redaction text-pretty text-16 text-ink-700">
             Cette pièce n&apos;a pas encore de texte : il n&apos;y a rien à
             imprimer. L&apos;entretien guidé et l&apos;éditeur produisent la
             première version.

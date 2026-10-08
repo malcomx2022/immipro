@@ -114,10 +114,10 @@ export function CoutsIa({
             <h2 className="text-16 font-semibold text-ink-900">
               Les coûts ne sont pas calculés
             </h2>
-            <p className="max-w-[80ch] text-pretty text-14 text-ink-700">
+            <p className="max-w-lecture-large text-pretty text-14 text-ink-700">
               {MENTION_TARIF_ABSENT}
             </p>
-            <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+            <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
               {COMMENT_TARIFER}
             </p>
           </section>
@@ -173,7 +173,7 @@ export function CoutsIa({
             relever » là où un dossier à dix fois son quota attendait.
           */}
           {!tarife ? (
-            <p className="max-w-[80ch] text-pretty text-14 text-ink-700">
+            <p className="max-w-lecture-large text-pretty text-14 text-ink-700">
               {MENTION_DEPASSEMENTS_NON_CALCULABLES} {MENTION_QUOTA_SANS_TARIF}
             </p>
           ) : null}
@@ -237,7 +237,7 @@ export function CoutsIa({
           </dl>
         </section>
 
-        <section className="flex max-w-[80ch] flex-col gap-2 rounded-lg bg-white p-5">
+        <section className="flex max-w-lecture-large flex-col gap-2 rounded-lg bg-white p-5">
           <h2 className="text-16 font-semibold text-ink-900">
             Comment cet écran se remplit
           </h2>
@@ -314,7 +314,7 @@ function FournisseursIA({
         <h2 id="fournisseurs-ia" className="text-16 font-semibold text-ink-900">
           Fournisseurs d&apos;IA
         </h2>
-        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">
+        <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
           {MENTION_CHOIX_DU_FOURNISSEUR}
         </p>
       </div>
@@ -340,7 +340,7 @@ function FournisseursIA({
                 {f.tarife ? " · tarif renseigné" : " · sans tarif de jeton"}
               </span>
               {f.raison ? (
-                <span className="max-w-[60ch] text-pretty text-13 text-ink-700 md:text-right">
+                <span className="max-w-lecture-courte text-pretty text-13 text-ink-700 md:text-right">
                   {f.raison}
                 </span>
               ) : null}
@@ -390,7 +390,7 @@ function FournisseursIA({
             </table>
           </div>
         )}
-        <p className="max-w-[80ch] text-pretty text-13 text-ink-500">{MENTION_QUOTA_EN_JETONS}</p>
+        <p className="max-w-lecture-large text-pretty text-13 text-ink-500">{MENTION_QUOTA_EN_JETONS}</p>
       </div>
     </section>
   );
