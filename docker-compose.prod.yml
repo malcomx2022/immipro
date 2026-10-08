@@ -42,7 +42,7 @@ services:
   # `garage.toml` porte un secret RPC : le dépôt ne contient qu'un modèle
   # (secret à remplacer), le serveur porte le vrai fichier (600).
   minio:
-    image: dxflrs/garage:v2.2.0
+    image: dxflrs/garage:v2.4.1
     restart: unless-stopped
     command: ["/garage", "server"]
     # Publié en loopback pour le vhost nginx du stockage public
