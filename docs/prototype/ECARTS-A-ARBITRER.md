@@ -11538,3 +11538,19 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 2. E7 : les analyses `HORS_SUJET` déjà écrites avec un libellé hors référentiel sont à relire à la main ; le contrôle du message final (étape 6) reste facultatif.
 3. M1 : les versions existantes dont la clé ne suit pas le préfixe du dossier ne sont pas diagnostiquées.
 4. Restent de S.125 : réécritures passées (C1), objets orphelins en quarantaine (E4), double débit sur arrêt entre débit et verdict (E5).
+
+## S.127 — Revue du 07/10/2026 : comptes (M3, M2, N1)
+
+**Contexte.** Troisième lot du plan de traitement. Deux décisions produit prises le 08/10/2026 : D-3, option B (le décompte « il te reste N essais » est gardé, et les adresses sans compte ont leur propre compteur) ; D-22 (une session non mémorisée a un cookie oublié à la fermeture du navigateur et vit 24 heures au plus en base).
+
+**Ce que fait le code.**
+- **M3, A-02 à A-04.** Les compteurs d'essais se prennent en base, sous condition, et non sur une valeur lue. Un essai de code n'est compté que s'il en reste, et un code ne se consomme qu'une fois. L'échec de connexion s'incrémente en base et le blocage se décide sur la valeur rendue. Un mot de passe juste glissé dans une rafale qui a bloqué le compte n'ouvre pas la session.
+- **M2, A-02.** Le premier refus ne dit plus si l'adresse a un compte. `server/acces/echecs-sans-compte.ts` compte les échecs des adresses sans compte, sous une empreinte HMAC dont le sel ne quitte pas la mémoire du processus, avec les mêmes règles de blocage. Le champ `essaisRestants`, que l'écran ne lisait pas, est retiré de la réponse.
+- **N1, A-02.** La case « Rester connecté » est envoyée et honorée. Décochée, le cookie n'a pas d'échéance et la session expire en base au bout de 24 heures ; cochée, trente jours comme avant. L'inscription ouvre toujours une session mémorisée.
+
+**Ce qui est éprouvé.** `smoke:transitions`, rejouée sur l'ancien code avant correction : vingt codes faux simultanés comptaient 14 essais au lieu de 5, deux codes justes simultanés réussissaient tous les deux, huit connexions fausses simultanées ne comptaient qu'un échec, et le premier refus disait « 5 essais » pour une adresse inconnue contre « 4 » pour une connue. Après correction : 5 essais, une seule réussite, 8 échecs et compte bloqué, même phrase à chaque essai et même blocage au cinquième. La parité de temps de réponse tient (rapport 1,1). Essais d'unité sur le compteur sans compte, sur la forme des compteurs et sur le corps envoyé par A-02.
+
+**Écarts qui restent.**
+1. Le compteur des adresses sans compte vit en mémoire : la parité se perd au redémarrage du processus, et il faudra le déplacer avec `limites.ts` le jour où l'application tournera sur plusieurs instances.
+2. Un tiers peut « bloquer » quinze minutes une adresse sans compte ; cela ne gêne aucune inscription.
+3. Le blocage d'un compte réel n'envoie toujours aucun courriel à son titulaire (c'était l'option A).
