@@ -215,7 +215,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "sous_traitants",
     groupe: "donnees",
     libelle: "Sous-traitants",
-    aide: "Un sous-traitant par ligne : nom, rôle et pays de traitement. Hébergement, prestataire d'IA retenu, FedaPay, Stripe, messagerie.",
+    aide: "Un sous-traitant par ligne : nom, rôle et pays de traitement. Hébergement, stockage des sauvegardes chiffrées (Backblaze B2, D-26), prestataire d'IA retenu, FedaPay, Stripe, messagerie.",
     nature: "liste",
   },
   {
@@ -243,7 +243,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "securite_complements",
     groupe: "donnees",
     libelle: "Chiffrement au repos et sauvegardes",
-    aide: "Ce qui est réellement en place : chiffrement des données au repos, fréquence et durée de conservation des sauvegardes.",
+    aide: "Ce qui est réellement en place : chiffrement des données au repos, fréquence et durée de conservation des sauvegardes. Sauvegardes : chaque nuit, chiffrées, hors du serveur, 30 jours (D-27) — texte proposé dans docs/exploitation/sauvegardes.md.",
     nature: "texte",
   },
   {

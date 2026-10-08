@@ -138,13 +138,15 @@ jobs:
           } > ~/.ssh/config
           chmod 600 ~/.ssh/config
 
-      - name: Recopier le compose et le script
+      - name: Recopier le compose et les scripts
         run: |
           set -euo pipefail
           ssh vps 'mkdir -p /srv/immipro/scripts /srv/immipro/.deploiement/arrivee'
           scp docker-compose.prod.yml vps:/srv/immipro/.deploiement/arrivee/docker-compose.prod.yml
           scp scripts/deployer.sh vps:/srv/immipro/scripts/deployer.sh
-          ssh vps 'chmod 755 /srv/immipro/scripts/deployer.sh'
+          # Les scripts de la sauvegarde de nuit (E10), lancés par le cron.
+          scp scripts/sauvegarde.sh scripts/backup-postgres.sh scripts/backup-pieces.sh vps:/srv/immipro/scripts/
+          ssh vps 'chmod 755 /srv/immipro/scripts/deployer.sh /srv/immipro/scripts/sauvegarde.sh /srv/immipro/scripts/backup-postgres.sh /srv/immipro/scripts/backup-pieces.sh'
 
       - name: Déployer sur le VPS
         run: ssh vps "/srv/immipro/scripts/deployer.sh ${{ needs.build.outputs.tag }} ${{ github.repository_owner }}"
