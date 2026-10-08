@@ -137,13 +137,16 @@ export function Alertes({ alertes, nonLues: nonLuesServeur, total, maintenant, d
           : `${nonLues} ${nonLues > 1 ? "alertes non lues" : "alerte non lue"}.`}
       </p>
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filtrer les alertes">
+      {/* Des filtres, pas des onglets (revue M12) : aucun panneau ne leur
+          répond, et un `tablist` sans flèches ni `aria-controls` promettait
+          un clavier qu'il n'avait pas. `aria-pressed`, comme les filtres du
+          back-office. */}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer les alertes">
         {FILTRES.map((cle) => (
           <button
             key={cle}
             type="button"
-            role="tab"
-            aria-selected={filtre === cle}
+            aria-pressed={filtre === cle}
             onClick={() => setFiltre(cle)}
             className={cn(
               "flex min-h-touch items-center rounded-sm border px-3.5 text-14",

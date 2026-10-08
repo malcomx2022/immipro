@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LienDeNavigation } from "@/components/layout/LienDeNavigation";
 import { SkipLink } from "@/components/layout/SkipLink";
 import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 
@@ -46,12 +47,13 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
         <ul className="flex flex-col gap-0.5">
           {NAVIGATION_ADMIN.map((entree) => (
             <li key={entree.href}>
-              <Link
+              <LienDeNavigation
                 href={entree.href}
+                sections={entree.sections}
                 className="flex min-h-touch items-center rounded-sm px-3 text-14 text-ink-700 hover:bg-ink-100"
               >
                 {entree.libelle}
-              </Link>
+              </LienDeNavigation>
             </li>
           ))}
         </ul>

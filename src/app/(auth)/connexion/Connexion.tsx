@@ -24,6 +24,11 @@ import { suiteInterne } from "@/domain/comptes/suite";
  * Après connexion, l'écran renvoie là où la personne allait. Quelqu'un qui
  * ouvre un lien vers son dossier après expiration de sa session doit y
  * revenir, pas atterrir sur un tableau de bord et chercher.
+ *
+ * L'écran est un formulaire (revue du 07/10/2026, M11) : Entrée dans un
+ * champ connecte, comme partout ailleurs sur le web, et le gestionnaire de
+ * mots de passe reconnaît la paire `email` / `password`. `noValidate` : les
+ * messages sont ceux de l'écran, en français, pas les bulles du navigateur.
  */
 export function Connexion() {
   const router = useRouter();
@@ -34,7 +39,10 @@ export function Connexion() {
   // Le refus vient du serveur ; l'écran sait seulement l'afficher.
   const [echec, setEchec] = useState<string | null>(null);
 
+  const complet = Boolean(email && motDePasse);
+
   async function connecter() {
+    if (!complet || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler<{ compte: { emailVerifie: boolean } }>(
@@ -57,7 +65,15 @@ export function Connexion() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-connexion flex-col gap-5 px-4 pb-8 md:py-6">
+    <form
+      noValidate
+      aria-labelledby="contenu"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void connecter();
+      }}
+      className="mx-auto flex w-full max-w-connexion flex-col gap-5 px-4 pb-8 md:py-6"
+    >
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"
@@ -95,6 +111,7 @@ export function Connexion() {
         <Input
           libelle="Adresse email"
           type="email"
+          name="email"
           autoComplete="email"
           placeholder="aline.dossou@email.com"
           invalide={Boolean(echec)}
@@ -104,6 +121,7 @@ export function Connexion() {
         <Input
           libelle="Mot de passe"
           type="password"
+          name="password"
           autoComplete="current-password"
           placeholder="Ton mot de passe"
           invalide={Boolean(echec)}
@@ -138,16 +156,14 @@ export function Connexion() {
 
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:border-0 md:p-0">
         <Button
+          type="submit"
           pleineLargeur
           className="min-h-action"
-          disabled={!email || !motDePasse}
+          disabled={!complet}
           chargement={envoi}
           raisonDesactivation={
-            email && motDePasse
-              ? undefined
-              : "Renseigne ton adresse email et ton mot de passe."
+            complet ? undefined : "Renseigne ton adresse email et ton mot de passe."
           }
-          onClick={() => void connecter()}
         >
           Se connecter
         </Button>
@@ -158,7 +174,7 @@ export function Connexion() {
           </Link>
         </p>
       </div>
-    </div>
+    </form>
   );
 }
 

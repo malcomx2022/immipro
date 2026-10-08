@@ -70,6 +70,7 @@ export function DemandeDeCorrection({
       : refusDeLExplication(explication);
 
   async function envoyer() {
+    if (manque !== null || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler<{ message: string }>(
@@ -87,10 +88,21 @@ export function DemandeDeCorrection({
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-ink-300 pt-3">
+    // Un formulaire (revue du 07/10/2026, M11) : Entrée dans la date envoie,
+    // Entrée dans l'explication va à la ligne, comme dans tout `textarea`.
+    <form
+      noValidate
+      aria-label="Corriger la date du dépôt"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void envoyer();
+      }}
+      className="flex flex-col gap-3 border-t border-ink-300 pt-3"
+    >
       <p className="text-pretty text-13 text-ink-700">{AIDE_DEMANDE_DE_CORRECTION}</p>
       <Input
         type="date"
+        name="deposeLe"
         libelle="Date réelle de ton dépôt"
         value={date}
         onChange={(e) => setDate(e.target.value)}
@@ -102,6 +114,7 @@ export function DemandeDeCorrection({
         </label>
         <textarea
           id={idExplication}
+          name="explication"
           rows={3}
           value={explication}
           onChange={(e) => setExplication(e.target.value)}
@@ -115,15 +128,15 @@ export function DemandeDeCorrection({
       </div>
       {echec && !echec.champs ? <BlocEchec echec={echec} annonce /> : null}
       <Button
+        type="submit"
         variante="secondaire"
         className="md:w-auto md:self-start"
         disabled={manque !== null}
         chargement={envoi}
         raisonDesactivation={manque ?? undefined}
-        onClick={() => void envoyer()}
       >
         Demander la correction
       </Button>
-    </div>
+    </form>
   );
 }

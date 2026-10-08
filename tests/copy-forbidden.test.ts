@@ -17,7 +17,14 @@ import { extraireChaines } from "@/domain/copy/source";
  * points d'application. Le back-office (`src/app/(admin)`) est exclu — son
  * lecteur agit sur les codes techniques et sur les ratios d'exploitation.
  */
-const RACINES = ["src/app", "src/components", "src/lib/contenu"];
+const RACINES = [
+  "src/app",
+  "src/components",
+  "src/lib/contenu",
+  // Les textes des pages d'état vivent dans le domaine et s'affichent à
+  // tout candidat — revue du 07/10/2026, E8.
+  "src/domain/etats",
+];
 
 interface Exception {
   chaine: string;
@@ -66,6 +73,10 @@ describe("vocabulaire interdit côté candidat", () => {
   it("couvre le contenu éditorial, pas seulement les composants", () => {
     expect(RACINES).toContain("src/lib/contenu");
     expect(fichiers("src/lib/contenu").length).toBeGreaterThan(0);
+  });
+
+  it("couvre les textes des pages d'état", () => {
+    expect(fichiers("src/domain/etats").length).toBeGreaterThan(0);
   });
 });
 

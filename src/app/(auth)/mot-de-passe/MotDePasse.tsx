@@ -37,6 +37,9 @@ import { JaugeMotDePasse } from "../JaugeMotDePasse";
  * L'espace de recherche d'un code à six chiffres est borné par ailleurs :
  * cinq essais, dix minutes, et tout code précédent annulé à l'émission du
  * suivant.
+ *
+ * Un formulaire (revue du 07/10/2026, M11) : Entrée envoie l'étape
+ * affichée, et le `onSubmit` choisit laquelle.
  */
 type Etape = "demande" | "nouveau";
 
@@ -75,6 +78,7 @@ function Etapes() {
   const nouveauPret = longueurOk && identiques && codeOk;
 
   async function demander() {
+    if (!email || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler("/api/comptes/mot-de-passe", {
@@ -88,6 +92,7 @@ function Etapes() {
   }
 
   async function enregistrer() {
+    if (!nouveauPret || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler("/api/comptes/mot-de-passe", {
@@ -99,8 +104,18 @@ function Etapes() {
     else setEchec(resultat.echec);
   }
 
+  const envoyer = () => (etape === "demande" ? demander() : enregistrer());
+
   return (
-    <div className="mx-auto flex w-full max-w-comptes flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
+    <form
+      noValidate
+      aria-labelledby="contenu"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void envoyer();
+      }}
+      className="mx-auto flex w-full max-w-comptes flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6"
+    >
       <div className="flex flex-col gap-5 md:w-formulaire md:flex-none">
         <Link href="/connexion" className="text-14 font-semibold text-ink-900">
           Connexion
@@ -115,6 +130,7 @@ function Etapes() {
             <Input
               libelle="Adresse email"
               type="email"
+              name="email"
               autoComplete="email"
               placeholder="aline.dossou@email.com"
               value={email}
@@ -136,6 +152,7 @@ function Etapes() {
             <Input
               libelle="Code reçu par email"
               inputMode="numeric"
+              name="code"
               autoComplete="one-time-code"
               placeholder="000000"
               classNameControle="font-mono tracking-code"
@@ -147,6 +164,7 @@ function Etapes() {
               <Input
                 libelle="Nouveau mot de passe"
                 type="password"
+                name="password"
                 autoComplete="new-password"
                 placeholder="Au moins 10 caractères"
                 aria-describedby={idJauge}
@@ -158,6 +176,7 @@ function Etapes() {
             <Input
               libelle="Confirme le mot de passe"
               type="password"
+              name="confirmation"
               autoComplete="new-password"
               placeholder="Répète le mot de passe"
               aide={libelleConcordance(motDePasse, confirmation)}
@@ -178,6 +197,7 @@ function Etapes() {
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:w-72 md:flex-none md:border-0 md:p-0">
         {etape === "demande" ? (
           <Button
+            type="submit"
             pleineLargeur
             className="min-h-action"
             disabled={!email}
@@ -185,7 +205,6 @@ function Etapes() {
               email ? undefined : "Renseigne l'adresse email de ton compte."
             }
             chargement={envoi}
-            onClick={() => void demander()}
           >
             Envoyer le code
           </Button>
@@ -193,6 +212,7 @@ function Etapes() {
 
         {etape === "nouveau" ? (
           <Button
+            type="submit"
             pleineLargeur
             className="min-h-action"
             disabled={!nouveauPret}
@@ -206,7 +226,6 @@ function Etapes() {
                     ? "Le mot de passe doit faire au moins dix caractères."
                     : "Les deux saisies doivent être identiques."
             }
-            onClick={() => void enregistrer()}
           >
             Enregistrer le mot de passe
           </Button>
@@ -218,7 +237,7 @@ function Etapes() {
           </Link>
         </p>
       </div>
-    </div>
+    </form>
   );
 }
 

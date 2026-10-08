@@ -567,3 +567,86 @@ describe("A-05 — Consentements", () => {
     );
   });
 });
+
+/**
+ * Des formulaires, pas des boutons isolés — revue du 07/10/2026, M11.
+ *
+ * Entrée dans un champ doit envoyer, comme partout ailleurs sur le web, et
+ * le gestionnaire de mots de passe doit reconnaître la paire. jsdom ne
+ * simule pas la soumission implicite d'Entrée : l'essai soumet le
+ * formulaire, ce que fait le navigateur.
+ */
+describe("M11 — les écrans de comptes sont des formulaires", () => {
+  const appels = () => (global.fetch as ReturnType<typeof vi.fn>).mock.calls.map(([url]) => String(url));
+  const repondre = (donnees: unknown = {}) => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => donnees } as Response);
+  };
+
+  it("A-02 : le formulaire porte le titre, Entrée connecte, rien ne part à vide", async () => {
+    repondre({ compte: { emailVerifie: true } });
+    render(<Connexion />);
+    const formulaire = screen.getByRole("form", { name: "Bon retour" });
+    expect(formulaire).toHaveAttribute("novalidate");
+    fireEvent.submit(formulaire);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Adresse email"), { target: { value: "aline.dossou@email.com" } });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: "un mot de passe assez long" } });
+    expect(screen.getByLabelText("Adresse email")).toHaveAttribute("name", "email");
+    expect(screen.getByLabelText("Mot de passe")).toHaveAttribute("name", "password");
+    expect(screen.getByRole("button", { name: "Se connecter" })).toHaveAttribute("type", "submit");
+    fireEvent.submit(formulaire);
+    await waitFor(() => expect(appels()).toEqual(["/api/comptes/session"]));
+  });
+
+  it("A-01 : Entrée crée le compte une fois tout rempli, pas avant", async () => {
+    repondre({ etape: "verification" });
+    render(<Inscription publiees={{}} />);
+    const formulaire = screen.getByRole("form", { name: "Crée ton compte" });
+    fireEvent.change(screen.getByLabelText("Prénom et nom"), { target: { value: "Aline Dossou" } });
+    fireEvent.change(screen.getByLabelText("Adresse email"), { target: { value: "aline.dossou@email.com" } });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: "un mot de passe assez long" } });
+    fireEvent.submit(formulaire);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /J'accepte/u }));
+    fireEvent.submit(formulaire);
+    await waitFor(() => expect(appels()).toEqual(["/api/comptes"]));
+  });
+
+  it("A-03 : deux formulaires côte à côte, jamais imbriqués ; le bouton de la barre vise le code", async () => {
+    repondre();
+    const { container } = render(<Verification email="aline.dossou@email.com" />);
+    fireEvent.click(screen.getByRole("button", { name: "Corriger mon adresse email" }));
+    expect(container.querySelectorAll("form")).toHaveLength(2);
+    expect(container.querySelector("form form")).toBeNull();
+    for (const f of container.querySelectorAll("form")) expect(f).toHaveAttribute("novalidate");
+
+    const formulaire = screen.getByRole("form", { name: "Vérifie ton adresse email" });
+    const verifier = screen.getByRole("button", { name: "Vérifier mon adresse" });
+    expect(verifier).toHaveAttribute("type", "submit");
+    expect(verifier).toHaveAttribute("form", formulaire.id);
+
+    fireEvent.submit(formulaire);
+    expect(global.fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Code de vérification"), { target: { value: "123456" } });
+    fireEvent.submit(formulaire);
+    await waitFor(() => expect(appels()).toEqual(["/api/comptes/verification"]));
+  });
+
+  it("A-04 : le même formulaire envoie l'étape affichée", async () => {
+    repondre({ envoye: true });
+    render(<MotDePasse />);
+    fireEvent.change(screen.getByLabelText("Adresse email"), { target: { value: "aline.dossou@email.com" } });
+    fireEvent.submit(screen.getByRole("form", { name: "Réinitialise ton mot de passe" }));
+    await waitFor(() =>
+      expect(screen.getByRole("form", { name: "Choisis un nouveau mot de passe" })).toBeDefined(),
+    );
+    const [, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect((options as RequestInit).method ?? "POST").toBe("POST");
+
+    // Étape suivante : rien ne part tant que le code et les deux saisies ne concordent pas.
+    fireEvent.submit(screen.getByRole("form", { name: "Choisis un nouveau mot de passe" }));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});

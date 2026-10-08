@@ -1,14 +1,17 @@
 "use client";
 
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useId } from "react";
 import { cn } from "@/lib/utils";
+import { useGroupeRadio } from "./useGroupeRadio";
 
 /**
  * Choix exclusif — Bibliothèque de composants §3, règle clavier 4.
  *
  * Le groupe entier est un seul arrêt de tabulation : les flèches changent la
  * sélection, Origine et Fin vont aux extrémités. Sans ça, traverser les trois
- * packs de $-01 coûte trois tabulations avant d'atteindre « Continuer ».
+ * packs de $-01 coûte trois tabulations avant d'atteindre « Continuer ». Le
+ * clavier vit dans `useGroupeRadio`, que partagent les groupes d'une autre
+ * apparence (M12).
  *
  * `aria-checked` porte l'état ; la ligne entière est cliquable et mesure au
  * moins 44 px. Une option indisponible garde son libellé et sa raison.
@@ -64,59 +67,7 @@ export function RadioGroup({
   className,
 }: RadioGroupProps) {
   const idLibelle = useId();
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  const selectionnables = options
-    .map((o, i) => ({ o, i }))
-    .filter(({ o }) => !o.desactivee);
-
-  const positionCourante = () => {
-    const trouve = selectionnables.findIndex(({ o }) => o.valeur === valeur);
-    return trouve === -1 ? 0 : trouve;
-  };
-
-  const deplacer = (pas: number | "debut" | "fin") => {
-    if (selectionnables.length === 0) return;
-    const courant = positionCourante();
-    const cible =
-      pas === "debut"
-        ? 0
-        : pas === "fin"
-          ? selectionnables.length - 1
-          : (courant + pas + selectionnables.length) % selectionnables.length;
-    const entree = selectionnables[cible];
-    if (!entree) return;
-    onChangement(entree.o.valeur);
-    refs.current[entree.i]?.focus();
-  };
-
-  const auClavier = (e: KeyboardEvent<HTMLDivElement>) => {
-    switch (e.key) {
-      case "ArrowDown":
-      case "ArrowRight":
-        e.preventDefault();
-        deplacer(1);
-        break;
-      case "ArrowUp":
-      case "ArrowLeft":
-        e.preventDefault();
-        deplacer(-1);
-        break;
-      case "Home":
-        e.preventDefault();
-        deplacer("debut");
-        break;
-      case "End":
-        e.preventDefault();
-        deplacer("fin");
-        break;
-      default:
-        break;
-    }
-  };
-
-  // Un seul arrêt de tabulation : la ligne retenue, ou la première disponible.
-  const valeurTabulable = valeur ?? selectionnables[0]?.o.valeur ?? null;
+  const { auClavier, refDe, tabIndexDe } = useGroupeRadio({ options, valeur, onChangement });
 
   return (
     <div className={cn("flex flex-col gap-2.5", className)}>
@@ -134,14 +85,12 @@ export function RadioGroup({
           return (
             <button
               key={o.valeur}
-              ref={(n) => {
-                refs.current[i] = n;
-              }}
+              ref={refDe(i)}
               type="button"
               role="radio"
               aria-checked={retenue}
               disabled={o.desactivee}
-              tabIndex={o.valeur === valeurTabulable ? 0 : -1}
+              tabIndex={tabIndexDe(o.valeur)}
               onClick={() => onChangement(o.valeur)}
               className={cn(
                 "flex min-h-touch items-center gap-3 rounded-md border px-3.5 py-2.5 text-left",

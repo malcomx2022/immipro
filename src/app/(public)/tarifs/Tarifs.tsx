@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BasculeDeDevise } from "@/components/ui/BasculeDeDevise";
 import { LienBouton } from "@/components/ui/LienBouton";
 import {
   PACKS,
@@ -53,26 +54,7 @@ export function Tarifs() {
         </p>
 
         <div className="flex flex-col gap-2">
-          <div
-            role="radiogroup"
-            aria-label="Devise d'affichage"
-            className="flex gap-2 rounded-full bg-ink-100 p-1"
-          >
-            {(["XOF", "EUR"] as const).map((d) => (
-              <button
-                key={d}
-                type="button"
-                role="radio"
-                aria-checked={devise === d}
-                onClick={() => setDevise(d)}
-                className={`min-h-touch flex-1 rounded-full text-14 font-semibold text-ink-900 ${
-                  devise === d ? "bg-white shadow-e1" : "hover:bg-white"
-                }`}
-              >
-                {d === "XOF" ? "Francs CFA" : "Euros"}
-              </button>
-            ))}
-          </div>
+          <BasculeDeDevise devises={["XOF", "EUR"]} devise={devise} onChangement={setDevise} />
           <p className="text-13 text-ink-500">
             Devise déduite de ton pays, le Bénin. Tu peux la changer.
           </p>

@@ -31,6 +31,10 @@ const NOMMES = ["conditions", "donnees"] as const;
  * et l'écran mène donc à la vérification dans les deux cas. C'est l'email
  * reçu qui distingue les deux : un formulaire d'inscription ne doit pas
  * servir à vérifier si quelqu'un a un compte ici.
+ *
+ * Un formulaire (revue du 07/10/2026, M11) : Entrée crée le compte quand
+ * tout est rempli, et le gestionnaire de mots de passe propose d'enregistrer
+ * la paire `email` / `password`.
  */
 export function Inscription({ publiees }: { publiees: Publiees }) {
   /*
@@ -54,6 +58,7 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
   const complet = Boolean(nom && email && longueurOk && conditions);
 
   async function creer() {
+    if (!complet || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const [prenom, ...reste] = nom.trim().split(/\s+/u);
@@ -80,7 +85,15 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
       : "Renseigne ton nom et ton adresse email.";
 
   return (
-    <div className="mx-auto flex w-full max-w-gabarit flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6">
+    <form
+      noValidate
+      aria-labelledby="contenu"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void creer();
+      }}
+      className="mx-auto flex w-full max-w-gabarit flex-col gap-8 px-4 pb-8 md:flex-row md:gap-16 md:px-12 md:py-6"
+    >
       <div className="flex flex-col gap-5 md:w-formulaire md:flex-none">
         <div className="flex flex-col gap-2">
           <h1
@@ -98,6 +111,7 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
         <div className="flex flex-col gap-4">
           <Input
             libelle="Prénom et nom"
+            name="name"
             autoComplete="name"
             placeholder="Aline Dossou"
             value={nom}
@@ -106,6 +120,7 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
           <Input
             libelle="Adresse email"
             type="email"
+            name="email"
             autoComplete="email"
             placeholder="aline.dossou@email.com"
             aide="C'est là qu'arrivent les alertes de changement de règles."
@@ -115,6 +130,7 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
           <Input
             libelle="Numéro Mobile Money"
             type="tel"
+            name="tel"
             autoComplete="tel"
             placeholder="97 00 00 42"
             aide="Bénin, +229. Sert au paiement, jamais à la publicité."
@@ -126,6 +142,7 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
             <Input
               libelle="Mot de passe"
               type="password"
+              name="password"
               autoComplete="new-password"
               placeholder="Au moins 10 caractères"
               aria-describedby={idJauge}
@@ -176,12 +193,12 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
 
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:w-72 md:flex-none md:border-0 md:p-0">
         <Button
+          type="submit"
           pleineLargeur
           className="min-h-action"
           disabled={!complet}
           chargement={envoi}
           raisonDesactivation={complet ? undefined : raison}
-          onClick={() => void creer()}
         >
           Créer mon compte
         </Button>
@@ -192,6 +209,6 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
           </Link>
         </p>
       </div>
-    </div>
+    </form>
   );
 }

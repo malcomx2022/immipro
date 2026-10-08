@@ -37,6 +37,9 @@ import { momentEnFrancais } from "@/domain/format/moment";
  * l'interrupteur reste réglable — c'est un souhait, et il vaudra quand
  * l'envoi reprendra —, mais la phrase dit où les rappels attendent en
  * attendant.
+ *
+ * Un formulaire (revue du 07/10/2026, M11) : Entrée dans un champ envoie,
+ * comme le bouton principal.
  */
 export interface PreferencesDeRappelsProps {
   initial: PreferencesDeRappel;
@@ -65,6 +68,7 @@ export function PreferencesDeRappels({ initial, canal, dernier, retour }: Prefer
   };
 
   async function enregistrer() {
+    if (!modifie || envoi) return;
     setEnvoi(true);
     setEchec(null);
     setConfirme(false);
@@ -89,7 +93,15 @@ export function PreferencesDeRappels({ initial, canal, dernier, retour }: Prefer
   const idEmailTexte = `${prefixe}-email-texte`;
 
   return (
-    <div className="mx-auto flex w-full max-w-reglages flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
+    <form
+      noValidate
+      aria-labelledby="contenu"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void enregistrer();
+      }}
+      className="mx-auto flex w-full max-w-reglages flex-col gap-6 px-4 py-6 md:px-8 md:py-10"
+    >
       <Link href={retour} className="text-14 font-semibold text-ink-900">
         {retour === "/consentements" ? "Mon compte" : "Revenir à l'échéancier"}
       </Link>
@@ -163,6 +175,7 @@ export function PreferencesDeRappels({ initial, canal, dernier, retour }: Prefer
 
       <Select
         libelle="Mon fuseau horaire"
+        name="fuseau"
         aide={`Les rappels partent à partir de ${HEURE_DES_RAPPELS} h, à l'heure de cette ville.`}
         options={FUSEAUX_PROPOSES.map((f) => ({ valeur: f.id, libelle: f.libelle }))}
         value={prefs.fuseau}
@@ -196,16 +209,16 @@ export function PreferencesDeRappels({ initial, canal, dernier, retour }: Prefer
           </p>
         ) : null}
         <Button
+          type="submit"
           pleineLargeur
           className="min-h-action"
           chargement={envoi}
           disabled={!modifie}
           raisonDesactivation="Aucun réglage n'a changé depuis le dernier enregistrement."
-          onClick={() => void enregistrer()}
         >
           Enregistrer mes réglages
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

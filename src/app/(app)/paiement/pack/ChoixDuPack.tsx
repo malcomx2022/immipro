@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { BasculeDeDevise } from "@/components/ui/BasculeDeDevise";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { PACKS, RECHARGE_ANALYSES, type Devise } from "@/domain/payments/pricing";
@@ -89,29 +90,14 @@ export function ChoixDuPack({ tunnel }: { tunnel: Tunnel }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <div
-            role="radiogroup"
-            aria-label="Devise d'affichage"
-            className="flex gap-2 rounded-full bg-ink-100 p-1"
-          >
-            {/* Seules les devises dont le rail est ouvert se proposent :
-                pendant le pilote FedaPay, l'euro menait à un paiement par
-                carte que rien ne pouvait ouvrir (03/10/2026). */}
-            {tunnel.devisesOuvertes.map((d) => (
-              <button
-                key={d}
-                type="button"
-                role="radio"
-                aria-checked={devise === d}
-                onClick={() => setDevise(d)}
-                className={`min-h-touch flex-1 rounded-full text-14 font-semibold text-ink-900 ${
-                  devise === d ? "bg-white shadow-e1" : "hover:bg-white"
-                }`}
-              >
-                {d === "XOF" ? "Francs CFA" : "Euros"}
-              </button>
-            ))}
-          </div>
+          {/* Seules les devises dont le rail est ouvert se proposent :
+              pendant le pilote FedaPay, l'euro menait à un paiement par
+              carte que rien ne pouvait ouvrir (03/10/2026). */}
+          <BasculeDeDevise
+            devises={tunnel.devisesOuvertes}
+            devise={devise}
+            onChangement={setDevise}
+          />
           {/* Le pays du compte, et non « le Bénin » écrit en dur : un compte
               sans pays renseigné n'a pas de déduction à annoncer. */}
           <p className="text-13 text-ink-500">
