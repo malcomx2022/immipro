@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) et S.127 (M3, M2, N1) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -73,8 +73,8 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-8 | Un remboursement constaté sans obligation ouverte ouvre-t-il un écart, sans retrait automatique des droits ? | Direction | E3 |
 | D-9 | Un second écart sur une transaction dont le premier est refermé doit-il réécrire la colonne d'écart, l'historique restant au journal ? | Responsable technique | E2, E3 |
 | D-10 | Que faire d'un remboursement supérieur au dû ? | M.C | E3 |
-| D-11 | Une revue manuelle peut-elle conclure à zéro, et comment l'obligation se referme-t-elle ? Un pack Pro servi sur plusieurs dossiers retire-t-il les droits de tous ? | Direction | M4 |
-| D-12 | Les analyses du pack sont-elles celles vendues à l'achat ? (confirmation de lecture de RG-15.2) | Direction | M5 |
+| D-11 | Une revue manuelle peut-elle conclure à zéro, et comment l'obligation se referme-t-elle ? Un pack Pro servi sur plusieurs dossiers retire-t-il les droits de tous ? | Direction | M4 — **tranchée le 08/10/2026** : zéro est possible et le candidat garde ses analyses ; un Pro remboursé perd ses analyses restantes sur tous les dossiers servis |
+| D-12 | Les analyses du pack sont-elles celles vendues à l'achat ? (confirmation de lecture de RG-15.2) | Direction | M5 — **tranchée le 08/10/2026** : la base est celle vendue à l'achat, figée sur la transaction |
 | D-13 | Renomme-t-on les montants de `Transaction` par `@map`, sans migration de données ? | Responsable technique | M18 |
 | D-14 | Une facture émise le 02/01 pour une vente du 31/12 prend-elle l'exercice de l'émission avec la date de la vente, ou l'exercice de la vente ? | M.C | F5 |
 | D-15 | Textes des pages introuvable, erreur et hors ligne ; emploi d'`erreur.svg` | Design, produit | E8 |
@@ -109,7 +109,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.125 — livré** | C1, E1, E4, E5 | — | — | Version figée intouchable, débit compté par la vraie adresse, purge des deux zones, une analyse par version |
 | **S.126 — livré** | E6, E7, F4, M1, F12 | M+M+S+M+S | Sans décision | Aucune pièce bloquée « en analyse », aucune chaîne du modèle affichée, clé de dépôt vérifiée |
 | **S.127 — livré** | M3, M2, N1 | S+M+S | D-3, D-22 (M3 sans décision) | Compteurs d'essais atomiques, pas d'énumération, case « Rester connecté » honorée |
-| S.128 — paiements I | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
+| **S.128 — livré** | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
 | S.129 — paiements II | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
 | S.130 — paiements III | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
 | S.131 — données | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
@@ -750,6 +750,8 @@ Garde-fous : un REMBOURSEE sans `refundDueAt` refusé ; plus les deux garde-fous
 
 #### M4 — Revue manuelle de remboursement : le montant décidé ne s'écrit nulle part
 
+**État : livré en S.128** (D-11). Écart au plan : la tranche ne réécrit pas l'envoi — `initierLeRemboursement` lit la décision (`refundDecidedAt`) au lieu de réévaluer le pack, et l'index de retrait passe à un retrait par transaction **et par dossier**. Zéro referme l'obligation (`refundDueAt` remis à nul, trace dans l'écart et le journal).
+
 **Constat vérifié.** `ouvrirUnRemboursement` pose `refundAmount: null` sur une revue manuelle (`paiements.ts:1713-1718`). `initierLeRemboursement` rend `revue_manuelle` avant de réserver la tentative : `refundAttemptedAt` reste nul, aucun droit n'est retiré.
 
 **Correction de la revue.** Ajouter un montant à `declarerLeRemboursementManuel` ne suffit pas : `defautDeDeclaration` (`domain/paiement/remboursement.ts:276`) refuse toute dette non initiée avec `non_initiee`. Aucune voie du produit ne permet aujourd'hui de fixer le montant décidé par la direction. Il faut une action de tranche distincte.
@@ -778,6 +780,8 @@ Garde-fous : un REMBOURSEE sans `refundDueAt` refusé ; plus les deux garde-fous
 ---
 
 #### M5 — Dénominateur du prorata lu sur la grille du jour
+
+**État : livré en S.128** (D-12). Lus aussi sur la vente : la confirmation d'un pack retiré de la grille et l'écran de confirmation des destinations.
 
 **Constat vérifié.** `suiteDuQuotaDuPack` lit `packDeLAchat(packCode)` (`paiements.ts:1383`), donc `PACKS` du jour, puis `analysesDuPack: pack.analyses` (l.1409). Même cause ailleurs : `appliquerLaCouverture` (`server/acces/couverture.ts:105-115`) lit `destinations` et `analysesParDestination` sur la grille du jour, et un pack retiré de la grille retombe sur la règle des recharges. Les valeurs 10, 30 et 90 n'ont jamais changé.
 
@@ -1387,7 +1391,8 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 | S.126 (livrée) | `20261008090000_regle_figee_non_supprimable` | `Application.visaRuleId` en `ON DELETE RESTRICT` |
 | S.126 (livrée) | `20261008091000_cle_d_objet_unique` | Arrêt sur doublon existant ; index unique partiel `documentversion_cle_unique` |
 | S.126 (livrée) | `20261008092000_un_seul_rendu_par_analyse` | Dédoublonnage des rendus, index unique partiel `analysiscredit_un_seul_rendu_par_analyse` |
-| S.128 | `analyses_vendues_figees` | `Transaction.packAnalyses`, `packDestinations`, reprise, contrainte |
+| S.128 (livrée) | `20261008100000_analyses_vendues_figees` | `Transaction.packAnalyses`, `packDestinations`, reprise, contrainte |
+| S.128 (livrée) | `20261008101000_tranche_de_la_revue` | `refundDecidedAt`, `refundDecidedBy`, contrainte ; index de retrait par transaction et par dossier |
 | S.129 | `remboursement_suppose_une_obligation` | Reprise des remboursements sans obligation, contrainte |
 | S.130 | `contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
 | S.131 | `index_des_cles_etrangeres` | Neuf index |
@@ -1397,7 +1402,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.127
+## 7. Ce qui reste ouvert après les lots S.125 à S.128
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1407,3 +1412,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **E7** : relire à la main les analyses `HORS_SUJET` et les notifications « Ce fichier ressemble à : » dont le libellé n'appartient pas au référentiel ; l'étape 6 (contrôle du message final) reste facultative.
 - **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.
 - **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.
+- **M4** : lister les dettes déjà bloquées en revue (obligation ouverte, `refundAmount` nul, non demandée, non rendue) et les trancher en B-04 ; une tranche à zéro n'envoie aucun message au candidat.
