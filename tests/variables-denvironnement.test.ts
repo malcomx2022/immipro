@@ -45,8 +45,16 @@ function fichiers(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
+/**
+ * Les scripts shell exécutés sur le VPS lisent aussi des variables — ceux
+ * de la sauvegarde de nuit (E10) et du déploiement, depuis `.env.sauvegarde`.
+ */
+const SHELL = readdirSync("scripts")
+  .filter((nom) => nom.endsWith(".sh"))
+  .map((nom) => lire(join("scripts", nom)));
+
 /** Le code de l'application, et les scripts d'exploitation. */
-const SOURCES = [...fichiers("src"), ...fichiers("scripts")].map(lire).join("\n");
+const SOURCES = [...[...fichiers("src"), ...fichiers("scripts")].map(lire), ...SHELL].join("\n");
 
 /** Les conteneurs en sont des lecteurs, aussi réels que le code. */
 const COMPOSES = ["docker-compose.yml", "docker-compose.prod.yml"].map(lire).join("\n");

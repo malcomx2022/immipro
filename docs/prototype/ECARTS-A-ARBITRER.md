@@ -11733,3 +11733,48 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 1. Avant le premier déploiement par la CI, renseigner `VPS_KNOWN_HOSTS` et `.env.sauvegarde`, et faire à la main les trois répétitions de `docs/exploitation/deploiement.md` sur le VPS. Sans `VPS_KNOWN_HOSTS`, le job `deploy` échoue en le disant.
 2. La base ne revient jamais en arrière : la restauration depuis `sauvegardes/avant-<tag>.dump.gpg` est manuelle, et la clé privée GPG n'est pas sur le VPS.
 3. Le `Dockerfile` installe encore le CLI Prisma par `npm install -g` (M15).
+
+## S.133 — Revue du 07/10/2026 : exploitation II (E10)
+
+**Contexte.** Neuvième lot du plan de traitement. Deux décisions, tranchées le 08/10/2026 :
+- **D-26** : les sauvegardes partent sur Backblaze B2, hors du VPS ; la clé privée GPG est dans un coffre hors ligne, jamais sur le VPS ; la surveillance passe par Healthchecks.io.
+- **D-27** : les pièces restent 30 jours dans les sauvegardes, comme la base.
+
+**Ce que fait le code.**
+- **`scripts/sauvegarde.sh`** est lancé par le cron à 2 h UTC, avant la purge de 3 h 30. Il sauvegarde la base puis les pièces, avec le même horodatage et le même tag, puis envoie un ping : `/start` en commençant, l'adresse nue en cas de succès, `/fail` à la première erreur. Il refuse de tourner sans adresse de ping.
+- **`backup-postgres.sh`** :
+  - les identifiants sont lus dans le conteneur ;
+  - le dump passe en `pg_dump -Fc` ;
+  - le fichier porte l'horodatage et le tag ;
+  - `--b2-hard-delete` : B2 ne garde plus de version masquée au-delà de 30 jours.
+- **`backup-pieces.sh`** (nouveau) copie le seul seau des pièces saines par une clé en lecture seule, sans la quarantaine, ajoute un inventaire (clé, taille, SHA-256), puis expédie une archive chiffrée, conservée 30 jours.
+- **`restauration-controle.sh`** (nouveau) se lance hors du VPS et refuse de tourner dessus. Il prend la base et les pièces d'une même nuit et restaure la base sur un PostgreSQL jetable, dans un réseau sans sortie. Il vérifie ensuite :
+  - les garde-fous, depuis l'image du tag de la nuit ;
+  - les migrations, qui doivent être exactement celles de cette image ;
+  - les pièces : zéro pièce saine manquante attendue.
+
+  Il imprime la ligne du registre mensuel.
+- **`deploy.yml`** recopie aussi ces scripts. **`.env.example`** déclare les clés de `.env.sauvegarde`, et le test des variables lit désormais les scripts shell.
+- **Juridique** : l'aide des variables `securite_complements` et `sous_traitants` nomme la durée et Backblaze. Le texte proposé pour la page « Données personnelles » est dans `docs/exploitation/sauvegardes.md`.
+
+**Ce qui est éprouvé.** `tests/sauvegarde.test.ts` exécute les vrais scripts : de faux `rclone`, `docker`, `gpg` et `curl`, et les vrais `tar`, `find` et `sha256sum`. Treize scénarios :
+- sur la sauvegarde :
+  - la base et les pièces sont expédiées pour la même nuit, avec les pings dans l'ordre ;
+  - l'archive porte l'inventaire et jamais la quarantaine ;
+  - un échec envoie `/fail` ;
+  - sans ping ou sans `.env.sauvegarde`, refus ;
+- sur la restauration de contrôle, en aller-retour :
+  - le cas nominal passe, à zéro manquante ;
+  - une pièce manquante, une migration absente ou des garde-fous qui ne tiennent pas font échouer ;
+  - une empreinte divergente est signalée ;
+  - une nuit sans archive des pièces, un remote illisible ou une date vide sont refusés.
+
+**Écarts qui restent.**
+1. Sur le VPS :
+   - créer `.env.sauvegarde`, importer la clé publique GPG, configurer les remotes `b2` et `garage` (en lecture seule) et le contrôle Healthchecks.io ;
+   - remplacer l'ancienne ligne de cron (`backup-postgres.sh` sans argument échoue désormais) ;
+   - faire la première restauration de contrôle et couper le ping une fois pour voir l'alerte.
+2. Publier en B-08 le texte de `securite_complements` et ajouter Backblaze aux sous-traitants, avec la région du seau.
+3. L'image ne porte aucune commande pour lancer la purge à la main : après une restauration, l'application attend le passage de 3 h 30 avant de rouvrir.
+4. L'archive des pièces est complète chaque nuit : sur B2, le volume vaut environ 30 fois le seau. C'est acceptable au pilote, à revoir avec la croissance (copie incrémentale).
+5. `dependabot.yml` n'ignore pas les majeures des actions GitHub : `checkout` v7 et `setup-buildx` v4 sont arrivés hors de l'ordre de M19.

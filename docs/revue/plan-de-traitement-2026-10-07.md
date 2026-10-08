@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17) et S.132 (E9) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9) et S.133 (E10) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -88,8 +88,8 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) |
 | D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 |
 | D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 — **tranchée le 08/10/2026** : `ssh` natif vérifié par `VPS_KNOWN_HOSTS`, compose et script recopiés à chaque déploiement |
-| D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 |
-| D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 |
+| D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 — **tranchée le 08/10/2026** : Backblaze B2 hors du VPS, clé privée dans un coffre hors ligne, Healthchecks.io |
+| D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 — **tranchée le 08/10/2026** : 30 jours, comme la base ; texte proposé pour `securite_complements` |
 | D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 |
 | D-29 | ~~Domaines servis~~ : `immipro.app`, tranché le 07/10/2026 (S.125 bis). Restent `nginx -T` du VPS et la méthode certbot | Exploitant | M16 |
 | D-30 | Node 24 ou Node 22 ? | Direction | M19 étape 0, M15 |
@@ -114,7 +114,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.130 — livré** | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
 | **S.131 — livré** | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
 | **S.132 — livré** | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
-| S.133 — exploitation II | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
+| **S.133 — livré** | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
 | S.134 — exploitation III | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
 | S.135 — interface I | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
 | S.136 — interface II | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
@@ -1210,6 +1210,12 @@ Valeurs Tailwind natives : 320px devient `w-80`, 240px devient `w-60`. Autres je
 
 #### E10 — Sauvegardes : pièces non couvertes, restauration jamais éprouvée
 
+**État : livré en S.133** (D-26, D-27). Écarts au texte ci-dessous :
+- la base passe en `pg_dump -Fc` (rechargé par `pg_restore`), comme la sauvegarde du déploiement ;
+- le déploiement recopie aussi les scripts de sauvegarde ;
+- la restauration de contrôle signale les empreintes divergentes sans échouer, parce que l'empreinte en base est déclarée par le navigateur et jamais recalculée ;
+- l'image ne porte pas de commande pour lancer la purge à la main après une restauration, et la procédure attend donc le passage de 3 h 30.
+
 **Constat vérifié.** `scripts/backup-postgres.sh` ne sauvegarde que PostgreSQL ; les volumes Garage n'ont aucune sauvegarde ; les variables viennent du cron ; la ligne 20 renvoie à un fichier inexistant. `docs/exploitation/sauvegardes.md` (S.120) documente déjà la restauration manuelle, mais rien ne l'éprouve et aucune alerte n'existe.
 
 **Méthode retenue pour Garage v2.** Export S3 par `rclone` du seul seau de confiance. `garage meta snapshot` ne capture pas les données ; une copie à froid de `data_dir` emporterait la quarantaine et des blocs purgés pas encore collectés, contraire à INV-5.
@@ -1421,7 +1427,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.132
+## 7. Ce qui reste ouvert après les lots S.125 à S.133
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1436,3 +1442,10 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **Audit** : l'exception `deepmerge-ts` (D-34) est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15) ; les quatre modérées de `minio` restent affichées.
 - **M17** : une base de développement où la graine a tourné avant S.131 garde ses relevés de veille de démonstration, sans dommage ; ceux d'une veille réelle effacés par les passes antérieures ne se retrouvent pas.
 - **E9** : avant le premier déploiement par la CI, renseigner `VPS_KNOWN_HOSTS` (relevé depuis la console du fournisseur) et `.env.sauvegarde` sur le VPS, puis faire les trois répétitions de `docs/exploitation/deploiement.md` à la main. Sans `VPS_KNOWN_HOSTS`, le job `deploy` échoue, et il le dit.
+- **E10** : sur le VPS, avant d'activer le cron de `sauvegarde.sh`, mettre en place :
+  - `.env.sauvegarde` ;
+  - la clé publique GPG ;
+  - les remotes rclone `b2` et `garage` (clé en lecture seule) ;
+  - le contrôle Healthchecks.io.
+
+  Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.

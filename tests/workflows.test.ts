@@ -64,6 +64,8 @@ describe("le déploiement — D-25, option A", () => {
   it("le compose et le script sont recopiés, puis le script fait le reste", () => {
     expect(deploy).toMatch(/scp docker-compose\.prod\.yml vps:\/srv\/immipro\/\.deploiement\/arrivee\//u);
     expect(deploy).toMatch(/scp scripts\/deployer\.sh vps:/u);
+    // Et les scripts de la sauvegarde de nuit (E10) : le cron lance la version du dépôt.
+    expect(deploy).toMatch(/scp scripts\/sauvegarde\.sh scripts\/backup-postgres\.sh scripts\/backup-pieces\.sh vps:/u);
     expect(deploy).toMatch(/\/srv\/immipro\/scripts\/deployer\.sh \$\{\{ needs\.build\.outputs\.tag \}\}/u);
     // Plus de migration ni de bascule improvisées dans le workflow.
     expect(deploy).not.toMatch(/migrate deploy|up -d/u);
