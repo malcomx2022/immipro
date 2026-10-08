@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { BasculeDeDevise } from "@/components/ui/BasculeDeDevise";
+import { useState } from "react";
+import type { Devise } from "@/domain/payments/pricing";
 
 const PACKS = [
   { valeur: "essentiel", libelle: "Pack Essentiel" },
@@ -135,5 +138,47 @@ describe("Checkbox", () => {
     const case_ = screen.getByRole("checkbox");
     case_.focus();
     expect(document.activeElement).toBe(case_);
+  });
+});
+
+/**
+ * La bascule de devise des tarifs et du choix du pack — revue du
+ * 07/10/2026, M12. Deux copies déclarées `radiogroup`, sans le clavier :
+ * deux arrêts de tabulation, aucune flèche.
+ */
+describe("BasculeDeDevise", () => {
+  function Bascule({ devises = ["XOF", "EUR"] as Devise[] }) {
+    const [devise, setDevise] = useState<Devise>("XOF");
+    return <BasculeDeDevise devises={devises} devise={devise} onChangement={setDevise} />;
+  }
+
+  it("un seul arrêt de tabulation, sur la devise retenue", () => {
+    render(<Bascule />);
+    const groupe = screen.getByRole("radiogroup", { name: "Devise d'affichage" });
+    expect(groupe).toBeDefined();
+    const tabulables = screen.getAllByRole("radio").filter((r) => r.getAttribute("tabindex") === "0");
+    expect(tabulables).toHaveLength(1);
+    expect(tabulables[0]).toHaveAccessibleName("Francs CFA");
+  });
+
+  it("les flèches, Origine et Fin changent la devise et suivent le focus", () => {
+    render(<Bascule />);
+    const cfa = screen.getByRole("radio", { name: "Francs CFA" });
+    const euros = screen.getByRole("radio", { name: "Euros" });
+    fireEvent.keyDown(cfa, { key: "ArrowRight" });
+    expect(euros).toBeChecked();
+    expect(euros).toHaveFocus();
+    expect(euros).toHaveAttribute("tabindex", "0");
+    fireEvent.keyDown(euros, { key: "Home" });
+    expect(cfa).toBeChecked();
+    fireEvent.keyDown(cfa, { key: "End" });
+    expect(euros).toBeChecked();
+    fireEvent.keyDown(euros, { key: "ArrowRight" });
+    expect(cfa).toBeChecked();
+  });
+
+  it("une seule devise ouverte : une seule option", () => {
+    render(<Bascule devises={["XOF"]} />);
+    expect(screen.getAllByRole("radio")).toHaveLength(1);
   });
 });

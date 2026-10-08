@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15) et S.135 (F8, F9, F7) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7) et S.136 (E8, M11, M12) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -77,9 +77,9 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-12 | Les analyses du pack sont-elles celles vendues à l'achat ? (confirmation de lecture de RG-15.2) | Direction | M5 — **tranchée le 08/10/2026** : la base est celle vendue à l'achat, figée sur la transaction |
 | D-13 | Renomme-t-on les montants de `Transaction` par `@map`, sans migration de données ? | Responsable technique | M18 |
 | D-14 | Une facture émise le 02/01 pour une vente du 31/12 prend-elle l'exercice de l'émission avec la date de la vente, ou l'exercice de la vente ? | M.C | F5 |
-| D-15 | Textes des pages introuvable, erreur et hors ligne ; emploi d'`erreur.svg` | Design, produit | E8 |
-| D-16 | La suppression de compte part-elle sur la touche Entrée ? | Produit | M11 |
-| D-17 | Correspondances de section de la navigation (`/services` et `/consultants` sous « Dossiers ») | Produit | M12 |
+| D-15 | Textes des pages introuvable, erreur et hors ligne ; emploi d'`erreur.svg` | Design, produit | E8 — **tranchée le 08/10/2026** : les textes du tableau E8 ; `erreur.svg` sur l'échec, `hors-ligne.svg` hors connexion, aucune image sur l'introuvable |
+| D-16 | La suppression de compte part-elle sur la touche Entrée ? | Produit | M11 — **tranchée le 08/10/2026** : non, geste explicite sur son bouton |
+| D-17 | Correspondances de section de la navigation (`/services` et `/consultants` sous « Dossiers ») | Produit | M12 — **tranchée le 08/10/2026** : `/dossiers`, `/fiches`, `/services` et `/consultants` sous « Dossiers » |
 | D-18 | Ajoute-t-on un bouton « Menu » au gabarit mobile, d'abord dans le prototype ? | Design | M13 |
 | D-19 | Accepte-t-on des pages publiques revalidées toutes les 5 minutes pour servir les liens juridiques dans le HTML ? | Produit, responsable technique | M14 |
 | D-20 | Regroupe-t-on des largeurs voisines (760 vers 720, 560 et 480 vers 520, 68ch et 75ch vers 70ch) ? | Design | F7 — **tranchée le 08/10/2026** : un jeton par valeur, aucun regroupement |
@@ -117,7 +117,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.133 — livré** | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
 | **S.134 — livré** | M19 étape 0, M15 | S+M | D-28, D-30 | Node maintenu, limites et sondes en production |
 | **S.135 — livré** | F8, F9, F7 | S+S+M | D-20, D-21 | Catalogue d'échecs dans le domaine, jetons de largeur |
-| S.136 — interface II | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
+| **S.136 — livré** | E8, M11, M12 | M+M+M | D-15, D-16, D-17 | Pages d'état en français, formulaires, clavier |
 | S.137 — reprises du worker | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
 | S.138 — rédaction et en-têtes | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
 | S.139 — interface III | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
@@ -931,6 +931,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 
 #### E8 — Pages d'état des routes : introuvable, erreur, chargement
 
+**État : livré en S.136** (D-15). Écarts au texte ci-dessous : l'échec du back-office rend `EtatDEcran` suivi de la trace (`digest`), et non `BlocEchec`, pour garder un `h1` cible du lien d'évitement ; l'`error.tsx` racine a son propre texte (`general`, « Ce qui était déjà enregistré est conservé »), l'espace en cause étant inconnu à ce niveau. `instrumentation.ts` (option) n'est pas posé.
+
 **Constat vérifié.** Aucun `not-found.tsx`, `error.tsx`, `loading.tsx` ni `global-error.tsx` dans `src/app`. 41 appels `notFound()` dans 31 fichiers (15 dans `(app)/(dossier)`, 7 dans `(app)/paiement`, 7 dans `(public)`, 2 dans `(admin)`) affichent la 404 anglaise de Next. Deux visuels prévus sont inutilisés : `public/illustrations/erreur.svg` (« erreur de C-04 ») et `hors-ligne.svg` (« hors ligne de $-06 »).
 
 **Règle.** CLAUDE.md (états vide, chargement, erreur ; aucune chaîne anglaise) ; DOC-12 §3.8 (squelettes, jamais de spinner plein écran) ; règles d'écriture ; règles clavier 2, 6 et 10.
@@ -971,6 +973,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 
 #### M11 — Formulaires sans élément `<form>`
 
+**État : livré en S.136** (D-16 : la suppression de compte reste un geste explicite, sans `<form>`). Les dix écrans des deux lots sont des formulaires ; `Verification` en a deux, côte à côte. Le back-office reste à faire, comme prévu, dans un ticket séparé.
+
 **Constat vérifié.** Un seul `<form>` (`Verification.tsx:205`), sans `noValidate` alors qu'il contient un champ `type="email"`. Ailleurs, l'action est un `Button onClick` placé dans une barre d'action (`Connexion.tsx:139-153`).
 
 **Règle.** DOC-12 §5 critère 3 ; règle d'écriture 4. Écrans A-01 à A-04, C-02, C-05, C-10, C-11a.
@@ -993,6 +997,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 ---
 
 #### M12 — Accessibilité clavier
+
+**État : livré en S.136** (D-17), bonus compris. Les onglets de `Redaction` utilisent le même crochet que les groupes radio ; ceux d'`Alertes` deviennent des filtres en `aria-pressed`. Au back-office, la fiche d'une règle (`/regles`) allume « Veille réglementaire ».
 
 **Constat vérifié.** Trois groupes radio sans flèches : `Simulateur.tsx:108-131`, `Tarifs.tsx:56-75` et `ChoixDuPack.tsx:92-114`. Les deux derniers sont la même **bascule de devise**, dupliquée ; le choix du pack utilise déjà `RadioGroup`. Deux `outline-none` sur des éléments tabulables : `ListeSelectionnable.tsx:100`, `FicheDetaillee.tsx:109`. Zéro `aria-current`. En plus de la revue : deux `tablist` sans flèches ni `aria-controls` (`Redaction.tsx:399-416`, `Alertes.tsx:140-158`).
 
@@ -1438,7 +1444,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.135
+## 7. Ce qui reste ouvert après les lots S.125 à S.136
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1461,3 +1467,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
   Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.
 - **M15** : après le premier déploiement de S.134, vérifier sur le VPS que les six services sont `healthy` et que les limites apparaissent dans `docker stats`.
+- **M11** : les formulaires du back-office (ticket séparé, comme prévu) ; et le champ « Établissement visé » de C-05, saisi mais jamais envoyé, à trancher (l'envoyer ou le retirer).

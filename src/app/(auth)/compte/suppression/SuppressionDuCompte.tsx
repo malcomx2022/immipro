@@ -35,6 +35,12 @@ import { MENTION_DELAI_REMBOURSEMENT } from "@/domain/consultants/annulation";
  * Après coup, l'écran ne redirige pas tout de suite : il confirme. Un
  * renvoi immédiat vers l'accueil laisserait la personne se demander si le
  * geste a été fait.
+ *
+ * **Pas de `<form>` ici** (D-16 du 08/10/2026). Les écrans de saisie sont
+ * devenus des formulaires, où Entrée envoie (revue du 07/10/2026, M11).
+ * Celui-ci ne l'est pas : Entrée dans le champ du mot de passe ne supprime
+ * rien. Un geste irréversible se fait sur son bouton, lu et visé — comme le
+ * paiement du récapitulatif. `tests/formulaires.test.ts` y veille.
  */
 export interface SuppressionDuCompteProps {
   email: string;

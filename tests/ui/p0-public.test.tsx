@@ -50,6 +50,21 @@ describe("P-02 — Simulateur", () => {
     );
   });
 
+  it("les réponses se choisissent aux flèches, en un seul arrêt de tabulation (revue M12)", () => {
+    render(<Simulateur />);
+    const options = screen.getAllByRole("radio");
+    expect(options.filter((o) => o.getAttribute("tabindex") === "0")).toHaveLength(1);
+    expect(options[0]).toHaveAttribute("tabindex", "0");
+    // Comme un groupe radio natif : la flèche part de l'option qui a le focus.
+    fireEvent.keyDown(options[0]!, { key: "ArrowDown" });
+    expect(options[1]).toBeChecked();
+    expect(options[1]).toHaveFocus();
+    fireEvent.keyDown(options[1]!, { key: "End" });
+    expect(options.at(-1)).toBeChecked();
+    // Choisir ne fait pas avancer : « Continuer » reste le geste qui passe à la suite.
+    expect(screen.getByText("1 / 6")).toBeDefined();
+  });
+
   it("marque la réponse retenue par aria-checked", () => {
     render(<Simulateur />);
     fireEvent.click(screen.getByRole("radio", { name: /Étudier/ }));
@@ -312,6 +327,18 @@ describe("P-03 — Résultats", () => {
       const lien = await screen.findByRole("link", { name: "Ouvrir un dossier" });
       expect(lien).toHaveAttribute("href", "/inscription");
     });
+  });
+});
+
+describe("P-06 — Tarifs, bascule de devise au clavier (revue M12)", () => {
+  it("un arrêt de tabulation, et la flèche passe aux euros", () => {
+    render(<Tarifs />);
+    const cfa = screen.getByRole("radio", { name: "Francs CFA" });
+    const euros = screen.getByRole("radio", { name: "Euros" });
+    expect(euros).toHaveAttribute("tabindex", "-1");
+    fireEvent.keyDown(cfa, { key: "ArrowRight" });
+    expect(euros).toBeChecked();
+    expect(euros).toHaveFocus();
   });
 });
 

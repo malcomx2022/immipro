@@ -183,6 +183,21 @@ describe("C-02 — Profil", () => {
   });
 });
 
+describe("C-02 — Profil, en formulaire (revue M11)", () => {
+  it("Entrée dans un champ enregistre, comme le bouton", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) } as Response);
+    render(<Profil initial={{ nom: "Aline Dossou" }} />);
+    const formulaire = screen.getByRole("form", { name: "Mon profil" });
+    expect(formulaire).toHaveAttribute("novalidate");
+    expect(screen.getByRole("button", { name: "Enregistrer" })).toHaveAttribute("type", "submit");
+    fireEvent.submit(formulaire);
+    await waitFor(() => expect(screen.getByText("Profil enregistré.")).toBeDefined());
+    const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(url).toBe("/api/comptes/profil");
+    expect((options as RequestInit).method).toBe("PUT");
+  });
+});
+
 describe("C-03 — Comparateur", () => {
   const comparateur = () => (
     <Comparateur

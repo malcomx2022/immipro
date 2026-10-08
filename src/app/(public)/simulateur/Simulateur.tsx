@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useGroupeRadio } from "@/components/ui/useGroupeRadio";
 import {
   avancement,
   estDerniereEtape,
@@ -52,6 +53,14 @@ export function Simulateur() {
     setReponses(suivantes);
     ecrireReponses(suivantes);
   };
+
+  // Les flèches choisissent, comme dans tout groupe radio (règle clavier 4,
+  // revue M12) : un seul arrêt de tabulation, puis « Continuer ».
+  const { auClavier, refDe, tabIndexDe } = useGroupeRadio({
+    options: question.options.map((valeur) => ({ valeur })),
+    valeur: choisie ?? null,
+    onChangement: repondre,
+  });
 
   const continuer = () => {
     if (derniere) {
@@ -108,14 +117,17 @@ export function Simulateur() {
         <div
           role="radiogroup"
           aria-labelledby="contenu"
+          onKeyDown={auClavier}
           className="flex flex-col gap-2"
         >
-          {question.options.map((option) => (
+          {question.options.map((option, i) => (
             <button
               key={option}
+              ref={refDe(i)}
               type="button"
               role="radio"
               aria-checked={choisie === option}
+              tabIndex={tabIndexDe(option)}
               onClick={() => repondre(option)}
               className={`flex min-h-option items-center justify-between gap-3 rounded-md border px-4 text-left text-16 font-medium text-ink-900 ${
                 choisie === option

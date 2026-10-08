@@ -61,6 +61,7 @@ export function Depot({ dossier, aujourdhui, ouvertLe }: DepotProps) {
   const refusDate = refusDeLaDateDeDepot(deposeLe, aujourdhui, ouvertLe);
 
   async function declarer() {
+    if (!confirme || refusDate !== null || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler(`/api/dossiers/${dossier.id}/depot`, {
@@ -113,9 +114,22 @@ export function Depot({ dossier, aujourdhui, ouvertLe }: DepotProps) {
 
           <p className="text-pretty text-14 text-ink-700">{AVERTISSEMENT_DEPOT}</p>
 
-          <div className="flex flex-col gap-3 border-t border-ink-300 pt-4">
+          {/* Un formulaire (revue du 07/10/2026, M11) : Entrée déclare, une
+              fois la case cochée — la case reste le geste qui engage.
+              `noValidate` : `min`, `max` et `required` sont repris en
+              français par `refusDeLaDateDeDepot`, pas par le navigateur. */}
+          <form
+            noValidate
+            aria-labelledby="contenu"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void declarer();
+            }}
+            className="flex flex-col gap-3 border-t border-ink-300 pt-4"
+          >
             <Input
               type="date"
+              name="deposeLe"
               libelle={QUESTION_DATE_DEPOT}
               aide={AIDE_DATE_DEPOT}
               required
@@ -132,17 +146,17 @@ export function Depot({ dossier, aujourdhui, ouvertLe }: DepotProps) {
             />
             {echec ? <BlocEchec echec={echec} /> : null}
             <Button
+              type="submit"
               pleineLargeur
               disabled={!confirme || refusDate !== null}
               chargement={envoi}
               raisonDesactivation={refusDate ? "Corrige d'abord la date du dépôt." : RAISON_BOUTON_DEPOT}
               className="min-h-action"
-              onClick={() => void declarer()}
             >
               Déclarer mon dépôt
             </Button>
             <p className="text-center text-13 text-ink-500">{MENTION_DECLARATION}</p>
-          </div>
+          </form>
         </>
       ) : (
         <LienBouton

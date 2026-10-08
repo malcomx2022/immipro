@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { LienDeNavigation } from "./LienDeNavigation";
 
 /**
  * Barre haute du gabarit acquisition — sections P et A.
@@ -46,9 +47,14 @@ export function Header({ className }: HeaderProps) {
 
       <nav aria-label="Navigation principale" className="hidden items-center gap-7 md:flex">
         {NAVIGATION.map((l) => (
-          <Link key={l.href} href={l.href} className="text-14 text-ink-900">
+          <LienDeNavigation
+            key={l.href}
+            href={l.href}
+            className="text-14 text-ink-900"
+            classNameCourant="font-semibold text-accent-700"
+          >
             {l.libelle}
-          </Link>
+          </LienDeNavigation>
         ))}
       </nav>
 

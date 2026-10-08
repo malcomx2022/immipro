@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
+import { useGroupeRadio } from "@/components/ui/useGroupeRadio";
 import { CHAMP_CONTROLE } from "@/components/ui/champ";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { PieceRedigeable } from "@/domain/redaction/entretien";
@@ -136,6 +137,16 @@ export function Redaction({
 }: RedactionProps) {
   const router = useRouter();
   const [vue, setVue] = useState<Vue>(versions.length > 0 ? "EDITEUR" : "ENTRETIEN");
+  // Les deux onglets de 390 px : un arrêt de tabulation et les flèches,
+  // comme tout `tablist` (règle clavier 4, revue M12). Le clavier est celui
+  // des groupes radio : un choix exclusif, qui s'active au déplacement.
+  const onglets = useGroupeRadio({
+    options: [{ valeur: "EDITEUR" }, { valeur: "VERSIONS" }],
+    valeur: vue,
+    onChangement: (v) => setVue(v as Vue),
+  });
+  const idPanneau = useId();
+  const panneau = (cle: "EDITEUR" | "VERSIONS") => `${idPanneau}-${cle.toLowerCase()}`;
   const [index, setIndex] = useState(0);
   const [reponses, setReponses] = useState<Reponses>(reponsesEnregistrees);
   const [suggestionVisible, setSuggestionVisible] = useState(Boolean(suggestion));
@@ -396,13 +407,21 @@ export function Redaction({
 
       {/* Deux onglets en 390 px, deux colonnes au-delà : la commutation
           disparaît dès que les deux tiennent ensemble. */}
-      <div className="flex gap-2 md:hidden" role="tablist" aria-label="Vues de la pièce">
-        {(["EDITEUR", "VERSIONS"] as const).map((cle) => (
+      <div
+        className="flex gap-2 md:hidden"
+        role="tablist"
+        aria-label="Vues de la pièce"
+        onKeyDown={onglets.auClavier}
+      >
+        {(["EDITEUR", "VERSIONS"] as const).map((cle, i) => (
           <button
             key={cle}
+            ref={onglets.refDe(i)}
             type="button"
             role="tab"
             aria-selected={vue === cle}
+            aria-controls={panneau(cle)}
+            tabIndex={onglets.tabIndexDe(cle)}
             onClick={() => setVue(cle)}
             className={cn(
               "flex min-h-touch flex-1 items-center justify-center rounded-sm border text-14",
@@ -418,6 +437,7 @@ export function Redaction({
 
       <div className="flex flex-col gap-6 md:flex-row md:items-start">
         <section
+          id={panneau("EDITEUR")}
           className={cn(
             "min-w-0 flex-1 flex-col gap-5 md:flex",
             vue === "VERSIONS" ? "hidden" : "flex",
@@ -540,6 +560,7 @@ export function Redaction({
         </section>
 
         <section
+          id={panneau("VERSIONS")}
           className={cn(
             "flex-col gap-3 md:flex md:w-versions md:flex-none",
             vue === "EDITEUR" ? "hidden" : "flex",

@@ -35,6 +35,9 @@ import { ADRESSE_FACTURATION, NOM_FACTURATION } from "@/domain/facturation/factu
  * naissance, nationalité, personnes à charge, refus antérieur — étaient
  * rendus, comptés et jetés à l'envoi, faute de colonne où les ranger ;
  * l'arbitrage qui les rétablirait est noté dans `domain/comptes/profil`.
+ *
+ * Un formulaire (revue du 07/10/2026, M11) : Entrée dans un champ
+ * enregistre, comme le bouton.
  */
 const SECTIONS = ["Identité", "Parcours"] as const;
 
@@ -68,6 +71,7 @@ export function Profil({
   };
 
   async function enregistrer() {
+    if (envoi) return;
     setEnvoi(true);
     setEchec(null);
     /*
@@ -97,7 +101,15 @@ export function Profil({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <form
+      noValidate
+      aria-labelledby="contenu"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void enregistrer();
+      }}
+      className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-6 md:px-8 md:py-8"
+    >
       <h1
         id="contenu"
         tabIndex={-1}
@@ -127,6 +139,7 @@ export function Profil({
           {CHAMPS_PROFIL.filter((c) => c.section === section).map((champ) => (
             <Input
               key={champ.cle}
+              name={champ.cle}
               libelle={champ.libelle}
               aide={champ.aide}
               placeholder="À renseigner"
@@ -143,6 +156,7 @@ export function Profil({
         <h2 className="text-19 font-semibold text-ink-900">Paiement Mobile Money</h2>
         <Input
           id="telephone"
+          name="telephone"
           type="tel"
           autoComplete="tel"
           inputMode="tel"
@@ -165,6 +179,7 @@ export function Profil({
           Facturation
         </h2>
         <Input
+          name="facturationNom"
           autoComplete="name"
           libelle={NOM_FACTURATION.libelle}
           aide={NOM_FACTURATION.aide}
@@ -178,6 +193,7 @@ export function Profil({
           }}
         />
         <Input
+          name="facturationAdresse"
           autoComplete="street-address"
           libelle={ADRESSE_FACTURATION.libelle}
           aide={ADRESSE_FACTURATION.aide}
@@ -201,12 +217,7 @@ export function Profil({
 
       <div className="flex flex-col gap-2">
         {echec ? <BlocEchec echec={echec} /> : null}
-        <Button
-          pleineLargeur
-          className="min-h-action"
-          chargement={envoi}
-          onClick={() => void enregistrer()}
-        >
+        <Button type="submit" pleineLargeur className="min-h-action" chargement={envoi}>
           Enregistrer
         </Button>
         {enregistre ? (
@@ -218,6 +229,6 @@ export function Profil({
           Tu peux compléter ton profil plus tard
         </p>
       </div>
-    </div>
+    </form>
   );
 }

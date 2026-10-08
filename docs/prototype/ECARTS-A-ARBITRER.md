@@ -11833,3 +11833,32 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 **Écarts qui restent.**
 1. Un éventuel regroupement des largeurs se décide écran par écran, en changeant la valeur du jeton.
 2. Les autres valeurs arbitraires non numériques (aucune aujourd'hui) ne sont pas couvertes par le garde-fou.
+
+## S.136 — Revue du 07/10/2026 : interface II (E8, M11, M12)
+
+**Contexte.** Douzième lot du plan de traitement. Trois décisions produit et design, tranchées le 08/10/2026 :
+- **D-15** : les textes du plan ; `erreur.svg` sur l'échec, `hors-ligne.svg` hors connexion, aucune image sur une page introuvable ;
+- **D-16** : la suppression de compte ne part pas sur Entrée ;
+- **D-17** : `/dossiers`, `/fiches`, `/services` et `/consultants` allument « Dossiers ».
+
+**Ce que fait le code.**
+- **E8.** Aucune route n'avait de page introuvable, d'erreur ni de chargement : 41 appels à `notFound()` affichaient la 404 anglaise de Next.
+  - Les textes vivent dans `domain/etats/ecrans.ts`, au format d'`EchecCandidat`. La page d'échec du paiement ne dit jamais « rien n'a été débité ».
+  - `EtatDEcran` (titre `h1#contenu`, corps, conservé avant l'action), `PageIntrouvable`, `EchecDeRendu` et `ChargementDePage` sont partagés par les `not-found`, `error` et `loading` des groupes, plus `not-found`, `error` et `global-error` à la racine.
+  - `EchecDeRendu` ne journalise que l'espace et le `digest`, jamais le message ; « Réessayer » rafraîchit le serveur puis efface la frontière ; hors connexion, l'écran le dit.
+- **M11.** Connexion, inscription, mot de passe, vérification, profil, ouverture de dossier, replanification, dépôt, demande de correction et rappels sont des `<form noValidate>` : Entrée envoie, les champs ont un `name`. La vérification a deux formulaires côte à côte, le bouton de la barre rattaché par `form`. La suppression de compte reste sans formulaire (D-16).
+- **M12.**
+  - `useGroupeRadio`, extrait de `RadioGroup`, donne les flèches au simulateur, à la nouvelle `BasculeDeDevise` (tarifs et choix du pack) et aux onglets de la rédaction.
+  - Les deux `outline-none` sur des éléments tabulables sont retirés.
+  - `LienDeNavigation` pose `aria-current` et le style actif dans les deux navigations candidat, la barre publique et le back-office.
+  - Les filtres des alertes passent en `aria-pressed`.
+
+**Ce qui est éprouvé.**
+- `tests/ui/etats-de-route.test.tsx` : chaque page qui appelle `notFound()` a un `not-found` dans son groupe, chaque gabarit son `error`, et `global-error` écrit `lang="fr"`. Les rendus vérifient le titre focalisable, l'action, l'absence du message d'erreur et le hors-ligne. Les essais de source échouent sur l'ancien code.
+- `tests/formulaires.test.ts` et les essais de soumission de `p0-comptes` et `p0-dossier1` : 15 échecs sur les anciens écrans.
+- `tests/navigation-courante.test.ts`, `tests/ui/navigation.test.tsx`, `tests/anneau-de-focus.test.ts` et les essais au clavier du simulateur, des tarifs, du choix du pack et de la rédaction échouent sur l'ancien code.
+
+**Écarts qui restent.**
+1. L'échec du back-office donne la trace sous `EtatDEcran`, pas dans un `BlocEchec` : son titre doit rester le `h1` que vise le lien d'évitement.
+2. Les formulaires du back-office restent à faire, dans un ticket séparé.
+3. Le champ « Établissement visé » de C-05 est saisi mais n'a jamais été envoyé au serveur. M11 lui a seulement donné un `name` ; reste à l'envoyer ou à le retirer.

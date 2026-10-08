@@ -305,6 +305,22 @@ describe("R-03 — Éditeur et versions", () => {
       />,
     );
 
+  it("les deux onglets de 390 px : un arrêt, les flèches, et le panneau qu'ils commandent (revue M12)", () => {
+    rendre();
+    const editeur = screen.getByRole("tab", { name: "Éditeur" });
+    const versions = screen.getByRole("tab", { name: "Versions" });
+    expect(editeur).toHaveAttribute("tabindex", "0");
+    expect(versions).toHaveAttribute("tabindex", "-1");
+    for (const onglet of [editeur, versions]) {
+      expect(document.getElementById(onglet.getAttribute("aria-controls")!)).not.toBeNull();
+    }
+    fireEvent.keyDown(editeur, { key: "ArrowRight" });
+    expect(versions).toHaveAttribute("aria-selected", "true");
+    expect(versions).toHaveFocus();
+    fireEvent.keyDown(versions, { key: "Home" });
+    expect(editeur).toHaveAttribute("aria-selected", "true");
+  });
+
   it("s'ouvre sur le texte quand la pièce a déjà des versions", () => {
     rendre();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Lettre de motivation");
@@ -672,9 +688,13 @@ describe("T-01 — Alertes", () => {
     expect(container.textContent).toContain("Renouvellement du passeport · aujourd'hui");
   });
 
-  it("filtre par catégorie", () => {
+  it("filtre par catégorie, l'état porté par aria-pressed (revue M12)", () => {
     rendre();
-    fireEvent.click(screen.getByRole("tab", { name: "Réglementation" }));
+    const filtre = screen.getByRole("button", { name: "Réglementation" });
+    expect(filtre).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(filtre);
+    expect(filtre).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByText("Reçu de paiement disponible")).toBeNull();
     expect(screen.getByText("Le compte bloqué allemand passe à 11 904 €")).toBeDefined();
   });

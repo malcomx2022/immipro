@@ -106,7 +106,7 @@ export function FicheDetaillee({ fiche }: { fiche: FicheDestination }) {
         id={idPanneau(actif)}
         aria-labelledby={idOnglet(actif)}
         tabIndex={0}
-        className="flex flex-col gap-4 outline-none"
+        className="flex flex-col gap-4"
       >
         {/* Chaque onglet dit ce qu'il en est quand sa liste est vide. Un
             panneau blanc sous l'onglet qu'on vient de choisir se lit comme

@@ -77,6 +77,7 @@ export function Faisabilite({
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
   async function replanifier() {
+    if (date === "" || date === dateCible || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler(`/api/dossiers/${dossierId}/echeancier`, {
@@ -109,9 +110,22 @@ export function Faisabilite({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-ink-300 pt-3 md:flex-row md:items-end">
+      {/* Un formulaire (revue du 07/10/2026, M11) : Entrée dans la date
+          replanifie. `noValidate` : la borne `min` ne doit pas ouvrir la
+          bulle anglaise du navigateur, l'écran et le serveur disent déjà
+          pourquoi une date est refusée. */}
+      <form
+        noValidate
+        aria-label="Replanifier le départ"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void replanifier();
+        }}
+        className="flex flex-col gap-2 border-t border-ink-300 pt-3 md:flex-row md:items-end"
+      >
         <Input
           type="date"
+          name="dateCible"
           libelle="Nouvelle date de départ visée"
           aide="Tout l'échéancier est recalculé depuis les délais de ta procédure."
           min={aujourdhui}
@@ -120,15 +134,15 @@ export function Faisabilite({
           classNameChamp="md:flex-1"
         />
         <Button
+          type="submit"
           variante="secondaire"
           className="min-h-action md:w-auto"
           chargement={envoi}
           disabled={date === "" || date === dateCible}
-          onClick={() => void replanifier()}
         >
           Replanifier
         </Button>
-      </div>
+      </form>
 
       {echec ? <BlocEchec echec={echec} /> : null}
     </section>

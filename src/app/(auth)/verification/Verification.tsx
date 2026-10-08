@@ -29,6 +29,12 @@ import { cn } from "@/lib/utils";
  * nouvelle adresse et mot de passe, puis un nouveau code part. L'adresse en
  * cours est écrite dans le chapeau, comme au prototype : c'est en la lisant
  * qu'on voit la faute de frappe.
+ *
+ * Deux formulaires, côte à côte et jamais imbriqués (revue du 07/10/2026,
+ * M11) : le code, dont le bouton vit dans la barre d'action et s'y rattache
+ * par l'attribut `form`, et la correction d'adresse. Entrée dans le champ du
+ * code vérifie ; Entrée dans la correction corrige. `noValidate` aux deux :
+ * les messages sont ceux de l'écran, pas les bulles du navigateur.
  */
 /**
  * Où aller après la vérification, ou après « Plus tard » : la page qui avait
@@ -54,10 +60,12 @@ export function Verification({ email = null }: { email?: string | null }) {
   const [corrigee, setCorrigee] = useState<string | null>(null);
   const idAvancement = useId();
   const idCorrection = useId();
+  const idCode = useId();
   const chiffres = normaliserCode(code).length;
   const complet = codeComplet(code);
 
   async function verifier() {
+    if (!complet || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const resultat = await appeler("/api/comptes/verification", { corps: { code } });
@@ -131,10 +139,20 @@ export function Verification({ email = null }: { email?: string | null }) {
         </p>
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <form
+        id={idCode}
+        noValidate
+        aria-labelledby="contenu"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void verifier();
+        }}
+        className="flex flex-col gap-2.5"
+      >
         <Input
           libelle="Code de vérification"
           inputMode="numeric"
+          name="code"
           autoComplete="one-time-code"
           placeholder="000000"
           aria-describedby={idAvancement}
@@ -156,7 +174,7 @@ export function Verification({ email = null }: { email?: string | null }) {
         <span id={idAvancement} aria-live="polite" className="text-13 text-ink-500">
           {libelleAvancementCode(code)}
         </span>
-      </div>
+      </form>
 
       <div className="flex flex-col items-start gap-2.5 rounded-lg bg-ink-100 p-4">
         <p className="text-14 font-semibold text-ink-900">Rien reçu&nbsp;?</p>
@@ -204,6 +222,8 @@ export function Verification({ email = null }: { email?: string | null }) {
         {correction ? (
           <form
             id={idCorrection}
+            noValidate
+            aria-label="Corriger mon adresse email"
             className="flex flex-col gap-3 rounded-lg border border-ink-300 p-4"
             onSubmit={(e) => {
               e.preventDefault();
@@ -213,6 +233,7 @@ export function Verification({ email = null }: { email?: string | null }) {
             <Input
               libelle="Nouvelle adresse email"
               type="email"
+              name="email"
               autoComplete="email"
               value={nouvelle}
               erreur={echecCorrection?.champs?.email}
@@ -221,6 +242,7 @@ export function Verification({ email = null }: { email?: string | null }) {
             <Input
               libelle="Mot de passe"
               type="password"
+              name="password"
               autoComplete="current-password"
               aide="Celui choisi à l'inscription, pour confirmer que c'est bien toi."
               value={motDePasse}
@@ -255,6 +277,8 @@ export function Verification({ email = null }: { email?: string | null }) {
 
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-ink-300 bg-white px-4 py-3 md:static md:mx-0 md:border-0 md:p-0">
         <Button
+          type="submit"
+          form={idCode}
           pleineLargeur
           className="min-h-action"
           disabled={!complet}
@@ -262,7 +286,6 @@ export function Verification({ email = null }: { email?: string | null }) {
           raisonDesactivation={
             complet ? undefined : `Saisis les ${LONGUEUR_CODE} chiffres du code.`
           }
-          onClick={() => void verifier()}
         >
           Vérifier mon adresse
         </Button>

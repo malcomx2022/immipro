@@ -16,10 +16,13 @@
 export interface EntreeAdmin {
   href: string;
   libelle: string;
+  /** Adresses rattachées à l'entrée pour `aria-current` (revue M12). */
+  sections?: readonly string[];
 }
 
 export const NAVIGATION_ADMIN: readonly EntreeAdmin[] = [
-  { href: "/veille", libelle: "Veille réglementaire" },
+  // La fiche d'une règle (B-02) s'ouvre depuis la file de veille.
+  { href: "/veille", libelle: "Veille réglementaire", sections: ["/regles"] },
   { href: "/contenus", libelle: "Guides et articles" },
   /*
     `/textes-juridiques` et non `/juridique` ou `/conditions` : les pages

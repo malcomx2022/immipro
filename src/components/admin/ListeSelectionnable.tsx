@@ -96,8 +96,11 @@ export function ListeSelectionnable<T>({
               aria-selected={selectionne}
               tabIndex={index === position ? 0 : -1}
               onClick={() => onSelection(k)}
+              // L'anneau de focus reste (règle clavier 3, revue M12), tracé à
+              // l'intérieur de la ligne : la liste défile, et un anneau
+              // extérieur serait rogné par ses bords.
               className={cn(
-                "cursor-pointer border-t border-ink-300 px-3 py-2.5 text-14 outline-none",
+                "cursor-pointer border-t border-ink-300 px-3 py-2.5 text-14 focus-visible:-outline-offset-2",
                 selectionne ? "bg-accent-50" : "bg-white hover:bg-ink-100",
               )}
             >

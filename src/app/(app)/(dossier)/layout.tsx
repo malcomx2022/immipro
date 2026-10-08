@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LienDeNavigation } from "@/components/layout/LienDeNavigation";
 import { SkipLink } from "@/components/layout/SkipLink";
+import { NAVIGATION_CANDIDAT } from "@/domain/navigation/courant";
 import { db } from "@/lib/db";
 import { exigerCandidat, initiales } from "@/server/securite/page";
 
@@ -17,14 +19,11 @@ import { exigerCandidat, initiales } from "@/server/securite/page";
  * une page ajoutée demain sous ce groupe de routes est protégée sans que
  * personne y pense, et c'est exactement le genre d'oubli qui ouvre un
  * dossier à qui n'est pas connecté.
+ *
+ * Les deux navigations disent la page courante (`aria-current`, revue M12) ;
+ * les entrées et leurs sections rattachées vivent dans le domaine (D-17).
  */
 export const dynamic = "force-dynamic";
-const NAVIGATION = [
-  { href: "/tableau-de-bord", libelle: "Dossiers" },
-  { href: "/comparateur", libelle: "Destinations" },
-  { href: "/notifications", libelle: "Alertes" },
-  { href: "/profil", libelle: "Profil" },
-] as const;
 
 export default async function GabaritDossier({
   children,
@@ -56,14 +55,15 @@ export default async function GabaritDossier({
           />
         </Link>
         <ul className="flex flex-col gap-1">
-          {NAVIGATION.map((lien) => (
+          {NAVIGATION_CANDIDAT.map((lien) => (
             <li key={lien.href}>
-              <Link
+              <LienDeNavigation
                 href={lien.href}
+                sections={lien.sections}
                 className="flex min-h-touch items-center rounded-sm px-3 text-14 text-ink-700 hover:bg-ink-100"
               >
                 {lien.libelle}
-              </Link>
+              </LienDeNavigation>
             </li>
           ))}
         </ul>
@@ -99,14 +99,15 @@ export default async function GabaritDossier({
         aria-label="Navigation de l'espace candidat"
         className="pas-a-imprimer fixed inset-x-0 bottom-0 flex border-t border-ink-300 bg-white px-2 py-2 md:hidden"
       >
-        {NAVIGATION.map((lien) => (
-          <Link
+        {NAVIGATION_CANDIDAT.map((lien) => (
+          <LienDeNavigation
             key={lien.href}
             href={lien.href}
+            sections={lien.sections}
             className="flex min-h-action flex-1 flex-col items-center justify-center gap-1 rounded-sm text-13 text-ink-500 hover:bg-ink-100"
           >
             {lien.libelle}
-          </Link>
+          </LienDeNavigation>
         ))}
       </nav>
     </div>

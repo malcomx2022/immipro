@@ -68,6 +68,40 @@ describe("cible du lien d'évitement", () => {
     expect(src).toContain("tabIndex={-1}");
   });
 
+  /*
+    Les pages d'état — revue du 07/10/2026, E8. Un `not-found`, un `error`
+    ou un `loading` remplace la page : il doit poser la cible lui-même, ou
+    passer par un composant qui la pose.
+  */
+  const ETATS = readdirSync(join("src", "app"), { recursive: true, encoding: "utf8" })
+    .filter((f) => /(^|\/)(not-found|error|loading|global-error)\.tsx$/u.test(f))
+    .map((f) => join("src", "app", f));
+  const PORTEURS_D_ETAT: Record<string, string> = {
+    EtatDEcran: join("src", "components", "ui", "EtatDEcran.tsx"),
+    ChargementDePage: join("src", "components", "etats", "ChargementDePage.tsx"),
+  };
+  const RELAIS = ["PageIntrouvable", "EchecDeRendu"];
+
+  it("il y a bien des pages d'état à vérifier", () => {
+    expect(ETATS.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it.each(Object.keys(PORTEURS_D_ETAT))("le composant d'état %s pose bien la cible", (porteur) => {
+    const src = readFileSync(PORTEURS_D_ETAT[porteur]!, "utf8");
+    expect(src).toContain('id="contenu"');
+    expect(src).toContain("tabIndex={-1}");
+  });
+
+  it.each(RELAIS)("%s rend EtatDEcran", (relais) => {
+    expect(readFileSync(join("src", "components", "etats", `${relais}.tsx`), "utf8")).toContain("<EtatDEcran");
+  });
+
+  it.each(ETATS)("%s rend la cible du lien d'évitement", (f) => {
+    const src = readFileSync(f, "utf8");
+    const porteurs = [...Object.keys(PORTEURS_D_ETAT), ...RELAIS];
+    expect(porteurs.some((p) => src.includes(`<${p}`)), f).toBe(true);
+  });
+
   it.each(dossiers)("%s pose un titre focalisable id=\"contenu\"", (dir) => {
     const src = sourcesDeLaRoute(dir);
     if (PORTEURS.some((p) => src.includes(`<${p}`))) return;

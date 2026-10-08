@@ -105,6 +105,7 @@ vi.mock("@/lib/telechargement", () => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: rafraichir }),
+  usePathname: () => "/veille",
   notFound: () => {
     throw new Error("notFound");
   },

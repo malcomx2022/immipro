@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ChoixDuPack } from "@/app/(app)/paiement/pack/ChoixDuPack";
 import { MENTION_MISE_EN_AVANT } from "@/components/ui/RadioGroup";
 import { Recapitulatif } from "@/app/(app)/paiement/recapitulatif/Recapitulatif";
@@ -61,6 +61,14 @@ beforeEach(() => {
   for (const cle of [...parametres.keys()]) parametres.delete(cle);
   pousse.mockClear();
   remplace.mockClear();
+});
+
+describe("$-01 — bascule de devise au clavier (revue M12)", () => {
+  it("un seul arrêt de tabulation pour la devise", () => {
+    render(<ChoixDuPack tunnel={TUNNEL} />);
+    const devises = within(screen.getByRole("radiogroup", { name: "Devise d'affichage" })).getAllByRole("radio");
+    expect(devises.filter((d) => d.getAttribute("tabindex") === "0")).toHaveLength(1);
+  });
 });
 
 describe("$-01 — Choix du pack", () => {

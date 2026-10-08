@@ -38,6 +38,9 @@ import { formatMontant } from "@/lib/utils";
  * dur. Figées, elles finissent dans le passé et l'écran propose alors des
  * départs impossibles — le même défaut que les créneaux de consultant du
  * lot WF-12.
+ *
+ * Un formulaire (revue du 07/10/2026, M11) : Entrée dans un champ envoie,
+ * comme le bouton principal.
  */
 interface Rentree {
   valeur: string;
@@ -105,6 +108,7 @@ export function OuvertureDossier({
   const destination = fiche.slug;
 
   async function ouvrir() {
+    if (date === null || envoi) return;
     setEnvoi(true);
     setEchec(null);
     const choisie = DATES.find((d) => d.valeur === date);
@@ -122,7 +126,15 @@ export function OuvertureDossier({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <form
+      noValidate
+      aria-labelledby="contenu"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void ouvrir();
+      }}
+      className="mx-auto flex w-full max-w-decision flex-col gap-6 px-4 py-6 md:px-8 md:py-8"
+    >
       <div className="flex flex-col gap-2">
         <h1
           id="contenu"
@@ -151,6 +163,7 @@ export function OuvertureDossier({
 
       <Input
         libelle="Établissement visé"
+        name="etablissement"
         aide="Optionnel. Tu pourras le renseigner plus tard."
         placeholder="Université de Groningue"
         value={etablissement}
@@ -191,6 +204,7 @@ export function OuvertureDossier({
       <div className="flex flex-col gap-2">
         {echec ? <BlocEchec echec={echec} /> : null}
         <Button
+          type="submit"
           pleineLargeur
           className="min-h-action"
           disabled={date === null}
@@ -198,7 +212,6 @@ export function OuvertureDossier({
           raisonDesactivation={
             date === null ? "Choisis une date de départ visée, même approximative." : undefined
           }
-          onClick={() => void ouvrir()}
         >
           Créer mon dossier
         </Button>
@@ -208,7 +221,7 @@ export function OuvertureDossier({
             : (DATES.find((d) => d.valeur === date)?.libelle ?? "")}
         </p>
       </div>
-    </div>
+    </form>
   );
 }
 
