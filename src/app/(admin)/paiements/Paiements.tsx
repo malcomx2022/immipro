@@ -39,7 +39,12 @@ import {
   type IssueEcart,
 } from "@/domain/backoffice/ecart";
 import { FUSEAU_AFFICHAGE } from "@/domain/format/fuseau";
-import type { DetteFedaPay } from "@/domain/paiement/remboursement";
+import {
+  lireLeMontantTranche,
+  suiteDeLaTranche,
+  type DetteFedaPay,
+} from "@/domain/paiement/remboursement";
+import { formatMineur, versMineur } from "@/domain/facturation/montants";
 import { RemboursementsFedaPay } from "./RemboursementsFedaPay";
 
 /**
@@ -143,7 +148,9 @@ function TraitementDeLEcart({ paiement, dateeDuJour = false }: ProprietesDuTrait
       </div>
       <p className="text-pretty text-14 text-ink-700">{paiement.ecart?.constat}</p>
 
-      {resolution ? (
+      {paiement.revueATrancher && !resolution ? (
+        <TrancheDuRemboursement paiement={paiement} />
+      ) : resolution ? (
         <p className="text-pretty text-13 text-ink-500">
           Refermé le {jourEnFrancais(resolution.le)} par {resolution.par} —{" "}
           {LIBELLE_ISSUE[resolution.issue]}. {resolution.note}
@@ -180,6 +187,88 @@ function TraitementDeLEcart({ paiement, dateeDuJour = false }: ProprietesDuTrait
           </Button>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * La tranche d'une revue manuelle de remboursement — RG-15.2, revue du
+ * 07/10/2026, M4 (décision D-11).
+ *
+ * Hors de la règle du prorata, la somme se fixe avec la direction. L'issue
+ * générique d'un écart ne l'écrivait nulle part : la dette restait sans
+ * montant et rien ne partait. Ici la somme se saisit, se lit par le même
+ * domaine que la route, et la conséquence s'affiche avant le clic : une
+ * somme part chez le fournisseur et retire les analyses restantes, zéro
+ * referme la demande et les laisse au candidat.
+ */
+function TrancheDuRemboursement({ paiement }: { paiement: Paiement }) {
+  const router = useRouter();
+  const [montant, setMontant] = useState("");
+  const [motif, setMotif] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+
+  const payeMineur = versMineur(paiement.montant, paiement.devise);
+  const lu = lireLeMontantTranche(montant, payeMineur, paiement.devise);
+  const saisi = montant.trim() !== "";
+  const obstacle =
+    "refus" in lu
+      ? lu.refus
+      : motif.trim().length < 10
+        ? "Écris le motif de la décision, en dix caractères au moins : il figure au journal."
+        : null;
+
+  async function trancher() {
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler<{ issue: string }>(
+      `/api/admin/paiements/${paiement.reference}/remboursement/tranche`,
+      { corps: { montant, motif } },
+    );
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-14 font-semibold text-ink-900">Trancher le remboursement</p>
+      {echec ? <BlocEchec echec={echec} annonce /> : null}
+      <Input
+        libelle="Somme à rendre"
+        inputMode="decimal"
+        value={montant}
+        onChange={(e) => setMontant(e.target.value)}
+        {...(saisi && "refus" in lu
+          ? { erreur: lu.refus }
+          : {
+              aide: `0 si rien n'est à rendre, ${formatMineur(payeMineur, paiement.devise)} au plus.`,
+            })}
+      />
+      {"montantMineur" in lu ? (
+        <p className="text-pretty text-13 text-ink-500">
+          {suiteDeLaTranche(lu.montantMineur, payeMineur, paiement.devise)}
+        </p>
+      ) : null}
+      <Input
+        libelle="Motif de la décision"
+        value={motif}
+        onChange={(e) => setMotif(e.target.value)}
+        aide={MENTION_AUDIT}
+      />
+      <Button
+        chargement={envoi}
+        disabled={obstacle !== null}
+        raisonDesactivation={obstacle ?? undefined}
+        onClick={() => void trancher()}
+        className="self-start"
+      >
+        Trancher
+      </Button>
     </div>
   );
 }

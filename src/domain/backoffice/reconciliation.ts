@@ -73,6 +73,12 @@ export interface Paiement {
    */
   montantRembourse?: number;
   /**
+   * Un remboursement attend que la direction fixe sa somme — RG-15.2, M4.
+   * Hors de la règle du prorata, rien ne part tant qu'elle n'est pas
+   * tranchée ; B-04 propose alors la tranche au lieu de l'issue générique.
+   */
+  revueATrancher?: true;
+  /**
    * L'écart, et sa résolution si elle a eu lieu — arbitrage du 21/09/2026.
    *
    * Les deux voyagent ensemble parce que l'un ne se lit pas sans l'autre :

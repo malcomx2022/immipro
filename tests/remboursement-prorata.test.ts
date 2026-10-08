@@ -1,13 +1,17 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { sansCommentaires } from "@/domain/copy/source";
 import {
   A_REMBOURSER_A_LA_MAIN,
   ETATS_CLOS,
   consigneFedaPay,
   estPartiel,
   libelleDeLaSommeARendre,
+  lireLeMontantTranche,
   montantAuProrata,
   montantDuRemboursement,
   sommeARendre,
+  suiteDeLaTranche,
   type PackARembourser,
 } from "@/domain/paiement/remboursement";
 import { getPack } from "@/domain/payments/pricing";
@@ -254,5 +258,70 @@ describe("RG-15.2 — les conditions portent la règle, et le registre ne l'atte
 
   it("la variable « remboursement_entame » a quitté le registre", () => {
     expect(VARIABLES_JURIDIQUES.map((v) => v.cle)).not.toContain("remboursement_entame");
+  });
+});
+
+/**
+ * La base du prorata est celle de la vente — revue du 07/10/2026, M5
+ * (décision D-12). `smoke:remboursement` change la grille en cours de
+ * processus et vérifie la somme ; ces lignes tiennent la forme du code.
+ */
+describe("RG-15.2 — la base du prorata est celle de la vente (M5, D-12)", () => {
+  const paiements = sansCommentaires(readFileSync("src/server/acces/paiements.ts", "utf8"));
+  const couverture = sansCommentaires(readFileSync("src/server/acces/couverture.ts", "utf8"));
+
+  it("la vente fige les analyses et les destinations du pack", () => {
+    expect(paiements).toMatch(/packAnalyses: pack\.analyses, packDestinations: pack\.destinations/u);
+    expect(paiements).toMatch(/\.\.\.analysesVendues\(achat\)/u);
+  });
+
+  it("le prorata lit la vente, la grille ne sert que de repli", () => {
+    expect(paiements).toMatch(
+      /const analysesDuPack = transaction\.packAnalyses \?\? packDeLAchat\(packCode\)\?\.analyses/u,
+    );
+    expect(paiements).not.toMatch(/analysesDuPack: pack\.analyses/u);
+  });
+
+  it("la couverture répartit ce qui a été vendu", () => {
+    expect(couverture).toMatch(/analyses: achat\.packAnalyses, destinations: achat\.packDestinations/u);
+  });
+});
+
+/**
+ * La tranche d'une revue manuelle — revue du 07/10/2026, M4 (D-11).
+ */
+describe("RG-15.2 — la somme d'une revue manuelle se lit avant de se trancher (M4)", () => {
+  const paye = versMineur(dossier.prix.XOF, "XOF");
+
+  it("zéro est une réponse : rien n'est rendu", () => {
+    expect(lireLeMontantTranche("0", paye, "XOF")).toEqual({ montantMineur: 0 });
+    expect(suiteDeLaTranche(0, paye, "XOF")).toMatch(/garde ses analyses restantes/u);
+  });
+
+  it("une somme valide se lit en unités mineures, espaces et virgule compris", () => {
+    expect(lireLeMontantTranche("4 000", paye, "XOF")).toEqual({ montantMineur: 4000 });
+    expect(lireLeMontantTranche("12,50", 2900, "EUR")).toEqual({ montantMineur: 1250 });
+    expect(lireLeMontantTranche("12", 2900, "EUR")).toEqual({ montantMineur: 1200 });
+    expect(suiteDeLaTranche(4000, paye, "XOF")).toMatch(/retirées de chaque dossier/u);
+  });
+
+  it("chaque refus dit quoi écrire", () => {
+    const vide = lireLeMontantTranche("  ", paye, "XOF");
+    const negatif = lireLeMontantTranche("-500", paye, "XOF");
+    const centimes = lireLeMontantTranche("4000,5", paye, "XOF");
+    const trop = lireLeMontantTranche("15001", paye, "XOF");
+    expect(vide).toMatchObject({ refus: expect.stringMatching(/0 si rien n'est à rendre/u) });
+    expect(negatif).toMatchObject({ refus: expect.stringMatching(/en chiffres, par exemple 4000/u) });
+    expect(centimes).toMatchObject({ refus: expect.stringMatching(/pas de centimes/u) });
+    expect(trop).toMatchObject({ refus: expect.stringMatching(/dépasse le prix payé/u) });
+    expect(lireLeMontantTranche("12,505", 2900, "EUR")).toMatchObject({
+      refus: expect.stringMatching(/12,50/u),
+    });
+  });
+
+  it("l'initiation lit la décision au lieu de réévaluer le pack", () => {
+    const paiements = sansCommentaires(readFileSync("src/server/acces/paiements.ts", "utf8"));
+    expect(paiements).toMatch(/const tranchee = transaction\.refundDecidedAt !== null/u);
+    expect([...paiements.matchAll(/!dejaRetire && !tranchee/gu)]).toHaveLength(2);
   });
 });

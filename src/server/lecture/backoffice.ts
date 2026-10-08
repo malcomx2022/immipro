@@ -394,6 +394,16 @@ async function enLignesDePaiement(
     ...(t.refundDueAt || t.status === "REMBOURSEE"
       ? { montantRembourse: montantRenduEnUnites(t) }
       : {}),
+    // Une dette sans somme fixée, ni demandée, ni tranchée : c'est la revue
+    // manuelle de RG-15.2 (M4). La route revérifie sous verrou.
+    ...(t.refundDueAt &&
+    !t.refundedAt &&
+    !t.refundRequestedAt &&
+    !t.refundDecidedAt &&
+    t.refundAmount === null &&
+    t.applicationId
+      ? { revueATrancher: true as const }
+      : {}),
     recuLe: t.createdAt.toISOString(),
     etat: etatDuRapprochement(t, maintenant),
     // L'écart voyage avec sa résolution : refermer sans relire le constat
@@ -601,6 +611,7 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "compte.export": "COMPTE",
   "paiement.remboursement": "PAIEMENT",
   "paiement.remboursement.manuel": "PAIEMENT",
+  "paiement.remboursement.tranche": "PAIEMENT",
   "paiement.reconciliation": "PAIEMENT",
   "regle.publication": "REGLE",
   "regle.republication": "REGLE",

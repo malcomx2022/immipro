@@ -11554,3 +11554,43 @@ Le défaut, consigné à S.102 comme « à décider », est tranché le 06/10/20
 1. Le compteur des adresses sans compte vit en mémoire : la parité se perd au redémarrage du processus, et il faudra le déplacer avec `limites.ts` le jour où l'application tournera sur plusieurs instances.
 2. Un tiers peut « bloquer » quinze minutes une adresse sans compte ; cela ne gêne aucune inscription.
 3. Le blocage d'un compte réel n'envoie toujours aucun courriel à son titulaire (c'était l'option A).
+
+## S.128 — Revue du 07/10/2026 : paiements I (M5, M4)
+
+**Contexte.** Quatrième lot du plan de traitement. Décisions de la direction du 08/10/2026 :
+- D-12 : la base du prorata est le nombre d'analyses vendu à l'achat.
+- D-11 : une revue manuelle peut conclure à zéro, et le candidat garde alors ses analyses. Un Pro remboursé perd ses analyses restantes sur tous les dossiers qu'il a servis.
+
+**Ce que fait le code.**
+- **M5, RG-15.2.** Ce que le pack vendait est figé sur la transaction (`packAnalyses`, `packDestinations`), à la création, comme `visaRuleId` fige la règle d'un dossier. Les lecteurs suivants lisent la vente, et la grille ne sert plus que de repli pour les ventes antérieures :
+  - le prorata d'un remboursement ;
+  - la part de chaque destination ;
+  - la confirmation d'un pack retiré de la grille ;
+  - l'écran de confirmation des destinations.
+
+  La migration reprend les ventes existantes avec les valeurs de la grille, qui n'ont jamais changé (10/1, 30/1, 90/3).
+- **M4, RG-15.2, INV-7.** Une revue manuelle se tranche en B-04 : on saisit une somme et le motif de la décision.
+  - **Une somme supérieure à zéro** est figée avec qui l'a décidée et quand (`refundDecidedAt`, `refundDecidedBy`). Les analyses restantes partent de chaque dossier servi, et la demande part. L'initiation lit alors la décision au lieu de réévaluer le pack, et la déclaration FedaPay est acceptée. L'avoir porte la somme décidée.
+  - **Zéro** referme l'obligation : `refundDueAt` est remis à nul, ni `status` ni `refundedAt` ne bougent. Le candidat garde ses analyses, et l'écart conserve ce que la dette était.
+  - L'index de retrait passe à un retrait par transaction **et par dossier**.
+  - La tranche est journalisée (`paiement.remboursement.tranche`).
+
+**Ce qui est éprouvé.** `smoke:remboursement`, rejouée sur l'ancien code avant correction :
+- Un Dossier vendu pour 30 analyses, 25 consommées, avec une grille passée à 20 : « rien à rendre » au lieu de 2 500 F.
+- Aucune action ne permettait de trancher.
+
+Après correction :
+- 2 500 F à rendre.
+- Une tranche à 4 000 F sur 15 000 donne une déclaration FedaPay acceptée et un avoir de 4 000 F.
+- Une tranche à zéro referme l'obligation, et le candidat garde ses 29 analyses.
+- Un Pro sur trois dossiers donne trois retraits et trois soldes à zéro.
+- Une somme supérieure au prix est refusée, et une seconde tranche aussi.
+
+`smoke:tunnel` vérifie qu'une vente porte les deux colonnes. Deux garde-fous en base s'ajoutent : `smoke:migrations` compte 91 refus et 5 passages. Côté essais :
+- essais d'unité sur `lireLeMontantTranche` ;
+- essai d'écran B-04 : la conséquence est dite avant le clic, puis la requête part.
+
+**Écarts qui restent.**
+1. Une tranche à zéro n'envoie aucun message au candidat. La dette disparaît de B-04, et seuls l'écart et le journal en gardent la trace.
+2. Les dettes déjà bloquées en revue manuelle avant ce lot sont à lister et à trancher en B-04.
+3. Le reste des lots de paiement (E2, E3, F6, F3) attend D-6 à D-10.

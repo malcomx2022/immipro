@@ -248,7 +248,7 @@ export const getPack = (code: string) => PACKS.find((p) => p.code === code);
  * trois sur un seul dossier, c'est acheter trois fois Dossier, ce que le
  * produit permet déjà.
  */
-export const analysesParDestination = (pack: Pack): number =>
+export const analysesParDestination = (pack: Pick<Pack, "analyses" | "destinations">): number =>
   Math.floor(pack.analyses / pack.destinations);
 
 export const packMisEnAvant = () => PACKS.find((p) => p.misEnAvant);

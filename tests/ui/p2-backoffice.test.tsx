@@ -1072,6 +1072,65 @@ describe("B-04 — Paiements", () => {
     });
   });
 
+  /*
+    La revue manuelle d'un remboursement n'avait pas d'issue : l'écart se
+    refermait sans que la somme s'écrive nulle part (revue du 07/10/2026,
+    M4 ; décision D-11).
+  */
+  it("une revue manuelle propose la tranche, dit sa conséquence et l'envoie", async () => {
+    appels.length = 0;
+    reponse = { ok: true, donnees: { issue: "decidee", envoi: "procedure_manuelle" } };
+    const revue = {
+      reference: "IMP-261008-REVUE1",
+      compte: "aline.dossou@email.com",
+      montant: 15000,
+      devise: "XOF",
+      moyen: "Mobile Money",
+      recuLe: "2026-10-01T10:00:00.000Z",
+      etat: "ECART" as const,
+      motifDuRemboursement: "Geste de support — dossier déposé",
+      revueATrancher: true as const,
+      ecart: { constat: "Pack entamé : 1 analyse consommée sur 30. À trancher à la main." },
+    };
+    render(
+      <Paiements
+        paiements={[]}
+        ecartsAnterieurs={[revue]}
+        operateur={OPERATEUR}
+        journee="Journée du 8 octobre 2026"
+        jourIso="2026-10-08"
+        aujourdhuiIso="2026-10-08"
+      />,
+    );
+    const bouton = () => screen.getByRole("button", { name: "Trancher" });
+    expect(bouton()).toHaveProperty("disabled", true);
+    // L'issue générique ne s'offre pas : elle refermait sans écrire la somme.
+    expect(screen.queryByRole("button", { name: "Refermer l'écart" })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Somme à rendre"), { target: { value: "0" } });
+    expect(screen.getByText(/le candidat garde ses analyses restantes/u)).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("Somme à rendre"), { target: { value: "20000" } });
+    expect(screen.getAllByText(/dépasse le prix payé/u).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("Somme à rendre"), { target: { value: "4000" } });
+    expect(screen.getByText(/retirées de chaque dossier qu'il sert/u)).toBeDefined();
+    expect(bouton()).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByLabelText("Motif de la décision"), {
+      target: { value: "Décision de la direction du 08/10" },
+    });
+    expect(bouton()).toHaveProperty("disabled", false);
+
+    await act(async () => {
+      fireEvent.click(bouton());
+    });
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.url).toBe("/api/admin/paiements/IMP-261008-REVUE1/remboursement/tranche");
+    expect(appels[0]!.corps).toEqual({ montant: "4000", motif: "Décision de la direction du 08/10" });
+    expect(rafraichir).toHaveBeenCalled();
+    reponse = { ok: true };
+  });
+
   it("garde les paiements en attente, transaction inconnue", () => {
     render(
       <Paiements

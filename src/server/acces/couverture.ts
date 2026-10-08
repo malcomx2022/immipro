@@ -95,7 +95,13 @@ export async function appliquerLaCouverture(
       ensuite rendrait l'argent et le service à la fois.
     */
     where: { userId, status: "CONFIRMEE", applicationId: { not: null }, refundDueAt: null },
-    select: { id: true, packCode: true, applicationId: true },
+    select: {
+      id: true,
+      packCode: true,
+      packAnalyses: true,
+      packDestinations: true,
+      applicationId: true,
+    },
     orderBy: { createdAt: "asc" },
   });
   if (achats.length === 0) return SANS_EFFET;
@@ -104,14 +110,25 @@ export async function appliquerLaCouverture(
   let analyses = 0;
 
   for (const achat of achats) {
-    const pack = getPack(achat.packCode);
-    if (!pack) continue;
+    /*
+      Ce qui a été vendu, et non la grille du jour (revue du 07/10/2026,
+      M5, décision D-12) : un Pro vendu pour trois destinations les garde,
+      même si la grille change ou retire le pack. La grille ne sert de
+      repli qu'aux ventes antérieures aux colonnes.
+    */
+    const grille = getPack(achat.packCode);
+    const vendu =
+      achat.packAnalyses !== null && achat.packDestinations !== null
+        ? { analyses: achat.packAnalyses, destinations: achat.packDestinations }
+        : grille;
+    if (!vendu) continue;
+    const libelle = grille?.libelle ?? achat.packCode;
 
     const dejaCouverts = await destinationsServies(achat.id);
-    let restantes = pack.destinations - dejaCouverts.length;
+    let restantes = vendu.destinations - dejaCouverts.length;
     if (restantes <= 0) continue;
 
-    const part = analysesParDestination(pack);
+    const part = analysesParDestination(vendu);
     if (part <= 0) continue;
 
     const cibles: string[] = [];
@@ -150,7 +167,7 @@ export async function appliquerLaCouverture(
         analyses: part,
         motif: "ACHAT_PACK",
         transactionId: achat.id,
-        note: `Pack ${pack.libelle} — destination ${pack.destinations - restantes + 1} sur ${pack.destinations}`,
+        note: `Pack ${libelle} — destination ${vendu.destinations - restantes + 1} sur ${vendu.destinations}`,
       });
       restantes -= 1;
       servis.push(applicationId);

@@ -486,6 +486,13 @@ try {
         ligne.currency === "EUR" && ligne.provider === "STRIPE",
         `${code} — le rail suit la devise (${ligne.provider})`,
       );
+      // M5, D-12 — un pack fige ce qu'il vend ; un complément n'en porte rien.
+      verifier(
+        code === "dossier"
+          ? ligne.packAnalyses === 30 && ligne.packDestinations === 1
+          : ligne.packAnalyses === null && ligne.packDestinations === null,
+        `${code} — ce qui est vendu est figé sur la vente (${ligne.packAnalyses} / ${ligne.packDestinations})`,
+      );
     }
 
     /*
