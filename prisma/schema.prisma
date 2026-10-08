@@ -572,6 +572,16 @@ model Transaction {
   /// filet qui rattrape un crédit interrompu ne reviendrait jamais. Passé
   /// le délai, la ligne se reprend.
   creditingAt DateTime?
+  /// La contrepartie constatée — revue du 07/10/2026, F6.
+  ///
+  /// Posée une fois, quand la contrepartie d'un paiement confirmé est
+  /// ouverte **ou** établie comme impossible (pack retiré de la grille,
+  /// remboursement décidé avant l'ouverture, créneau qui n'est plus tenu ;
+  /// un écart le dit alors). Le filet de la réconciliation ne relit que les
+  /// paiements confirmés qui ne la portent pas : il lisait les deux cents
+  /// plus anciennes ventes confirmées, si bien qu'au-delà de deux cents
+  /// ventes un crédit interrompu récent n'était jamais rattrapé.
+  creditedAt  DateTime?
   /// Écart constaté, conservé **y compris après** sa résolution (B-04).
   ///
   /// Il ne s'efface pas : l'historique doit dire qu'un désaccord a existé
@@ -688,6 +698,7 @@ model Transaction {
   @@index([refundDueAt, refundedAt])
   @@index([discrepancyResolvedAt])
   @@index([refundRequestedAt, refundedAt])
+  @@index([status, creditedAt])
 }
 
 /// L'issue d'un écart de réconciliation — arbitrage du 21/09/2026.

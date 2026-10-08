@@ -246,9 +246,11 @@ export const consultantStripe = (cle: string): Consultant => ({
       return { issue: "introuvable" };
     }
     const identifiant = providerTxId.replace(/^stripe:/u, "");
+    // La charge vient avec l'intention : son `amount_refunded` dit si le
+    // paiement a été remboursé (E3, étape 5).
     const reponse = await appeler(
       cle,
-      `/checkout/sessions/${encodeURIComponent(identifiant)}?expand[]=payment_intent`,
+      `/checkout/sessions/${encodeURIComponent(identifiant)}?expand[]=payment_intent.latest_charge`,
       {},
     );
 
@@ -286,6 +288,9 @@ export const consultantStripe = (cle: string): Consultant => ({
     // Payé, c'est payé : la session le dit sans ambiguïté, et c'est le
     // cas qui compte — un webhook perdu sur un paiement réussi.
     const sansMontant = { montantMineur: null, devise: null };
+    const charge = intention?.latest_charge;
+    const rembourse =
+      typeof charge === "object" && charge !== null ? (charge.amount_refunded ?? null) : null;
     if (lu.data.payment_status === "paid") {
       return {
         issue: "connu",
@@ -293,6 +298,7 @@ export const consultantStripe = (cle: string): Consultant => ({
         providerTxId: `stripe:${lu.data.id}`,
         montantMineur: lu.data.amount_total ?? null,
         devise: lu.data.currency ? lu.data.currency.toUpperCase() : null,
+        ...(rembourse !== null && rembourse > 0 ? { rembourseMineur: rembourse } : {}),
       };
     }
 

@@ -11643,3 +11643,26 @@ Après correction, chaque scénario ouvre l'écart attendu, et le cumul entier s
 1. Le rattrapage par la réconciliation des dettes initiées dont la notification s'est perdue (E3, étape 5) est prévu en S.130.
 2. Il reste à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`. Sinon, `charge.refunded` ne retrouve pas son paiement, comme avant ce lot.
 3. On ne sait pas encore si FedaPay notifie un remboursement partiel avec son montant : c'est la seconde moitié de D-7, à poser à FedaPay. D'ici là, la notification `refunded` de FedaPay n'est pas lue avec un montant et s'applique sans comparaison ; la déclaration manuelle (S.91) reste la garde.
+
+## S.130 — Revue du 07/10/2026 : paiements III (F6, E3 étape 5, F3)
+
+**Contexte.** Sixième lot du plan de traitement, sans décision à obtenir.
+
+**Ce que fait le code.**
+- **F6, INV-7, RG-05.4.** La contrepartie d'un paiement confirmé est constatée une fois (`Transaction.creditedAt`), qu'elle ait été ouverte ou qu'elle soit impossible. Elle est impossible quand le pack n'est plus dans la grille et que la vente n'en porte pas le contenu, quand un remboursement a été décidé avant l'ouverture, ou quand le créneau n'est plus tenu. Dans ces cas, un écart nomme la cause et le geste à faire. Le filet ne relit plus que les paiements confirmés sans contrepartie constatée et sans bail en cours. Il lisait les deux cents plus anciennes ventes, si bien qu'au-delà de deux cents ventes un crédit interrompu récent n'était jamais rattrapé. Les branches `if (!achat)` mortes sont retirées. La migration `contrepartie_constatee` reprend les ventes déjà servies, pose la contrainte « une contrepartie suppose un encaissement » et ajoute l'index.
+- **E3, étape 5.** La passe de réconciliation consulte aussi les dettes initiées et non soldées. Stripe dit `amount_refunded` par la charge développée, FedaPay son état `refunded`. Ce que dit le fournisseur s'applique par le même service et le même verdict que la notification signée : une dette remboursée en entier se solde avec son avoir, un partiel ouvre son écart.
+- **F3, WF-05 étape 8.** Le reçu passe par une notification `PAIEMENT` à clé unique (`recu:<référence>`), avec un courrier en attente. La première tentative part tout de suite, attendue trois secondes au plus. La passe de réconciliation reprend le reçu jusqu'à cinq tentatives. Rien de ce qui suit le crédit ne renvoie d'erreur au fournisseur.
+
+**Ce qui est éprouvé.** Tous les scénarios ont été rejoués sur l'ancien code avant correction :
+- `smoke:reconciliation` :
+  - un pack absent de la grille se disait « achevé » à chaque passe, avec une ligne de journal fausse ;
+  - une 201e vente interrompue n'était jamais créditée ;
+  - une dette dont la notification s'était perdue restait due ;
+  - au passage, l'essai du bail périmé échouait aussi, pour la même fenêtre saturée.
+- `smoke:courrier` : un reçu non parti n'était jamais repris.
+
+Après correction, tous ces scénarios passent. `tests/reception-paiement.test.ts` vérifie qu'une réservation, une lecture ou un envoi qui lève rend quand même « créditée ». Un garde-fou s'ajoute en base.
+
+**Écarts qui restent.**
+1. Si la réservation du reçu elle-même échoue (base indisponible juste après le crédit), le reçu n'est pas repris automatiquement. Le candidat peut le renvoyer depuis $-06.
+2. Les ventes confirmées avant la migration et sans contrepartie seront examinées à la première passe : un écart s'ouvrira pour celles qui n'ont rien à ouvrir.

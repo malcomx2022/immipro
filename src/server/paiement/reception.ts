@@ -1,6 +1,7 @@
 import { appliquerLaNotification, type Notification } from "@/server/acces/paiements";
 import { journaliser } from "@/server/acces/journal";
-import { envoyerRecu, envoyerRemboursementConfirme } from "@/server/courrier";
+import { envoyerRemboursementConfirme } from "@/server/courrier";
+import { prevenirDuRecu } from "@/server/paiement/recu";
 import { db } from "@/lib/db";
 import { formatMontant } from "@/lib/utils";
 import { sommeARendre } from "@/domain/paiement/remboursement";
@@ -31,21 +32,14 @@ export async function traiterLaNotification(
   const resultat = await appliquerLaNotification(lue);
 
   switch (resultat.issue) {
-    case "creditee": {
-      const transaction = resultat.transaction;
-      const user = await db.user.findUnique({
-        where: { id: transaction.userId },
-        select: { email: true },
-      });
-      if (user) {
-        await envoyerRecu(
-          user.email,
-          transaction.reference,
-          formatMontant(transaction.amount, transaction.currency),
-        );
-      }
+    /*
+      Le reçu est réservé, puis tenté (F3) : un courrier qui ne part pas
+      est repris par la passe de réconciliation, et rien de ce qui suit le
+      crédit ne renvoie d'erreur au fournisseur.
+    */
+    case "creditee":
+      await prevenirDuRecu(resultat.transaction);
       return { recue: true, issue: "creditee" };
-    }
     /**
      * Le remboursement confirmé — arbitrage du 21/09/2026.
      *

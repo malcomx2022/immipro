@@ -636,6 +636,13 @@ SELECT refuse(
      VALUES ('t7d','IMP-261008-EEEEED','u1','essentiel',5000,'XOF','FEDAPAY','CONFIRMEE',
        now(), 3000)$q$);
 
+-- La contrepartie constatée suppose un encaissement (08/10/2026, revue F6).
+SELECT refuse(
+  'F6 · une contrepartie constatée sur un paiement jamais confirmé',
+  $q$INSERT INTO "Transaction" (id, reference, "userId", "packCode", amount, currency,
+       provider, status, "creditedAt")
+     VALUES ('t8f','IMP-261008-FFFFF6','u1','essentiel',5000,'XOF','FEDAPAY','EN_ATTENTE', now())$q$);
+
 -- ── K.C · le remboursement dû ─────────────────────────────────────────────
 SELECT refuse(
   'K.C · un remboursement dû sans motif',

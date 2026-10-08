@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) et S.129 (E2, E3 étapes 1 à 4) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) et S.130 (F6, E3 étape 5, F3) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -111,7 +111,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.127 — livré** | M3, M2, N1 | S+M+S | D-3, D-22 (M3 sans décision) | Compteurs d'essais atomiques, pas d'énumération, case « Rester connecté » honorée |
 | **S.128 — livré** | M5, M4 | S+M | D-11, D-12 | Dénominateur figé à la vente, revue manuelle tranchable avec son montant |
 | **S.129 — livré** | E2, E3 (étapes 1 à 4) | M+M | D-6, D-7, D-8, D-9, D-10 | Aucun crédit ni avoir sur un montant non vérifié |
-| S.130 — paiements III | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
+| **S.130 — livré** | F6, E3 (rattrapage), F3 | M+M+S | Sans décision | Filet de crédit complet, remboursements perdus rattrapés, reçu repris |
 | S.131 — données | E11, audit, M17 | S+S+S | D-34 (audit seulement) | Clés étrangères indexées, audit bloquant en CI, graine sûre |
 | S.132 — exploitation I | E9 | M | D-25 | Déploiement vérifié, garde-fous après migration, retour arrière |
 | S.133 — exploitation II | E10 | M | D-26, D-27 | Pièces sauvegardées, restauration de contrôle réussie |
@@ -702,7 +702,7 @@ En développement : `'unsafe-eval'`, `ws:`, origine du stockage déduite de `MIN
 
 #### E3 — `refunded` reçu sans obligation, ou partiel
 
-**État : étapes 1 à 4 et migration livrées en S.129** (D-8, D-10). Reste l'étape 5 (rattrapage par la réconciliation), prévue en S.130. Les écarts passent tous par `noterLEcart`, qui rouvre un écart refermé (D-9).
+**État : livré** — étapes 1 à 4 et migration en S.129 (D-8, D-10), étape 5 (rattrapage par la réconciliation) en S.130. Les écarts passent tous par `noterLEcart`, qui rouvre un écart refermé (D-9).
 
 **Constat vérifié.** `SUITES.CONFIRMEE = ["REMBOURSEE"]` (`cycle.ts:20`) ne regarde ni `refundDueAt` ni le montant. `appliquerLaNotification` pose `refundedAt` puis appelle `etablirLAvoir`, qui vaut le prix entier quand `refundAmount` est nul (`emission.ts:275-279`). Le seul retrait au grand livre est dans `initierLeRemboursement`. `charge.refunded` vaut REMBOURSEE sans lire `amount_refunded` (`notifications.ts:99`).
 
@@ -848,6 +848,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 
 #### F3 — Reçu par courriel perdu sans reprise
 
+**État : livré en S.130**, correction complète : notification `recu:<référence>` reprise par la passe de réconciliation. La première tentative est attendue trois secondes au plus avant de répondre au fournisseur.
+
 **Correction de la revue.** Un échec SMTP ne lève pas : `envoyerParSmtp` intercepte et rend une issue (`courrier/smtp.ts:228-254`). Une réponse 5xx après crédit ne vient que d'une panne de base, d'un transport qui lève ou d'un refus INV-2.
 
 **Défaut réel.** `reception.ts:41-45` ignore l'issue rendue : un reçu non parti n'est jamais repris. Un SMTP lent bloque aussi jusqu'à 40 s la réponse au fournisseur (`domain/courrier/transport.ts:130-132`). Le candidat peut renvoyer son reçu depuis $-06.
@@ -891,6 +893,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 ---
 
 #### F6 — Crédit sans contrepartie ouvrable, et filet limité aux 200 plus anciennes ventes
+
+**État : livré en S.130.** L'écart nomme la cause (pack absent de la grille, remboursement décidé avant l'ouverture, créneau qui n'est plus tenu).
 
 **Constat vérifié.** `creditingAt` n'est rendu que sur exception. Pour un pack retiré de la grille (`if (!pack) return;`, l.1591) ou une obligation ouverte avant le crédit, rien n'est ouvert mais `acheverLeCredit` rend vrai : à chaque passe, `creditsAcheves` augmente et une ligne de journal fausse est écrite.
 
@@ -1398,7 +1402,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 | S.128 (livrée) | `20261008100000_analyses_vendues_figees` | `Transaction.packAnalyses`, `packDestinations`, reprise, contrainte |
 | S.128 (livrée) | `20261008101000_tranche_de_la_revue` | `refundDecidedAt`, `refundDecidedBy`, contrainte ; index de retrait par transaction et par dossier |
 | S.129 (livrée) | `20261008110000_remboursement_suppose_une_obligation` | Reprise des remboursements sans obligation, contrainte |
-| S.130 | `contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
+| S.130 (livrée) | `20261008120000_contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
 | S.131 | `index_des_cles_etrangeres` | Neuf index |
 | S.137 | `divergence_a_propager` | `VisaRule.divergenceDueAt`, index, contrainte |
 | S.140 | `date_de_la_prestation` | `Invoice.performedAt`, reprise, déclencheur `facture_immuable` étendu (si M.C retient l'option a) |
@@ -1406,7 +1410,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.129
+## 7. Ce qui reste ouvert après les lots S.125 à S.130
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1417,4 +1421,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.
 - **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.
 - **M4** : lister les dettes déjà bloquées en revue (obligation ouverte, `refundAmount` nul, non demandée, non rendue) et les trancher en B-04 ; une tranche à zéro n'envoie aucun message au candidat.
-- **E3** : le rattrapage par la réconciliation des dettes initiées dont la notification s'est perdue (étape 5, S.130) ; à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.
+- **E3** : à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.

@@ -830,10 +830,11 @@ export async function appliquerLaNotification(
  * elle, n'a pas été créditée du tout.
  */
 async function contrepartieOuverte(transaction: Transaction): Promise<boolean> {
-  // Rien à ouvrir : ni dossier visé, ni achat que le domaine reconnaisse.
+  // Déjà constatée : ouverte, ou établie comme impossible (F6).
+  if (transaction.creditedAt) return true;
+  // Rien à ouvrir : aucun dossier visé.
   if (!transaction.applicationId) return true;
   const achat = achatDepuisLeCode(transaction.packCode);
-  if (!achat) return true;
 
   if (achat.type === "consultation") {
     /*
@@ -886,7 +887,13 @@ async function contrepartieOuverte(transaction: Transaction): Promise<boolean> {
  * Rend `true` quand elle a ouvert quelque chose.
  */
 export async function acheverLeCredit(transaction: Transaction): Promise<boolean> {
-  if (await contrepartieOuverte(transaction)) return false;
+  if (transaction.creditedAt) return false;
+  if (await contrepartieOuverte(transaction)) {
+    // Ouverte par un passage antérieur à la colonne : on la constate, et le
+    // filet cesse de la relire (F6).
+    await constaterLaContrepartie(transaction.id);
+    return false;
+  }
 
   /*
     Et la base arbitre entre deux appelants — INV-7.
@@ -924,8 +931,9 @@ export async function acheverLeCredit(transaction: Transaction): Promise<boolean
   });
   if (count !== 1) return false;
 
+  let issue: IssueDuCredit;
   try {
-    await crediterLAchat(transaction);
+    issue = await crediterLAchat(transaction);
   } catch (erreur) {
     /*
       Le bail se rend tout de suite. L'attendre ferait patienter le filet
@@ -937,7 +945,39 @@ export async function acheverLeCredit(transaction: Transaction): Promise<boolean
       .catch(() => undefined);
     throw erreur;
   }
+
+  /*
+    La contrepartie est constatée dans les deux cas — revue du 07/10/2026,
+    F6. Un achat qui n'avait rien à ouvrir — pack retiré de la grille,
+    remboursement décidé avant l'ouverture, créneau qui n'est plus tenu —
+    rendait « vrai » à chaque passe : le filet le comptait achevé et
+    écrivait une ligne de journal fausse, tous les quarts d'heure. Il est
+    désormais constaté une fois, et l'écart dit quoi faire.
+  */
+  await constaterLaContrepartie(transaction.id);
+  if (issue === "rien_a_ouvrir") {
+    await noterLEcart(transaction.id, motifSansContrepartie(transaction));
+    return false;
+  }
   return true;
+}
+
+/** La contrepartie d'un paiement est établie : ouverte, ou impossible — F6. */
+async function constaterLaContrepartie(transactionId: string): Promise<void> {
+  await db.transaction.updateMany({
+    where: { id: transactionId, creditedAt: null, confirmedAt: { not: null } },
+    data: { creditedAt: new Date() },
+  });
+}
+
+/** Ce que l'écart dit d'un paiement confirmé sans contrepartie ouvrable — F6. */
+function motifSansContrepartie(transaction: Transaction): string {
+  const pourquoi = transaction.refundDueAt
+    ? "un remboursement était décidé avant l'ouverture"
+    : transaction.packCode === "consultation"
+      ? "le créneau de la consultation n'est plus tenu"
+      : `le pack « ${transaction.packCode} » n'est plus dans la grille et la vente n'en porte pas le contenu`;
+  return `Paiement confirmé sans contrepartie ouvrable (${pourquoi}) : rien n'a été ouvert. Rembourser le candidat, ou lui ouvrir l'accès à la main.`;
 }
 
 /**
@@ -1846,14 +1886,18 @@ function estUnDoublon(erreur: unknown): boolean {
  * celle qui le relit vivent côte à côte, et un code inconnu ne devient
  * pas un pack par défaut.
  */
-async function crediterLAchat(transaction: Transaction): Promise<void> {
-  if (!transaction.applicationId) return;
+/**
+ * Ce qu'a donné l'ouverture de la contrepartie — F6. « Rien à ouvrir »
+ * n'est pas une panne : l'achat ne peut rien ouvrir, et un humain décide.
+ */
+type IssueDuCredit = "ouverte" | "rien_a_ouvrir";
 
+async function crediterLAchat(transaction: Transaction): Promise<IssueDuCredit> {
+  if (!transaction.applicationId) return "rien_a_ouvrir";
+
+  // Un code inconnu se relit comme un pack (`achatDepuisLeCode`) : c'est
+  // la grille, puis la vente, qui disent s'il y a quelque chose à ouvrir.
   const achat = achatDepuisLeCode(transaction.packCode);
-  // Un code que le domaine ne reconnaît plus — un pack retiré de la
-  // grille, par exemple. Rien n'est crédité au hasard ; la transaction
-  // reste confirmée et lisible en back-office.
-  if (!achat) return;
 
   switch (achat.type) {
     case "recharge":
@@ -1864,7 +1908,7 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
         transactionId: transaction.id,
         note: RECHARGE_ANALYSES.libelle,
       });
-      return;
+      return "ouverte";
 
     /*
       Une consultation ne crédite pas un quota : elle confirme un
@@ -1878,9 +1922,13 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
       (`ouvrableDepuisLeRecapitulatif`) : ouverte hors de T-05, elle
       n'aurait ici aucun rendez-vous à confirmer.
     */
-    case "consultation":
+    case "consultation": {
       await confirmerLaConsultation(transaction);
-      return;
+      const reserves = await db.appointment.count({
+        where: { transactionId: transaction.id, status: "RESERVE" },
+      });
+      return reserves > 0 ? "ouverte" : "rien_a_ouvrir";
+    }
 
     /*
       Le passage à Dossier (S.88) ajoute **vingt** analyses, pas trente :
@@ -1903,12 +1951,12 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
         transactionId: transaction.id,
         note: `${LIBELLE_MONTEE} — ${ANALYSES_AJOUTEES} analyses ajoutées`,
       });
-      return;
+      return "ouverte";
 
     case "pack": {
       // Un pack retiré de la grille entre la vente et la confirmation reste
       // dû : ce qui a été vendu est sur la transaction (M5, D-12).
-      if (!getPack(achat.code) && transaction.packAnalyses === null) return;
+      if (!getPack(achat.code) && transaction.packAnalyses === null) return "rien_a_ouvrir";
       /*
         Le dossier peut déjà être prêt : rien n'interdit d'acheter un
         second pack une fois la checklist complète, et c'est même le cas
@@ -1940,7 +1988,14 @@ async function crediterLAchat(transaction: Transaction): Promise<void> {
         applicationId: transaction.applicationId,
         transactionId: transaction.id,
       });
-      return;
+      /*
+        La couverture ne sert rien quand un remboursement est déjà décidé
+        sur cet achat : ses droits seraient rendus avec son prix.
+      */
+      const ouverts = await db.analysisCredit.count({
+        where: { transactionId: transaction.id, delta: { gt: 0 } },
+      });
+      return ouverts > 0 ? "ouverte" : "rien_a_ouvrir";
     }
 
     default: {

@@ -288,6 +288,46 @@ try {
     verifier(recus.length === 1, `toujours un seul reçu après quatre passages (${recus.length})`);
   }
 
+  console.log("\nUn reçu qui ne part pas est repris par la passe (F3)");
+  {
+    /*
+      Reproduit avant correction : le relais injoignable au moment de la
+      confirmation, le reçu ne partait pas et rien ne le reprenait — la
+      réception ignorait l'issue de l'envoi.
+    */
+    recus.length = 0;
+    const url = process.env.SMTP_URL;
+    process.env.SMTP_URL = "smtp://127.0.0.1:1";
+    oublierLeTransporteur();
+    const { user, transaction } = await candidat();
+    const confirmation = {
+      providerEventId: `stripe:evt_recu_repris_${process.pid}`,
+      providerTxId: transaction.providerTxId!,
+      reference: transaction.reference,
+      statut: "CONFIRMEE" as const,
+      ...(await encaisse(transaction.reference)),
+    };
+    const { valeur: issue } = await sousEcoute(() => traiterLaNotification(confirmation, "stripe"));
+    verifier(issue.issue === "creditee", `la confirmation est acquittée malgré le relais (${issue.issue})`);
+    verifier(recus.length === 0, `rien n'est parti (${recus.length})`);
+
+    process.env.SMTP_URL = url;
+    oublierLeTransporteur();
+    const module = (await import("../src/server/paiement/recu").catch(() => null)) as
+      | { reprendreLesRecus?: (maintenant?: Date) => Promise<number> }
+      | null;
+    const reprise = module?.reprendreLesRecus;
+    verifier(typeof reprise === "function", "une passe reprend les reçus en attente");
+    if (reprise) {
+      // Le bail de la première tentative passé, la passe la reprend.
+      const { valeur: partis } = await sousEcoute(() => reprise(new Date(Date.now() + 11 * 60_000)));
+      verifier(partis === 1 && recus.length === 1, `le reçu part à la passe suivante (${partis}, ${recus.length})`);
+      verifier(recus[0]?.vers.join(",") === user.email, "au candidat qui a payé");
+      const { valeur: encore } = await sousEcoute(() => reprise(new Date(Date.now() + 22 * 60_000)));
+      verifier(encore === 0 && recus.length === 1, "et ne repart pas une seconde fois");
+    }
+  }
+
   console.log("\nCe qui atteint le journal");
   {
     recus.length = 0;
