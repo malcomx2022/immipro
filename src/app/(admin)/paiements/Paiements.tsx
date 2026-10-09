@@ -281,6 +281,7 @@ export function Paiements({
   journee,
   jourIso,
   aujourdhuiIso,
+  certifications = null,
 }: {
   paiements: readonly Paiement[];
   /**
@@ -311,6 +312,11 @@ export function Paiements({
    * qui n'est pas celui du livre.
    */
   aujourdhuiIso: string;
+  /**
+   * Les pièces réelles émises sans code de certification — S.158. Le
+   * message vient du domaine ; nul quand il n'y en a aucune.
+   */
+  certifications?: string | null;
 }) {
   const agregats = agreger(paiements);
   // La file se déplie sur demande : B-04 est d'abord un tableau de bord,
@@ -432,6 +438,13 @@ export function Paiements({
         <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
           {MENTION_RAPPROCHEMENT_MANUEL}
         </p>
+
+        {certifications ? (
+          <section className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
+            <h2 className="text-16 font-semibold text-ink-900">Certification en attente</h2>
+            <p className="max-w-lecture-large text-pretty text-14 text-ink-700">{certifications}</p>
+          </section>
+        ) : null}
 
         {incident ? (
           <section className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">

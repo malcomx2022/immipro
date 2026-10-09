@@ -237,3 +237,21 @@ export function surveillanceDeLaFacturation(
     message,
   };
 }
+
+/**
+ * Les pièces réelles en attente de leur code de certification — S.158
+ * (RF-6, préparation de M.C). Elles sont émises et numérotées ; tant que
+ * le dispositif ne leur a pas rendu de code, elles ne valent pas facture
+ * normalisée, et la réconciliation les reprend.
+ */
+export interface EtatDesCertifications {
+  lisible: boolean;
+  enAttente: number;
+  depuisHeures: number;
+}
+
+export function messageDesCertifications(etat: EtatDesCertifications): string {
+  if (!etat.lisible) return "Les pièces en attente de certification n'ont pas pu être lues.";
+  if (etat.enAttente === 0) return "Aucune pièce réelle n'attend son code de certification.";
+  return `${etat.enAttente} pièce(s) réelle(s) attendent leur code de certification, la plus ancienne depuis ${etat.depuisHeures} h. La réconciliation les reprend ; relire son journal si le nombre ne baisse pas.`;
+}

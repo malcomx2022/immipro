@@ -12719,3 +12719,46 @@ Le lot part de main `a7f23e0`. Ni schéma, ni migration, ni drapeau, ni service 
 **Données existantes.** Aucune réécriture. Les décisions B-05 déjà prises s'affichent désormais sur C-08 ; elles l'étaient déjà dans l'alerte et la checklist.
 
 **Ce qui reste, non vérifié.** La vérification en préproduction, et les lignes « non vérifié » de la matrice. Il reste aussi l'avertissement de lint préexistant de `domain/exploitation/purge-stockage.ts` (directive inutile, S.152), laissé hors de ce lot.
+
+## S.158 — RF-6 : préparation de M.C et dossier de levée des préalables
+
+**Autorisation et choix.** RF-6 a été autorisé par le responsable le 09/10/2026, avec le périmètre « Préparer M.C + dossier ». Le lot ne lève aucun préalable : il ne contient ni adaptateur de certification, ni drapeau commercial, ni changement de schéma ou de service. Il part de main `a2ea746`.
+
+**Le défaut préparé.** C'était `certifierSiReelle`, inatteignable tant qu'aucun adaptateur n'existe. Le jour où l'adaptateur arrive, un échec du service se serait passé ainsi :
+- l'erreur remontait après l'enregistrement de la pièce ;
+- le journal de l'émission ne s'écrivait pas ;
+- rien ne reprenait la pièce réelle restée sans code, puisque le filet de la réconciliation ne cherche que les ventes **sans** pièce.
+
+Ce défaut a été établi à la lecture du code ; l'ancien code ne permet pas de le reproduire, faute de pouvoir y brancher un certificateur.
+
+**Le défaut trouvé en cours de lot.** La première version de la reprise appelait le certificateur deux fois par pièce sous deux passes simultanées, ce que la fumée a montré (« 2+2 »). La base ne gardait qu'un code, mais le dispositif fiscal en aurait rendu deux. Corrigé avant la PR.
+
+**Ce qui est livré.**
+- **Certification sans perte** (`server/facturation/emission.ts`) :
+  - un échec laisse la pièce émise, numérotée et journalisée (« Certification en attente : la réconciliation la reprend »), sans code inventé ;
+  - `certifierLesPiecesEnAttente` reprend les pièces réelles sans code et non annulées, la plus ancienne d'abord. La réconciliation l'appelle après le filet des pièces manquantes (`piecesCertifiees` au bilan) ;
+  - chaque reprise réussie est journalisée (`facture.certification`).
+- **Un appel au dispositif à la fois, par pièce.** L'émission au webhook et la reprise prennent le même verrou consultatif par pièce. Elles relisent le code sous ce verrou et l'écrivent dans la même transaction (au plus 120 s).
+- **Le certificateur est un paramètre**, que seul du code peut fournir. Aucune variable d'environnement n'en choisit un : `leCertificateur` rend toujours la fonction non branchée, et un test le vérifie. Les certificateurs d'essai n'existent que dans `smoke:facturation`.
+  - Cela s'écarte de l'option telle que formulée (« choix de l'adaptateur par configuration avec un faux certificateur réservé aux essais ») : un faux certificateur activable par l'environnement pouvait, mal configuré, produire des codes que personne n'a certifiés. Le principe des points de branchement du dépôt (`server/exploitation/capacites`) l'exclut aussi.
+- **Visible.**
+  - Le détail de `/api/health` porte un bloc `certifications` (nombre, ancienneté). Il est informatif, comme `analyses`, et ne change pas le statut.
+  - B-04 affiche « Certification en attente » quand une pièce réelle attend.
+  - `facture.emission` et `facture.certification` se rangent avec les paiements au journal ; `facture.emission` retombait sur le repli « Comptes ».
+- **Le dossier** `docs/exploitation/levee-des-prealables.md` couvre Q.A, M.C, D-14, la TVA, FedaPay et Stripe. Pour chacun, il dit qui doit agir, quelle preuve lève le point, ce que fait le produit en attendant et ce qui change une fois la pièce reçue. Il contient aussi les questions à poser au conseil juridique, à l'expertise comptable, au service fiscal et à FedaPay.
+- **Autres documents** : DOC-11 RG-05.7, `facturation.md` et le préalable M.C du registre (`prealables.ts`).
+
+**Vérifications.**
+- `smoke:facturation` (nouvelle section) vérifie :
+  - émission réelle sans code inventé, journal, compte en attente, rejeu sans seconde pièce ;
+  - aucune tentative sans adaptateur ;
+  - avoir en attente ;
+  - deux passes simultanées : un appel par pièce ;
+  - l'avoir certifié avec le numéro de sa facture, les certifications journalisées, aucune recertification.
+- `tests/certification-reprise` vérifie l'absence de certificateur par l'environnement, la garde, le verrou, l'ordre dans la réconciliation, la catégorie au journal et le message.
+- `npm run check`, `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris.
+- Ni l'image ni le déploiement ne changent : pas de fumée d'image.
+
+**Données existantes.** Aucune : la série réelle n'a jamais été ouverte.
+
+**Ce qui reste, hors code.** Tous les préalables du dossier, et RF-5 avant eux : recette en préproduction et signature de la matrice. Il faut aussi confirmer avec le service fiscal qu'un même numéro, soumis deux fois après une coupure entre l'appel et l'écriture, rend le même code.

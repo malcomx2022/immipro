@@ -64,6 +64,11 @@ export type ActionAuditee =
   | "paiement.ecart.rouvert"
   /** Une facture ou un avoir émis à la confirmation du fournisseur (M.C). */
   | "facture.emission"
+  /**
+   * Une pièce réelle dont le code de certification est obtenu à la
+   * reprise, après un premier échec — S.158.
+   */
+  | "facture.certification"
   | "regle.publication"
   /**
    * La remise en ligne d'une fiche que l'échéance avait dépubliée — B-01.

@@ -16,9 +16,15 @@ import { constaterLesDependances } from "@/server/exploitation/capacites";
 import { etatDesFonctions } from "@/domain/ia/fournisseurs";
 import { fournisseursDeclares } from "@/domain/payments/rail";
 import { CLE_FOURNISSEURS, espaceReel, fournisseursActifs } from "@/server/paiement/secrets";
-import { etatDeLaFacturation, regimeDeLExploitant } from "@/server/facturation/emission";
+import {
+  etatDeLaFacturation,
+  piecesEnAttenteDeCertification,
+  regimeDeLExploitant,
+} from "@/server/facturation/emission";
 import {
   surveillanceDeLaFacturation,
+  messageDesCertifications,
+  type EtatDesCertifications,
   type SurveillanceDeLaFacturation,
 } from "@/domain/facturation/facture";
 import { lireLesConstats } from "@/server/exploitation/constats";
@@ -383,6 +389,20 @@ async function lireLaFacturation(): Promise<SurveillanceDeLaFacturation> {
   }
 }
 
+/** Les pièces réelles sans code de certification — S.158. Une lecture, rien n'est relancé. */
+async function sonderLesCertifications(): Promise<EtatDesCertifications> {
+  try {
+    const { nombre, plusAncienne } = await piecesEnAttenteDeCertification();
+    return {
+      lisible: true,
+      enAttente: nombre,
+      depuisHeures: plusAncienne ? Math.floor((Date.now() - plusAncienne.getTime()) / 3_600_000) : 0,
+    };
+  } catch {
+    return { lisible: false, enAttente: 0, depuisHeures: 0 };
+  }
+}
+
 async function compterLesDossiersPayes(): Promise<number> {
   try {
     const lignes = await db.transaction.findMany({
@@ -412,7 +432,7 @@ export const GET = route({
 });
 
 async function etatDeService() {
-  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes, divergences, taches, analyses] = await Promise.all([
+  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes, divergences, taches, analyses, certifications] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
@@ -436,6 +456,7 @@ async function etatDeService() {
     sonderLesDivergences(),
     sonderLesTachesEnEchec(),
     sonderLesAnalysesEnAttente(),
+    sonderLesCertifications(),
   ]);
 
   /*
@@ -611,6 +632,8 @@ async function etatDeService() {
             ? "Aucune pièce n'attend son analyse depuis plus d'une heure."
             : `${analyses.enAttente} pièce(s) saine(s) attendent leur analyse depuis plus d'une heure, la plus ancienne depuis ${analyses.depuisHeures} h. La reprise horaire les remet en file : relire le journal du worker.`,
       },
+      // S.158 (RF-6) : des pièces réelles émises dont le code de certification manque.
+      certifications: { ...certifications, message: messageDesCertifications(certifications) },
     },
   };
 }

@@ -31,7 +31,12 @@ import { espaceReel } from "@/server/paiement/secrets";
 import { valeursDesVariables } from "@/server/juridique/lecture";
 import { versFiche } from "@/server/acces/regles";
 import { journaliser } from "@/server/acces/journal";
-import { certificationBranchee, leCertificateur } from "@/server/facturation/certification";
+import {
+  NON_BRANCHE,
+  certificationBranchee,
+  leCertificateur,
+  type Certificateur,
+} from "@/server/facturation/certification";
 
 /**
  * Émission des factures et des avoirs — avis comptable M.C du 04/10/2026.
@@ -141,6 +146,12 @@ export async function etablirLaFacture(
   transactionId: string,
   environnement: Readonly<Record<string, string | undefined>> = process.env,
   maintenant = new Date(),
+  /*
+    Le certificateur est celui du point de branchement. Il n'est un
+    paramètre que pour les essais, qui y passent le leur : aucune variable
+    d'environnement ne peut en faire choisir un faux (S.158).
+  */
+  certificateur: Certificateur = leCertificateur(environnement),
 ): Promise<IssueDEmission> {
   const deja = await db.invoice.findUnique({
     where: { transactionId_kind: { transactionId, kind: "FACTURE" } },
@@ -165,7 +176,7 @@ export async function etablirLaFacture(
 
   if (serie === "REELLE") {
     const raisons: string[] = obstaclesALaFacturation({
-      certificationBranchee: certificationBranchee(environnement),
+      certificationBranchee: certificateur !== NON_BRANCHE,
       emetteurComplet: emetteur !== null,
       regime,
     });
@@ -225,12 +236,12 @@ export async function etablirLaFacture(
     return { issue: "deja_emise", numero: gagnante.number };
   }
 
-  await certifierSiReelle(piece, environnement);
+  const certifiee = await certifierSiReelle(piece, certificateur);
   await journaliser({
     acteurId: "systeme:facturation",
     action: "facture.emission",
     cible: `transaction:${transaction.reference}`,
-    motif: `Facture ${piece.number} émise à la confirmation du paiement (M.C).`,
+    motif: `Facture ${piece.number} émise à la confirmation du paiement (M.C).${certifiee === "en_attente" ? " Certification en attente : la réconciliation la reprend." : ""}`,
   }).catch(() => undefined);
   return { issue: "emise", numero: piece.number };
 }
@@ -245,6 +256,7 @@ export async function etablirLAvoir(
   transactionId: string,
   environnement: Readonly<Record<string, string | undefined>> = process.env,
   maintenant = new Date(),
+  certificateur: Certificateur = leCertificateur(environnement),
 ): Promise<IssueDEmission> {
   const deja = await db.invoice.findUnique({
     where: { transactionId_kind: { transactionId, kind: "AVOIR" } },
@@ -254,7 +266,7 @@ export async function etablirLAvoir(
   const transaction = await db.transaction.findUnique({ where: { id: transactionId } });
   if (!transaction || transaction.status !== "REMBOURSEE") return { issue: "sans_objet" };
 
-  const facture = await etablirLaFacture(transactionId, environnement, maintenant);
+  const facture = await etablirLaFacture(transactionId, environnement, maintenant, certificateur);
   if (facture.issue === "bloquee" || facture.issue === "sans_objet") return facture;
 
   const origine = await db.invoice.findUniqueOrThrow({
@@ -336,12 +348,12 @@ export async function etablirLAvoir(
     return { issue: "deja_emise", numero: gagnante.number };
   }
 
-  await certifierSiReelle(piece, environnement, origine.number);
+  const certifiee = await certifierSiReelle(piece, certificateur, origine.number);
   await journaliser({
     acteurId: "systeme:facturation",
     action: "facture.emission",
     cible: `transaction:${transaction.reference}`,
-    motif: `Avoir ${piece.number} émis sur la facture ${origine.number} au remboursement (M.C).`,
+    motif: `Avoir ${piece.number} émis sur la facture ${origine.number} au remboursement (M.C).${certifiee === "en_attente" ? " Certification en attente : la réconciliation la reprend." : ""}`,
   }).catch(() => undefined);
   return { issue: "emise", numero: piece.number };
 }
@@ -350,34 +362,143 @@ export async function etablirLAvoir(
  * Une pièce réelle se certifie dès son émission. Inatteignable tant
  * qu'aucun adaptateur n'existe — la série réelle est fermée en amont —,
  * et écrit pour que l'adaptateur, le jour venu, n'ait qu'à se brancher.
+ *
+ * S.158 (RF-6, préparation de M.C) — un échec ne perd rien. La pièce est
+ * déjà enregistrée, avec sa place dans la suite : elle ne se défait pas,
+ * et elle ne peut pas porter un code que personne n'a rendu. Elle reste
+ * **en attente de certification** — l'écran le dit, `/api/health` la
+ * compte — et la réconciliation la reprend (`certifierLesPiecesEnAttente`).
+ * Avant, l'erreur remontait après le commit : la ligne du journal ne
+ * s'écrivait pas, et rien ne reprenait la pièce, puisque le filet ne
+ * cherche que les ventes **sans** pièce.
  */
+type IssueDeCertification = "certifiee" | "en_attente" | "sans_objet" | "deja_certifiee" | "en_cours";
+
+/**
+ * Le temps qu'on laisse au dispositif pour rendre un code, verrou tenu.
+ * Au-delà, la transaction tombe et la pièce reste en attente.
+ */
+const DUREE_MAXIMALE_D_UNE_CERTIFICATION_MS = 120_000;
+
+/*
+  Une pièce, un appel au dispositif à la fois — S.158. La fumée l'a
+  montré : deux passes simultanées appelaient chacune le certificateur
+  pour la même pièce ; la base ne gardait qu'un code, mais le dispositif
+  fiscal en aurait rendu deux. L'émission (au webhook) et la reprise (à
+  la réconciliation) prennent donc le même verrou par pièce, relisent le
+  code sous ce verrou, et l'écrivent dans la même transaction.
+*/
 async function certifierSiReelle(
   piece: Prisma.InvoiceGetPayload<object>,
-  environnement: Readonly<Record<string, string | undefined>>,
+  certificateur: Certificateur,
   origine: string | null = null,
-): Promise<void> {
-  if (piece.series !== "REELLE" || !certificationBranchee(environnement)) return;
-  const certification = await leCertificateur(environnement)({
-    numero: piece.number,
-    genre: piece.kind,
-    emiseLe: piece.issuedAt,
-    prestationLe: piece.performedAt,
-    devise: piece.currency,
-    ttc: piece.amountIncl,
-    ht: piece.amountExcl,
-    tva: piece.vatAmount,
-    tauxBp: piece.vatRateBp,
-    client: {
-      nom: piece.clientName ?? "",
-      adresse: piece.clientAddress ?? "",
-      qualite: piece.clientQuality,
+): Promise<IssueDeCertification> {
+  if (piece.series !== "REELLE" || certificateur === NON_BRANCHE) return "sans_objet";
+  return db.$transaction(
+    async (tx) => {
+      const verrou = await tx.$queryRaw<{ pris: boolean }[]>`
+        SELECT pg_try_advisory_xact_lock(hashtextextended(${`certification:${piece.id}`}, 0)) AS pris`;
+      if (!verrou[0]?.pris) return "en_cours";
+      const actuelle = await tx.invoice.findUnique({
+        where: { id: piece.id },
+        select: { certificationCode: true },
+      });
+      if (actuelle?.certificationCode) return "deja_certifiee";
+      let certification;
+      try {
+        certification = await certificateur({
+          numero: piece.number,
+          genre: piece.kind,
+          emiseLe: piece.issuedAt,
+          prestationLe: piece.performedAt,
+          devise: piece.currency,
+          ttc: piece.amountIncl,
+          ht: piece.amountExcl,
+          tva: piece.vatAmount,
+          tauxBp: piece.vatRateBp,
+          client: {
+            nom: piece.clientName ?? "",
+            adresse: piece.clientAddress ?? "",
+            qualite: piece.clientQuality,
+          },
+          origine,
+        });
+      } catch (erreur) {
+        console.warn(
+          `[facturation] ${piece.number} : certification en attente (${erreur instanceof Error ? erreur.name : "erreur"})`,
+        );
+        return "en_attente";
+      }
+      await tx.invoice.update({
+        where: { id: piece.id },
+        data: { certificationCode: certification.code, certifiedAt: certification.le },
+      });
+      return "certifiee";
     },
-    origine,
+    { timeout: DUREE_MAXIMALE_D_UNE_CERTIFICATION_MS, maxWait: 5_000 },
+  );
+}
+
+/**
+ * Les pièces réelles sans code de certification. Une pièce annulée (date et
+ * motif tracés) n'est plus à certifier : la reprise ne la soumet pas.
+ */
+const EN_ATTENTE_DE_CERTIFICATION = {
+  series: "REELLE",
+  certificationCode: null,
+  cancelledAt: null,
+} satisfies Prisma.InvoiceWhereInput;
+
+/**
+ * Ce que `/api/health` et B-04 disent des pièces réelles en attente de
+ * leur code — S.158. Une lecture : elle ne relance rien.
+ */
+export async function piecesEnAttenteDeCertification(): Promise<{
+  nombre: number;
+  plusAncienne: Date | null;
+}> {
+  const [nombre, premiere] = await Promise.all([
+    db.invoice.count({ where: EN_ATTENTE_DE_CERTIFICATION }),
+    db.invoice.findFirst({
+      where: EN_ATTENTE_DE_CERTIFICATION,
+      orderBy: { issuedAt: "asc" },
+      select: { issuedAt: true },
+    }),
+  ]);
+  return { nombre, plusAncienne: premiere?.issuedAt ?? null };
+}
+
+/**
+ * La reprise des certifications en attente — S.158. Appelée par la
+ * réconciliation, après le filet des pièces manquantes. Sans adaptateur,
+ * elle ne tente rien : il n'y a d'ailleurs aucune pièce réelle à reprendre,
+ * la série réelle étant fermée.
+ */
+export async function certifierLesPiecesEnAttente(
+  environnement: Readonly<Record<string, string | undefined>> = process.env,
+  certificateur: Certificateur = leCertificateur(environnement),
+  limite = 100,
+): Promise<{ certifiees: number; enAttente: number }> {
+  if (certificateur === NON_BRANCHE) return { certifiees: 0, enAttente: 0 };
+  const pieces = await db.invoice.findMany({
+    where: EN_ATTENTE_DE_CERTIFICATION,
+    include: { origin: { select: { number: true } } },
+    orderBy: { issuedAt: "asc" },
+    take: limite,
   });
-  await db.invoice.update({
-    where: { id: piece.id },
-    data: { certificationCode: certification.code, certifiedAt: certification.le },
-  });
+  let certifiees = 0;
+  for (const piece of pieces) {
+    const issue = await certifierSiReelle(piece, certificateur, piece.origin?.number ?? null);
+    if (issue !== "certifiee") continue;
+    certifiees += 1;
+    await journaliser({
+      acteurId: "systeme:facturation",
+      action: "facture.certification",
+      cible: `facture:${piece.number}`,
+      motif: `${piece.kind === "AVOIR" ? "Avoir" : "Facture"} ${piece.number} certifiée à la reprise (M.C).`,
+    }).catch(() => undefined);
+  }
+  return { certifiees, enAttente: pieces.length - certifiees };
 }
 
 /**
