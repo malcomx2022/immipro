@@ -315,6 +315,25 @@ if (!argImage) {
       `exploitation · « node dist/inventaire-stockage.mjs » démarre dans l'image (${/L'inventaire n'a pas abouti/u.test(sortie) ? "stockage absent, attendu" : sortie.trim().split("\n").at(-1)})`,
     );
   }
+  /*
+    Les deux purges lancées à la main (RF-4, S.152) : sans base ni
+    stockage, elles le disent et s'arrêtent, sans rien avoir supprimé.
+  */
+  for (const [commande, ...args] of [
+    ["dist/purge-retention.mjs", "--par", "Opérateur de fumée"],
+    ["dist/purge-inventaire.mjs"],
+  ]) {
+    const r = spawnSync(
+      "docker",
+      ["run", "--rm", "--network", "none", "-e", `DATABASE_URL=${URL_SANS_BASE}`, "--entrypoint", "node", tag, commande, ...args],
+      { encoding: "utf8", timeout: 120_000 },
+    );
+    const sortie = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    verifier(
+      /La purge n'a pas abouti/u.test(sortie) && !/Cannot find module|Dynamic require/u.test(sortie),
+      `exploitation · « node ${commande} » démarre dans l'image (${/La purge n'a pas abouti/u.test(sortie) ? "base et stockage absents, attendu" : sortie.trim().split("\n").at(-1)})`,
+    );
+  }
   const sonde = (commande) =>
     spawnSync("docker", ["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-c", commande], {
       encoding: "utf8",

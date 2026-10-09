@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { decalerDeMois } from "@/domain/format/mois";
 import { miseEnEtat } from "@/domain/dossiers/etat";
 import { etatApresPurge } from "@/domain/dossiers/conservation";
-import { supprimerPartout } from "@/lib/storage";
+import { listerLaZone, supprimerDansLaZone, supprimerPartout } from "@/lib/storage";
+import { prefixeDuDossier } from "@/domain/exploitation/purge-stockage";
 import { journaliser } from "@/server/acces/journal";
 import { CONSERVATION_MOIS } from "@/domain/notifications/alerte";
 import { CONSERVATION_ANNEES } from "@/domain/backoffice/audit";
@@ -78,6 +79,62 @@ export interface Bilan {
   objetsEnEchec: number;
   /** Dossiers laissés échus parce qu'au moins un objet a résisté. */
   dossiersIncomplets: number;
+  /**
+   * Les objets sans version supprimés sous le préfixe d'un dossier purgé :
+   * dépôts jamais confirmés, doubles de promotion — S.152 (E4, étape 3).
+   */
+  objetsSousLePrefixe: number;
+  /**
+   * Les objets du préfixe qu'une version vivante d'**un autre** dossier
+   * désigne encore (clés d'avant M1). Gardés, et le dossier reste échu :
+   * un doute bloque la purge jusqu'à décision.
+   */
+  objetsReserves: number;
+}
+
+/**
+ * Le préfixe d'un dossier, vidé dans les deux zones — S.152, E4 étape 3.
+ *
+ * La purge part des versions : un objet qu'aucune version ne désigne — un
+ * dépôt présigné jamais confirmé, le double d'une promotion interrompue —
+ * survivait au dossier, sans plus rien en base pour le retrouver. Passé
+ * les versions, le préfixe `dossiers/<dossier>/` est donc listé et vidé.
+ *
+ * Une exception, et elle vient de M1 : avant S.126, la confirmation
+ * acceptait la clé d'un autre dossier. Une version vivante ailleurs peut
+ * donc désigner un objet d'ici. Il n'est pas supprimé — un doute bloque
+ * la purge jusqu'à décision (diagnostic S.149, constat M1) — et il est
+ * compté, pour que le dossier reste échu et que le journal le dise.
+ */
+async function viderLePrefixe(
+  applicationId: string,
+): Promise<{ supprimes: number; reserves: number }> {
+  const prefixe = prefixeDuDossier(applicationId);
+  const reservees = new Set(
+    (
+      await db.documentVersion.findMany({
+        where: {
+          objectKey: { startsWith: prefixe },
+          purgedAt: null,
+          document: { applicationId: { not: applicationId } },
+        },
+        select: { objectKey: true },
+      })
+    ).map((v) => v.objectKey!),
+  );
+  let supprimes = 0;
+  let reserves = 0;
+  for (const zone of ["CONFIANCE", "QUARANTAINE"] as const) {
+    for await (const objet of listerLaZone(zone, prefixe)) {
+      if (reservees.has(objet.cle)) {
+        reserves += 1;
+        continue;
+      }
+      await supprimerDansLaZone(zone, objet.cle);
+      supprimes += 1;
+    }
+  }
+  return { supprimes, reserves };
 }
 
 /**
@@ -139,6 +196,11 @@ export function effacerLesDerives(versionIds: string[], documentIds: string[]) {
 export async function purgerLesPiecesEchues(
   maintenant = new Date(),
   userId?: string,
+  /**
+   * L'auteur au journal : la tâche planifiée, ou l'opérateur qui lance la
+   * même purge à la main après une restauration (`console:<nom>`, S.152).
+   */
+  acteurId = "systeme:purge",
 ): Promise<Bilan> {
   const dossiers = await db.application.findMany({
     where: {
@@ -155,6 +217,8 @@ export async function purgerLesPiecesEchues(
     objetsSupprimes: 0,
     objetsEnEchec: 0,
     dossiersIncomplets: 0,
+    objetsSousLePrefixe: 0,
+    objetsReserves: 0,
   };
 
   for (const dossier of dossiers) {
@@ -181,6 +245,24 @@ export async function purgerLesPiecesEchues(
       }
     }
 
+    /*
+      Les versions parties, le préfixe — seulement si rien n'a résisté :
+      une version gardée a encore son objet sous ce préfixe, et le vider
+      la rendrait introuvable. Un refus ici laisse le dossier échu, comme
+      un objet de version : la passe suivante reprend le préfixe.
+    */
+    let prefixe: { supprimes: number; reserves: number } | null = null;
+    if (resistent.size === 0) {
+      try {
+        prefixe = await viderLePrefixe(dossier.id);
+        bilan.objetsSousLePrefixe += prefixe.supprimes;
+        bilan.objetsReserves += prefixe.reserves;
+      } catch {
+        bilan.objetsEnEchec += 1;
+      }
+    }
+    const reserve = (prefixe?.reserves ?? 0) > 0;
+
     const purgeables = versions.filter((v) => !resistent.has(v.id));
     /*
       Un document n'est « purgé » que si plus rien de lui ne reste à
@@ -191,7 +273,7 @@ export async function purgerLesPiecesEchues(
     const documentsEntiers = dossier.documents.filter((d) =>
       d.versions.every((v) => !resistent.has(v.id)),
     );
-    const complet = resistent.size === 0;
+    const complet = resistent.size === 0 && prefixe !== null && !reserve;
 
     await db.$transaction([
       db.documentVersion.updateMany({
@@ -259,13 +341,20 @@ export async function purgerLesPiecesEchues(
     ]);
 
     await journaliser({
-      acteurId: "systeme:purge",
+      acteurId,
       action: "piece.purge",
       cible: `application:${dossier.id}`,
       motif: complet
         ? "Purge automatique à l'échéance de rétention (INV-5)"
-        : "Purge partielle : le stockage a refusé au moins un objet (INV-5)",
-      details: { versions: purgeables.length, enEchec: resistent.size },
+        : reserve
+          ? "Purge partielle : un objet du dossier est désigné par la version d'un autre dossier (M1), décision requise (INV-5)"
+          : "Purge partielle : le stockage a refusé au moins un objet (INV-5)",
+      details: {
+        versions: purgeables.length,
+        enEchec: resistent.size,
+        sousLePrefixe: prefixe?.supprimes ?? 0,
+        reserves: prefixe?.reserves ?? 0,
+      },
     }).catch(() => undefined);
 
     if (complet) bilan.dossiers += 1;

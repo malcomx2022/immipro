@@ -91,6 +91,10 @@ if (migration.status !== 0) {
 process.env.SMTP_URL = `smtp://127.0.0.1:${portSmtp}`;
 process.env.SMTP_FROM = "ne-pas-repondre@immipro.test";
 
+// S.152 : la purge liste le préfixe du dossier dans les deux zones ; sans
+// stockage, elle laisserait chaque dossier échu, et elle aurait raison.
+const { demarrerUnFauxStockage } = await import("./faux-stockage");
+const fauxStockage = await demarrerUnFauxStockage();
 const { db } = await import("../src/lib/db");
 const { declarerLeDepot, confirmerLInstruction } = await import(
   "../src/server/dossiers/parcours"
@@ -434,6 +438,7 @@ try {
   echecs.push(String(erreur));
 } finally {
   await db.$disconnect();
+  await fauxStockage.arreter();
   await new Promise<void>((ok) => smtp.close(() => ok()));
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
 }

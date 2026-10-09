@@ -192,8 +192,13 @@ describe("le worker passe les trois purges dans la même tâche", () => {
   const WORKER = readFileSync("src/server/jobs/worker.ts", "utf8");
 
   it("la tâche de rétention appelle les deux lots", () => {
-    expect(WORKER).toContain("purgerLesPiecesEchues");
-    expect(WORKER).toContain("purgerCeQuiEstEchu");
+    // Depuis S.152, par la passe partagée avec la commande de restauration.
+    const tache = WORKER.slice(WORKER.indexOf("boss.work(JOBS.PURGE_RETENTION"));
+    expect(tache.slice(0, tache.indexOf("});"))).toContain("await passeDeRetention()");
+    const PASSE = readFileSync("src/server/jobs/retention.ts", "utf8");
+    expect(PASSE).toContain("purge: await purgerLesPiecesEchues(");
+    expect(PASSE).toContain("conservation: await purgerCeQuiEstEchu(");
+    expect(PASSE).toContain("suppressions: await acheverLesSuppressionsEnAttente(");
   });
 
   it("elle reste quotidienne, comme l'annonce DOC-11", () => {
