@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
+import { estFige } from "@/domain/dossiers/etat";
 import { filtrePourCandidat, payload, reglePubliee } from "@/server/acces/regles";
 import { editorialDe } from "@/lib/contenu/destinations";
 import type { Alerte } from "@/domain/notifications/alerte";
@@ -164,7 +165,7 @@ export async function divergenceAArbitrer(
 ): Promise<VueDivergence> {
   const migration = await db.ruleMigration.findFirst({
     where: { id: migrationId, application: { userId } },
-    include: { fromRule: true, toRule: true },
+    include: { fromRule: true, toRule: true, application: { select: { status: true } } },
   });
   if (!migration) throw echec("introuvable");
 
@@ -180,7 +181,11 @@ export async function divergenceAArbitrer(
       .piecesTouchees,
     // Le même filtre qu'à l'ouverture d'un dossier, et que l'arbitrage
     // applique côté écriture : une seule définition de « en vigueur ».
-    blocage: await blocageDeLaMigration(migration.toRule),
+    // Un dossier déposé ou clôturé ne migre pas (RF-1, FON-04) : l'écran
+    // le dit avant le clic, comme le service le refuse après.
+    blocage: estFige(migration.application.status)
+      ? "DOSSIER_FIGE"
+      : await blocageDeLaMigration(migration.toRule),
   };
 }
 

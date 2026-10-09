@@ -171,8 +171,17 @@ export interface Dossier {
 /** Trois dossiers en parallèle au maximum (C-01). */
 export const DOSSIERS_MAX = 3;
 
+/**
+ * « En parallèle » : ceux qui attendent encore une suite — RF-1, FON-01.
+ *
+ * La liste entière était comptée, historique compris. Après trois
+ * démarches déposées ou clôturées, le tableau de bord retirait « Ouvrir un
+ * nouveau dossier » et invitait à clôturer un dossier, là où le serveur
+ * l'aurait accepté. Un dossier en pause, lui, compte : il attend une
+ * décision du candidat.
+ */
 export const peutOuvrirUnDossier = (dossiers: readonly Dossier[]): boolean =>
-  dossiers.length < DOSSIERS_MAX;
+  dossiers.filter(attendUneSuite).length < DOSSIERS_MAX;
 
 /**
  * Les dossiers actifs d'abord, puis les brouillons, puis le reste : ce qui

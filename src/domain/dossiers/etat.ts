@@ -147,3 +147,33 @@ export const REPRISE_APRES_PAUSE: EtatStocke = "ACTIF";
  * classe d'impact que la passe met en pause, c'est-à-dire la plus grave.
  */
 export const ETATS_A_PREVENIR: readonly EtatStocke[] = ["ACTIF", "PRET", "SUSPENDU"];
+
+/**
+ * Les dossiers **ouverts**, ceux que compte le plafond de C-01 — RF-1,
+ * FON-01, 09/10/2026.
+ *
+ * Le serveur comptait `BROUILLON`, `ACTIF` et `PRET`, et oubliait
+ * `SUSPENDU` : un dossier mis en pause par une divergence attend pourtant
+ * une décision du candidat, et il le dit à l'écran (`ATTEND_UNE_SUITE`).
+ * L'écran, lui, comptait la liste entière, historique compris : trois
+ * démarches terminées retiraient « Ouvrir un nouveau dossier » et
+ * invitaient à clôturer un dossier — alors qu'aucun ne l'était plus.
+ *
+ * Une liste, lue par le serveur et tenue face à celle de l'écran par
+ * `tests/dossiers` : les états d'ici sont exactement ceux qui s'affichent
+ * dans `ATTEND_UNE_SUITE`.
+ */
+export const ETATS_OUVERTS: readonly EtatStocke[] = ["BROUILLON", "ACTIF", "PRET", "SUSPENDU"];
+
+/**
+ * Un dossier déposé ou clôturé garde l'état qu'il avait ce jour-là — et la
+ * version de règle qu'il avait figée (INV-3, DOC-11 §2.1).
+ */
+export const ETATS_FIGES: readonly EtatStocke[] = [
+  "SOUMIS",
+  "ISSUE_DECLAREE",
+  "ABANDONNE",
+  "ARCHIVE",
+];
+
+export const estFige = (etat: EtatStocke): boolean => ETATS_FIGES.includes(etat);

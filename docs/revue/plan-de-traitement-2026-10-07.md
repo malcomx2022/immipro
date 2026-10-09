@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est proposé. Tout le reste est à faire.
 
 ---
 
@@ -1493,7 +1493,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
   Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.
 - **M15** : six services `healthy` relevés sur le VPS le 09/10/2026, après le déploiement de `87fbdef` ; reste à vérifier que les limites apparaissent dans `docker stats`.
-- **M11** : les formulaires du back-office (ticket séparé, comme prévu) ; et le champ « Établissement visé » de C-05, saisi mais jamais envoyé, à trancher (l'envoyer ou le retirer).
+- **M11** : les formulaires du back-office (ticket séparé, comme prévu). Le champ « Établissement visé » de C-05 est retiré par S.146 (choix A-1) ; le prototype C-05 le porte encore.
 - **M10** : renseigner `ETAT_DE_SERVICE_JETON` dans `.env.app` si une surveillance externe doit lire le détail de `/api/health` ; sans lui, seul un administrateur connecté le lit.
 - **M8 (D-23)** : après le déploiement de S.137, la première reprise horaire propage la version en vigueur de chaque procédure qui a un prédécesseur ; relire `[reprise-divergence]` dans le journal du worker et les alertes parties.
 - **M16** : sur le VPS, relever `sudo nginx -T`, installer `nginx/immipro.conf` et `nginx/stockage.conf`, étendre le certificat à `stockage.immipro.app` par webroot et vérifier `certbot renew --dry-run` (`INSTALLATION-GITHUB.md`, « nginx et certificats »).
@@ -1539,4 +1539,10 @@ sans reproduction. La montée des dépendances déjà fusionnée n'est pas dupli
 **Statut.** RF-0 autorisé par le responsable et préparé dans une PR
 documentaire ; sa fusion reste distincte. Aucun correctif métier n'est
 livré par RF-0. RF-1 à RF-7 sont planifiés ; A-1 à A-3 restent à valider.
+
+**RF-1 (S.146), 09/10/2026.** Autorisé par le responsable, avec A-1
+(retirer le champ « Établissement visé ») et A-3 (alerte consultable,
+« conserver » seul sur un dossier figé). FON-01, FON-04 et FON-05 sont
+reproduits sur l'ancien code puis corrigés ; voir le registre, entrée
+S.146. A-2 reste ouvert, avec RF-2.
 Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

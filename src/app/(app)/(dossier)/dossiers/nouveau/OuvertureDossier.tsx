@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import { libellePieces, type FicheDestination } from "@/domain/destinations/fiche";
 import { getPack } from "@/domain/payments/pricing";
@@ -41,6 +40,16 @@ import { formatMontant } from "@/lib/utils";
  *
  * Un formulaire (revue du 07/10/2026, M11) : Entrée dans un champ envoie,
  * comme le bouton principal.
+ *
+ * ── Un champ saisi, et jamais envoyé ────────────────────────────────
+ *
+ * « Établissement visé » se remplissait, promettait « Tu pourras le
+ * renseigner plus tard », et ne partait pas : ni le corps de la requête
+ * ni l'API ne le portaient, et aucun écran ne permettait de le saisir
+ * ensuite. Le candidat croyait avoir donné une information que la
+ * plateforme jetait. Choix A-1 du 09/10/2026 (RF-1, FON-05) : le champ
+ * est retiré en V1, tant qu'aucun usage n'est défini. Tout ce que cet
+ * écran demande part au serveur.
  */
 interface Rentree {
   valeur: string;
@@ -96,7 +105,6 @@ export function OuvertureDossier({
 }) {
   const router = useRouter();
   const [date, setDate] = useState<string | null>(null);
-  const [etablissement, setEtablissement] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const packDossier = getPack("dossier");
@@ -144,7 +152,8 @@ export function OuvertureDossier({
           Ouvre ton dossier {fiche.pays}
         </h1>
         <p className="text-pretty text-16 text-ink-700">
-          Deux informations suffisent pour générer ta checklist et ton échéancier.
+          Ta destination est choisie : une date suffit pour générer ta checklist
+          et ton échéancier.
         </p>
       </div>
 
@@ -160,15 +169,6 @@ export function OuvertureDossier({
           recule du délai d&apos;instruction annoncé par la procédure.
         </p>
       </div>
-
-      <Input
-        libelle="Établissement visé"
-        name="etablissement"
-        aide="Optionnel. Tu pourras le renseigner plus tard."
-        placeholder="Université de Groningue"
-        value={etablissement}
-        onChange={(e) => setEtablissement(e.target.value)}
-      />
 
       <section className="flex flex-col gap-3 rounded-lg bg-ink-100 p-5">
         <div className="flex items-baseline justify-between gap-3">

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
+  ATTEND_UNE_SUITE,
   DOSSIERS_MAX,
   LIBELLE_STATUT,
   peutOuvrirUnDossier,
@@ -16,6 +17,8 @@ import {
   profilComplet,
 } from "@/domain/comptes/profil";
 import { DOSSIERS } from "@/lib/contenu/dossiers";
+import { ETATS_FIGES, ETATS_OUVERTS, type EtatStocke } from "@/domain/dossiers/etat";
+import { versStatut } from "@/server/vue/dossier";
 import { INTERDITS_ECRAN_CANDIDAT, verifierTexte } from "@/domain/copy/vocabulaire-interdit";
 
 const dossier = (statut: Dossier["statut"], obligatoires: number): Dossier => ({
@@ -52,6 +55,42 @@ describe("dossiers — WF-09", () => {
     expect(
       peutOuvrirUnDossier([dossier("ACTIF", 1), dossier("BROUILLON", 2), dossier("PRET", 0)]),
     ).toBe(false);
+  });
+
+  /*
+    RF-1, FON-01. Le tableau de bord comptait la liste entière : trois
+    démarches finies retiraient « Ouvrir un nouveau dossier ». Et un
+    dossier en pause, qui attend une décision, ne comptait pas côté
+    serveur.
+  */
+  it("ne compte que les dossiers qui attendent une suite, pause comprise", () => {
+    expect(
+      peutOuvrirUnDossier([dossier("CLOTURE", 0), dossier("CLOTURE", 0), dossier("CLOTURE", 0)]),
+    ).toBe(true);
+    expect(
+      peutOuvrirUnDossier([dossier("SOUMIS", 0), dossier("ACTIF", 1), dossier("PRET", 0)]),
+    ).toBe(true);
+    expect(
+      peutOuvrirUnDossier([dossier("ACTIF", 1), dossier("BROUILLON", 2), dossier("EN_PAUSE", 0)]),
+    ).toBe(false);
+  });
+
+  it("compte côté serveur exactement ce que l'écran compte", () => {
+    const tous: EtatStocke[] = [
+      "BROUILLON",
+      "ACTIF",
+      "PRET",
+      "SOUMIS",
+      "SUSPENDU",
+      "ISSUE_DECLAREE",
+      "ABANDONNE",
+      "ARCHIVE",
+    ];
+    for (const etat of tous) {
+      expect(ETATS_OUVERTS.includes(etat), etat).toBe(ATTEND_UNE_SUITE.includes(versStatut(etat)));
+      // Un état est ouvert ou figé, jamais les deux, jamais aucun.
+      expect(ETATS_OUVERTS.includes(etat), etat).toBe(!ETATS_FIGES.includes(etat));
+    }
   });
 
   it("accorde le résumé du jour, et le tait quand il n'y a rien", () => {
