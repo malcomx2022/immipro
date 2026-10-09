@@ -21,3 +21,4 @@ next-env.d.ts
 
 # Résultats du banc des fournisseurs d IA (S.99) : produits localement, jamais versionnés.
 /banc-ia-resultats/
+.recette/

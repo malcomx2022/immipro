@@ -10,6 +10,10 @@
  * DELETE (204 sur une clé absente), et la liste `list-type=2` filtrée par
  * préfixe, en une page. Il n'apprend rien au code : il lui laisse faire
  * ce qu'il fait en production.
+ *
+ * Le banc de recette (RF-5, S.156) le sert aussi au navigateur : le dépôt
+ * présigné (préflight CORS, PUT), l'aperçu (GET), et au worker : la taille
+ * (HEAD), la lecture et la promotion (copie par `x-amz-copy-source`).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -20,7 +24,7 @@ export const SEAU_QUARANTAINE = "immipro-quarantaine";
 const echapperXml = (texte: string) =>
   texte.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;");
 
-export async function demarrerUnFauxStockage() {
+export async function demarrerUnFauxStockage(options: { port?: number; journal?: (ligne: string) => void } = {}) {
   const seaux = new Map<string, Map<string, Buffer>>([
     [SEAU_CONFIANCE, new Map()],
     [SEAU_QUARANTAINE, new Map()],
@@ -41,6 +45,26 @@ export async function demarrerUnFauxStockage() {
       const cle = separation === -1 ? "" : chemin.slice(separation + 1);
       const objets = seau(nomDuSeau);
       const parametres = new URLSearchParams(requeteDUrl ?? "");
+      // Le navigateur dépose et lit par des URL présignées : il faut l'y autoriser.
+      reponse.setHeader("Access-Control-Allow-Origin", requete.headers.origin ?? "*");
+      reponse.setHeader("Access-Control-Allow-Methods", "GET, PUT, HEAD");
+      reponse.setHeader("Access-Control-Allow-Headers", requete.headers["access-control-request-headers"] ?? "*");
+      reponse.setHeader("Access-Control-Expose-Headers", "ETag");
+      if (requete.method === "OPTIONS") {
+        reponse.writeHead(204);
+        return reponse.end();
+      }
+      if (requeteDUrl === "location") {
+        reponse.writeHead(200, { "Content-Type": "application/xml" });
+        return reponse.end(
+          '<?xml version="1.0" encoding="UTF-8"?><LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>',
+        );
+      }
+      const absent = () => {
+        reponse.writeHead(404, { "Content-Type": "application/xml" });
+        reponse.end("<Error><Code>NoSuchKey</Code></Error>");
+      };
+      options.journal?.(`${requete.method} ${nomDuSeau}/${cle}`);
 
       if (requete.method === "GET" && cle === "" && parametres.get("list-type") === "2") {
         const prefixe = parametres.get("prefix") ?? "";
@@ -57,6 +81,34 @@ export async function demarrerUnFauxStockage() {
           `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>${nomDuSeau}</Name><IsTruncated>false</IsTruncated>${contenus}</ListBucketResult>`,
         );
       }
+      if (requete.method === "HEAD" && cle !== "") {
+        const objet = objets.get(cle);
+        if (!objet) return absent();
+        reponse.writeHead(200, {
+          "Content-Length": String(objet.length),
+          ETag: '"essai"',
+          "Last-Modified": new Date().toUTCString(),
+        });
+        return reponse.end();
+      }
+      if (requete.method === "GET" && cle !== "") {
+        const objet = objets.get(cle);
+        if (!objet) return absent();
+        reponse.writeHead(200, { "Content-Length": String(objet.length) });
+        return reponse.end(objet);
+      }
+      const copieDe = requete.headers["x-amz-copy-source"] as string | undefined;
+      if (requete.method === "PUT" && copieDe) {
+        const depuis = decodeURIComponent(copieDe).replace(/^\//u, "");
+        const coupure = depuis.indexOf("/");
+        const objet = seau(depuis.slice(0, coupure)).get(depuis.slice(coupure + 1));
+        if (!objet) return absent();
+        objets.set(cle, objet);
+        reponse.writeHead(200, { "Content-Type": "application/xml" });
+        return reponse.end(
+          `<CopyObjectResult><ETag>"essai"</ETag><LastModified>${new Date().toISOString()}</LastModified></CopyObjectResult>`,
+        );
+      }
       if (requete.method === "PUT") {
         objets.set(cle, Buffer.concat(morceaux));
         reponse.writeHead(200, { ETag: '"essai"' });
@@ -71,7 +123,7 @@ export async function demarrerUnFauxStockage() {
       return reponse.end();
     });
   });
-  await new Promise<void>((ok) => serveur.listen(0, "127.0.0.1", ok));
+  await new Promise<void>((ok) => serveur.listen(options.port ?? 0, "127.0.0.1", ok));
   const port = (serveur.address() as AddressInfo).port;
 
   process.env.MINIO_ENDPOINT = "127.0.0.1";

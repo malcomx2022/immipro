@@ -12611,3 +12611,59 @@ Le lot part de main `dcc034f`.
 **Données existantes.** Aucune écriture n'a eu lieu pendant la panne : la préparation échouait avant de créer la version ou de réserver une analyse. Rien à reprendre en base ; les candidats qui ont échoué doivent recommencer leur dépôt.
 
 **Ce qui reste, non vérifié.** Le dépôt en production après déploiement : un dépôt réel, de bout en bout, à constater par le responsable.
+
+## S.156 — RF-5 : banc de recette local et matrice de recette V1
+
+**Autorisation et choix.** RF-5 a été autorisé par le responsable le 09/10/2026, avec le périmètre « Matrice + recette locale ». Le lot part de main `80b8bc5` (S.155 compris). Il ne change ni code applicatif, ni schéma, ni drapeau, ni service.
+
+**Ce qui est livré.**
+- **Le banc**, `npm run recette:banc` (`scripts/recette/banc.mts`). Il lance l'application comme l'image la lance (serveur `standalone`, statiques copiés à côté) et le worker de `dist/`, sur une base jetable `immipro_recette*`. Les services sont simulés sur la boucle locale :
+  - le stockage S3, avec CORS, dépôt présigné, copie de promotion et aperçu ;
+  - l'antivirus, qui reconnaît EICAR ;
+  - le courrier, capturé dans `.recette/courriers/` (ignoré par git) avec le code de vérification affiché.
+
+  Les graines de démonstration utilisent un mot de passe tiré au hasard. Aucune clé de lecture ni de paiement n'est transmise.
+- **Le stockage simulé** (`scripts/faux-stockage.ts`) sert aussi le navigateur et le worker : préflight CORS, `?location`, HEAD, GET et copie par `x-amz-copy-source`. Les fumées qui l'utilisaient ne changent pas.
+- **La matrice** (`docs/recette/matrice-v1.md`) suit les critères de preuve du chantier : scénario, rôle, préconditions, attendu, observé, preuve, statut, date, responsable. Les lignes qui dépendent d'un service réel restent « non vérifié ».
+
+**Ce que la recette a trouvé.**
+- **Bloquant, corrigé en S.155** : la préparation du dépôt répondait 503 depuis S.148.
+- **R-01, majeure** : l'écran C-08 d'une pièce ignore la décision de la revue humaine. Il affiche le verdict de la machine (« Illisible — Un opérateur regarde ta pièce ») et propose « Reprendre la photo » sur une pièce validée par un opérateur. L'alerte et la checklist disent pourtant « conforme ». Cela contredit RG-06.8.
+- **R-02, moyenne** : le bandeau « Connexion perdue » promet un envoi « dès le retour du réseau », qui n'a pas lieu. Un nouvel appui envoie bien le fichier.
+- **R-03, moyenne** : « Signaler une erreur de lecture » et « Voir l'historique des versions » mènent à des routes absentes (404).
+- **Observations mineures** :
+  - O-1 : « Pays-Bas » est affiché deux fois dans les résultats du simulateur ;
+  - O-2 : l'aide de B-05 dit « la lecture a rendu un résultat » sans lecture ;
+  - O-3 : l'état vide de B-05 parle des pièces « d'hier ».
+
+**Ce qui est vérifié sur le banc.**
+- Parcours visiteur jusqu'au tableau de bord, à 390 px.
+- Dépôt sain et dépôt EICAR.
+- Remplacement d'une pièce, avec l'historique gardé.
+- Double clic : une seule version.
+- Session expirée : la page renvoie vers la connexion, et l'API répond 401 avec un message actionnable.
+- Fournisseur absent : revue humaine, sans débit d'analyse.
+- Revue B-05 :
+  - ouverture impossible sans motif, aperçu présigné ;
+  - ouverture et décision au journal, avec leur motif ;
+  - message porteur de promesse bloqué (INV-2).
+- Absence de défilement horizontal à 390 px.
+
+**Vérifications.**
+- `npm run check`, `npm run build` et `npm run check:audit` passent.
+- Les 25 fumées passent, `smoke:worker -- --base` compris.
+- Le banc démarre et sert les parcours ci-dessus.
+- Ni l'image ni le déploiement ne changent : pas de fumée d'image.
+
+**Ce qui reste, non vérifié.**
+- Toutes les lignes « non vérifié » de la matrice :
+  - achat ;
+  - complétude, rédaction ;
+  - déclaration du dépôt, purge, portabilité ;
+  - publication, arbitrage ;
+  - remboursement ;
+  - suppression de compte ;
+  - clavier, TalkBack ;
+  - exploitation en préproduction : nginx, certificats, CORS réel, FedaPay, services, runbook.
+- La signature de la matrice par le responsable.
+- Les correctifs de R-01 à R-03, qui demandent son choix.
