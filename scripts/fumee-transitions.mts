@@ -541,6 +541,231 @@ try {
     );
   }
 
+  console.log("\nC-01 — le plafond compte les dossiers ouverts, et seulement eux (RF-1, FON-01)");
+  paysCourant = nouveauScenario();
+  {
+    const r = await regle(brute.rules);
+    rang += 1;
+    const candidat = await db.user.create({
+      data: { email: `fumee-pl-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    /*
+      Trois démarches finies : déposée puis répondue, abandonnée, archivée.
+      Elles restent dans l'historique, et aucune n'attend plus rien du
+      candidat. Elles ne doivent pas lui prendre une place.
+    */
+    for (const status of ["ISSUE_DECLAREE", "ABANDONNE", "ARCHIVE"] as const) {
+      await db.application.create({ data: { userId: candidat.id, visaRuleId: r.id, status } });
+    }
+    const ouvert = await ouvrirDossier(candidat.id, r.id, null).then(
+      () => "ouvert",
+      (e: unknown) => (e as { echec?: { code: string } }).echec?.code ?? String(e),
+    );
+    verifier(ouvert === "ouvert", `trois dossiers terminés laissent ouvrir un dossier (${ouvert})`);
+
+    // Un deuxième ouvert, et un troisième mis en pause par une divergence.
+    await ouvrirDossier(candidat.id, r.id, null);
+    await db.application.create({
+      data: {
+        userId: candidat.id,
+        visaRuleId: r.id,
+        status: "SUSPENDU",
+        suspendedAt: new Date(),
+      },
+    });
+    const refus = await ouvrirDossier(candidat.id, r.id, null).then(
+      () => "ouvert",
+      (e: unknown) => (e as { echec?: { code: string } }).echec?.code ?? String(e),
+    );
+    verifier(
+      refus === "dossiers_au_maximum",
+      `deux dossiers ouverts et un en pause : le quatrième est refusé (${refus})`,
+    );
+  }
+
+  console.log("\n  C-01 — des ouvertures simultanées n'en passent qu'une au-delà du plafond");
+  {
+    const r = await regle(brute.rules);
+    /*
+      Cinq candidats ont chacun deux dossiers ouverts, donc une place. Huit
+      demandes partent ensemble pour chacun, comme un double clic répété ou
+      deux onglets. Le décompte et la création étaient deux requêtes
+      séparées : toutes lisaient « deux », et plusieurs créaient.
+    */
+    const candidats = [];
+    for (let i = 0; i < 5; i += 1) {
+      rang += 1;
+      const candidat = await db.user.create({
+        data: { email: `fumee-pc-${rang}-${process.pid}@exemple.test`, role: "CANDIDAT" },
+      });
+      await ouvrirDossier(candidat.id, r.id, null);
+      await ouvrirDossier(candidat.id, r.id, null);
+      candidats.push(candidat);
+    }
+    const issues = await Promise.all(
+      candidats.map((c) =>
+        Promise.allSettled(Array.from({ length: 8 }, () => ouvrirDossier(c.id, r.id, null))),
+      ),
+    );
+    const ouverts = await Promise.all(
+      candidats.map((c) =>
+        db.application.count({
+          where: { userId: c.id, status: { in: ["BROUILLON", "ACTIF", "PRET", "SUSPENDU"] } },
+        }),
+      ),
+    );
+    const passees = issues.map((l) => l.filter((i) => i.status === "fulfilled").length);
+    verifier(
+      passees.every((n) => n === 1),
+      `une seule demande passe par candidat (${passees.join(", ")})`,
+    );
+    verifier(
+      ouverts.every((n) => n === 3),
+      `chacun a trois dossiers ouverts, pas plus (${ouverts.join(", ")})`,
+    );
+    const autres = issues
+      .flat()
+      .filter((i): i is PromiseRejectedResult => i.status === "rejected")
+      .map((i) => (i.reason as { echec?: { code: string } }).echec?.code ?? String(i.reason));
+    verifier(
+      autres.every((c) => c === "dossiers_au_maximum"),
+      `et les autres sont refusées avec le motif du plafond (${[...new Set(autres)].join(", ")})`,
+    );
+  }
+
+  console.log("\nWF-10, WF-11 — un arbitrage ne rouvre pas un dossier déposé (RF-1, FON-04)");
+  paysCourant = nouveauScenario();
+  {
+    // Une divergence majeure : elle prévient sans mettre en pause, et le
+    // dossier prêt peut donc être déposé avant que le candidat ne réponde.
+    const v1 = await regle(brute.rules);
+    const v2 = await regle({
+      ...(brute.rules as object),
+      pieces_requises: [
+        ...PIECES,
+        {
+          code: "attestation_logement",
+          libelle: "Attestation de logement",
+          obligatoire: true,
+          traduction_assermentee: false,
+          legalisation: false,
+        },
+      ],
+    });
+    const deposeAvant = await dossierPret(v1.id);
+    const deposeApres = await dossierPret(v1.id);
+    const simultane = await dossierPret(v1.id);
+    const conserve = await dossierPret(v1.id);
+    const migreAvant = await dossierPret(v1.id);
+    const bilan = await propagerLaPublication(v2.id);
+    verifier(
+      bilan.alertes === 5 && bilan.critiques === 0,
+      `cinq dossiers prêts alertés, aucun mis en pause (${JSON.stringify(bilan)})`,
+    );
+    const migrationDe = async (applicationId: string) =>
+      (await db.ruleMigration.findFirst({ where: { applicationId } }))!;
+    const codeDe = (e: unknown) => (e as { echec?: { code: string } }).echec?.code ?? String(e);
+
+    // 1. Déposé, puis « je migre » depuis un ancien onglet ou l'API.
+    {
+      const lu = await etat(deposeAvant.application.id);
+      await declarerLeDepot(lu, { deposeLe: jourCivil(new Date()) });
+      const depose = await etat(deposeAvant.application.id);
+      const m = await migrationDe(depose.id);
+      const refus = await arbitrerLaDivergence(depose, m.id, "MIGRER").then(() => "migré", codeDe);
+      const apres = await etat(depose.id);
+      verifier(refus === "dossier_fige", `la migration d'un dossier déposé est refusée (${refus})`);
+      verifier(
+        apres.status === "SOUMIS" && apres.visaRuleId === v1.id,
+        `il reste déposé, sur sa version (${apres.status}, v${apres.visaRuleId === v1.id ? 1 : 2})`,
+      );
+      const relue = await db.ruleMigration.findUniqueOrThrow({ where: { id: m.id } });
+      verifier(relue.decision === null, "et aucune décision n'est écrite à sa place");
+    }
+
+    // 2. L'onglet ouvert avant le dépôt : la copie du dossier dit encore PRET.
+    {
+      const copie = await etat(deposeApres.application.id);
+      await declarerLeDepot(copie, { deposeLe: jourCivil(new Date()) });
+      const m = await migrationDe(copie.id);
+      const refus = await arbitrerLaDivergence(copie, m.id, "MIGRER").then(() => "migré", codeDe);
+      const apres = await etat(copie.id);
+      verifier(
+        refus === "dossier_fige",
+        `une copie lue avant le dépôt ne suffit pas à migrer (${refus})`,
+      );
+      verifier(
+        apres.status === "SOUMIS" && apres.visaRuleId === v1.id,
+        `le dépôt garde son état et sa règle (${apres.status})`,
+      );
+      const pieces = await db.document.count({ where: { applicationId: copie.id } });
+      verifier(pieces === PIECES.length, `et sa checklist n'a pas été réalignée (${pieces})`);
+    }
+
+    // 3. Les deux gestes ensemble : l'un ou l'autre, jamais un mélange.
+    {
+      const lu = await etat(simultane.application.id);
+      const m = await migrationDe(lu.id);
+      const [depot, arbitrage] = await Promise.allSettled([
+        declarerLeDepot(lu, { deposeLe: jourCivil(new Date()) }),
+        arbitrerLaDivergence(lu, m.id, "MIGRER"),
+      ]);
+      const apres = await etat(lu.id);
+      const coherent =
+        (apres.status === "SOUMIS" && apres.visaRuleId === v1.id) ||
+        (apres.status !== "SOUMIS" && apres.visaRuleId === v2.id);
+      verifier(
+        coherent,
+        `dépôt et migration simultanés : ${apres.status} sur v${apres.visaRuleId === v1.id ? 1 : 2} (dépôt ${depot.status}, migration ${arbitrage.status})`,
+      );
+      verifier(
+        !(depot.status === "fulfilled" && arbitrage.status === "fulfilled"),
+        "les deux ne réussissent pas ensemble",
+      );
+    }
+
+    // 3 bis. L'autre ordre, sans course : migré d'abord, puis le dépôt
+    // déclaré depuis une copie lue avant la migration, qui dit encore PRET.
+    {
+      const copie = await etat(migreAvant.application.id);
+      const m = await migrationDe(copie.id);
+      await arbitrerLaDivergence(copie, m.id, "MIGRER");
+      const refus = await declarerLeDepot(copie, { deposeLe: jourCivil(new Date()) }).then(
+        () => "déposé",
+        codeDe,
+      );
+      const apres = await etat(copie.id);
+      verifier(
+        refus === "etat_incompatible",
+        `le dépôt d'une copie d'avant la migration est refusé (${refus})`,
+      );
+      verifier(
+        apres.status !== "SOUMIS" && apres.submittedAt === null && apres.visaRuleId === v2.id,
+        `le dossier migré n'est pas déposé à l'aveugle (${apres.status})`,
+      );
+    }
+
+    // 4. A-3 : « je conserve » s'enregistre à titre historique, sans rien rouvrir.
+    {
+      const lu = await etat(conserve.application.id);
+      await declarerLeDepot(lu, { deposeLe: jourCivil(new Date()) });
+      const depose = await etat(conserve.application.id);
+      const m = await migrationDe(depose.id);
+      const arbitrage = await arbitrerLaDivergence(depose, m.id, "CONSERVER");
+      const apres = await etat(depose.id);
+      verifier(
+        arbitrage.decision === "CONSERVER",
+        "« je conserve » s'enregistre sur un dossier déposé",
+      );
+      verifier(
+        apres.status === "SOUMIS" && apres.visaRuleId === v1.id && apres.submittedAt !== null,
+        `le dossier reste déposé, sur sa version (${apres.status})`,
+      );
+      const relue = await db.ruleMigration.findUniqueOrThrow({ where: { id: m.id } });
+      verifier(relue.decision === "CONSERVER", "la décision est au journal de la divergence");
+    }
+  }
+
   console.log("\nWF-11 — une divergence majeure ne se répète pas quand la file rejoue");
   paysCourant = nouveauScenario();
   {

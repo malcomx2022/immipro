@@ -7,7 +7,7 @@ import { exigerCandidat } from "@/server/securite/page";
 /**
  * C-05 — Ouverture de dossier. WF-04.
  *
- * Deux informations suffisent. L'aperçu de la checklist est gratuit, et
+ * Une date suffit, la destination étant choisie. L'aperçu de la checklist est gratuit, et
  * l'écran dit ce qu'ouvrir un dossier n'est pas : aucune démarche auprès de
  * l'administration (INV-1).
  *
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Ouvrir un dossier",
-  description: "Deux informations suffisent pour générer ta checklist.",
+  description: "Une date suffit pour générer ta checklist et ton échéancier.",
 };
 
 export default async function PageNouveauDossier({

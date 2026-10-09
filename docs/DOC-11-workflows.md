@@ -217,6 +217,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-04.1 : un candidat peut ouvrir plusieurs dossiers ; un seul pack est consommé par dossier.
 - RG-04.2 : un dossier `BROUILLON`, `ACTIF` ou `PRET` inactif depuis 90 jours déclenche une relance, puis passe en `ABANDONNE` à 12 mois ; ses pièces sont purgées sous 30 jours. Le paiement ne constitue pas un motif de conservation (arbitrage S.78).
 - RG-04.3 : l'étape « reconnaissance / équivalence de diplôme » est insérée automatiquement dans la checklist pour les destinations qui l'exigent, avec son délai propre (souvent 2 à 4 mois) — c'est le poste qui fait rater les échéances.
+- RG-04.4 : trois dossiers ouverts au plus en parallèle (C-01). Sont ouverts les dossiers `BROUILLON`, `ACTIF`, `PRET` et `SUSPENDU` ; un dossier déposé ou clôturé reste dans l'historique sans prendre de place. Le décompte et la création sont tenus ensemble, sous verrou par candidat, et l'écran applique la même liste (S.146, RF-1).
 
 ---
 
@@ -432,6 +433,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 - RG-11.1 : une migration recalcule la checklist et le score, sans jamais supprimer une pièce déjà validée.
 - RG-11.2 : les alertes sont ciblées par destination et type de visa, jamais diffusées à toute la base.
 - RG-11.3 : un changement critique est doublé d'un email nominatif, pas seulement d'une notification in-app.
+- RG-11.4 : un dossier `SOUMIS`, `ISSUE_DECLAREE`, `ABANDONNE` ou `ARCHIVE` ne migre pas. L'alerte reste consultable, « conserver » s'enregistre à titre historique sans changer l'état ni la règle, et « migrer » est refusé avec sa raison. Le refus tient aussi contre un dépôt déclaré pendant l'arbitrage (S.146, RF-1, choix A-3).
 
 ### WF-12 — Mise en relation consultant (phase 3)
 

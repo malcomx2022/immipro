@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUCUNE_PIECE,
+  MENTION_DOSSIER_FIGE,
   MENTION_VERSION_EN_RELECTURE,
   MENTION_VERSION_REMPLACEE,
   ceQuiSepare,
@@ -313,7 +314,7 @@ describe("les options d'arbitrage citent les pièces", () => {
  * plateforme refusait d'y commencer et acceptait d'y aller.
  */
 describe("une version retirée ne se propose plus", () => {
-  const options = (blocage: "AUCUN" | "REMPLACEE" | "EN_RELECTURE") =>
+  const options = (blocage: "AUCUN" | "REMPLACEE" | "EN_RELECTURE" | "DOSSIER_FIGE") =>
     optionsArbitrage(V1, V2, "11 500 €", "13 000 €", AUCUNE_PIECE, blocage);
 
   it("l'option « migrer » devient indisponible", () => {
@@ -331,6 +332,19 @@ describe("une version retirée ne se propose plus", () => {
   it("et la raison dit laquelle des deux causes c'est", () => {
     expect(options("EN_RELECTURE")[0]!.detail).toBe(MENTION_VERSION_EN_RELECTURE);
     expect(options("REMPLACEE")[0]!.detail).toBe(MENTION_VERSION_REMPLACEE);
+  });
+
+  /*
+    RF-1, FON-04, choix A-3 du 09/10/2026. Sur un dossier déposé ou
+    clôturé, migrer le rouvrirait : l'option est indisponible et le dit,
+    et « conserver » reste ouvert, à titre historique.
+  */
+  it("un dossier déposé ou clôturé ne migre pas, et peut conserver", () => {
+    const [migrer, conserver] = options("DOSSIER_FIGE");
+    expect(migrer!.desactivee).toBe(true);
+    expect(migrer!.detail).toBe(MENTION_DOSSIER_FIGE);
+    expect(conserver!.desactivee).toBeUndefined();
+    expect(MENTION_DOSSIER_FIGE).toContain("Tu peux enregistrer que tu conserves ta version");
   });
 
   it("une version remplacée ne promet pas de revenir", () => {

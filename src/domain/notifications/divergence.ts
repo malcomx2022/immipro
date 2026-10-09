@@ -465,7 +465,7 @@ export const mentionArbitrage = (choix: Arbitrage, pays: string): string =>
  * vigueur. Le message envoyait attendre une vérification qui n'a pas lieu,
  * au lieu de dire qu'une version plus récente l'attend déjà.
  */
-export type BlocageDeMigration = "AUCUN" | "REMPLACEE" | "EN_RELECTURE";
+export type BlocageDeMigration = "AUCUN" | "REMPLACEE" | "EN_RELECTURE" | "DOSSIER_FIGE";
 
 export const MENTION_VERSION_EN_RELECTURE =
   "Cette version n'est plus celle en vigueur : nos veilleurs la revérifient. Elle te sera proposée de nouveau une fois vérifiée.";
@@ -478,8 +478,22 @@ export const MENTION_VERSION_EN_RELECTURE =
 export const MENTION_VERSION_REMPLACEE =
   "Une version plus récente est entrée en vigueur depuis. C'est elle qui te sera proposée : cette comparaison-ci n'a plus d'objet.";
 
+/**
+ * Le dossier est déposé ou clôturé — RF-1, FON-04, choix A-3 du
+ * 09/10/2026. Il garde la version figée à son ouverture (INV-3) : migrer
+ * le rouvrirait. L'alerte reste lisible, et « conserver » s'enregistre à
+ * titre historique. La cause passe avant celle de la version : sur un
+ * dossier parti, qu'elle soit en relecture ou remplacée ne change rien.
+ */
+export const MENTION_DOSSIER_FIGE =
+  "Ton dossier est déposé ou clôturé : il garde la version figée à son ouverture et tout son historique. Tu peux enregistrer que tu conserves ta version.";
+
 export const mentionDuBlocage = (blocage: BlocageDeMigration): string =>
-  blocage === "REMPLACEE" ? MENTION_VERSION_REMPLACEE : MENTION_VERSION_EN_RELECTURE;
+  blocage === "DOSSIER_FIGE"
+    ? MENTION_DOSSIER_FIGE
+    : blocage === "REMPLACEE"
+      ? MENTION_VERSION_REMPLACEE
+      : MENTION_VERSION_EN_RELECTURE;
 
 /**
  * Ce que l'arbitrage a **réellement** changé — T-02, WF-11 étape 4.

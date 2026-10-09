@@ -388,6 +388,20 @@ describe("C-05 — Ouverture de dossier", () => {
     expect(corps[0]).toEqual({ destination: PAYS_BAS.slug });
   });
 
+  /*
+    RF-1, FON-05, choix A-1 du 09/10/2026. « Établissement visé » se
+    saisissait, promettait d'être modifiable plus tard, et ne partait pas.
+    Tout ce que l'écran demande part au serveur ; le reste n'est pas demandé.
+  */
+  it("ne demande rien qu'il n'envoie pas", () => {
+    const { container } = render(ouverture());
+    expect(screen.queryByLabelText(/Établissement/)).toBeNull();
+    expect(container.textContent).not.toContain("Tu pourras le renseigner plus tard");
+    // La date de départ est la seule saisie : ses options, et aucun champ libre.
+    expect(screen.getAllByRole("radio").length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+  });
+
   it("affiche la destination que la page lui a donnée", () => {
     render(ouverture());
     expect(

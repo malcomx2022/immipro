@@ -12183,3 +12183,64 @@ Le cas se produit sans déploiement : un redémarrage du VPS relance tous les co
 À éprouver dans ce lot : un worker démarré avant clamd doit atteindre 200 sans relance manuelle, sur une base jetable avec l'image (`smoke:worker --image`).
 
 **Non vérifié.** `[reprise-divergence]` dans le journal du worker (rejeu D-23, à la 25ᵉ minute de l'heure) et les alertes parties.
+
+## S.146 — RF-1 : dossiers et données du formulaire (FON-01, FON-04, FON-05/M11)
+
+**Autorisation.** Le responsable a autorisé le lot RF-1 du [chantier](../revue/chantier-fonctionnel-2026-10-09.md) le 09/10/2026, avec deux choix pris sur la recommandation :
+- **A-1** : le champ « Établissement visé » de C-05 est retiré en V1 ;
+- **A-3** : sur un dossier figé, l'alerte reste consultable et « conserver » s'enregistre à titre historique ; « migrer » est refusé.
+
+A-2 reste ouvert et commande RF-2. Le lot part de main `d297fa5`.
+
+**FON-01 — le plafond (C-01, WF-04, nouvelle RG-04.4).** Deux défauts, reproduits dans `smoke:transitions` sur l'ancien code :
+- *La règle n'était pas la même des deux côtés.* Le tableau de bord comptait la liste entière : trois démarches finies retiraient « Ouvrir un nouveau dossier ». Le serveur, lui, oubliait `SUSPENDU` : avec deux dossiers ouverts et un en pause, un quatrième s'ouvrait.
+- *Le décompte et la création étaient deux requêtes.* Cinq candidats à qui il restait une place, huit demandes simultanées chacun : **huit passaient sur huit**, et chacun finissait avec dix dossiers ouverts.
+
+Correction :
+- `ETATS_OUVERTS` et `ETATS_FIGES` vivent dans `domain/dossiers/etat.ts`. `tests/dossiers` tient leur accord avec `ATTEND_UNE_SUITE`, que l'écran applique : chaque état stocké est ouvert ou figé, et compté de la même façon par l'écran et par le serveur.
+- `peutOuvrirUnDossier` ne compte plus que les dossiers qui attendent une suite.
+- `ouvrirDossier` décompte et crée dans une transaction, sous un verrou consultatif par candidat (le motif du grand livre). Après correction, une seule demande passe par candidat, et les autres reçoivent `dossiers_au_maximum`.
+
+**FON-04 — un arbitrage ne rouvre pas un dossier déposé (WF-10, WF-11, INV-3, nouvelle RG-11.4).** Une divergence majeure prévient sans mettre en pause : le candidat peut déposer avant de répondre. Reproduit sur l'ancien code :
+- « je migre » après le dépôt repassait le dossier `ACTIF`, sur la nouvelle version, sa checklist réalignée ;
+- une copie du dossier lue avant le dépôt suffisait à migrer ;
+- un dépôt et une migration simultanés réussissaient tous deux ;
+- dans l'autre ordre, le dépôt déclaré depuis une copie lue avant la migration déposait un dossier migré, dont la nouvelle checklist n'était pas relue.
+
+Correction :
+- `arbitrerLaDivergence` refuse « migrer » sur un dossier figé (`dossier_fige`, avec la raison et le geste qui reste).
+- Ses écritures sont **conditionnelles**, l'état et l'arbitrage étant relus par la base au moment d'écrire. Un dépôt concurrent annule toute la transaction, checklist et échéancier compris, au lieu d'être recouvert. Un second envoi du même arbitrage est refusé.
+- « Conserver » sur un dossier figé n'écrit que la décision. Sur un dossier non suspendu, il ne réécrit plus l'état lu en tête, qui aurait pu recouvrir un dépôt.
+- `declarerLeDepot` écrit sous la condition `status = PRET`, et nomme la cause d'un refus : en pause, déjà déposé, ou pas encore complet.
+- L'écran T-02 présente « migrer » indisponible, avec sa raison (`DOSSIER_FIGE`), avant le clic.
+
+**FON-05/M11 — un champ saisi et jamais envoyé (C-05).** « Établissement visé » se remplissait, promettait « Tu pourras le renseigner plus tard », et ne partait pas. Le champ est retiré, et la phrase d'en-tête dit maintenant : « Ta destination est choisie : une date suffit ». Un test vérifie que l'écran ne demande aucun champ libre. Le prototype C-05 le porte encore : sa mise à jour appartient à qui l'a écrit.
+
+**Données existantes.** Rien n'est réécrit ni clôturé. Un compte déjà au-delà du plafond garde ses dossiers et ne peut simplement plus en ouvrir. À diagnostiquer en lecture seule sur la production avant la recette :
+
+```sql
+SELECT "userId", count(*) AS ouverts
+FROM "Application"
+WHERE status IN ('BROUILLON', 'ACTIF', 'PRET', 'SUSPENDU')
+GROUP BY "userId" HAVING count(*) > 3;
+
+-- Dossiers figés dont la règle a changé après le dépôt par une migration (FON-04)
+SELECT m."applicationId", a.status, m."decidedAt", a."submittedAt"
+FROM "RuleMigration" m JOIN "Application" a ON a.id = m."applicationId"
+WHERE m.decision = 'MIGRER' AND a."submittedAt" IS NOT NULL AND m."decidedAt" > a."submittedAt";
+```
+
+Un résultat de la seconde requête est un dossier qui a migré après son dépôt. Il se traite au cas par cas, sans réécriture automatique des règles figées ni du journal.
+
+**Effet de bord connu.** Un refus de concurrence passe par l'erreur P2025 de Prisma, que le client journalise en `prisma:error` avant que le service ne la traduise. Le candidat reçoit le refus actionnable, et la ligne de journal n'est pas une panne.
+
+**Vérifications.**
+- `npm run check` : lint, typage, 164 fichiers et 3442 tests, vocabulaire.
+- `npm run build`.
+- Les fumées, dont `smoke:transitions` (sept nouveaux contrôles, chacun en échec sur l'ancien code) et `smoke:worker --base`. Aucune image n'est requise : le lot ne touche ni les artefacts ni le déploiement.
+
+**Écarts restants.**
+- RF-2 (FON-02) et RF-3 (FON-03, E5), A-2.
+- Les formulaires du back-office (M11).
+- Le prototype C-05 et T-02.
+- La recette du parcours (RF-5) reste **non vérifiée**.

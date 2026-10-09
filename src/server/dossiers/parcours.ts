@@ -1,7 +1,7 @@
-import type { Application } from "@prisma/client";
+import { Prisma, type Application } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { miseEnEtat } from "@/domain/dossiers/etat";
+import { estFige, miseEnEtat } from "@/domain/dossiers/etat";
 import { PURGE_JOURS, type IssueDemarche } from "@/domain/dossiers/cloture";
 import { MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDePurge } from "@/server/acces/dossiers";
@@ -80,21 +80,7 @@ export async function declarerLeDepot(
   dossier: Application,
   { deposeLe, fuseau = FUSEAU_AFFICHAGE, maintenant = new Date() }: DeclarationDeDepot,
 ): Promise<Application> {
-  /*
-    Deux refus, parce qu'il y a deux raisons et qu'elles n'appellent pas le
-    même geste. Le message unique envoyait chercher des pièces manquantes
-    un candidat dont le dossier était complet et seulement mis en pause :
-    il relisait une checklist entière sans y trouver quoi que ce soit.
-  */
-  if (dossier.status === "SUSPENDU") {
-    throw echec("etat_incompatible", { corps: MENTION_EN_PAUSE });
-  }
-  if (dossier.status !== "PRET") {
-    throw echec("etat_incompatible", {
-      corps:
-        "Ton dossier n'est pas encore complet : il reste des pièces obligatoires à réunir. La checklist dit lesquelles.",
-    });
-  }
+  refuserUnDepotHorsPret(dossier.status);
 
   /*
     Arbitrage S.89 — la date réelle du dépôt, lue dans le fuseau du
@@ -109,23 +95,65 @@ export async function declarerLeDepot(
   );
   if (refus) throw echec("champs_invalides", { champs: { deposeLe: refus } });
 
-  return db.application.update({
-    where: { id: dossier.id },
-    data: {
-      ...miseEnEtat("SOUMIS", dossier, maintenant),
-      // Deux faits, et aucun ne remplace l'autre : le jour où la demande
-      // est partie, et l'instant où le candidat nous l'a dit.
-      depositedOn: versDateCivile(deposeLe),
-      submittedAt: maintenant,
-      /*
-        Arbitrage S.78, précisé par S.89 : les pièces d'un dossier soumis
-        sont conservées douze mois après **la date réelle** du dépôt. Une
-        déclaration tardive peut donc poser une échéance proche, voire
-        passée : la passe de conservation ne purge alors qu'après un
-        préavis de trente jours (`echeanceAnnoncee`), jamais sur-le-champ.
-      */
-      retentionUntil: echeanceNormale(deposeLe),
-    },
+  /*
+    Conditionnelle — RF-1, FON-04, 09/10/2026. L'état est relu par la base
+    au moment d'écrire : une migration arbitrée depuis la lecture a remis
+    le dossier `ACTIF` sur une autre version, avec une checklist que
+    personne n'a encore relue. L'écriture inconditionnelle déposait ce
+    dossier-là — exécuté avant correction, dépôt et migration simultanés
+    réussissaient tous deux.
+  */
+  return db.application
+    .update({
+      where: { id: dossier.id, status: "PRET" },
+      data: {
+        ...miseEnEtat("SOUMIS", dossier, maintenant),
+        // Deux faits, et aucun ne remplace l'autre : le jour où la demande
+        // est partie, et l'instant où le candidat nous l'a dit.
+        depositedOn: versDateCivile(deposeLe),
+        submittedAt: maintenant,
+        /*
+          Arbitrage S.78, précisé par S.89 : les pièces d'un dossier soumis
+          sont conservées douze mois après **la date réelle** du dépôt. Une
+          déclaration tardive peut donc poser une échéance proche, voire
+          passée : la passe de conservation ne purge alors qu'après un
+          préavis de trente jours (`echeanceAnnoncee`), jamais sur-le-champ.
+        */
+        retentionUntil: echeanceNormale(deposeLe),
+      },
+    })
+    .catch(async (e: unknown) => {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025")) throw e;
+      const relu = await db.application.findUnique({
+        where: { id: dossier.id },
+        select: { status: true },
+      });
+      refuserUnDepotHorsPret(relu?.status ?? dossier.status);
+      throw e;
+    });
+}
+
+/**
+ * Deux refus, parce qu'il y a deux raisons et qu'elles n'appellent pas le
+ * même geste. Le message unique envoyait chercher des pièces manquantes
+ * un candidat dont le dossier était complet et seulement mis en pause :
+ * il relisait une checklist entière sans y trouver quoi que ce soit.
+ *
+ * Un troisième pour le dossier déjà déposé : le lui redemander sur la
+ * checklist l'enverrait chercher une pièce qui ne manque pas.
+ */
+function refuserUnDepotHorsPret(status: Application["status"]): void {
+  if (status === "PRET") return;
+  if (status === "SUSPENDU") throw echec("etat_incompatible", { corps: MENTION_EN_PAUSE });
+  if (status === "SOUMIS") {
+    throw echec("etat_incompatible", {
+      corps: "Ton dépôt est déjà déclaré. Sa date se corrige depuis le dossier, s'il le faut.",
+    });
+  }
+  if (estFige(status)) throw echec("dossier_fige");
+  throw echec("etat_incompatible", {
+    corps:
+      "Ton dossier n'est pas encore complet : il reste des pièces obligatoires à réunir. La checklist dit lesquelles.",
   });
 }
 

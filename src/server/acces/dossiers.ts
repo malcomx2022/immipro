@@ -6,7 +6,7 @@ import { codesConformes, conditionsEvaluees } from "@/domain/completeness/condit
 import { DOSSIERS_MAX } from "@/domain/dossiers/dossier";
 import { PURGE_JOURS } from "@/domain/dossiers/cloture";
 import { computeCompleteness } from "@/domain/completeness/score";
-import { miseEnEtat } from "@/domain/dossiers/etat";
+import { ETATS_FIGES, ETATS_OUVERTS, miseEnEtat } from "@/domain/dossiers/etat";
 import { payload, reglePubliee } from "./regles";
 import type { VisaRulesPayload } from "@/domain/rules/schema";
 
@@ -80,12 +80,7 @@ export async function dossierAvecPieces(
 }
 
 /** Un dossier déposé ou clôturé garde l'état qu'il avait ce jour-là. */
-const FIGES: readonly Application["status"][] = [
-  "SOUMIS",
-  "ISSUE_DECLAREE",
-  "ARCHIVE",
-  "ABANDONNE",
-];
+const FIGES: readonly Application["status"][] = ETATS_FIGES;
 
 export function exigerModifiable(dossier: Application): void {
   if (FIGES.includes(dossier.status)) throw echec("dossier_fige");
@@ -109,24 +104,42 @@ export async function ouvrirDossier(
   visaRuleId: string,
   dateCible: Date | null,
 ): Promise<Application> {
-  const ouverts = await db.application.count({
-    where: { userId, status: { in: ["BROUILLON", "ACTIF", "PRET"] } },
-  });
-  if (ouverts >= DOSSIERS_MAX) throw echec("dossiers_au_maximum");
-
   const regle = await reglePubliee(visaRuleId);
   if (!regle) throw echec("regle_indisponible");
   const p = payload(regle);
 
-  const dossier = await db.application.create({
-    data: {
-      userId,
-      visaRuleId: regle.id,
-      status: "BROUILLON",
-      targetDate: dateCible,
-      documents: { create: checklistDepuis(p) },
-      deadlines: dateCible ? { create: echeancesDepuis(p, dateCible) } : undefined,
-    },
+  /*
+    Le plafond de C-01, décompté et tenu dans la même transaction — RF-1,
+    FON-01, 09/10/2026.
+
+    Le décompte et la création étaient deux requêtes. Huit demandes
+    simultanées d'un candidat à qui il restait une place lisaient toutes
+    « deux ouverts », et toutes créaient : exécuté avant correction, cinq
+    candidats finissaient avec dix dossiers ouverts chacun. Un double clic
+    répété ou deux onglets suffisent.
+
+    Un verrou consultatif de transaction, par candidat, comme celui du
+    grand livre : il sérialise les ouvertures d'un même candidat, et rien
+    d'autre. Le décompte lit la liste partagée avec l'écran
+    (`ETATS_OUVERTS`), pause comprise.
+  */
+  const dossier = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ouverture-dossier:${userId}`}, 0))`;
+    const ouverts = await tx.application.count({
+      where: { userId, status: { in: [...ETATS_OUVERTS] } },
+    });
+    if (ouverts >= DOSSIERS_MAX) throw echec("dossiers_au_maximum");
+
+    return tx.application.create({
+      data: {
+        userId,
+        visaRuleId: regle.id,
+        status: "BROUILLON",
+        targetDate: dateCible,
+        documents: { create: checklistDepuis(p) },
+        deadlines: dateCible ? { create: echeancesDepuis(p, dateCible) } : undefined,
+      },
+    });
   });
 
   /*

@@ -1,7 +1,7 @@
-import type { Application } from "@prisma/client";
+import { Prisma, type Application } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
+import { ETATS_FIGES, estFige, miseEnEtat, REPRISE_APRES_PAUSE } from "@/domain/dossiers/etat";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { remplacementDeLEcheancier } from "@/server/dossiers/echeancier";
 import { realignementDeLaChecklist, rejugementDesPieces } from "@/server/dossiers/checklist";
@@ -95,6 +95,45 @@ const MENTION_CONSERVEE =
 const MENTION_MIGREE = "Aucune pièce déjà validée n'a été retirée.";
 
 /**
+ * Un dossier déposé ou clôturé — RF-1, FON-04, choix A-3 du 09/10/2026.
+ *
+ * L'alerte reste consultable, et « je conserve » s'enregistre à titre
+ * historique : il ne change ni l'état ni la règle. « Je migre » est
+ * refusé, et le refus dit pourquoi et ce qui reste possible.
+ */
+export const MENTION_CONSERVEE_FIGE =
+  "Ta décision est enregistrée. Ton dossier garde la version figée à son ouverture, et rien ne change dans ce qui a été déposé.";
+export const MENTION_MIGRATION_FIGEE =
+  "Ton dossier est déposé ou clôturé : il garde la version figée à son ouverture et tout son historique. La nouvelle version ne s'applique pas à une démarche déjà partie. Tu peux enregistrer que tu conserves ta version.";
+
+const DEJA_ARBITREE = "Cette divergence a déjà été arbitrée.";
+
+const estIntrouvable = (e: unknown): boolean =>
+  e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025";
+
+/**
+ * Une écriture conditionnelle n'a rien trouvé : le dossier ou l'arbitrage
+ * a changé depuis la lecture. La relecture dit lequel, et le refus le
+ * nomme ; tout autre cas remonte tel quel.
+ */
+async function refusApresCourse(
+  dossierId: string,
+  migrationId: string,
+  e: unknown,
+): Promise<never> {
+  if (!estIntrouvable(e)) throw e;
+  const [dossier, migration] = await Promise.all([
+    db.application.findUnique({ where: { id: dossierId }, select: { status: true } }),
+    db.ruleMigration.findUnique({ where: { id: migrationId }, select: { decision: true } }),
+  ]);
+  if (migration?.decision) throw echec("etat_incompatible", { corps: DEJA_ARBITREE });
+  if (dossier && estFige(dossier.status)) {
+    throw echec("dossier_fige", { corps: MENTION_MIGRATION_FIGEE });
+  }
+  throw e;
+}
+
+/**
  * Le refus, et il est actionnable : il dit ce qui bloque, ce qui ne change
  * pas, et le geste qui reste possible. « Migration impossible » seul
  * laisserait chercher ce qu'on a mal fait.
@@ -138,31 +177,70 @@ export async function arbitrerLaDivergence(
     include: { toRule: true },
   });
   if (!migration) throw echec("introuvable");
-  if (migration.decision) {
-    throw echec("etat_incompatible", { corps: "Cette divergence a déjà été arbitrée." });
-  }
+  if (migration.decision) throw echec("etat_incompatible", { corps: DEJA_ARBITREE });
 
   /*
-    La pause prend fin dans les deux branches, et seulement si elle avait
-    lieu : un dossier que la divergence n'a pas suspendu — impact majeur,
-    donc notification sans mise en pause — garde son état, et un dossier
-    prêt reste prêt. Remettre tout le monde à `ACTIF` ferait redescendre
-    un dossier complet sur un arbitrage qui ne touche rien.
+    ── Un dossier déposé ne se rouvre pas — RF-1, FON-04, 09/10/2026 ───
+
+    La branche « migrer » posait `ACTIF` et changeait `visaRuleId` quel
+    que soit l'état. Une divergence majeure prévient sans mettre en
+    pause ; le candidat peut donc déposer avant de répondre, puis migrer
+    depuis un ancien onglet. Exécuté avant correction : le dossier déposé
+    repassait `ACTIF`, sur la nouvelle version, sa checklist réalignée.
+
+    Le refus est ici, dans le service que la route appelle, et pas
+    seulement à l'écran. Et il ne suffit pas de lire l'état en tête : un
+    dépôt peut s'écrire entre cette lecture et l'écriture. Les écritures
+    sont donc **conditionnelles** — l'état et l'arbitrage relus par la
+    base au moment d'écrire —, et un dépôt concurrent fait échouer la
+    transaction entière plutôt que d'être recouvert.
+
+    Choix A-3 : « je conserve » reste ouvert sur un dossier figé. Il
+    s'enregistre à titre historique, sans toucher au dossier.
   */
-  const repris =
-    dossier.status === "SUSPENDU" ? REPRISE_APRES_PAUSE : dossier.status;
+  const libre = { id: migration.id, decision: null };
 
   if (decision === "CONSERVER") {
-    await db.$transaction([
-      db.application.update({
-        where: { id: dossier.id },
-        data: { ...miseEnEtat(repris, dossier, maintenant), ...leveeDeLaPause(dossier) },
-      }),
-      db.ruleMigration.update({
-        where: { id: migration.id },
-        data: { decision: "CONSERVER", decidedAt: maintenant },
-      }),
-    ]);
+    try {
+      if (estFige(dossier.status)) {
+        await db.ruleMigration.update({
+          where: libre,
+          data: { decision: "CONSERVER", decidedAt: maintenant },
+        });
+        return {
+          decision: "CONSERVER",
+          piecesAjoutees: [],
+          piecesLiberees: [],
+          mention: MENTION_CONSERVEE_FIGE,
+        };
+      }
+      /*
+        La pause prend fin, et seulement si elle avait lieu : un dossier
+        que la divergence n'a pas suspendu — impact majeur, donc
+        notification sans mise en pause — garde son état, et un dossier
+        prêt reste prêt. Il n'est même pas réécrit : réécrire l'état lu
+        en tête recouvrirait un dépôt déclaré entre-temps.
+      */
+      await db.$transaction([
+        ...(dossier.status === "SUSPENDU"
+          ? [
+              db.application.update({
+                where: { id: dossier.id, status: "SUSPENDU" },
+                data: {
+                  ...miseEnEtat(REPRISE_APRES_PAUSE, dossier, maintenant),
+                  ...leveeDeLaPause(dossier),
+                },
+              }),
+            ]
+          : []),
+        db.ruleMigration.update({
+          where: libre,
+          data: { decision: "CONSERVER", decidedAt: maintenant },
+        }),
+      ]);
+    } catch (e) {
+      return refusApresCourse(dossier.id, migration.id, e);
+    }
     // Le dossier peut être redevenu complet pendant la pause : le calcul
     // décide, la reprise ne fait que lui rendre la main.
     await recalculerCompletude(dossier.id);
@@ -173,6 +251,8 @@ export async function arbitrerLaDivergence(
       mention: MENTION_CONSERVEE,
     };
   }
+
+  if (estFige(dossier.status)) throw echec("dossier_fige", { corps: MENTION_MIGRATION_FIGEE });
 
   /*
     RG-14.1. La version visée doit être **en vigueur aujourd'hui**, et pas
@@ -235,31 +315,39 @@ export async function arbitrerLaDivergence(
     dossier.targetDate,
   );
 
-  await db.$transaction([
-    // RG-11.1 — on ajoute et on réaligne, on ne retire pas.
-    ...checklist.operations,
-    ...echeancier,
-    /*
-      Après le réalignement, et non avant : celui-ci réécrit le remède
-      depuis le référentiel, et le re-jugement le repose sur « remplacer »
-      quand la pièce est à corriger.
-    */
-    ...rejugement.operations,
-    db.application.update({
-      where: { id: dossier.id },
-      data: {
-        visaRuleId: migration.toRuleId,
-        // Une pièce vient peut-être d'être ajoutée à l'état « attendue » :
-        // le dossier n'est plus prêt tant que le calcul n'a pas conclu.
-        ...miseEnEtat(REPRISE_APRES_PAUSE, dossier, maintenant),
-        ...leveeDeLaPause(dossier),
-      },
-    }),
-    db.ruleMigration.update({
-      where: { id: migration.id },
-      data: { decision: "MIGRER", decidedAt: maintenant },
-    }),
-  ]);
+  await db
+    .$transaction([
+      // RG-11.1 — on ajoute et on réaligne, on ne retire pas.
+      ...checklist.operations,
+      ...echeancier,
+      /*
+        Après le réalignement, et non avant : celui-ci réécrit le remède
+        depuis le référentiel, et le re-jugement le repose sur « remplacer »
+        quand la pièce est à corriger.
+      */
+      ...rejugement.operations,
+      /*
+        Conditionnelle : un dépôt déclaré depuis la lecture laisse cette
+        écriture sans ligne, et toute la migration est annulée — la
+        checklist et l'échéancier compris.
+      */
+      db.application.update({
+        where: { id: dossier.id, status: { notIn: [...ETATS_FIGES] } },
+        data: {
+          visaRuleId: migration.toRuleId,
+          // Une pièce vient peut-être d'être ajoutée à l'état « attendue » :
+          // le dossier n'est plus prêt tant que le calcul n'a pas conclu.
+          ...miseEnEtat(REPRISE_APRES_PAUSE, dossier, maintenant),
+          ...leveeDeLaPause(dossier),
+        },
+      }),
+      // Et un second envoi du même arbitrage ne passe pas derrière le premier.
+      db.ruleMigration.update({
+        where: libre,
+        data: { decision: "MIGRER", decidedAt: maintenant },
+      }),
+    ])
+    .catch((e: unknown) => refusApresCourse(dossier.id, migration.id, e));
 
   await recalculerCompletude(dossier.id);
 
