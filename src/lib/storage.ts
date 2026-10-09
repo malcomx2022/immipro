@@ -197,6 +197,22 @@ export async function promouvoir(key: string): Promise<void> {
 export const removeQuarantaine = (key: string) => connexion().removeObject(quarantaine(), key);
 
 /**
+ * Tous les objets d'une zone, par pages — l'inventaire E4 (RF-4, S.151).
+ *
+ * Lecture seule : la liste ne touche à aucun objet. Seul appelant :
+ * `server/exploitation/inventaire-stockage.ts`.
+ */
+export async function* listerLaZone(
+  zone: "CONFIANCE" | "QUARANTAINE",
+): AsyncGenerator<{ cle: string; taille: number; modifieLe: Date }> {
+  const seau = zone === "CONFIANCE" ? confiance() : quarantaine();
+  for await (const objet of connexion().listObjectsV2(seau, "", true)) {
+    if (!objet.name) continue; // un préfixe commun, pas un objet
+    yield { cle: objet.name, taille: Number(objet.size ?? 0), modifieLe: objet.lastModified ?? new Date(0) };
+  }
+}
+
+/**
  * Suppression définitive, dans les deux zones — la purge de rétention (INV-5).
  *
  * ── Elle ne visait que la zone de confiance ─────────────────────────

@@ -20,6 +20,7 @@
  *
  *     DATABASE_URL=postgresql://…/postgres npm run smoke:purge
  */
+import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -66,6 +67,15 @@ const seaux = new Map<string, Map<string, Buffer>>([
   [SEAU_QUARANTAINE, new Map()],
 ]);
 const seau = (nom: string) => seaux.get(nom) ?? new Map<string, Buffer>();
+/**
+ * La date de dernière écriture, que l'inventaire lit (S.151). Un objet posé
+ * directement dans un seau, sans PUT, est daté du moment où on le liste.
+ */
+const datees = new Map<string, Date>();
+const dateDe = (nomDuSeau: string, cle: string) => datees.get(`${nomDuSeau}\u0000${cle}`) ?? new Date();
+const dater = (nomDuSeau: string, cle: string, date: Date) => datees.set(`${nomDuSeau}\u0000${cle}`, date);
+const echapperXml = (texte: string) =>
+  texte.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;");
 
 /** Le stockage refuse toute suppression tant que ceci est vrai. */
 let refuserLesSuppressions = false;
@@ -91,8 +101,30 @@ const stockage = createServer((requete: IncomingMessage, reponse: ServerResponse
     const cle = separation === -1 ? "" : chemin.slice(separation + 1);
 
     switch (requete.method) {
+      case "GET": {
+        /*
+          La liste d'un seau (ListObjectsV2), en une page : l'inventaire
+          du stockage (RF-4, S.151) la lit, et rien d'autre ici.
+        */
+        if (cle === "" && new URLSearchParams(requeteDUrl ?? "").get("list-type") === "2") {
+          const contenus = [...objets.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(
+              ([k, octets]) =>
+                `<Contents><Key>${echapperXml(k)}</Key><LastModified>${dateDe(nomDuSeau, k).toISOString()}</LastModified><ETag>"essai"</ETag><Size>${octets.length}</Size></Contents>`,
+            )
+            .join("");
+          reponse.writeHead(200, { "Content-Type": "application/xml" });
+          return reponse.end(
+            `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>${nomDuSeau}</Name><IsTruncated>false</IsTruncated>${contenus}</ListBucketResult>`,
+          );
+        }
+        reponse.writeHead(405);
+        return reponse.end();
+      }
       case "PUT": {
         objets.set(cle, Buffer.concat(morceaux));
+        dater(nomDuSeau, cle, new Date());
         reponse.writeHead(200, { ETag: '"essai"' });
         return reponse.end();
       }
@@ -147,6 +179,7 @@ process.env.MINIO_BUCKET_QUARANTAINE = SEAU_QUARANTAINE;
 const { db } = await import("../src/lib/db");
 const { purgerLesPiecesEchues, ANALYSE_PURGEE_CORPS } = await import("../src/server/jobs/purge");
 const { donneesDuCompte } = await import("../src/server/lecture/portabilite");
+const { inventorierLeStockage } = await import("../src/server/exploitation/inventaire-stockage");
 const { demanderLaSuppression, acheverLesSuppressionsEnAttente } = await import(
   "../src/server/acces/suppression"
 );
@@ -809,6 +842,128 @@ try {
     verifier(
       (exporte.rendezVous as unknown[]).length === 1,
       `et la racine porte ses rendez-vous (${(exporte.rendezVous as unknown[]).length})`,
+    );
+  }
+
+  console.log("\nL'inventaire du stockage classe chaque objet, et ne supprime rien (RF-4, S.151)");
+  {
+    const IL_Y_A_DEUX_JOURS = new Date(Date.now() - 48 * 3_600_000);
+    const candidat = await db.user.create({
+      data: { email: `fumee-p-inventaire-${process.pid}@exemple.test`, role: "CANDIDAT" },
+    });
+    const purge = await db.application.create({
+      data: { userId: candidat.id, purgeDueAt: HIER, purgedAt: HIER },
+    });
+    const echu = await db.application.create({ data: { userId: candidat.id, purgeDueAt: HIER } });
+    const vivant = await db.application.create({ data: { userId: candidat.id } });
+    const document = await db.document.create({
+      data: { applicationId: vivant.id, code: "passeport", label: "Passeport", status: "CONFORME", required: true },
+    });
+
+    const cle = (dossier: string, suffixe: string) => `dossiers/${dossier}/passeport/${suffixe}`;
+    const poser = (nomDuSeau: string, k: string, date = new Date()) => {
+      seau(nomDuSeau).set(k, Buffer.from(`octets de ${k}`));
+      dater(nomDuSeau, k, date);
+    };
+    // Une pièce restée en quarantaine, que la purge d'avant S.125 a laissée.
+    const apresPurge = cle(purge.id, "1700000000000-apres-purge");
+    poser(SEAU_QUARANTAINE, apresPurge, IL_Y_A_DEUX_JOURS);
+    // Un objet sans version sous un dossier échu : sa purge ne le verra pas.
+    const sousEchu = cle(echu.id, "1700000000000-sous-echu");
+    poser(SEAU_CONFIANCE, sousEchu, IL_Y_A_DEUX_JOURS);
+    // Une version saine, dans sa zone, et son double resté en quarantaine.
+    const rattache = cle(vivant.id, "1700000000000-rattache");
+    poser(SEAU_CONFIANCE, rattache, IL_Y_A_DEUX_JOURS);
+    poser(SEAU_QUARANTAINE, rattache, IL_Y_A_DEUX_JOURS);
+    await db.documentVersion.create({
+      data: {
+        documentId: document.id, rank: 1, objectKey: rattache, checksum: `inv-1-${process.pid}`,
+        mimeType: "application/pdf", sizeBytes: 10, scanState: "SAINE", scannedAt: IL_Y_A_DEUX_JOURS,
+      },
+    });
+    // Une version en quarantaine dont l'objet n'existe nulle part.
+    const manquante = await db.documentVersion.create({
+      data: {
+        documentId: document.id, rank: 2, objectKey: cle(vivant.id, "1700000000000-manquante"),
+        checksum: `inv-2-${process.pid}`, mimeType: "application/pdf", sizeBytes: 10,
+      },
+    });
+    // Un dépôt de l'instant, et un dépôt jamais confirmé.
+    const enCours = cle(vivant.id, `${Date.now()}-en-cours`);
+    poser(SEAU_QUARANTAINE, enCours);
+    const jamaisConfirme = cle(vivant.id, "1700000000000-jamais-confirme");
+    poser(SEAU_QUARANTAINE, jamaisConfirme, IL_Y_A_DEUX_JOURS);
+    // Ni l'un ni l'autre n'a d'appartenance démontrée.
+    const inconnu = `dossiers/${randomUUID()}/passeport/1700000000000-inconnu`;
+    poser(SEAU_CONFIANCE, inconnu, IL_Y_A_DEUX_JOURS);
+    const horsSchema = `divers/inventaire-${process.pid}.pdf`;
+    poser(SEAU_CONFIANCE, horsSchema, IL_Y_A_DEUX_JOURS);
+
+    const photo = async () => ({
+      objets: [...seaux.entries()].map(([nom, m]) => `${nom}:${[...m.keys()].sort().join(",")}`).join("|"),
+      lignes: [
+        await db.application.count(),
+        await db.document.count(),
+        await db.documentVersion.count(),
+        await db.auditLog.count(),
+      ].join(","),
+    });
+    const avant = await photo();
+    const inventaire = await inventorierLeStockage({ limite: 1000 });
+    const apres = await photo();
+
+    const classe = (code: string) => inventaire.classes.find((c) => c.code === code)!;
+    const dans = (code: string, zone: string, k: string) => classe(code).identifiants.includes(`${zone} ${k}`);
+    verifier(dans("APRES_PURGE", "QUARANTAINE", apresPurge), "un objet resté sous un dossier purgé est nommé");
+    verifier(dans("DOSSIER_ECHU", "CONFIANCE", sousEchu), "un objet sans version sous un dossier échu aussi");
+    verifier(dans("RATTACHE", "CONFIANCE", rattache), "une version dans sa zone est rattachée");
+    verifier(dans("DOUBLON", "QUARANTAINE", rattache), "et son double dans l'autre zone est un doublon");
+    verifier(dans("DEPOT_EN_COURS", "QUARANTAINE", enCours), "un dépôt de l'instant attend sa confirmation");
+    verifier(dans("DOSSIER_VIVANT", "QUARANTAINE", jamaisConfirme), "un dépôt jamais confirmé se relit");
+    verifier(dans("DOSSIER_INCONNU", "CONFIANCE", inconnu), "un dossier que la base ignore se relit");
+    verifier(dans("HORS_SCHEMA", "CONFIANCE", horsSchema), "une clé hors schéma se relit");
+    verifier(
+      classe("MANQUANT").identifiants.includes(manquante.id),
+      "une version dont l'objet manque est nommée par son identifiant",
+    );
+
+    const perimetre = new Set(inventaire.perimetre.lignes);
+    verifier(
+      perimetre.has(`QUARANTAINE ${apresPurge}`) && perimetre.has(`CONFIANCE ${sousEchu}`),
+      `le périmètre candidat tient l'appartenance démontrée et la rétention échue (${inventaire.perimetre.nombre})`,
+    );
+    verifier(
+      [rattache, enCours, jamaisConfirme, inconnu, horsSchema].every(
+        (k) => !perimetre.has(`CONFIANCE ${k}`) && !perimetre.has(`QUARANTAINE ${k}`),
+      ),
+      "et rien d'autre : ni pièce vivante, ni doute",
+    );
+    verifier(
+      (await inventorierLeStockage({ limite: 1 })).perimetre.empreinte === inventaire.perimetre.empreinte,
+      "l'empreinte du périmètre ne dépend que de la liste, pas de la limite d'affichage",
+    );
+    verifier(avant.objets === apres.objets, "aucun objet n'a été supprimé ni ajouté");
+    verifier(avant.lignes === apres.lignes, `aucune ligne n'a été écrite en base (${apres.lignes})`);
+    verifier(
+      !JSON.stringify(inventaire).includes(candidat.email),
+      "la sortie ne porte aucun courriel",
+    );
+
+    /*
+      Le défaut qu'il rend visible (revue E4) : la purge part des versions.
+      Un objet sans version sous un dossier échu survit à la purge de son
+      dossier, et plus rien en base ne le désigne.
+    */
+    await purgerLesPiecesEchues();
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: echu.id } })).purgedAt !== null,
+      "le dossier échu se déclare purgé",
+    );
+    verifier(seau(SEAU_CONFIANCE).has(sousEchu), "et l'objet sans version est toujours dans le stockage");
+    const ensuite = await inventorierLeStockage({ limite: 1000 });
+    verifier(
+      ensuite.classes.find((c) => c.code === "APRES_PURGE")!.identifiants.includes(`CONFIANCE ${sousEchu}`),
+      "l'inventaire le retrouve sous un dossier purgé",
     );
   }
 
