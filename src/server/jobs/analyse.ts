@@ -9,6 +9,7 @@ import {
   rendreUneTentative,
 } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
+import { commandeLaPiece, ecrireSurLaPieceCourante } from "@/server/acces/piece-courante";
 import { autorisationAccordee } from "@/server/acces/consentements";
 import { MENTION_NON_ANALYSEE } from "@/domain/dossiers/piece";
 import { conditionsDeLaPiece, evaluerConditions } from "@/domain/dossiers/verification";
@@ -90,6 +91,14 @@ export type Suite = "TERMINEE" | "A_REPRENDRE";
  * d'admettre que quelqu'un doit regarder.
  */
 export const TENTATIVES_AVANT_REVUE = 3;
+
+/**
+ * Le motif du rendu d'une lecture devenue sans objet — choix A-2 du
+ * 09/10/2026 : remplacer un fichier pendant sa lecture ne fait pas payer
+ * deux résultats.
+ */
+const MOTIF_OBSOLETE =
+  "Lecture sans effet : la pièce a été remplacée, ou le dossier clos, pendant la lecture";
 
 /** Le motif de mise en file de revue, déduit de la cause. */
 function motifDeRevue(cause: CauseDeNonLecture): ReviewReason {
@@ -187,6 +196,19 @@ export async function analyserUnePiece(
   */
   if (version.analyses.length > 0) return "TERMINEE";
 
+  /*
+    Une version remplacée ne se lit plus — RF-2, FON-02, choix A-2 du
+    09/10/2026. Le candidat a déposé un autre fichier depuis la mise en
+    file, ou son dossier est déposé ou clôturé : rien de ce que dirait
+    cette lecture ne s'afficherait. Ni débit, ni appel au modèle, ni
+    écriture — la nouvelle version a sa propre tâche.
+
+    Exécuté avant correction : une v1 restée en file derrière une v2 déjà
+    conforme était envoyée au service, payée, et son verdict « à
+    corriger » remplaçait celui de la v2.
+  */
+  if (!(await commandeLaPiece(version.documentId, version.rank))) return "TERMINEE";
+
   const document = version.document;
   const application = document.application;
   const regle = application.visaRule;
@@ -220,14 +242,11 @@ export async function analyserUnePiece(
     octet transmis.
   */
   if (!(await autorisationAccordee(application.userId, "pieces_identite"))) {
-    await db.document.update({
-      where: { id: document.id },
-      data: {
-        status: "ATTENDUE",
-        remedy: "REMPLACER",
-        feedback: MENTION_NON_ANALYSEE.autorisation_retiree,
-        finding: null,
-      },
+    await ecrireSurLaPieceCourante(db, document.id, version.rank, {
+      status: "ATTENDUE",
+      remedy: "REMPLACER",
+      feedback: MENTION_NON_ANALYSEE.autorisation_retiree,
+      finding: null,
     });
     await recalculerCompletude(tache.applicationId);
     return "TERMINEE";
@@ -277,7 +296,7 @@ export async function analyserUnePiece(
       debit = await debiterUneAnalyse(tache.applicationId);
     } catch (erreur) {
       if (!(erreur instanceof EchecHttp) || erreur.echec.code !== "quota_epuise") throw erreur;
-      await conserverFauteDeQuota(document.id, tache);
+      await conserverFauteDeQuota(version, tache);
       return "TERMINEE";
     }
   }
@@ -345,13 +364,19 @@ export async function analyserUnePiece(
           creditConsumed: false,
         },
       });
-      await tx.manualReview.create({
-        data: { analysisId: analyse.id, reason: motifDeRevue(lu.cause) },
+      // RF-2 : la pièce n'est écrite, et la revue ouverte, que si cette
+      // version est encore la sienne. Relire un fichier remplacé
+      // n'avancerait rien.
+      const courante = await ecrireSurLaPieceCourante(tx, document.id, version.rank, {
+        status: "ILLISIBLE",
+        feedback: analyse.body,
+        analyzedAt: new Date(),
       });
-      await tx.document.update({
-        where: { id: document.id },
-        data: { status: "ILLISIBLE", feedback: analyse.body, analyzedAt: new Date() },
-      });
+      if (courante) {
+        await tx.manualReview.create({
+          data: { analysisId: analyse.id, reason: motifDeRevue(lu.cause) },
+        });
+      }
       await solderLesTentatives(version.id, version.analysisAttempts, tx);
       if (consomme) {
         await rendreUneAnalyse(
@@ -374,15 +399,17 @@ export async function analyserUnePiece(
         formulations du même fait finiraient par se contredire, et celle
         que le candidat lit dans sa checklist est celle-là.
       */
-      await tx.notification.create({
-        data: {
-          userId: application.userId,
-          applicationId: tache.applicationId,
-          kind: "ANALYSE",
-          title: analyse.title,
-          body: analyse.body,
-        },
-      });
+      if (courante) {
+        await tx.notification.create({
+          data: {
+            userId: application.userId,
+            applicationId: tache.applicationId,
+            kind: "ANALYSE",
+            title: analyse.title,
+            body: analyse.body,
+          },
+        });
+      }
     });
     if (!consignee) return "TERMINEE";
     await recalculerCompletude(tache.applicationId);
@@ -407,7 +434,7 @@ export async function analyserUnePiece(
       ? regles?.pieces_requises.find((p) => p.code === lu.pieceIdentifiee)?.libelle
       : undefined;
   if (intituleReconnu !== undefined) {
-    return acheverHorsSujet(tache, version.id, document.id, application.userId, intituleReconnu, {
+    return acheverHorsSujet(tache, version.id, version.rank, document.id, application.userId, intituleReconnu, {
       consomme,
       ligne: debit?.ligne ?? null,
       entame,
@@ -426,6 +453,34 @@ export async function analyserUnePiece(
   const verdict = evaluerConditions(conditions, mesures.champs, mesures.reserves);
 
   const consignee = await consignerUneFois(tache, consomme, entame, async (tx) => {
+    /*
+      RF-2 — la pièce d'abord, sous condition : le candidat a pu déposer un
+      autre fichier, ou clore son dossier, pendant l'appel. Si cette
+      version ne commande plus la pièce, son verdict reste à l'historique,
+      sans avis, et la lecture est rendue (choix A-2) : le candidat ne
+      paie pas un résultat qu'il ne reçoit pas. Les jetons, eux, sont
+      déjà notés.
+    */
+    const courante = await ecrireSurLaPieceCourante(tx, document.id, version.rank, {
+      status: verdict.verdict,
+      feedback: verdict.corps,
+      finding: verdict.constat,
+      extracted: lu.bruts as never,
+      analyzedAt: new Date(),
+      // Le remède suit l'état réel : une pièce déjà déposée se **remplace**,
+      // elle ne s'ajoute pas. « Ajouter » sur une ligne où un fichier existe
+      // déjà fait croire qu'il manque, et fait chercher ce qu'on a déjà
+      // envoyé. C'est le remède qui commande le libellé du bouton.
+      //
+      // Une pièce seulement **sous réserve** n'a rien à se reprocher : le
+      // geste attendu porte sur le dossier, et proposer de remplacer le
+      // fichier enverrait refaire ce qui est déjà bon.
+      ...(verdict.verdict === "A_CORRIGER" &&
+      verdict.echecs.length > 0 &&
+      document.remedy === "TELEVERSER"
+        ? { remedy: "REMPLACER" as const }
+        : {}),
+    });
     const analyse = await tx.documentAnalysis.create({
       data: {
         versionId: version.id,
@@ -437,7 +492,7 @@ export async function analyserUnePiece(
           portait sa valeur par défaut sur ce chemin, c'est-à-dire `true`,
           y compris pour une reprise gratuite.
         */
-        creditConsumed: consomme,
+        creditConsumed: consomme && courante,
         // Les **faits bruts**, et non les mesures : la date lue reste utile
         // le jour où la date cible est renseignée, et c'est elle qu'un
         // opérateur relit. Une durée calculée ne se relit pas sur la pièce.
@@ -460,29 +515,12 @@ export async function analyserUnePiece(
       });
     }
 
-    await tx.document.update({
-      where: { id: document.id },
-      data: {
-        status: verdict.verdict,
-        feedback: verdict.corps,
-        finding: verdict.constat,
-        extracted: lu.bruts as never,
-        analyzedAt: new Date(),
-        // Le remède suit l'état réel : une pièce déjà déposée se **remplace**,
-        // elle ne s'ajoute pas. « Ajouter » sur une ligne où un fichier existe
-        // déjà fait croire qu'il manque, et fait chercher ce qu'on a déjà
-        // envoyé. C'est le remède qui commande le libellé du bouton.
-        //
-        // Une pièce seulement **sous réserve** n'a rien à se reprocher : le
-        // geste attendu porte sur le dossier, et proposer de remplacer le
-        // fichier enverrait refaire ce qui est déjà bon.
-        ...(verdict.verdict === "A_CORRIGER" &&
-        verdict.echecs.length > 0 &&
-        document.remedy === "TELEVERSER"
-          ? { remedy: "REMPLACER" as const }
-          : {}),
-      },
-    });
+    if (!courante) {
+      if (consomme) {
+        await rendreUneAnalyse(tache.applicationId, analyse.id, MOTIF_OBSOLETE, entame, tx);
+      }
+      return;
+    }
 
     await tx.notification.create({
       data: {
@@ -531,6 +569,7 @@ async function solderLesTentatives(
 async function acheverHorsSujet(
   tache: Tache,
   versionId: string,
+  rangVersion: number,
   documentId: string,
   userId: string,
   intituleReconnu: string,
@@ -546,13 +585,20 @@ async function acheverHorsSujet(
   const corps = `Ce fichier ressemble à : ${intituleReconnu}. Reclasse-le dans cette ligne de la checklist, puis dépose ici la pièce attendue.`;
 
   const consignee = await consignerUneFois(tache, cout.consomme, cout.entame, async (tx) => {
+    // RF-2 — même règle que le verdict : la pièce sous condition, la
+    // lecture rendue si la version ne la commande plus (A-2).
+    const courante = await ecrireSurLaPieceCourante(tx, documentId, rangVersion, {
+      status: "HORS_SUJET",
+      feedback: corps,
+      analyzedAt: new Date(),
+    });
     const analyse = await tx.documentAnalysis.create({
       data: {
         versionId,
         verdict: "HORS_SUJET",
         title: titre,
         body: corps,
-        creditConsumed: cout.consomme,
+        creditConsumed: cout.consomme && courante,
       },
     });
     if (cout.ligne) {
@@ -561,10 +607,12 @@ async function acheverHorsSujet(
         data: { analysisId: analyse.id },
       });
     }
-    await tx.document.update({
-      where: { id: documentId },
-      data: { status: "HORS_SUJET", feedback: corps, analyzedAt: new Date() },
-    });
+    if (!courante) {
+      if (cout.consomme) {
+        await rendreUneAnalyse(tache.applicationId, analyse.id, MOTIF_OBSOLETE, cout.entame, tx);
+      }
+      return;
+    }
     await tx.notification.create({
       data: {
         userId,

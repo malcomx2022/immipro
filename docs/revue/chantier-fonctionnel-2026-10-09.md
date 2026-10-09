@@ -1,5 +1,5 @@
 # Chantier de correction et de finalisation — ImmiPro
-Date : 9 octobre 2026. **RF-0 autorisé ; RF-1 autorisé le 09/10 avec A-1 et A-3, proposé en S.146 ; RF-2 à RF-7 planifiés ; A-2 ouvert.**
+Date : 9 octobre 2026. **RF-0 autorisé ; RF-1 livré en S.146 (A-1, A-3) ; RF-2 autorisé le 09/10 avec A-2, proposé en S.147 ; RF-3 à RF-7 planifiés.**
 
 Base du lot documentaire : main dd2b58f / S.144. S.142 à S.144 (PR #241 à #243) sont fusionnés : Stripe-Version, ESLint plat, Next 16. La revue initiale reste épinglée à main 3f089c2/S.141. Aucun numéro S.xxx n'est réservé ; le numéro d'un lot applicatif sera attribué après lecture du registre et des PR en cours.
 
@@ -129,7 +129,7 @@ Ces travaux ne remplacent pas les preuves fonctionnelles et ne doivent pas prolo
 | S.121 / S.122 | Différer recrédit commercial et édition des plafonds sans règle validée | Actions absentes explicitement assumées ; pas de bouton sans contrat métier. |
 | D-32 / D-33 | Refactoring après correctifs ; clarifier inventaire et archivage des prototypes | Respect du code et des tests de Claude Code, pas de nettoyage mélangeant les sujets. |
 
-**Tranchés le 09/10/2026 par le responsable, à l'autorisation de RF-1 :** A-1 sur la recommandation (champ retiré en V1) et A-3 sur la recommandation (« conserver » enregistrable à titre historique, « migrer » refusé). A-2 reste ouvert.
+**Tranchés le 09/10/2026 par le responsable, à l'autorisation de RF-1 :** A-1 sur la recommandation (champ retiré en V1) et A-3 sur la recommandation (« conserver » enregistrable à titre historique, « migrer » refusé). A-2 tranché à l'autorisation de RF-2, sur la recommandation : la lecture devenue obsolète est rendue au candidat, ses jetons restant mesurés.
 
 La validation de ce chantier ne remplace pas les avis M.C/Q.A ni les réponses du prestataire. Une décision ouverte ne bloque que le sous-lot qui en dépend.
 

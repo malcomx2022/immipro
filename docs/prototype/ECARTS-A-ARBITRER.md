@@ -12244,3 +12244,50 @@ Un résultat de la seconde requête est un dossier qui a migré après son dép�
 - Les formulaires du back-office (M11).
 - Le prototype C-05 et T-02.
 - La recette du parcours (RF-5) reste **non vérifiée**.
+
+## S.147 — RF-2 : la version courante commande la pièce (FON-02)
+
+**Autorisation.** Le responsable a autorisé le lot RF-2 le 09/10/2026, avec le choix **A-2** pris sur la recommandation. Une lecture qui devient obsolète pendant l'appel au modèle est rendue au candidat : il ne paie pas deux résultats pour un remplacement. Les jetons réellement consommés restent mesurés (INV-6). Le lot part de main `6746743`.
+
+**Constat, reproduit sur l'ancien code.** L'analyse vérifiait que sa version n'avait pas déjà de verdict, mais pas qu'elle était encore la dernière. Le balayage et la revue humaine non plus. `smoke:extraction` et `smoke:balayage` le montrent :
+- *Remplacement pendant la lecture.* Le verdict « à corriger » de la v1 s'écrit sur la pièce au-dessus du fichier v2, avec un avis. La lecture est payée.
+- *v2 rapide, v1 lente.* La v1 restée en file est envoyée au service et payée, et son verdict remplace celui de la v2, qui était conforme. Le candidat paie deux analyses et lit le mauvais verdict.
+- *Clôture pendant la lecture.* La pièce d'un dossier abandonné change d'état, avec un avis.
+- *Revue humaine ancienne.* Une revue ouverte sur la v1 et tranchée après le dépôt d'une v2 écrit son verdict sur la pièce, et l'avis l'annonce comme celui de la pièce.
+- *Balayage.* Un fichier infecté déjà remplacé fait redemander la pièce, avec un avis, et une version saine déjà remplacée part en analyse.
+
+**Correction.**
+- Une règle commune, `server/acces/piece-courante.ts` : une version écrit sur la pièce si aucune version plus récente n'existe et si le dossier n'est pas figé.
+- Elle est tenue **dans l'écriture**, par une mise à jour conditionnelle, et non par une lecture en tête. Le dépôt crée la nouvelle version avant de remettre la pièce en analyse. Une écriture qui voit la nouvelle version s'abstient ; une écriture qui passe avant elle est aussitôt recouverte par la remise en analyse. Dans les deux ordres, la pièce finit décrite par le fichier courant.
+- Elle est appliquée aux cinq écritures de l'analyse (verdict, illisible, hors sujet, autorisation retirée, quota épuisé), aux deux du balayage (conservation, refus au contrôle) et à la revue humaine.
+- Aucune migration de schéma : le rang des versions suffit, sans pointeur de version courante.
+- Le résultat d'une version ancienne reste à son historique : l'analyse avec `creditConsumed: false`, et la décision de revue, consignée et journalisée avec `appliquee: false`. Il ne produit aucun avis et n'ouvre aucune revue.
+- Une version déjà remplacée n'est ni débitée ni envoyée au fournisseur. Une version saine remplacée est promue, mais ne part pas en analyse.
+- Une lecture devenue obsolète pendant l'appel est rendue (A-2). La même règle vaut pour un dossier clos pendant la lecture : aucun résultat n'est livré, donc rien n'est payé.
+- Garde-fou : `tests/piece-courante.test.ts`. Aucune écriture directe de la pièce ne subsiste dans ces trois chemins, et le rendu A-2 est présent.
+
+**Données existantes.** Rien n'est réécrit. Une pièce que l'ancien code a fait passer à un verdict de version ancienne se repère en lecture seule. Le signal : la pièce porte un verdict, alors que sa version courante, saine ou en quarantaine, n'a jamais été analysée.
+
+```sql
+SELECT d.id AS piece, d.status, v.rank AS version_courante, v."scanState"
+FROM "Document" d
+JOIN "DocumentVersion" v ON v."documentId" = d.id
+ AND v.rank = (SELECT max(rank) FROM "DocumentVersion" WHERE "documentId" = d.id)
+WHERE d.status IN ('CONFORME', 'A_CORRIGER', 'ILLISIBLE', 'HORS_SUJET')
+  AND v."scanState" <> 'INFECTEE' AND v.body IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "DocumentAnalysis" a WHERE a."versionId" = v.id);
+```
+
+Une revue humaine tranchée sans analyse de la version courante peut aussi y figurer : c'est un signal à relire, pas un verdict.
+
+À traiter dans RF-4 (diagnostics), au cas par cas : la version courante peut être relancée en analyse, sans réécriture de l'historique.
+
+**Vérifications.**
+- `npm run check`, `npm run build`, `npm run check:audit` et les fumées passent.
+- Chaque nouveau contrôle de `smoke:extraction` (14) et de `smoke:balayage` (5) échoue sur l'ancien code, sauf les constats d'historique, déjà tenus.
+- Aucune image n'est requise : le lot ne touche ni les artefacts ni le déploiement.
+
+**Écarts restants.**
+- B-05 ne signale pas encore à l'opérateur qu'une revue porte sur un fichier remplacé : la décision est consignée sans effet, et la revue quitte la file.
+- RF-3 : E5 et FON-03.
+- La recette du parcours (RF-5) reste **non vérifiée**.

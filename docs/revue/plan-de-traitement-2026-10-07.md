@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est proposé. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est proposé. Tout le reste est à faire.
 
 ---
 
@@ -1545,4 +1545,10 @@ livré par RF-0. RF-1 à RF-7 sont planifiés ; A-1 à A-3 restent à valider.
 « conserver » seul sur un dossier figé). FON-01, FON-04 et FON-05 sont
 reproduits sur l'ancien code puis corrigés ; voir le registre, entrée
 S.146. A-2 reste ouvert, avec RF-2.
+
+**RF-2 (S.147), 09/10/2026.** Autorisé par le responsable, avec A-2 :
+une lecture devenue obsolète pendant l'appel est rendue au candidat,
+ses jetons restant mesurés. FON-02 est reproduit sur l'ancien code
+(analyse, balayage, revue humaine, clôture pendant la lecture) puis
+corrigé ; voir le registre, entrée S.147.
 Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

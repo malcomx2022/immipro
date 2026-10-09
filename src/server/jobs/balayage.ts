@@ -8,6 +8,7 @@ import {
 } from "@/domain/securite/balayage";
 import { refusAuControle } from "@/domain/dossiers/quarantaine";
 import { recalculerCompletude } from "@/server/acces/dossiers";
+import { commandeLaPiece, ecrireSurLaPieceCourante } from "@/server/acces/piece-courante";
 import { compteur, solde } from "@/server/acces/quota";
 import { autorisationAccordee } from "@/server/acces/consentements";
 import { MENTION_NON_ANALYSEE, type MotifDeNonAnalyse } from "@/domain/dossiers/piece";
@@ -199,9 +200,17 @@ async function analyseEnAttente(version: Version): Promise<boolean> {
  * même fait finiraient par diverger.
  */
 async function suiteApresPromotion(
-  version: Pick<Version, "documentId">,
+  version: Pick<Version, "documentId" | "rank">,
   tache: Tache,
 ): Promise<Suite> {
+  /*
+    RF-2, FON-02 — une version remplacée depuis son dépôt, ou celle d'un
+    dossier déposé ou clos, ne part pas en analyse et n'écrit rien sur la
+    pièce : la version courante a sa propre suite. Le fichier reste
+    promu et consultable à l'historique.
+  */
+  if (!(await commandeLaPiece(version.documentId, version.rank))) return "SANS_OBJET";
+
   /*
     RG-02.1 — l'autorisation d'analyse est révocable, et un retrait arrête
     la lecture à venir, pas seulement les dépôts suivants. Elle se relit
@@ -221,7 +230,7 @@ async function suiteApresPromotion(
     ).application.userId,
     "pieces_identite",
   );
-  if (!autorise) return conserver(version.documentId, tache, "autorisation_retiree");
+  if (!autorise) return conserver(version, tache, "autorisation_retiree");
 
   // RG-06.5 — le quota n'interdit pas le dépôt, il n'interdit que l'analyse.
   // Il se relit ici et non au dépôt : entre les deux, une autre pièce a pu
@@ -230,7 +239,7 @@ async function suiteApresPromotion(
 
   // Sans pack, il n'y a pas d'analyses épuisées : il n'y en a jamais eu.
   const { total } = await compteur(tache.applicationId);
-  return conserver(version.documentId, tache, total > 0 ? "quota" : "sans_pack");
+  return conserver(version, tache, total > 0 ? "quota" : "sans_pack");
 }
 
 /**
@@ -238,9 +247,12 @@ async function suiteApresPromotion(
  * ou la rédaction assistée, a pris la dernière analyse. La pièce est
  * conservée comme si le quota avait manqué à la promotion (E6).
  */
-export async function conserverFauteDeQuota(documentId: string, tache: Tache): Promise<void> {
+export async function conserverFauteDeQuota(
+  version: Pick<Version, "documentId" | "rank">,
+  tache: Tache,
+): Promise<void> {
   const { total } = await compteur(tache.applicationId);
-  await conserver(documentId, tache, total > 0 ? "quota" : "sans_pack");
+  await conserver(version, tache, total > 0 ? "quota" : "sans_pack");
 }
 
 /**
@@ -250,14 +262,16 @@ export async function conserverFauteDeQuota(documentId: string, tache: Tache): P
  * deux désormais, et une mention unique en démentirait une.
  */
 async function conserver(
-  documentId: string,
+  version: Pick<Version, "documentId" | "rank">,
   tache: Tache,
   motif: MotifDeNonAnalyse,
 ): Promise<Suite> {
-  await db.document.update({
-    where: { id: documentId },
-    data: { status: "ATTENDUE", feedback: MENTION_NON_ANALYSEE[motif] },
+  // RF-2 : seulement si cette version commande encore la pièce.
+  const courante = await ecrireSurLaPieceCourante(db, version.documentId, version.rank, {
+    status: "ATTENDUE",
+    feedback: MENTION_NON_ANALYSEE[motif],
   });
+  if (!courante) return "SANS_OBJET";
   await recalculerCompletude(tache.applicationId);
   return "CONSERVEE";
 }
@@ -279,17 +293,21 @@ async function ecarter(version: Version, tache: Tache, menace: string): Promise<
     },
   });
 
+  /*
+    RF-2 — les octets d'une version infectée partent toujours. La pièce,
+    elle, ne se réécrit que si cette version la commande encore : un
+    fichier déjà remplacé n'a pas à faire redemander la pièce, ni à
+    produire un avis sur ce que le candidat a déjà corrigé.
+  */
   const refus = refusAuControle(version.document.label);
-  await db.document.update({
-    where: { id: version.documentId },
-    data: {
-      status: "A_CORRIGER",
-      feedback: refus.corps,
-      // La pièce est de nouveau à déposer, et rien n'en tient lieu : le
-      // remède redevient « téléverser », pas « remplacer ».
-      remedy: "TELEVERSER",
-    },
+  const courante = await ecrireSurLaPieceCourante(db, version.documentId, version.rank, {
+    status: "A_CORRIGER",
+    feedback: refus.corps,
+    // La pièce est de nouveau à déposer, et rien n'en tient lieu : le
+    // remède redevient « téléverser », pas « remplacer ».
+    remedy: "TELEVERSER",
   });
+  if (!courante) return "REFUSEE";
   await db.notification.create({
     data: {
       userId: version.document.application.userId,
