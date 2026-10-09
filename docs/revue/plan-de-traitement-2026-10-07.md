@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14) et S.140 (F5, M18) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18) et S.141 (M6, F11) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -63,7 +63,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 
 | # | Question | À qui | Bloque |
 |---|---|---|---|
-| D-1 | INV-6 se lit-il « quota d'analyses, jetons mesurés et surveillés » ? La réponse réécrit CLAUDE.md et DOC-11 | Direction | M6 |
+| D-1 | INV-6 se lit-il « quota d'analyses, jetons mesurés et surveillés » ? La réponse réécrit CLAUDE.md et DOC-11 | Direction | M6 — **tranchée le 09/10/2026** : oui, INV-6 réécrit avec l'accord du responsable du projet |
 | D-2 | Un CDN ou un proxy sera-t-il placé devant nginx ? | Exploitant | Confirme E1 (livré) |
 | D-3 | Garde-t-on le décompte « il te reste N essais » d'A-02, au prix d'un compteur en mémoire des adresses sans compte ? | Direction produit | M2 — **tranchée le 08/10/2026 : option B**, décompte gardé, compteur par empreinte |
 | D-4 | La surveillance externe a-t-elle besoin du détail de `/api/health` ? | Exploitant | M10 — **tranchée le 08/10/2026** : un anonyme lit `{ status, db }` ; le détail, un administrateur ou `ETAT_DE_SERVICE_JETON` |
@@ -86,7 +86,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-21 | La mention de nouvel onglet est-elle visible ou réservée aux lecteurs d'écran ? | Design | F8 — **tranchée le 08/10/2026** : réservée aux lecteurs d'écran |
 | D-22 | Quelle durée pour une session non mémorisée ? | Produit | N1 — **tranchée le 08/10/2026 : cookie oublié à la fermeture du navigateur, 24 h au plus en base** |
 | D-23 | Rejoue-t-on une fois la propagation des divergences au déploiement ? | Produit | M8 (rejeu seulement) — **tranchée le 08/10/2026** : oui, par la migration, via la reprise horaire |
-| D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 |
+| D-24 | Remplace-t-on l'immuabilité « par absence d'écrivain » par des déclencheurs en base ? | Direction technique | F11 — **tranchée le 09/10/2026** : oui, déclencheurs en base |
 | D-25 | Déploiement par `ssh` natif ou par l'action tierce épinglée ; empreinte d'hôte relevée depuis la console | Exploitant | E9 — **tranchée le 08/10/2026** : `ssh` natif vérifié par `VPS_KNOWN_HOSTS`, compose et script recopiés à chaque déploiement |
 | D-26 | Le stockage `b2:` est-il hors du VPS ? Où vit la clé privée GPG ? Quel service reçoit le ping ? | Exploitant | E10 — **tranchée le 08/10/2026** : Backblaze B2 hors du VPS, clé privée dans un coffre hors ligne, Healthchecks.io |
 | D-27 | Durée de conservation des pièces dans les sauvegardes, à écrire dans les textes juridiques | Direction, conformité | E10 — **tranchée le 08/10/2026** : 30 jours, comme la base ; texte proposé pour `securite_complements` |
@@ -122,7 +122,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.138 — livré** | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
 | **S.139 — livré** | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
 | **S.140 — livré** | F5, M18 | S+S | D-13, D-14 | Date de la prestation, unités nommées |
-| S.141 — arbitrages | M6, F11 | S+M | D-1, D-24 | Texte d'INV-6 aligné sur le code, historiques immuables |
+| **S.141 — livré** | M6, F11 | S+M | D-1, D-24 | Texte d'INV-6 aligné sur le code, historiques immuables |
 | Ensuite | M19 étapes 1 à 9, M20, F10 | L | D-30 à D-33 | Un lot par étape |
 
 **Avant l'ouverture au public**, au minimum : S.126 à S.134. Ils couvrent tous les constats de gravité élevée et les invariants INV-5 à INV-7.
@@ -444,6 +444,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### M6 — INV-6 est tenu en analyses, pas en jetons
 
+**État : livré en S.141** (D-1 : oui). Au-delà du plan, la mention de B-07 (« Le quota des packs reste compté en jetons ») et l'en-tête de `domain/ia/fournisseurs.ts`, qui l'affirmaient encore, sont alignés ; le test le garde.
+
 **Constat vérifié.** Déjà consigné en S.47 (« relevé en passant, laissé ouvert »). Le quota est le grand livre `AnalysisCredit` ; les jetons sont comptés et comparés à `Pack.tokensIA` pour l'alerte de B-07. `verifierQuota` (`src/lib/ai.ts:45-53`) n'a aucun appelant. Les textes se contredisent : CLAUDE.md et DOC-11 §0 (« quota de tokens »), WF-06, RG-06.7, RG-08.4, contre RG-15.2 du 06/10/2026 (« les analyses, l'unité que le candidat voit et achète, et non les jetons »).
 
 **Décision.** D-1 (direction) : voir §2.
@@ -463,6 +465,8 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 ---
 
 #### F11 — Tables dites immuables sans déclencheur
+
+**État : livré en S.141** (D-24 : oui). Migration `20261009150000_historiques_immuables`. La purge du journal garde un jour de marge sur les cinq ans exigés par la base : sans elle, une horloge en avance ou un 29 février ferait échouer toute la passe.
 
 **Constat vérifié.** Immuabilité déclarée pour `EditorialVersion`, `LegalPublication` et `AuditLog`, tenue « par absence d'écrivain ». `AuditLog` est légitimement purgé à cinq ans (`purge.ts:362-364`) et vidé par la graine de démonstration. `RuleMigration` se met à jour légitimement (`alertedAt`, `decision`).
 
@@ -1462,11 +1466,11 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 | S.131 (livrée) | `20261008130000_index_des_cles_etrangeres` | Onze index de clés étrangères et de date |
 | S.137 | `divergence_a_propager` | `VisaRule.divergenceDueAt`, index, contrainte |
 | S.140 (livrée) | `20261009120000_date_de_la_prestation` | `Invoice.performedAt`, reprise, déclencheur `facture_immuable` étendu |
-| S.141 | `historiques_immuables` | Déclencheurs sur les historiques (si D-24 est oui) |
+| S.141 (livrée) | `20261009150000_historiques_immuables` | Déclencheurs sur les historiques, le journal et l'arbitrage ; `facture_immuable` en `check_violation` |
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.140
+## 7. Ce qui reste ouvert après les lots S.125 à S.141
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1497,4 +1501,5 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M7** : relire en lecture seule les versions déjà produites par le modèle (`changeNote` de première version) contre la liste « partout » ; aucune réécriture.
 - **M13** : reporter le menu mobile dans le prototype 390 px (DOC-12 §6.5), où il manque.
 - **M14** : le cache des liens juridiques vit sur le disque du conteneur `app` ; à partager le jour d'un passage à plusieurs instances.
+- **F11** : sur une base où la graine de démonstration a tourné, les écritures « systeme:demonstration » restent au journal cinq ans ; elles ne se suppriment plus. Le script des garde-fous, joué à chaque déploiement, insère et annule une page `conditions` de rang 999 999 : rien n'en reste.
 - **D-13, D-14** : appliquées en S.140 sur l'option recommandée, sans réponse explicite. Faire confirmer D-14 par M.C. Si M.C retient l'option b (exercice de la vente), seule `etablirLaFacture` change, et `performedAt` reste.

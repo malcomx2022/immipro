@@ -116,7 +116,9 @@ async function main() {
   }
   await prisma.consultant.deleteMany({ where: { firm: "Visser Immigration Advies" } });
   await prisma.partner.deleteMany({ where: { name: PARTENAIRE_DEMO } });
-  await prisma.auditLog.deleteMany({ where: { actorId: "systeme:demonstration" } });
+  // Le journal ne se vide plus : la base refuse toute suppression avant
+  // cinq ans (revue F11). L'écriture de démonstration n'est posée qu'une
+  // fois par règle, plus bas.
 
   const candidate = await prisma.user.create({
     data: {
@@ -370,14 +372,14 @@ async function main() {
     ).map((sourceUrl) => ({ sourceUrl, reachable: true })),
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: "systeme:demonstration",
-      action: "regle.publication",
-      target: `visaRule:${regle.id}`,
-      reason: "Jeu de démonstration",
-    },
-  });
+  const ecriture = {
+    actorId: "systeme:demonstration",
+    action: "regle.publication",
+    target: `visaRule:${regle.id}`,
+  };
+  if (!(await prisma.auditLog.findFirst({ where: ecriture }))) {
+    await prisma.auditLog.create({ data: { ...ecriture, reason: "Jeu de démonstration" } });
+  }
 
   for (const operateur of OPERATEURS) {
     await prisma.user.deleteMany({ where: { email: operateur.email } });

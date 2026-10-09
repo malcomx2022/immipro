@@ -391,6 +391,44 @@ try {
       .then(() => "acceptée", () => "refusée");
     verifier(dateSeule === "refusée", `une date de pause hors pause est refusée (${dateSeule})`);
   }
+
+  console.log("\nLe journal : cinq ans, puis la purge — et rien d'autre (revue F11)");
+  {
+    const { purgerCeQuiEstEchu } = await import("../src/server/jobs/purge");
+    const maintenant = new Date();
+    const ilYA = (ans: number, jours = 0) => {
+      const d = new Date(maintenant);
+      d.setUTCFullYear(d.getUTCFullYear() - ans);
+      return new Date(d.getTime() - jours * 86_400_000);
+    };
+    const ecriture = (id: string, createdAt: Date) =>
+      db.auditLog.create({
+        data: { id: `${id}-${process.pid}`, actorId: "fumee", action: "f11", target: id, reason: "fumée", createdAt },
+      });
+    await ecriture("echue", ilYA(6));
+    // Cinq ans passés d'une heure : échue pour la base, gardée par la marge
+    // d'un jour de la purge. Sans marge, une horloge en avance ferait
+    // échouer toute la passe sur cette ligne.
+    await ecriture("frontiere", new Date(ilYA(5).getTime() - 3_600_000));
+    await ecriture("recente", maintenant);
+
+    const passe = await purgerCeQuiEstEchu(maintenant).then(() => "passée", (e: unknown) => String(e));
+    const restantes = (await db.auditLog.findMany({ where: { action: "f11" }, select: { target: true } }))
+      .map((l) => l.target)
+      .sort();
+    verifier(passe === "passée", `la purge planifiée passe le déclencheur (${passe})`);
+    verifier(
+      JSON.stringify(restantes) === JSON.stringify(["frontiere", "recente"]),
+      `seule l'écriture de plus de cinq ans et un jour part (${restantes.join(", ")})`,
+    );
+    const recente = await db.auditLog.findFirstOrThrow({ where: { target: "recente", action: "f11" } });
+    const effacee = await db.auditLog.delete({ where: { id: recente.id } }).then(() => "acceptée", () => "refusée");
+    verifier(effacee === "refusée", `une écriture de moins de cinq ans ne se supprime pas (${effacee})`);
+    const reecrite = await db.auditLog
+      .update({ where: { id: recente.id }, data: { reason: "réécrit" } })
+      .then(() => "acceptée", () => "refusée");
+    verifier(reecrite === "refusée", `une écriture ne se modifie pas (${reecrite})`);
+  }
 } catch (erreur) {
   console.error(erreur);
   echecs.push(String(erreur));

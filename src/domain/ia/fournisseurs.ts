@@ -30,9 +30,10 @@ import {
  * ordinaire (`injoignable`, `service_sature`…) ; rien ne réessaie chez un
  * autre, qui recevrait une pièce que personne ne lui a destinée.
  *
- * **Le quota reste compté en jetons** (option a du document de décision) :
- * un jeton n'a pas la même taille d'un fournisseur à l'autre, et l'écart
- * se lit dans B-07, ventilé par fournisseur.
+ * **Le quota se compte en analyses, les jetons se mesurent** (INV-6, D-1
+ * du 09/10/2026) : la contrepartie en jetons du pack reste le repère de
+ * marge de B-07. Un jeton n'a pas la même taille d'un fournisseur à
+ * l'autre, et l'écart s'y lit, ventilé par fournisseur.
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
@@ -372,5 +373,5 @@ export function fournisseursATarifer(
 
 export const MENTION_CHOIX_DU_FOURNISSEUR = `Le fournisseur de chaque fonction se choisit par configuration (${VARIABLE_DU_CHOIX.extraction}, ${VARIABLE_DU_CHOIX.redaction}), ${FOURNISSEUR_PAR_DEFAUT} par défaut. Aucune bascule automatique : un fournisseur indisponible ne renvoie pas les pièces chez un autre.`;
 
-export const MENTION_QUOTA_EN_JETONS =
-  "Le quota des packs reste compté en jetons. Un jeton n'a pas la même taille d'un fournisseur à l'autre : l'écart se lit dans le tableau ci-dessous.";
+export const MENTION_CONTREPARTIE_EN_JETONS =
+  "Les packs se consomment en analyses ; leur contrepartie en jetons sert de repère de marge. Un jeton n'a pas la même taille d'un fournisseur à l'autre : l'écart se lit dans le tableau ci-dessous.";

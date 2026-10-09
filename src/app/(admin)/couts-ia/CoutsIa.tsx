@@ -28,7 +28,7 @@ import { ExportDesAppels } from "./ExportDesAppels";
 import {
   FOURNISSEURS,
   MENTION_CHOIX_DU_FOURNISSEUR,
-  MENTION_QUOTA_EN_JETONS,
+  MENTION_CONTREPARTIE_EN_JETONS,
   type ConsommationDuFournisseur,
   type EtatDeLaFonction,
 } from "@/domain/ia/fournisseurs";
@@ -390,7 +390,7 @@ function FournisseursIA({
             </table>
           </div>
         )}
-        <p className="max-w-lecture-large text-pretty text-13 text-ink-500">{MENTION_QUOTA_EN_JETONS}</p>
+        <p className="max-w-lecture-large text-pretty text-13 text-ink-500">{MENTION_CONTREPARTIE_EN_JETONS}</p>
       </div>
     </section>
   );

@@ -27,7 +27,7 @@ export const quotaEpuise = (quota: Quota): boolean => quota.restantes <= 0;
 
 /**
  * « Analyses restantes : 12 sur 30 ». Un compteur d'analyses, jamais un
- * nombre de jetons : le quota de tokens est une donnée d'exploitation, le
+ * nombre de jetons : les jetons sont une mesure d'exploitation, le
  * candidat compte des pièces (INV-6, lu côté écran).
  */
 export const libelleQuota = (quota: Quota): string =>
