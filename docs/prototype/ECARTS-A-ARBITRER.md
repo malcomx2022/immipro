@@ -12554,7 +12554,7 @@ Le lot part de main `dcc034f`.
 - `tests/reservation-de-redaction` : la règle, l'ordre débit-appel, le solde dans la transaction de l'issue, les écritures conditionnelles, la passe horaire, la migration additive.
 - `tests/redaction-versions` : adapté sans relâcher (le rendu passe par la réservation du débit).
 - `npm run check` (3499 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:migrations` et `smoke:worker -- --base` compris.
-- `smoke:worker --image` : en cours. La construction locale a d'abord manqué de place disque, puis s'est heurtée à la limite de Docker Hub (429). Le résultat sera ajouté ici.
+- `smoke:worker --image` passe sur une image construite en local (25 vérifications), migration `reservation_de_redaction` comprise. La première construction avait manqué de place disque, puis s'était heurtée à la limite de Docker Hub (429). Elle a abouti au deuxième essai.
 
 **Limite dite.** Si l'issue arrive après l'échéance, déjà rendue par la reprise, le texte est livré quand même. Il faudrait pour cela plusieurs appels entiers, ce qui n'est pas réaliste. Le candidat ne perd pas ce qu'il a obtenu.
 
