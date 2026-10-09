@@ -5,7 +5,7 @@ import { acheverLeCredit, appliquerLaNotification } from "@/server/acces/paiemen
 import { cleDEvenementDeReconciliation } from "@/domain/paiement/ouverture";
 import { leConsultant, type Consultant } from "@/server/paiement/consultation";
 import { libererLesTenuesEchues } from "@/server/acces/consultations";
-import { emettreLesPiecesEnSouffrance } from "@/server/facturation/emission";
+import { certifierLesPiecesEnAttente, emettreLesPiecesEnSouffrance } from "@/server/facturation/emission";
 import { reprendreLesRecus } from "@/server/paiement/recu";
 import { reprendreLesAvisDeTrancheNulle } from "@/server/paiement/avis-de-revue";
 
@@ -74,6 +74,8 @@ export interface Bilan {
    * un remboursement sans avoir (M.C, 04/10/2026).
    */
   piecesEmises: number;
+  /** Pièces réelles certifiées à la reprise, après un premier échec — S.158. */
+  piecesCertifiees: number;
   /**
    * Transactions examinées dont le fournisseur n'a pas répondu — adaptateur
    * non branché, appel en erreur. Rien n'a été écrit pour elles : une
@@ -113,6 +115,7 @@ export async function reconcilierLesPaiements(
     avisRepris: 0,
     tenuesLiberees: await libererLesTenuesEchues(maintenant),
     piecesEmises: 0,
+    piecesCertifiees: 0,
     indisponibles: 0,
   };
 
@@ -257,6 +260,10 @@ export async function reconcilierLesPaiements(
   // Les avis d'une tranche à zéro suivent le même chemin (S.154).
   bilan.avisRepris = await reprendreLesAvisDeTrancheNulle(maintenant).catch(() => 0);
   bilan.piecesEmises = await emettreLesPiecesEnSouffrance().catch(() => 0);
+  // Puis les pièces réelles restées sans code de certification (S.158).
+  bilan.piecesCertifiees = await certifierLesPiecesEnAttente()
+    .then((r) => r.certifiees)
+    .catch(() => 0);
   return bilan;
 }
 

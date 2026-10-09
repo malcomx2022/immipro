@@ -351,6 +351,124 @@ try {
   process.env.FEDAPAY_ENVIRONMENT = "sandbox";
   const essai = await suspensionDeLEncaissement(candidat.id, "FEDAPAY");
   verifier(essai === null, "en bac à sable, rien ne suspend le paiement");
+
+  /*
+    S.158 (RF-6, préparation de M.C) — une certification qui échoue ne perd
+    rien. Avant, l'erreur remontait après l'enregistrement de la pièce :
+    le journal ne s'écrivait pas, et rien ne reprenait une pièce réelle
+    restée sans code, le filet ne cherchant que les ventes sans pièce.
+    Aucun adaptateur n'existe : les certificateurs ci-dessous sont ceux de
+    la fumée, passés en paramètre — aucune variable d'environnement ne
+    sait en choisir un.
+  */
+  console.log("\nUne certification qui échoue ne perd rien, et se reprend (S.158)");
+  {
+    const { certifierLesPiecesEnAttente, piecesEnAttenteDeCertification } = await import(
+      "../src/server/facturation/emission"
+    );
+    const { NON_BRANCHE } = await import("../src/server/facturation/certification");
+    const { CLES_EMETTEUR_FACTURE } = await import("../src/domain/facturation/facture");
+    for (const cle of CLES_EMETTEUR_FACTURE) {
+      await db.legalVariable.upsert({
+        where: { key: cle },
+        create: { key: cle, value: `${cle} de fumée`, updatedBy: "fumée" },
+        update: {},
+      });
+    }
+    process.env.FACTURATION_TVA = "18";
+    process.env.FEDAPAY_ENVIRONMENT = "live";
+    const recus: { numero: string; origine: string | null }[] = [];
+    const echoue = async () => {
+      throw new Error("dispositif injoignable");
+    };
+    let n = 0;
+    const reussit = async (piece: { numero: string; origine: string | null }) => {
+      recus.push(piece);
+      n += 1;
+      return { code: `CODE-FUMEE-${n}`, le: new Date() };
+    };
+    const avant = await db.auditLog.count({ where: { action: "facture.emission" } });
+
+    const vendue = await vente();
+    const emise = await etablirLaFacture(vendue.id, process.env, new Date(), echoue);
+    const piece = await db.invoice.findFirst({ where: { transactionId: vendue.id, kind: "FACTURE" } });
+    verifier(
+      emise.issue === "emise" && piece?.series === "REELLE" && piece.certificationCode === null,
+      `la pièce réelle est émise, sans code inventé (${emise.issue}, ${piece?.number})`,
+    );
+    const traces = await db.auditLog.findMany({
+      where: { action: "facture.emission" },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+    verifier(
+      (await db.auditLog.count({ where: { action: "facture.emission" } })) === avant + 1 &&
+        traces[0]!.reason.includes("Certification en attente"),
+      "l'émission est journalisée, et dit que la certification attend",
+    );
+    verifier(
+      (await piecesEnAttenteDeCertification()).nombre === 1,
+      "elle est comptée parmi les pièces en attente de certification",
+    );
+    const rejouee = await etablirLaFacture(vendue.id, process.env, new Date(), echoue);
+    verifier(rejouee.issue === "deja_emise", "rejouée, l'émission ne fait pas une seconde pièce");
+
+    verifier(
+      (await certifierLesPiecesEnAttente(process.env, NON_BRANCHE)).certifiees === 0,
+      "sans adaptateur, la reprise ne tente rien",
+    );
+
+    // Le remboursement de cette vente : l'avoir échoue à son tour.
+    await db.transaction.update({
+      where: { id: vendue.id },
+      data: {
+        status: "REMBOURSEE",
+        refundDueAt: new Date(),
+        refundBasis: "Geste de support — fumée S.158",
+        refundedAt: new Date(),
+      },
+    });
+    const avoir = await etablirLAvoir(vendue.id, process.env, new Date(), echoue);
+    verifier(avoir.issue === "emise", `l'avoir réel est émis lui aussi (${avoir.issue})`);
+    verifier((await piecesEnAttenteDeCertification()).nombre === 2, "deux pièces attendent leur code");
+
+    // Deux passes simultanées : chaque pièce reçoit un code, et un seul.
+    const [a, b] = await Promise.all([
+      certifierLesPiecesEnAttente(process.env, reussit),
+      certifierLesPiecesEnAttente(process.env, reussit),
+    ]);
+    const certifiees = await db.invoice.findMany({ where: { transactionId: vendue.id } });
+    verifier(
+      certifiees.every((p) => p.certificationCode?.startsWith("CODE-FUMEE-") && p.certifiedAt),
+      `la reprise certifie la facture et l'avoir (${a.certifiees}+${b.certifiees})`,
+    );
+    verifier(
+      a.certifiees + b.certifiees === 2 && recus.length === 2,
+      `deux passes simultanées : un seul appel au dispositif par pièce (${recus.length} appel(s))`,
+    );
+    verifier(
+      (await piecesEnAttenteDeCertification()).nombre === 0,
+      "plus aucune pièce n'attend",
+    );
+    const facture = certifiees.find((p) => p.kind === "FACTURE")!;
+    verifier(
+      recus.some((r) => r.origine === facture.number),
+      "l'avoir part à la certification avec le numéro de sa facture",
+    );
+    verifier(
+      (await db.auditLog.count({ where: { action: "facture.certification" } })) >= 2,
+      "chaque certification reprise est journalisée",
+    );
+    const encore = await certifierLesPiecesEnAttente(process.env, reussit);
+    const relues = await db.invoice.findMany({ where: { transactionId: vendue.id } });
+    const codes = new Map(certifiees.map((p) => [p.id, p.certificationCode]));
+    verifier(
+      encore.certifiees === 0 && relues.every((p) => p.certificationCode === codes.get(p.id)),
+      "une passe de plus ne recertifie rien",
+    );
+    delete process.env.FACTURATION_TVA;
+    process.env.FEDAPAY_ENVIRONMENT = "sandbox";
+  }
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

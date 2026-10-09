@@ -618,6 +618,12 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "paiement.remboursement.tranche": "PAIEMENT",
   "paiement.reconciliation": "PAIEMENT",
   "paiement.ecart.rouvert": "PAIEMENT",
+  /*
+    Les pièces comptables — S.158. `facture.emission` retombait sur le
+    repli « Comptes » : une facture se cherche avec les paiements.
+  */
+  "facture.emission": "PAIEMENT",
+  "facture.certification": "PAIEMENT",
   "regle.publication": "REGLE",
   "regle.republication": "REGLE",
   "contenu.publication": "REGLE",
