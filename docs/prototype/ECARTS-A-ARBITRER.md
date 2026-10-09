@@ -12086,3 +12086,34 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 **Écarts qui restent.**
 1. Réactiver `react-hooks/set-state-in-effect` et `react-hooks/purity` en réécrivant les huit sites : lot dédié, il touche l'hydratation.
 2. `next dev` tourne aussi sous Turbopack : à essayer en local au prochain développement d'écran.
+
+## RF-0 — Revue fonctionnelle et consignes de chantier du 09/10/2026
+
+**Périmètre autorisé.** Le responsable a demandé « lot 0 » après présentation
+du plan : mise à jour documentaire uniquement. RF-0 est préparé sur une
+branche dédiée et soumis en PR ; aucun correctif applicatif, migration ou
+déploiement n'est compris. Aucun numéro S.xxx n'est réservé.
+
+**Continuité Claude Code.** Revue initiale sur main 3f089c2/S.141 ; base
+de RF-0 main dd2b58f/S.144. S.142, S.143 et S.144 sont fusionnés (PR #241,
+#242, #243). Le registre historique et leurs décisions sont conservés.
+
+**Constats.** FON-01 à FON-04 et le reliquat E5 ont cinq reproductions
+préparatoires avec dépendances simulées. La concurrence et la pause omise
+du plafond restent à éprouver sur PostgreSQL. C-05/M11 est repris. DOC-11
+est aligné sur la route de statut réelle, le quota d'analyses et le
+fournisseur de lecture choisi par l'exploitant ; aucun contrat métier ne change.
+
+**Documents.** [Revue](../revue/revue-fonctionnelle-2026-10-09.md),
+[chantier RF-0 à RF-7](../revue/chantier-fonctionnel-2026-10-09.md),
+[preuves et limites](../revue/validation-2026-10-09.md), CLAUDE.md et
+plan de traitement du 07/10 §8. Les huit invariants sont conservés.
+
+**Décisions ouvertes.** A-1 : retrait ou persistance de l'établissement ;
+A-2 : coût d'une lecture devenue obsolète ; A-3 : arbitrage après dépôt.
+Les recommandations du plan ne valent pas décision. RF-1 à RF-7 restent
+planifiés ; Q.A, M.C et la recette d'exploitation restent à satisfaire.
+
+**Écarts qui restent.** Tous les constats applicatifs de la revue. RF-0
+documente le chantier ; aucune conformité juridique, certification fiscale,
+recette de la V1 ou mise en production n'est déclarée.
