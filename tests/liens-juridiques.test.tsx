@@ -58,7 +58,7 @@ describe("le mécanisme", () => {
       "src/app/api/admin/textes-juridiques/[page]/validation/route.ts",
       "src/app/api/admin/textes-juridiques/variables/route.ts",
     ]) {
-      expect(readFileSync(route, "utf8"), route).toContain("revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES)");
+      expect(readFileSync(route, "utf8"), route).toContain("revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES, EXPIRATION_IMMEDIATE)");
     }
     // Hors de Next, l'invalidation n'a pas de sens : l'écriture ne la fait pas.
     expect(readFileSync("src/server/juridique/ecriture.ts", "utf8")).not.toContain("revalidateTag");

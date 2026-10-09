@@ -12062,3 +12062,27 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
    - 1 dans `postcss.config.mjs`.
 
    Les faire entrer est un lot à part.
+
+## S.144 — Revue du 07/10/2026 : montée des dépendances, étape 3, Next 16 (M19)
+
+**Contexte.** Troisième étape de la montée : Next 15.5.27 passe à 16.4.0, avec `eslint-config-next` 16.4.0. Décision du 09/10/2026 : les deux règles du React Compiler que la v7 d'`eslint-plugin-react-hooks` fait échouer sur huit sites sont coupées, motif écrit, pour un lot dédié.
+
+**Ce que fait le code.**
+- **`src/middleware.ts` devient `src/proxy.ts`** et la fonction `middleware` devient `proxy`. Rien d'autre ne change : en-tête de chemin, CSP, même filtre de routes. Le proxy tourne désormais sur le runtime Node, ce que ce code permet déjà. Les commentaires et les deux tests qui le citaient suivent.
+- **`revalidateTag` exige un profil en Next 16.** Le profil `"max"` servirait encore la version périmée au premier visiteur après une validation en B-08. `EXPIRATION_IMMEDIATE` (`{ expire: 0 }`, `server/juridique/cache.ts`) garde le comportement de Next 15 : la requête suivante relit la base. `updateTag` ne s'appelle que d'une action serveur, et ces écritures sont des routes.
+- **ESLint.** `eslint-config-next` 16 exporte ses préréglages au format plat : `eslint.config.mjs` les importe directement. `FlatCompat` et `@eslint/eslintrc` sont retirés.
+  - Les règles nouvelles de la v7 de `react-hooks` restent actives, sauf deux : `set-state-in-effect` (7 sites) et `purity` (`Date.now()` dans la page serveur du journal).
+  - Ces 8 sites sont décrits dans le fichier et consignés au plan.
+- **L'override `postcss` est retiré.** Next 16 n'épingle plus `postcss` 8.4.31 mais 8.5.23, et l'audit reste propre sans lui.
+- Le commentaire du `Dockerfile` sur l'écoute de `server.js` vaut pour Next 15 et 16 : `HOSTNAME` lu de la même façon.
+
+**Ce qui est éprouvé.**
+- Typecheck : les deux seuls appels à corriger étaient `revalidateTag`. Aucun accès synchrone aux API de requête ne restait.
+- `next build` passe sous Turbopack. Il rend les mêmes 136 routes qu'en Next 15, avec les mêmes modes (statique, dynamique, revalidée à 5 minutes), et le proxy est reconnu.
+- La sortie `standalone` produit `server.js`.
+- `next start` : la CSP est posée sur une page et absente de l'API.
+- Validation complète, les 25 fumées et `smoke:worker --image`. Ce dernier démarre l'application et le worker depuis la sortie `standalone`, dans l'image.
+
+**Écarts qui restent.**
+1. Réactiver `react-hooks/set-state-in-effect` et `react-hooks/purity` en réécrivant les huit sites : lot dédié, il touche l'hydratation.
+2. `next dev` tourne aussi sous Turbopack : à essayer en local au prochain développement d'écran.

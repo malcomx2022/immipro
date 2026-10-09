@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { revalidateTag } from "next/cache";
 import { route } from "@/server/http/route";
-import { ETIQUETTE_TEXTES_JURIDIQUES } from "@/server/juridique/cache";
+import { ETIQUETTE_TEXTES_JURIDIQUES, EXPIRATION_IMMEDIATE } from "@/server/juridique/cache";
 import { echec } from "@/server/http/echecs";
 import { enregistrerLesVariables } from "@/server/juridique/ecriture";
 
@@ -28,7 +28,7 @@ export const PUT = route({
     const issue = await enregistrerLesVariables(corps.valeurs, acteur!.id);
     if (!issue.ok) throw echec("champs_invalides", { champs: issue.refus });
     // Le pied de page des pages publiques se relit tout de suite (M14).
-    revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES);
+    revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES, EXPIRATION_IMMEDIATE);
     return issue;
   },
 });

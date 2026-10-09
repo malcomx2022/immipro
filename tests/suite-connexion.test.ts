@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 import { EN_TETE_CHEMIN, suiteInterne } from "@/domain/comptes/suite";
-import { config, middleware } from "@/middleware";
+import { config, proxy } from "@/proxy";
 
 /**
  * Relevé au contrôle du 02/10/2026 : `/dossiers/nouveau?destination=suisse`
@@ -38,11 +38,11 @@ describe("La suite d'une connexion", () => {
   });
 });
 
-describe("Le middleware relève l'adresse demandée", () => {
+describe("Le proxy relève l'adresse demandée", () => {
   const entete = (reponse: Response) => reponse.headers.get(`x-middleware-request-${EN_TETE_CHEMIN}`);
 
   it("pose le chemin et la requête dans un en-tête de requête", () => {
-    const reponse = middleware(new NextRequest("https://immipro.app/dossiers/nouveau?destination=suisse"));
+    const reponse = proxy(new NextRequest("https://immipro.app/dossiers/nouveau?destination=suisse"));
     expect(entete(reponse)).toBe("/dossiers/nouveau?destination=suisse");
   });
 
@@ -50,7 +50,7 @@ describe("Le middleware relève l'adresse demandée", () => {
     const requete = new NextRequest("https://immipro.app/profil", {
       headers: { [EN_TETE_CHEMIN]: "https://ailleurs.test" },
     });
-    expect(entete(middleware(requete))).toBe("/profil");
+    expect(entete(proxy(requete))).toBe("/profil");
   });
 
   it("ne s'applique ni à l'API, ni aux fichiers du build, ni à robots.txt", () => {
