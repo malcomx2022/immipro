@@ -1,37 +1,31 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { liensJuridiquesPublies } from "@/server/juridique/cache";
 
 /**
- * Les liens vers les pages juridiques publiées — S.101.
+ * Les liens vers les pages juridiques publiées — S.101 ; servis dans le
+ * HTML depuis la revue du 07/10/2026, M14 (D-19).
  *
- * Le pied de page reste sans données : c'est ce qui garde statiques
- * toutes les pages du gabarit (Q.B), et un test le vérifie. Ce composant,
- * lui, demande au navigateur quelles pages sont publiées, et n'affiche
- * rien d'autre. Une page jamais validée n'est donc promise nulle part,
- * et une page validée apparaît sans redéploiement.
+ * Composant serveur : la liste vient d'un cache de cinq minutes que la
+ * validation d'un texte invalide (`server/juridique/cache.ts`). Le pied de
+ * page, lui, reste synchrone et sans données (Q.B) : il rend ce composant
+ * sans rien lire.
  *
- * Les adresses viennent de la réponse, jamais d'une chaîne écrite ici :
- * le registre Q.A interdit de nommer une page qui pourrait ne pas exister.
+ * Une page jamais validée n'est promise nulle part, et une page validée
+ * apparaît sans redéploiement. Les adresses viennent du registre, jamais
+ * d'une chaîne écrite ici (Q.A).
+ *
+ * Si la lecture échoue — une base indisponible, ou le build sans base —,
+ * rien n'est rendu et la cause va au journal : un pied de page sans ses
+ * liens vaut mieux qu'une page publique en erreur.
  */
-interface PagePubliee {
-  adresse: string;
-  titre: string;
-}
-
-export function LiensJuridiques() {
-  const [pages, setPages] = useState<readonly PagePubliee[]>([]);
-
-  useEffect(() => {
-    const controle = new AbortController();
-    fetch("/api/juridique/pages", { signal: controle.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((charge: { pages?: PagePubliee[] } | null) => setPages(charge?.pages ?? []))
-      .catch(() => undefined);
-    return () => controle.abort();
-  }, []);
-
+export async function LiensJuridiques() {
+  let pages: Awaited<ReturnType<typeof liensJuridiquesPublies>>;
+  try {
+    pages = await liensJuridiquesPublies();
+  } catch (erreur) {
+    console.error("[juridique] liens du pied de page non lus", erreur instanceof Error ? erreur.message : erreur);
+    return null;
+  }
   if (pages.length === 0) return null;
   return (
     <nav aria-label="Informations légales" className="flex flex-col gap-2.5">

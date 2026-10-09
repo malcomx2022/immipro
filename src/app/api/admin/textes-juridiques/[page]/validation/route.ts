@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { revalidateTag } from "next/cache";
 import { route } from "@/server/http/route";
+import { ETIQUETTE_TEXTES_JURIDIQUES } from "@/server/juridique/cache";
 import { echec } from "@/server/http/echecs";
 import { estUnePageJuridique } from "@/domain/juridique/modeles";
 import { validerUnTexte } from "@/server/juridique/ecriture";
@@ -25,6 +27,14 @@ export const POST = route({
   async traiter({ corps, params, acteur }) {
     const page = params.page ?? "";
     if (!estUnePageJuridique(page)) throw echec("introuvable");
-    return validerUnTexte(page, corps, acteur!.id);
+    const issue = await validerUnTexte(page, corps, acteur!.id);
+    /*
+      Revue M14 : le pied de page des pages publiques porte ce lien dès la
+      validation, sans attendre les cinq minutes du cache. Ici et non dans
+      `ecriture.ts` : la fumée appelle l'écriture hors de Next, où
+      l'invalidation n'a pas de sens.
+    */
+    revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES);
+    return issue;
   },
 });

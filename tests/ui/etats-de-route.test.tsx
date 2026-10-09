@@ -9,6 +9,9 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/adresse-inconnue",
 }));
 
+// Composant serveur asynchrone (revue M14) : simulé, comme dans gabarit.test.
+vi.mock("@/components/juridique/LiensJuridiques", () => ({ LiensJuridiques: () => null }));
+
 import { ChargementDePage } from "@/components/etats/ChargementDePage";
 import { EchecDeRendu } from "@/components/etats/EchecDeRendu";
 import { PageIntrouvable } from "@/components/etats/PageIntrouvable";

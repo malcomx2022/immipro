@@ -11919,3 +11919,28 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 3. `nginx -T` du VPS à relever avant de remplacer la configuration servie ; installation et extension du certificat à faire à la main.
 4. L'identifiant des invitations de calendrier garde `@immipro.bj` (`domain/consultants/agenda.ts`) : le changer ferait traiter les invitations déjà envoyées comme des rendez-vous différents.
 5. Les versions déjà produites par le modèle n'ont pas été relues contre la liste ; à faire en lecture seule.
+
+## S.139 — Revue du 07/10/2026 : interface III (M13, M14)
+
+**Contexte.** Quinzième lot du plan de traitement. Décisions du 08/10/2026 :
+- **D-18** : un bouton « Menu » sous 768 px, en feuille du bas ;
+- **D-19** : les liens juridiques du pied de page sont servis dans le HTML, sur des pages publiques revalidées toutes les cinq minutes.
+
+**Ce que fait le code.**
+- **M13.** `MenuPublic` (nouveau, client) : « Menu » (`aria-haspopup="dialog"`, `aria-expanded`, masqué dès 768 px) ouvre `BottomSheet` avec les trois entrées de la barre, « Créer un compte », « Connexion » et « Fermer le menu ». La feuille se ferme au choix d'un lien et à tout changement de chemin. Les liens viennent de `Header`, une seule liste pour les deux largeurs.
+- **M14.**
+  - `liensJuridiquesPublies` (`server/juridique/cache.ts`) : `unstable_cache`, étiquette `textes-juridiques`, 300 s. `LiensJuridiques` devient un composant serveur asynchrone, et ne rend rien si la lecture échoue. `Footer` reste synchrone et sans données (Q.B).
+  - `revalidateTag` dans les routes de validation et de variables de B-08, pas dans `ecriture.ts`.
+  - L'inscription, le paiement et le plan du site lisent toujours la base en direct.
+  - `/api/juridique/pages` est supprimée.
+- **Fumée `smoke:tunnel`.** Elle calculait le jour en UTC quand le lecteur borne la journée à Cotonou : entre 23 h et minuit UTC, elle échouait, sur `main` comme sur la branche. Elle lit désormais `jourCivil`.
+
+**Ce qui est éprouvé.**
+- `tests/ui/gabarit.test.tsx` : le menu est fermé et annonce un dialogue ; il ouvre la feuille avec ses liens ; Échap ferme et rend le focus ; « Fermer le menu » et un lien ferment.
+- `tests/liens-juridiques.test.tsx` : rendu serveur des pages publiées ; rien si aucune ; rien et une ligne au journal si la lecture échoue ; mécanisme de cache et d'invalidation.
+- `next build` sans base : les pages publiques se construisent et sont revalidées à 300 s.
+
+**Écarts qui restent.**
+1. Le prototype 390 px n'a pas de menu : écart à reporter par le design (le code précède ici le prototype, par décision D-18).
+2. Les pages publiques ne sont plus « statiques » mais revalidées : le premier rendu après un déploiement peut, cinq minutes durant, ne pas porter les liens juridiques si le build a tourné sans base.
+3. Le cache vit sur le disque du conteneur : à partager le jour d'un passage à plusieurs instances.
