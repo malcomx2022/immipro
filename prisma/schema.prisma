@@ -905,6 +905,8 @@ model DocumentVersion {
   critiquedAt DateTime?
 
   analyses DocumentAnalysis[]
+  /// Les débits qui la réservent et les rendus qui les soldent (RF-3, E5).
+  credits  AnalysisCredit[]
   findings CritiqueFinding[]
 
   @@unique([documentId, rank])
@@ -1027,12 +1029,20 @@ model AnalysisCredit {
   grantId       String?
   grant         AnalysisCredit?  @relation("Imputation", fields: [grantId], references: [id], onDelete: SetNull)
   imputees      AnalysisCredit[] @relation("Imputation")
+  /// La version de pièce que ce débit réserve, ou que ce rendu solde —
+  /// RF-3, E5, 09/10/2026. Un arrêt entre le débit et le verdict laissait
+  /// un débit que le rejeu ne retrouvait pas : il débitait de nouveau. Le
+  /// rejeu reprend désormais la réservation ouverte de sa version. Nul
+  /// pour la rédaction assistée et pour les lignes antérieures.
+  versionId     String?
+  version       DocumentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
   note          String?
   createdAt     DateTime     @default(now())
 
   @@index([applicationId, createdAt])
   @@index([grantId])
   @@index([transactionId])
+  @@index([versionId])
 }
 
 // ═══════════════════════════════════════════════════════════

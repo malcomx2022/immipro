@@ -157,9 +157,21 @@ export async function lignesDuGrandLivre(
 export async function debiterUneAnalyse(
   applicationId: string,
   analysisId?: string,
-  options: { note?: string } = {},
-): Promise<{ ligne: string; octroi: string | null }> {
+  options: {
+    note?: string;
+    /**
+     * La version de pièce que ce débit réserve — RF-3, E5. Avec elle, un
+     * rejeu reprend la réservation ouverte de la version au lieu d'en
+     * poser une seconde.
+     */
+    versionId?: string;
+  } = {},
+): Promise<{ ligne: string; octroi: string | null; reprise: boolean }> {
   return sousVerrouDuGrandLivre(applicationId, async (tx) => {
+    if (options.versionId) {
+      const ouverte = await reservationOuverte(applicationId, options.versionId, tx);
+      if (ouverte) return { ...ouverte, reprise: true };
+    }
     const lignes = await lignesDuGrandLivre(applicationId, tx);
     const restantes = lignes.reduce((n, l) => n + l.delta, 0);
     if (restantes <= 0) throw echec("quota_epuise");
@@ -171,11 +183,74 @@ export async function debiterUneAnalyse(
         reason: "ANALYSE",
         analysisId: analysisId ?? null,
         grantId,
+        versionId: options.versionId ?? null,
         note: options.note ?? null,
       },
       select: { id: true },
     });
-    return { ligne: ligne.id, octroi: grantId };
+    return { ligne: ligne.id, octroi: grantId, reprise: false };
+  });
+}
+
+/**
+ * La réservation ouverte d'une version, s'il y en a une — RF-3, E5,
+ * 09/10/2026.
+ *
+ * Le débit précède l'appel au modèle (INV-6). Un arrêt entre les deux —
+ * worker arrêté, base indisponible au moment du verdict — laissait une
+ * ligne `ANALYSE` que rien ne rattachait à sa pièce : le rejeu ne la
+ * voyait pas et débitait de nouveau. Exécuté avant correction, une
+ * extraction interrompue puis rejouée coûtait deux analyses, et deux
+ * reprises simultanées trois.
+ *
+ * Ouverte : les écritures de la version ne s'annulent pas (un débit sans
+ * rendu) et son dernier débit n'est lié à aucune analyse. Un débit lié a
+ * servi ; un débit rendu est soldé. À lire sous le verrou du grand livre,
+ * qui sérialise déjà tous les débits du dossier.
+ */
+async function reservationOuverte(
+  applicationId: string,
+  versionId: string,
+  client: Prisma.TransactionClient,
+): Promise<{ ligne: string; octroi: string | null } | null> {
+  const lignes = await client.analysisCredit.findMany({
+    where: { applicationId, versionId, reason: { in: ["ANALYSE", "ANALYSE_RENDUE"] } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, delta: true, reason: true, analysisId: true, grantId: true },
+  });
+  if (lignes.reduce((n, l) => n + l.delta, 0) >= 0) return null;
+  const debit = lignes.filter((l) => l.reason === "ANALYSE").at(-1);
+  if (!debit || debit.analysisId !== null) return null;
+  return { ligne: debit.id, octroi: debit.grantId };
+}
+
+/**
+ * Rend la réservation ouverte d'une version, et seulement elle — RF-3, E5.
+ *
+ * Pour ce qui s'arrête sans verdict : une version remplacée ou une
+ * autorisation retirée après un arrêt, ou l'exécution qui perd la course
+ * contre une autre sur la même version. Un débit déjà lié à une analyse
+ * a servi, un débit déjà rendu est soldé : rien n'est rendu deux fois.
+ */
+export async function rendreLaReservation(
+  applicationId: string,
+  versionId: string,
+  note: string,
+): Promise<boolean> {
+  return sousVerrouDuGrandLivre(applicationId, async (tx) => {
+    const ouverte = await reservationOuverte(applicationId, versionId, tx);
+    if (!ouverte) return false;
+    await tx.analysisCredit.create({
+      data: {
+        applicationId,
+        delta: 1,
+        reason: "ANALYSE_RENDUE",
+        grantId: ouverte.octroi,
+        versionId,
+        note,
+      },
+    });
+    return true;
   });
 }
 
@@ -220,6 +295,11 @@ export async function rendreUneAnalyse(
     règle (`analysiscredit_un_seul_rendu_par_analyse`, revue du
     07/10/2026, F4) : le second bute sur l'unicité et ne rend rien.
   */
+  // La version de l'analyse : le rendu solde sa réservation (RF-3, E5).
+  const lue = await client.documentAnalysis.findUnique({
+    where: { id: analysisId },
+    select: { versionId: true },
+  });
   try {
     await client.analysisCredit.create({
       data: {
@@ -228,6 +308,7 @@ export async function rendreUneAnalyse(
         reason: "ANALYSE_RENDUE",
         analysisId,
         grantId: debit?.grantId ?? null,
+        versionId: lue?.versionId ?? null,
         note,
       },
     });
@@ -258,9 +339,11 @@ export async function rendreUneTentative(
   note: string,
   /** L'octroi que le débit avait entamé, tel que `debiterUneAnalyse` l'a rendu (S.92). */
   grantId: string | null = null,
+  /** La version dont la réservation est soldée, pour la lecture d'une pièce (RF-3). */
+  versionId: string | null = null,
 ): Promise<void> {
   await db.analysisCredit.create({
-    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", note, grantId },
+    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", note, grantId, versionId },
   });
 }
 

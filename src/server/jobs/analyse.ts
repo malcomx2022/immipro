@@ -2,10 +2,11 @@ import type { Prisma, ReviewReason } from "@prisma/client";
 import { db } from "@/lib/db";
 import { noterLesJetons } from "@/server/ia/appel";
 import { payload } from "@/server/acces/regles";
-import { consommeUneAnalyse, type VerdictAnalyse } from "@/domain/dossiers/analyse";
+import { lectureAPayer } from "@/server/dossiers/reprise-gratuite";
 import {
   debiterUneAnalyse,
   rendreUneAnalyse,
+  rendreLaReservation,
   rendreUneTentative,
 } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
@@ -126,44 +127,6 @@ function motifDeRevue(cause: CauseDeNonLecture): ReviewReason {
 }
 
 
-/**
- * Le verdict rendu sur la version précédente de cette pièce, ou `null`
- * quand c'est le premier dépôt.
- *
- * Sur la version d'avant, et non sur `document.status` : le dépôt d'une
- * nouvelle version remet la pièce en analyse, si bien que l'état de la
- * pièce a déjà oublié pourquoi le candidat revient. Et sur le **rang**,
- * qui est ce que la version a de stable — une date d'analyse peut
- * manquer, une reprise peut être rejouée.
- */
-async function verdictPrecedent(
-  documentId: string,
-  rang: number,
-): Promise<VerdictAnalyse | null> {
-  const precedente = await db.documentVersion.findFirst({
-    where: { documentId, rank: { lt: rang } },
-    orderBy: { rank: "desc" },
-    select: {
-      analyses: {
-        orderBy: { analyzedAt: "desc" },
-        take: 1,
-        select: { verdict: true },
-      },
-    },
-  });
-  const verdict = precedente?.analyses[0]?.verdict ?? null;
-  /*
-    `HORS_SUJET` n'est pas dans les verdicts du domaine : il est écrit par
-    le chemin de reclassement, après une lecture débitée comme les autres.
-    Une reprise après lui est donc payante — le candidat a déposé le
-    mauvais fichier, la lecture a bien eu lieu et elle a bien rendu
-    quelque chose.
-  */
-  return verdict === "CONFORME" || verdict === "A_CORRIGER" || verdict === "ILLISIBLE"
-    ? verdict
-    : null;
-}
-
 export async function analyserUnePiece(
   tache: Tache,
   extraire: Extracteur = lExtracteur(),
@@ -207,7 +170,12 @@ export async function analyserUnePiece(
     conforme était envoyée au service, payée, et son verdict « à
     corriger » remplaçait celui de la v2.
   */
-  if (!(await commandeLaPiece(version.documentId, version.rank))) return "TERMINEE";
+  if (!(await commandeLaPiece(version.documentId, version.rank))) {
+    // Une exécution arrêtée avant ce remplacement avait peut-être débité :
+    // sa réservation est rendue (RF-3, E5).
+    await rendreLaReservation(tache.applicationId, version.id, MOTIF_OBSOLETE);
+    return "TERMINEE";
+  }
 
   const document = version.document;
   const application = document.application;
@@ -248,6 +216,11 @@ export async function analyserUnePiece(
       feedback: MENTION_NON_ANALYSEE.autorisation_retiree,
       finding: null,
     });
+    await rendreLaReservation(
+      tache.applicationId,
+      version.id,
+      "Lecture arrêtée : l'autorisation d'analyse a été retirée",
+    );
     await recalculerCompletude(tache.applicationId);
     return "TERMINEE";
   }
@@ -277,7 +250,7 @@ export async function analyserUnePiece(
     analyse, si bien que l'état de la pièce a déjà oublié pourquoi le
     candidat revient.
   */
-  const consomme = consommeUneAnalyse(await verdictPrecedent(document.id, version.rank));
+  const consomme = await lectureAPayer(document.id, version.rank);
 
   // INV-6 — le débit précède l'appel. Débiter après laisserait une analyse
   // gratuite à chaque interruption, et l'invariant dit « jamais de
@@ -293,7 +266,9 @@ export async function analyserUnePiece(
   let debit: Awaited<ReturnType<typeof debiterUneAnalyse>> | null = null;
   if (consomme) {
     try {
-      debit = await debiterUneAnalyse(tache.applicationId);
+      // La réservation nomme sa version : un rejeu après un arrêt la
+      // reprend au lieu d'en poser une seconde (RF-3, E5).
+      debit = await debiterUneAnalyse(tache.applicationId, undefined, { versionId: version.id });
     } catch (erreur) {
       if (!(erreur instanceof EchecHttp) || erreur.echec.code !== "quota_epuise") throw erreur;
       await conserverFauteDeQuota(version, tache);
@@ -341,6 +316,7 @@ export async function analyserUnePiece(
           tache.applicationId,
           `Lecture non aboutie (${lu.cause}), tentative ${tentatives} — reprise en attente`,
           entame,
+          version.id,
         );
       }
       return "A_REPRENDRE";
@@ -654,11 +630,18 @@ async function consignerUneFois(
     return true;
   } catch (erreur) {
     if ((erreur as { code?: unknown } | null)?.code !== "P2002") throw erreur;
+    /*
+      RF-3, E5 : deux exécutions d'une même version partagent désormais sa
+      réservation — la seconde reprend celle de la première. La gagnante
+      l'a liée à son analyse, ou l'a rendue : il ne reste rien à rendre, et
+      rendre ici offrirait une analyse. Seule une réservation encore
+      ouverte l'est.
+    */
     if (consomme) {
-      await rendreUneTentative(
+      await rendreLaReservation(
         tache.applicationId,
+        tache.versionId,
         "Lecture en double : la pièce était déjà analysée par une autre tâche",
-        entame,
       );
     }
     return false;

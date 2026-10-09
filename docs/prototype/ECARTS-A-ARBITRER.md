@@ -12291,3 +12291,64 @@ Une revue humaine tranchée sans analyse de la version courante peut aussi y fig
 - B-05 ne signale pas encore à l'opérateur qu'une revue porte sur un fichier remplacé : la décision est consignée sans effet, et la revue quitte la file.
 - RF-3 : E5 et FON-03.
 - La recette du parcours (RF-5) reste **non vérifiée**.
+
+## S.148 — RF-3 : une opération, un débit durable (E5, FON-03)
+
+**Autorisation.** Le responsable a autorisé le lot RF-3 le 09/10/2026. Aucun choix ouvert. Le lot part de main `39e6d7d`.
+
+**Reproduit sur l'ancien code** (`smoke:extraction`, `smoke:balayage`) :
+- **E5 :**
+  - une extraction interrompue après le débit, puis rejouée, coûte deux analyses ;
+  - deux reprises simultanées après l'arrêt écrivent trois débits pour une seule version ;
+  - une version remplacée après l'arrêt garde son débit.
+- **FON-03 :** une meilleure photo déposée à solde nul après « illisible » est conservée sans lecture, alors que C-08 promet « Cette reprise ne consomme pas d'analyse ». La promotion ne regardait que le solde, et le dépôt l'annonçait de même.
+
+**Correction.**
+- **Migration additive** `20261009180000_reservation_par_version` : `AnalysisCredit.versionId`, avec sa clé étrangère (`ON DELETE SET NULL`) et son index. Les lignes antérieures ne sont pas réécrites.
+- **Réservation par version :**
+  - le débit d'une lecture nomme sa version ;
+  - sous le verrou du grand livre, un débit demandé pour une version dont la réservation est ouverte la reprend au lieu d'en poser une seconde ;
+  - une réservation est ouverte quand son débit n'est ni lié à une analyse ni rendu ;
+  - les rendus nomment la version qu'ils soldent : tentative, illisible, lecture obsolète, revue humaine.
+- **Sorties sans verdict :** `rendreLaReservation` rend la réservation restée ouverte, et elle seule. Cela couvre la version remplacée après un arrêt, l'autorisation retirée et l'exécution qui perd la course. Le perdant d'une course ne rend plus « sa » tentative : la réservation étant partagée, la gagnante l'a liée ou rendue, et rendre de nouveau offrirait une analyse.
+- **Comportement conservé :** une tentative qui sera rejouée (service saturé) rend toujours son débit tout de suite, décision antérieure tenue par `smoke:extraction`.
+- **Reprise gratuite :** une règle commune, `server/dossiers/reprise-gratuite.ts` (`lectureAPayer`, `analyseAnnoncee`), est lue par l'annonce du dépôt, la promotion et l'analyse. La reprise après « illisible » passe à solde nul. La première lecture reste refusée à solde nul, et un retrait d'autorisation bloque toujours, avant.
+- **Limite dite :** un arrêt du processus ne garantit pas un unique appel au fournisseur. Deux reprises simultanées peuvent appeler deux fois. Le quota reste cohérent : une analyse payée.
+
+**Rédaction et relecture assistées, examinées.** Le débit précède l'appel, comme pour la lecture, mais il n'y a pas de file. Un arrêt du processus entre le débit et le résultat laisse un débit sans texte ni avis, et rien ne le reprend : le candidat qui relance paie de nouveau. Le cas est plus étroit, puisqu'il s'agit d'une requête synchrone et que l'échec d'appel est déjà rendu. Il reste ouvert : rattacher la relecture à la version relue et rendre une réservation restée ouverte après un délai relève d'un lot suivant (RF-4).
+
+**Données existantes.** Rien n'est réécrit. Les débits antérieurs à la migration n'ont pas de version. Un débit ambigu se repère en comparant, par dossier, les analyses de lecture payées aux analyses `creditConsumed` :
+
+```sql
+WITH lecture AS (
+  SELECT c."applicationId", -sum(c.delta) AS payees
+  FROM "AnalysisCredit" c
+  WHERE c.reason IN ('ANALYSE', 'ANALYSE_RENDUE')
+    AND (c.note IS NULL OR (c.note NOT LIKE 'Rédaction assistée%'
+         AND c.note NOT LIKE 'Mise en forme%' AND c.note NOT LIKE 'Relecture%'))
+  GROUP BY 1),
+consommees AS (
+  SELECT d."applicationId", count(*) AS consommees
+  FROM "DocumentAnalysis" a
+  JOIN "DocumentVersion" v ON v.id = a."versionId"
+  JOIN "Document" d ON d.id = v."documentId"
+  WHERE a."creditConsumed"
+  GROUP BY 1)
+SELECT l."applicationId", l.payees, coalesce(c.consommees, 0) AS consommees
+FROM lecture l LEFT JOIN consommees c USING ("applicationId")
+WHERE l.payees <> coalesce(c.consommees, 0);
+```
+
+Un écart est un débit sans résultat, ou un résultat sans débit. Il se traite au cas par cas dans RF-4, sans rendu massif automatique : un débit ambigu ne devient pas une analyse gratuite.
+
+**Vérifications.**
+- `npm run check` : 166 fichiers, 3454 tests. `npm run build` et `npm run check:audit` passent.
+- Les 25 fumées passent, dont `smoke:migrations` (migration et garde-fous) et `smoke:worker --base`.
+- Les nouveaux contrôles E5 et FON-03 échouent sur l'ancien code.
+- Deux tests structurels sont adaptés sans rien relâcher : `analyse-idempotente` (le perdant rend la réservation ouverte) et `depot-sans-analyse` (la reprise gratuite passe avant le solde). Nouveau garde-fou : `tests/reservation-par-version`.
+- Aucune image n'est requise : le lot ne touche ni les artefacts ni le déploiement. La migration passe par le chemin ordinaire de `deployer.sh`, sauvegarde comprise.
+
+**Écarts restants.**
+- La rédaction et la relecture assistées (ci-dessus).
+- RF-4 : le diagnostic des débits antérieurs, entre autres.
+- La recette du parcours (RF-5) reste **non vérifiée**.
