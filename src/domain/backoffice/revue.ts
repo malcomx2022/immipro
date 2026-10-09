@@ -43,6 +43,11 @@ export interface PieceEnEchec {
   motif: MotifEchec;
   /** Trace technique de la lecture automatique, pour l'opérateur seul. */
   journal: string;
+  /**
+   * Ce que le candidat désigne comme faux, quand c'est lui qui a ouvert la
+   * revue (S.157) ; `null` sinon.
+   */
+  signalement: string | null;
 }
 
 /** Délai cible de traitement d'une pièce en revue, en heures (WF-15). */

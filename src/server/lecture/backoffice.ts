@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { resumeDuSignalement } from "@/domain/dossiers/signalement";
 import type { Transaction } from "@prisma/client";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
 import { etapeDe, sommeARendre, type DetteFedaPay } from "@/domain/paiement/remboursement";
@@ -600,6 +601,8 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "piece.consultation": "ACCES_PIECE",
   "piece.purge": "ACCES_PIECE",
   "piece.purge.inventaire": "ACCES_PIECE",
+  // Il ouvre une revue de pièce : il se range avec `revue.decision`.
+  "piece.signalement": "ACCES_PIECE",
   "dossier.consultation": "ACCES_PIECE",
   // Le retrait d'un accord de partage porte sur ce qu'un tiers pouvait
   // lire : il se classe avec les accès aux pièces, pas avec le compte.
@@ -777,8 +780,31 @@ export async function fileDeRevue(): Promise<PieceEnEchec[]> {
     },
   });
 
+  /*
+    S.157 — ce que le candidat a désigné comme faux vit au journal, avec
+    son signalement : la revue n'en garde que le motif.
+  */
+  const signalees = file.filter((r) => r.reason === "SIGNALE_PAR_LE_CANDIDAT");
+  const traces = signalees.length
+    ? await db.auditLog.findMany({
+        where: {
+          action: "piece.signalement",
+          target: { in: signalees.map((r) => `document:${r.analysis.version.documentId}`) },
+        },
+        select: { metadata: true },
+      })
+    : [];
+  const designes = new Map<string, string[]>();
+  for (const t of traces) {
+    const m = t.metadata as { analyse?: unknown; champs?: unknown } | null;
+    if (typeof m?.analyse === "string" && Array.isArray(m.champs)) {
+      designes.set(m.analyse, m.champs.map(String));
+    }
+  }
+
   return file.map((r) => {
     const document = r.analysis.version.document;
+    const champs = designes.get(r.analysisId);
     return {
       id: r.id,
       piece: document.label,
@@ -788,6 +814,7 @@ export async function fileDeRevue(): Promise<PieceEnEchec[]> {
       // Trace technique : pour l'opérateur seul, jamais pour le candidat
       // (DOC-12 §16, règle 3 — l'exception assumée du message B-02).
       journal: r.analysis.engineLog ?? "Aucune trace enregistrée.",
+      signalement: champs ? resumeDuSignalement(champs) : null,
     };
   });
 }

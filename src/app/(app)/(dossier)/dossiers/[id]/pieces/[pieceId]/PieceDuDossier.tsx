@@ -2,18 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { CONSENTEMENTS } from "@/domain/comptes/consentements";
-import { appeler } from "@/lib/api";
+import { HORS_LIGNE, appeler } from "@/lib/api";
 import { ECHECS, type EchecCandidat } from "@/domain/echecs/catalogue";
 import { SOCLE_BOUTON, VARIANTES_BOUTON } from "@/components/ui/bouton-styles";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { Dossier } from "@/domain/dossiers/dossier";
+import { attendUneSuite } from "@/domain/dossiers/dossier";
 import type { Piece } from "@/domain/dossiers/piece";
 import { estAPhotographier, estDeposeeNonVerifiee, sousTitreDepot } from "@/domain/dossiers/piece";
 import type { ControleDuDepot } from "@/domain/dossiers/quarantaine";
@@ -22,13 +23,18 @@ import {
   PORTEE_ANALYSE,
   RESERVE_LECTURE,
   libelleSuite,
+  mentionDeRelecture,
   mentionSuite,
   valeurAffichee,
 } from "@/domain/dossiers/analyse";
-import type { EtatTeleversement, Fichier, Quota } from "@/domain/dossiers/televersement";
+import { AUTRE_CHOSE, refusDuSignalement } from "@/domain/dossiers/signalement";
+import type { Coupure, EtatTeleversement, Fichier, Quota } from "@/domain/dossiers/televersement";
 import {
   CADRAGES,
   CONSEILS_PHOTO,
+  DELAI_DE_RELANCE_MS,
+  RELANCES_AUTOMATIQUES,
+  messageCoupure,
   FORMATS_ACCEPTES,
   envoiEnCours,
   libelleAvancement,
@@ -145,6 +151,21 @@ export function PieceDuDossier({
   const [recu, setRecu] = useState<string | null>(null);
   const champ = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  /*
+    S.157, R-02 — « sera envoyé dès le retour du réseau ». Trouvé par la
+    recette RF-5 : au retour du réseau, l'écran revenait à « prêt » et rien
+    ne partait ; qui attendait, comme on le lui avait dit, attendait en
+    vain. L'envoi coupé repart désormais de lui-même, une fois, avec le même
+    fichier : au retour du réseau, ou après quelques secondes si le
+    navigateur se croit déjà en ligne (le stockage, lui, ne répondait pas).
+    Un double envoi n'est pas à craindre : rien n'est enregistré avant la
+    confirmation, et une empreinte déjà connue est refusée (RG-06.2).
+  */
+  const [coupureEnCours, setCoupureEnCours] = useState<Coupure>("HORS_LIGNE");
+  const aRelancer = useRef(false);
+  const relancesRestantes = useRef(RELANCES_AUTOMATIQUES);
+  const minuteurDeRelance = useRef<number | null>(null);
+  const envoiCourant = useRef<(auto: boolean) => Promise<void>>(async () => undefined);
 
   /*
     Le contrôle se fait hors de la page, en quelques secondes : l'écran se
@@ -174,7 +195,10 @@ export function PieceDuDossier({
   // échoué.
   useEffect(() => {
     const perdu = () => setEtat("RESEAU_COUPE");
-    const revenu = () => setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
+    const revenu = () => {
+      if (aRelancer.current) relancer();
+      else setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
+    };
     window.addEventListener("offline", perdu);
     window.addEventListener("online", revenu);
     if (typeof navigator !== "undefined" && navigator.onLine === false) perdu();
@@ -183,6 +207,40 @@ export function PieceDuDossier({
       window.removeEventListener("online", revenu);
     };
   }, [quota]);
+
+  // La relance appelle l'envoi du dernier rendu, celui qui connaît le fichier.
+  useEffect(() => {
+    envoiCourant.current = envoyer;
+  });
+  useEffect(
+    () => () => {
+      if (minuteurDeRelance.current !== null) window.clearTimeout(minuteurDeRelance.current);
+    },
+    [],
+  );
+
+  function relancer() {
+    if (!aRelancer.current) return;
+    aRelancer.current = false;
+    if (minuteurDeRelance.current !== null) window.clearTimeout(minuteurDeRelance.current);
+    minuteurDeRelance.current = null;
+    relancesRestantes.current -= 1;
+    void envoiCourant.current(true);
+  }
+
+  /** L'envoi n'a pas joint le serveur ou le stockage : on garde le fichier. */
+  function coupure() {
+    setEtat("RESEAU_COUPE");
+    if (relancesRestantes.current <= 0) {
+      setCoupureEnCours("RELANCE_ECHOUEE");
+      return;
+    }
+    setCoupureEnCours("ENVOI_EN_ATTENTE");
+    aRelancer.current = true;
+    if (typeof navigator === "undefined" || navigator.onLine !== false) {
+      minuteurDeRelance.current = window.setTimeout(relancer, DELAI_DE_RELANCE_MS);
+    }
+  }
 
   function choisir(liste: FileList | null) {
     const brut = liste?.[0];
@@ -225,12 +283,16 @@ export function PieceDuDossier({
     else setEchecConsentement(resultat.echec);
   }
 
-  async function envoyer() {
+  async function envoyer(auto = false) {
     if (!consenti) return;
     if (!fichier || !brut) {
-      champ.current?.click();
+      if (!auto) champ.current?.click();
       return;
     }
+    // Un envoi lancé à la main rouvre le droit à une relance automatique.
+    if (!auto) relancesRestantes.current = RELANCES_AUTOMATIQUES;
+    aRelancer.current = false;
+    setCoupureEnCours("HORS_LIGNE");
     setEtat("ENVOI");
     setEchec(null);
     setEnvoyes(0);
@@ -248,6 +310,10 @@ export function PieceDuDossier({
       depot: { url: string; cle: string };
       analyseraLaPiece: boolean;
     }>(`/api/dossiers/${dossier.id}/pieces/${piece.id}/depot`, { corps: demande });
+    if (!prepare.ok && prepare.echec === HORS_LIGNE) {
+      coupure();
+      return;
+    }
     if (!prepare.ok) {
       setEtat(quotaEpuise(quota) ? "QUOTA_EPUISE" : "PRET");
       // Autorisation retirée entre-temps, depuis un autre appareil : la case
@@ -260,7 +326,7 @@ export function PieceDuDossier({
 
     const monte = await televerser(prepare.donnees.depot.url, brut, setEnvoyes);
     if (!monte) {
-      setEtat("RESEAU_COUPE");
+      coupure();
       return;
     }
 
@@ -353,10 +419,7 @@ export function PieceDuDossier({
       {etat === "RESEAU_COUPE" ? (
         <section className="flex flex-col gap-1.5 rounded-lg border-l-6 border-danger bg-white p-4 shadow-e2">
           <h2 className="text-16 font-semibold text-ink-900">Connexion perdue</h2>
-          <p className="text-pretty text-14 text-ink-700">
-            Ton fichier est conservé sur ton téléphone et sera envoyé dès le retour du réseau. Ne
-            quitte pas l&apos;application.
-          </p>
+          <p className="text-pretty text-14 text-ink-700">{messageCoupure(coupureEnCours)}</p>
         </section>
       ) : null}
 
@@ -589,7 +652,7 @@ export function PieceDuDossier({
         >
           {libelleCta(etat)}
         </Button>
-        <p className="text-center text-13 text-ink-500">{mentionPied(etat)}</p>
+        <p className="text-center text-13 text-ink-500">{mentionPied(etat, coupureEnCours)}</p>
       </div>
     </div>
   );
@@ -617,6 +680,8 @@ function Analyse({
     quelqu'un que sa pièce était illisible.
   */
   const lignes = analyse.champs;
+  const relue = analyse.relecture?.etat === "TRANCHEE";
+  const enRelecture = analyse.relecture ? mentionDeRelecture(analyse.relecture) : null;
 
   return (
     <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
@@ -654,6 +719,13 @@ function Analyse({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-16 font-semibold text-ink-900">Ce que nous avons lu</h2>
+        {/* S.157, R-01 — la décision ci-dessus a remplacé cette lecture. */}
+        {relue ? (
+          <p className="text-pretty text-13 text-ink-500">
+            Lecture automatique, avant la relecture. La décision de la personne qui a relu ta
+            pièce la remplace.
+          </p>
+        ) : null}
         <dl className="flex flex-col">
           {/* En 390 px, « 13 569,24 € · 8 901 000 F » ne tient pas sur la même
               ligne que son intitulé : la valeur passe dessous plutôt que de
@@ -670,14 +742,26 @@ function Analyse({
             </div>
           ))}
         </dl>
-        <p className="text-pretty text-13 text-ink-500">{RESERVE_LECTURE}</p>
+        {analyse.relecture ? (
+          enRelecture ? (
+            <p role="status" className="text-pretty rounded-md bg-ink-100 p-3.5 text-14 text-ink-700">
+              {enRelecture}
+            </p>
+          ) : null
+        ) : (
+          <>
+            <p className="text-pretty text-13 text-ink-500">{RESERVE_LECTURE}</p>
+            {/* Un dossier déposé ou clos garde ses pièces telles quelles : rien à relire. */}
+            {attendUneSuite(dossier) ? (
+              <Signalement
+                dossierId={dossier.id}
+                pieceId={piece.id}
+                lus={lignes.map((c) => c.intitule)}
+              />
+            ) : null}
+          </>
+        )}
         <div className="flex flex-col gap-1">
-          <Link
-            href={`/dossiers/${dossier.id}/pieces/${piece.id}/signalement`}
-            className="flex min-h-touch items-center text-14 text-accent-700 underline"
-          >
-            Signaler une erreur de lecture
-          </Link>
           <Link
             href={`/dossiers/${dossier.id}/pieces/${piece.id}/versions`}
             className="flex min-h-touch items-center text-14 text-accent-700 underline"
@@ -734,9 +818,101 @@ function Analyse({
             {libelleSuite(analyse.verdict)}
           </Button>
         )}
-        <p className="text-center text-13 text-ink-500">{mentionSuite(analyse.verdict, quota)}</p>
+        <p className="text-center text-13 text-ink-500">
+          {mentionSuite(analyse.verdict, quota, analyse.verdictLu)}
+        </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Signaler une erreur de lecture — S.157, R-03.
+ *
+ * Sur place, et non sur une page à part : le candidat coche les valeurs
+ * qu'il voit fausses, juste au-dessus. Il ne recopie pas la bonne valeur
+ * (elle irait au journal, qui ne se purge pas avec les pièces) ;
+ * l'opérateur relit la pièce elle-même.
+ */
+function Signalement({
+  dossierId,
+  pieceId,
+  lus,
+}: {
+  dossierId: string;
+  pieceId: string;
+  lus: readonly string[];
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const [designes, setDesignes] = useState<string[]>([]);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const router = useRouter();
+  const choix = [...lus, AUTRE_CHOSE];
+  const refus = refusDuSignalement(designes, lus);
+
+  async function envoyer(e: FormEvent) {
+    e.preventDefault();
+    if (refus || envoi) return;
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler<{ dejaEnRelecture: boolean }>(
+      `/api/dossiers/${dossierId}/pieces/${pieceId}/signalement`,
+      { corps: { champs: designes } },
+    );
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setEchec(resultat.echec);
+      return;
+    }
+    // L'écran se relit : c'est le serveur qui dit que la relecture est ouverte.
+    router.refresh();
+  }
+
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        className="flex min-h-touch items-center self-start text-14 text-accent-700 underline"
+      >
+        Signaler une erreur de lecture
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={envoyer} className="flex flex-col gap-3 rounded-lg border border-ink-300 bg-white p-4">
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-pretty pb-1 text-14 font-medium text-ink-900">
+          Quelles valeurs sont fausses ?
+        </legend>
+        {choix.map((intitule) => (
+          <Checkbox
+            key={intitule}
+            libelle={intitule}
+            checked={designes.includes(intitule)}
+            onChangement={(coche) =>
+              setDesignes((d) => (coche ? [...d, intitule] : d.filter((x) => x !== intitule)))
+            }
+          />
+        ))}
+      </fieldset>
+      <p className="text-pretty text-13 text-ink-500">
+        Une personne de l&apos;équipe relit la pièce elle-même. Le signalement ne consomme pas
+        d&apos;analyse.
+      </p>
+      {echec ? <BlocEchec echec={echec} annonce /> : null}
+      <Button
+        type="submit"
+        pleineLargeur
+        chargement={envoi}
+        disabled={refus !== null}
+        raisonDesactivation={refus ?? undefined}
+      >
+        Envoyer le signalement
+      </Button>
+    </form>
   );
 }
 

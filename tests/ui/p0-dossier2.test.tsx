@@ -389,7 +389,9 @@ describe("C-08 — Résultat d'analyse", () => {
     expect(screen.getByText("10 000 €")).toBeDefined();
     expect(screen.getByText("preuve fonds annuelle")).toBeDefined();
     expect(container.textContent).toContain("Lecture automatique, susceptible d'erreur");
-    expect(screen.getByRole("link", { name: "Signaler une erreur de lecture" })).toBeDefined();
+    // S.157, R-03 : le signalement s'ouvre sur place ; le lien menait à un 404.
+    expect(screen.getByRole("button", { name: "Signaler une erreur de lecture" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Voir l'historique des versions" })).toBeDefined();
   });
 
   /*

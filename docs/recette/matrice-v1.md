@@ -62,9 +62,9 @@ chaque geste.
 | R-C02 | Ouverture d'un dossier, achat d'essai | Compte vérifié | Dossier ouvert, pack acheté, quota crédité | Non déroulé : aucun rail de paiement sur le banc | — | Non vérifié |
 | R-C03 | Dépôt d'une pièce saine | Dossier de démonstration, autorisation « pièces » donnée | Accusé « bien arrivé », contrôle, promotion, lecture annoncée | Avant S.155 : la préparation répondait **503** (défaut bloquant, corrigé en S.155). Après : accusé, balayage SAINE, analyse sans débit (aucun fournisseur), revue humaine ouverte | Version 1 SAINE, analyse `creditConsumed = false` | Vérifié (banc) |
 | R-C04 | Dépôt du fichier EICAR | Idem | Fichier écarté, non conservé, message qui dit quoi faire, aucune analyse débitée | « Fichier écarté au contrôle… Dépose une nouvelle version de la pièce. » Analyses restantes inchangées | Version INFECTEE, `objectKey` vide | Vérifié (banc) |
-| R-C05 | Résultat d'une revue humaine sur l'écran de la pièce (C-08) | R-C03, puis décision B-05 « Conforme » | La pièce se lit conforme, avec le message de l'opérateur | L'alerte dit « Ta pièce a été acceptée après relecture », la checklist compte la pièce conforme, mais C-08 affiche encore « Illisible — Un opérateur regarde ta pièce » et propose « Reprendre la photo » | Capture `r-cas-3-avant` ; `Document.status = CONFORME` | **Anomalie R-01** |
+| R-C05 | Résultat d'une revue humaine sur l'écran de la pièce (C-08) | R-C03, puis décision B-05 « Conforme » | La pièce se lit conforme, avec le message de l'opérateur | L'alerte dit « Ta pièce a été acceptée après relecture », la checklist compte la pièce conforme, mais C-08 affiche encore « Illisible — Un opérateur regarde ta pièce » et propose « Reprendre la photo » | Capture `r-cas-3-avant` ; `Document.status = CONFORME`. Rejoué après S.157 : « Conforme », titre de l'avis, message de l'opérateur, « Revenir à la checklist », plus de « Reprendre la photo » | Corrigé en S.157 (banc) |
 | R-C06 | Remplacement d'une pièce | Pièce déjà déposée | Nouvelle version courante ; l'ancienne reste à l'historique ; la pièce suit la version courante (RG-06.8) | Version 2 créée, version 1 gardée, l'état suit la version 2 | Deux versions en base | Vérifié (banc) |
-| R-C07 | Historique des versions et signalement d'une erreur de lecture | Écran C-08 | Les deux liens mènent à leur écran | Les deux liens répondent **404** | Réponses 404 sur `…/versions` et `…/signalement` | **Anomalie R-03** |
+| R-C07 | Historique des versions et signalement d'une erreur de lecture | Écran C-08 | Les deux liens mènent à leur écran | Les deux liens répondent **404** | Réponses 404 sur `…/versions` et `…/signalement`. Rejoué après S.157 : le signalement ouvre la revue (motif « Signalé par le candidat »), B-05 montre la valeur désignée ; l'historique liste les versions, sans défilement à 390 px | Corrigé en S.157 (banc) |
 | R-C08 | Complétude, rédaction assistée, échéancier | Dossier avec pièces lues | Complétude recalculée, rédaction débitée puis soldée (S.153) | Non déroulé : la lecture et la rédaction demandent un fournisseur | — | Non vérifié |
 | R-C09 | Déclaration du dépôt, issue, purge et portabilité | Dossier prêt | RG-10.8, RG-10.9 | Non déroulé | — | Non vérifié |
 
@@ -72,7 +72,7 @@ chaque geste.
 
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |
 |---|---|---|---|---|---|---|
-| R-K01 | Perte réseau pendant l'envoi des octets | Fichier choisi ; envoi vers le stockage coupé | Bandeau « Connexion perdue » ; fichier gardé ; envoi possible au retour du réseau | Bandeau et fichier gardé : conforme. Le bandeau promet « sera envoyé dès le retour du réseau », mais rien ne part de lui-même : 8 s après le retour, aucune version. Un nouvel appui envoie bien | Aucune version avant l'appui, une après | **Anomalie R-02** |
+| R-K01 | Perte réseau pendant l'envoi des octets | Fichier choisi ; envoi vers le stockage coupé | Bandeau « Connexion perdue » ; fichier gardé ; envoi possible au retour du réseau | Bandeau et fichier gardé : conforme. Le bandeau promet « sera envoyé dès le retour du réseau », mais rien ne part de lui-même : 8 s après le retour, aucune version. Un nouvel appui envoie bien | Aucune version avant l'appui, une après. Rejoué après S.157 : la version arrive sans appui (coupure du stockage, puis hors ligne au moment d'appuyer) ; une relance coupée elle aussi dit d'appuyer sur « Réessayer l'envoi » | Corrigé en S.157 (banc) |
 | R-K02 | Double clic sur l'envoi | Fichier choisi | Une seule version | Une seule version (1 → 2) | Décompte en base | Vérifié (banc) |
 | R-K03 | Session expirée | Cookies effacés | Page → connexion avec retour ; API → message actionnable | `/connexion?suite=…` ; 401 « Ta session a expiré. Il faut te reconnecter pour continuer. Ton dossier est conservé en l'état. » | Réponse de l'API relevée | Vérifié (banc) |
 | R-K04 | Fournisseur de lecture indisponible | Aucune clé | Revue humaine, analyse non débitée, message honnête | « La lecture automatique n'est pas active sur cette installation. Un opérateur regarde ta pièce » ; aucun débit | `engineLog`, `creditConsumed = false` | Vérifié (banc) |
@@ -145,6 +145,8 @@ et « Voir l'historique des versions » mènent à des routes absentes, donc
 - Gravité : moyenne.
 - Correctif proposé, au choix du responsable : retirer les liens en V1,
   ou construire les deux écrans.
+
+**Suite, 09/10/2026.** Les trois anomalies sont corrigées en S.157, aux choix du responsable : la décision prime (R-01), relance automatique (R-02), signalement et historique construits (R-03). Un test vérifie désormais qu'aucun lien interne ne mène à une route absente. Leur vérification en préproduction reste à faire.
 
 ## Observations mineures
 

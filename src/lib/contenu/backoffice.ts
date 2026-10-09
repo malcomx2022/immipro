@@ -254,6 +254,8 @@ export function piecesEnEchec(maintenant: Date): readonly PieceEnEchec[] {
   return ECHECS.map(({ ilYAMinutes, ...piece }) => ({
     ...piece,
     deposeeLe: new Date(maintenant.getTime() - ilYAMinutes * 60_000).toISOString(),
+    // Le prototype ne garde pas les valeurs désignées : la trace en tient lieu.
+    signalement: null,
   }));
 }
 

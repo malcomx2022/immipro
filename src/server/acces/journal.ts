@@ -24,6 +24,13 @@ export type ActionAuditee =
    * de l'inventaire du stockage — S.152. L'auteur est `console:<nom>`.
    */
   | "piece.purge.inventaire"
+  /**
+   * Une erreur de lecture signalée par le candidat — S.157. Elle ouvre la
+   * revue manuelle de la lecture (B-05) : c'est un changement du sort de
+   * la pièce, pas une consultation. L'auteur est le candidat ; les
+   * détails disent quelles valeurs il désigne, jamais leur bonne valeur.
+   */
+  | "piece.signalement"
   | "dossier.consultation"
   | "compte.suspension"
   /** Un rôle donné ou retiré depuis la console du serveur (S.115). */

@@ -212,6 +212,8 @@ export const ANALYSE_RESSOURCES: ResultatAnalyse = {
     },
   ],
   mention: { source: "ind.nl", verifieeLe: "2026-09-01" },
+  verdictLu: "A_CORRIGER",
+  relecture: null,
 };
 
 /**
