@@ -527,6 +527,7 @@ ORDER BY next_review_at;
 - RG-15.1 : tout accès administrateur à une pièce d'identité est **journalisé avec motif obligatoire**.
 - RG-15.2 : remboursement proratisé selon les **analyses** consommées — l'unité que le candidat voit et achète, et non les jetons (décision de la direction du 06/10/2026). Montant = prix payé × analyses restantes ÷ analyses du pack, arrondi à l'unité mineure inférieure. Automatique tant que le dossier n'est ni déclaré déposé ni clos ; au-delà, revue manuelle. Rien de consommé : prix entier. Tout consommé : rien à rendre, aucune obligation ouverte. La rédaction assistée ne change pas le montant. L'avoir porte la somme rendue.
 - RG-15.3 : RBAC strict, principe du moindre privilège, aucun compte partagé.
+- RG-15.4 : une revue manuelle de remboursement tranchée à zéro en B-04 se dit au candidat par un message fixe, en alerte et par courriel : l'achat et sa référence, « aucun montant n'est remboursé », ce qui lui reste d'analyses, et la page Contact pour une question. Le motif saisi par l'opérateur reste interne (journal, écart). Un avis par obligation refermée ; un courriel qui ne part pas est repris par la passe de rapprochement (S.154, RF-4, décision du 09/10/2026).
 
 ### WF-16 — Supervision des coûts IA
 

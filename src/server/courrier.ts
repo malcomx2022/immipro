@@ -291,6 +291,19 @@ Le reçu détaillé est consultable dans ton espace, à tout moment.${SIGNATURE}
   });
 
 /**
+ * Une demande de remboursement tranchée à zéro — B-04, S.154. Le texte
+ * vient du domaine (`avisDeTrancheNulle`) : l'alerte et le courriel disent
+ * la même chose, mot pour mot.
+ */
+export const envoyerAvisDeTrancheNulle = (destinataire: string, titre: string, corps: string) =>
+  expedier({
+    destinataire,
+    genre: "remboursement_tranche_nulle",
+    objet: titre,
+    corps: `${corps}${SIGNATURE}`,
+  });
+
+/**
  * Remboursement confirmé — arbitrage du 21/09/2026.
  *
  * Envoyé à la **confirmation**, jamais à la décision ni à l'envoi de la

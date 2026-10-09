@@ -78,6 +78,7 @@ import {
   suiteDuRemboursementDeLaMontee,
 } from "@/domain/payments/montee";
 import { repartir } from "@/domain/payments/grand-livre";
+import { prevenirDeLaTrancheNulle } from "@/server/paiement/avis-de-revue";
 import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 import { etablirLAvoir, etablirLaFacture, etatDeLaFacturation } from "@/server/facturation/emission";
@@ -1851,7 +1852,12 @@ export async function trancherLaRevueManuelle(
     return "decidee" as const;
   });
 
-  if (conclusion === "refermee") return { issue: "refermee" };
+  if (conclusion === "refermee") {
+    // Le candidat apprend la décision (S.154, message fixe). Après la
+    // transaction, et sans lever : l'envoi ne défait jamais une tranche.
+    await prevenirDeLaTrancheNulle({ ...transaction, applicationId }, ouverteLe, maintenant);
+    return { issue: "refermee" };
+  }
   if (conclusion !== "decidee") {
     throw echec("etat_incompatible", { corps: REFUS_DE_LA_TRANCHE[conclusion] });
   }
