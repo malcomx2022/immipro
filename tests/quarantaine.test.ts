@@ -369,6 +369,22 @@ describe("une pièce saine finit toujours par être analysée ou conservée", ()
     );
   });
 
+  it("l'état de service compte ce que la reprise ne fait pas lire, avec la même définition (RF-4, S.150)", () => {
+    const reprise = sansCommentaires(lire("src/server/jobs/quarantaine.ts"));
+    const corps = reprise.slice(reprise.indexOf("export async function reprendreLesAnalysesEnAttente"));
+    expect(corps).toMatch(/const enAttente = await analysesEnAttenteDepuis\(seuil\);/u);
+    // Ni version remplacée ni dossier figé : la définition les écarte dans la requête.
+    expect(reprise).toMatch(/application: \{ status: \{ notIn: \[\.\.\.ETATS_FIGES\] \} \}/u);
+    expect(reprise).toMatch(/\.filter\(\(v\) => v\.document\.versions\[0\]\?\.id === v\.id\)/u);
+
+    const sante = sansCommentaires(lire("src/app/api/health/route.ts"));
+    expect(sante).toMatch(/import \{ analysesEnAttenteDepuis \} from "@\/server\/jobs\/quarantaine";/u);
+    expect(sante).toMatch(/const RETARD_ANALYSE_HEURES = 1;/u);
+    // Le compte figure au détail restreint, avec un message qui dit quoi faire.
+    expect(sante).toMatch(/analyses: \{\s*lisible: analyses\.lisible,/u);
+    expect(sante).toContain("relire le journal du worker");
+  });
+
   it("un quota épuisé au débit conserve la pièce au lieu de faire échouer le job", () => {
     const analyse = lire("src/server/jobs/analyse.ts");
     expect(analyse).toMatch(/erreur\.echec\.code !== "quota_epuise"\) throw erreur;\s*await conserverFauteDeQuota\(/u);

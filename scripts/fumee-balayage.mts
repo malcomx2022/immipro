@@ -232,7 +232,9 @@ const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
 const { constaterLesDependances } = await import("../src/server/exploitation/capacites");
 const { sonderLesServices } = await import("../src/server/exploitation/sondes");
 const { exigerUnDepotConforme } = await import("../src/server/acces/pieces");
-const { reprendreLesAnalysesEnAttente } = await import("../src/server/jobs/quarantaine");
+const { reprendreLesAnalysesEnAttente, analysesEnAttenteDepuis } = await import(
+  "../src/server/jobs/quarantaine"
+);
 const { cleObjet } = await import("../src/server/securite/secret");
 const { REFUS_DE_LA_CONFIRMATION } = await import("../src/domain/dossiers/televersement");
 
@@ -818,6 +820,62 @@ try {
       (await balayerUnePiece(perdue.tache, leBalayeur())) === "ANALYSE",
       "et ce balayage redemande l'analyse",
     );
+  }
+
+  console.log("\nL'état de service compte les analyses que la reprise ne fait pas lire (RF-4, S.150)");
+  {
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    const ilYADeuxHeures = new Date(Date.now() - 2 * 3_600_000);
+    const saine = async () => {
+      const p = await piece({ avecQuota: true });
+      await balayerUnePiece(p.tache, leBalayeur());
+      return p;
+    };
+    const attend = await saine();
+    const recente = await saine();
+    const figee = await saine();
+    const remplacee = await saine();
+    await db.documentVersion.updateMany({
+      where: { id: { in: [attend, figee, remplacee].map((p) => p.tache.versionId) } },
+      data: { scannedAt: ilYADeuxHeures },
+    });
+    // Un dossier déposé garde l'état de ses pièces : sa version ne sera jamais lue.
+    await db.application.update({ where: { id: figee.tache.applicationId }, data: { status: "SOUMIS" } });
+    // Une version remplacée n'a plus rien à attendre (RG-06.8).
+    await db.documentVersion.create({
+      data: {
+        documentId: remplacee.tache.documentId,
+        rank: 2,
+        objectKey: `${remplacee.cle}.v2`,
+        checksum: `somme-v2-${rang}-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+      },
+    });
+
+    const comptees = new Set(
+      (await analysesEnAttenteDepuis(new Date(Date.now() - 3_600_000))).map((v) => v.id),
+    );
+    verifier(comptees.has(attend.tache.versionId), "une pièce saine sans analyse depuis deux heures est comptée");
+    verifier(!comptees.has(recente.tache.versionId), "une pièce qui vient d'être promue ne l'est pas");
+    verifier(!comptees.has(figee.tache.versionId), "un dossier déposé ne fait pas d'alerte qui ne s'éteint pas");
+    verifier(!comptees.has(remplacee.tache.versionId), "une version remplacée n'est pas comptée");
+
+    // La reprise lit la même définition : elle ne relance pas ce que l'état de service tait.
+    await reprendreLesAnalysesEnAttente();
+    const enFile = async (versionId: string) =>
+      Number(
+        (
+          await db.$queryRawUnsafe<{ n: bigint }[]>(
+            `SELECT count(*) AS n FROM pgboss.job WHERE name = $1 AND data->>'versionId' = $2`,
+            JOBS.BALAYAGE_PIECE,
+            versionId,
+          )
+        )[0]!.n,
+      );
+    verifier((await enFile(attend.tache.versionId)) === 1, "la reprise remet en file la pièce comptée");
+    verifier((await enFile(figee.tache.versionId)) === 0, "et laisse celle d'un dossier déposé");
+    verifier((await enFile(remplacee.tache.versionId)) === 0, "et celle qu'une version plus récente remplace");
   }
 
   console.log("\nUn objet promu que la file rejoue ne promeut rien une seconde fois");
