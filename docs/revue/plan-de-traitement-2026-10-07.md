@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est livré, S.150 (RF-4, supervision E6) est livré, S.151 (RF-4, inventaire du stockage E4) est livré, S.152 (RF-4, purges : restauration, préfixe, périmètre validé) est livré, S.153 (RF-4, réservations de la rédaction assistée) est livré, S.154 (RF-4, tranche à zéro dite au candidat) est proposé. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est livré, S.150 (RF-4, supervision E6) est livré, S.151 (RF-4, inventaire du stockage E4) est livré, S.152 (RF-4, purges : restauration, préfixe, périmètre validé) est livré, S.153 (RF-4, réservations de la rédaction assistée) est livré, S.154 (RF-4, tranche à zéro dite au candidat) est livré, S.155 (correctif urgent : préparation du dépôt en 503 depuis S.148) est proposé. Tout le reste est à faire.
 
 ---
 
@@ -1483,7 +1483,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **E7** : relire à la main les analyses `HORS_SUJET` et les notifications « Ce fichier ressemble à : » dont le libellé n'appartient pas au référentiel ; l'étape 6 (contrôle du message final) reste facultative.
 - **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.
 - **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.
-- **M4** : lister les dettes déjà bloquées en revue (constat M4 de `dist/diagnostic-donnees.mjs`, S.149) et les trancher en B-04 : **non vérifié**. Depuis S.154 (proposé), une tranche à zéro est dite au candidat par un message fixe (alerte et courriel).
+- **M4** : lister les dettes déjà bloquées en revue (constat M4 de `dist/diagnostic-donnees.mjs`, S.149) et les trancher en B-04 : **non vérifié**. Depuis S.154 (livré), une tranche à zéro est dite au candidat par un message fixe (alerte et courriel).
 - **E3** : à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.
 - **Audit** : l'exception `deepmerge-ts` (D-34) est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15) ; les quatre modérées de `minio` restent affichées.
 - **M17** : une base de développement où la graine a tourné avant S.131 garde ses relevés de veille de démonstration, sans dommage ; ceux d'une veille réelle effacés par les passes antérieures ne se retrouvent pas.
@@ -1601,4 +1601,11 @@ courriel au texte du domaine, motif interne), et le courriel manqué est
 repris par la passe de rapprochement. Voir le registre, entrée S.154.
 Avec ce lot, toutes les étapes de RF-4 sont proposées ; leurs contrôles
 d'exploitation restent **non vérifiés**.
+
+**Correctif S.155, 09/10/2026, trouvé par la recette RF-5.** Depuis
+S.148, la préparation du dépôt cherchait la version précédente sous un
+rang hors de l'entier 32 bits : toute préparation répondait 503. Sans
+rang, l'annonce ne filtre plus ; la fumée du balayage le couvre contre
+un vrai Postgres. Le dépôt en production après déploiement reste
+**non vérifié**. Voir le registre, entrée S.155.
 Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

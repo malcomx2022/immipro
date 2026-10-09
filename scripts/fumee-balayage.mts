@@ -236,6 +236,7 @@ const { reprendreLesAnalysesEnAttente, analysesEnAttenteDepuis } = await import(
   "../src/server/jobs/quarantaine"
 );
 const { cleObjet } = await import("../src/server/securite/secret");
+const { analyseAnnoncee } = await import("../src/server/dossiers/reprise-gratuite");
 const { REFUS_DE_LA_CONFIRMATION } = await import("../src/domain/dossiers/televersement");
 
 let rang = 0;
@@ -819,6 +820,35 @@ try {
     verifier(
       (await balayerUnePiece(perdue.tache, leBalayeur())) === "ANALYSE",
       "et ce balayage redemande l'analyse",
+    );
+  }
+
+  console.log("\nLe dépôt annonce la lecture sans connaître le rang à venir (S.155)");
+  {
+    /*
+      La préparation d'un dépôt demande, avant qu'aucune version n'existe,
+      si la pièce sera lue. Sans rang, la version « à venir » passait
+      Number.MAX_SAFE_INTEGER à la base, qui le refusait (INT4) : toute
+      préparation de dépôt répondait 503 depuis S.148. Trouvé par la
+      recette (RF-5).
+    */
+    const p = await piece({ avecQuota: true });
+    let annonce: boolean | string;
+    try {
+      annonce = await analyseAnnoncee(p.tache.applicationId, p.tache.documentId);
+    } catch (erreur) {
+      annonce = erreur instanceof Error ? erreur.message.split("\n").find((l) => l.includes("INT4")) ?? erreur.name : "erreur";
+    }
+    verifier(annonce === true, `sans rang, l'annonce se lit (${annonce})`);
+
+    // Après une lecture illisible, la reprise s'annonce gratuite même à solde nul.
+    await db.documentAnalysis.create({
+      data: { versionId: p.tache.versionId, verdict: "ILLISIBLE", title: "Illisible", body: "Pièce illisible." },
+    });
+    await db.analysisCredit.create({ data: { applicationId: p.tache.applicationId, delta: -3, reason: "ANALYSE" } });
+    verifier(
+      (await analyseAnnoncee(p.tache.applicationId, p.tache.documentId)) === true,
+      "après « illisible », la reprise s'annonce lue, à solde nul",
     );
   }
 
