@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -1514,3 +1514,28 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
   Lot dédié : il touche l'hydratation.
 - **S.145 (déploiement)** : après la fusion, le prochain déploiement recopie `deployer.sh` corrigé sur le VPS. Vérifier qu'il passe l'étape 2 (« aucune migration en attente » ou « une migration attend »), puis l'étape 3, qui joue les trois migrations en attente depuis `9b5f174` (S.137 `divergence_a_propager`, avec son rejeu D-23 ; S.140 `date_de_la_prestation` ; S.141 `historiques_immuables`), avec leur sauvegarde préalable.
 - **D-13, D-14** : appliquées en S.140 sur l'option recommandée, sans réponse explicite. Faire confirmer D-14 par M.C. Si M.C retient l'option b (exercice de la vente), seule `etablirLaFacture` change, et `performedAt` reste.
+
+## 8. Revue fonctionnelle complémentaire du 09/10/2026 — chantier RF
+
+La [revue fonctionnelle](revue-fonctionnelle-2026-10-09.md) a été menée sur
+main 3f089c2/S.141. Le lot documentaire RF-0 a ensuite été rapproché de
+main dd2b58f/S.144 : S.142, S.143 et S.144 sont fusionnés (PR #241 à #243).
+Leurs changements et décisions sont conservés ; aucun numéro S.xxx n'est réservé.
+
+La revue reproduit, avec dépendances simulées, FON-01 (historique compté
+dans le plafond à l'écran), FON-02 (ancienne version publiée sur la pièce
+courante), FON-03 (reprise gratuite bloquée à quota nul), FON-04 (migration
+qui réactive un dossier soumis) et le reliquat E5 après interruption.
+Les courses du plafond et la pause omise côté serveur sont des constats de
+lecture à éprouver sur base réelle. M11/C-05 et DOC-11 sont également repris.
+
+Le [chantier](chantier-fonctionnel-2026-10-09.md) ordonne RF-0 à RF-7 :
+documentation, dossiers, versions, quota, historique/purge/supervision,
+recette V1, préalables Q.A/M.C, maintenance restante en continuité avec Claude Code.
+Les restes du §7 demeurent ; aucune correction antérieure n'est rouverte
+sans reproduction. La montée des dépendances déjà fusionnée n'est pas dupliquée.
+
+**Statut.** RF-0 autorisé par le responsable et préparé dans une PR
+documentaire ; sa fusion reste distincte. Aucun correctif métier n'est
+livré par RF-0. RF-1 à RF-7 sont planifiés ; A-1 à A-3 restent à valider.
+Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

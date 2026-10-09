@@ -74,3 +74,49 @@ Un message d'échec est toujours actionnable.
 - [ ] La règle de gestion de DOC-11 implémentée est citée dans la description
 - [ ] Les états vide, chargement et erreur sont traités
 - [ ] Aucune chaîne de caractères en anglais dans l'interface
+
+## Suivi du chantier fonctionnel — 09/10/2026
+
+Le responsable a autorisé le **lot RF-0**, limité aux documents. Les lots
+RF-1 à RF-7 restent planifiés ; les choix A-1 à A-3 ne sont pas tranchés.
+Une autorisation ultérieure vaut pour le lot demandé et ses travaux nécessaires.
+
+Ordre de lecture : ce fichier, [DOC-11](docs/DOC-11-workflows.md),
+[DOC-12](docs/DOC-12-prototype.md), les dernières décisions du
+[registre](docs/prototype/ECARTS-A-ARBITRER.md), le
+[plan historique](docs/revue/plan-de-traitement-2026-10-07.md), puis la
+[revue fonctionnelle](docs/revue/revue-fonctionnelle-2026-10-09.md) et le
+[chantier RF](docs/revue/chantier-fonctionnel-2026-10-09.md).
+
+Base du lot 0 : main dd2b58f, S.125 à S.144 intégrés. Claude Code a livré
+S.142 (Stripe-Version et dépendances SMTP, PR #241), S.143 (ESLint plat,
+PR #242) et S.144 (Next 16, PR #243). Relire main et les PR ouvertes avant
+chaque lot ; conserver ces changements et leurs décisions. Les identifiants
+RF ne réservent aucun numéro S.xxx : attribuer celui-ci au démarrage d'un
+lot applicatif, après vérification du registre et du travail en cours.
+
+Trois preuves distinctes : code implémenté, parcours éprouvé, préalable de
+lancement levé. Une PR ouverte reste proposée ; une fusion ne démontre ni
+recette ni déploiement. Un contrôle non exécuté reste « non vérifié ».
+
+Pour chaque lot applicatif autorisé :
+
+- une PR, une entrée de suivi, un rattachement WF/RG/écran et les écarts restants ;
+- reproduction du comportement, puis test du résultat voulu ; courses et
+  interruptions éprouvées sur une base jetable ;
+- traiter FON-01 à FON-04, le reliquat E5 et C-05/M11 selon les dépendances
+  du chantier, sans considérer les choix ouverts comme approuvés ;
+- garder l'historique des anciennes pièces ; empêcher ses effets sur la
+  pièce courante ; partager la règle de reprise gratuite et respecter les
+  états figés lors d'un arbitrage ;
+- diagnostiquer les données antérieures sans réécrire les règles figées,
+  le journal ou les pièces comptables ; attribuer et tracer les traitements ;
+- conserver les reports V2 de DOC-11 §0 et les huit invariants ci-dessus ;
+- Q.A commande l'ouverture publique, M.C l'encaissement réel ; leur levée
+  exige les validations et preuves prévues, au-delà de la présence du code.
+
+Appliquer la porte de qualité de `.github/workflows/validation.yml` et
+les critères du chantier : verrou, check, audit, build, schéma, migrations,
+garde-fous et fumées concernés ; image si les artefacts ou le déploiement
+changent. Documenter les résultats dans le lot. RF-0 ne modifie aucun code,
+schéma, drapeau commercial ou service ; sa validation ne certifie pas la V1.

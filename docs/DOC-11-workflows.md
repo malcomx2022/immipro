@@ -233,7 +233,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 2. Création d'une `Transaction` locale en `INITIEE` avec une référence interne unique.
 3. Appel FedaPay, stockage du `providerTxId`, redirection vers la page de paiement hébergée.
 4. Le candidat choisit son opérateur, saisit son numéro, reçoit une notification USSD et confirme par code PIN.
-5. Redirection vers `/paiement/attente`, page de polling interrogeant `GET /api/payments/status?tx=` toutes les 3 secondes, **timeout à 5 minutes**, bouton « Réessayer ».
+5. Redirection vers `/paiement/attente`, page de polling interrogeant `GET /api/paiements/statut?tx=` toutes les 3 secondes, **timeout à 5 minutes**, bouton « Réessayer ».
 6. En parallèle, le webhook FedaPay arrive, sa **signature est vérifiée**, la `Transaction` passe en `CONFIRMEE`.
 7. Crédit du pack : analyses ouvertes au grand livre du dossier, déblocage des fonctionnalités, passage du dossier en `ACTIF`.
 8. Envoi du reçu par email.
@@ -255,7 +255,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 | Double soumission | Réutilisation de la transaction `EN_ATTENTE` existante, pas de nouvelle création |
 | Solde insuffisant | Message explicite et proposition du pack inférieur |
 | Changement de devise en cours de session | Interdit après création de la transaction |
-| Demande de remboursement | WF-15, avec règle de proratisation selon les tokens déjà consommés |
+| Demande de remboursement | WF-15, avec proratisation selon les analyses vendues et restantes, figées sur la transaction (RG-15.2, S.124 et S.128) |
 
 ---
 
@@ -272,7 +272,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 2. Contrôles immédiats : type MIME, taille, **analyse antivirus**. Rejet synchrone en cas d'échec.
 3. Stockage dans MinIO, bucket privé, clé non devinable. La pièce passe en `EN_ANALYSE`.
 4. Mise en file d'un job (pg-boss).
-5. Le worker appelle **Claude en vision directe sur le document** : identification du type, extraction des champs clés, signalement des incohérences apparentes.
+5. Le worker appelle **le fournisseur de lecture choisi par l’exploitant, dans le cadre de RG-06.7** : identification du type, extraction des champs clés, signalement des incohérences apparentes.
 6. Application des **validations déterministes en TypeScript** à partir de `rules.conditions` : validité du passeport, seuil de fonds, cohérence des dates, correspondance nom/prénom entre pièces.
 7. Verdict, champs extraits, messages actionnables et tokens consommés enregistrés.
 8. Notification du candidat, mise à jour du score de complétude (WF-07).
@@ -280,7 +280,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 **Règles de gestion**
 
 - RG-06.1 : tout ce qui est vérifiable sans IA l'est sans IA. L'IA n'intervient que sur l'extraction et la cohérence narrative.
-- RG-06.2 : une pièce re-téléversée à l'identique (même empreinte) réutilise le verdict en cache, sans débit de tokens.
+- RG-06.2 : une pièce re-téléversée à l'identique (même empreinte) réutilise le verdict en cache, sans nouvel appel IA ni nouveau débit d’analyse (INV-6).
 - RG-06.3 : un message d'échec est toujours **actionnable** — « votre passeport expire 4 mois après la date de retour prévue, il en faut 6 », jamais « document non conforme ».
 - RG-06.4 : les URLs MinIO présignées ont une durée de vie de 5 minutes et sont générées à la demande.
 - RG-06.5 : quota épuisé → dégradation gracieuse, proposition du pack supérieur, jamais de dépassement silencieux (INV-6).
