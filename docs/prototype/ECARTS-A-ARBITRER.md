@@ -12382,3 +12382,31 @@ Un écart est un débit sans résultat, ou un résultat sans débit. Il se trait
 - L'inventaire du stockage (E4).
 - La reprise des réservations de la rédaction assistée (S.148).
 - Les obligations en revue manuelle (B-04).
+
+## S.150 — RF-4, supervision E6 : les analyses que la reprise ne fait pas lire
+
+**Autorisation.** RF-4, autorisé par le responsable le 09/10/2026 ; étape 4 du chantier (« ajouter le compteur d'analyses saines en attente depuis plus d'une heure à la supervision ; respecter l'accès restreint au détail de /api/health »). Le lot part de main `e737827`. Aucun choix ouvert.
+
+**Ce qui manquait.** E6 étape 5 restait à faire depuis S.126 : une pièce saine dont l'analyse n'était jamais partie était reprise chaque heure, mais si la reprise n'y arrivait pas, rien ne le disait. Et la reprise relançait aussi, chaque heure, les pièces des dossiers déposés ou clos, dont le résultat ne change plus rien (RG-06.8) : une mise en file sans effet, indéfiniment.
+
+**Reproduction sur l'ancien code.** La section ajoutée à `smoke:balayage` échoue sur deux points : aucune pièce n'est comptée, et la reprise met en file la version d'un dossier `SOUMIS`.
+
+**Ce qui est livré.**
+- `analysesEnAttenteDepuis(seuil)` (`server/jobs/quarantaine.ts`) : une seule définition des pièces en attente. Elle retient la version saine, sans analyse, la plus récente de sa pièce, sur un dossier qui n'est pas figé (`ETATS_FIGES`). Le filtre du dossier est dans la requête.
+- `reprendreLesAnalysesEnAttente` la lit avec son seuil de trente minutes ; son comportement ne change que pour les dossiers figés, désormais laissés.
+- Le détail restreint de `/api/health` (lecteur exploitant, inchangé) gagne un bloc `analyses` : `lisible`, `enAttente`, `depuisHeures`. Son message dit quoi faire : relire le journal du worker. Le corps public reste `{status, db}` (D-4). Le compte ne relance rien ; c'est la reprise qui relance.
+- DOC-11 : RG-06.10.
+
+**Vérifications.**
+- `tests/quarantaine` : la reprise et l'état de service lisent la même fonction, le seuil est d'une heure, et le bloc figure au détail.
+- `smoke:balayage` : une pièce saine depuis deux heures est comptée et remise en file. Une pièce récente, une pièce de dossier déposé et une version remplacée ne sont ni comptées ni relancées.
+- `npm run check` (3464 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris. Aucun artefact ni déploiement modifié : pas de fumée d'image.
+
+**Données existantes.** Aucune écriture. Les pièces de dossiers figés qui étaient relancées chaque heure cessent de l'être ; leur état reste celui de l'historique.
+
+**Ce qui reste de RF-4.**
+- Le diagnostic sur la production (S.149) et le relevé de ce compte après déploiement : **non vérifiés**.
+- La commande de purge exécutable dans l'image, éprouvée sur une restauration isolée.
+- L'inventaire du stockage (E4).
+- La reprise des réservations de la rédaction assistée (S.148).
+- Les obligations en revue manuelle (B-04).

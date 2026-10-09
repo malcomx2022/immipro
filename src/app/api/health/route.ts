@@ -3,6 +3,7 @@ import { route } from "@/server/http/route";
 import { lecteurExploitant } from "@/server/exploitation/lecteur";
 import { corpsPublic } from "@/domain/exploitation/etat-public";
 import { messageDesTachesEnEchec, sonderLesTachesEnEchec } from "@/server/exploitation/taches";
+import { analysesEnAttenteDepuis } from "@/server/jobs/quarantaine";
 import {
   DEPENDANCES,
   LIBELLE_CAPACITE,
@@ -98,6 +99,44 @@ async function sonderLesDivergences(): Promise<EtatDesDivergences> {
     return { lisible: true, enRetard, depuisHeures };
   } catch {
     return { lisible: false, enRetard: 0, depuisHeures: 0 };
+  }
+}
+
+/**
+ * Une analyse en attente depuis une heure a manqué au moins une reprise
+ * horaire (revue E6, étape 5 ; RF-4, S.150) : la reprise les remet en file
+ * après trente minutes, à la vingtième minute de chaque heure.
+ */
+const RETARD_ANALYSE_HEURES = 1;
+
+interface EtatDesAnalyses {
+  lisible: boolean;
+  enAttente: number;
+  depuisHeures: number;
+}
+
+/**
+ * Les pièces saines qui attendent leur analyse depuis plus d'une heure.
+ *
+ * La définition est celle de la reprise (`analysesEnAttenteDepuis`) : la
+ * dernière version, sur un dossier encore modifiable. Ce compte ne relance
+ * rien — c'est la reprise qui le fait ; il dit qu'elle n'y arrive pas.
+ */
+async function sonderLesAnalysesEnAttente(): Promise<EtatDesAnalyses> {
+  try {
+    const enAttente = await analysesEnAttenteDepuis(
+      new Date(Date.now() - RETARD_ANALYSE_HEURES * 3_600_000),
+    );
+    const plusAncienne = enAttente[0]?.scannedAt;
+    return {
+      lisible: true,
+      enAttente: enAttente.length,
+      depuisHeures: plusAncienne
+        ? Math.floor((Date.now() - plusAncienne.getTime()) / 3_600_000)
+        : 0,
+    };
+  } catch {
+    return { lisible: false, enAttente: 0, depuisHeures: 0 };
   }
 }
 
@@ -373,7 +412,7 @@ export const GET = route({
 });
 
 async function etatDeService() {
-  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes, divergences, taches] = await Promise.all([
+  const [base, file, quarantaine, purge, suspensions, faits, dossiersPayes, divergences, taches, analyses] = await Promise.all([
     sonderLaBase(),
     sonderLaFile(),
     sonderLaQuarantaine(),
@@ -396,6 +435,7 @@ async function etatDeService() {
     compterLesDossiersPayes(),
     sonderLesDivergences(),
     sonderLesTachesEnEchec(),
+    sonderLesAnalysesEnAttente(),
   ]);
 
   /*
@@ -560,6 +600,17 @@ async function etatDeService() {
       },
       // Revue M9 : ce que pg-boss a abandonné, file par file.
       taches: { ...taches, message: messageDesTachesEnEchec(taches) },
+      // Revue E6, étape 5 : des pièces saines que la reprise ne parvient pas à faire lire.
+      analyses: {
+        lisible: analyses.lisible,
+        enAttente: analyses.enAttente,
+        depuisHeures: analyses.depuisHeures,
+        message: !analyses.lisible
+          ? "Les analyses en attente n'ont pas pu être lues."
+          : analyses.enAttente === 0
+            ? "Aucune pièce n'attend son analyse depuis plus d'une heure."
+            : `${analyses.enAttente} pièce(s) saine(s) attendent leur analyse depuis plus d'une heure, la plus ancienne depuis ${analyses.depuisHeures} h. La reprise horaire les remet en file : relire le journal du worker.`,
+      },
     },
   };
 }

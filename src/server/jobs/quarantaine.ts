@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ETATS_FIGES } from "@/domain/dossiers/etat";
 import { getQueue, JOBS, poster } from "@/lib/queue";
 import { lireLesConstats } from "@/server/exploitation/constats";
 import { antivirusConfigure } from "@/server/securite/antivirus";
@@ -142,19 +143,49 @@ export async function reprendreLesAnalysesEnAttente(
   maintenant: Date = new Date(),
 ): Promise<{ remises: number }> {
   const seuil = new Date(maintenant.getTime() - ATTENTE_DE_L_ANALYSE_MINUTES * 60_000);
-  const enAttente = await db.documentVersion.findMany({
+  const enAttente = await analysesEnAttenteDepuis(seuil);
+
+  const file = await getQueue();
+  for (const version of enAttente) {
+    await poster(file, JOBS.BALAYAGE_PIECE, {
+      applicationId: version.applicationId,
+      documentId: version.documentId,
+      versionId: version.id,
+    });
+  }
+  return { remises: enAttente.length };
+}
+
+/**
+ * Les versions saines qui attendent leur analyse depuis le seuil — une
+ * définition, lue par la reprise horaire (30 minutes) et par l'état de
+ * service (une heure, RF-4, S.150).
+ *
+ * Seule la dernière version d'une pièce compte : une version remplacée
+ * n'a plus rien à attendre (RG-06.8). Et seulement sur un dossier encore
+ * modifiable : un dossier déposé ou clos garde l'état de ses pièces, sa
+ * version ne sera jamais lue, et la compter ferait une alerte qui ne
+ * s'éteint pas.
+ */
+export async function analysesEnAttenteDepuis(
+  seuil: Date,
+): Promise<{ id: string; documentId: string; applicationId: string; scannedAt: Date }[]> {
+  const versions = await db.documentVersion.findMany({
     where: {
       scanState: "SAINE",
       objectKey: { not: null },
       purgedAt: null,
       scannedAt: { lt: seuil },
       analyses: { none: {} },
-      document: { status: "EN_ANALYSE" },
+      document: {
+        status: "EN_ANALYSE",
+        application: { status: { notIn: [...ETATS_FIGES] } },
+      },
     },
     select: {
       id: true,
-      rank: true,
       documentId: true,
+      scannedAt: true,
       document: {
         select: {
           applicationId: true,
@@ -162,18 +193,14 @@ export async function reprendreLesAnalysesEnAttente(
         },
       },
     },
+    orderBy: { scannedAt: "asc" },
   });
-
-  const file = await getQueue();
-  let remises = 0;
-  for (const version of enAttente) {
-    if (version.document.versions[0]?.id !== version.id) continue;
-    await poster(file, JOBS.BALAYAGE_PIECE, {
-      applicationId: version.document.applicationId,
-      documentId: version.documentId,
-      versionId: version.id,
-    });
-    remises += 1;
-  }
-  return { remises };
+  return versions
+    .filter((v) => v.document.versions[0]?.id === v.id)
+    .map((v) => ({
+      id: v.id,
+      documentId: v.documentId,
+      applicationId: v.document.applicationId,
+      scannedAt: v.scannedAt!,
+    }));
 }
