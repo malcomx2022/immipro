@@ -12762,3 +12762,40 @@ Ce défaut a été établi à la lecture du code ; l'ancien code ne permet pas d
 **Données existantes.** Aucune : la série réelle n'a jamais été ouverte.
 
 **Ce qui reste, hors code.** Tous les préalables du dossier, et RF-5 avant eux : recette en préproduction et signature de la matrice. Il faut aussi confirmer avec le service fiscal qu'un même numéro, soumis deux fois après une coupure entre l'appel et l'écriture, rend le même code.
+
+## S.159 — RF-5 : recette sur l'instance pilote, contrôles sans écriture et protocole
+
+**Autorisation et choix.** RF-5 a été poursuivi le 09/10/2026. Il n'existe pas de préproduction distincte : la recette se fait sur l'instance pilote `immipro.app`. Le responsable a choisi deux choses :
+- des **contrôles sans écriture** depuis la session de développement, puis un protocole pour le reste ;
+- de relever lui-même le détail de `/api/health`, pour qu'aucun secret ne transite par la session.
+
+Le lot ne change ni code, ni schéma, ni service. Il part de main `c19d585`, et la version recettée est `a2ea746` (S.157).
+
+**Ce qui est vérifié sur l'instance pilote.** Ce sont les lignes R-P02 à R-P07, R-P09 et R-P10 de la matrice :
+- les redirections en 301 ;
+- les en-têtes de sécurité ;
+- `/api/health` public : `{status, db}` et `no-store` ;
+- les 12 pages du plan du site, et `robots.txt` ;
+- les pages juridiques introuvables, sans lien qui y mène ;
+- l'espace privé redirigé vers la connexion, l'API d'administration en 401 ;
+- la lecture anonyme du stockage refusée ;
+- neuf pages publiques à 390 px sans erreur de console.
+
+**Ce que la recette a trouvé.**
+- **R-E01, bloquante : aucune règle CORS sur les seaux du stockage.** Tous les prévols vers `stockage.immipro.app` répondent 403, `https://immipro.app` comprise. Un nœud Garage v2.4.1 jetable sans règle reproduit le message mot pour mot.
+  - Effet : aucun dépôt n'est possible depuis un navigateur en production. Le défaut de S.155 masquait celui-ci, en échouant plus tôt.
+  - Cause : `INSTALLATION-GITHUB.md` décrivait la règle sans commande. Garage ne la pose que par `PutBucketCors`, et seulement avec une clé propriétaire du seau.
+  - Livré : la procédure, éprouvée sur le nœud jetable. Elle donne `owner` le temps de poser la règle avec `aws-cli`, puis le retire. Après la pose, seule `https://immipro.app` obtient `GET` et `PUT` ; une origine étrangère, `www` et `DELETE` restent refusés. La procédure contient aussi les deux `curl` de vérification.
+  - Reste : l'appliquer sur le VPS, puis faire un dépôt réel.
+- **R-E02, mineure : `/tarifs` déborde à 390 px (436 px).** Le badge du pack mis en avant est en `flex-none` et porte une phrase entière (`Tarifs.tsx`). Le correctif est à décider.
+
+**Non vérifié d'ici.**
+- Les certificats : le proxy de sortie de la session présente son propre certificat.
+- Le détail de `/api/health`, les services et le worker.
+- Les parcours candidat et opérateur, le clavier et TalkBack, le runbook.
+
+Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape, le protocole dit ce qu'elle écrit en base et comment l'effacer. La matrice gagne un bloc « Signature », à remplir par le responsable.
+
+**Vérifications.** `npm run check` passe ; c'est le vocabulaire interdit qui s'applique aux documents. Aucune fumée n'est concernée : ni le code, ni l'image, ni le déploiement ne changent.
+
+**Correction d'un compte rendu.** Le compte rendu du déploiement de S.155 disait que « les dépôts devraient être rétablis ». R-E01 l'empêche : le dépôt en production reste impossible tant que la règle CORS n'est pas posée.

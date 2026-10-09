@@ -148,6 +148,64 @@ et « Voir l'historique des versions » mènent à des routes absentes, donc
 
 **Suite, 09/10/2026.** Les trois anomalies sont corrigées en S.157, aux choix du responsable : la décision prime (R-01), relance automatique (R-02), signalement et historique construits (R-03). Un test vérifie désormais qu'aucun lien interne ne mène à une route absente. Leur vérification en préproduction reste à faire.
 
+## Instance pilote `immipro.app` — 09/10/2026 (S.159)
+
+Il n'existe pas de préproduction distincte. Le responsable a choisi, le
+09/10/2026, des **contrôles sans écriture** depuis la session de
+développement, puis un protocole pour le reste
+(`docs/recette/protocole-pilote.md`). Version servie : main `a2ea746`
+(S.157), déploiement réussi à 19 h 14 UTC. Responsable des contrôles :
+Claude Code.
+
+| N° | Scénario | Attendu | Observé | Statut |
+|---|---|---|---|---|
+| R-P01 | Certificats des trois noms | Let's Encrypt, trois noms, échéance lointaine | Illisible d'ici : le proxy de sortie de la session présente son propre certificat | Non vérifié (protocole §2) |
+| R-P02 | HTTP vers HTTPS, `www` vers le domaine nu | 301, chemin conservé | `http://`, `http://www.` et `https://www.` donnent 301 vers `https://immipro.app/…`, chemin conservé | Vérifié (pilote) |
+| R-P03 | En-têtes de sécurité | HSTS, CSP, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy | Tous présents ; CSP avec `'unsafe-inline'` (choix F1) ; `camera=()` ne gêne pas la photo, qui passe par `<input capture>` | Vérifié (pilote) |
+| R-P04 | `/api/health` public | `{status, db}` seulement, `no-store` | `{"status":"pilote","db":"up"}`, `cache-control: no-store` | Vérifié (pilote) |
+| R-P05 | Pages publiques et plan du site | 200 ; plan du site sans page absente | 12 adresses du plan du site en 200 (0,4 à 0,8 s) ; `robots.txt` ferme l'espace privé | Vérifié (pilote) |
+| R-P06 | Pages juridiques avant Q.A | Introuvables, et aucun lien vers elles | Les quatre en 404 ; aucun lien dans l'accueil (M14) | Vérifié (pilote) |
+| R-P07 | Espace privé sans session | Redirection vers la connexion ; API refusée | `/tableau-de-bord`, `/revue`, `/paiements` en 307 vers `/connexion?suite=…` ; `/api/admin/revue` en 401 | Vérifié (pilote) |
+| R-P08 | CORS du stockage, prévol `OPTIONS` | 200 pour `https://immipro.app`, 403 ailleurs | **403 pour toutes les origines, `immipro.app` comprise** (« This CORS request is not allowed ») | **Anomalie R-E01** |
+| R-P09 | Lecture anonyme d'un seau | Refusée | 403 | Vérifié (pilote) |
+| R-P10 | Pages publiques à 390 px, console | Pas de défilement horizontal, aucune erreur | Neuf pages sans défaut ; **`/tarifs` déborde (436 px)** | **Anomalie R-E02** |
+| R-P11 | Détail de `/api/health` | Bloquantes expliquées | Lecture laissée au responsable (choix du 09/10) | Non vérifié (protocole §1) |
+| R-P12 | Six services, worker, alertes | `healthy`, limites, battement, sondes | — | Non vérifié (protocole §3) |
+| R-P13 à R-P17 | Parcours candidat sur téléphone | Voir le protocole §4 | — | Non vérifié |
+| R-P18, R-P19 | Parcours opérateur B-05, B-04 | Voir le protocole §5 | — | Non vérifié |
+| R-P20 | Runbook de déploiement | Trois répétitions | — | Non vérifié (protocole §7) |
+
+**R-E01 — aucune règle CORS sur les seaux du stockage (bloquante).**
+- Constat : tous les prévols vers `stockage.immipro.app` répondent 403,
+  quelles que soient l'origine et la méthode. Un nœud Garage v2.4.1 sans
+  règle reproduit le message mot pour mot.
+- Effet : le navigateur ne peut déposer aucune pièce. Le `PUT` présigné
+  est refusé avant de partir, et l'écran affiche une coupure.
+- Cause : le dépôt décrivait la règle en prose, sans commande.
+  Garage ne la pose que par `PutBucketCors`, avec une clé propriétaire du
+  seau, ce que la clé de l'application n'est pas.
+- Correctif : opération sur le VPS, procédure éprouvée dans
+  `docs/INSTALLATION-GITHUB.md` (S.159).
+- Vérification : les deux `curl` de la procédure, puis un dépôt réel
+  (protocole §0 et §4c).
+
+**R-E02 — `/tarifs` déborde à 390 px (mineure).** Le badge de
+justification du pack mis en avant (`Tarifs.tsx`, classe `flex-none`)
+porte une phrase qui ne peut pas passer à la ligne : la page fait 436 px.
+Correctif à décider : laisser le badge se replier.
+
+## Signature
+
+| | |
+|---|---|
+| Version recettée | |
+| Lignes vérifiées | |
+| Lignes « non vérifié » assumées | |
+| Anomalies ouvertes | |
+| Nom et fonction | |
+| Date | |
+| Décision | Recette signée / à reprendre |
+
 ## Observations mineures
 
 - **O-1.** Les résultats du simulateur affichent « Pays-Bas » deux fois,

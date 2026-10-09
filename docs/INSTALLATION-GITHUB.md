@@ -74,6 +74,48 @@ boucle locale seulement, et une règle CORS qui n'autorise que l'origine
 du site (`PUT`, `GET`, préliminaire `OPTIONS`). Sans `MINIO_PUBLIC_URL`
 en production, le dépôt d'une pièce refuse avec un message qui la nomme.
 
+**La règle CORS des deux seaux (S.159).** Sans elle, le navigateur ne peut
+rien déposer : le préliminaire `OPTIONS` est refusé (« Forbidden: This CORS
+request is not allowed ») avant que le fichier parte, et l'écran affiche une
+coupure. La recette RF-5 l'a relevé sur `stockage.immipro.app` le
+09/10/2026 : aucune règle n'y était posée. Garage ne pose la règle que par
+l'API S3 (`PutBucketCors`), et seulement pour une clé **propriétaire** du
+seau ; la clé de l'application ne l'est pas, et ne doit pas le rester. La
+procédure ci-dessous a été éprouvée sur un nœud Garage v2.4.1 jetable :
+
+```bash
+cd /srv/immipro
+G="docker compose -f docker-compose.prod.yml exec -T minio /garage"
+$G key list                       # l'ID de la clé de l'application (immipro-app)
+read -r ID                        # coller l'ID (GK…)
+read -rs SECRET                   # coller le secret (MINIO_ROOT_PASSWORD de .env.app), sans écho
+cat > /tmp/cors.json <<'JSON'
+{"CORSRules":[{"AllowedOrigins":["https://immipro.app"],"AllowedMethods":["GET","PUT"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]}
+JSON
+for b in immipro-quarantaine immipro-documents; do
+  $G bucket allow --owner "$b" --key "$ID"            # le temps de poser la règle
+  docker run --rm --network host \
+    -e AWS_ACCESS_KEY_ID="$ID" -e AWS_SECRET_ACCESS_KEY="$SECRET" -e AWS_DEFAULT_REGION=us-east-1 \
+    -v /tmp/cors.json:/cors.json:ro amazon/aws-cli:2.27.0 \
+    s3api put-bucket-cors --endpoint-url http://127.0.0.1:9000 --bucket "$b" --cors-configuration file:///cors.json
+  $G bucket deny --owner "$b" --key "$ID"             # la règle reste, le droit part
+done
+rm /tmp/cors.json; unset SECRET
+```
+
+Les noms des seaux sont ceux de `MINIO_BUCKET_DOCUMENTS` et
+`MINIO_BUCKET_QUARANTAINE` dans `.env.app`. Vérification, depuis n'importe
+quel poste — la première doit répondre `200` avec
+`access-control-allow-origin: https://immipro.app`, la seconde `403` :
+
+```bash
+curl -si -X OPTIONS https://stockage.immipro.app/immipro-quarantaine/essai \
+  -H 'Origin: https://immipro.app' -H 'Access-Control-Request-Method: PUT' \
+  -H 'Access-Control-Request-Headers: content-type' | head -5
+curl -si -X OPTIONS https://stockage.immipro.app/immipro-quarantaine/essai \
+  -H 'Origin: https://exemple.test' -H 'Access-Control-Request-Method: PUT' | head -1
+```
+
 ### nginx et certificats (revue M16, D-29)
 
 Trois noms, un certificat, renouvelé par **webroot** : `immipro.app` (le
