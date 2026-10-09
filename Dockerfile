@@ -61,15 +61,18 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
 
 # Les migrations Prisma : le déploiement les applique depuis l'image
-# (`docker compose run --rm app npx prisma migrate deploy`). Le schéma
+# (`docker compose run --rm app prisma migrate deploy`). Le schéma
 # et les migrations doivent donc être dans l'image finale — la sortie
 # `standalone` de Next ne les embarque pas.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# La CLI Prisma pour les migrations : le `standalone` ne la trace pas, et
-# `npx prisma` seul téléchargerait la 7, qui refuse le `url` du schéma au
-# style v6 (P1012). Elle vient de l'étage `prisma-cli`, à version exacte,
-# et se trouve par le PATH (`npx prisma migrate deploy`, `prisma --version`).
+# La CLI Prisma pour les migrations : le `standalone` ne la trace pas. Elle
+# vient de l'étage `prisma-cli`, à version exacte, et se trouve par le PATH
+# sous son nom nu : `prisma migrate deploy`, `prisma --version`. Jamais
+# `npx prisma` : npx ne regarde pas le PATH, ne trouve pas `prisma` dans le
+# `node_modules` du `standalone`, et télécharge l'étiquette `latest` du
+# registre — une 7 qui refuse le `url` du schéma (P1012), puis une 8 qui
+# ne connaît plus `migrate` (09/10/2026).
 COPY --from=prisma-cli /opt/prisma-cli /opt/prisma-cli
 ENV PATH=/opt/prisma-cli/node_modules/.bin:$PATH
 

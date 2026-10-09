@@ -252,6 +252,35 @@ if (!argImage) {
   });
   const versionCli = /^prisma\s*:\s*(\S+)/mu.exec(cli.stdout ?? "")?.[1] ?? "absente";
   verifier(versionCli === PRISMA_ATTENDU, `CLI Prisma de l'image : ${versionCli} (verrou : ${PRISMA_ATTENDU})`);
+
+  /*
+    Les commandes Prisma du déploiement, telles que `deployer.sh` les écrit,
+    rejouées dans l'image sans réseau (09/10/2026). Vérifier `prisma
+    --version` ne suffisait pas : le script appelait `npx prisma`, que npx
+    ne résout pas par le PATH. Il téléchargeait l'étiquette `latest` du
+    registre — une préversion de Prisma 8 sans `migrate` — et chaque
+    déploiement s'arrêtait à l'étape 2. Sans réseau, une commande qui
+    n'atteint pas la CLI de l'image échoue ici, sur le registre ; celle qui
+    l'atteint échoue plus loin, sur la base absente (P1001).
+  */
+  const deployer = readFileSync(join(RACINE, "scripts/deployer.sh"), "utf8");
+  const commandesPrisma = [...deployer.matchAll(/run --rm -T app ((?:npx )?prisma migrate (?:status|deploy))\b/gu)].map(
+    (m) => m[1],
+  );
+  verifier(commandesPrisma.length === 2, `deployer.sh appelle Prisma deux fois (${commandesPrisma.length})`);
+  for (const commande of commandesPrisma) {
+    const [programme, ...args] = commande.split(" ");
+    const r = spawnSync(
+      "docker",
+      ["run", "--rm", "--network", "none", "-e", `DATABASE_URL=${URL_SANS_BASE}`, "--entrypoint", programme, tag, ...args],
+      { encoding: "utf8", timeout: 120_000 },
+    );
+    const sortie = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    verifier(
+      /P1001/u.test(sortie) && !/registry\.npmjs\.org|UNKNOWN_COMMAND/u.test(sortie),
+      `déploiement · « ${commande} » atteint la CLI de l'image (${/P1001/u.test(sortie) ? "base absente, attendu" : sortie.trim().split("\n").at(-1)})`,
+    );
+  }
   const sonde = (commande) =>
     spawnSync("docker", ["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-c", commande], {
       encoding: "utf8",

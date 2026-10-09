@@ -12117,3 +12117,28 @@ planifiés ; Q.A, M.C et la recette d'exploitation restent à satisfaire.
 **Écarts qui restent.** Tous les constats applicatifs de la revue. RF-0
 documente le chantier ; aucune conformité juridique, certification fiscale,
 recette de la V1 ou mise en production n'est déclarée.
+
+## S.145 — Correctif : déploiements arrêtés par `npx prisma` (09/10/2026)
+
+**Constat.** Depuis la montée des dépendances, tous les déploiements échouaient à l'étape 2 de `deployer.sh` :
+
+```
+prisma@8.0.0-rc.22 → CLI.UNKNOWN_COMMAND : No command registered for `migrate`, did you mean `migration`?
+```
+
+Rien n'a changé en production : l'étape 2 précède la migration et la bascule, et le VPS est resté sur `9b5f174`.
+
+**Cause, reproduite dans l'image.** La CLI Prisma de l'image est bien celle du verrou, 6.19.3, sur le `PATH`. Mais `deployer.sh` l'appelait par `npx prisma`, et npx ne regarde pas le `PATH` : ne trouvant pas `prisma` dans le `node_modules` du `standalone`, il télécharge l'étiquette `latest` du registre. Le 09/10/2026, celle-ci désigne `8.0.0-rc.22`, une préversion. Rien dans S.142 à S.144 ne touchait Prisma ; c'est le registre qui a bougé.
+
+Dans l'image `s144`, avec la même base injoignable :
+- sans réseau, `npx prisma …` échoue sur le registre ;
+- avec réseau, il rend exactement `CLI.UNKNOWN_COMMAND` ;
+- `prisma migrate status` atteint la CLI 6.19.3 et échoue sur la base absente (P1001).
+
+**Correction.** Le correctif proposé à l'origine, renommer `migrate` en `migration`, a été écarté : il aurait fait migrer la production avec une préversion de Prisma 8, contre un schéma et des migrations Prisma 6.
+- `deployer.sh` appelle `prisma migrate status` et `prisma migrate deploy` par le nom nu, c'est-à-dire avec la CLI de l'image. Le commentaire du `Dockerfile`, qui affirmait le contraire, est corrigé.
+- `tests/deployer.test.ts` : aucun `npx` dans le script, et les deux appels partent vers le conteneur `app`. Le test échoue sur l'ancien script.
+- `smoke:worker --image`, joué par `deploy.yml` avant toute poussée, rejoue les deux commandes Prisma de `deployer.sh` dans l'image, sans réseau. Sur l'ancien script, il échoue sur le registre ; sur le nouveau, la commande atteint la CLI (P1001 attendu).
+- `docs/exploitation/deploiement.md` : nouvelle section « La CLI Prisma de l'image, jamais celle du registre ».
+
+**Ce qui reste.** Le prochain déploiement recopie le script corrigé sur le VPS. Il jouera les trois migrations en attente depuis `9b5f174`, avec leur sauvegarde préalable : S.137 `divergence_a_propager` (et son rejeu D-23), S.140 `date_de_la_prestation`, S.141 `historiques_immuables`. À suivre jusqu'à « est en service ».
