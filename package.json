@@ -47,6 +47,7 @@
     "stockage:inventaire": "tsx scripts/inventaire-stockage.mts",
     "stockage:purge-retention": "tsx scripts/purge-retention.mts",
     "stockage:purge-inventaire": "tsx scripts/purge-inventaire.mts",
+    "recette:banc": "tsx scripts/recette/banc.mts",
     "smoke:graine": "node scripts/fumee-graine.mjs",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
     "smoke:conservation": "tsx scripts/fumee-conservation.mts",
