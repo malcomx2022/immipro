@@ -17,7 +17,7 @@ import { EN_TETE_CHEMIN, suiteInterne } from "@/domain/comptes/suite";
  * après expiration de sa session doit y revenir après s'être reconnecté, pas
  * atterrir sur un tableau de bord et chercher.
  *
- * Sans suite explicite, la garde prend l'adresse que le middleware a
+ * Sans suite explicite, la garde prend l'adresse que le proxy (`src/proxy.ts`) a
  * relevée : un gabarit ne connaît pas la page qu'il entoure, et c'est le
  * gabarit `(dossier)` qui redirigeait le premier, sans suite (02/10/2026).
  */

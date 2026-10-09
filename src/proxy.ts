@@ -9,9 +9,14 @@ import { lireAdressePublique } from "@/domain/stockage/adresse-publique";
  * Un gabarit Next ne connaît pas l'adresse de la page qu'il entoure. La
  * garde du groupe `(dossier)` redirigeait donc vers `/connexion` sans
  * `?suite=`, et le candidat perdait la page qu'il venait d'ouvrir. Le
- * middleware pose l'adresse dans un en-tête **de requête**, que la garde
+ * proxy pose l'adresse dans un en-tête **de requête**, que la garde
  * lit côté serveur. Il écrase toute valeur venue du client : l'en-tête ne
  * peut pas être fourni de l'extérieur.
+ *
+ * Next 16 renomme le « middleware » en « proxy » (revue M19, étape 3) : le
+ * fichier et la fonction suivent, rien d'autre ne change. Il tourne
+ * désormais sur le runtime Node, ce que ce code permet déjà — il ne lit
+ * que l'environnement et des fonctions du domaine.
  *
  * Il pose aussi la politique de contenu (revue du 07/10/2026, F1). Elle
  * vit ici et non dans `next.config.mjs` parce que l'origine du stockage
@@ -19,7 +24,7 @@ import { lireAdressePublique } from "@/domain/stockage/adresse-publique";
  * servie avec le `.env` du serveur.
  *
  * Il ne fait rien d'autre : ni session, ni limitation, ni redirection.
- * La session se lit en base, ce que le middleware ne fait pas, et chaque
+ * La session se lit en base, ce que le proxy ne fait pas, et chaque
  * garde reste là où elle était.
  */
 const DEVELOPPEMENT = process.env.NODE_ENV !== "production";
@@ -44,7 +49,7 @@ function stockage(env: NodeJS.ProcessEnv): string | null {
 
 const POLITIQUE = politiqueDeContenu({ stockage: stockage(process.env), developpement: DEVELOPPEMENT });
 
-export function middleware(requete: NextRequest) {
+export function proxy(requete: NextRequest) {
   const entetes = new Headers(requete.headers);
   entetes.set(EN_TETE_CHEMIN, `${requete.nextUrl.pathname}${requete.nextUrl.search}`);
   const reponse = NextResponse.next({ request: { headers: entetes } });

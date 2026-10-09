@@ -34,7 +34,7 @@ FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b533
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Next 15 (`standalone`, `node server.js`) écoute sur `process.env.HOSTNAME`
+# Next 15 et 16 (`standalone`, `node server.js`) écoutent sur `process.env.HOSTNAME`
 # quand il est défini — et Docker remplit automatiquement HOSTNAME avec
 # l'ID du conteneur. Sans DNS (`--network none`, comme le test de fumée),
 # cet ID ne se résout pas : le serveur meurt au démarrage sur `EAI_AGAIN`.

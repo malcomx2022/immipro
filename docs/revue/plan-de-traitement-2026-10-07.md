@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1) et S.143 (M19 étape 2) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2) et S.144 (M19 étape 3) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -619,7 +619,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 **Choix techniques.**
 - `'unsafe-inline'` et non un nonce : un nonce rendrait toutes les pages dynamiques, alors que les pages publiques doivent rester statiques (`tests/plan-du-site.test.ts`).
-- La CSP se pose dans `src/middleware.ts`, pas dans `next.config.mjs` : l'origine du stockage (`MINIO_PUBLIC_URL`) n'est connue qu'à l'exécution, et l'image est construite une fois.
+- La CSP se pose dans `src/middleware.ts` (`src/proxy.ts` depuis Next 16, S.144), pas dans `next.config.mjs` : l'origine du stockage (`MINIO_PUBLIC_URL`) n'est connue qu'à l'exécution, et l'image est construite une fois.
 
 **Politique de production.**
 ```
@@ -1375,7 +1375,7 @@ Un lot par étape, chacun avec la porte complète et `smoke:worker --image`.
 | 0 | Node 24 LTS (ou 22.12+) : `.nvmrc`, `Dockerfile`, `setup-node`, `engines`, cible esbuild, `@types/node` | **Livrée en S.134** (D-30). A cassé deux fichiers de tests sous jsdom : `fetch` de Node 24 refuse l'`AbortSignal` de jsdom ; ils tournent désormais sous l'environnement `node` |
 | 1 | Retirer `stripe`, poser `Stripe-Version` dans `appeler()`, correctifs (`next` 15.5.27, `nodemailer`, `postcss`, `tsx`, `prettier`, `smtp-server`) | **Livrée en S.142** (D-31). Rien n'a cassé ; `next`, `postcss`, `tsx` et `prettier` étaient déjà au dernier correctif de leur plage |
 | 2 | ESLint en configuration plate (`eslint.config.mjs` avec `FlatCompat`), `.eslintrc.json` supprimé | **Livrée en S.143.** Mêmes 98 règles et mêmes sévérités ; le script `lint` devient `eslint src`, le périmètre exact de `next lint`. Lire aussi `tests`, `scripts` et `docs` relève 33 remarques : lot à part |
-| 3 | Next 16 : `middleware.ts` devient `proxy.ts`, Turbopack par défaut, `next lint` disparaît | `tests/suite-connexion.test.ts:45`, sortie `standalone` à revérifier |
+| 3 | Next 16 : `middleware.ts` devient `proxy.ts`, Turbopack par défaut, `next lint` disparaît | **Livrée en S.144** (Next 16.4.0). `revalidateTag` exige un profil : `{ expire: 0 }` garde l'invalidation immédiate. `eslint-config-next` 16 est plat natif. Deux règles du React Compiler (`set-state-in-effect`, `purity`) sont coupées pour un lot dédié (huit sites). L'override `postcss` n'est plus utile. Rendu des 136 routes identique, `standalone` vérifiée dans l'image |
 | 4 | zod 4, par `zod/v4` fichier par fichier | `server/http/messages-zod.ts` en entier, `errorMap` de la prise de rendez-vous, messages par défaut |
 | 5 | pg-boss 10 → 11 → 12, deux lots | Migration du schéma `pgboss` au démarrage ; v12 en ESM seul ; fumée de montée à écrire |
 | 6 | Prisma 7 | `prisma.config.ts`, adaptateur `@prisma/adapter-pg`, `build-worker.mjs`, `scripts/migrations.mjs`, CLI de l'image |
@@ -1470,7 +1470,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.143
+## 7. Ce qui reste ouvert après les lots S.125 à S.144
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1504,4 +1504,12 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **F11** : sur une base où la graine de démonstration a tourné, les écritures « systeme:demonstration » restent au journal cinq ans ; elles ne se suppriment plus. Le script des garde-fous, joué à chaque déploiement, insère et annule une page `conditions` de rang 999 999 : rien n'en reste.
 - **M19 étape 1 (D-31)** : au tableau de bord Stripe, créer (ou recréer) le point d'écoute du webhook sur la version `2025-02-24.acacia`, celle que fixe chaque appel. Un point d'écoute existant garde la version de sa création.
 - **M19 étape 2** : élargir le lint à `tests` et `scripts` (et ignorer `docs/prototype/exports`) relève 24 remarques hors `docs` : surtout des variables inutilisées (tests et scripts) et 6 `no-assign-module-variable`. Lot à part, sans urgence.
+- **M19 étape 3** : réactiver `react-hooks/set-state-in-effect` et `react-hooks/purity`, coupées dans `eslint.config.mjs` (décision du 09/10/2026), en réécrivant huit sites :
+  - les lectures de `sessionStorage` du simulateur, de l'accueil et des résultats, par `useSyncExternalStore` ;
+  - les deux chargements au montage des consentements ;
+  - l'état dérivé de la pièce du dossier ;
+  - la fermeture du menu au changement de page ;
+  - `Date.now()` dans la page serveur du journal.
+
+  Lot dédié : il touche l'hydratation.
 - **D-13, D-14** : appliquées en S.140 sur l'option recommandée, sans réponse explicite. Faire confirmer D-14 par M.C. Si M.C retient l'option b (exercice de la vente), seule `etablirLaFacture` change, et `performedAt` reste.

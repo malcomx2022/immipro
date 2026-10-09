@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { revalidateTag } from "next/cache";
 import { route } from "@/server/http/route";
-import { ETIQUETTE_TEXTES_JURIDIQUES } from "@/server/juridique/cache";
+import { ETIQUETTE_TEXTES_JURIDIQUES, EXPIRATION_IMMEDIATE } from "@/server/juridique/cache";
 import { echec } from "@/server/http/echecs";
 import { estUnePageJuridique } from "@/domain/juridique/modeles";
 import { validerUnTexte } from "@/server/juridique/ecriture";
@@ -34,7 +34,7 @@ export const POST = route({
       `ecriture.ts` : la fumée appelle l'écriture hors de Next, où
       l'invalidation n'a pas de sens.
     */
-    revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES);
+    revalidateTag(ETIQUETTE_TEXTES_JURIDIQUES, EXPIRATION_IMMEDIATE);
     return issue;
   },
 });

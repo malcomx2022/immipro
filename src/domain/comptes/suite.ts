@@ -11,7 +11,7 @@
  * c'est sa redirection qui partait la première. Après connexion, le
  * candidat tombait sur le tableau de bord et cherchait.
  *
- * L'adresse demandée est maintenant relevée par le middleware dans un
+ * L'adresse demandée est maintenant relevée par le proxy (`src/proxy.ts`) dans un
  * en-tête de requête, et la garde la lit quand on ne lui en donne pas.
  * Cette fonction décide de ce qui est acceptable comme suite, une fois,
  * pour les trois endroits qui en suivent une : la garde, l'écran de

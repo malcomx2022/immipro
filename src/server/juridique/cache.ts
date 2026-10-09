@@ -26,6 +26,19 @@ import { pagesPubliees } from "./lecture";
 export const ETIQUETTE_TEXTES_JURIDIQUES = "textes-juridiques";
 export const REVALIDATION_LIENS_JURIDIQUES_S = 300;
 
+/**
+ * L'invalidation qui suit une validation en B-08 : expiration immédiate.
+ *
+ * Next 16 (revue M19, étape 3) exige un profil à `revalidateTag`. Le
+ * profil courant, `"max"`, sert encore la version périmée à la requête
+ * suivante et ne la refait qu'en arrière-plan : le premier visiteur après
+ * la validation verrait le pied de page sans le nouveau texte. `expire: 0`
+ * garde le comportement de Next 15 — la requête suivante relit la base.
+ * `updateTag` ferait de même, mais ne s'appelle que d'une action serveur ;
+ * ces écritures sont des routes.
+ */
+export const EXPIRATION_IMMEDIATE = { expire: 0 } as const;
+
 export interface LienJuridique {
   adresse: string;
   titre: string;

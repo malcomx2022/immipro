@@ -59,11 +59,11 @@ describe("l'origine du stockage", () => {
 });
 
 describe("où l'en-tête est posé", () => {
-  const MIDDLEWARE = readFileSync("src/middleware.ts", "utf8");
+  const PROXY = readFileSync("src/proxy.ts", "utf8");
 
-  it("le middleware pose la CSP, et exclut toujours l'API", () => {
-    expect(MIDDLEWARE).toMatch(/headers\.set\("Content-Security-Policy", POLITIQUE\)/u);
-    expect(MIDDLEWARE).toMatch(/matcher: \["\/\(\(\?!api\//u);
+  it("le proxy pose la CSP, et exclut toujours l'API", () => {
+    expect(PROXY).toMatch(/headers\.set\("Content-Security-Policy", POLITIQUE\)/u);
+    expect(PROXY).toMatch(/matcher: \["\/\(\(\?!api\//u);
   });
 
   it("next.config pose la même Permissions-Policy que le domaine", () => {
