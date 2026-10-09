@@ -666,6 +666,176 @@ try {
     );
   }
 
+  /*
+    RF-2, FON-02 — 09/10/2026. Une version ancienne ne commande pas
+    la pièce courante. L'analyse vérifiait que sa version n'avait pas déjà
+    de verdict, jamais qu'elle était encore la dernière : le verdict d'une
+    v1 lente s'écrivait sur la pièce, au-dessus du fichier v2. Choix A-2 :
+    une lecture devenue obsolète pendant l'appel ne se paie pas.
+  */
+  console.log("\nRF-2 — une version ancienne ne réécrit pas la pièce courante (FON-02)");
+  {
+    const LISIBLE_CONFORME = reponseDeLecture({
+      piece_identifiee: "passeport",
+      obstacle: null,
+      champs: { passeport_validite_min: "2029-03-01" },
+    });
+    const LISIBLE_A_CORRIGER = reponseDeLecture({
+      piece_identifiee: "passeport",
+      obstacle: null,
+      champs: { passeport_validite_min: "2027-10-01" },
+    });
+    /** Ce que fait le dépôt d'un nouveau fichier : une version, la pièce en analyse. */
+    const deposerUneVersion = async (
+      p: Awaited<ReturnType<typeof piece>>,
+      rangVersion: number,
+      saine = false,
+    ) => {
+      const cle = `dossiers/${p.application.id}/passeport-v${rangVersion}-${rang}.pdf`;
+      if (saine) seau(SEAU_CONFIANCE).set(cle, Buffer.from(`%PDF-1.4 v${rangVersion}`));
+      const v = await db.documentVersion.create({
+        data: {
+          documentId: p.document.id,
+          rank: rangVersion,
+          objectKey: cle,
+          checksum: `somme-v${rangVersion}-${rang}-${process.pid}`,
+          mimeType: "application/pdf",
+          sizeBytes: 16,
+          ...(saine ? { scanState: "SAINE" as const, scannedAt: new Date() } : {}),
+        },
+      });
+      await db.document.update({ where: { id: p.document.id }, data: { status: "EN_ANALYSE" } });
+      return v;
+    };
+    const notificationsAnalyse = (applicationId: string) =>
+      db.notification.count({ where: { applicationId, kind: "ANALYSE" } });
+
+    // 1. Le candidat remplace son fichier pendant que la v1 est lue.
+    {
+      reponseDuService = LISIBLE_A_CORRIGER;
+      const p = await piece({ dateCible: "2027-09-01" });
+      const pendantLaLecture: typeof lExtracteur extends () => infer E ? E : never = async (
+        fichier,
+        demande,
+      ) => {
+        await deposerUneVersion(p, 2);
+        return lExtracteur()(fichier, demande);
+      };
+      await analyserUnePiece(p.tache, pendantLaLecture);
+      const apres = await relireDocument(p.document.id);
+      verifier(
+        apres.status === "EN_ANALYSE" && apres.extracted === null,
+        `la pièce reste celle du nouveau fichier, en analyse (${apres.status})`,
+      );
+      verifier(
+        (await notificationsAnalyse(p.application.id)) === 0,
+        "aucun avis ne décrit l'ancien fichier comme le nouveau",
+      );
+      verifier(
+        (await solde(p.application.id)) === 5,
+        `A-2 : la lecture devenue obsolète est rendue (solde ${await solde(p.application.id)})`,
+      );
+      const historique = await analyseDe(p.version.id);
+      verifier(
+        historique?.verdict === "A_CORRIGER" && historique.creditConsumed === false,
+        `le résultat de la v1 reste à l'historique, sans débit (${historique?.verdict})`,
+      );
+      const usages = await db.aiUsage.count({ where: { applicationId: p.application.id } });
+      verifier(usages === 1, `les jetons de l'appel sont mesurés quand même (${usages})`);
+    }
+
+    // 2. v2 rapide, v1 lente : la v1 arrive après, son verdict ne s'écrit pas.
+    {
+      const p = await piece({ dateCible: "2027-09-01" });
+      const v2 = await deposerUneVersion(p, 2, true);
+      reponseDuService = LISIBLE_CONFORME;
+      await analyserUnePiece({ ...p.tache, versionId: v2.id }, lExtracteur());
+      recusParLeService.length = 0;
+      reponseDuService = LISIBLE_A_CORRIGER;
+      await analyserUnePiece(p.tache, lExtracteur());
+      const apres = await relireDocument(p.document.id);
+      verifier(
+        apres.status === "CONFORME",
+        `la pièce garde le verdict du fichier courant (${apres.status})`,
+      );
+      verifier(
+        recusParLeService.length === 0,
+        `la v1 n'est même pas envoyée au service (${recusParLeService.length} appel)`,
+      );
+      verifier(
+        (await solde(p.application.id)) === 4,
+        `une seule analyse payée, celle de la v2 (solde ${await solde(p.application.id)})`,
+      );
+    }
+
+    // 3. Le dossier est clôturé pendant la lecture.
+    {
+      reponseDuService = LISIBLE_CONFORME;
+      const p = await piece({ dateCible: "2027-09-01" });
+      const pendantLaLecture: typeof lExtracteur extends () => infer E ? E : never = async (
+        fichier,
+        demande,
+      ) => {
+        await db.application.update({
+          where: { id: p.application.id },
+          data: { status: "ABANDONNE" },
+        });
+        return lExtracteur()(fichier, demande);
+      };
+      await analyserUnePiece(p.tache, pendantLaLecture);
+      const apres = await relireDocument(p.document.id);
+      verifier(
+        apres.status === "EN_ANALYSE",
+        `un dossier clôturé garde l'état de ses pièces (${apres.status})`,
+      );
+      verifier(
+        (await notificationsAnalyse(p.application.id)) === 0,
+        "et aucun avis d'analyse ne part sur un dossier clos",
+      );
+      verifier(
+        (await solde(p.application.id)) === 5,
+        `la lecture sans effet est rendue (solde ${await solde(p.application.id)})`,
+      );
+    }
+
+    // 4. La revue humaine d'une ancienne version, tranchée après le remplacement.
+    {
+      reponseDuService = reponseDeLecture(
+        { piece_identifiee: null, obstacle: "scan_illisible", champs: { passeport_validite_min: null } },
+        3100,
+        40,
+      );
+      const p = await piece({ dateCible: "2027-09-01" });
+      await analyserUnePiece(p.tache, lExtracteur());
+      const analyse = await analyseDe(p.version.id);
+      const revue = await db.manualReview.findFirstOrThrow({ where: { analysisId: analyse!.id } });
+      await deposerUneVersion(p, 2);
+      const avant = await notificationsAnalyse(p.application.id);
+      const operateur = await db.user.create({
+        data: { email: `fumee-op-rf2-${rang}-${process.pid}@exemple.test`, role: "ADMIN" },
+      });
+      const suite = await trancherLaRevue(
+        revue.id,
+        { id: operateur.id },
+        {
+          decision: "CONFORME",
+          message: "Ton passeport est lisible et valable : la pièce est retenue.",
+          motif: "Relecture",
+        },
+      );
+      const apres = await relireDocument(p.document.id);
+      verifier(suite.decidee, "la décision sur l'ancien fichier est consignée");
+      verifier(
+        apres.status === "EN_ANALYSE",
+        `elle ne s'écrit pas sur le nouveau fichier (${apres.status})`,
+      );
+      verifier(
+        (await notificationsAnalyse(p.application.id)) === avant,
+        "et aucun avis ne l'annonce comme le verdict de la pièce",
+      );
+    }
+  }
+
   console.log("\nLa reprise après un verdict illisible ne se paie pas");
   {
     /*

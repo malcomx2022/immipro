@@ -30,8 +30,12 @@ describe("le job d'analyse ne paie pas deux fois la même lecture", () => {
     expect(job).not.toMatch(/await db\.documentAnalysis\.create\(/u);
     expect(job).not.toMatch(/await db\.notification\.create\(/u);
     // Une seule mise à jour de la pièce reste hors transaction : le retrait
-    // d'autorisation, qui n'écrit aucun verdict et ne débite rien.
-    const horsTransaction = [...job.matchAll(/await db\.document\.update\(\{[\s\S]*?\}\);/gu)];
+    // d'autorisation, qui n'écrit aucun verdict et ne débite rien. Elle
+    // passe, comme les autres, par la règle de la version courante (RF-2).
+    expect(job).not.toMatch(/\bdb\.document\.update\(/u);
+    const horsTransaction = [
+      ...job.matchAll(/await ecrireSurLaPieceCourante\(db,[\s\S]*?\}\);/gu),
+    ];
     expect(horsTransaction).toHaveLength(1);
     expect(horsTransaction[0]![0]).toContain("MENTION_NON_ANALYSEE.autorisation_retiree");
   });
@@ -45,7 +49,7 @@ describe("le job d'analyse ne paie pas deux fois la même lecture", () => {
 
   it("le reclassement hors sujet dit ce qu'il a coûté et relie son débit", () => {
     const hors = job.slice(job.indexOf("async function acheverHorsSujet("));
-    expect(hors).toContain("creditConsumed: cout.consomme");
+    expect(hors).toContain("creditConsumed: cout.consomme && courante");
     expect(hors).toMatch(/where: \{ id: cout\.ligne, analysisId: null \}/u);
   });
 

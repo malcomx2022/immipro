@@ -512,6 +512,58 @@ try {
     );
   }
 
+  /*
+    RF-2, FON-02 — 09/10/2026. Le balayage d'une version remplacée depuis
+    son dépôt écrivait sur la pièce : un fichier infecté déjà remplacé la
+    faisait redemander, avec un avis ; une version saine remplacée partait
+    en analyse.
+  */
+  console.log("\nRF-2 — le balayage d'une version remplacée n'écrit pas sur la pièce (FON-02)");
+  {
+    const remplacer = async (p: Awaited<ReturnType<typeof piece>>) => {
+      const cle = `dossiers/${p.application.id}/passeport-v2-${rang}.pdf`;
+      seau(SEAU_QUARANTAINE).set(cle, Buffer.from("%PDF-1.4 v2"));
+      await db.documentVersion.create({
+        data: {
+          documentId: p.document.id,
+          rank: 2,
+          objectKey: cle,
+          checksum: `somme-v2-${rang}-${process.pid}`,
+          mimeType: "application/pdf",
+          sizeBytes: 11,
+        },
+      });
+      await db.document.update({ where: { id: p.document.id }, data: { status: "EN_ANALYSE" } });
+    };
+
+    reponseDuMoteur = {
+      statut: 200,
+      corps: '{"status":"infected","signature":"Eicar-Test-Signature"}',
+    };
+    const infectee = await piece({ avecQuota: true });
+    await remplacer(infectee);
+    await balayerUnePiece(infectee.tache, leBalayeur());
+    const version = await relire(infectee.tache.versionId);
+    const document = await db.document.findUniqueOrThrow({ where: { id: infectee.document.id } });
+    const avis = await db.notification.count({ where: { userId: infectee.user.id } });
+    verifier(
+      version.scanState === "INFECTEE" && version.objectKey === null,
+      "l'ancien fichier infecté est quand même détruit",
+    );
+    verifier(
+      document.status === "EN_ANALYSE",
+      `la pièce reste celle du nouveau fichier (${document.status})`,
+    );
+    verifier(avis === 0, `aucun avis sur un fichier déjà remplacé (${avis})`);
+
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    const saine = await piece({ avecQuota: true });
+    await remplacer(saine);
+    const suite = await balayerUnePiece(saine.tache, leBalayeur());
+    verifier(suite === "SANS_OBJET", `une version saine remplacée ne part pas en analyse (${suite})`);
+    verifier(enConfiance(saine.cle), "elle est promue tout de même, et reste à l'historique");
+  }
+
   console.log("\nUn moteur qui ne conclut pas ne promeut rien, et se fait reprendre");
   {
     reponseDuMoteur = { statut: 503, corps: "" };

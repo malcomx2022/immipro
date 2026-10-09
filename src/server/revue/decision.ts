@@ -3,6 +3,7 @@ import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { rendreUneAnalyse } from "@/server/acces/quota";
 import { recalculerCompletude } from "@/server/acces/dossiers";
+import { ecrireSurLaPieceCourante } from "@/server/acces/piece-courante";
 import {
   TITRE_DE_LA_DECISION,
   recrediteLeQuota,
@@ -58,6 +59,12 @@ export interface Tranche {
 export interface Suite {
   decidee: true;
   quotaRendu: boolean;
+  /**
+   * La décision s'est-elle écrite sur la pièce ? Non quand le candidat a
+   * déposé un autre fichier depuis, ou que son dossier est déposé ou
+   * clos : elle reste consignée sur la revue, sans effet ni avis (RF-2).
+   */
+  appliquee: boolean;
 }
 
 export async function trancherLaRevue(
@@ -112,7 +119,7 @@ export async function trancherLaRevue(
     qui n'existe pas. Le corps est le message de l'opérateur tel quel —
     c'est lui que le candidat doit lire, et le résumer le trahirait.
   */
-  await db.$transaction(async (tx) => {
+  const appliquee = await db.$transaction(async (tx) => {
     const { count } = await tx.manualReview.updateMany({
       where: { id: revue.id, decidedAt: null },
       data: {
@@ -129,14 +136,20 @@ export async function trancherLaRevue(
           "Cette pièce vient d'être tranchée par un autre membre de l'équipe. Recharge la file pour voir sa décision.",
       });
     }
-    await tx.document.update({
-      where: { id: document.id },
-      data: {
-        status: tranche.decision,
-        feedback: tranche.message,
-        analyzedAt: new Date(),
-      },
-    });
+    /*
+      RF-2, FON-02 — la décision porte sur **une version**. Une revue
+      ouverte sur la v1 et tranchée après le dépôt d'une v2 écrivait son
+      verdict sur la pièce, au-dessus du nouveau fichier, et l'avis
+      l'annonçait comme le verdict de la pièce. Elle reste consignée sur
+      la revue ; la pièce et l'avis suivent le fichier courant.
+    */
+    const courante = await ecrireSurLaPieceCourante(
+      tx,
+      document.id,
+      revue.analysis.version.rank,
+      { status: tranche.decision, feedback: tranche.message, analyzedAt: new Date() },
+    );
+    if (!courante) return false;
     await tx.notification.create({
       data: {
         userId: document.application.userId,
@@ -146,6 +159,7 @@ export async function trancherLaRevue(
         body: tranche.message,
       },
     });
+    return true;
   });
 
   // Au journal, la décision retenue, et elle seule.
@@ -154,7 +168,7 @@ export async function trancherLaRevue(
     action: "revue.decision",
     cible: `document:${document.id}`,
     motif: tranche.motif,
-    details: { decision: tranche.decision },
+    details: { decision: tranche.decision, appliquee },
   });
 
   if (rendu) {
@@ -166,5 +180,5 @@ export async function trancherLaRevue(
   }
 
   await recalculerCompletude(document.applicationId);
-  return { decidee: true, quotaRendu: rendu };
+  return { decidee: true, quotaRendu: rendu, appliquee };
 }
