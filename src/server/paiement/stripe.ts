@@ -32,6 +32,19 @@ import type { TransactionStatus } from "@prisma/client";
 
 const BASE = "https://api.stripe.com/v1";
 
+/**
+ * La version d'API, figée sur chaque appel — D-31 du 09/10/2026 (revue
+ * M19, étape 1).
+ *
+ * Sans elle, Stripe répond dans la version par défaut du compte : une
+ * montée faite au tableau de bord changerait la forme des sessions et des
+ * remboursements que les schémas ci-dessous lisent, sans qu'une ligne de
+ * code ait bougé. C'est celle du SDK contre lequel l'adaptateur a été
+ * écrit. Le point d'écoute du webhook se crée sur la même version :
+ * `lireStripe` lit les événements dans cette forme-là.
+ */
+export const VERSION_API_STRIPE = "2025-02-24.acacia";
+
 /** Le domaine, pas l'hôte : un sous-domaine peut changer, le domaine non. */
 export const DOMAINES = ["stripe.com"] as const;
 
@@ -59,7 +72,10 @@ async function appeler(
   chemin: string,
   options: { corps?: string; idempotence?: string },
 ): Promise<{ statut: number; charge: unknown } | null> {
-  const entetes: Record<string, string> = { Authorization: `Bearer ${cle}` };
+  const entetes: Record<string, string> = {
+    Authorization: `Bearer ${cle}`,
+    "Stripe-Version": VERSION_API_STRIPE,
+  };
   if (options.corps !== undefined) {
     entetes["Content-Type"] = "application/x-www-form-urlencoded";
   }
