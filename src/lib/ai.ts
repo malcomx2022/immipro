@@ -4,9 +4,11 @@ import { FOURNISSEURS } from "@/domain/ia/fournisseurs";
 /**
  * Le client d'appel au modèle. Deux règles tiennent ce module :
  *  - tout ce qui est vérifiable sans IA l'est sans IA (RG-06.1) ;
- *  - chaque appel débite un quota, jamais de dépassement silencieux
- *    (INV-6) — l'appelant enregistre `AiUsage`, y compris quand l'appel
- *    n'a rien rendu : les jetons ont été consommés quand même.
+ *  - chaque appel débite une analyse du grand livre, jamais de
+ *    dépassement silencieux (INV-6) ; ses jetons sont mesurés : l'appelant
+ *    enregistre `AiUsage`, y compris quand l'appel n'a rien rendu, car ils
+ *    ont été consommés quand même. Ils ne plafonnent rien : l'alerte de
+ *    B-07 les compare à `Pack.tokensIA` (D-1 du 09/10/2026).
  *
  * ── Construit à l'usage, pas au chargement ──────────────────────────
  *
@@ -41,13 +43,3 @@ export const AI_MODEL_PAR_DEFAUT = FOURNISSEURS.anthropic.modele.defaut!;
 export const modeleConfigure = (
   environnement: Readonly<Record<string, string | undefined>> = process.env,
 ): string => (environnement.AI_MODEL ?? "").trim() || AI_MODEL_PAR_DEFAUT;
-
-export interface QuotaCheck {
-  restant: number;
-  suffisant: boolean;
-}
-
-export function verifierQuota(consomme: number, alloue: number, estimation: number): QuotaCheck {
-  const restant = alloue - consomme;
-  return { restant, suffisant: restant >= estimation };
-}

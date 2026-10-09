@@ -585,6 +585,52 @@ SELECT refuse(
        "sourceLabel", "verifiedAt", "publishedBy", reason)
      VALUES ('ev4','d1',0,'Titre','Chapeau','{}'::jsonb,'service-public.fr', now(),'op','Publication')$q$);
 
+-- ── F11 · les historiques immuables en base (D-24 du 09/10/2026) ──────────
+INSERT INTO "EditorialDoc" (id, kind, slug, status, title, standfirst, body,
+    "countryLabel", "sourceLabel", "verifiedAt", "publishedAt", "updatedAt")
+  VALUES ('ed11','GUIDE','pays-bas-f11','PUBLIE','Titre','Chapeau','{}'::jsonb,
+    'Pays-Bas','service-public.fr', now(), now(), now());
+INSERT INTO "EditorialVersion" (id, "docId", rang, title, standfirst, body,
+    "sourceLabel", "verifiedAt", "publishedBy", reason)
+  VALUES ('ev11','ed11',1,'Titre','Chapeau','{}'::jsonb,'service-public.fr', now(),'op','Publication');
+-- Un rang hors d'atteinte : le script tourne aussi contre la base de production, annulé.
+INSERT INTO "LegalPublication" (id, page, rang, kind, "templateHash", title, standfirst,
+    body, variables, reviewer, "reviewedAt", "publishedBy", reason)
+  VALUES ('lp11','conditions',999999,'VALIDATION','h','Conditions','x','[]'::jsonb,'{}'::jsonb,
+    'Juriste', now(),'op','Validation');
+INSERT INTO "AuditLog" (id, "actorId", action, target, reason)
+  VALUES ('al11','op','LECTURE','d1','Motif');
+INSERT INTO "AuditLog" (id, "actorId", action, target, reason, "createdAt")
+  VALUES ('al12','op','LECTURE','d1','Motif', now() - interval '6 years');
+INSERT INTO "RuleMigration" (id, "applicationId", "fromRuleId", "toRuleId", impact, diff)
+  VALUES ('rm11','a0','vr1','vr2','CRITIQUE','[]');
+
+SELECT refuse('F11 · une version éditoriale publiée ne se corrige pas',
+  $q$UPDATE "EditorialVersion" SET title = 'Corrigé' WHERE id = 'ev11'$q$);
+SELECT refuse('F11 · une version éditoriale publiée ne se supprime pas',
+  $q$DELETE FROM "EditorialVersion" WHERE id = 'ev11'$q$);
+SELECT refuse('F11 · un texte juridique accepté ne se corrige pas',
+  $q$UPDATE "LegalPublication" SET body = '[{"x":1}]'::jsonb WHERE id = 'lp11'$q$);
+SELECT refuse('F11 · un texte juridique accepté ne se supprime pas',
+  $q$DELETE FROM "LegalPublication" WHERE id = 'lp11'$q$);
+SELECT refuse('F11 · une écriture du journal ne se modifie pas',
+  $q$UPDATE "AuditLog" SET reason = 'Réécrit' WHERE id = 'al11'$q$);
+SELECT refuse('F11 · une écriture du journal de moins de cinq ans ne se supprime pas',
+  $q$DELETE FROM "AuditLog" WHERE id = 'al11'$q$);
+SELECT passe('F11 · une écriture du journal échue se purge',
+  $q$DELETE FROM "AuditLog" WHERE id = 'al12'$q$);
+SELECT passe('F11 · la propagation prévient le candidat, puis il tranche',
+  $q$UPDATE "RuleMigration" SET "alertedAt" = now() WHERE id = 'rm11';
+     UPDATE "RuleMigration" SET decision = 'CONSERVER', "decidedAt" = now() WHERE id = 'rm11'$q$);
+SELECT refuse('F11 · un arbitrage rendu ne se change pas',
+  $q$UPDATE "RuleMigration" SET decision = 'MIGRER' WHERE id = 'rm11'$q$);
+SELECT refuse('F11 · un candidat prévenu ne redevient pas « à prévenir »',
+  $q$UPDATE "RuleMigration" SET "alertedAt" = NULL WHERE id = 'rm11'$q$);
+SELECT refuse('F11 · le diff d''une divergence est figé',
+  $q$UPDATE "RuleMigration" SET diff = '[{"x":1}]'::jsonb WHERE id = 'rm11'$q$);
+SELECT passe('F11 · l''arbitrage suit son dossier en cascade',
+  $q$DELETE FROM "RuleMigration" WHERE id = 'rm11'$q$);
+
 -- ── O.B · la conservation du motif ────────────────────────────────────────
 SELECT refuse(
   'O.B · un motif d''échec sans date, qui échapperait à la purge',

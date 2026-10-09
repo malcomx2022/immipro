@@ -340,6 +340,9 @@ export function echeanceEnJours(jours: number, maintenant: Date): Date {
   return limite;
 }
 
+/** Un jour : ce que la purge du journal attend au-delà des cinq ans que la base exige. */
+export const MARGE_DU_JOURNAL_MS = 24 * 60 * 60 * 1000;
+
 export function echeanceEnAnnees(annees: number, maintenant: Date): Date {
   const limite = new Date(maintenant);
   limite.setUTCFullYear(limite.getUTCFullYear() - annees);
@@ -359,9 +362,17 @@ export async function purgerCeQuiEstEchu(
    * modifiée depuis l'interface ». Une tâche planifiée n'est pas
    * l'interface ; c'est même la seule façon de tenir les deux moitiés de la
    * phrase, l'immuabilité et la durée.
+   *
+   * La base refuse elle-même toute suppression avant cinq ans
+   * (`journal_immuable`, revue F11). La purge garde donc un jour de
+   * marge : une horloge applicative en avance, ou un 29 février que
+   * JavaScript et Postgres ne reculent pas de la même façon, ferait
+   * échouer toute la passe sur la ligne de la frontière.
    */
   const audit = await db.auditLog.deleteMany({
-    where: { createdAt: { lt: echeanceEnAnnees(CONSERVATION_ANNEES, maintenant) } },
+    where: {
+      createdAt: { lt: new Date(echeanceEnAnnees(CONSERVATION_ANNEES, maintenant).getTime() - MARGE_DU_JOURNAL_MS) },
+    },
   });
 
   /**

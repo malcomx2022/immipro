@@ -11982,3 +11982,42 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 **Écarts qui restent.**
 1. D-14 est à confirmer par M.C. L'option b (exercice de la vente) ne changerait que `etablirLaFacture`, et garderait `performedAt`.
 2. Les noms SQL `amount` et `refundAmount` restent, ainsi que dans `verifier-garde-fous.sql` : seul le client Prisma les renomme.
+
+## S.141 — Revue du 07/10/2026 : arbitrages (M6, F11)
+
+**Contexte.** Dix-septième lot du plan de traitement ; restent ensuite M19 (étapes 1 à 9), M20 et F10. Décisions du 09/10/2026 :
+- **D-1** : INV-6 se lit « quota d'analyses ; jetons mesurés et surveillés ». CLAUDE.md est réécrit avec l'accord explicite du responsable du projet.
+- **D-24** : l'immuabilité des historiques est tenue par des déclencheurs en base.
+
+**Ce que fait le code.**
+- **M6.**
+  - INV-6 réécrit dans CLAUDE.md et DOC-11 §0 : « Tout appel IA est débité d'un quota d'analyses rattaché au pack ; les jetons consommés sont mesurés et surveillés. »
+  - Alignés sur INV-6 : WF-05 étape 7, la précondition de WF-06, RG-06.7 et RG-08.4.
+  - `verifierQuota` et `QuotaCheck`, sans appelant, sont supprimés ; l'en-tête de `lib/ai.ts` est corrigé.
+  - La mention de B-07 disait à l'exploitant « Le quota des packs reste compté en jetons ». Elle devient `MENTION_CONTREPARTIE_EN_JETONS` : les packs se consomment en analyses, la contrepartie en jetons sert de repère de marge.
+  - Cela clôt la note de S.47 (« le quota de jetons n'est pas un plafond ») et le point 3 de S.94 (« le quota INV-6 est compté en jetons »).
+- **F11.** Migration `20261009150000_historiques_immuables` :
+  - `historique_immuable` refuse toute mise à jour et toute suppression sur `EditorialVersion` et `LegalPublication` ;
+  - `journal_immuable` refuse toute modification d'une écriture d'`AuditLog`, et toute suppression avant cinq ans ;
+  - `arbitrage_fige` fige `RuleMigration` à sa création. Seuls `alertedAt`, `decision` et `decidedAt` passent, chacun une fois, de nul à une valeur. La suppression suit le dossier en cascade ;
+  - tous les refus lèvent `check_violation`, `facture_immuable` compris (il levait `P0001`).
+  - La purge du journal attend un jour de plus que les cinq ans : une horloge applicative en avance, ou un 29 février, ferait sinon échouer toute la passe sur la ligne frontière.
+  - La graine de démonstration ne vide plus le journal. Elle n'y pose son écriture qu'une fois par règle.
+
+**Ce qui est éprouvé.**
+- Reproduction sur l'ancien schéma : une version éditoriale, une publication juridique et une écriture du journal se réécrivaient et se supprimaient sans refus.
+- `tests/quota-en-analyses.test.ts` (nouveau) : trois échecs sur l'ancien texte, verts après. Il vérifie que :
+  - « quota de tokens » a disparu de CLAUDE.md et de DOC-11 ;
+  - la ligne d'INV-6 est la même dans les deux ;
+  - `verifierQuota` a disparu, et plus rien n'affirme un quota compté en jetons.
+- `tests/historiques-immuables.test.ts` (nouveau) :
+  - un déclencheur par table ;
+  - le seuil SQL égal à `CONSERVATION_ANNEES` ;
+  - `check_violation` partout ;
+  - la graine sans suppression ni mise à jour du journal.
+- `scripts/verifier-garde-fous.sql` : douze cas F11 : neuf refus et trois passages (purge échue, alerte puis arbitrage, cascade).
+- `smoke:conservation` : la purge planifiée passe le déclencheur. Elle efface l'écriture de six ans, garde la ligne frontière et la récente. Une suppression ou une modification d'une écriture récente est refusée.
+
+**Écarts qui restent.**
+1. Les écritures « systeme:demonstration » d'une base de développement restent au journal cinq ans.
+2. Le script des garde-fous, joué contre la production au déploiement, insère puis annule une page `conditions` de rang 999 999.

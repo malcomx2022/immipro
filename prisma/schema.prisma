@@ -803,6 +803,10 @@ model ServiceProbe {
   @@index([observedAt])
 }
 
+/// Le journal d'audit (B-06). Une écriture ne se modifie jamais et ne se
+/// supprime qu'après cinq ans (`CONSERVATION_ANNEES`), par la purge
+/// planifiée : le déclencheur `journal_immuable` refuse le reste (revue
+/// F11, D-24).
 model AuditLog {
   id        String   @id @default(uuid())
   actorId   String
@@ -1183,6 +1187,10 @@ enum MigrationDecision {
 /// n'a pas tranché, et rien ne change dans sa checklist entre-temps. Migrer
 /// d'office aurait rendu ce modèle inutile — c'est précisément pourquoi il
 /// existe.
+///
+/// Figée à sa création, sauf `alertedAt`, `decision` et `decidedAt`, qui
+/// passent chacun une fois de nul à une valeur : le déclencheur
+/// `arbitrage_fige` le tient (revue F11, D-24).
 model RuleMigration {
   id            String             @id @default(uuid())
   applicationId String
@@ -1525,10 +1533,10 @@ model EditorialDoc {
 /// Ce qu'on veut savoir tient en une phrase — quel texte un lecteur a-t-il
 /// pu lire le 12 mars — et seule une publication change la réponse.
 ///
-/// **Immuable.** Aucun chemin de code ne la réécrit ni ne la supprime :
-/// c'est la même immuabilité que celle du journal d'audit, tenue de la
-/// même façon, par l'absence d'écrivain et par un test qui la vérifie. Une
-/// version qu'on pourrait corriger ne prouverait plus rien.
+/// **Immuable**, en base : le déclencheur `historique_immuable` refuse
+/// toute mise à jour et toute suppression (revue F11, D-24). Elle tenait
+/// d'abord par l'absence d'écrivain ; une graine ou un SQL à la main
+/// passait. Une version qu'on pourrait corriger ne prouverait plus rien.
 ///
 /// Restaurer n'est pas ressusciter : republier le texte d'une ancienne
 /// version crée une version de plus, dont le contenu se trouve être
@@ -1667,10 +1675,10 @@ model LegalVariable {
 /// drapeau « validé » qu'on cocherait ; ceci n'en est pas un, c'est la
 /// trace d'une affirmation, avec son auteur.
 ///
-/// **Immuable**, comme `EditorialVersion` et le journal d'audit : aucun
-/// chemin de code ne réécrit ni ne supprime une version. Un texte
-/// juridique qu'on pourrait corriger après coup ne prouverait plus ce
-/// qu'un candidat a accepté.
+/// **Immuable**, comme `EditorialVersion` : le déclencheur
+/// `historique_immuable` refuse toute mise à jour et toute suppression
+/// (revue F11, D-24). Un texte juridique qu'on pourrait corriger après
+/// coup ne prouverait plus ce qu'un candidat a accepté.
 model LegalPublication {
   id   String @id @default(uuid())
   /// `mentions-legales`, `conditions`, `donnees-personnelles`, `contact`.

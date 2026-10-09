@@ -107,11 +107,11 @@ describe("une version naît quand le texte public change", () => {
 
 describe("une version ne se réécrit pas", () => {
   /**
-   * L'immuabilité tient comme celle du journal d'audit (B-06) : par
-   * l'absence d'écrivain. Aucune contrainte CHECK n'empêche un UPDATE, et
-   * le dépôt n'emploie pas de déclencheur — introduire le premier pour
-   * cette table seule aurait créé un mécanisme de plus à connaître, là où
-   * la table voisine tient sa promesse autrement.
+   * L'immuabilité tient en base depuis la revue F11 (D-24) : le
+   * déclencheur `historique_immuable` refuse la mise à jour et la
+   * suppression, comme `facture_immuable` et `regle_figee_immuable`. Ce
+   * test reste : un écrivain dans le code serait une erreur à
+   * l'exécution, autant la voir à la lecture.
    */
   it("aucun code ne met à jour ni ne supprime une version", () => {
     const sources = [...fichiers("src", /\.tsx?$/u)];
@@ -121,10 +121,12 @@ describe("une version ne se réécrit pas", () => {
     expect(fautifs).toEqual([]);
   });
 
-  /** Et la migration dit pourquoi l'immuabilité n'est pas une contrainte. */
+  /** La migration d'origine pose les contraintes de contenu ; F11 pose le déclencheur. */
   it("la migration dit où tient l'immuabilité", () => {
     const sql = lire("prisma/migrations/20260920000800_historique_des_publications/migration.sql");
-    expect(sql).toMatch(/absence d'écrivain/u);
+    expect(lire("prisma/migrations/20261009150000_historiques_immuables/migration.sql")).toMatch(
+      /CREATE TRIGGER "historique_immuable"\s+BEFORE UPDATE OR DELETE ON "EditorialVersion"/u,
+    );
     expect(sql).toContain("version_editoriale_porte_sa_source");
     expect(sql).toContain("version_editoriale_porte_son_motif");
     expect(sql).toContain("version_editoriale_rang_a_partir_de_un");

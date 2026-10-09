@@ -11,7 +11,7 @@
 | INV-3 | Un dossier fige la version de règle utilisée (`Application.visaRuleId`). Une évolution réglementaire ne casse jamais une checklist en cours. |
 | INV-4 | Une règle de source `SECONDAIRE` n'est jamais visible par l'utilisateur. Le filtrage se fait dans la requête, pas dans l'affichage. |
 | INV-5 | Les pièces d'identité sont purgées automatiquement selon la politique de rétention. |
-| INV-6 | Tout appel IA est débité d'un quota de tokens rattaché au pack. Jamais de dépassement silencieux. |
+| INV-6 | Tout appel IA est débité d'un quota d'analyses rattaché au pack ; les jetons consommés sont mesurés et surveillés. Jamais de dépassement silencieux. |
 | INV-7 | Tout paiement est idempotent et réconcilié par webhook signé. |
 | INV-8 | Toute information réglementaire affichée porte sa source et sa date de vérification. |
 
