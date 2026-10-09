@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18) et S.141 (M6, F11) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11) et S.142 (M19 étape 1) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -93,7 +93,7 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-28 | RAM réelle du VPS ; rotation des journaux dans le compose ou le démon | Exploitant | M15 — **tranchée le 08/10/2026** : 8 Go, rotation dans le compose |
 | D-29 | ~~Domaines servis~~ : `immipro.app`, tranché le 07/10/2026 (S.125 bis). Restent `nginx -T` du VPS et la méthode certbot | Exploitant | M16 — **tranchée le 08/10/2026** : un certificat par webroot, `www` redirigé en 301 ; `nginx -T` reste à relever sur le VPS |
 | D-30 | Node 24 ou Node 22 ? | Direction | M19 étape 0, M15 — **tranchée le 08/10/2026** : Node 24 LTS |
-| D-31 | Version d'API Stripe à figer | Exploitant | M19 étape 1 |
+| D-31 | Version d'API Stripe à figer | Exploitant | M19 étape 1 — **tranchée le 09/10/2026** : `2025-02-24.acacia`, celle du SDK 17.7.0 contre lequel l'adaptateur a été écrit |
 | D-32 | Découpage de `paiements.ts` après le bloc paiements | Direction technique | M20 |
 | D-33 | B-08 entre-t-il dans l'inventaire de DOC-12 ? Garde-t-on `docs/prototype/exports/` ? | Produit, direction | F10 |
 | D-34 | Override `deepmerge-ts` ou risque accepté ? | Direction technique | Audit — **tranchée le 08/10/2026** : risque accepté, motivé et daté dans `audit-exceptions.json`, à revoir à la montée de Prisma |
@@ -1373,7 +1373,7 @@ Un lot par étape, chacun avec la porte complète et `smoke:worker --image`.
 | Étape | Contenu | Ce qui casse |
 |---|---|---|
 | 0 | Node 24 LTS (ou 22.12+) : `.nvmrc`, `Dockerfile`, `setup-node`, `engines`, cible esbuild, `@types/node` | **Livrée en S.134** (D-30). A cassé deux fichiers de tests sous jsdom : `fetch` de Node 24 refuse l'`AbortSignal` de jsdom ; ils tournent désormais sous l'environnement `node` |
-| 1 | Retirer `stripe`, poser `Stripe-Version` dans `appeler()`, correctifs (`next` 15.5.27, `nodemailer`, `postcss`, `tsx`, `prettier`, `smtp-server`) | Rien |
+| 1 | Retirer `stripe`, poser `Stripe-Version` dans `appeler()`, correctifs (`next` 15.5.27, `nodemailer`, `postcss`, `tsx`, `prettier`, `smtp-server`) | **Livrée en S.142** (D-31). Rien n'a cassé ; `next`, `postcss`, `tsx` et `prettier` étaient déjà au dernier correctif de leur plage |
 | 2 | ESLint en configuration plate (`eslint.config.mjs` avec `FlatCompat`), `.eslintrc.json` supprimé | Règles sur des fichiers que `next lint` ne lisait pas, si le périmètre s'élargit |
 | 3 | Next 16 : `middleware.ts` devient `proxy.ts`, Turbopack par défaut, `next lint` disparaît | `tests/suite-connexion.test.ts:45`, sortie `standalone` à revérifier |
 | 4 | zod 4, par `zod/v4` fichier par fichier | `server/http/messages-zod.ts` en entier, `errorMap` de la prise de rendez-vous, messages par défaut |
@@ -1470,7 +1470,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.141
+## 7. Ce qui reste ouvert après les lots S.125 à S.142
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1502,4 +1502,5 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M13** : reporter le menu mobile dans le prototype 390 px (DOC-12 §6.5), où il manque.
 - **M14** : le cache des liens juridiques vit sur le disque du conteneur `app` ; à partager le jour d'un passage à plusieurs instances.
 - **F11** : sur une base où la graine de démonstration a tourné, les écritures « systeme:demonstration » restent au journal cinq ans ; elles ne se suppriment plus. Le script des garde-fous, joué à chaque déploiement, insère et annule une page `conditions` de rang 999 999 : rien n'en reste.
+- **M19 étape 1 (D-31)** : au tableau de bord Stripe, créer (ou recréer) le point d'écoute du webhook sur la version `2025-02-24.acacia`, celle que fixe chaque appel. Un point d'écoute existant garde la version de sa création.
 - **D-13, D-14** : appliquées en S.140 sur l'option recommandée, sans réponse explicite. Faire confirmer D-14 par M.C. Si M.C retient l'option b (exercice de la vente), seule `etablirLaFacture` change, et `performedAt` reste.

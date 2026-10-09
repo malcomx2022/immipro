@@ -12021,3 +12021,20 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 **Écarts qui restent.**
 1. Les écritures « systeme:demonstration » d'une base de développement restent au journal cinq ans.
 2. Le script des garde-fous, joué contre la production au déploiement, insère puis annule une page `conditions` de rang 999 999.
+
+## S.142 — Revue du 07/10/2026 : montée des dépendances, étape 1 (M19)
+
+**Contexte.** Premier lot de la montée des dépendances après Node 24 (S.134). Décision du 09/10/2026 : **D-31**, la version d'API Stripe est figée à `2025-02-24.acacia`. C'est celle du SDK 17.7.0 du verrou, contre lequel l'adaptateur a été écrit, et la dernière avant les ruptures de la série « basil ».
+
+**Ce que fait le code.**
+- `appeler()` (`server/paiement/stripe.ts`) pose `Stripe-Version: 2025-02-24.acacia` (`VERSION_API_STRIPE`) sur chaque appel : ouverture de session, consultation, remboursement. Sans cet en-tête, Stripe répondait dans la version par défaut du compte : une montée faite au tableau de bord aurait changé la forme des réponses que les schémas lisent, sans qu'une ligne de code bouge.
+- Le paquet `stripe`, déclaré mais importé nulle part, est retiré : l'adaptateur appelle l'API par `fetch`.
+- Correctifs dans la plage : `nodemailer` 10.0.16 et `smtp-server` 3.19.18. `next` (15.5.27), `postcss`, `tsx` et `prettier` étaient déjà au dernier correctif de leur plage.
+- `.env.example` rappelle que le point d'écoute du webhook se crée sur la même version.
+
+**Ce qui est éprouvé.**
+- `tests/stripe-version.test.ts` (nouveau) échouait sur l'ancien code (version absente, paquet présent). Il vérifie que les trois adaptateurs portent l'en-tête sur chaque appel, et que `stripe` n'est plus une dépendance.
+- Validation complète, les 25 fumées et `smoke:worker --image`.
+
+**Écarts qui restent.**
+1. Le point d'écoute du webhook Stripe est à créer, ou recréer, sur `2025-02-24.acacia` au tableau de bord : un point d'écoute existant garde la version de sa création.
