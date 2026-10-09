@@ -11,11 +11,12 @@ import {
   montantEnLettres,
   regimeDeTva,
   ventiler,
-  versMineur,
+  prixPayeMineur,
   type Regime,
 } from "@/domain/facturation/montants";
 import {
   QUALITE_CLIENT_PARTICULIER,
+  dateDeLaPrestation,
   designation,
   emetteurDeLaFacture,
   identiteDeFacturation,
@@ -173,7 +174,7 @@ export async function etablirLaFacture(
   }
 
   const fiche = transaction.application?.visaRule ? versFiche(transaction.application.visaRule) : null;
-  const ttc = versMineur(transaction.amount, transaction.currency);
+  const ttc = prixPayeMineur(transaction);
   const montants = ventiler(ttc, regime);
   const exercice = exerciceDe(maintenant);
 
@@ -189,6 +190,9 @@ export async function etablirLaFacture(
           rank: rang,
           transactionId: transaction.id,
           issuedAt: maintenant,
+          // L'exercice est celui de l'émission ; la date de la vente reste
+          // sur la pièce (revue F5, D-14).
+          performedAt: dateDeLaPrestation("FACTURE", transaction, maintenant),
           emitter: emetteur ? [...emetteur] : undefined,
           clientName: client?.nom ?? null,
           clientAddress: client?.adresse ?? null,
@@ -273,7 +277,7 @@ export async function etablirLAvoir(
     il ne la refacture pas. La somme en lettres suit le montant rendu.
   */
   const rendu = Math.min(
-    sommeARendre(transaction.refundAmount, origine.amountIncl),
+    sommeARendre(transaction.refundAmountMinor, origine.amountIncl),
     origine.amountIncl,
   );
   const partiel = rendu < origine.amountIncl;
@@ -299,6 +303,7 @@ export async function etablirLAvoir(
           transactionId,
           originId: origine.id,
           issuedAt: maintenant,
+          performedAt: dateDeLaPrestation("AVOIR", transaction, maintenant),
           emitter: origine.emitter ?? undefined,
           clientName: origine.clientName,
           clientAddress: origine.clientAddress,
@@ -356,6 +361,7 @@ async function certifierSiReelle(
     numero: piece.number,
     genre: piece.kind,
     emiseLe: piece.issuedAt,
+    prestationLe: piece.performedAt,
     devise: piece.currency,
     ttc: piece.amountIncl,
     ht: piece.amountExcl,

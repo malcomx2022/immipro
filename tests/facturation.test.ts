@@ -4,17 +4,21 @@ import {
   intituleDeLaPiece,
   numeroDeLaPiece,
 } from "@/domain/facturation/numerotation";
+import { depuisSousUnite, versSousUnite } from "@/domain/paiement/ouverture";
 import {
+  depuisMineur,
   enLettres,
   formatMineur,
   libelleDuTaux,
   mentionDeTva,
   montantEnLettres,
   regimeDeTva,
+  prixPayeMineur,
   ventiler,
   versMineur,
 } from "@/domain/facturation/montants";
 import {
+  dateDeLaPrestation,
   emetteurDeLaFacture,
   identiteDeFacturation,
   modeDeReglement,
@@ -48,6 +52,28 @@ describe("numérotation (avis M.C, point 3)", () => {
   });
 });
 
+describe("date de la prestation (revue F5, D-14 option a)", () => {
+  // Vente le 31/12/2026 à 23 h 50 à Cotonou, pièce émise le 02/01/2027
+  // par le filet de la réconciliation.
+  const vente = { confirmedAt: new Date("2026-12-31T22:50:00Z"), refundedAt: null };
+  const emiseLe = new Date("2027-01-02T08:00:00Z");
+
+  it("la pièce porte la date de la vente, l'exercice celui de l'émission", () => {
+    expect(dateDeLaPrestation("FACTURE", vente, emiseLe)).toEqual(vente.confirmedAt);
+    expect(exerciceDe(emiseLe)).toBe(2027);
+    expect(exerciceDe(dateDeLaPrestation("FACTURE", vente, emiseLe))).toBe(2026);
+  });
+
+  it("l'avoir porte la date du remboursement, non celle de la vente", () => {
+    const rendue = { ...vente, refundedAt: new Date("2027-01-01T10:00:00Z") };
+    expect(dateDeLaPrestation("AVOIR", rendue, emiseLe)).toEqual(rendue.refundedAt);
+  });
+
+  it("sans date de la vente, l'émission : ce que la pièce portait jusqu'ici", () => {
+    expect(dateDeLaPrestation("FACTURE", { confirmedAt: null, refundedAt: null }, emiseLe)).toEqual(emiseLe);
+  });
+});
+
 describe("TVA extraite d'un prix TTC (décision du 04/10/2026)", () => {
   it("lit le régime déclaré, et seulement lui", () => {
     expect(regimeDeTva("non_assujettie")).toEqual({ declare: true, assujettie: false });
@@ -65,6 +91,17 @@ describe("TVA extraite d'un prix TTC (décision du 04/10/2026)", () => {
     for (const ttc of [3000, 5000, 15000, 45000, 20000, 1200, 2900, 5900]) {
       const v = ventiler(ttc, regime);
       expect(v.ht + v.tva).toBe(ttc);
+    }
+  });
+
+  it("un seul prix payé en unités mineures, une seule table de facteurs (revue M18)", () => {
+    expect(prixPayeMineur({ amountMajor: 12, currency: "EUR" })).toBe(1200);
+    expect(prixPayeMineur({ amountMajor: 5000, currency: "XOF" })).toBe(5000);
+    for (const devise of ["XOF", "EUR", "xof", "eur", "USD", "CHF"]) {
+      for (const montant of [0, 1, 12, 29.9, 5000]) {
+        expect(versSousUnite(montant, devise)).toBe(versMineur(montant, devise));
+        expect(depuisSousUnite(versMineur(montant, devise), devise)).toBe(depuisMineur(versMineur(montant, devise), devise));
+      }
     }
   });
 

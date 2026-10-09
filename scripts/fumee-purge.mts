@@ -267,7 +267,7 @@ async function unCompteComplet() {
     data: {
       userId: user.id, applicationId: application.id,
       reference: `IMP-EXP-${process.pid}`, packCode: "dossier",
-      amount: 29, currency: "EUR", provider: "STRIPE", status: "CONFIRMEE",
+      amountMajor: 29, currency: "EUR", provider: "STRIPE", status: "CONFIRMEE",
       confirmedAt: new Date(),
     },
   });

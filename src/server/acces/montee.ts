@@ -44,7 +44,7 @@ export async function verdictDuDossier(
         reference: true,
         packCode: true,
         status: true,
-        amount: true,
+        amountMajor: true,
         currency: true,
         refundDueAt: true,
         montees: {
@@ -63,7 +63,7 @@ export async function verdictDuDossier(
       reference: t.reference,
       packCode: t.packCode,
       statut: t.status,
-      montant: t.amount,
+      montant: t.amountMajor,
       devise: t.currency as Devise,
       couvreLeDossier: true,
       remboursementOuvert: t.refundDueAt !== null || t.status === "REMBOURSEE",

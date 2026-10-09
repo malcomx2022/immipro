@@ -82,7 +82,7 @@ import type { Constat, Ouvreur } from "@/server/paiement/ouvreur";
 import type { CauseRefus } from "@/domain/paiement/echec";
 import { etablirLAvoir, etablirLaFacture, etatDeLaFacturation } from "@/server/facturation/emission";
 import { identiteDeFacturation } from "@/domain/facturation/facture";
-import { facteurMineur, formatMineur, versMineur } from "@/domain/facturation/montants";
+import { facteurMineur, formatMineur, prixPayeMineur } from "@/domain/facturation/montants";
 import { suspensionDuPaiement, type SuspensionDuPaiement } from "@/domain/paiement/ouverture";
 
 /**
@@ -238,7 +238,7 @@ export async function creerOuReprendre(
       // (`achatDepuisLeCode`) vit à côté d'elle.
       packCode: codeEnregistre(achat),
       ...analysesVendues(achat),
-      amount: montant,
+      amountMajor: montant,
       currency: devise,
       // N.A — le rail suit la devise, et la règle vit dans le domaine :
       // elle était écrite ici, en ligne, et quatre écrans la redisaient
@@ -413,7 +413,7 @@ export async function ouvrirLeTunnel(
     : await ouvreur.creer({
         reference: transaction.reference,
         // Recalculé par `creerOuReprendre`, jamais reçu du navigateur.
-        montant: transaction.amount,
+        montant: transaction.amountMajor,
         devise,
         cle: cleDOuverture(transaction.reference),
         retour: cheminDeRetour(transaction.reference),
@@ -468,7 +468,7 @@ export async function ouvrirLeTunnel(
     s'ils divergent, on n'envoie personne payer une somme qu'on n'a pas
     décidée. L'écart s'ouvre en back-office, le candidat lit un refus.
   */
-  const attendu = { montant: transaction.amount, devise: transaction.currency };
+  const attendu = { montant: transaction.amountMajor, devise: transaction.currency };
   if (!ouvertureConcorde(attendu, ouverture.session)) {
     await db.transaction.update({
       where: { id: transaction.id },
@@ -647,9 +647,9 @@ export async function appliquerLaNotification(
     notification.statut === "REMBOURSEE" &&
     notification.rembourseMineur !== null &&
     notification.rembourseMineur >
-      sommeARendre(transaction.refundAmount, versMineur(transaction.amount, transaction.currency))
+      sommeARendre(transaction.refundAmountMinor, prixPayeMineur(transaction))
   ) {
-    const raison = `Remboursement supplémentaire constaté pour ${transaction.reference}, déjà remboursée : ${formatMineur(notification.rembourseMineur, transaction.currency)} rendus au total pour ${formatMineur(sommeARendre(transaction.refundAmount, versMineur(transaction.amount, transaction.currency)), transaction.currency)} dus. À trancher avec le comptable.`;
+    const raison = `Remboursement supplémentaire constaté pour ${transaction.reference}, déjà remboursée : ${formatMineur(notification.rembourseMineur, transaction.currency)} rendus au total pour ${formatMineur(sommeARendre(transaction.refundAmountMinor, prixPayeMineur(transaction)), transaction.currency)} dus. À trancher avec le comptable.`;
     await noterLEcart(transaction.id, raison);
     return { issue: "refusee", raison };
   }
@@ -680,7 +680,7 @@ export async function appliquerLaNotification(
     la transaction suit la règle d'expiration de la plateforme.
   */
   if (effet.vers === "CONFIRMEE") {
-    const attendu = versMineur(transaction.amount, transaction.currency);
+    const attendu = prixPayeMineur(transaction);
     if (!encaissementConcorde(attendu, transaction.currency, notification)) {
       const raison = motifDEncaissementDivergent(
         notification.providerTxId,
@@ -1112,8 +1112,8 @@ export async function initierLeRemboursement(
     payé » — les dettes antérieures à RG-15.2, et celles qui ne portent
     pas sur un pack d'analyses.
   */
-  const payeMineur = versMineur(transaction.amount, transaction.currency);
-  let aRendre = sommeARendre(transaction.refundAmount, payeMineur);
+  const payeMineur = prixPayeMineur(transaction);
+  let aRendre = sommeARendre(transaction.refundAmountMinor, payeMineur);
 
   /*
     Les droits partent une fois la tentative réservée, et une seule fois.
@@ -1157,7 +1157,7 @@ export async function initierLeRemboursement(
       if (lue.suite === "RETRAIT_INTEGRAL") {
         await tx.transaction.updateMany({
           where: { id: transaction.id, refundRequestedAt: null, refundedAt: null },
-          data: { refundAmount: lue.montant },
+          data: { refundAmountMinor: lue.montant },
         });
       }
       if (lue.suite === "RETRAIT_INTEGRAL" && lue.retire > 0) {
@@ -1290,9 +1290,9 @@ export async function declarerLeRemboursementManuel(
     select: {
       id: true,
       provider: true,
-      amount: true,
+      amountMajor: true,
       currency: true,
-      refundAmount: true,
+      refundAmountMinor: true,
       refundDueAt: true,
       refundedAt: true,
       refundAttemptedAt: true,
@@ -1304,8 +1304,8 @@ export async function declarerLeRemboursementManuel(
 
   /** Ce que l'opérateur déclare avoir rendu : la somme figée à l'initiation (RG-15.2). */
   const aRendre = sommeARendre(
-    transaction.refundAmount,
-    versMineur(transaction.amount, transaction.currency),
+    transaction.refundAmountMinor,
+    prixPayeMineur(transaction),
   );
 
   const defaut = defautDeDeclaration(transaction);
@@ -1488,7 +1488,7 @@ type SuiteDuRetrait =
 
 type TransactionARembourser = Pick<
   Transaction,
-  "id" | "packCode" | "packAnalyses" | "amount" | "currency"
+  "id" | "packCode" | "packAnalyses" | "amountMajor" | "currency"
 >;
 
 /** Le pack de la grille qu'un code d'achat désigne, s'il en est un. */
@@ -1504,7 +1504,7 @@ async function suiteDuQuotaDuPack(
 ): Promise<SuiteDuRetrait> {
   const transactionId = transaction.id;
   const packCode = transaction.packCode;
-  const prixMineur = versMineur(transaction.amount, transaction.currency);
+  const prixMineur = prixPayeMineur(transaction);
   /*
     Le remboursement d'un passage à Dossier — décision définitive S.92.
 
@@ -1699,7 +1699,7 @@ export async function resoudreLEcart(
  * Hors de la règle du prorata — dossier déclaré déposé ou clos, pack
  * servi sur plusieurs dossiers, recharge ou montée entamée —, l'initiation
  * ouvre un écart et n'envoie rien : la somme se fixe avec la direction.
- * Rien ne permettait de l'écrire. `refundAmount` restait nul, aucun droit
+ * Rien ne permettait de l'écrire. `refundAmountMinor` restait nul, aucun droit
  * n'était retiré, et la déclaration d'un remboursement FedaPay refusait
  * une dette jamais initiée : la revue n'avait pas d'issue.
  *
@@ -1758,7 +1758,7 @@ export async function trancherLaRevueManuelle(
     throw echec("etat_incompatible", { corps: REFUS_DE_LA_TRANCHE.sans_revue });
   }
 
-  const payeMineur = versMineur(transaction.amount, transaction.currency);
+  const payeMineur = prixPayeMineur(transaction);
   const lu = lireLeMontantTranche(saisie, payeMineur, transaction.currency);
   if ("refus" in lu) throw echec("champs_invalides", { champs: { montant: lu.refus } });
   const montant = lu.montantMineur;
@@ -1812,7 +1812,7 @@ export async function trancherLaRevueManuelle(
         data: {
           refundDueAt: null,
           refundBasis: null,
-          refundAmount: null,
+          refundAmountMinor: null,
           refundAttemptedAt: null,
           ...resolution,
         },
@@ -1823,7 +1823,7 @@ export async function trancherLaRevueManuelle(
     const { count } = await tx.transaction.updateMany({
       where: enAttente,
       data: {
-        refundAmount: montant,
+        refundAmountMinor: montant,
         refundDecidedAt: maintenant,
         refundDecidedBy: acteurId,
         ...resolution,
@@ -2038,7 +2038,7 @@ export async function ouvrirUnRemboursement(
       refundedAt: true,
       packCode: true,
       packAnalyses: true,
-      amount: true,
+      amountMajor: true,
       currency: true,
       applicationId: true,
       // Une montée confirmée et non remboursée qui part de cet achat (S.92).
@@ -2080,18 +2080,18 @@ export async function ouvrirUnRemboursement(
     droits partent, et c'est cette seconde lecture qui la fige. Une revue
     manuelle laisse la colonne nulle : le montant n'est pas fixé.
   */
-  let refundAmount: number | null = versMineur(transaction.amount, transaction.currency);
+  let refundAmountMinor: number | null = prixPayeMineur(transaction);
   if (transaction.applicationId) {
     const suite = await suiteDuQuotaDuPack(transaction.applicationId, transaction);
     if (suite.suite === "REVUE_MANUELLE" && suite.rienARendre) {
       return { ouvert: false, raison: suite.motif };
     }
-    refundAmount = suite.suite === "RETRAIT_INTEGRAL" ? suite.montant : null;
+    refundAmountMinor = suite.suite === "RETRAIT_INTEGRAL" ? suite.montant : null;
   }
 
   await db.transaction.update({
     where: { id: transactionId },
-    data: { refundDueAt: maintenant, refundBasis: motif, refundAmount },
+    data: { refundDueAt: maintenant, refundBasis: motif, refundAmountMinor },
   });
   return { ouvert: true, reference: transaction.reference };
 }

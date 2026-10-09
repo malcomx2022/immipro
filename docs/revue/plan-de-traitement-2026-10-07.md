@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16) et S.139 (M13, M14) sont livrés. Tout le reste est à faire.
+**État au 08/10/2026.** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14) et S.140 (F5, M18) sont livrés. Tout le reste est à faire.
 
 ---
 
@@ -75,8 +75,8 @@ Une décision bloque les points qu'elle cite, et eux seuls. Tout le reste se fai
 | D-10 | Que faire d'un remboursement supérieur au dû ? | M.C | E3 — **tranchée le 08/10/2026** : écart, pas de solde automatique, à trancher avec le comptable |
 | D-11 | Une revue manuelle peut-elle conclure à zéro, et comment l'obligation se referme-t-elle ? Un pack Pro servi sur plusieurs dossiers retire-t-il les droits de tous ? | Direction | M4 — **tranchée le 08/10/2026** : zéro est possible et le candidat garde ses analyses ; un Pro remboursé perd ses analyses restantes sur tous les dossiers servis |
 | D-12 | Les analyses du pack sont-elles celles vendues à l'achat ? (confirmation de lecture de RG-15.2) | Direction | M5 — **tranchée le 08/10/2026** : la base est celle vendue à l'achat, figée sur la transaction |
-| D-13 | Renomme-t-on les montants de `Transaction` par `@map`, sans migration de données ? | Responsable technique | M18 |
-| D-14 | Une facture émise le 02/01 pour une vente du 31/12 prend-elle l'exercice de l'émission avec la date de la vente, ou l'exercice de la vente ? | M.C | F5 |
+| D-13 | Renomme-t-on les montants de `Transaction` par `@map`, sans migration de données ? | Responsable technique | M18 — **appliquée par défaut en S.140** (option A recommandée), à confirmer : `amountMajor` et `refundAmountMinor`, aucune colonne SQL ne change |
+| D-14 | Une facture émise le 02/01 pour une vente du 31/12 prend-elle l'exercice de l'émission avec la date de la vente, ou l'exercice de la vente ? | M.C | F5 — **appliquée par défaut en S.140** (option a recommandée), à confirmer par M.C : exercice et numéro de l'émission, `Invoice.performedAt` « Date de la prestation » |
 | D-15 | Textes des pages introuvable, erreur et hors ligne ; emploi d'`erreur.svg` | Design, produit | E8 — **tranchée le 08/10/2026** : les textes du tableau E8 ; `erreur.svg` sur l'échec, `hors-ligne.svg` hors connexion, aucune image sur l'introuvable |
 | D-16 | La suppression de compte part-elle sur la touche Entrée ? | Produit | M11 — **tranchée le 08/10/2026** : non, geste explicite sur son bouton |
 | D-17 | Correspondances de section de la navigation (`/services` et `/consultants` sous « Dossiers ») | Produit | M12 — **tranchée le 08/10/2026** : `/dossiers`, `/fiches`, `/services` et `/consultants` sous « Dossiers » |
@@ -121,7 +121,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 | **S.137 — livré** | M8, M9, M10 | M+M+S | D-4, D-23 | Divergence jamais perdue, arrêt propre, état de service non public |
 | **S.138 — livré** | M7, F1, F2, M16 (reste) | M+M+S+S | D-5, D-29 | Texte rédigé contrôlé, CSP, origine vérifiée, nginx réconcilié |
 | **S.139 — livré** | M13, M14 | S+M | D-18, D-19 | Navigation mobile, liens juridiques servis |
-| S.140 — facturation et montants | F5, M18 | S+S | D-13, D-14 | Date de la prestation, unités nommées |
+| **S.140 — livré** | F5, M18 | S+S | D-13, D-14 | Date de la prestation, unités nommées |
 | S.141 — arbitrages | M6, F11 | S+M | D-1, D-24 | Texte d'INV-6 aligné sur le code, historiques immuables |
 | Ensuite | M19 étapes 1 à 9, M20, F10 | L | D-30 à D-33 | Un lot par étape |
 
@@ -834,6 +834,8 @@ Les valeurs de reprise sont à relire contre `PACKS` au moment d'écrire la migr
 
 #### M18 — Deux unités monétaires dans `Transaction`
 
+**État : livré en S.140** (D-13, option A, appliquée par défaut). `prisma migrate diff` sort vide. La table des facteurs n'existe plus qu'une fois : `facteurMineur` suit `SANS_SOUS_UNITE` (XOF seul sans sous-unité, insensible à la casse), et `versSousUnite`/`depuisSousUnite` en sont des alias. `prixPayeMineur` remplace les conversions répétées du prix payé : treize dans `src`, neuf dans les fumées.
+
 **Constat vérifié.** `Transaction.amount` est en unités entières, `refundAmount` et `Invoice.*` en unités mineures. 22 sites dans 10 fichiers de `src`, environ 28 lignes dans 11 fumées, la graine de démonstration, 5 fichiers de test et le SQL des garde-fous. `versMineur(transaction.amount, transaction.currency)` est répété six fois.
 
 **Correction de la revue.** L'alerte sur `AiUsage.costMicros` ne tient pas : un `Int` de 32 bits plafonne à environ 2 147 unités monétaires **par appel**, aucune somme n'est stockée et B-07 recalcule les coûts.
@@ -883,6 +885,8 @@ Option B (migrer `amount` en unités mineures) : effort L, risque élevé avant 
 ---
 
 #### F5 — Exercice et date de la pièce pris à l'émission
+
+**État : livré en S.140** (D-14, option a, appliquée par défaut, à confirmer par M.C). Migration `20261009120000_date_de_la_prestation`. La date est affichée sur la pièce, exportée dans « Mes données » et transmise au futur certificateur (`prestationLe`).
 
 **Constat vérifié.** `etablirLaFacture` : `exerciceDe(maintenant)` (`emission.ts:178`) et `issuedAt: maintenant` (l.191). Pour l'avoir, c'est voulu et commenté. La pièce ne porte aucune date de vente. Le décalage n'arrive que si l'émission immédiate échoue et que le filet la reprend plus tard.
 
@@ -1457,12 +1461,12 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 | S.130 (livrée) | `20261008120000_contrepartie_constatee` | `Transaction.creditedAt`, reprise, contrainte, index |
 | S.131 (livrée) | `20261008130000_index_des_cles_etrangeres` | Onze index de clés étrangères et de date |
 | S.137 | `divergence_a_propager` | `VisaRule.divergenceDueAt`, index, contrainte |
-| S.140 | `date_de_la_prestation` | `Invoice.performedAt`, reprise, déclencheur `facture_immuable` étendu (si M.C retient l'option a) |
+| S.140 (livrée) | `20261009120000_date_de_la_prestation` | `Invoice.performedAt`, reprise, déclencheur `facture_immuable` étendu |
 | S.141 | `historiques_immuables` | Déclencheurs sur les historiques (si D-24 est oui) |
 
 ---
 
-## 7. Ce qui reste ouvert après les lots S.125 à S.139
+## 7. Ce qui reste ouvert après les lots S.125 à S.140
 
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
@@ -1472,7 +1476,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **E7** : relire à la main les analyses `HORS_SUJET` et les notifications « Ce fichier ressemble à : » dont le libellé n'appartient pas au référentiel ; l'étape 6 (contrôle du message final) reste facultative.
 - **M1** : diagnostic des versions existantes dont la clé ne commence pas par `dossiers/<applicationId>/<code>/`.
 - **M2** : la parité du décompte se perd au redémarrage du processus (compteur en mémoire) ; à reprendre si l'application passe à plusieurs instances, avec `limites.ts`.
-- **M4** : lister les dettes déjà bloquées en revue (obligation ouverte, `refundAmount` nul, non demandée, non rendue) et les trancher en B-04 ; une tranche à zéro n'envoie aucun message au candidat.
+- **M4** : lister les dettes déjà bloquées en revue (obligation ouverte, `refundAmountMinor` nul, non demandée, non rendue) et les trancher en B-04 ; une tranche à zéro n'envoie aucun message au candidat.
 - **E3** : à vérifier en mode test Stripe que la `Charge` remboursée porte `metadata.reference`.
 - **Audit** : l'exception `deepmerge-ts` (D-34) est à revoir à la montée de Prisma (M19) ou avec le verrou du CLI de l'image (M15) ; les quatre modérées de `minio` restent affichées.
 - **M17** : une base de développement où la graine a tourné avant S.131 garde ses relevés de veille de démonstration, sans dommage ; ceux d'une veille réelle effacés par les passes antérieures ne se retrouvent pas.
@@ -1493,3 +1497,4 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 - **M7** : relire en lecture seule les versions déjà produites par le modèle (`changeNote` de première version) contre la liste « partout » ; aucune réécriture.
 - **M13** : reporter le menu mobile dans le prototype 390 px (DOC-12 §6.5), où il manque.
 - **M14** : le cache des liens juridiques vit sur le disque du conteneur `app` ; à partager le jour d'un passage à plusieurs instances.
+- **D-13, D-14** : appliquées en S.140 sur l'option recommandée, sans réponse explicite. Faire confirmer D-14 par M.C. Si M.C retient l'option b (exercice de la vente), seule `etablirLaFacture` change, et `performedAt` reste.

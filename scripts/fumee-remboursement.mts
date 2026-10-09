@@ -75,13 +75,13 @@ const { db } = await import("../src/lib/db");
  * confirmation sans montant ne crédite plus rien.
  */
 const encaisse = async (reference: string) => {
-  const { versMineur } = await import("../src/domain/facturation/montants");
+  const { prixPayeMineur } = await import("../src/domain/facturation/montants");
   const t = await db.transaction.findUniqueOrThrow({
     where: { reference },
-    select: { amount: true, currency: true },
+    select: { amountMajor: true, currency: true },
   });
   return {
-    montantMineur: versMineur(t.amount, t.currency),
+    montantMineur: prixPayeMineur(t),
     devise: t.currency,
     rembourseMineur: null,
   };
@@ -201,7 +201,7 @@ async function candidatPaye(
       userId: user.id,
       applicationId: application.id,
       packCode: "dossier",
-      amount: options.fedapay ? 25_000 : 29,
+      amountMajor: options.fedapay ? 25_000 : 29,
       currency: options.fedapay ? "XOF" : "EUR",
       provider: options.fedapay ? "FEDAPAY" : "STRIPE",
       status: "CONFIRMEE",
@@ -431,7 +431,7 @@ try {
     */
     const { application, transaction } = await candidatPaye({ analyses: 30 });
     const ouverte = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
-    verifier(ouverte.refundAmount === 2900, `ouverte intacte, la dette porte le prix entier (${ouverte.refundAmount})`);
+    verifier(ouverte.refundAmountMinor === 2900, `ouverte intacte, la dette porte le prix entier (${ouverte.refundAmountMinor})`);
     await debiterUneAnalyse(application.id);
 
     const montants: number[] = [];
@@ -448,14 +448,14 @@ try {
       `la demande porte 28,03 €, et non 29 € (${montants.join(", ")})`,
     );
     const apres = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
-    verifier(apres.refundAmount === 2803, `la somme figée est en centimes (${apres.refundAmount})`);
+    verifier(apres.refundAmountMinor === 2803, `la somme figée est en centimes (${apres.refundAmountMinor})`);
     verifier(apres.discrepancy === null, "aucun écart : il n'y a rien à trancher");
     verifier((await solde(application.id)) === 0, "les 29 analyses restantes sont retirées");
 
     // Le rejeu ne refixe rien : les droits sont partis avec la somme.
     await initierLeRemboursement(transaction.reference, rembourseurSimule([acceptee()]));
     verifier(
-      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } })).refundAmount === 2803,
+      (await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } })).refundAmountMinor === 2803,
       "une reprise ne change pas la somme",
     );
 
@@ -508,7 +508,7 @@ try {
         userId: user.id,
         applicationId: application.id,
         packCode: "essentiel",
-        amount: 5000,
+        amountMajor: 5000,
         currency: "XOF",
         provider: "FEDAPAY",
         status: "CONFIRMEE",
@@ -526,7 +526,7 @@ try {
     for (let n = 0; n < 4; n += 1) await debiterUneAnalyse(application.id);
     const ouverture = await ouvrirUnRemboursement(transaction.id, "Geste de support — prorata");
     const ouverte = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
-    verifier(ouverture.ouvert && ouverte.refundAmount === 3000, `l'obligation porte 3 000 F (${ouverte.refundAmount})`);
+    verifier(ouverture.ouvert && ouverte.refundAmountMinor === 3000, `l'obligation porte 3 000 F (${ouverte.refundAmountMinor})`);
     const envoi = await initierLeRemboursement(transaction.reference, remboursementFedaPay());
     verifier(envoi.issue === "procedure_manuelle", `FedaPay : procédure manuelle (${envoi.issue})`);
     const initiee = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
@@ -547,7 +547,7 @@ try {
     // c. Dossier déclaré déposé : la règle d'avant, la revue manuelle.
     const { application, transaction } = await candidatPaye({ analyses: 30, consommees: 1, depose: true });
     const ouverte = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
-    verifier(ouverte.refundDueAt !== null && ouverte.refundAmount === null, "l'obligation s'ouvre sans montant fixé");
+    verifier(ouverte.refundDueAt !== null && ouverte.refundAmountMinor === null, "l'obligation s'ouvre sans montant fixé");
     const rembourseur = rembourseurSimule([acceptee()]);
 
     const issue = await initierLeRemboursement(transaction.reference, rembourseur);
@@ -578,22 +578,22 @@ try {
       `rien à rendre : l'obligation ne s'ouvre pas (${ouverture.ouvert ? "ouverte" : ouverture.raison})`,
     );
     const lue = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
-    verifier(lue.refundDueAt === null && lue.refundAmount === null, "et rien n'est écrit");
+    verifier(lue.refundDueAt === null && lue.refundAmountMinor === null, "et rien n'est écrit");
   }
   {
     // e. La base refuse une somme supérieure au paiement, nulle, ou sans obligation.
     const { transaction } = await candidatPaye({ analyses: 30 });
     const trop = await db.transaction
-      .update({ where: { id: transaction.id }, data: { refundAmount: 2901 } })
+      .update({ where: { id: transaction.id }, data: { refundAmountMinor: 2901 } })
       .then(() => true, () => false);
     verifier(!trop, "la base refuse de rendre plus que le paiement");
     const nulle = await db.transaction
-      .update({ where: { id: transaction.id }, data: { refundAmount: 0 } })
+      .update({ where: { id: transaction.id }, data: { refundAmountMinor: 0 } })
       .then(() => true, () => false);
     verifier(!nulle, "et une somme nulle");
     const { transaction: sansDette } = await candidatPaye({ analyses: 30, consommees: 30 });
     const orpheline = await db.transaction
-      .update({ where: { id: sansDette.id }, data: { refundAmount: 100 } })
+      .update({ where: { id: sansDette.id }, data: { refundAmountMinor: 100 } })
       .then(() => true, () => false);
     verifier(!orpheline, "et une somme sans obligation");
   }
@@ -625,7 +625,7 @@ try {
         packCode: "dossier",
         packAnalyses: venduPour,
         packDestinations: 1,
-        amount: 15000,
+        amountMajor: 15000,
         currency: "XOF",
         provider: "FEDAPAY",
         status: "CONFIRMEE",
@@ -646,8 +646,8 @@ try {
       const ouverture = await ouvrirUnRemboursement(transaction.id, "Geste de support — grille révisée");
       const lue = await db.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
       verifier(
-        ouverture.ouvert && lue.refundAmount === 2500,
-        `15 000 × 5 ÷ 30 = 2 500 F, et non « rien à rendre » (${ouverture.ouvert ? lue.refundAmount : ouverture.raison})`,
+        ouverture.ouvert && lue.refundAmountMinor === 2500,
+        `15 000 × 5 ÷ 30 = 2 500 F, et non « rien à rendre » (${ouverture.ouvert ? lue.refundAmountMinor : ouverture.raison})`,
       );
     } finally {
       grille.analyses = venduPour;
@@ -688,7 +688,7 @@ try {
 
     // a. Une somme : 4 000 F sur 15 000, dossier déclaré déposé.
     const a = await candidatPaye({ analyses: 30, consommees: 1, depose: true, fedapay: true });
-    await db.transaction.update({ where: { id: a.transaction.id }, data: { amount: 15000 } });
+    await db.transaction.update({ where: { id: a.transaction.id }, data: { amountMajor: 15000 } });
     const revue = await initierLeRemboursement(a.transaction.reference, remboursementFedaPay());
     verifier(revue.issue === "revue_manuelle", `la dette part en revue (${revue.issue})`);
     verifier(
@@ -716,7 +716,7 @@ try {
         `la tranche fait partir la demande (${tranche.issue}, ${tranche.envoi})`,
       );
       const decidee = await db.transaction.findUniqueOrThrow({ where: { id: a.transaction.id } });
-      verifier(decidee.refundAmount === 4000, `la somme décidée est figée (${decidee.refundAmount})`);
+      verifier(decidee.refundAmountMinor === 4000, `la somme décidée est figée (${decidee.refundAmountMinor})`);
       verifier(
         decidee.refundDecidedBy === admin.id && decidee.refundDecidedAt !== null,
         "la décision porte qui l'a prise et quand",
@@ -765,7 +765,7 @@ try {
       const refermee = await db.transaction.findUniqueOrThrow({ where: { id: b.transaction.id } });
       verifier(zero.issue === "refermee", `zéro referme la demande (${zero.issue})`);
       verifier(
-        refermee.refundDueAt === null && refermee.refundAmount === null && refermee.status === "CONFIRMEE",
+        refermee.refundDueAt === null && refermee.refundAmountMinor === null && refermee.status === "CONFIRMEE",
         "plus d'obligation, et rien n'est déclaré rendu (INV-7)",
       );
       verifier(
@@ -796,7 +796,7 @@ try {
           packCode: "pro",
           packAnalyses: 90,
           packDestinations: 3,
-          amount: 59,
+          amountMajor: 59,
           currency: "EUR",
           provider: "STRIPE",
           status: "CONFIRMEE",

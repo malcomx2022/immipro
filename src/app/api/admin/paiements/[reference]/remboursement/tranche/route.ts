@@ -44,7 +44,7 @@ export const POST = route({
     // relirait comme une décision prise.
     const relue = await db.transaction.findUnique({
       where: { id: transaction.id },
-      select: { refundAmount: true },
+      select: { refundAmountMinor: true },
     });
     await journaliser({
       acteurId: acteur!.id,
@@ -52,7 +52,7 @@ export const POST = route({
       cible: `transaction:${transaction.id}`,
       motif: corps.motif,
       details: {
-        montantMineur: tranche.issue === "refermee" ? 0 : (relue?.refundAmount ?? null),
+        montantMineur: tranche.issue === "refermee" ? 0 : (relue?.refundAmountMinor ?? null),
         issue: tranche.issue,
         ...(tranche.issue === "decidee" ? { envoi: tranche.envoi } : {}),
       },

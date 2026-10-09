@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import type { Transaction } from "@prisma/client";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
 import { etapeDe, sommeARendre, type DetteFedaPay } from "@/domain/paiement/remboursement";
-import { facteurMineur, versMineur } from "@/domain/facturation/montants";
+import { depuisMineur, prixPayeMineur } from "@/domain/facturation/montants";
 import {
   acteurLisible,
   compteDeLActeur,
@@ -382,7 +382,7 @@ async function enLignesDePaiement(
   return transactions.map((t) => ({
     reference: t.reference,
     compte: t.user.email,
-    montant: t.amount,
+    montant: t.amountMajor,
     devise: t.currency,
     moyen: moyenDe(t.provider),
     ...(t.providerTxId ? { transaction: t.providerTxId } : {}),
@@ -400,7 +400,7 @@ async function enLignesDePaiement(
     !t.refundedAt &&
     !t.refundRequestedAt &&
     !t.refundDecidedAt &&
-    t.refundAmount === null &&
+    t.refundAmountMinor === null &&
     t.applicationId
       ? { revueATrancher: true as const }
       : {}),
@@ -434,16 +434,16 @@ async function enLignesDePaiement(
 }
 
 /**
- * La somme rendue, dans l'unité de `Transaction.amount` (unités entières
- * de la grille, décimales possibles en euros) : `refundAmount` est en
- * unités mineures, et nul se lit « le montant payé » (RG-15.2).
+ * La somme rendue, dans l'unité de `Transaction.amountMajor` (unités
+ * entières de la grille, décimales possibles en euros) :
+ * `refundAmountMinor` est en unités mineures, et nul se lit « le montant
+ * payé » (RG-15.2).
  */
 const montantRenduEnUnites = (t: {
-  amount: number;
+  amountMajor: number;
   currency: string;
-  refundAmount: number | null;
-}): number =>
-  sommeARendre(t.refundAmount, versMineur(t.amount, t.currency)) / facteurMineur(t.currency);
+  refundAmountMinor: number | null;
+}): number => depuisMineur(sommeARendre(t.refundAmountMinor, prixPayeMineur(t)), t.currency);
 
 function etatDuRapprochement(
   t: {
@@ -536,9 +536,9 @@ export async function dettesFedaPay(): Promise<DetteFedaPay[]> {
     orderBy: { refundDueAt: "asc" },
     select: {
       reference: true,
-      amount: true,
+      amountMajor: true,
       currency: true,
-      refundAmount: true,
+      refundAmountMinor: true,
       refundDueAt: true,
       refundRequestedAt: true,
       refundedAt: true,
@@ -551,7 +551,7 @@ export async function dettesFedaPay(): Promise<DetteFedaPay[]> {
   return dettes.map((d) => ({
     reference: d.reference,
     compte: d.user.email,
-    montant: d.amount,
+    montant: d.amountMajor,
     montantARendre: montantRenduEnUnites(d),
     devise: d.currency,
     etape: etapeDe({ dueAt: d.refundDueAt, requestedAt: d.refundRequestedAt, refundedAt: d.refundedAt }) ?? "DECIDE",
@@ -872,7 +872,7 @@ export interface LigneDeCout {
 const SELECTION_COUVRANTE = {
   id: true,
   packCode: true,
-  amount: true,
+  amountMajor: true,
   currency: true,
   status: true,
   refundDueAt: true,
@@ -890,7 +890,7 @@ function achatsCouvrants(
     transaction: {
       id: string;
       packCode: string;
-      amount: number;
+      amountMajor: number;
       currency: string;
       status: string;
       refundDueAt: Date | null;
@@ -905,7 +905,7 @@ function achatsCouvrants(
     vus.set(t.id, {
       id: t.id,
       packCode: t.packCode,
-      montant: t.amount,
+      montant: t.amountMajor,
       devise: t.currency,
       sourceTransactionId: t.sourceTransactionId,
       retiree: t.refundDueAt !== null,
@@ -1005,7 +1005,7 @@ export async function coutsParDossier(
       const premier = effectif ? undefined : leurPack(dossier?.transactions ?? []);
       const code = effectif?.code ?? premier?.packCode;
       const pack = code ? getPack(code) : undefined;
-      const prix = effectif?.prixPaye ?? premier?.amount ?? null;
+      const prix = effectif?.prixPaye ?? premier?.amountMajor ?? null;
       const achat = effectif ? { currency: effectif.devise } : premier;
       const jetonsEntree = u._sum.inputTokens ?? 0;
       const jetonsSortie = u._sum.outputTokens ?? 0;

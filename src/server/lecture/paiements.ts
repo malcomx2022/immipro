@@ -10,7 +10,7 @@ import { destinationsServies } from "@/server/acces/couverture";
 import { masquerNumero, type CauseRefus } from "@/domain/paiement/echec";
 import { CODES_HORS_PACK, achatDepuisLeCode } from "@/domain/payments/achat";
 import { sommeARendre } from "@/domain/paiement/remboursement";
-import { facteurMineur, versMineur } from "@/domain/facturation/montants";
+import { facteurMineur, prixPayeMineur } from "@/domain/facturation/montants";
 
 /**
  * Lecture d'un reçu — $-04 et $-06.
@@ -93,13 +93,13 @@ export async function recuDuPaiement(reference: string, userId: string): Promise
     rembourseLe: transaction.refundedAt?.toISOString() ?? null,
     montantRembourse: transaction.refundedAt
       ? sommeARendre(
-          transaction.refundAmount,
-          versMineur(transaction.amount, transaction.currency),
+          transaction.refundAmountMinor,
+          prixPayeMineur(transaction),
         ) / facteurMineur(transaction.currency)
       : null,
     achat: libelleDeLAchat(transaction.packCode),
     achatCode: transaction.packCode,
-    montant: transaction.amount,
+    montant: transaction.amountMajor,
     devise: transaction.currency,
     dossier:
       transaction.application && fiche
@@ -291,7 +291,7 @@ export async function paiementDuTunnel(
     etat: etatDuRecu(transaction.status),
     statut: transaction.status,
     cause: transaction.failureCause,
-    montant: transaction.amount,
+    montant: transaction.amountMajor,
     // La colonne est un `Char(3)` ; le seul écrivain est `creerLaTransaction`,
     // qui y met une devise du domaine. Le repli ne devrait donc jamais
     // servir — mais il vaut mieux qu'un `as` : l'écran propose de changer

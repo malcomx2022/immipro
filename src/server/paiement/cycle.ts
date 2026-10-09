@@ -1,5 +1,5 @@
 import type { TransactionStatus } from "@prisma/client";
-import { formatMineur, versMineur } from "@/domain/facturation/montants";
+import { formatMineur, prixPayeMineur } from "@/domain/facturation/montants";
 import { sommeARendre } from "@/domain/paiement/remboursement";
 
 /**
@@ -150,17 +150,17 @@ export type VerdictDuRemboursement = { issue: "appliquer" } | { issue: "ecart"; 
 export function verdictDuRemboursementAnnonce(
   t: {
     reference: string;
-    amount: number;
+    amountMajor: number;
     currency: string;
     refundDueAt: Date | null;
     refundAttemptedAt: Date | null;
     refundRequestedAt: Date | null;
-    refundAmount: number | null;
+    refundAmountMinor: number | null;
   },
   rembourseMineur: number | null,
 ): VerdictDuRemboursement {
-  const paye = versMineur(t.amount, t.currency);
-  const du = sommeARendre(t.refundAmount, paye);
+  const paye = prixPayeMineur(t);
+  const du = sommeARendre(t.refundAmountMinor, paye);
   const annonce =
     rembourseMineur === null ? "" : ` pour ${formatMineur(rembourseMineur, t.currency)}`;
 

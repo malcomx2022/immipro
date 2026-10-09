@@ -67,13 +67,13 @@ const { db } = await import("../src/lib/db");
  * confirmation sans montant ne crédite plus rien.
  */
 const encaisse = async (reference: string) => {
-  const { versMineur } = await import("../src/domain/facturation/montants");
+  const { prixPayeMineur } = await import("../src/domain/facturation/montants");
   const t = await db.transaction.findUniqueOrThrow({
     where: { reference },
-    select: { amount: true, currency: true },
+    select: { amountMajor: true, currency: true },
   });
   return {
-    montantMineur: versMineur(t.amount, t.currency),
+    montantMineur: prixPayeMineur(t),
     devise: t.currency,
     rembourseMineur: null,
   };
@@ -160,7 +160,7 @@ async function transactionEnAttente(options: {
       userId: user.id,
       applicationId: application.id,
       packCode: "dossier",
-      amount: 29,
+      amountMajor: 29,
       currency: "EUR",
       provider: "STRIPE",
       status: options.statut ?? "EN_ATTENTE",
@@ -523,7 +523,7 @@ try {
       userId: proprietaire,
       applicationId: dossierDesVentes,
       packCode: "recharge",
-      amount: 2000,
+      amountMajor: 2000,
       currency: "XOF",
       provider: "FEDAPAY" as const,
       status: "CONFIRMEE" as const,
@@ -568,7 +568,7 @@ try {
           creditedAt: new Date(maintenant.getTime() - 60_000),
           refundDueAt: maintenant,
           refundBasis: "Geste de support — fumée de rattrapage",
-          refundAmount: 2900,
+          refundAmountMinor: 2900,
           refundAttemptedAt: maintenant,
           refundAttempts: 1,
           refundRequestedAt: maintenant,

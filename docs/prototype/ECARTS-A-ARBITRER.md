@@ -11944,3 +11944,41 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 1. Le prototype 390 px n'a pas de menu : écart à reporter par le design (le code précède ici le prototype, par décision D-18).
 2. Les pages publiques ne sont plus « statiques » mais revalidées : le premier rendu après un déploiement peut, cinq minutes durant, ne pas porter les liens juridiques si le build a tourné sans base.
 3. Le cache vit sur le disque du conteneur : à partager le jour d'un passage à plusieurs instances.
+
+## S.140 — Revue du 07/10/2026 : facturation et montants (F5, M18)
+
+**Contexte.** Seizième lot du plan de traitement. D-13 et D-14 n'ont pas reçu de réponse explicite : l'option recommandée par le plan est appliquée, et réversible.
+- **D-13**, option A : les montants de `Transaction` sont renommés par `@map`, sans migration de données.
+- **D-14**, option a : numéro et exercice de l'émission, plus une date de la prestation. À faire confirmer par M.C.
+
+**Ce que fait le code.**
+- **F5.**
+  - `Invoice.performedAt` : la confirmation du paiement pour une facture, celle du remboursement pour un avoir (`dateDeLaPrestation`, `domain/facturation/facture.ts`).
+  - Migration `20261009120000_date_de_la_prestation` :
+    - ajoute la colonne ;
+    - reprend les pièces existantes par `UPDATE … FROM "Transaction"`, avant l'extension du déclencheur, puis passe la colonne en `NOT NULL` ;
+    - étend `facture_immuable` à la colonne.
+  - La pièce affiche « Date de la prestation » sous « Date d'émission ». « Mes données » exporte `prestationLe`, et `PieceACertifier` la transmet au futur certificateur.
+- **M18.**
+  - `amountMajor Int @map("amount")` et `refundAmountMinor Int? @map("refundAmount")` : le nom dit l'unité, et la colonne SQL ne change pas (`prisma migrate diff` vide).
+  - `prixPayeMineur` remplace les conversions répétées du prix payé : treize dans `src`, neuf dans les fumées.
+  - Une seule table de facteurs. `facteurMineur` suit `SANS_SOUS_UNITE`, déplacée dans `domain/facturation/montants` : le XOF seul n'a pas de sous-unité, et la devise est lue sans tenir compte de la casse. `versSousUnite`/`depuisSousUnite` en deviennent des alias.
+  - Les deux tables divergeaient sur toute devise autre que XOF et EUR : `facteurMineur` donnait 1, `versSousUnite` 100. Aucune n'est vendue aujourd'hui.
+
+**Ce qui est éprouvé.**
+- `tests/facturation.test.ts` :
+  - une vente du 31/12 à 23 h 50 (Cotonou), émise le 02/01, porte la date de la vente, avec l'exercice de l'émission ;
+  - l'avoir porte la date du remboursement ;
+  - `prixPayeMineur` donne 12 € → 1 200 et 5 000 F → 5 000 ;
+  - `versSousUnite` est égale à `versMineur` pour chaque devise.
+- `smoke:facturation` :
+  - le même scénario sur une base réelle (numéro `ESSAI-RD-<année+1>-00001`, exercice suivant, date de la vente) ;
+  - le client lit les deux dates ;
+  - l'avoir porte `refundedAt` ;
+  - la base refuse de réécrire `performedAt`.
+- Reproduction sur l'ancien code : la pièce n'avait aucune colonne pour la date de la vente.
+- Reprise de la migration vérifiée sur une base portant une facture et un avoir antérieurs : 31/12 22:50 UTC et 01/01 10:00 UTC repris, puis réécriture refusée par le déclencheur.
+
+**Écarts qui restent.**
+1. D-14 est à confirmer par M.C. L'option b (exercice de la vente) ne changerait que `etablirLaFacture`, et garderait `performedAt`.
+2. Les noms SQL `amount` et `refundAmount` restent, ainsi que dans `verifier-garde-fous.sql` : seul le client Prisma les renomme.

@@ -157,6 +157,29 @@ export function designation(achat: string, dossier: string | null): string {
   return dossier ? `${achat} — ${dossier}` : achat;
 }
 
+/**
+ * La date de la prestation qu'une pièce constate — revue du 07/10/2026,
+ * F5 (D-14, option a).
+ *
+ * Le numéro et l'exercice suivent l'émission : la suite reste
+ * chronologique et continue, et rien ne s'émet dans une série close. Mais
+ * une vente du 31/12 à 23 h 50 dont la facture n'est émise que le 02/01,
+ * par le filet de la réconciliation, ne portait plus aucune trace du
+ * 31/12 — la note M.C demande « la date ou la période de la prestation ».
+ *
+ * Une facture constate la vente : la confirmation du paiement. Un avoir
+ * constate le remboursement : sa confirmation. À défaut — une vente
+ * confirmée sans date, qu'aucune transition ne produit —, l'émission,
+ * c'est-à-dire ce que la pièce portait jusqu'ici.
+ */
+export function dateDeLaPrestation(
+  genre: "FACTURE" | "AVOIR",
+  vente: { confirmedAt: Date | null; refundedAt: Date | null },
+  emiseLe: Date,
+): Date {
+  return (genre === "FACTURE" ? vente.confirmedAt : vente.refundedAt) ?? emiseLe;
+}
+
 /** Combien de temps une facture et un avoir se conservent (OHADA et fiscal béninois). */
 export const CONSERVATION_PIECES_COMPTABLES_ANS = 10;
 

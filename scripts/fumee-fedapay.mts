@@ -319,7 +319,7 @@ try {
         userId: autre.userId,
         applicationId: autre.applicationId,
         packCode: "dossier",
-        amount: 10000,
+        amountMajor: 10000,
         currency: "XOF",
         provider: "FEDAPAY",
         status: "INITIEE",
