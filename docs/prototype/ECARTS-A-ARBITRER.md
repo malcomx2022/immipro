@@ -12038,3 +12038,27 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 
 **Écarts qui restent.**
 1. Le point d'écoute du webhook Stripe est à créer, ou recréer, sur `2025-02-24.acacia` au tableau de bord : un point d'écoute existant garde la version de sa création.
+
+## S.143 — Revue du 07/10/2026 : montée des dépendances, étape 2 (M19)
+
+**Contexte.** Deuxième étape de la montée. `next lint` est déprécié en Next 15.5, il annonçait lui-même sa suppression en Next 16. `.eslintrc.json` n'est plus lu à partir d'ESLint 10. La configuration passe au format plat d'abord, seule, pour que l'étape Next 16 n'ait rien d'autre à porter.
+
+**Ce que fait le code.**
+- `eslint.config.mjs` (nouveau) reprend les préréglages `next/core-web-vitals` et `next/typescript` par `FlatCompat`, plus la seule règle du dépôt (`no-unused-vars`, arguments en `_` ignorés). `.eslintrc.json` est supprimé.
+- `@eslint/eslintrc` devient une dépendance de développement déclarée ; il n'était là que par transitivité.
+- Le script `lint` devient `eslint src` : exactement le périmètre que `next lint` lisait, faute de dossiers `app`, `pages`, `components` ou `lib` à la racine.
+
+**Ce qui est éprouvé.**
+- Avant et après, sur trois fichiers témoins (une page, un module serveur, un module du domaine), la configuration effective donne 98 règles et les mêmes sévérités. Les seuls écarts sont des options par défaut que le format plat écrit explicitement.
+- Le lint échoue toujours sur une faute réelle : une variable inutilisée dans `src` donne un code de sortie 1.
+- `tests/configuration-eslint.test.ts` (nouveau) vérifie que l'ancien format est absent et que le script n'appelle plus `next lint`. Il vérifie aussi, par l'API d'ESLint, que les préréglages de Next et la règle du dépôt s'appliquent au code.
+- Validation complète, build, les 25 fumées et `smoke:worker --image`.
+
+**Écarts qui restent.**
+1. Lire aussi `tests`, `scripts` et `docs` relève 33 remarques que `next lint` n'a jamais vues :
+   - 17 dans `tests` ;
+   - 6 dans `scripts` ;
+   - 9 dans `docs/prototype` ;
+   - 1 dans `postcss.config.mjs`.
+
+   Les faire entrer est un lot à part.
