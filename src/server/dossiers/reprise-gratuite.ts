@@ -18,7 +18,7 @@ import { solde } from "@/server/acces/quota";
  * qui lance la lecture, l'analyse qui débite. Le retrait d'autorisation
  * se décide ailleurs, et avant elle : il bloque toujours.
  */
-export async function lectureAPayer(documentId: string, rang: number): Promise<boolean> {
+export async function lectureAPayer(documentId: string, rang?: number): Promise<boolean> {
   return consommeUneAnalyse(await verdictPrecedent(documentId, rang));
 }
 
@@ -26,11 +26,16 @@ export async function lectureAPayer(documentId: string, rang: number): Promise<b
  * Ce que le dépôt annonce (RG-06.5) : la pièce sera-t-elle lue ? Oui si la
  * lecture est gratuite, ou si le solde la couvre. Sans rang, c'est la
  * version à venir, après toutes celles qui existent.
+ *
+ * « Sans rang » veut dire **sans filtre**, et non un rang immense : le rang
+ * est un entier 32 bits en base, et `Number.MAX_SAFE_INTEGER` y était
+ * refusé — toute préparation de dépôt répondait 503 depuis S.148 (S.155,
+ * trouvé par la recette RF-5).
  */
 export async function analyseAnnoncee(
   applicationId: string,
   documentId: string,
-  rang: number = Number.MAX_SAFE_INTEGER,
+  rang?: number,
 ): Promise<boolean> {
   if (!(await lectureAPayer(documentId, rang))) return true;
   return (await solde(applicationId)) > 0;
@@ -48,10 +53,11 @@ export async function analyseAnnoncee(
  */
 export async function verdictPrecedent(
   documentId: string,
-  rang: number,
+  /** Le rang de la version déposée ; absent, la dernière version existante est la précédente. */
+  rang?: number,
 ): Promise<VerdictAnalyse | null> {
   const precedente = await db.documentVersion.findFirst({
-    where: { documentId, rank: { lt: rang } },
+    where: rang === undefined ? { documentId } : { documentId, rank: { lt: rang } },
     orderBy: { rank: "desc" },
     select: {
       analyses: {

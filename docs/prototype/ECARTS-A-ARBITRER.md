@@ -12591,3 +12591,23 @@ Le lot part de main `dcc034f`.
 **Ce qui reste, non vérifié.** Lister en production les dettes déjà bloquées en revue (constat M4 du diagnostic, S.149) et les trancher en B-04. Une dette tranchée à zéro avant S.154 n'a pas été dite au candidat. Le lui dire relève du support, au cas par cas : rien ne réécrit une décision passée.
 
 **RF-4.** Avec ce lot, toutes les étapes sont proposées : diagnostics (S.149), supervision E6 (S.150), inventaire (S.151), purges (S.152), réservations de rédaction (S.153), B-04 (S.154). Leurs contrôles d'exploitation restent **non vérifiés**.
+
+## S.155 — correctif urgent : la préparation du dépôt répondait 503 depuis S.148
+
+**Origine.** Défaut trouvé par la recette locale de RF-5 (parcours R-C03, dépôt d'une pièce), le 09/10/2026. Le lot part de main `783f419`. Il ne tranche aucun choix ouvert et ne change ni schéma, ni drapeau, ni service.
+
+**Ce qui cassait.** Depuis S.148 (FON-03), la préparation du dépôt (`POST /api/dossiers/[id]/pieces/[pieceId]/depot`) annonce si la pièce sera lue (`analyseAnnoncee`, RG-06.5). Sans rang connu — la version n'existe pas encore — elle cherchait la version précédente avec `rank < Number.MAX_SAFE_INTEGER`. Le rang est un entier 32 bits en base : Postgres refusait la valeur (« Unable to fit integer value '9007199254740991' into an INT4 »), et **toute préparation de dépôt répondait 503**. En production, depuis le déploiement de S.148, aucun candidat ne pouvait déposer de pièce.
+
+**Pourquoi rien ne l'a vu.** Les tests de la route lisent son source ou simulent la base ; aucune fumée n'appelait l'annonce sans rang contre un vrai Postgres. La comparaison n'échoue qu'à l'exécution de la requête.
+
+**Reproduction sur l'ancien code.** La nouvelle section de `smoke:balayage` (« Le dépôt annonce la lecture sans connaître le rang à venir ») échoue sur l'ancien `reprise-gratuite.ts` avec l'erreur exacte de la production.
+
+**Ce qui est livré.** `server/dossiers/reprise-gratuite.ts` : un rang absent veut dire **sans filtre** — la dernière version existante est la précédente. Le rang reste facultatif dans `lectureAPayer`, `analyseAnnoncee` et `verdictPrecedent`. Les appels qui le donnent (confirmation du dépôt, balayage, analyse) ne changent pas.
+
+**Vérifications.**
+- `smoke:balayage` : sans rang, l'annonce se lit (`true`) ; après une version « illisible », la reprise s'annonce lue, même à solde nul (RG-06.5, FON-03).
+- `npm run check` (3505 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris. Ni le paquet de l'image ni le déploiement ne changent : pas de fumée d'image.
+
+**Données existantes.** Aucune écriture n'a eu lieu pendant la panne : la préparation échouait avant de créer la version ou de réserver une analyse. Rien à reprendre en base ; les candidats qui ont échoué doivent recommencer leur dépôt.
+
+**Ce qui reste, non vérifié.** Le dépôt en production après déploiement : un dépôt réel, de bout en bout, à constater par le responsable.
