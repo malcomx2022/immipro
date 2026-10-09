@@ -1492,7 +1492,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
   - le contrôle Healthchecks.io.
 
   Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.
-- **M15** : après le premier déploiement de S.134, vérifier sur le VPS que les six services sont `healthy` et que les limites apparaissent dans `docker stats`.
+- **M15** : six services `healthy` relevés sur le VPS le 09/10/2026, après le déploiement de `87fbdef` ; reste à vérifier que les limites apparaissent dans `docker stats`.
 - **M11** : les formulaires du back-office (ticket séparé, comme prévu) ; et le champ « Établissement visé » de C-05, saisi mais jamais envoyé, à trancher (l'envoyer ou le retirer).
 - **M10** : renseigner `ETAT_DE_SERVICE_JETON` dans `.env.app` si une surveillance externe doit lire le détail de `/api/health` ; sans lui, seul un administrateur connecté le lit.
 - **M8 (D-23)** : après le déploiement de S.137, la première reprise horaire propage la version en vigueur de chaque procédure qui a un prédécesseur ; relire `[reprise-divergence]` dans le journal du worker et les alertes parties.
@@ -1512,7 +1512,8 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
   - `Date.now()` dans la page serveur du journal.
 
   Lot dédié : il touche l'hydratation.
-- **S.145 (déploiement)** : après la fusion, le prochain déploiement recopie `deployer.sh` corrigé sur le VPS. Vérifier qu'il passe l'étape 2 (« aucune migration en attente » ou « une migration attend »), puis l'étape 3, qui joue les trois migrations en attente depuis `9b5f174` (S.137 `divergence_a_propager`, avec son rejeu D-23 ; S.140 `date_de_la_prestation` ; S.141 `historiques_immuables`), avec leur sauvegarde préalable.
+- **S.145 (déploiement)** : vérifié le 09/10/2026. Le run #509 (troisième tentative) met `87fbdef` en service : sauvegarde préalable écrite, trois migrations appliquées par la CLI de l'image, garde-fous tenus, six services `healthy`. Reste non vérifié : `[reprise-divergence]` (M8, D-23) dans le journal du worker.
+- **Démarrage à froid de l'antivirus** (constat du 09/10/2026, registre des écarts) : le worker n'éprouve le moteur qu'au démarrage puis à l'heure pile. Démarré avant clamd, il laisse l'instance en 503 jusqu'à l'heure suivante, et la sonde de `deployer.sh` (30 × 2 s) ne l'a vue en service qu'après sa relance. Correctif recommandé : réessayer le moteur à intervalle court pendant la mise en route de clamd, puis attendre `antivirus` `healthy` dans `deployer.sh`. À traiter dans un lot autorisé (RF-7).
 - **D-13, D-14** : appliquées en S.140 sur l'option recommandée, sans réponse explicite. Faire confirmer D-14 par M.C. Si M.C retient l'option b (exercice de la vente), seule `etablirLaFacture` change, et `performedAt` reste.
 
 ## 8. Revue fonctionnelle complémentaire du 09/10/2026 — chantier RF

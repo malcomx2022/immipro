@@ -12142,3 +12142,44 @@ Dans l'image `s144`, avec la même base injoignable :
 - `docs/exploitation/deploiement.md` : nouvelle section « La CLI Prisma de l'image, jamais celle du registre ».
 
 **Ce qui reste.** Le prochain déploiement recopie le script corrigé sur le VPS. Il jouera les trois migrations en attente depuis `9b5f174`, avec leur sauvegarde préalable : S.137 `divergence_a_propager` (et son rejeu D-23), S.140 `date_de_la_prestation`, S.141 `historiques_immuables`. À suivre jusqu'à « est en service ».
+
+## Constat d'exploitation — le déploiement de 87fbdef et le démarrage à froid de l'antivirus (09/10/2026)
+
+**Ce qui est vérifié.** Le run #509 de `deploy.yml`, à sa troisième tentative (10:17 à 10:21 UTC), met `87fbdef` en service à la place de `9b5f174`. Les deux premières tentatives s'étaient arrêtées sur « BACKUP_GPG_RECIPIENT n'est pas défini », le temps de poser `.env.sauvegarde` sur le VPS.
+
+Ce que montre le journal du job :
+- la sauvegarde préalable `sauvegardes/avant-87fbdef.dump.gpg` est écrite ;
+- les trois migrations sont appliquées par la CLI Prisma de l'image : `divergence_a_propager`, `date_de_la_prestation` et `historiques_immuables` ;
+- les garde-fous donnent 105 écritures refusées, 9 posées et 0 acceptée à tort.
+
+Relevé par le responsable sur le VPS :
+- les six services sont `healthy` ;
+- « worker démarré » apparaît deux fois ;
+- la sauvegarde est présente (289 Ko) ;
+- `.deploiement/journal` porte « 87fbdef depuis 9b5f174 ».
+
+Depuis l'extérieur, `/api/health` répond 200 `{"status":"pilote","db":"up"}`, le corps public de S.137.
+
+**L'écart.** Après `up -d`, la sonde de `deployer.sh` a échoué 30 fois sur un 503. Il a fallu la relance de `app` et `worker` pour que l'instance passe à 200, six secondes plus tard.
+
+La cause est vérifiée dans les journaux du VPS. ClamAV, recréé, chargeait encore ses signatures : « Socket for clamd not found yet, retrying » jusqu'à 44/1800, et la configuration de clamd n'était lue qu'à 10:20:12.
+
+Le code explique la suite (`src/server/jobs/worker.ts`) :
+- Le worker n'éprouve le moteur (EICAR) qu'une fois à son démarrage, puis à chaque heure pile (`SONDE_SERVICES`, `0 * * * *`).
+- Parti à 10:19:32, il a trouvé un moteur muet. Ce constat rend le balayage, bloquant, non opérationnel, et `/api/health` répond 503.
+- Seul le redémarrage du worker, une fois clamd debout, a refait l'essai.
+
+**Portée.** La fenêtre de la sonde (30 × 2 s) est trop courte, mais ce n'est pas le fond du problème. **Sans la relance, l'instance serait restée inapte jusqu'à l'heure pile suivante, soit jusqu'à 40 minutes**, quelle que soit la longueur de la fenêtre.
+
+Le cas se produit sans déploiement : un redémarrage du VPS relance tous les conteneurs à froid, et rien ne relance alors le worker. Il se produit aussi dans l'autre sens : un déploiement dont la relance tomberait encore avant clamd reviendrait à tort à la version précédente. La base, elle, resterait migrée.
+
+**Pistes, à trancher dans un lot autorisé** (RF-7, maintenance ; aucune n'est appliquée ici) :
+
+1. *Allonger la fenêtre de la sonde.* Elle se règle déjà par `IMMIPRO_SONDE_ESSAIS` et `IMMIPRO_SONDE_PAUSE`. Seule, cette piste ne corrige rien : le worker ne réessaie pas avant l'heure pile.
+2. *Exclure l'antivirus de la sonde du déploiement.* Écartée : `deployer.sh` déclarerait en service une instance que `/api/health` dit inapte (503 vu par le répartiteur et la surveillance). Une image qui casse réellement le balayage passerait aussi sans retour arrière. Le worker ne vérifie pas l'antivirus « à part » : c'est son constat qui fait le 503.
+3. *Recommandée.* Après un constat « muet » au démarrage, le worker réessaie le moteur à intervalle court (30 s par exemple) pendant la mise en route de clamd (`start_period` de la passerelle : 180 s), puis revient à la cadence horaire. Il n'y a pas de `depends_on` vers l'antivirus : la décision de compose (« un antivirus en panne […] ne doit pas arrêter la purge ni les paiements ») tient. Ce correctif couvre le déploiement comme le redémarrage du VPS.
+4. *En complément de 3.* `deployer.sh` attend que `antivirus` soit `healthy` (clamd répond PONG) avant de lancer la sonde, sans dépasser une borne. Le retour arrière ne se décide alors plus pendant le chargement des signatures.
+
+À éprouver dans ce lot : un worker démarré avant clamd doit atteindre 200 sans relance manuelle, sur une base jetable avec l'image (`smoke:worker --image`).
+
+**Non vérifié.** `[reprise-divergence]` dans le journal du worker (rejeu D-23, à la 25ᵉ minute de l'heure) et les alertes parties.
