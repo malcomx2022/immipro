@@ -2,6 +2,8 @@ import type { CreditReason, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { octroiAEntamer, type LigneDuGrandLivre } from "@/domain/payments/grand-livre";
+import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
+import { NOTE_RESERVATION_RENDUE } from "@/domain/redaction/reservation";
 
 /**
  * Quota d'analyses — INV-6, « jamais de dépassement silencieux ».
@@ -165,6 +167,11 @@ export async function debiterUneAnalyse(
      * poser une seconde.
      */
     versionId?: string;
+    /**
+     * L'échéance de la réservation d'une rédaction assistée — S.153. Une
+     * issue la solde ; la reprise horaire rend celles qui l'ont passée.
+     */
+    reserveJusquA?: Date;
   } = {},
 ): Promise<{ ligne: string; octroi: string | null; reprise: boolean }> {
   return sousVerrouDuGrandLivre(applicationId, async (tx) => {
@@ -185,6 +192,7 @@ export async function debiterUneAnalyse(
         grantId,
         versionId: options.versionId ?? null,
         note: options.note ?? null,
+        reservedUntil: options.reserveJusquA ?? null,
       },
       select: { id: true },
     });
@@ -214,7 +222,14 @@ async function reservationOuverte(
   client: Prisma.TransactionClient,
 ): Promise<{ ligne: string; octroi: string | null } | null> {
   const lignes = await client.analysisCredit.findMany({
-    where: { applicationId, versionId, reason: { in: ["ANALYSE", "ANALYSE_RENDUE"] } },
+    where: {
+      applicationId,
+      versionId,
+      reason: { in: ["ANALYSE", "ANALYSE_RENDUE"] },
+      // La rédaction assistée nomme aussi sa version (S.153), sans analyse
+      // à lier : son débit n'est pas une réservation de lecture.
+      OR: [{ note: null }, { NOT: { note: { startsWith: NOTE_REDACTION_ASSISTEE } } }],
+    },
     orderBy: { createdAt: "asc" },
     select: { id: true, delta: true, reason: true, analysisId: true, grantId: true },
   });
@@ -353,3 +368,75 @@ export async function rendreUneTentative(
  * divergent au premier changement de grille.
  */
 export { getPack as packDuCode } from "@/domain/payments/pricing";
+
+/**
+ * Solde la réservation d'une rédaction assistée qui a abouti — S.153.
+ *
+ * Dans la transaction qui écrit l'issue (la version, ou l'avis daté) :
+ * les deux tiennent ou tombent ensemble. Conditionnelle : si la reprise
+ * l'a déjà rendue, rien ne change, et le texte est livré quand même — la
+ * réservation ne peut échoir qu'après plusieurs appels entiers, et le
+ * candidat ne perd pas ce qu'il a obtenu. Le débit nomme alors la version.
+ */
+export function solderLaReservationDeRedaction(
+  client: Pick<Prisma.TransactionClient, "analysisCredit">,
+  ligne: string,
+  versionId: string,
+) {
+  return client.analysisCredit.updateMany({
+    where: { id: ligne, reason: "ANALYSE", reservedUntil: { not: null } },
+    data: { reservedUntil: null, versionId },
+  });
+}
+
+/**
+ * Rend la réservation d'une rédaction assistée restée sans texte — S.153.
+ *
+ * Un échec d'appel ou un texte écarté, au moment même ; une interruption,
+ * par la reprise horaire. Sous le verrou du grand livre, et seulement si la
+ * réservation est encore ouverte : un débit soldé ou déjà rendu ne l'est
+ * jamais deux fois.
+ */
+export async function rendreLaReservationDeRedaction(
+  applicationId: string,
+  ligne: string,
+  note: string,
+): Promise<boolean> {
+  return sousVerrouDuGrandLivre(applicationId, async (tx) => {
+    const debit = await tx.analysisCredit.findFirst({
+      where: { id: ligne, applicationId, reason: "ANALYSE", reservedUntil: { not: null } },
+      select: { grantId: true },
+    });
+    if (!debit) return false;
+    await tx.analysisCredit.update({ where: { id: ligne }, data: { reservedUntil: null } });
+    await tx.analysisCredit.create({
+      data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", grantId: debit.grantId, note },
+    });
+    return true;
+  });
+}
+
+/**
+ * La reprise des réservations de rédaction échues — S.153, passe horaire.
+ *
+ * Ce qui reste ouvert après l'échéance a été interrompu : le texte n'est
+ * jamais arrivé, ou n'a jamais été écrit. Le débit est rendu (INV-6) ; la
+ * trace de la rédaction reste sur la ligne du débit, que le remboursement
+ * d'une montée continue de lire.
+ */
+export async function rendreLesReservationsDeRedactionEchues(
+  maintenant: Date = new Date(),
+): Promise<{ rendues: number }> {
+  const echues = await db.analysisCredit.findMany({
+    where: { reason: "ANALYSE", reservedUntil: { lt: maintenant } },
+    select: { id: true, applicationId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  let rendues = 0;
+  for (const debit of echues) {
+    if (await rendreLaReservationDeRedaction(debit.applicationId, debit.id, NOTE_RESERVATION_RENDUE)) {
+      rendues += 1;
+    }
+  }
+  return { rendues };
+}

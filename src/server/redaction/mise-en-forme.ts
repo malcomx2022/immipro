@@ -2,7 +2,8 @@ import type { Reponses } from "@/domain/redaction/entretien";
 import { MOTIF_DAPPEL } from "@/domain/ia/appel";
 import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
 import { MOTIF_FORMULATION_REFUSEE, refusDuTexteRedige } from "@/domain/redaction/commande";
-import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
+import { debiterUneAnalyse, rendreLaReservationDeRedaction } from "@/server/acces/quota";
+import { echeanceDeLaReservation } from "@/domain/redaction/reservation";
 import type { PieceARediger } from "@/server/lecture/redaction";
 import type { Redacteur } from "./adaptateur";
 import { leRedacteur } from "./service";
@@ -23,7 +24,11 @@ import { noterLesJetons } from "./usage";
  * réécriture et la restauration.
  */
 export type IssueDeLaMiseEnForme =
-  | { produite: true; texte: string }
+  /**
+   * `reservation` : la ligne du débit, que la route solde dans la
+   * transaction qui crée la version (S.153).
+   */
+  | { produite: true; texte: string; reservation: string }
   | { produite: false; motif: typeof MOTIF_FORMULATION_REFUSEE | null };
 
 export async function mettreEnForme(
@@ -39,9 +44,14 @@ export async function mettreEnForme(
    * INV-6 dit « jamais de dépassement silencieux », pas « le plus
    * souvent ». Ici l'échec reste imprévisible — le service est branché,
    * et c'est l'appel qui peut ne pas aboutir.
+   *
+   * La réservation porte une échéance (S.153) : une interruption entre ce
+   * débit et la version laisserait sinon un débit sans texte, que rien ne
+   * rendrait. La reprise horaire rend ce qui l'a passée sans issue.
    */
   const debit = await debiterUneAnalyse(dossierId, undefined, {
     note: `${NOTE_REDACTION_ASSISTEE} — Mise en forme (${piece.type})`,
+    reserveJusquA: echeanceDeLaReservation(new Date()),
   });
 
   const produit = await redacteur({
@@ -80,10 +90,10 @@ export async function mettreEnForme(
      * créée et l'analyse est rendue — sans ce retour, un candidat
      * paierait l'échec d'un appel.
      */
-    await rendreUneTentative(
+    await rendreLaReservationDeRedaction(
       dossierId,
+      debit.ligne,
       `Mise en forme non aboutie (${produit.cause}) : aucun texte rendu`,
-      debit.octroi,
     );
     console.warn(`[redaction] ${MOTIF_DAPPEL[produit.cause]} — ${produit.detail}`);
     return { produite: false, motif: null };
@@ -91,11 +101,11 @@ export async function mettreEnForme(
 
   const faute = refusDuTexteRedige(produit.texte);
   if (faute) {
-    await rendreUneTentative(dossierId, "Mise en forme écartée : formulation refusée", debit.octroi);
+    await rendreLaReservationDeRedaction(dossierId, debit.ligne, "Mise en forme écartée : formulation refusée");
     // Le code et l'extrait, pour qui relit le journal ; jamais le texte entier.
     console.warn(`[redaction] mise en forme écartée — ${faute.code} « ${faute.extrait} »`);
     return { produite: false, motif: MOTIF_FORMULATION_REFUSEE };
   }
 
-  return { produite: true, texte: produit.texte };
+  return { produite: true, texte: produit.texte, reservation: debit.ligne };
 }

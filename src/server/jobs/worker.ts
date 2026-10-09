@@ -12,6 +12,7 @@ import { sonderLesServices } from "@/server/exploitation/sondes";
 import { demarrerLeBattement } from "./battement";
 import { arreterProprement } from "./arret";
 import { passeDeRetention } from "./retention";
+import { rendreLesReservationsDeRedactionEchues } from "@/server/acces/quota";
 import { depublierLesFichesEchues } from "./veille";
 import { declasserLesPiecesEchues } from "./peremption";
 import { envoyerLesRappels } from "./rappels";
@@ -169,6 +170,13 @@ async function main() {
     */
     const analyses = await reprendreLesAnalysesEnAttente();
     if (analyses.remises > 0) console.info("[quarantaine] analyses reprises", analyses);
+    /*
+      Même cadence, même famille : une rédaction assistée interrompue
+      entre son débit et son texte rend sa réservation une fois l'échéance
+      passée (S.153). Ni le moteur ni la file n'y sont pour rien.
+    */
+    const reservations = await rendreLesReservationsDeRedactionEchues();
+    if (reservations.rendues > 0) console.info("[redaction] réservations rendues", reservations);
     const bilan = await reprendreLesQuarantaines();
     /*
       `moteurMuet` n'est pas une panne de la passe : c'est le cas où

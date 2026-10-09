@@ -1037,12 +1037,18 @@ model AnalysisCredit {
   versionId     String?
   version       DocumentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
   note          String?
+  /// L'échéance de la réservation d'une rédaction assistée — RF-4, S.153.
+  /// Posée au débit, avant l'appel ; remise à nul par l'issue (texte devenu
+  /// version, avis daté, ou rendu d'un échec). La reprise horaire rend les
+  /// réservations échues sans issue. Nulle partout ailleurs.
+  reservedUntil DateTime?
   createdAt     DateTime     @default(now())
 
   @@index([applicationId, createdAt])
   @@index([grantId])
   @@index([transactionId])
   @@index([versionId])
+  @@index([reservedUntil])
 }
 
 // ═══════════════════════════════════════════════════════════

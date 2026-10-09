@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
@@ -6,6 +7,7 @@ import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction"
 import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { mettreEnForme } from "@/server/redaction/mise-en-forme";
+import { solderLaReservationDeRedaction } from "@/server/acces/quota";
 import { compterMotsTexte } from "@/domain/redaction/versions";
 import {
   MOTIF_PREMIERE_VERSION,
@@ -145,19 +147,38 @@ export const POST = route({
       return { produite: false, disponible: true, rang: null, motif: issue.motif };
     }
 
-    return creer(piece.documentId, dernier + 1, issue.texte, MOTIF_PREMIERE_VERSION);
+    return creer(piece.documentId, dernier + 1, issue.texte, MOTIF_PREMIERE_VERSION, issue.reservation);
   },
 });
 
-async function creer(documentId: string, rang: number, texte: string, motif: string) {
-  const version = await db.documentVersion.create({
-    data: {
-      documentId,
-      rank: rang,
-      body: texte,
-      wordCount: compterMotsTexte(texte),
-      changeNote: motif,
-    },
-  });
+async function creer(
+  documentId: string,
+  rang: number,
+  texte: string,
+  motif: string,
+  /** La réservation de la mise en forme, soldée avec la version (S.153). */
+  reservation?: string,
+) {
+  const donnees = {
+    documentId,
+    rank: rang,
+    body: texte,
+    wordCount: compterMotsTexte(texte),
+    changeNote: motif,
+  };
+  if (!reservation) {
+    const version = await db.documentVersion.create({ data: donnees });
+    return { produite: true, disponible: true, rang: version.rank };
+  }
+  /*
+    La version et le solde de sa réservation, ensemble ou pas du tout :
+    une version sans solde serait rendue par la reprise alors que le texte
+    a été livré ; un solde sans version, un débit sans texte.
+  */
+  const id = randomUUID();
+  const [version] = await db.$transaction([
+    db.documentVersion.create({ data: { id, ...donnees } }),
+    solderLaReservationDeRedaction(db, reservation, id),
+  ]);
   return { produite: true, disponible: true, rang: version.rank };
 }

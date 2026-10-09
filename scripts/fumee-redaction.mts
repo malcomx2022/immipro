@@ -25,6 +25,7 @@
  *
  *     DATABASE_URL=postgresql://…/postgres npm run smoke:redaction
  */
+import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -151,7 +152,15 @@ const { faitsDuDossier, piecesARediger, vueDeLaRelecture } = await import(
 );
 const { instructionsDeRedaction } = await import("../src/domain/redaction/commande");
 const { etatDeLaRelecture, resumeSelonLEtat } = await import("../src/domain/redaction/relecture");
-const { solde } = await import("../src/server/acces/quota");
+const {
+  solde,
+  debiterUneAnalyse,
+  rendreLesReservationsDeRedactionEchues,
+  solderLaReservationDeRedaction,
+} = await import("../src/server/acces/quota");
+const { NOTE_RESERVATION_RENDUE, RESERVATION_DE_REDACTION_MINUTES } = await import(
+  "../src/domain/redaction/reservation"
+);
 const { noterLesJetons } = await import("../src/server/redaction/usage");
 const { mettreEnForme } = await import("../src/server/redaction/mise-en-forme");
 
@@ -351,6 +360,81 @@ try {
     const gardee = await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses);
     verifier(gardee.produite, "une négation passe : elle ne promet rien");
     verifier((await solde(p.application.id)) === avant - 1, "et cette mise en forme-là est décomptée");
+  }
+
+  console.log("\nUne rédaction interrompue rend sa réservation à l'échéance (RF-4, S.153)");
+  {
+    const p = await piece({ avecTexte: false });
+    const avant = await solde(p.application.id);
+    const PIECE = {
+      type: "lettre-motivation",
+      libelle: MATIERE.piece,
+      objet: MATIERE.objet,
+      pays: MATIERE.pays,
+      questions: [{ section: "PARCOURS", intitule: "Quel est ton parcours ?" }],
+    } as never;
+    const apres = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+
+    // Le processus s'arrête entre le débit et le texte.
+    let interrompue = false;
+    try {
+      await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses, async () => {
+        throw new Error("processus interrompu");
+      });
+    } catch {
+      interrompue = true;
+    }
+    verifier(interrompue && (await solde(p.application.id)) === avant - 1, "l'interruption laisse un débit");
+    verifier(
+      (await rendreLesReservationsDeRedactionEchues(apres(1))).rendues === 0,
+      "avant l'échéance, la reprise n'y touche pas : la requête pourrait tourner encore",
+    );
+    const rendue = await rendreLesReservationsDeRedactionEchues(apres(RESERVATION_DE_REDACTION_MINUTES + 1));
+    verifier(rendue.rendues >= 1, `l'échéance passée, la reprise la rend (${rendue.rendues})`);
+    verifier((await solde(p.application.id)) === avant, "le candidat retrouve son analyse (INV-6)");
+    const rendus = await db.analysisCredit.findMany({
+      where: { applicationId: p.application.id, reason: "ANALYSE_RENDUE" },
+    });
+    verifier(
+      rendus.length === 1 && rendus[0]!.note === NOTE_RESERVATION_RENDUE,
+      "un seul rendu, qui dit pourquoi",
+    );
+    await rendreLesReservationsDeRedactionEchues(apres(2 * RESERVATION_DE_REDACTION_MINUTES));
+    verifier((await solde(p.application.id)) === avant, "et jamais deux fois");
+
+    // Une mise en forme qui aboutit : la version et le solde, ensemble.
+    reponseDuService = messageDe(LETTRE, 3000, 700);
+    const issue = await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses);
+    verifier(issue.produite, "la mise en forme suivante aboutit");
+    if (issue.produite) {
+      const id = randomUUID();
+      await db.$transaction([
+        db.documentVersion.create({
+          data: { id, documentId: p.document.id, rank: 1, body: issue.texte, changeNote: "fumée" },
+        }),
+        solderLaReservationDeRedaction(db, issue.reservation, id),
+      ]);
+      const debit = await db.analysisCredit.findUniqueOrThrow({ where: { id: issue.reservation } });
+      verifier(
+        debit.reservedUntil === null && debit.versionId === id,
+        "la réservation est soldée, et le débit nomme la version produite",
+      );
+      await rendreLesReservationsDeRedactionEchues(apres(RESERVATION_DE_REDACTION_MINUTES + 1));
+      verifier((await solde(p.application.id)) === avant - 1, "une rédaction aboutie n'est jamais rendue");
+      // Le débit de rédaction nomme une version sans être une réservation de lecture (RF-3).
+      const lecture = await debiterUneAnalyse(p.application.id, undefined, { versionId: id });
+      verifier(!lecture.reprise, "une lecture de cette version ne reprend pas le débit de la rédaction");
+      await db.analysisCredit.create({
+        data: { applicationId: p.application.id, delta: 1, reason: "ANALYSE_RENDUE", note: "fumée" },
+      });
+    }
+
+    // Un texte écarté est rendu tout de suite, et la reprise ne le rend pas une seconde fois.
+    const avantEcart = await solde(p.application.id);
+    reponseDuService = messageDe(`${LETTRE}\n\nAvec ce parcours, mon visa est garanti.`, 3000, 700);
+    await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses);
+    await rendreLesReservationsDeRedactionEchues(apres(RESERVATION_DE_REDACTION_MINUTES + 1));
+    verifier((await solde(p.application.id)) === avantEcart, "un texte écarté est rendu une fois, pas deux");
   }
 
   console.log("\nUn texte tronqué n'est pas une version");
