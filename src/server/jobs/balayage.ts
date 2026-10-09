@@ -9,6 +9,7 @@ import {
 import { refusAuControle } from "@/domain/dossiers/quarantaine";
 import { recalculerCompletude } from "@/server/acces/dossiers";
 import { commandeLaPiece, ecrireSurLaPieceCourante } from "@/server/acces/piece-courante";
+import { lectureAPayer } from "@/server/dossiers/reprise-gratuite";
 import { compteur, solde } from "@/server/acces/quota";
 import { autorisationAccordee } from "@/server/acces/consentements";
 import { MENTION_NON_ANALYSEE, type MotifDeNonAnalyse } from "@/domain/dossiers/piece";
@@ -235,6 +236,10 @@ async function suiteApresPromotion(
   // RG-06.5 — le quota n'interdit pas le dépôt, il n'interdit que l'analyse.
   // Il se relit ici et non au dépôt : entre les deux, une autre pièce a pu
   // consommer la dernière analyse.
+  //
+  // RF-3, FON-03 : et seulement l'analyse qui se paie. La reprise après
+  // « illisible » est gratuite ; elle partait conservée à solde nul.
+  if (!(await lectureAPayer(version.documentId, version.rank))) return "ANALYSE";
   if ((await solde(tache.applicationId)) > 0) return "ANALYSE";
 
   // Sans pack, il n'y a pas d'analyses épuisées : il n'y en a jamais eu.

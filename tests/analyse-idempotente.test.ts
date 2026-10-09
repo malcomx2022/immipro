@@ -40,11 +40,13 @@ describe("le job d'analyse ne paie pas deux fois la même lecture", () => {
     expect(horsTransaction[0]![0]).toContain("MENTION_NON_ANALYSEE.autorisation_retiree");
   });
 
-  it("la course perdue rend l'analyse débitée, et ne laisse rien d'autre", () => {
+  it("la course perdue rend la réservation restée ouverte, et ne laisse rien d'autre", () => {
     const consigner = job.slice(job.indexOf("async function consignerUneFois("));
     expect(consigner).toContain("await db.$transaction(ecrire)");
     expect(consigner).toMatch(/code !== "P2002"\) throw erreur/u);
-    expect(consigner).toMatch(/if \(consomme\) \{\s*await rendreUneTentative\(/u);
+    // RF-3, E5 : la réservation est partagée par les deux exécutions ; le
+    // perdant ne rend que si elle est encore ouverte.
+    expect(consigner).toMatch(/if \(consomme\) \{\s*await rendreLaReservation\(/u);
   });
 
   it("le reclassement hors sujet dit ce qu'il a coûté et relie son débit", () => {

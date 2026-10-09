@@ -1167,6 +1167,67 @@ try {
     verifier(suite === "SANS_OBJET", `une version saine remplacée ne part pas en analyse (${suite})`);
     verifier(enConfiance(saine.cle), "elle est promue tout de même, et reste à l'historique");
   }
+
+  /*
+    RF-3, FON-03 — 09/10/2026. La reprise après une lecture illisible ne
+    se paie pas (WF-06) ; le worker le sait, mais la promotion ne lançait
+    l'analyse qu'avec un solde positif, sans regarder le verdict d'avant.
+    Une meilleure photo déposée à solde nul était conservée sans lecture.
+  */
+  console.log("\nRF-3 — la reprise gratuite passe à solde nul, la première lecture non (FON-03)");
+  {
+    reponseDuMoteur = { statut: 200, corps: '{"status":"clean"}' };
+    const reprise = await piece({ avecQuota: false });
+    // La v1 a été lue et déclarée illisible ; son analyse a été rendue.
+    const v1 = await db.documentVersion.findUniqueOrThrow({ where: { id: reprise.tache.versionId } });
+    await db.documentVersion.update({
+      where: { id: v1.id },
+      data: { scanState: "SAINE", scannedAt: new Date() },
+    });
+    await db.documentAnalysis.create({
+      data: {
+        versionId: v1.id,
+        verdict: "ILLISIBLE",
+        title: "Cette pièce demande une relecture",
+        body: "Reprends la photo.",
+        creditConsumed: false,
+      },
+    });
+    // Un pack existe, mais son solde est nul : tout a servi ailleurs.
+    await db.analysisCredit.createMany({
+      data: [
+        { applicationId: reprise.application.id, delta: 1, reason: "ACHAT_PACK" },
+        { applicationId: reprise.application.id, delta: -1, reason: "ANALYSE" },
+      ],
+    });
+    const cle = `dossiers/${reprise.application.id}/passeport-reprise-${rang}.pdf`;
+    seau(SEAU_QUARANTAINE).set(cle, Buffer.from("%PDF-1.4 meilleure photo"));
+    const v2 = await db.documentVersion.create({
+      data: {
+        documentId: reprise.document.id,
+        rank: 2,
+        objectKey: cle,
+        checksum: `somme-reprise-${rang}-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 22,
+      },
+    });
+    const suite = await balayerUnePiece(
+      { ...reprise.tache, versionId: v2.id },
+      leBalayeur(),
+    );
+    verifier(suite === "ANALYSE", `la reprise après « illisible » part en analyse à solde nul (${suite})`);
+
+    const premiere = await piece({ avecQuota: false });
+    await db.analysisCredit.createMany({
+      data: [
+        { applicationId: premiere.application.id, delta: 1, reason: "ACHAT_PACK" },
+        { applicationId: premiere.application.id, delta: -1, reason: "ANALYSE" },
+      ],
+    });
+    const refus = await balayerUnePiece(premiere.tache, leBalayeur());
+    verifier(refus === "CONSERVEE", `une première lecture à solde nul reste conservée (${refus})`);
+  }
 } finally {
   /*
     La reprise poste un job : pg-boss tient ses propres connexions sur la

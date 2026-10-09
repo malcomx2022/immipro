@@ -836,6 +836,75 @@ try {
     }
   }
 
+  /*
+    RF-3, reliquat E5 — 09/10/2026. Le débit précède l'appel (INV-6), et
+    l'unicité du verdict départage deux exécutions. Mais un arrêt entre
+    le débit et le verdict laissait un débit sans analyse : le rejeu ne
+    le retrouvait pas et débitait de nouveau.
+  */
+  console.log("\nRF-3 — un arrêt entre le débit et le verdict ne fait pas payer deux fois (E5)");
+  {
+    reponseDuService = reponseDeLecture({
+      piece_identifiee: "passeport",
+      obstacle: null,
+      champs: { passeport_validite_min: "2029-03-01" },
+    });
+    const arret: typeof lExtracteur extends () => infer E ? E : never = async () => {
+      throw new Error("arrêt du worker pendant l'appel");
+    };
+
+    const p = await piece({ dateCible: "2027-09-01" });
+    const interrompue = await analyserUnePiece(p.tache, arret).then(
+      () => "achevée",
+      () => "interrompue",
+    );
+    verifier(interrompue === "interrompue", "la première exécution s'arrête après le débit");
+    verifier((await solde(p.application.id)) === 4, "le débit est posé avant l'appel (INV-6)");
+
+    await analyserUnePiece(p.tache, lExtracteur());
+    const apres = await relireDocument(p.document.id);
+    verifier(apres.status === "CONFORME", `le rejeu rend le verdict (${apres.status})`);
+    verifier(
+      (await solde(p.application.id)) === 4,
+      `le rejeu reprend le débit posé, il n'en ajoute pas (solde ${await solde(p.application.id)})`,
+    );
+
+    // Deux reprises simultanées après l'arrêt : toujours une seule analyse payée.
+    const q = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(q.tache, arret).catch(() => undefined);
+    await Promise.all([
+      analyserUnePiece(q.tache, lExtracteur()),
+      analyserUnePiece(q.tache, lExtracteur()),
+    ]);
+    verifier(
+      (await solde(q.application.id)) === 4,
+      `deux reprises concurrentes, une analyse payée (solde ${await solde(q.application.id)})`,
+    );
+    const debits = await db.analysisCredit.count({
+      where: { applicationId: q.application.id, reason: "ANALYSE" },
+    });
+    verifier(debits === 1, `un seul débit écrit pour la version (${debits})`);
+
+    // Une version remplacée après l'arrêt : sa réservation est rendue.
+    const r = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(r.tache, arret).catch(() => undefined);
+    await db.documentVersion.create({
+      data: {
+        documentId: r.document.id,
+        rank: 2,
+        objectKey: `dossiers/${r.application.id}/passeport-v2-e5.pdf`,
+        checksum: `somme-e5-${rang}-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+      },
+    });
+    await analyserUnePiece(r.tache, lExtracteur());
+    verifier(
+      (await solde(r.application.id)) === 5,
+      `la réservation d'une version remplacée est rendue (solde ${await solde(r.application.id)})`,
+    );
+  }
+
   console.log("\nLa reprise après un verdict illisible ne se paie pas");
   {
     /*

@@ -182,9 +182,10 @@ describe("la chaîne serveur tenait déjà RG-06.5", () => {
    * autre pièce a pu consommer la dernière analyse.
    */
   it("le balayage relit le solde avant de mettre l'analyse en file", () => {
-    expect(balayage).toContain("await solde(");
-    expect(balayage.indexOf("await solde(")).toBeLessThan(
-      balayage.indexOf('return "ANALYSE"'),
+    // RF-3, FON-03 : la reprise gratuite après « illisible » passe d'abord,
+    // sans solde ; toute lecture payante relit le solde.
+    expect(balayage).toMatch(
+      /if \(!\(await lectureAPayer\([^)]*\)\)\) return "ANALYSE";\s*if \(\(await solde\(tache\.applicationId\)\) > 0\) return "ANALYSE";/u,
     );
   });
 

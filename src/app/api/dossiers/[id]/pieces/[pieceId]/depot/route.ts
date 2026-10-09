@@ -13,7 +13,8 @@ import {
   refusDeLaDemande,
   versionDeMemeEmpreinte,
 } from "@/server/acces/pieces";
-import { compteur, solde } from "@/server/acces/quota";
+import { compteur } from "@/server/acces/quota";
+import { analyseAnnoncee } from "@/server/dossiers/reprise-gratuite";
 import { getQueue, JOBS, poster } from "@/lib/queue";
 import { antivirusConfigure } from "@/server/securite/antivirus";
 import { lireLesConstats } from "@/server/exploitation/constats";
@@ -94,8 +95,9 @@ export const POST = route({
     const depot = await preparerLeDepot(dossier.id, piece);
     return {
       depot,
-      // RG-06.5 — le quota épuisé ne ferme pas le dépôt, il ferme l'analyse.
-      analyseraLaPiece: (await solde(dossier.id)) > 0,
+      // RG-06.5 — le quota épuisé ne ferme pas le dépôt, il ferme l'analyse
+      // qui se paie ; la reprise après « illisible » est lue (FON-03).
+      analyseraLaPiece: await analyseAnnoncee(dossier.id, piece.id),
       quota: await compteur(dossier.id),
     };
   },
@@ -167,7 +169,7 @@ export const PUT = route({
       etat: "EN_ANALYSE",
       mention: MENTION_EN_QUARANTAINE,
       /** RG-06.5 — dit d'avance si l'analyse suivra la promotion. */
-      analyseraLaPiece: (await solde(dossier.id)) > 0,
+      analyseraLaPiece: await analyseAnnoncee(dossier.id, piece.id, version.rank),
       quota: await compteur(dossier.id),
     };
   },
