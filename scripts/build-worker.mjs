@@ -201,6 +201,30 @@ const octetsDiagnostic =
 console.log(`dist/diagnostic-paiement.mjs — ${(octetsDiagnostic / 1024).toFixed(0)} Kio`);
 
 /*
+  Le diagnostic des données antérieures (RF-4, S.149), même image et même
+  méthode. Lecture seule, identifiants techniques seulement :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/diagnostic-donnees.mjs
+*/
+const diagnosticDonnees = await build({
+  entryPoints: ["scripts/diagnostic-donnees.mts"],
+  outfile: "dist/diagnostic-donnees.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node24",
+  format: "esm",
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsDiagnosticDonnees =
+  Object.values(diagnosticDonnees.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/diagnostic-donnees.mjs — ${(octetsDiagnosticDonnees / 1024).toFixed(0)} Kio`);
+
+/*
   La graine éditoriale (S.120), même image et même méthode : le guide Pays-Bas
   et l'article de départ, que `npm run seed:editorial` chargeait sans pouvoir
   tourner dans l'image.

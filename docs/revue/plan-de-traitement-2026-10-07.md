@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est proposé. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est proposé. Tout le reste est à faire.
 
 ---
 
@@ -1472,6 +1472,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ## 7. Ce qui reste ouvert après les lots S.125 à S.145
 
+- **Diagnostics (S.149)** : `node dist/diagnostic-donnees.mjs`, lancé depuis l'image, compte en lecture seule les constats C1, M1, E5, E7, M4 et M7, ainsi que ceux de S.146 et S.147 (`docs/exploitation/diagnostic-donnees.md`). Le lancer sur la production et reporter chaque constat dans le suivi du chantier. Les lignes ci-dessous restent ouvertes tant que leurs constats ne sont pas relus.
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
 - **E4** : purge par préfixe de dossier et inventaire unique des objets déjà orphelins, qui ont perdu leur clé en base.
 - **E5** : fermé par S.148 (RF-3) — la réservation nomme sa version et le rejeu la reprend. Les débits antérieurs restent sans version : leur diagnostic en lecture seule est au registre (S.148), à traiter dans RF-4.
@@ -1556,4 +1557,10 @@ corrigé ; voir le registre, entrée S.147.
 ouvert. E5 et FON-03 sont reproduits sur l'ancien code puis corrigés,
 avec une migration additive (`AnalysisCredit.versionId`) ; voir le
 registre, entrée S.148.
+
+**RF-4 (S.149), 09/10/2026, première étape.** Autorisé par le
+responsable, qui a choisi de commencer par les diagnostics en lecture
+seule. La supervision E6, la commande de purge, l'inventaire du stockage
+(E4) et la reprise des réservations de la rédaction assistée restent à
+faire ; voir le registre, entrée S.149.
 Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

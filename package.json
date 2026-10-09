@@ -43,6 +43,7 @@
     "compte:role": "tsx scripts/changer-role.mts",
     "smoke:diagnostic": "tsx scripts/fumee-diagnostic.mts",
     "paiement:diagnostic": "tsx scripts/diagnostic-paiement.mts",
+    "donnees:diagnostic": "tsx scripts/diagnostic-donnees.mts",
     "smoke:graine": "node scripts/fumee-graine.mjs",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
     "smoke:conservation": "tsx scripts/fumee-conservation.mts",

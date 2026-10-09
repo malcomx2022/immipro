@@ -12352,3 +12352,33 @@ Un écart est un débit sans résultat, ou un résultat sans débit. Il se trait
 - La rédaction et la relecture assistées (ci-dessus).
 - RF-4 : le diagnostic des débits antérieurs, entre autres.
 - La recette du parcours (RF-5) reste **non vérifiée**.
+
+## S.149 — RF-4, première étape : les données antérieures, diagnostiquées en lecture seule
+
+**Autorisation.** Le responsable a autorisé RF-4 le 09/10/2026. Il a choisi de commencer par les diagnostics en lecture seule, après la fusion de S.148. Le lot part de main `c09ad0d`.
+
+**Ce qui est livré.** Une commande lancée depuis l'image : `node dist/diagnostic-donnees.mjs [--limite N]` (`npm run donnees:diagnostic` en local, mode d'emploi dans `docs/exploitation/diagnostic-donnees.md`).
+- **Les constats couverts :** C1, M1, E5, E7, M4 et M7 (les « données existantes » du plan du 07/10), ainsi que ceux de S.146 (`PLAFOND`, `DEPOT_MIGRE`) et de S.147 (`VERDICT_ANCIEN`).
+- **Ce qu'elle donne pour chaque constat :** le nombre, les premiers identifiants techniques, la règle, le responsable et le traitement proposé, comme le chantier le demande.
+- **Où vivent les éléments :**
+  - les définitions, dans `domain/exploitation/diagnostic-donnees.ts` ;
+  - les requêtes, une par constat, dans `server/exploitation/diagnostic-donnees.ts` ;
+  - le préfixe de M1 (`prefixeDeDepot`) et la portée « partout » de M7 sont ceux du code qui les applique, sans copie.
+
+**Lecture seule, prouvée deux fois.**
+- `tests/diagnostic-donnees` refuse toute écriture dans la source du serveur : client ou SQL brut.
+- `smoke:diagnostic` pose une anomalie de chaque sorte (M1, M4, E7, PLAFOND, VERDICT_ANCIEN). Elle vérifie que le paquet les compte et les nomme, que huit tables gardent le même nombre de lignes, et qu'aucun courriel ni contenu cité ne sort.
+
+**Ce que la commande ne fait pas.** Elle ne décide pas : C1 compte aussi les retraits d'affichage par échéance, et c'est la veille qui distingue. Elle ne réécrit rien, ne rend aucune analyse en masse et ne lit pas le stockage. L'inventaire des objets orphelins (E4) est une étape suivante.
+
+**Vérifications.**
+- `npm run check`, `npm run build` et `npm run check:audit` passent, ainsi que les 25 fumées.
+- `smoke:worker --image` passe sur une image construite en local : la commande est dans l'image et y démarre ; sans base, elle le dit, et aucun module ne manque.
+
+**Ce qui reste de RF-4.**
+- Lancer le diagnostic sur la production et reporter chaque constat. Tant que ce n'est pas fait, c'est **non vérifié**.
+- La supervision E6 : le compteur des analyses saines en attente depuis plus d'une heure.
+- La commande de purge exécutable dans l'image, éprouvée sur une restauration isolée.
+- L'inventaire du stockage (E4).
+- La reprise des réservations de la rédaction assistée (S.148).
+- Les obligations en revue manuelle (B-04).

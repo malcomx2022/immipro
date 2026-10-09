@@ -185,6 +185,8 @@ describe("INV-4 — le filtrage est dans la requête", () => {
       "l'état de service compte les divergences encore à propager (revue M8) : un nombre et une ancienneté, aucune règle servie",
     "src/server/veille/releve.ts":
       "le relevé de WF-14 lit la fiche que le veilleur consulte, brouillon compris : c'est le sien, pas celui d'un candidat",
+    "src/server/exploitation/diagnostic-donnees.ts":
+      "le diagnostic des données (RF-4, S.149) lit les libellés de toutes les versions pour reconnaître un reclassement hors référentiel ; il n'en sert aucune à un candidat et ne sort que des identifiants techniques",
   };
 
   it("aucun lecteur du référentiel hors de la liste, sur tout le serveur", () => {

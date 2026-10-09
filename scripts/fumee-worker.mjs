@@ -281,6 +281,24 @@ if (!argImage) {
       `déploiement · « ${commande} » atteint la CLI de l'image (${/P1001/u.test(sortie) ? "base absente, attendu" : sortie.trim().split("\n").at(-1)})`,
     );
   }
+  /*
+    Le diagnostic des données antérieures (RF-4, S.149) se lance depuis
+    l'image, comme celui d'un paiement : il doit y être, et y démarrer.
+    Sans base joignable, il le dit et s'arrête — un module absent dirait
+    « Cannot find module », que cette vérification attraperait.
+  */
+  {
+    const r = spawnSync(
+      "docker",
+      ["run", "--rm", "--network", "none", "-e", `DATABASE_URL=${URL_SANS_BASE}`, "--entrypoint", "node", tag, "dist/diagnostic-donnees.mjs"],
+      { encoding: "utf8", timeout: 120_000 },
+    );
+    const sortie = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    verifier(
+      /Le diagnostic n'a pas abouti/u.test(sortie) && !/Cannot find module/u.test(sortie),
+      `exploitation · « node dist/diagnostic-donnees.mjs » démarre dans l'image (${/Le diagnostic n'a pas abouti/u.test(sortie) ? "base absente, attendu" : sortie.trim().split("\n").at(-1)})`,
+    );
+  }
   const sonde = (commande) =>
     spawnSync("docker", ["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-c", commande], {
       encoding: "utf8",

@@ -1,5 +1,5 @@
 # Chantier de correction et de finalisation — ImmiPro
-Date : 9 octobre 2026. **RF-0 autorisé ; RF-1 livré en S.146 (A-1, A-3) ; RF-2 livré en S.147 (A-2) ; RF-3 autorisé le 09/10, proposé en S.148 ; RF-4 à RF-7 planifiés.**
+Date : 9 octobre 2026. **RF-0 autorisé ; RF-1 livré en S.146 (A-1, A-3) ; RF-2 livré en S.147 (A-2) ; RF-3 livré en S.148 ; RF-4 autorisé le 09/10, diagnostics proposés en S.149 ; RF-5 à RF-7 planifiés.**
 
 Base du lot documentaire : main dd2b58f / S.144. S.142 à S.144 (PR #241 à #243) sont fusionnés : Stripe-Version, ESLint plat, Next 16. La revue initiale reste épinglée à main 3f089c2/S.141. Aucun numéro S.xxx n'est réservé ; le numéro d'un lot applicatif sera attribué après lecture du registre et des PR en cours.
 
