@@ -75,13 +75,13 @@ const { db } = await import("../src/lib/db");
  * confirmation sans montant ne crédite plus rien.
  */
 const encaisse = async (reference: string) => {
-  const { versMineur } = await import("../src/domain/facturation/montants");
+  const { prixPayeMineur } = await import("../src/domain/facturation/montants");
   const t = await db.transaction.findUniqueOrThrow({
     where: { reference },
-    select: { amount: true, currency: true },
+    select: { amountMajor: true, currency: true },
   });
   return {
-    montantMineur: versMineur(t.amount, t.currency),
+    montantMineur: prixPayeMineur(t),
     devise: t.currency,
     rembourseMineur: null,
   };
@@ -282,7 +282,7 @@ try {
   verifier(ouverte.reference !== rechargeEnAttente.reference, "la recharge en attente n'est pas reprise à sa place");
   const montee = await db.transaction.findUniqueOrThrow({ where: { reference: ouverte.reference } });
   verifier(montee.packCode === CODE_MONTEE_DOSSIER, `code ${montee.packCode}`);
-  verifier(montee.amount === 17 && montee.currency === "EUR", `17 EUR enregistrés (${montee.amount} ${montee.currency})`);
+  verifier(montee.amountMajor === 17 && montee.currency === "EUR", `17 EUR enregistrés (${montee.amountMajor} ${montee.currency})`);
   verifier(montee.sourceTransactionId === essentiel.id, "elle cite l'achat Essentiel");
 
   const reprise = await ouvrirLeTunnel(
@@ -313,7 +313,7 @@ try {
           userId: a.userId,
           applicationId: a.applicationId,
           packCode: CODE_MONTEE_DOSSIER,
-          amount: 17,
+          amountMajor: 17,
           currency: "EUR",
           provider: "STRIPE",
           sourceTransactionId: essentiel.id,
@@ -329,7 +329,7 @@ try {
           userId: a.userId,
           applicationId: a.applicationId,
           packCode: CODE_MONTEE_DOSSIER,
-          amount: 17,
+          amountMajor: 17,
           currency: "EUR",
           provider: "STRIPE",
         },

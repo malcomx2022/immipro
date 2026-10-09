@@ -336,7 +336,7 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
     paiements: compte.transactions.map((t) => ({
       reference: t.reference,
       pack: t.packCode,
-      montant: t.amount,
+      montant: t.amountMajor,
       devise: t.currency,
       operateur: t.provider,
       statut: t.status,
@@ -348,6 +348,7 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
         genre: f.kind,
         serie: f.series,
         emiseLe: iso(f.issuedAt),
+        prestationLe: iso(f.performedAt),
         nom: f.clientName,
         adresse: f.clientAddress,
         designation: f.designation,

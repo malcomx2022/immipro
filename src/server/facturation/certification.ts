@@ -33,6 +33,8 @@ export interface PieceACertifier {
   numero: string;
   genre: "FACTURE" | "AVOIR";
   emiseLe: Date;
+  /** La vente ou le remboursement que la pièce constate (revue F5). */
+  prestationLe: Date;
   devise: string;
   ttc: number;
   ht: number;

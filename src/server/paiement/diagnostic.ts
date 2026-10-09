@@ -124,7 +124,7 @@ export async function diagnostiquerLePaiement(
       cause: t.failureCause,
       fournisseur: t.provider,
       providerTxId: t.providerTxId,
-      montant: t.amount,
+      montant: t.amountMajor,
       devise: t.currency,
       creeeLe: t.createdAt.toISOString(),
       confirmeeLe: t.confirmedAt?.toISOString() ?? null,

@@ -298,7 +298,7 @@ export const MOTIF_DE_REFUS_DE_DECLARATION: Record<DefautDeDeclaration, string> 
 export interface DetteFedaPay {
   reference: string;
   compte: string;
-  /** Le prix payé, en unités entières de la grille, comme `Transaction.amount`. */
+  /** Le prix payé, en unités entières de la grille, comme `Transaction.amountMajor`. */
   montant: number;
   /**
    * Ce qu'il faut rendre, dans la même unité — RG-15.2. Égal à `montant`
@@ -574,7 +574,7 @@ export function montantDuRemboursement(p: PackARembourser): MontantDuRembourseme
 /**
  * La somme à rendre d'une transaction, en unités mineures.
  *
- * `refundAmount` nul se lit « le montant payé » : c'était vrai de toutes
+ * `refundAmountMinor` nul se lit « le montant payé » : c'était vrai de toutes
  * les lignes antérieures à RG-15.2, et cela reste vrai d'une dette en
  * revue manuelle, dont le montant n'est pas encore fixé.
  */
@@ -697,7 +697,7 @@ export const MOTIF_RELANCES_EPUISEES = (tentatives: number): string =>
  * Le montant qu'une revue manuelle décide de rendre (décision D-11 du
  * 08/10/2026).
  *
- * Une revue manuelle laissait `refundAmount` nul, et aucune voie du
+ * Une revue manuelle laissait `refundAmountMinor` nul, et aucune voie du
  * produit ne permettait d'y écrire la somme arrêtée avec la direction : la
  * dette restait en B-04, sans montant, sans demande, sans droits retirés.
  * La saisie se lit ici, une fois, pour l'écran comme pour la route.

@@ -43,8 +43,8 @@ const decider = (
   return "EN_ATTENTE";
 };
 
-const montantDe = (t: Pick<Transaction, "amount" | "currency">) =>
-  formatMontant(t.amount, t.currency);
+const montantDe = (t: Pick<Transaction, "amountMajor" | "currency">) =>
+  formatMontant(t.amountMajor, t.currency);
 
 const estUnDoublon = (erreur: unknown): boolean =>
   (erreur as { code?: unknown } | null)?.code === "P2002";
@@ -74,7 +74,7 @@ async function reserverLeRecu(
 
 async function tenterLeRecu(
   notification: { id: string; emailAttempts: number },
-  transaction: Pick<Transaction, "userId" | "reference" | "amount" | "currency">,
+  transaction: Pick<Transaction, "userId" | "reference" | "amountMajor" | "currency">,
   maintenant: Date,
 ): Promise<EtatDuCourrier | null> {
   const user = await db.user.findUnique({
@@ -136,7 +136,7 @@ export async function reprendreLesRecus(maintenant = new Date()): Promise<number
     const reference = n.dedupKey!.slice("recu:".length);
     const transaction = await db.transaction.findUnique({
       where: { reference },
-      select: { userId: true, reference: true, amount: true, currency: true },
+      select: { userId: true, reference: true, amountMajor: true, currency: true },
     });
     if (!transaction) continue;
     const etat = await tenterLeRecu(n, transaction, maintenant).catch(() => null);

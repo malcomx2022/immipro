@@ -172,7 +172,7 @@ async function main() {
       userId: candidate.id,
       applicationId: dossier.id,
       packCode: pack.code,
-      amount: pack.prix.XOF,
+      amountMajor: pack.prix.XOF,
       currency: "XOF",
       provider: "FEDAPAY",
       providerTxId: "fedapay:demonstration-1",

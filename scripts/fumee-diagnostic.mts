@@ -65,13 +65,13 @@ const { db } = await import("../src/lib/db");
  * confirmation sans montant ne crédite plus rien.
  */
 const encaisse = async (reference: string) => {
-  const { versMineur } = await import("../src/domain/facturation/montants");
+  const { prixPayeMineur } = await import("../src/domain/facturation/montants");
   const t = await db.transaction.findUniqueOrThrow({
     where: { reference },
-    select: { amount: true, currency: true },
+    select: { amountMajor: true, currency: true },
   });
   return {
-    montantMineur: versMineur(t.amount, t.currency),
+    montantMineur: prixPayeMineur(t),
     devise: t.currency,
     rembourseMineur: null,
   };
@@ -99,7 +99,7 @@ try {
       reference,
       userId: candidat.id,
       packCode: "essentiel",
-      amount: 5000,
+      amountMajor: 5000,
       currency: "XOF",
       provider: "FEDAPAY",
       providerTxId,
@@ -115,7 +115,7 @@ try {
       reference: `IMP-261004-C${process.pid}`,
       userId: candidat.id,
       packCode: "essentiel",
-      amount: 5000,
+      amountMajor: 5000,
       currency: "XOF",
       provider: "FEDAPAY",
       status: "EXPIREE",

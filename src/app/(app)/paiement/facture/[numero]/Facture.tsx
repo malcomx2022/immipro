@@ -77,6 +77,9 @@ export function Facture({ piece }: { piece: PieceComptable }) {
           {[
             { intitule: "Numéro", valeur: piece.numero, mono: true },
             { intitule: "Date d'émission", valeur: momentEnFrancais(piece.emiseLe), mono: false },
+            // La vente ou le remboursement constaté : une pièce émise par le
+            // filet le 02/01 garde le 31/12 de la vente (revue F5, D-14).
+            { intitule: "Date de la prestation", valeur: momentEnFrancais(piece.prestationLe), mono: false },
             ...(piece.origine
               ? [{ intitule: "Facture d'origine", valeur: piece.origine, mono: true }]
               : []),

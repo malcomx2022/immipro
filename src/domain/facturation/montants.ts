@@ -53,12 +53,41 @@ export function regimeDeTva(brut: string | undefined | null): Regime {
   return { declare: false, illisible: true };
 }
 
-/** Combien d'unités mineures dans une unité de la devise. */
-export const facteurMineur = (devise: string): number => (devise === "EUR" ? 100 : 1);
+/**
+ * Les devises sans sous-unité.
+ *
+ * La plateforme compte ses prix en unités entières — 12 € s'écrit `12`,
+ * 5 000 F s'écrit `5000` (`Transaction.amountMajor`). Les pièces, les
+ * remboursements et les fournisseurs comptent en plus petite unité pour
+ * les devises qui en ont une : 12 € valent 1 200 centimes. Le franc CFA
+ * n'en a pas, et le convertir le multiplierait par cent.
+ *
+ * Une seule table depuis la revue du 07/10/2026 (M18) : le tunnel de
+ * paiement en tenait une seconde (`versSousUnite`), qui ne disait pas la
+ * même chose qu'ici d'une devise ni l'une ni l'autre. Une erreur d'un
+ * facteur cent sur un débit réel ne doit avoir qu'un endroit où vivre.
+ */
+export const SANS_SOUS_UNITE: ReadonlySet<string> = new Set(["XOF"]);
 
-/** Le montant de la grille (unités entières) en unités mineures. */
+/** Combien d'unités mineures dans une unité de la devise. */
+export const facteurMineur = (devise: string): number =>
+  SANS_SOUS_UNITE.has(devise.toUpperCase()) ? 1 : 100;
+
+/** Un montant en unités entières (la grille, le prix payé) en unités mineures. */
 export const versMineur = (montant: number, devise: string): number =>
   Math.round(montant * facteurMineur(devise));
+
+/** Un montant en unités mineures (un fournisseur, une pièce) en unités entières. */
+export const depuisMineur = (mineur: number, devise: string): number =>
+  mineur / facteurMineur(devise);
+
+/**
+ * Le prix payé d'une transaction, en unités mineures : ce que porte une
+ * facture et ce à quoi un remboursement se compare. Il s'écrivait
+ * `versMineur(transaction.amount, transaction.currency)` en treize endroits.
+ */
+export const prixPayeMineur = (transaction: { amountMajor: number; currency: string }): number =>
+  versMineur(transaction.amountMajor, transaction.currency);
 
 export interface Ventilation {
   ht: number;

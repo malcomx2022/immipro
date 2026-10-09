@@ -76,13 +76,13 @@ const { db } = await import("../src/lib/db");
  * confirmation sans montant ne crédite plus rien.
  */
 const encaisse = async (reference: string) => {
-  const { versMineur } = await import("../src/domain/facturation/montants");
+  const { prixPayeMineur } = await import("../src/domain/facturation/montants");
   const t = await db.transaction.findUniqueOrThrow({
     where: { reference },
-    select: { amount: true, currency: true },
+    select: { amountMajor: true, currency: true },
   });
   return {
-    montantMineur: versMineur(t.amount, t.currency),
+    montantMineur: prixPayeMineur(t),
     devise: t.currency,
     rembourseMineur: null,
   };
@@ -260,7 +260,7 @@ try {
     );
 
     const repris = ouvreurSimule({
-      enregistre: { montant: apres.amount, devise: apres.currency },
+      enregistre: { montant: apres.amountMajor, devise: apres.currency },
     });
     const suite = await ouvrirLeTunnel(userId, ACHAT(applicationId), "EUR", repris);
     verifier(
@@ -500,8 +500,8 @@ try {
         `${code} — le code enregistré est le sien (${ligne.packCode})`,
       );
       verifier(
-        ligne.amount === attendu,
-        `${code} — le montant enregistré vient de la grille (${ligne.amount} attendu ${attendu})`,
+        ligne.amountMajor === attendu,
+        `${code} — le montant enregistré vient de la grille (${ligne.amountMajor} attendu ${attendu})`,
       );
       verifier(
         ligne.currency === "EUR" && ligne.provider === "STRIPE",
@@ -689,7 +689,7 @@ try {
           data: {
             userId, applicationId,
             reference: `IMP-C-${applicationId.slice(0, 8)}`,
-            packCode: "consultation", amount: 35, currency: "EUR", provider: "STRIPE",
+            packCode: "consultation", amountMajor: 35, currency: "EUR", provider: "STRIPE",
             status: "CONFIRMEE", confirmedAt: new Date(base + rang++ * 3_600_000),
           },
         });
@@ -698,7 +698,7 @@ try {
         data: {
           userId, applicationId,
           reference: `IMP-P-${applicationId.slice(0, 8)}`,
-          packCode: pack.code, amount: pack.prix.EUR, currency: "EUR", provider: "STRIPE",
+          packCode: pack.code, amountMajor: pack.prix.EUR, currency: "EUR", provider: "STRIPE",
           status: "CONFIRMEE", confirmedAt: new Date(base + rang++ * 3_600_000),
         },
       });

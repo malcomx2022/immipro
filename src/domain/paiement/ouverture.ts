@@ -12,7 +12,7 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
-import { formatMineur } from "@/domain/facturation/montants";
+import { depuisMineur, formatMineur, versMineur } from "@/domain/facturation/montants";
 
 /**
  * La clé d'idempotence d'une ouverture.
@@ -78,23 +78,14 @@ export function verifierLUrlHebergee(
 }
 
 /**
- * Les devises sans sous-unité, au sens des fournisseurs de paiement.
- *
- * La plateforme compte en unités entières — 12 € s'écrit `12`, 5 000 F
- * s'écrit `5000`. Les fournisseurs, eux, comptent en plus petite unité
- * pour les devises qui en ont une : 12 € valent 1 200 centimes. Le franc
- * CFA n'en a pas, et le convertir le multiplierait par cent.
- *
- * C'est une erreur d'un facteur cent sur un débit réel. Elle vit ici,
- * testée, plutôt que dans un adaptateur où personne ne la relit.
+ * La plus petite unité au sens des fournisseurs de paiement : la même que
+ * celle des pièces (revue du 07/10/2026, M18). Les noms restent pour les
+ * adaptateurs qui les lisent ; la table des facteurs, elle, n'existe plus
+ * qu'une fois, dans `domain/facturation/montants`.
  */
-export const SANS_SOUS_UNITE: ReadonlySet<string> = new Set(["XOF"]);
-
-export const versSousUnite = (montant: number, devise: string): number =>
-  SANS_SOUS_UNITE.has(devise.toUpperCase()) ? montant : Math.round(montant * 100);
-
-export const depuisSousUnite = (montant: number, devise: string): number =>
-  SANS_SOUS_UNITE.has(devise.toUpperCase()) ? montant : montant / 100;
+export { SANS_SOUS_UNITE } from "@/domain/facturation/montants";
+export const versSousUnite = versMineur;
+export const depuisSousUnite = depuisMineur;
 
 /**
  * Le montant et la devise que le fournisseur a enregistrés sont-ils ceux

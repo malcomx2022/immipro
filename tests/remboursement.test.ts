@@ -419,22 +419,22 @@ describe("S.92 — le remboursement du supplément se rejoue sans se contredire"
 describe("E3 — ce que vaut un remboursement annoncé", () => {
   const base = {
     reference: "IMP-261008-CCCCCC",
-    amount: 29,
+    amountMajor: 29,
     currency: "EUR",
     refundDueAt: new Date("2026-10-08T10:00:00Z"),
     refundAttemptedAt: new Date("2026-10-08T10:01:00Z"),
     refundRequestedAt: new Date("2026-10-08T10:01:00Z"),
-    refundAmount: 2900,
+    refundAmountMinor: 2900,
   };
 
   it("sans obligation : écart, rien ne bouge (D-8)", () => {
-    const v = verdictDuRemboursementAnnonce({ ...base, refundDueAt: null, refundAttemptedAt: null, refundRequestedAt: null, refundAmount: null }, 2900);
+    const v = verdictDuRemboursementAnnonce({ ...base, refundDueAt: null, refundAttemptedAt: null, refundRequestedAt: null, refundAmountMinor: null }, 2900);
     expect(v).toMatchObject({ issue: "ecart" });
     expect("constat" in v && v.constat).toMatch(/aucun remboursement n'était décidé/u);
   });
 
   it("obligation non initiée (revue manuelle) : écart", () => {
-    const v = verdictDuRemboursementAnnonce({ ...base, refundAttemptedAt: null, refundRequestedAt: null, refundAmount: null }, 2900);
+    const v = verdictDuRemboursementAnnonce({ ...base, refundAttemptedAt: null, refundRequestedAt: null, refundAmountMinor: null }, 2900);
     expect("constat" in v && v.constat).toMatch(/Trancher la revue/u);
   });
 
@@ -445,7 +445,7 @@ describe("E3 — ce que vaut un remboursement annoncé", () => {
   it("montant égal au dû : appliquer", () => {
     expect(verdictDuRemboursementAnnonce(base, 2900)).toEqual({ issue: "appliquer" });
     // Le dû est la somme figée, pas le prix : un prorata de 28,03 € se solde à 28,03 €.
-    expect(verdictDuRemboursementAnnonce({ ...base, refundAmount: 2803 }, 2803)).toEqual({ issue: "appliquer" });
+    expect(verdictDuRemboursementAnnonce({ ...base, refundAmountMinor: 2803 }, 2803)).toEqual({ issue: "appliquer" });
   });
 
   it("partiel : écart, le cumul suivant appliquera", () => {

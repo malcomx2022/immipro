@@ -517,7 +517,11 @@ model Transaction {
   /// l'exige.
   packAnalyses     Int?
   packDestinations Int?
-  amount        Int
+  /// Le prix payé, en **unités entières** de la devise : 12 € s'écrit 12,
+  /// 5 000 F s'écrit 5000. Le nom le dit depuis la revue du 07/10/2026
+  /// (M18, D-13) ; la colonne SQL reste `amount`. Toute pièce et tout
+  /// remboursement comptent en unités mineures : `prixPayeMineur`.
+  amountMajor   Int               @map("amount")
   currency      String            @db.Char(3)
   provider      PaymentProvider
   /// Identifiant de la transaction chez le fournisseur.
@@ -663,7 +667,7 @@ model Transaction {
   ///
   /// Le franc pour le XOF, le centime pour l'EUR : un pack entamé se
   /// rembourse au prorata des analyses restantes, et 12 € × 6 ÷ 10 ne
-  /// tombe pas sur un euro entier. `amount`, lui, reste en unités entières
+  /// tombe pas sur un euro entier. `amountMajor`, lui, reste en unités entières
   /// de la grille (5 000 F, 12 €) ; la conversion est `versMineur`.
   ///
   /// Posée à l'ouverture de l'obligation, recalculée sous le verrou du
@@ -672,13 +676,15 @@ model Transaction {
   /// lignes antérieures à la règle et sur une dette en revue manuelle :
   /// nulle se lit « le montant payé », comme avant. La base exige
   /// 0 < refundAmount ≤ montant payé, et une obligation ouverte.
-  refundAmount      Int?
+  /// En **unités mineures** (centimes pour l'euro), au contraire du prix
+  /// payé : le nom le dit (M18, D-13), la colonne SQL reste `refundAmount`.
+  refundAmountMinor Int?              @map("refundAmount")
   /// La revue manuelle tranchée — revue du 07/10/2026, M4 (décision D-11).
   ///
   /// Hors de la règle du prorata (dossier déposé ou clos, pack servi sur
   /// plusieurs dossiers, recharge ou montée entamée), la somme se fixe à la
   /// main. Rien ne l'écrivait : la dette restait sans montant ni demande.
-  /// Posées ensemble par `trancherLaRevueManuelle`, avec `refundAmount` :
+  /// Posées ensemble par `trancherLaRevueManuelle`, avec `refundAmountMinor` :
   /// l'initiation lit alors la décision au lieu de la réévaluer, et la
   /// demande part. Une tranche à zéro referme l'obligation et ne pose pas
   /// ces colonnes : il n'y a plus rien à envoyer.
@@ -1733,6 +1739,10 @@ model Invoice {
   origin        Invoice?      @relation("AvoirDeLaFacture", fields: [originId], references: [id], onDelete: Restrict)
   creditNote    Invoice?      @relation("AvoirDeLaFacture")
   issuedAt      DateTime      @default(now())
+  /// La vente (facture) ou le remboursement (avoir) que la pièce constate.
+  /// L'exercice et le numéro suivent `issuedAt` ; ceci est la « date de la
+  /// prestation » de la note M.C (revue F5, D-14). Figée comme le reste.
+  performedAt   DateTime
 
   /// Les lignes de l'émetteur au jour de l'émission. Nulles seulement sur
   /// une pièce d'essai émise avant la saisie des mentions.

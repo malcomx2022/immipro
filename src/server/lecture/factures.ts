@@ -17,6 +17,12 @@ export interface PieceComptable {
   serie: "REELLE" | "ESSAI";
   intitule: string;
   emiseLe: string;
+  /**
+   * La vente (facture) ou le remboursement (avoir) que la pièce constate.
+   * Diffère de l'émission quand le filet de la réconciliation a émis la
+   * pièce plus tard — jusque dans l'exercice suivant (revue F5, D-14).
+   */
+  prestationLe: string;
   emetteur: readonly string[] | null;
   client: { nom: string | null; adresse: string | null; qualite: string };
   designation: string;
@@ -57,6 +63,7 @@ export async function pieceDuClient(numero: string, userId: string): Promise<Pie
     serie: piece.series,
     intitule: intituleDeLaPiece(piece.kind, piece.series),
     emiseLe: piece.issuedAt.toISOString(),
+    prestationLe: piece.performedAt.toISOString(),
     emetteur,
     client: { nom: piece.clientName, adresse: piece.clientAddress, qualite: piece.clientQuality },
     designation: piece.designation,

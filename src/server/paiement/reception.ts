@@ -5,7 +5,7 @@ import { prevenirDuRecu } from "@/server/paiement/recu";
 import { db } from "@/lib/db";
 import { formatMontant } from "@/lib/utils";
 import { sommeARendre } from "@/domain/paiement/remboursement";
-import { facteurMineur, versMineur } from "@/domain/facturation/montants";
+import { facteurMineur, prixPayeMineur } from "@/domain/facturation/montants";
 
 /**
  * Réception d'une notification de paiement, commune aux deux rails.
@@ -63,8 +63,8 @@ export async function traiterLaNotification(
         if (user) {
           // La somme rendue, figée à l'initiation — RG-15.2. Le prix payé
           // ne s'ajoute que s'il en diffère : un remboursement partiel.
-          const payeMineur = versMineur(transaction.amount, transaction.currency);
-          const rendu = sommeARendre(transaction.refundAmount, payeMineur);
+          const payeMineur = prixPayeMineur(transaction);
+          const rendu = sommeARendre(transaction.refundAmountMinor, payeMineur);
           const enUnites = (mineur: number) =>
             formatMontant(mineur / facteurMineur(transaction.currency), transaction.currency);
           await envoyerRemboursementConfirme(

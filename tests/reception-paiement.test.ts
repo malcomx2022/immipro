@@ -15,7 +15,7 @@ const transaction = {
   reference: "IMP-261008-RECU01",
   userId: "u1",
   applicationId: "a1",
-  amount: 15000,
+  amountMajor: 15000,
   currency: "XOF",
 };
 

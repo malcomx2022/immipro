@@ -70,13 +70,13 @@ const { db } = await import("../src/lib/db");
  * confirmation sans montant ne crédite plus rien.
  */
 const encaisse = async (reference: string) => {
-  const { versMineur } = await import("../src/domain/facturation/montants");
+  const { prixPayeMineur } = await import("../src/domain/facturation/montants");
   const t = await db.transaction.findUniqueOrThrow({
     where: { reference },
-    select: { amount: true, currency: true },
+    select: { amountMajor: true, currency: true },
   });
   return {
-    montantMineur: versMineur(t.amount, t.currency),
+    montantMineur: prixPayeMineur(t),
     devise: t.currency,
     rembourseMineur: null,
   };
@@ -122,7 +122,7 @@ try {
         userId: candidat.id,
         applicationId: dossier.id,
         packCode: "essentiel",
-        amount: montant,
+        amountMajor: montant,
         currency: "XOF",
         provider: "FEDAPAY",
         providerTxId: statut === "INITIEE" ? null : `fedapay:${process.pid}${compteur}`,
@@ -152,6 +152,10 @@ try {
   verifier(piece.clientName === "Awa Koffi" && piece.clientAddress?.includes("Cotonou") === true, "le nom et l'adresse de facturation sont figés sur la pièce");
   verifier(piece.amountIncl === 5000 && piece.vatAmount === 0 && piece.amountInWords === "cinq mille francs CFA", "montant, TVA nulle sans régime déclaré, somme en lettres");
   verifier(piece.series === "ESSAI" && piece.emitter === null, "pièce d'essai, émetteur non saisi : elle le dit au lieu de compléter");
+  verifier(
+    piece.performedAt.getTime() === premiere.confirmedAt!.getTime(),
+    "la pièce porte la date de la vente (revue F5)",
+  );
   const sansVente = await etablirLaFacture((await vente("INITIEE")).id);
   verifier(sansVente.issue === "sans_objet", "un paiement non confirmé n'a pas de facture");
 
@@ -170,6 +174,32 @@ try {
   });
   verifier(suite.last === 8, `la suite n'a pas consommé de place pour le perdant (${suite.last})`);
 
+  console.log("\nVendue le 31/12, facturée le 02/01 par le filet (revue F5, D-14)");
+  // 31/12 à 23 h 50 à Cotonou (UTC+1), émission le 02/01 suivant. Relatif
+  // à l'année courante : la suite de l'an prochain est encore vide.
+  const venduLe = `${annee}-12-31T22:50:00.000Z`;
+  const emisLe = `${annee + 1}-01-02T08:00:00.000Z`;
+  const sylvestre = await vente();
+  await db.transaction.update({
+    where: { id: sylvestre.id },
+    data: { confirmedAt: new Date(venduLe) },
+  });
+  const nouvelAn = await etablirLaFacture(sylvestre.id, process.env, new Date(emisLe));
+  const tardive = await db.invoice.findFirstOrThrow({ where: { transactionId: sylvestre.id } });
+  verifier(
+    nouvelAn.issue === "emise" && nouvelAn.numero === `ESSAI-RD-${annee + 1}-00001` && tardive.fiscalYear === annee + 1,
+    `numéro et exercice de l'émission, la suite reste chronologique (${JSON.stringify(nouvelAn)})`,
+  );
+  verifier(
+    tardive.performedAt.toISOString() === venduLe,
+    `la date de la prestation est celle de la vente (${tardive.performedAt.toISOString()})`,
+  );
+  const lueTardive = await pieceDuClient(tardive.number, candidat.id);
+  verifier(
+    lueTardive.prestationLe === venduLe && lueTardive.emiseLe === emisLe,
+    "le client lit les deux dates sur sa pièce",
+  );
+
   console.log("\nUn avoir pour chaque remboursement");
   await db.transaction.update({
     where: { id: premiere.id },
@@ -184,6 +214,8 @@ try {
   verifier(avoir.issue === "emise" && avoir.numero === `ESSAI-AV-${annee}-00001`, `l'avoir a sa propre suite (${JSON.stringify(avoir)})`);
   const avoirLu = await db.invoice.findFirstOrThrow({ where: { transactionId: premiere.id, kind: "AVOIR" } });
   verifier(avoirLu.originId === piece.id && avoirLu.amountIncl === piece.amountIncl, "il cite la facture d'origine et en reprend le montant");
+  const rendueLe = (await db.transaction.findUniqueOrThrow({ where: { id: premiere.id } })).refundedAt!;
+  verifier(avoirLu.performedAt.getTime() === rendueLe.getTime(), "l'avoir porte la date du remboursement");
   const remboursee = await vente("REMBOURSEE");
   const avant = await etablirLAvoir(remboursee.id);
   const deux = await db.invoice.findMany({ where: { transactionId: remboursee.id }, orderBy: { issuedAt: "asc" } });
@@ -203,7 +235,7 @@ try {
       // Essentiel 5 000 F, 10 analyses, 4 consommées : 3 000 F rendus.
       refundDueAt: decidee,
       refundBasis: "Geste de support — fumée du prorata",
-      refundAmount: 3000,
+      refundAmountMinor: 3000,
       status: "REMBOURSEE",
       refundedAt: new Date(),
     },
@@ -236,6 +268,8 @@ try {
   verifier(!suppression, "une pièce émise ne se supprime pas");
   const reecriture = await db.invoice.update({ where: { id: piece.id }, data: { amountIncl: 1, amountExcl: 1 } }).then(() => true, () => false);
   verifier(!reecriture, "son montant ne se réécrit pas");
+  const redatee = await db.invoice.update({ where: { id: piece.id }, data: { performedAt: new Date("2020-01-01") } }).then(() => true, () => false);
+  verifier(!redatee, "sa date de la prestation non plus (revue F5)");
   const annulation = await db.invoice.update({ where: { id: piece.id }, data: { cancelledAt: new Date(), cancelReason: "Essai d'annulation tracée" } }).then(() => true, () => false);
   verifier(annulation, "l'annulation tracée s'y ajoute");
   const reannulation = await db.invoice.update({ where: { id: piece.id }, data: { cancelReason: "Autre motif" } }).then(() => true, () => false);
@@ -243,7 +277,7 @@ try {
   const avoirSansOrigine = await db.invoice.create({
     data: {
       number: "ESSAI-AV-1999-00001", kind: "AVOIR", series: "ESSAI", fiscalYear: 1999, rank: 1,
-      transactionId: double.id, designation: "x", currency: "XOF", amountIncl: 1, amountExcl: 1,
+      transactionId: double.id, performedAt: new Date(), designation: "x", currency: "XOF", amountIncl: 1, amountExcl: 1,
       vatAmount: 0, vatNote: "x", amountInWords: "un franc CFA", paymentMethod: "x",
     },
   }).then(() => true, () => false);

@@ -411,7 +411,7 @@ describe("l'initiation ne déclare jamais la somme rendue", () => {
     });
     expect(ecritures.length).toBeGreaterThan(0);
     for (const ecriture of ecritures) {
-      for (const interdit of ["status:", "refundedAt", "refundBasis", "amount:"]) {
+      for (const interdit of ["status:", "refundedAt", "refundBasis", "amountMajor:"]) {
         expect(ecriture, `${interdit} dans ${ecriture}`).not.toContain(interdit);
       }
     }
