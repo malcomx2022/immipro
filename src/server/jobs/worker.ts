@@ -11,8 +11,7 @@ import { getQueue, JOBS, poster } from "@/lib/queue";
 import { sonderLesServices } from "@/server/exploitation/sondes";
 import { demarrerLeBattement } from "./battement";
 import { arreterProprement } from "./arret";
-import { purgerCeQuiEstEchu, purgerLesPiecesEchues } from "./purge";
-import { acheverLesSuppressionsEnAttente } from "@/server/acces/suppression";
+import { passeDeRetention } from "./retention";
 import { depublierLesFichesEchues } from "./veille";
 import { declasserLesPiecesEchues } from "./peremption";
 import { envoyerLesRappels } from "./rappels";
@@ -133,17 +132,17 @@ async function main() {
   });
 
   await boss.work(JOBS.PURGE_RETENTION, async () => {
-    const bilan = await purgerLesPiecesEchues();
-    console.info("[purge]", bilan);
-    // Même passe, mêmes horaires : les durées annoncées ailleurs qu'INV-5
-    // — six mois pour les alertes, cinq ans pour le journal — et les
-    // sessions échues, qui ne servent plus rien.
-    console.info("[conservation]", await purgerCeQuiEstEchu());
-    // Même passe : une suppression de compte restée à mi-chemin faute de
-    // stockage disponible se rattrape ici. Les jours ordinaires, elle ne
-    // trouve rien (RG-10.4).
-    const reprises = await acheverLesSuppressionsEnAttente();
-    if (reprises.reprises > 0) console.info("[suppression]", reprises);
+    // La même passe que `dist/purge-retention.mjs`, sous le même verrou
+    // (S.152) : lancée à la main après une restauration, elle ne se
+    // recouvre pas avec celle-ci.
+    const passe = await passeDeRetention();
+    if (passe === null) {
+      console.info("[purge] passe ignorée : une autre purge est en cours");
+      return;
+    }
+    console.info("[purge]", passe.purge);
+    console.info("[conservation]", passe.conservation);
+    if (passe.suppressions.reprises > 0) console.info("[suppression]", passe.suppressions);
   });
 
   await boss.work(JOBS.VEILLE_ECHEANCE, async () => {

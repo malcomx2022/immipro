@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est livré, S.150 (RF-4, supervision E6) est livré, S.151 (RF-4, inventaire du stockage E4) est proposé. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est livré, S.150 (RF-4, supervision E6) est livré, S.151 (RF-4, inventaire du stockage E4) est livré, S.152 (RF-4, purges : restauration, préfixe, périmètre validé) est proposé. Tout le reste est à faire.
 
 ---
 
@@ -342,7 +342,7 @@ L'ordre suit la gravité, puis les dépendances. Les lots marqués « sans déci
 
 #### E4 — INV-5 : la purge laisse l'objet d'une pièce restée en quarantaine
 
-**État : livré en S.125**, étapes 1 et 2. L'inventaire des objets déjà orphelins est proposé en S.151 (RF-4), en lecture seule (`node dist/inventaire-stockage.mjs`, `docs/exploitation/inventaire-stockage.md`). Reste l'étape 3 (purge par préfixe de dossier), avec la commande de purge du périmètre validé.
+**État : livré en S.125**, étapes 1 et 2. L'inventaire des objets déjà orphelins est proposé en S.151 (RF-4), en lecture seule (`node dist/inventaire-stockage.mjs`, `docs/exploitation/inventaire-stockage.md`). L'étape 3 (purge par préfixe de dossier) et la purge du périmètre validé sont proposées en S.152 (RF-4).
 
 **Constat vérifié.** `purgerLesPiecesEchues` appelle `removeObject` (`purge.ts:175`), qui ne vise que le seau de confiance (`storage.ts:200`). Une version `EN_QUARANTAINE` a son objet en quarantaine ; la suppression rend 204 et la ligne est marquée purgée. Deux autres cas laissent des octets : le doublon transitoire de `promouvoir`, et les dépôts présignés jamais confirmés.
 
@@ -1474,7 +1474,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 - **Diagnostics (S.149)** : `node dist/diagnostic-donnees.mjs`, lancé depuis l'image, compte en lecture seule les constats C1, M1, E5, E7, M4 et M7, ainsi que ceux de S.146 et S.147 (`docs/exploitation/diagnostic-donnees.md`). Le lancer sur la production et reporter chaque constat dans le suivi du chantier. Les lignes ci-dessous restent ouvertes tant que leurs constats ne sont pas relus.
 - **C1** : relire avec la veille les versions `DRAFT` datées dont le contenu a changé après leur mise en vigueur ; les réécritures passées ne se détectent pas automatiquement.
-- **E4** : inventaire proposé en S.151 — `node dist/inventaire-stockage.mjs` classe chaque objet des deux zones et donne le périmètre candidat avec son empreinte. Le lancer sur la production et faire valider le périmètre : **non vérifié**. Restent la purge par préfixe de dossier et la purge du périmètre validé.
+- **E4** : inventaire proposé en S.151 — `node dist/inventaire-stockage.mjs` classe chaque objet des deux zones et donne le périmètre candidat avec son empreinte. Le lancer sur la production et faire valider le périmètre : **non vérifié**. S.152 propose la purge par préfixe de dossier et `node dist/purge-inventaire.mjs` (empreinte stricte, opérateur nommé) ; la purge du périmètre validé en production reste à faire : **non vérifié**.
 - **E5** : fermé par S.148 (RF-3) — la réservation nomme sa version et le rejeu la reprend. Les débits antérieurs restent sans version : leur diagnostic en lecture seule est au registre (S.148), à traiter dans RF-4.
 - **E1** : la configuration nginx du dépôt n'est pas déployée par la CI ; elle doit être recopiée sur le VPS et rechargée (`nginx -t && systemctl reload nginx`), puis vérifiée par une rafale de requêtes au `X-Forwarded-For` forgé.
 - **E6** : étape 5 proposée en S.150 — le détail restreint de `/api/health` compte les analyses saines en attente depuis plus d'une heure. Relever ce compte en production après le déploiement ; tant que ce n'est pas fait, il est **non vérifié**.
@@ -1492,7 +1492,7 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
   - les remotes rclone `b2` et `garage` (clé en lecture seule) ;
   - le contrôle Healthchecks.io.
 
-  Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. Reste aussi à écrire une commande de purge lançable depuis l'image, pour la restauration.
+  Ensuite, faire la première restauration de contrôle et la reporter au registre de `docs/exploitation/sauvegardes.md`, couper volontairement le ping une fois pour voir l'alerte arriver, et publier en B-08 le texte de `securite_complements` (D-27) avec Backblaze dans `sous_traitants`. La commande de purge lançable depuis l'image, pour la restauration, est proposée en S.152 (`dist/purge-retention.mjs`) ; l'éprouver sur une restauration isolée reste à faire : **non vérifié**.
 - **M15** : six services `healthy` relevés sur le VPS le 09/10/2026, après le déploiement de `87fbdef` ; reste à vérifier que les limites apparaissent dans `docker stats`.
 - **M11** : les formulaires du back-office (ticket séparé, comme prévu). Le champ « Établissement visé » de C-05 est retiré par S.146 (choix A-1) ; le prototype C-05 le porte encore.
 - **M10** : renseigner `ETAT_DE_SERVICE_JETON` dans `.env.app` si une surveillance externe doit lire le détail de `/api/health` ; sans lui, seul un administrateur connecté le lit.
@@ -1578,4 +1578,12 @@ inconnu, hors schéma) et nomme les versions dont l'objet manque. Le
 périmètre candidat — appartenance démontrée, rétention échue — est donné
 avec son empreinte, pour validation ; rien n'est supprimé. Voir le
 registre, entrée S.151.
+
+**RF-4 (S.152), 09/10/2026, purges.** Choix du responsable : les trois
+volets, empreinte stricte, journal par dossier sous l'opérateur nommé.
+La purge d'un dossier vide son préfixe (E4, étape 3) ; la passe de
+rétention se lance à la main après une restauration
+(`dist/purge-retention.mjs`), sous le même verrou que le worker ; le
+périmètre validé de l'inventaire se purge par `dist/purge-inventaire.mjs`.
+Voir le registre, entrée S.152.
 Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

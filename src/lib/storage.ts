@@ -197,16 +197,17 @@ export async function promouvoir(key: string): Promise<void> {
 export const removeQuarantaine = (key: string) => connexion().removeObject(quarantaine(), key);
 
 /**
- * Tous les objets d'une zone, par pages — l'inventaire E4 (RF-4, S.151).
+ * Les objets d'une zone, par pages — l'inventaire E4 (RF-4, S.151), et
+ * sous un préfixe la purge d'un dossier (S.152).
  *
- * Lecture seule : la liste ne touche à aucun objet. Seul appelant :
- * `server/exploitation/inventaire-stockage.ts`.
+ * Lecture seule : la liste ne touche à aucun objet.
  */
 export async function* listerLaZone(
   zone: "CONFIANCE" | "QUARANTAINE",
+  prefixe = "",
 ): AsyncGenerator<{ cle: string; taille: number; modifieLe: Date }> {
   const seau = zone === "CONFIANCE" ? confiance() : quarantaine();
-  for await (const objet of connexion().listObjectsV2(seau, "", true)) {
+  for await (const objet of connexion().listObjectsV2(seau, prefixe, true)) {
     if (!objet.name) continue; // un préfixe commun, pas un objet
     yield { cle: objet.name, taille: Number(objet.size ?? 0), modifieLe: objet.lastModified ?? new Date(0) };
   }
@@ -235,3 +236,11 @@ export async function supprimerPartout(key: string): Promise<void> {
   await client.removeObject(confiance(), key);
   await client.removeObject(quarantaine(), key);
 }
+
+/**
+ * Suppression d'un objet dans une zone nommée — S.152 : un objet que
+ * l'inventaire a trouvé là, et nulle part ailleurs. Une clé absente ne
+ * lève pas ; un refus lève.
+ */
+export const supprimerDansLaZone = (zone: "CONFIANCE" | "QUARANTAINE", key: string) =>
+  connexion().removeObject(zone === "CONFIANCE" ? confiance() : quarantaine(), key);

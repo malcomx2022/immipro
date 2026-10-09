@@ -56,6 +56,10 @@ if (migration.status !== 0) {
   process.exit(1);
 }
 
+// S.152 : la purge liste le préfixe du dossier dans les deux zones ; sans
+// stockage, elle laisserait chaque dossier échu, et elle aurait raison.
+const { demarrerUnFauxStockage } = await import("./faux-stockage");
+const fauxStockage = await demarrerUnFauxStockage();
 const { db } = await import("../src/lib/db");
 
 /**
@@ -860,6 +864,7 @@ try {
 
 } finally {
   await db.$disconnect().catch(() => {});
+  await fauxStockage.arreter();
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
 }
 

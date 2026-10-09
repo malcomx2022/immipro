@@ -19,6 +19,11 @@ import { db } from "@/lib/db";
 export type ActionAuditee =
   | "piece.consultation"
   | "piece.purge"
+  /**
+   * La purge, depuis la console du serveur, d'un objet du périmètre validé
+   * de l'inventaire du stockage — S.152. L'auteur est `console:<nom>`.
+   */
+  | "piece.purge.inventaire"
   | "dossier.consultation"
   | "compte.suspension"
   /** Un rôle donné ou retiré depuis la console du serveur (S.115). */

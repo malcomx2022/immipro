@@ -255,6 +255,34 @@ const octetsInventaire =
 console.log(`dist/inventaire-stockage.mjs — ${(octetsInventaire / 1024).toFixed(0)} Kio`);
 
 /*
+  Les deux purges lancées à la main (RF-4, S.152), même image et même
+  méthode, même bannière : elles tirent `minio` comme l'inventaire.
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/purge-retention.mjs --par "…"
+      docker compose -f docker-compose.prod.yml run --rm app node dist/purge-inventaire.mjs
+*/
+for (const nom of ["purge-retention", "purge-inventaire"]) {
+  const purge = await build({
+    entryPoints: [`scripts/${nom}.mts`],
+    outfile: `dist/${nom}.mjs`,
+    bundle: true,
+    platform: "node",
+    target: "node24",
+    format: "esm",
+    banner: {
+      js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
+    },
+    external: EXTERNES,
+    tsconfig: "tsconfig.json",
+    sourcemap: true,
+    logLevel: "info",
+    metafile: true,
+  });
+  const octetsPurge = Object.values(purge.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+  console.log(`dist/${nom}.mjs — ${(octetsPurge / 1024).toFixed(0)} Kio`);
+}
+
+/*
   La graine éditoriale (S.120), même image et même méthode : le guide Pays-Bas
   et l'article de départ, que `npm run seed:editorial` chargeait sans pouvoir
   tourner dans l'image.

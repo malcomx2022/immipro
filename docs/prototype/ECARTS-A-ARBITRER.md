@@ -12442,3 +12442,80 @@ Un écart est un débit sans résultat, ou un résultat sans débit. Il se trait
 - La commande de purge exécutable dans l'image : limitée au périmètre validé, refusant une autre empreinte, éprouvée sur une restauration isolée ; la purge par préfixe de dossier (E4, étape 3).
 - La reprise des réservations de la rédaction assistée (S.148).
 - Les obligations en revue manuelle (B-04).
+
+## S.152 — RF-4, les purges : restauration, préfixe d'un dossier, périmètre validé
+
+**Autorisation et choix.** RF-4, autorisé par le responsable le 09/10/2026 ; étapes 3 et 5 du chantier. Trois choix ont été tranchés le 09/10 :
+- **Périmètre :** les trois volets.
+- **Garde-fou :** l'empreinte stricte.
+- **Journal :** une ligne par dossier, sous l'opérateur nommé.
+
+Le lot part de main `dcc034f`.
+
+**Ce qui manquait.**
+- **E4, étape 3.** La purge partait des versions. Un objet qu'aucune version ne désigne — un dépôt présigné jamais confirmé, le double d'une promotion interrompue — survivait à son dossier, que la base déclarait purgé.
+- **E10.** L'image ne portait aucune commande pour repasser la purge après une restauration : la procédure attendait la passe de 3 h 30.
+- **S.151.** Le périmètre validé de l'inventaire n'avait aucun moyen d'être purgé.
+
+**Reproduction sur l'ancien code.** `smoke:purge`, avec `purge.ts` remis à l'état de main, échoue sur 12 vérifications :
+- l'objet sans version survit à la purge de son dossier ;
+- un dépôt jamais confirmé reste ;
+- un objet désigné par un autre dossier n'est ni gardé ni signalé ;
+- le refus du stockage sous le préfixe passe inaperçu ;
+- une purge lancée à la main n'a pas d'auteur.
+
+**Ce qui est livré.**
+- **Le préfixe d'un dossier** (`purgerLesPiecesEchues`) :
+  - **Quand :** une fois les versions parties, et seulement si rien n'a résisté.
+  - **Ce qui part :** tout ce qui est rangé sous `dossiers/<dossier>/` dans les deux zones est supprimé (`listerLaZone` sous préfixe, `supprimerDansLaZone`). Le bilan compte `objetsSousLePrefixe`.
+  - **Clé désignée ailleurs :** un objet que la version vivante d'un autre dossier désigne (clé d'avant M1) est gardé et compté `objetsReserves`. Le dossier reste échu, et le journal le dit : un doute bloque la purge jusqu'à décision.
+  - **Refus du stockage :** il laisse le dossier échu, et la passe suivante reprend.
+  - **Règle :** RG-10.9 (DOC-11).
+- **La passe de rétention** (`server/jobs/retention.ts`) :
+  - **Une seule définition** pour le worker et pour `node dist/purge-retention.mjs --par "<nom>"`.
+  - **Un verrou consultatif** (`purge-retention`) : une passe qui le trouve pris ne fait rien et le dit.
+  - **Après une restauration :** la commande écrit au journal sous `console:<nom>`, puis relance l'inventaire et dit ce qui reste sous des dossiers purgés ou échus. Code de sortie 1 si un objet a résisté.
+- **La purge du périmètre validé** (`node dist/purge-inventaire.mjs`) :
+  - **Sans option,** elle montre le périmètre et ne supprime rien.
+  - **Pour supprimer,** elle exige `--empreinte <sha256> --confirmer --par "<nom>"`. Sous le même verrou, elle recalcule l'inventaire et refuse si l'empreinte a changé.
+  - **Suppression :** chaque objet ne part que de la zone où l'inventaire l'a vu.
+  - **Journal :** une ligne `piece.purge.inventaire` par dossier, avec l'empreinte et sans aucune clé d'objet. Un journal indisponible arrête la passe.
+- **Le faux stockage partagé** (`scripts/faux-stockage.ts`) sert aux fumées qui passent par la purge (`conservation`, `consultation`, `transitions`). Sans stockage, la purge laisse désormais chaque dossier échu, et elle a raison.
+- **Docs :**
+  - `docs/exploitation/sauvegardes.md` : la procédure de restauration lance la commande au lieu d'attendre le worker ;
+  - `docs/exploitation/inventaire-stockage.md` : « Purger le périmètre validé ».
+
+**Vérifications.**
+- **Suite complète :** `npm run check` (3490 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris.
+- **`tests/purge-stockage` :**
+  - options et refus ;
+  - préfixe et lignes ;
+  - préfixe vidé après les versions, et seulement si rien n'a résisté ;
+  - réservation M1 ;
+  - même passe et même verrou pour le worker et la commande ;
+  - empreinte comparée avant toute suppression ;
+  - journal sans `catch` ;
+  - bannière du paquet.
+- **`tests/conservation` :** le test structurel lit les deux lots dans la passe partagée qu'appelle le worker.
+- **`smoke:purge` :**
+  - préfixe vidé ;
+  - réservation M1, puis purge une fois la référence levée ;
+  - refus du stockage, puis reprise ;
+  - empreinte erronée refusée, purge occupée refusée ;
+  - périmètre purgé, doutes et pièces vivantes intacts ;
+  - journal par dossier sous `console:<nom>`, sans clé ;
+  - purge de restauration sous verrou et attribuée.
+- **`smoke:worker --image` :** les deux commandes démarrent dans l'image.
+- **Contre un vrai Garage v2.4.1 et une base jetable, depuis l'image :**
+  - `purge-retention` a vidé les 1 100 objets du préfixe d'un dossier échu (au-delà d'une page de liste) et l'a déclaré purgé ;
+  - `purge-inventaire` a refusé une mauvaise empreinte, puis supprimé l'orphelin d'un dossier purgé avec la bonne ;
+  - l'objet du dossier vivant est resté ;
+  - le journal porte deux lignes sous `console:Essai S.152`.
+
+**Données existantes.** Aucune migration. À la première passe après déploiement, chaque dossier échu voit son préfixe vidé. Un dossier dont un objet est désigné par un autre dossier reste échu jusqu'à décision. Les orphelins sous des dossiers déjà purgés ne partent que par la purge du périmètre validé.
+
+**Ce qui reste de RF-4.**
+- Lancer en production le diagnostic (S.149) et l'inventaire, faire valider le périmètre, puis le purger : **non vérifié**.
+- Éprouver `purge-retention` sur une restauration isolée réelle (E10) : **non vérifié**.
+- La reprise des réservations de la rédaction assistée (S.148).
+- Les obligations en revue manuelle (B-04).

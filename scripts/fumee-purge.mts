@@ -106,8 +106,12 @@ const stockage = createServer((requete: IncomingMessage, reponse: ServerResponse
           La liste d'un seau (ListObjectsV2), en une page : l'inventaire
           du stockage (RF-4, S.151) la lit, et rien d'autre ici.
         */
-        if (cle === "" && new URLSearchParams(requeteDUrl ?? "").get("list-type") === "2") {
+        const parametres = new URLSearchParams(requeteDUrl ?? "");
+        if (cle === "" && parametres.get("list-type") === "2") {
+          // Le préfixe compte : la purge d'un dossier (S.152) ne liste que le sien.
+          const prefixe = parametres.get("prefix") ?? "";
           const contenus = [...objets.entries()]
+            .filter(([k]) => k.startsWith(prefixe))
             .sort(([a], [b]) => a.localeCompare(b))
             .map(
               ([k, octets]) =>
@@ -180,6 +184,8 @@ const { db } = await import("../src/lib/db");
 const { purgerLesPiecesEchues, ANALYSE_PURGEE_CORPS } = await import("../src/server/jobs/purge");
 const { donneesDuCompte } = await import("../src/server/lecture/portabilite");
 const { inventorierLeStockage } = await import("../src/server/exploitation/inventaire-stockage");
+const { passeDeRetention, sousLeVerrouDePurge } = await import("../src/server/jobs/retention");
+const { purgerLePerimetreValide } = await import("../src/server/exploitation/purge-inventaire");
 const { demanderLaSuppression, acheverLesSuppressionsEnAttente } = await import(
   "../src/server/acces/suppression"
 );
@@ -950,21 +956,157 @@ try {
     );
 
     /*
-      Le défaut qu'il rend visible (revue E4) : la purge part des versions.
-      Un objet sans version sous un dossier échu survit à la purge de son
-      dossier, et plus rien en base ne le désigne.
+      Le défaut qu'il rendait visible (revue E4) : la purge partait des
+      versions, et un objet sans version sous un dossier échu survivait à
+      la purge de son dossier. Depuis S.152, la purge vide aussi le
+      préfixe du dossier.
     */
     await purgerLesPiecesEchues();
     verifier(
       (await db.application.findUniqueOrThrow({ where: { id: echu.id } })).purgedAt !== null,
       "le dossier échu se déclare purgé",
     );
-    verifier(seau(SEAU_CONFIANCE).has(sousEchu), "et l'objet sans version est toujours dans le stockage");
+    verifier(!seau(SEAU_CONFIANCE).has(sousEchu), "et l'objet sans version est parti avec lui (S.152)");
     const ensuite = await inventorierLeStockage({ limite: 1000 });
     verifier(
-      ensuite.classes.find((c) => c.code === "APRES_PURGE")!.identifiants.includes(`CONFIANCE ${sousEchu}`),
-      "l'inventaire le retrouve sous un dossier purgé",
+      !ensuite.perimetre.lignes.includes(`CONFIANCE ${sousEchu}`),
+      "l'inventaire ne le trouve plus",
     );
+    // Les objets du dossier vivant ne bougent pas : son préfixe n'est pas visé.
+    verifier(
+      seau(SEAU_CONFIANCE).has(rattache) && seau(SEAU_QUARANTAINE).has(jamaisConfirme),
+      "un dossier conservé garde ses objets",
+    );
+
+    console.log("\nLa purge du périmètre validé : empreinte stricte, opérateur nommé (RF-4, S.152)");
+    const perimetreAvant = (await inventorierLeStockage({ limite: 1 })).perimetre;
+    verifier(
+      perimetreAvant.lignes.includes(`QUARANTAINE ${apresPurge}`),
+      `l'orphelin d'avant reste candidat (${perimetreAvant.nombre})`,
+    );
+    const lignesDuJournal = () => db.auditLog.count({ where: { action: "piece.purge.inventaire" } });
+
+    const mauvaise = await purgerLePerimetreValide({ empreinte: "0".repeat(64), par: "Opérateur de fumée" });
+    verifier(mauvaise.issue === "EMPREINTE", `une autre empreinte est refusée (${mauvaise.issue})`);
+    verifier(seau(SEAU_QUARANTAINE).has(apresPurge), "et rien n'est supprimé");
+    verifier((await lignesDuJournal()) === 0, "ni journalisé");
+
+    const occupee = await sousLeVerrouDePurge(() =>
+      purgerLePerimetreValide({ empreinte: perimetreAvant.empreinte, par: "Opérateur de fumée" }),
+    );
+    verifier(occupee?.issue === "OCCUPE", `pendant une autre purge, elle ne fait rien (${occupee?.issue})`);
+    verifier(seau(SEAU_QUARANTAINE).has(apresPurge), "et ne supprime rien");
+
+    const faite = await purgerLePerimetreValide({ empreinte: perimetreAvant.empreinte, par: "Opérateur de fumée" });
+    verifier(
+      faite.issue === "FAITE" && faite.supprimes === perimetreAvant.nombre && faite.enEchec === 0,
+      `avec l'empreinte validée, le périmètre part (${JSON.stringify(faite)})`,
+    );
+    verifier(!seau(SEAU_QUARANTAINE).has(apresPurge), "l'orphelin sous le dossier purgé est supprimé");
+    verifier(
+      seau(SEAU_CONFIANCE).has(inconnu) && seau(SEAU_CONFIANCE).has(horsSchema),
+      "un doute n'est pas touché : dossier inconnu, clé hors schéma",
+    );
+    verifier(
+      seau(SEAU_CONFIANCE).has(rattache) && seau(SEAU_QUARANTAINE).has(enCours),
+      "ni une pièce vivante, ni un dépôt en cours",
+    );
+    const traces = await db.auditLog.findMany({ where: { action: "piece.purge.inventaire" } });
+    verifier(
+      traces.length === (faite.issue === "FAITE" ? faite.dossiers : -1) &&
+        traces.every((t) => t.actorId === "console:Opérateur de fumée" && t.reason.includes(perimetreAvant.empreinte)),
+      `une ligne par dossier, sous l'opérateur nommé, avec l'empreinte (${traces.length})`,
+    );
+    verifier(
+      !traces.some((t) => JSON.stringify(t).includes("dossiers/")),
+      "aucune clé d'objet au journal",
+    );
+    verifier(
+      (await inventorierLeStockage({ limite: 1 })).perimetre.nombre === 0,
+      "après la purge, le périmètre est vide",
+    );
+  }
+
+  console.log("\nLe préfixe d'un dossier part avec lui, sauf ce qu'un autre dossier désigne (S.152, E4 étape 3)");
+  {
+    // Un dépôt jamais confirmé, sous un dossier échu qui a aussi une pièce.
+    const d = await dossierEchu(1);
+    const depotOublie = `dossiers/${d.application.id}/PIECE_0/1700000000000-jamais-confirme`;
+    seau(SEAU_QUARANTAINE).set(depotOublie, Buffer.from("octets oubliés"));
+    const bilan = await purgerLesPiecesEchues();
+    verifier(!seau(SEAU_QUARANTAINE).has(depotOublie), "le dépôt jamais confirmé part avec le dossier");
+    verifier(bilan.objetsSousLePrefixe >= 1, `et il est compté (${bilan.objetsSousLePrefixe})`);
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: d.application.id } })).purgedAt !== null,
+      "le dossier se déclare purgé",
+    );
+
+    // M1 : la version vivante d'un autre dossier désigne un objet de celui-ci.
+    const a = await dossierEchu(1);
+    const designe = `dossiers/${a.application.id}/PIECE_0/1700000000000-designe-ailleurs`;
+    seau(SEAU_CONFIANCE).set(designe, Buffer.from("octets désignés ailleurs"));
+    const autre = await db.application.create({ data: { userId: a.user.id } });
+    const docAutre = await db.document.create({
+      data: { applicationId: autre.id, code: "PASSEPORT", label: "Passeport", status: "CONFORME", required: true },
+    });
+    await db.documentVersion.create({
+      data: {
+        documentId: docAutre.id, rank: 1, objectKey: designe, checksum: `m1-${process.pid}`,
+        mimeType: "application/pdf", sizeBytes: 10, scanState: "SAINE", scannedAt: new Date(),
+      },
+    });
+    const reserve = await purgerLesPiecesEchues();
+    verifier(seau(SEAU_CONFIANCE).has(designe), "l'objet désigné par un autre dossier est gardé");
+    verifier(reserve.objetsReserves === 1, `il est compté réservé (${reserve.objetsReserves})`);
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: a.application.id } })).purgedAt === null,
+      "le dossier reste échu : un doute bloque la purge jusqu'à décision",
+    );
+    const motif = await db.auditLog.findFirst({
+      where: { target: `application:${a.application.id}`, action: "piece.purge" },
+      orderBy: { createdAt: "desc" },
+    });
+    verifier(motif?.reason.includes("(M1)") === true, `le journal dit pourquoi (${motif?.reason})`);
+    // Décision prise : la version de l'autre dossier ne désigne plus l'objet.
+    await db.documentVersion.deleteMany({ where: { documentId: docAutre.id } });
+    await purgerLesPiecesEchues();
+    verifier(!seau(SEAU_CONFIANCE).has(designe), "une fois la référence levée, la passe suivante le purge");
+
+    // Le stockage refuse sous le préfixe : le dossier reste échu, et la passe suivante reprend.
+    const r = await dossierEchu(0);
+    const refuse = `dossiers/${r.application.id}/PIECE_0/1700000000000-refuse`;
+    seau(SEAU_QUARANTAINE).set(refuse, Buffer.from("octets"));
+    refuserDansLeSeau = SEAU_QUARANTAINE;
+    const refusee = await purgerLesPiecesEchues();
+    refuserDansLeSeau = null;
+    verifier(refusee.objetsEnEchec >= 1, `le refus est compté (${refusee.objetsEnEchec})`);
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: r.application.id } })).purgedAt === null,
+      "le dossier n'est pas déclaré purgé",
+    );
+    await purgerLesPiecesEchues();
+    verifier(
+      !seau(SEAU_QUARANTAINE).has(refuse) &&
+        (await db.application.findUniqueOrThrow({ where: { id: r.application.id } })).purgedAt !== null,
+      "la passe suivante termine",
+    );
+  }
+
+  console.log("\nLa purge de rétention se lance à la main après une restauration (RF-4, S.152)");
+  {
+    // Une restauration ressuscite un dossier échu et ses octets.
+    const ressuscite = await dossierEchu(1);
+    const occupee = await sousLeVerrouDePurge(() => passeDeRetention({ acteurId: "console:Opérateur de fumée" }));
+    verifier(occupee === null, "pendant une autre purge, la passe ne fait rien");
+    verifier(seau(SEAU_CONFIANCE).has(ressuscite.cles[0]!), "et l'objet est encore là");
+
+    const passe = await passeDeRetention({ acteurId: "console:Opérateur de fumée" });
+    verifier(passe !== null && passe.purge.dossiers >= 1, `la passe purge (${JSON.stringify(passe?.purge)})`);
+    verifier(!seau(SEAU_CONFIANCE).has(ressuscite.cles[0]!), "les octets ressuscités sont partis");
+    const trace = await db.auditLog.findFirst({
+      where: { target: `application:${ressuscite.application.id}`, action: "piece.purge" },
+    });
+    verifier(trace?.actorId === "console:Opérateur de fumée", `l'opérateur en est l'auteur au journal (${trace?.actorId})`);
   }
 
 } finally {
