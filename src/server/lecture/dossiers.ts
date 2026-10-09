@@ -24,7 +24,10 @@ import {
 import type { Echeance } from "@/domain/dossiers/echeancier";
 import { dateAuPlusTot } from "@/domain/dossiers/echeancier";
 import type { CalendrierAEvaluer } from "@/domain/dossiers/faisabilite";
-import type { ChampLu, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers/analyse";
+import type { ChampLu, Relecture, ResultatAnalyse, VerdictAnalyse } from "@/domain/dossiers/analyse";
+import { resultatAffiche } from "@/domain/dossiers/analyse";
+import { TITRE_DE_LA_DECISION } from "@/domain/backoffice/revue";
+import type { VersionDeLaPiece } from "@/domain/dossiers/historique";
 import { exigencesDeLaPiece } from "@/domain/dossiers/verification";
 import type { Quota } from "@/domain/dossiers/televersement";
 import { packDeLaCouverture } from "@/domain/payments/droits";
@@ -340,7 +343,9 @@ export async function analyseDeLaPiece(
     include: {
       versions: {
         orderBy: { rank: "desc" },
-        include: { analyses: { orderBy: { analyzedAt: "desc" }, take: 1 } },
+        include: {
+          analyses: { orderBy: { analyzedAt: "desc" }, take: 1, include: { review: true } },
+        },
       },
       application: { include: { visaRule: true } },
     },
@@ -350,6 +355,43 @@ export async function analyseDeLaPiece(
   const derniere = document.versions[0];
   const analyse = derniere?.analyses[0];
   const regle = document.application.visaRule;
+  /*
+    S.157, R-01 — la relecture de la lecture affichée, et d'elle seule :
+    une décision prise sur une version remplacée depuis reste sur la revue
+    (RG-06.8), elle ne remonte pas ici.
+  */
+  const revue = analyse?.review ?? null;
+  /*
+    Une décision prise sur un dossier déjà déposé ou clos n'a pas été
+    écrite sur la pièce (RG-06.8, `appliquee: false`) : la checklist ne la
+    porte pas, l'écran ne la porte pas davantage. Une décision appliquée
+    a écrit son message sur la pièce ; c'est ce qui la distingue.
+  */
+  const tranchee =
+    revue?.decidedAt && revue.decision && revue.message && document.feedback === revue.message
+      ? revue
+      : null;
+  const relecture: Relecture | null = !revue
+    ? null
+    : tranchee
+      ? { etat: "TRANCHEE", decideeLe: tranchee.decidedAt!.toISOString() }
+      : revue.decidedAt
+        ? null
+        : { etat: "EN_COURS", signalee: revue.reason === "SIGNALE_PAR_LE_CANDIDAT" };
+  const affiche = analyse
+    ? resultatAffiche(
+        { verdict: verdictAffichable(analyse.verdict), titre: analyse.title, corps: analyse.body },
+        tranchee
+          ? {
+              verdict: verdictAffichable(tranchee.decision!),
+              titre:
+                TITRE_DE_LA_DECISION[tranchee.decision as keyof typeof TITRE_DE_LA_DECISION] ??
+                analyse.title,
+              message: tranchee.message!,
+            }
+          : null,
+      )
+    : null;
 
   return {
     piece: versPiece(document),
@@ -370,12 +412,14 @@ export async function analyseDeLaPiece(
     ),
     analyse: analyse
       ? {
-          verdict: verdictAffichable(analyse.verdict),
+          verdict: affiche!.verdict,
+          verdictLu: verdictAffichable(analyse.verdict),
+          relecture,
           fichier: nomDuFichier(derniere!),
           analyseeLe: analyse.analyzedAt.toISOString(),
           pages: 1,
-          titre: analyse.title,
-          corps: analyse.body,
+          titre: affiche!.titre,
+          corps: affiche!.corps,
           champs: champsLus(analyse.fields),
           exigences: regle ? exigencesDeLaPiece(payload(regle).conditions, document.code) : [],
           // Pas de règle relisible, pas d'exigence citée — et donc pas de
@@ -397,10 +441,55 @@ const verdictAffichable = (v: string): VerdictAnalyse =>
 const nomDuFichier = (version: DocumentVersion): string =>
   version.objectKey?.split("/").pop() ?? "version rédigée";
 
-function champsLus(fields: unknown): ChampLu[] {
+/** Les valeurs lues d'une analyse, telles que C-08 les montre — et que le signalement les désigne. */
+export function champsLus(fields: unknown): ChampLu[] {
   if (typeof fields !== "object" || fields === null) return [];
   return Object.entries(fields as Record<string, unknown>).map(([intitule, valeur]) => ({
     intitule: intitule.replace(/_/gu, " "),
     valeur: valeur === null || valeur === undefined ? null : String(valeur),
   }));
+}
+
+/**
+ * L'historique des versions d'une pièce — S.157, R-03.
+ *
+ * Toutes les versions, la plus récente d'abord, avec la dernière lecture
+ * de chacune et la décision de sa relecture s'il y en a une. Rien n'y est
+ * ouvert ni signé : l'écran est en lecture seule.
+ */
+export async function historiqueDeLaPiece(
+  pieceId: string,
+  applicationId: string,
+  userId: string,
+): Promise<{ piece: Piece; versions: VersionDeLaPiece[] }> {
+  const document = await db.document.findFirst({
+    where: { id: pieceId, applicationId, application: { userId } },
+    include: {
+      versions: {
+        orderBy: { rank: "desc" },
+        include: {
+          analyses: { orderBy: { analyzedAt: "desc" }, take: 1, include: { review: true } },
+        },
+      },
+    },
+  });
+  if (!document) throw echec("introuvable");
+
+  return {
+    piece: versPiece(document),
+    versions: document.versions.map((v, i) => {
+      const lecture = v.analyses[0];
+      const decision = lecture?.review?.decidedAt ? lecture.review.decision : null;
+      return {
+        rang: v.rank,
+        courante: i === 0,
+        deposeeLe: v.uploadedAt.toISOString(),
+        fichier: nomDuFichier(v),
+        controle: v.scanState,
+        purgee: v.purgedAt !== null,
+        verdictLu: lecture ? verdictAffichable(lecture.verdict) : null,
+        decision: decision ? verdictAffichable(decision) : null,
+      };
+    }),
+  };
 }

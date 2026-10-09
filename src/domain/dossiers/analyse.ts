@@ -61,6 +61,64 @@ export interface ResultatAnalyse {
    * donc rien n'a de source à porter.
    */
   mention: Mention | null;
+  /**
+   * Le verdict de la **lecture automatique**, même quand une relecture l'a
+   * remplacé à l'écran — S.157, R-01.
+   *
+   * `verdict`, `titre` et `corps` disent ce que le candidat doit lire : la
+   * décision de l'opérateur quand il y en a une. Le prix d'une reprise, lui,
+   * suit la lecture (FON-03, `consommeUneAnalyse`) : une pièce lue
+   * « illisible » se reprend sans débit, qu'un opérateur l'ait ensuite
+   * acceptée ou non.
+   */
+  verdictLu: VerdictAnalyse;
+  /** La relecture humaine de cette lecture, quand il y en a une. */
+  relecture: Relecture | null;
+}
+
+/**
+ * Une relecture humaine (B-05), vue du candidat. Ouverte, elle se dit ;
+ * tranchée, sa décision prend la place de la lecture.
+ */
+export type Relecture =
+  | {
+      etat: "EN_COURS";
+      /** Ouverte par le signalement du candidat, et non par la machine. */
+      signalee: boolean;
+    }
+  | { etat: "TRANCHEE"; decideeLe: string };
+
+/** Ce que la lecture automatique a rendu, tel que la machine l'a écrit. */
+export interface Lecture {
+  verdict: VerdictAnalyse;
+  titre: string;
+  corps: string;
+}
+
+/** Une décision B-05 sur la lecture, telle que l'avis l'a portée au candidat. */
+export interface DecisionDeRelecture {
+  verdict: VerdictAnalyse;
+  /** Le titre de l'avis (`TITRE_DE_LA_DECISION`). */
+  titre: string;
+  /** Le message de l'opérateur, tel qu'il l'a écrit. */
+  message: string;
+}
+
+/**
+ * Ce que l'écran affiche — S.157, R-01 (choix du responsable, 09/10/2026 :
+ * la décision prime).
+ *
+ * La décision d'un opérateur remplace le verdict, le titre et le texte de
+ * la lecture : c'est elle que l'avis a portée, et la checklist la porte
+ * aussi. L'écran disait encore « illisible, un opérateur regarde ta
+ * pièce » d'une pièce acceptée, et proposait de la reprendre.
+ */
+export function resultatAffiche(
+  lecture: Lecture,
+  decision: DecisionDeRelecture | null,
+): Lecture {
+  if (!decision) return lecture;
+  return { verdict: decision.verdict, titre: decision.titre, corps: decision.message };
 }
 
 /** Valeur affichée d'un champ non lu. Jamais une case vide : le vide se lit comme zéro. */
@@ -94,13 +152,30 @@ export function libelleSuite(verdict: VerdictAnalyse): string {
 export const consommeUneAnalyse = (verdictPrecedent: VerdictAnalyse | null): boolean =>
   verdictPrecedent !== "ILLISIBLE";
 
-/** Mention de pied de C-08, sous le bouton. Elle dit ce que coûte la suite. */
+/**
+ * Mention de pied de C-08, sous le bouton. Elle dit ce que coûte la suite.
+ *
+ * Le bouton suit le verdict affiché ; le prix, la lecture (`verdictLu`,
+ * S.157) — c'est elle que `consommeUneAnalyse` lit au dépôt suivant. Une
+ * pièce acceptée ne propose pas de reprise : la mention y redit le solde.
+ */
 export function mentionSuite(
   verdict: VerdictAnalyse,
   quota: { restantes: number; total: number },
+  verdictLu: VerdictAnalyse = verdict,
 ): string {
-  if (verdict === "ILLISIBLE") return "Cette reprise ne consomme pas d'analyse";
+  if (verdict !== "CONFORME" && !consommeUneAnalyse(verdictLu)) {
+    return "Cette reprise ne consomme pas d'analyse";
+  }
   return `Analyses restantes : ${quota.restantes} sur ${quota.total}`;
+}
+
+/** Ce que dit C-08 pendant une relecture, à la place du lien de signalement. */
+export function mentionDeRelecture(relecture: Relecture): string | null {
+  if (relecture.etat !== "EN_COURS") return null;
+  return relecture.signalee
+    ? "Ton signalement est enregistré. Une personne de l'équipe relit la pièce ; sa décision t'arrivera dans tes alertes."
+    : "Une personne de l'équipe relit la pièce ; sa décision t'arrivera dans tes alertes.";
 }
 
 /**

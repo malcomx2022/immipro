@@ -1511,6 +1511,202 @@ try {
     par coïncidence de graphie, comme celle de ce fichier le fait pour le
     passeport.
   */
+  /*
+    S.157, R-01 — trouvé par la recette RF-5. Une décision B-05 écrivait
+    l'état et le message sur la pièce, et l'avis partait ; l'écran de la
+    pièce (C-08), lui, se lisait sur la seule lecture automatique : il
+    disait « illisible, un opérateur regarde ta pièce » d'une pièce que
+    l'opérateur venait d'accepter, et proposait de la reprendre.
+  */
+  console.log("\nC-08 — la décision de la relecture prime sur la lecture automatique (S.157)");
+  {
+    const { analyseDeLaPiece } = await import("../src/server/lecture/dossiers");
+    reponseDuService = { statut: 401, corps: '{"type":"error","error":{"type":"authentication_error"}}' };
+    const operateur = await db.user.create({
+      data: { email: `fumee-r01-${process.pid}@exemple.test`, role: "ADMIN" },
+    });
+
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+    const avant = await analyseDeLaPiece(p.document.id, p.application.id, p.user.id);
+    verifier(
+      avant.analyse?.verdict === "ILLISIBLE" && avant.analyse.relecture?.etat === "EN_COURS",
+      `avant la décision : la lecture, et la relecture annoncée (${avant.analyse?.verdict}, ${avant.analyse?.relecture?.etat})`,
+    );
+
+    const revue = await db.manualReview.findFirstOrThrow({
+      where: { analysis: { versionId: p.version.id } },
+    });
+    const MESSAGE =
+      "Ton passeport est lisible et valable jusqu'en 2031 : la pièce est acceptée, tu n'as rien à refaire.";
+    await trancherLaRevue(
+      revue.id,
+      { id: operateur.id },
+      { decision: "CONFORME", message: MESSAGE, motif: "Relecture R-01" },
+    );
+    const apres = await analyseDeLaPiece(p.document.id, p.application.id, p.user.id);
+    verifier(
+      apres.analyse?.verdict === "CONFORME",
+      `l'écran dit la décision, pas la lecture (${apres.analyse?.verdict})`,
+    );
+    verifier(
+      apres.analyse?.titre === TITRE_DE_LA_DECISION.CONFORME && apres.analyse.corps === MESSAGE,
+      "avec le titre de l'avis et le message de l'opérateur, tels quels",
+    );
+    verifier(
+      apres.analyse?.verdictLu === "ILLISIBLE",
+      "la lecture automatique reste connue : c'est elle qui décide du prix d'une reprise (FON-03)",
+    );
+
+    /* Tranchée après le dépôt du dossier, la décision n'a rien écrit : l'écran ne la porte pas. */
+    const r = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(r.tache, lExtracteur());
+    const revueR = await db.manualReview.findFirstOrThrow({
+      where: { analysis: { versionId: r.version.id } },
+    });
+    await db.application.update({
+      where: { id: r.application.id },
+      data: { status: "SOUMIS", readyAt: null },
+    });
+    const surFige = await trancherLaRevue(
+      revueR.id,
+      { id: operateur.id },
+      { decision: "CONFORME", message: MESSAGE, motif: "Relecture après dépôt" },
+    );
+    const deposee = await analyseDeLaPiece(r.document.id, r.application.id, r.user.id);
+    verifier(
+      !surFige.appliquee && deposee.analyse?.verdict === "ILLISIBLE" && deposee.analyse.relecture === null,
+      `sur un dossier déposé, la décision non appliquée ne s'affiche pas (${deposee.analyse?.verdict})`,
+    );
+
+    /* Sur une version remplacée depuis, la décision ne commande plus l'écran (RG-06.8). */
+    const q = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(q.tache, lExtracteur());
+    const revueQ = await db.manualReview.findFirstOrThrow({
+      where: { analysis: { versionId: q.version.id } },
+    });
+    await db.documentVersion.create({
+      data: {
+        documentId: q.document.id,
+        rank: 2,
+        objectKey: `${q.cle}.v2`,
+        checksum: `somme-v2-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+        scanState: "EN_QUARANTAINE",
+      },
+    });
+    await trancherLaRevue(
+      revueQ.id,
+      { id: operateur.id },
+      { decision: "CONFORME", message: MESSAGE, motif: "Relecture d'une version remplacée" },
+    );
+    const remplacee = await analyseDeLaPiece(q.document.id, q.application.id, q.user.id);
+    verifier(
+      remplacee.analyse === null,
+      "la version courante n'a pas de lecture : rien de la version remplacée ne s'affiche",
+    );
+
+    /* S.157, R-03 — l'historique dit le sort de chaque version, la courante d'abord. */
+    const { historiqueDeLaPiece } = await import("../src/server/lecture/dossiers");
+    const historique = await historiqueDeLaPiece(q.document.id, q.application.id, q.user.id);
+    verifier(
+      historique.versions.map((v) => `${v.rang}${v.courante ? "*" : ""}`).join(",") === "2*,1",
+      `deux versions, la plus récente courante (${historique.versions.map((v) => v.rang).join(",")})`,
+    );
+    verifier(
+      historique.versions[1]?.decision === "CONFORME" && historique.versions[1].verdictLu === "ILLISIBLE",
+      "la version remplacée garde sa lecture et la décision de sa relecture",
+    );
+    let etranger = "lu";
+    await historiqueDeLaPiece(q.document.id, q.application.id, p.user.id).catch(() => {
+      etranger = "introuvable";
+    });
+    verifier(etranger === "introuvable", "l'historique d'une pièce d'un autre candidat est introuvable");
+  }
+
+  /*
+    S.157, R-03 — « Si une valeur est fausse, signale-le » : le lien menait
+    à une page absente. Le signalement ouvre la revue de la lecture
+    affichée, une seule fois, et la trace au journal.
+  */
+  console.log("\nC-08 — le signalement d'une erreur de lecture ouvre une relecture (S.157)");
+  {
+    const { analyseDeLaPiece } = await import("../src/server/lecture/dossiers");
+    const { signalerUneErreurDeLecture } = await import("../src/server/dossiers/signalement");
+    const { fileDeRevue } = await import("../src/server/lecture/backoffice");
+    const { AUTRE_CHOSE } = await import("../src/domain/dossiers/signalement");
+    reponseDuService = reponseDeLecture({
+      piece_identifiee: "passeport",
+      obstacle: null,
+      champs: { passeport_validite_min: "2029-03-01" },
+    });
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+    const lue = await analyseDeLaPiece(p.document.id, p.application.id, p.user.id);
+    const intitule = lue.analyse?.champs[0]?.intitule ?? "";
+    verifier(
+      lue.analyse?.verdict === "CONFORME" && lue.analyse.relecture === null,
+      `lue conforme, sans relecture (${lue.analyse?.verdict})`,
+    );
+
+    const demande = { applicationId: p.application.id, pieceId: p.document.id, userId: p.user.id };
+    let inconnu = "accepté";
+    await signalerUneErreurDeLecture({ ...demande, champs: ["Numéro inventé"] }).catch(() => {
+      inconnu = "refusé";
+    });
+    verifier(inconnu === "refusé", "une valeur que l'écran n'a pas montrée est refusée");
+
+    const [a, b] = await Promise.all([
+      signalerUneErreurDeLecture({ ...demande, champs: [intitule] }),
+      signalerUneErreurDeLecture({ ...demande, champs: [intitule] }),
+    ]);
+    const revues = await db.manualReview.findMany({ where: { analysis: { versionId: p.version.id } } });
+    verifier(
+      revues.length === 1 && revues[0]!.reason === "SIGNALE_PAR_LE_CANDIDAT",
+      `deux envois simultanés, une seule revue (${revues.length})`,
+    );
+    verifier(
+      [a.dejaEnRelecture, b.dejaEnRelecture].filter(Boolean).length === 1,
+      "le second envoi répond que la relecture est déjà ouverte",
+    );
+    const traces = await db.auditLog.findMany({
+      where: { action: "piece.signalement", target: `document:${p.document.id}` },
+    });
+    verifier(
+      traces.length === 1 && traces[0]!.actorId === p.user.id,
+      "une trace au journal, au nom du candidat",
+    );
+
+    const apres = await analyseDeLaPiece(p.document.id, p.application.id, p.user.id);
+    verifier(
+      apres.analyse?.relecture?.etat === "EN_COURS" && apres.analyse.relecture.signalee,
+      "C-08 dit que la relecture est en cours, ouverte par le signalement",
+    );
+    const enFile = (await fileDeRevue()).find((r) => r.id === revues[0]!.id);
+    verifier(
+      enFile?.signalement?.includes(intitule) === true,
+      `B-05 montre ce que le candidat désigne (${enFile?.signalement})`,
+    );
+
+    const figee = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(figee.tache, lExtracteur());
+    await db.application.update({
+      where: { id: figee.application.id },
+      data: { status: "SOUMIS", readyAt: null },
+    });
+    let surFige = "accepté";
+    await signalerUneErreurDeLecture({
+      applicationId: figee.application.id,
+      pieceId: figee.document.id,
+      userId: figee.user.id,
+      champs: [AUTRE_CHOSE],
+    }).catch(() => {
+      surFige = "refusé";
+    });
+    verifier(surFige === "refusé", "un dossier déposé ne se signale plus");
+  }
+
   console.log("\nC-08 — l'exigence vient du référentiel, elle ne se devine pas");
   {
     const { analyseDeLaPiece } = await import("../src/server/lecture/dossiers");

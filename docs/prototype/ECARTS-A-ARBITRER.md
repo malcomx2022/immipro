@@ -12667,3 +12667,55 @@ Le lot part de main `dcc034f`.
   - exploitation en préproduction : nginx, certificats, CORS réel, FedaPay, services, runbook.
 - La signature de la matrice par le responsable.
 - Les correctifs de R-01 à R-03, qui demandent son choix.
+
+## S.157 — RF-5 : les trois anomalies de la recette (R-01 à R-03)
+
+**Autorisation et choix.** Ce lot fait suite à la recette RF-5 (S.156). Le responsable a tranché le 09/10/2026, chaque fois sur la recommandation :
+- R-01 : la décision prime ;
+- R-02 : relance automatique ;
+- R-03 : construire le signalement et l'historique.
+
+Le lot part de main `a7f23e0`. Ni schéma, ni migration, ni drapeau, ni service ne changent.
+
+**Reproductions sur l'ancien code.**
+- **R-01.** La nouvelle section de `smoke:extraction` échoue : après une décision « conforme » en B-05, `analyseDeLaPiece` rend encore `ILLISIBLE`.
+- **R-02.** Le banc de S.156 l'a montré : 8 s après le retour du réseau, aucune version n'était créée.
+- **R-03.** Le nouveau test des liens internes, passé sur l'ancien code, nomme exactement les deux liens morts de C-08.
+
+**Ce qui est livré.**
+- **R-01, la décision prime (RG-06.11).** `analyseDeLaPiece` lit la revue de la lecture affichée, celle de la version courante. Le domaine (`resultatAffiche`) remplace le verdict, le titre et le texte par la décision : le titre de l'avis et le message de l'opérateur. L'écran garde la lecture automatique, présentée comme la lecture d'avant la relecture.
+  - La gratuité d'une reprise suit toujours la lecture (`verdictLu`, FON-03) ; `mentionSuite` la reçoit en troisième argument.
+  - Les libellés du bouton restent ceux de `libelleSuite`. Une pièce acceptée renvoie à la checklist, et ne propose plus de « Reprendre la photo ».
+  - Pendant une relecture, l'écran dit qu'une personne relit la pièce, au lieu de proposer le signalement.
+  - Seule une décision **appliquée** s'affiche, c'est-à-dire une décision qui a écrit son message sur la pièce. Une décision prise après le dépôt du dossier n'a rien écrit (RG-06.8, `appliquee: false`) : l'écran garde alors la lecture, comme la checklist. Ce cas a été trouvé à la relecture du diff, et la fumée le couvre.
+- **R-03, signalement et historique (RG-06.12).**
+  - **Le signalement.** C'est une action sur place (`POST /api/dossiers/[id]/pieces/[pieceId]/signalement`). Le candidat coche les valeurs qu'il voit fausses, ou « autre chose » ; il ne saisit pas la bonne valeur, qui irait au journal, et le journal ne se purge pas avec les pièces (INV-5).
+    - Il ouvre la revue de la lecture affichée (`SIGNALE_PAR_LE_CANDIDAT`, motif déjà au schéma). Il n'en ouvre qu'une par lecture : un double envoi ou une revue déjà ouverte ne créent rien de plus.
+    - Il est tracé au journal (`piece.signalement`, catégorie accès aux pièces), avec la création de la revue dans la même transaction.
+    - Il est refusé sur un dossier figé, et l'écran ne le propose pas sur un dossier déposé ou clos.
+    - B-05 montre au-dessus de la trace ce que le candidat désigne.
+  - **L'historique** (`/dossiers/[id]/pieces/[pieceId]/versions`) est en lecture seule. Il donne, pour chaque version, la date, le fichier et ce qu'il en est advenu : écartée, contrôle en cours, lue, relue, fichier purgé. La version courante est marquée. L'état vide dit quoi faire ; le chargement, l'erreur et l'introuvable sont ceux du groupe `(dossier)`.
+  - **Garde-fou** : `tests/liens-internes.test.ts`. Chaque `href` ou `retour` interne doit correspondre à une page ou une route existante.
+- **R-02, relance automatique (RG-06.13).**
+  - Un envoi coupé, à la préparation hors ligne comme à l'envoi des octets, repart de lui-même une fois avec le même fichier. Il repart au retour du réseau, ou après 5 s si le navigateur se dit en ligne. Un envoi lancé à la main rouvre ce droit.
+  - Le bandeau et la mention distinguent trois cas : hors ligne sans envoi en cours (aucune promesse), envoi en attente de relance, relance échouée (« Réessayer l'envoi »).
+  - Un double envoi n'est pas à craindre : rien n'est écrit avant la confirmation, et l'empreinte est contrôlée (RG-06.2).
+
+**Vérifications.**
+- `smoke:extraction` couvre sur une vraie base :
+  - la décision qui prime, la lecture gardée, la décision non appliquée d'un dossier déposé, et la version remplacée ;
+  - l'historique, y compris le refus d'une pièce d'un autre candidat ;
+  - le signalement : valeur inconnue refusée, deux envois simultanés pour une seule revue, trace au nom du candidat, relecture annoncée, valeur visible en B-05, dossier figé refusé.
+- `tests/relecture-signalement` et `tests/liens-internes` couvrent le domaine. Trois tests existants sont adaptés au nouveau comportement voulu : la mention de coupure, le bouton de signalement, et la relecture du source de l'envoi.
+- `npm run check` (3521 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris.
+- Rejoués sur le banc dans le navigateur, à 390 px pour le candidat et 1 280 px pour l'opérateur :
+  - R-01 : décision « conforme », puis écran conforme avec le message de l'opérateur ;
+  - R-02 : les trois cas de coupure ;
+  - R-03 : signalement, B-05, historique.
+
+  La console n'a montré aucune erreur.
+- Ni l'image ni le déploiement ne changent : pas de fumée d'image.
+
+**Données existantes.** Aucune réécriture. Les décisions B-05 déjà prises s'affichent désormais sur C-08 ; elles l'étaient déjà dans l'alerte et la checklist.
+
+**Ce qui reste, non vérifié.** La vérification en préproduction, et les lignes « non vérifié » de la matrice. Il reste aussi l'avertissement de lint préexistant de `domain/exploitation/purge-stockage.ts` (directive inutile, S.152), laissé hors de ce lot.

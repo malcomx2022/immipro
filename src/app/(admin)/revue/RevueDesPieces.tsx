@@ -189,6 +189,12 @@ export function RevueDesPieces({
               <p className="text-13 text-ink-500">
                 {retenue.dossier} · en attente depuis {libelleAge(retenue, date)}
               </p>
+              {/* S.157 — ce que le candidat désigne comme faux, s'il a signalé. */}
+              {retenue.signalement ? (
+                <p className="text-pretty rounded-md border-l-6 border-accent-500 bg-accent-50 p-3 text-14 text-ink-900">
+                  {retenue.signalement}
+                </p>
+              ) : null}
 
               {apercu ? (
                 apercu.url ? (

@@ -158,7 +158,12 @@ describe("C-07 — téléversement", () => {
     expect(libelleCta("ENVOI")).toBe("Envoi en cours…");
     expect(libelleCta("RESEAU_COUPE")).toBe("Réessayer l'envoi");
     expect(mentionPied("QUOTA_EPUISE")).toBe("Téléversement toujours possible sans analyse");
-    expect(mentionPied("RESEAU_COUPE")).toBe("Envoi automatique dès le retour du réseau");
+    // S.157, R-02 : l'envoi automatique ne se promet que s'il a lieu.
+    expect(mentionPied("RESEAU_COUPE")).toBe("Envoi possible dès le retour du réseau");
+    expect(mentionPied("RESEAU_COUPE", "ENVOI_EN_ATTENTE")).toBe(
+      "Envoi automatique dès le retour du réseau",
+    );
+    expect(mentionPied("RESEAU_COUPE", "RELANCE_ECHOUEE")).toContain("Réessayer l'envoi");
     expect(mentionPied("PRET")).toContain(`${TAILLE_MAXI_MO} Mo maximum`);
   });
 

@@ -66,13 +66,27 @@ export function libelleCta(etat: EtatTeleversement): string {
   }
 }
 
+/**
+ * Ce que l'écran sait d'une coupure — S.157, R-02.
+ *
+ * - `HORS_LIGNE` : le réseau est tombé, aucun envoi n'était en cours ;
+ * - `ENVOI_EN_ATTENTE` : un envoi a été coupé, il repartira de lui-même
+ *   au retour du réseau, une fois ;
+ * - `RELANCE_ECHOUEE` : cette relance a eu lieu sans aboutir.
+ */
+export type Coupure = "HORS_LIGNE" | "ENVOI_EN_ATTENTE" | "RELANCE_ECHOUEE";
+
 /** Mention de pied, par état. Elle dit ce qui reste possible. */
-export function mentionPied(etat: EtatTeleversement): string {
+export function mentionPied(etat: EtatTeleversement, coupure: Coupure = "HORS_LIGNE"): string {
   switch (etat) {
     case "QUOTA_EPUISE":
       return "Téléversement toujours possible sans analyse";
     case "RESEAU_COUPE":
-      return "Envoi automatique dès le retour du réseau";
+      if (coupure === "ENVOI_EN_ATTENTE") return "Envoi automatique dès le retour du réseau";
+      if (coupure === "RELANCE_ECHOUEE") {
+        return "Appuie sur « Réessayer l'envoi » quand le réseau est revenu";
+      }
+      return "Envoi possible dès le retour du réseau";
     default:
       return `Formats acceptés : PDF, JPG, PNG · ${TAILLE_MAXI_MO} Mo maximum`;
   }
@@ -209,3 +223,25 @@ export const CADRAGES: readonly { illustration: string; legende: string }[] = [
   { illustration: "/illustrations/cadrage-incline.svg", legende: "Incliné — à éviter" },
   { illustration: "/illustrations/cadrage-reflet.svg", legende: "Reflet — à éviter" },
 ];
+
+/**
+ * Le bandeau d'une coupure — S.157, R-02. Il promettait « sera envoyé dès
+ * le retour du réseau » dans tous les cas, et rien ne partait : il dit
+ * désormais ce qui va se passer, selon la coupure.
+ */
+export function messageCoupure(coupure: Coupure): string {
+  switch (coupure) {
+    case "ENVOI_EN_ATTENTE":
+      return "Ton fichier est conservé sur ton téléphone et sera envoyé dès le retour du réseau. Ne quitte pas l'application.";
+    case "RELANCE_ECHOUEE":
+      return "Ton fichier est conservé sur ton téléphone, mais l'envoi n'a pas abouti au retour du réseau. Appuie sur « Réessayer l'envoi » quand la connexion est stable.";
+    case "HORS_LIGNE":
+      return "Tu es hors ligne. Ce que tu as choisi reste ici ; tu pourras l'envoyer dès le retour du réseau.";
+  }
+}
+
+/** Relances automatiques après une coupure, par envoi lancé à la main. */
+export const RELANCES_AUTOMATIQUES = 1;
+
+/** Délai avant la relance quand le navigateur se dit déjà en ligne, en ms. */
+export const DELAI_DE_RELANCE_MS = 5000;
