@@ -90,3 +90,36 @@ describe("les scripts shell passent par shellcheck", () => {
     expect(lire("scripts/deployer.sh").startsWith("#!/usr/bin/env bash\n")).toBe(true);
   });
 });
+
+/**
+ * Aucun tirage anonyme sur Docker Hub dans la porte ni à la construction
+ * (S.160, RF-7). Les 8 et 9/10/2026, `toomanyrequests` a fait tomber la
+ * porte avant le premier test, puis le déploiement de S.158. Les images
+ * passent par le miroir de Google, épinglées par empreinte : le miroir ne
+ * peut rien substituer.
+ */
+describe("la porte et la construction ne tirent rien de Docker Hub", () => {
+  const empreinteDuCompose = (nom: string) =>
+    lire("docker-compose.prod.yml").match(new RegExp(`image: ${nom}:\\S+@(sha256:[0-9a-f]{64})`, "u"))?.[1];
+
+  it("le PostgreSQL de la porte vient du miroir, à l'empreinte de la production", () => {
+    const image = lire(".github/workflows/validation.yml").match(/^\s+image: (\S+)$/mu)?.[1];
+    const empreinte = empreinteDuCompose("postgres");
+    expect(empreinte).toBeDefined();
+    // Si Dependabot fait monter le PostgreSQL du compose, la porte doit
+    // suivre : reporter la nouvelle empreinte dans validation.yml.
+    expect(image).toBe(`mirror.gcr.io/library/postgres:16-alpine@${empreinte}`);
+  });
+
+  it("nginx -t tourne dans une image du miroir, épinglée", () => {
+    expect(lire("scripts/verifier-nginx.sh")).toMatch(
+      /NGINX_IMAGE:-mirror\.gcr\.io\/library\/nginx:[\w.-]+@sha256:[0-9a-f]{64}\}/u,
+    );
+  });
+
+  it("BuildKit vient du miroir et résout docker.io par lui", () => {
+    const deploy = lire(".github/workflows/deploy.yml");
+    expect(deploy).toMatch(/driver-opts: image=mirror\.gcr\.io\/moby\/buildkit:/u);
+    expect(deploy).toMatch(/\[registry\."docker\.io"\]\n\s+mirrors = \["mirror\.gcr\.io"\]/u);
+  });
+});

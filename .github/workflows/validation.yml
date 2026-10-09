@@ -33,9 +33,16 @@ jobs:
     # portent, et le worker qui crée ses files pg-boss au démarrage.
     # Le serveur seul est fourni ; chaque script crée et supprime la base
     # jetable dont il a besoin.
+    #
+    # Tirée du miroir de Google, et non de Docker Hub (S.160) : les 8 et
+    # 9/10/2026, Docker Hub a refusé les tirages anonymes des runners
+    # (`toomanyrequests`), et la porte, donc le déploiement, échouait avant
+    # le premier test. L'empreinte est celle de `docker-compose.prod.yml` :
+    # le miroir ne peut rien substituer, et la CI éprouve le PostgreSQL de
+    # la production.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: mirror.gcr.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_USER: immipro
           POSTGRES_PASSWORD: immipro

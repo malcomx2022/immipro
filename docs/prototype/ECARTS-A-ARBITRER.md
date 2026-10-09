@@ -12799,3 +12799,50 @@ Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape
 **Vérifications.** `npm run check` passe ; c'est le vocabulaire interdit qui s'applique aux documents. Aucune fumée n'est concernée : ni le code, ni l'image, ni le déploiement ne changent.
 
 **Correction d'un compte rendu.** Le compte rendu du déploiement de S.155 disait que « les dépôts devraient être rétablis ». R-E01 l'empêche : le dépôt en production reste impossible tant que la règle CORS n'est pas posée.
+
+## S.160 — RF-7 : une porte qui ne dépend plus des tirages anonymes de Docker Hub
+
+**Autorisation et choix.** RF-7 a été lancé le 09/10/2026. Le responsable a choisi de commencer par la fiabilité de la CI. Il avait choisi de livrer ce lot comme un commit séparé dans la PR de S.159. Celle-ci a été fusionnée avant la poussée : le lot part donc dans sa propre PR, depuis main `b29991f`. Le lot ne change ni code applicatif, ni schéma, ni Dockerfile, ni compose de production.
+
+**Constat reproduit.**
+- La porte de S.159 est tombée deux fois avant le premier test. Le service `postgres:16-alpine` ne se tirait pas : délais dépassés, puis `toomanyrequests: You have reached your unauthenticated pull rate limit`.
+- Le déploiement de S.158 (run 37992560351) est tombé de la même façon. Le VPS sert toujours S.157.
+- Depuis la session de développement, Docker Hub répond aussi 429 pour `postgres` et `nginx`.
+- La porte et la construction tiraient quatre images de Docker Hub, anonymement :
+  - le PostgreSQL du service, non épinglé ;
+  - l'image `nginx` de `scripts/verifier-nginx.sh`, non épinglée ;
+  - BuildKit, tiré par `setup-buildx-action` ;
+  - `node:24-alpine`, pour les quatre étages du Dockerfile.
+
+**Livré.**
+- **Les images viennent du miroir de Google (`mirror.gcr.io`), épinglées par empreinte.** Une image tirée par empreinte ne peut pas être substituée par le miroir. Le miroir sert les mêmes empreintes que Docker Hub ; c'est relevé pour les quatre images.
+- **La porte éprouve le PostgreSQL de la production.** Le service prend l'empreinte de `docker-compose.prod.yml`, au lieu de l'étiquette flottante `16-alpine`.
+- **nginx -t** : l'image par défaut de `verifier-nginx.sh` vient du miroir, épinglée. `NGINX_IMAGE` peut toujours la remplacer.
+- **Construction** : BuildKit vient du miroir, et `docker.io` se résout d'abord par le miroir. Si une image y manque, BuildKit retombe sur Docker Hub.
+  - Le Dockerfile ne change pas : ses étages restent `node:24-alpine@sha256:…`, et Dependabot continue de les suivre.
+  - Le miroir ne liste pas les étiquettes ; y porter le Dockerfile aurait aveuglé Dependabot.
+- **Tests** (`tests/workflows.test.ts`) :
+  - le PostgreSQL de la porte vient du miroir, à l'empreinte du compose ;
+  - nginx est épinglé sur le miroir ;
+  - BuildKit et la résolution de `docker.io` passent par le miroir.
+
+  Les trois échouent sur l'ancien code. Si Dependabot fait monter le PostgreSQL du compose, le premier échoue et demande de reporter l'empreinte dans `validation.yml`.
+
+**Vérifications.**
+- Le miroir sert les empreintes attendues :
+  - `postgres` : `721873c3…`, celle du compose ;
+  - `nginx:1.28-alpine` : `a8b39bd9…` ;
+  - `node:24-alpine` : `ebfe2f90…`, celle du Dockerfile ;
+  - `moby/buildkit:buildx-stable-1`.
+
+  Public ECR, première piste, a répondu 429 pour `node` : il n'a pas été retenu.
+- Le PostgreSQL de la porte, tiré du miroir par empreinte, démarre et répond (16.15).
+- `scripts/verifier-nginx.sh` passe avec l'image du miroir.
+- L'image se construit avec un BuildKit configuré comme dans `deploy.yml`, alors que Docker Hub répondait 429 : les étages `docker.io/library/node` ont été résolus par le miroir. Pour cet essai local seulement, le certificat du proxy de sortie de la session est ajouté au Dockerfile ; les lignes `FROM` sont identiques.
+- `smoke:worker -- --image` passe sur cette image.
+- `actionlint`, `shellcheck`, `npm run check` (3 531 tests), `npm run check:audit` et `smoke:worker -- --base`.
+
+**Non vérifié.**
+- Le run réel de la porte et du déploiement sur GitHub : il se verra sur la PR, puis au déploiement qui suivra la fusion.
+- Le VPS tire toujours ses images de Docker Hub (`deployer.sh`, `compose pull`). Elles sont épinglées et déjà présentes. Ce tirage ne se fait qu'une fois par déploiement, depuis l'adresse du VPS, et n'a jamais échoué. Il n'est pas changé : changer la référence d'une image du compose recréerait le conteneur, base comprise.
+- `scripts/restauration-controle.sh` se lance à la main hors du VPS. Il garde `postgres:16-alpine` par défaut, que `IMAGE_POSTGRES` remplace.

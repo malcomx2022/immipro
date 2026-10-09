@@ -9,7 +9,10 @@
 set -euo pipefail
 
 racine="$(cd "$(dirname "$0")/.." && pwd)"
-image="${NGINX_IMAGE:-nginx:1.28-alpine}"
+# L'image officielle, par le miroir de Google et épinglée par empreinte
+# (S.160) : Docker Hub refuse les tirages anonymes des runners au-delà de
+# sa limite, et la porte tombait avant le premier test.
+image="${NGINX_IMAGE:-mirror.gcr.io/library/nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236}"
 travail="$(mktemp -d)"
 trap 'rm -rf "$travail"' EXIT
 
