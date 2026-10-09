@@ -229,3 +229,32 @@ describe("une version qui ne répond pas", () => {
     expect(r.sortie).toMatch(/aucun tag précédent n'est connu/u);
   });
 });
+
+/**
+ * La CLI Prisma de l'image, jamais celle du registre — 09/10/2026.
+ *
+ * `npx prisma` ne regarde pas le PATH : faute de `prisma` dans le
+ * `node_modules` du `standalone`, il téléchargeait l'étiquette `latest`,
+ * ce jour-là `8.0.0-rc.22`, qui ne connaît plus `migrate`. Tous les
+ * déploiements s'arrêtaient à l'étape 2 sur `CLI.UNKNOWN_COMMAND`. Que la
+ * commande atteigne bien la CLI figée se vérifie dans l'image, par
+ * `smoke:worker --image`, qui rejoue les lignes de ce script.
+ */
+describe("la CLI Prisma de l'image", () => {
+  it("le script appelle `prisma` par son nom nu, jamais `npx prisma`", () => {
+    const lignes = readFileSync(SCRIPT, "utf8").split("\n").filter((l) => !/^\s*#/u.test(l));
+    expect(lignes.filter((l) => /\bnpx\b/u.test(l))).toEqual([]);
+    const appelsPrisma = lignes.filter((l) => /\bprisma migrate\b/u.test(l));
+    expect(appelsPrisma).toHaveLength(2);
+    for (const l of appelsPrisma) expect(l).toMatch(/run --rm -T app prisma migrate (status|deploy)\b/u);
+  });
+
+  it("les deux appels partent bien vers le conteneur app", () => {
+    expect(deployer("bbbbbbb").code).toBe(0);
+    const prisma = appels().filter((a) => /prisma/u.test(a));
+    expect(prisma.map((a) => a.replace(/^.* run --rm -T app /u, ""))).toEqual([
+      "prisma migrate status",
+      "prisma migrate deploy",
+    ]);
+  });
+});

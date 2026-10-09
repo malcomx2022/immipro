@@ -15,7 +15,8 @@
 #   1. tirer l'image — un tag absent arrête tout ici, rien n'a bougé ;
 #   2. si une migration attend, sauvegarder la base, chiffrée, dans
 #      `sauvegardes/avant-<tag>.dump.gpg` ; sans destinataire GPG, arrêt ;
-#   3. `prisma migrate deploy`, depuis la nouvelle image ;
+#   3. `prisma migrate deploy`, depuis la nouvelle image, avec **sa** CLI :
+#      `prisma`, jamais `npx prisma` (voir l'étape 2) ;
 #   4. les garde-fous SQL, depuis la nouvelle image : une migration qui
 #      passe sans porter ses contraintes arrête le déploiement avant la
 #      bascule ;
@@ -102,9 +103,18 @@ compose "$COMPOSE_NOUVEAU" "$TAG_NOUVEAU" pull --quiet ||
   echouer "l'image $TAG_NOUVEAU n'a pas pu être tirée ; rien n'a changé."
 
 # ── 2. Sauvegarder, si une migration attend ─────────────────────────
+#
+# La CLI Prisma s'appelle `prisma`, nom nu : c'est celle de l'image, à la
+# version du verrou (`/opt/prisma-cli`, M15), trouvée par le PATH.
+# `npx prisma` ne la regarde pas : l'application `standalone` n'a pas de
+# `prisma` dans son `node_modules`, et npx télécharge alors l'étiquette
+# `latest` du registre. Le 09/10/2026, c'était `8.0.0-rc.22`, qui ne
+# connaît plus `migrate` : tous les déploiements s'arrêtaient ici sur
+# `CLI.UNKNOWN_COMMAND`. Renommer la commande en `migration` aurait fait
+# migrer la production avec une préversion, contre un schéma Prisma 6.
 JOURNAL_STATUT=$(mktemp)
 trap 'rm -f "$JOURNAL_STATUT"' EXIT
-if compose "$COMPOSE_NOUVEAU" "$TAG_NOUVEAU" run --rm -T app npx prisma migrate status >"$JOURNAL_STATUT" 2>&1; then
+if compose "$COMPOSE_NOUVEAU" "$TAG_NOUVEAU" run --rm -T app prisma migrate status >"$JOURNAL_STATUT" 2>&1; then
   dire "aucune migration en attente"
 elif grep -q "not yet been applied" "$JOURNAL_STATUT"; then
   dire "une migration attend : sauvegarde préalable"
@@ -137,7 +147,7 @@ else
 fi
 
 # ── 3. Migrer, 4. vérifier les garde-fous — depuis la nouvelle image ─
-compose "$COMPOSE_NOUVEAU" "$TAG_NOUVEAU" run --rm -T app npx prisma migrate deploy ||
+compose "$COMPOSE_NOUVEAU" "$TAG_NOUVEAU" run --rm -T app prisma migrate deploy ||
   echouer "la migration a échoué ; la version $TAG_PRECEDENT tourne toujours. La base peut être partiellement migrée : voir docs/exploitation/deploiement.md."
 compose "$COMPOSE_NOUVEAU" "$TAG_NOUVEAU" run --rm -T app node dist/verifier-garde-fous.mjs ||
   echouer "les garde-fous ne tiennent pas sur la base migrée ; la version $TAG_PRECEDENT tourne toujours, la bascule n'a pas eu lieu."
