@@ -7,6 +7,7 @@ import { leConsultant, type Consultant } from "@/server/paiement/consultation";
 import { libererLesTenuesEchues } from "@/server/acces/consultations";
 import { emettreLesPiecesEnSouffrance } from "@/server/facturation/emission";
 import { reprendreLesRecus } from "@/server/paiement/recu";
+import { reprendreLesAvisDeTrancheNulle } from "@/server/paiement/avis-de-revue";
 
 /**
  * Réconciliation des paiements — RG-05.4.
@@ -66,6 +67,8 @@ export interface Bilan {
   remboursementsRattrapes: number;
   /** Reçus restés en attente et partis à cette passe — F3. */
   recusRepris: number;
+  /** Avis de tranche à zéro repris par la passe — S.154. */
+  avisRepris: number;
   /**
    * Factures et avoirs émis après coup : une vente confirmée sans facture,
    * un remboursement sans avoir (M.C, 04/10/2026).
@@ -107,6 +110,7 @@ export async function reconcilierLesPaiements(
     creditsAcheves: await acheverLesCreditsEnSouffrance(),
     remboursementsRattrapes: 0,
     recusRepris: 0,
+    avisRepris: 0,
     tenuesLiberees: await libererLesTenuesEchues(maintenant),
     piecesEmises: 0,
     indisponibles: 0,
@@ -250,6 +254,8 @@ export async function reconcilierLesPaiements(
   // celle-ci reprend ce que les notifications n'ont pas pu émettre.
   bilan.remboursementsRattrapes = await rattraperLesRemboursements(consultantDe).catch(() => 0);
   bilan.recusRepris = await reprendreLesRecus(maintenant).catch(() => 0);
+  // Les avis d'une tranche à zéro suivent le même chemin (S.154).
+  bilan.avisRepris = await reprendreLesAvisDeTrancheNulle(maintenant).catch(() => 0);
   bilan.piecesEmises = await emettreLesPiecesEnSouffrance().catch(() => 0);
   return bilan;
 }

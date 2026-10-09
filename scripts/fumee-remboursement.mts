@@ -68,6 +68,8 @@ if (migration.status !== 0) {
 }
 
 const { db } = await import("../src/lib/db");
+const { brancherTransport } = await import("../src/server/courrier");
+const { reprendreLesAvisDeTrancheNulle } = await import("../src/server/paiement/avis-de-revue");
 
 /**
  * Ce que le fournisseur annonce avoir encaissé : le montant décidé par la
@@ -761,6 +763,14 @@ try {
       // b. Zéro : l'obligation se referme, le candidat garde ses analyses.
       const b = await candidatPaye({ analyses: 30, consommees: 1, depose: true });
       await initierLeRemboursement(b.transaction.reference, rembourseurSimule([acceptee()]));
+      // Le courrier qui part, capturé ; le premier envoi échoue, la passe le reprend (S.154).
+      const partis: { genre: string; objet: string; corps: string }[] = [];
+      let refuser = true;
+      brancherTransport(async (c) => {
+        if (refuser) return { issue: "injoignable", detail: "relais coupé (fumée)" };
+        partis.push({ genre: c.genre, objet: c.objet, corps: c.corps });
+        return { issue: "envoye" };
+      });
       const zero = await trancher(b.transaction.reference, "0", "Rien à rendre, décision du 08/10", admin.id);
       const refermee = await db.transaction.findUniqueOrThrow({ where: { id: b.transaction.id } });
       verifier(zero.issue === "refermee", `zéro referme la demande (${zero.issue})`);
@@ -774,6 +784,32 @@ try {
         "l'écart garde ce que la dette était et pourquoi elle se referme",
       );
       verifier((await solde(b.application.id)) === 29, "le candidat garde ses 29 analyses");
+
+      // S.154 — le candidat l'apprend : une alerte, et un courriel au même texte.
+      const avis = await db.notification.findMany({
+        where: { userId: b.transaction.userId, dedupKey: { startsWith: "revue-refermee:" } },
+      });
+      verifier(avis.length === 1, `une alerte dans son espace (${avis.length})`);
+      verifier(
+        (avis[0]?.body ?? "").includes(b.transaction.reference) &&
+          (avis[0]?.body ?? "").includes("tes 29 analyses restantes restent disponibles"),
+        `elle nomme l'achat et ce qui lui reste (${avis[0]?.body})`,
+      );
+      verifier(
+        !(avis[0]?.body ?? "").includes("décision du 08/10"),
+        "le motif de l'opérateur reste interne",
+      );
+      verifier(avis[0]?.emailStatus === "EN_ATTENTE", `un premier envoi coupé reste à reprendre (${avis[0]?.emailStatus})`);
+      refuser = false;
+      // Une heure plus tard : la tentative coupée n'est plus « en vol ».
+      const plusTard = new Date(Date.now() + 60 * 60_000);
+      verifier((await reprendreLesAvisDeTrancheNulle(plusTard)) === 1, "la passe de rapprochement le reprend");
+      verifier(
+        partis.length === 1 && partis[0]!.genre === "remboursement_tranche_nulle" && partis[0]!.corps.startsWith(avis[0]!.body),
+        "le courriel dit la même chose que l'alerte",
+      );
+      verifier((await reprendreLesAvisDeTrancheNulle(plusTard)) === 0, "et ne part qu'une fois");
+      brancherTransport(null);
       const apresZero = await initierLeRemboursement(b.transaction.reference, rembourseurSimule([acceptee()]));
       verifier(apresZero.issue === "sans_objet", `plus rien ne part (${apresZero.issue})`);
 

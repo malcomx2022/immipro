@@ -741,7 +741,8 @@ export function lireLeMontantTranche(
 /** Ce que la tranche va faire, dit avant le clic. */
 export function suiteDeLaTranche(montantMineur: number, payeMineur: number, devise: string): string {
   if (montantMineur === 0) {
-    return "Aucune somme ne part : la demande de remboursement se referme, et le candidat garde ses analyses restantes.";
+    // S.154 : le candidat en est prévenu, par un message fixe ; le motif saisi reste interne.
+    return "Aucune somme ne part : la demande de remboursement se referme, et le candidat garde ses analyses restantes. Il en est prévenu par une alerte et un courriel au texte fixe ; le motif saisi reste interne.";
   }
   return `La demande part chez le fournisseur pour ${formatMineur(montantMineur, devise)} sur ${formatMineur(payeMineur, devise)} payés, et les analyses restantes du pack sont retirées de chaque dossier qu'il sert.`;
 }

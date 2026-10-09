@@ -12561,3 +12561,33 @@ Le lot part de main `dcc034f`.
 **Données existantes.** Les débits de rédaction antérieurs restent sans échéance : ils ne sont pas repris. Un débit interrompu avant S.153 ne se distingue pas d'un débit servi, faute de trace. Le remboursement d'une montée continue de lire les débits de rédaction comme « rédaction utilisée », ce qui est prudent.
 
 **Ce qui reste de RF-4.** Les obligations en revue manuelle (B-04) et le message au candidat pour une tranche nulle, qui demandent une décision. S'y ajoutent les contrôles d'exploitation **non vérifiés** de S.149 à S.152.
+
+## S.154 — RF-4, B-04 : une tranche à zéro se dit au candidat
+
+**Autorisation et choix.** RF-4, autorisé par le responsable le 09/10/2026 ; étape 6 du chantier (« vérifier les obligations en revue manuelle dans B-04 et décider du message au candidat pour une tranche nulle »). Choix du responsable, le 09/10 : un **message fixe**. Le lot part de main `c5396e0`.
+
+**Ce qui manquait.** C'était l'écart 1 de S.128 (M4) : « une tranche à zéro n'envoie aucun message au candidat ». L'obligation se refermait, le candidat gardait ses analyses (D-11), mais sa demande restait sans réponse. Seuls l'écart et le journal en gardaient la trace.
+
+**Reproduction sur l'ancien code.** Avec `paiements.ts` remis à l'état de main, `smoke:remboursement` échoue sur 5 vérifications : aucune alerte, aucun courriel, rien à reprendre.
+
+**Ce qui est livré.**
+- **Le texte**, dans le domaine (`domain/paiement/tranche-nulle.ts`) : « Ta demande de remboursement pour « <achat> » (référence …) a été examinée. Aucun montant n'est remboursé : tes N analyses restantes restent disponibles sur ton dossier. Pour une question sur cette décision, écris-nous depuis la page Contact. »
+  - Il s'accorde au nombre d'analyses et au Pro, qui sert plusieurs dossiers.
+  - Le motif de l'opérateur n'est pas lu : il reste interne, au journal et sur l'écart.
+- **Le chemin, celui du reçu (F3)** (`server/paiement/avis-de-revue.ts`) :
+  - une alerte `PAIEMENT` à clé unique, une par obligation refermée ;
+  - un courriel `EN_ATTENTE`, dont la première tentative part tout de suite ;
+  - la passe de rapprochement reprend un courriel qui n'est pas parti (`avisRepris`) ;
+  - un compte sur le départ ne reçoit pas de courrier ;
+  - la tranche ne dépend jamais de l'envoi.
+- **B-04 le dit avant le clic** (`suiteDeLaTranche`) : le candidat en est prévenu par un message fixe, et le motif saisi reste interne. Le traitement proposé pour le constat M4 du diagnostic le dit aussi.
+- **DOC-11 :** RG-15.4.
+
+**Vérifications.**
+- `smoke:remboursement` : une alerte qui nomme l'achat et les 29 analyses restantes, sans le motif ; un premier envoi coupé reste en attente ; la passe le reprend ; le courriel dit la même chose que l'alerte ; il ne part qu'une fois.
+- `tests/tranche-nulle` : le texte, ses accords, le vocabulaire interdit (les deux portées), la clé par obligation, le branchement après la transaction, la reprise.
+- `npm run check` (3505 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris. Ni le paquet de l'image ni le déploiement ne changent : pas de fumée d'image.
+
+**Ce qui reste, non vérifié.** Lister en production les dettes déjà bloquées en revue (constat M4 du diagnostic, S.149) et les trancher en B-04. Une dette tranchée à zéro avant S.154 n'a pas été dite au candidat. Le lui dire relève du support, au cas par cas : rien ne réécrit une décision passée.
+
+**RF-4.** Avec ce lot, toutes les étapes sont proposées : diagnostics (S.149), supervision E6 (S.150), inventaire (S.151), purges (S.152), réservations de rédaction (S.153), B-04 (S.154). Leurs contrôles d'exploitation restent **non vérifiés**.
