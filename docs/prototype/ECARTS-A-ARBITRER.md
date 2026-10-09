@@ -12519,3 +12519,45 @@ Le lot part de main `dcc034f`.
 - Éprouver `purge-retention` sur une restauration isolée réelle (E10) : **non vérifié**.
 - La reprise des réservations de la rédaction assistée (S.148).
 - Les obligations en revue manuelle (B-04).
+
+## S.153 — RF-4, la réservation de la rédaction assistée
+
+**Autorisation.** RF-4, autorisé par le responsable le 09/10/2026. C'est le reliquat que S.148 avait examiné et laissé ouvert : « rendre une réservation restée ouverte après un délai relève d'un lot suivant ». Le lot part de main `e1d08b1`.
+
+**Choix appliqué sans nouvelle question.** Une rédaction qui n'a rien produit est rendue au candidat, comme une lecture devenue obsolète (A-2, S.147). Le délai est fixé à trente minutes, soit dix fois la durée maximale d'un appel (`DELAI_REDACTION_MS`, 3 min). La reprise ne peut donc pas rendre une requête qui tourne encore.
+
+**Ce qui manquait.** La mise en forme et la relecture débitent avant l'appel au modèle (INV-6), dans une requête synchrone, sans file ni rejeu. Un échec d'appel ou un texte écarté était déjà rendu. Une interruption du processus ne l'était pas : le débit restait, sans texte ni avis, et le candidat qui relançait payait de nouveau.
+
+**Reproduction sur l'ancien code.** Sur une base jetable, une mise en forme interrompue après son débit fait passer le solde de 3 à 2. Rien ne la reprend.
+
+**Ce qui est livré.**
+- **Migration additive** `20261009200000_reservation_de_redaction` : `AnalysisCredit.reservedUntil` et son index. Les lignes antérieures restent nulles : elles ne sont ni réécrites ni reprises.
+- **Le débit** d'une mise en forme ou d'une relecture porte l'échéance de sa réservation, posée avant l'appel (`domain/redaction/reservation.ts`).
+- **L'issue solde la réservation** (`solderLaReservationDeRedaction`), dans la même transaction qu'elle :
+  - pour une mise en forme, avec la création de la version ;
+  - pour une relecture, avec l'avis daté.
+
+  Le débit nomme alors la version produite ou relue.
+- **Les échecs** (appel sans texte, formulation refusée) rendent la réservation de ce débit-là (`rendreLaReservationDeRedaction`), sous le verrou du grand livre, et une seule fois.
+- **La reprise horaire** (`rendreLesReservationsDeRedactionEchues`, passe `REPRISE_QUARANTAINE`) rend les réservations échues sans issue. Sa note commence par « Rédaction assistée », ce qui l'écarte du constat E5 du diagnostic.
+- **La réservation de lecture** (RF-3) ignore les débits de rédaction, qui nomment désormais une version sans analyse à lier.
+- **DOC-11 :** RG-08.7.
+
+**Vérifications.**
+- `smoke:redaction` :
+  - une interruption laisse un débit ;
+  - avant l'échéance, rien n'est rendu ;
+  - après l'échéance, le débit est rendu une seule fois, avec sa note, et le solde est retrouvé ;
+  - une mise en forme aboutie est soldée avec sa version et jamais rendue ;
+  - une lecture de cette version ne reprend pas le débit de la rédaction ;
+  - un texte écarté est rendu une fois, pas deux.
+- `tests/reservation-de-redaction` : la règle, l'ordre débit-appel, le solde dans la transaction de l'issue, les écritures conditionnelles, la passe horaire, la migration additive.
+- `tests/redaction-versions` : adapté sans relâcher (le rendu passe par la réservation du débit).
+- `npm run check` (3499 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:migrations` et `smoke:worker -- --base` compris.
+- `smoke:worker --image` passe sur une image construite en local (25 vérifications), migration `reservation_de_redaction` comprise. La première construction avait manqué de place disque, puis s'était heurtée à la limite de Docker Hub (429). Elle a abouti au deuxième essai.
+
+**Limite dite.** Si l'issue arrive après l'échéance, déjà rendue par la reprise, le texte est livré quand même. Il faudrait pour cela plusieurs appels entiers, ce qui n'est pas réaliste. Le candidat ne perd pas ce qu'il a obtenu.
+
+**Données existantes.** Les débits de rédaction antérieurs restent sans échéance : ils ne sont pas repris. Un débit interrompu avant S.153 ne se distingue pas d'un débit servi, faute de trace. Le remboursement d'une montée continue de lire les débits de rédaction comme « rédaction utilisée », ce qui est prudent.
+
+**Ce qui reste de RF-4.** Les obligations en revue manuelle (B-04) et le message au candidat pour une tranche nulle, qui demandent une décision. S'y ajoutent les contrôles d'exploitation **non vérifiés** de S.149 à S.152.

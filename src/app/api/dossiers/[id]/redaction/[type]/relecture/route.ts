@@ -3,7 +3,12 @@ import { MOTIF_FORMULATION_REFUSEE, refusDesRemarques } from "@/domain/redaction
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
-import { debiterUneAnalyse, rendreUneTentative } from "@/server/acces/quota";
+import {
+  debiterUneAnalyse,
+  rendreLaReservationDeRedaction,
+  solderLaReservationDeRedaction,
+} from "@/server/acces/quota";
+import { echeanceDeLaReservation } from "@/domain/redaction/reservation";
 import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
 import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
@@ -87,9 +92,12 @@ export const POST = route({
       return { relue: false, disponible: false, remarques: null };
     }
 
-    // INV-6 — le débit précède l'appel, comme partout ailleurs.
+    // INV-6 — le débit précède l'appel, comme partout ailleurs. Sa
+    // réservation porte une échéance (S.153) : une interruption avant
+    // l'avis daté est rendue par la reprise horaire.
     const debit = await debiterUneAnalyse(params.id!, undefined, {
       note: `${NOTE_REDACTION_ASSISTEE} — Relecture (${piece.type})`,
+      reserveJusquA: echeanceDeLaReservation(new Date()),
     });
 
     const reponses = await reponsesDeLEntretien(piece.documentId);
@@ -127,10 +135,10 @@ export const POST = route({
         ce lot — une relecture qui n'a pas abouti ne doit pas se lire
         comme une relecture sans remarque.
       */
-      await rendreUneTentative(
+      await rendreLaReservationDeRedaction(
         params.id!,
+        debit.ligne,
         `Relecture non aboutie (${avis.cause}) : aucun avis rendu`,
-        debit.octroi,
       );
       console.warn(`[relecture] ${MOTIF_DAPPEL[avis.cause]} — ${avis.detail}`);
       return { relue: false, disponible: true, remarques: null };
@@ -144,7 +152,7 @@ export const POST = route({
     */
     const faute = refusDesRemarques(avis.remarques);
     if (faute) {
-      await rendreUneTentative(params.id!, "Relecture écartée : formulation refusée", debit.octroi);
+      await rendreLaReservationDeRedaction(params.id!, debit.ligne, "Relecture écartée : formulation refusée");
       console.warn(`[relecture] relecture écartée — ${faute.code} « ${faute.extrait} »`);
       return { relue: false, disponible: true, remarques: null, motif: MOTIF_FORMULATION_REFUSEE };
     }
@@ -173,6 +181,8 @@ export const POST = route({
         where: { id: derniere.id },
         data: { critiquedAt: new Date() },
       }),
+      // Et le solde de la réservation, qui nomme la version relue (S.153).
+      solderLaReservationDeRedaction(db, debit.ligne, derniere.id),
     ]);
 
     return { relue: true, disponible: true, remarques: avis.remarques.length };

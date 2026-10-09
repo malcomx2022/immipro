@@ -318,7 +318,8 @@ describe("la route des versions ne fait pas payer une absence", () => {
   it("contrôle le texte avant de le rendre, et rend l'analyse s'il est écarté", () => {
     const controle = miseEnForme.indexOf("refusDuTexteRedige(produit.texte)");
     expect(controle).toBeGreaterThan(miseEnForme.indexOf("await redacteur("));
-    expect(miseEnForme.slice(controle)).toMatch(/rendreUneTentative\([\s\S]*?formulation refusée/u);
+    // Depuis S.153, le rendu solde la réservation de ce débit-là, et elle seule.
+    expect(miseEnForme.slice(controle)).toMatch(/rendreLaReservationDeRedaction\([\s\S]*?debit\.ligne[\s\S]*?formulation refusée/u);
   });
 
   /**
