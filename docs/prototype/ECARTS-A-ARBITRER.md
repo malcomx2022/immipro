@@ -12410,3 +12410,35 @@ Un écart est un débit sans résultat, ou un résultat sans débit. Il se trait
 - L'inventaire du stockage (E4).
 - La reprise des réservations de la rédaction assistée (S.148).
 - Les obligations en revue manuelle (B-04).
+
+## S.151 — RF-4, inventaire du stockage (E4), en lecture seule
+
+**Autorisation.** RF-4, autorisé par le responsable le 09/10/2026 ; étape 3 du chantier (« faire valider l'inventaire d'objets avant toute purge ; exiger une appartenance démontrée, un contrôle de rétention et une exécution limitée au périmètre identifié »). Le lot part de main `2f2dfb8`. Aucun choix ouvert.
+
+**Ce qui manquait.** S.125 a fait purger les deux zones, mais rien ne retrouvait ce qui était parti avant. Ce sont des objets qui n'ont plus de clé en base : une pièce jamais sortie de quarantaine, le double d'une promotion interrompue, un dépôt présigné jamais confirmé. La purge part des versions : elle ne les voit pas.
+
+**Reproduction.** `smoke:purge` pose un objet sans version sous un dossier échu, puis lance la purge du jour. Le dossier se déclare purgé, et l'objet reste dans le stockage sans que rien en base ne le désigne. Seul l'inventaire le retrouve, sous un dossier purgé.
+
+**Ce qui est livré.** Une commande lancée depuis l'image : `node dist/inventaire-stockage.mjs [--limite N] [--json]` (`npm run stockage:inventaire` en local ; mode d'emploi dans `docs/exploitation/inventaire-stockage.md`).
+- **Les classes** (`domain/exploitation/inventaire-stockage.ts`, pur) : `RATTACHE`, `DEPOT_EN_COURS` (moins de 24 h), `DOUBLON`, `APRES_PURGE`, `DOSSIER_ECHU`, `DOSSIER_VIVANT`, `DOSSIER_INCONNU`, `HORS_SCHEMA`, et l'inverse, `MANQUANT` (une version dont l'objet est absent de sa zone). Chacune dit sa règle, son responsable et le traitement proposé.
+- **L'appartenance** se démontre par le premier segment de la clé, `dossiers/<dossier>/`, sous lequel seul le serveur signe. Un dossier inconnu ou une clé hors schéma ne sont jamais candidats.
+- **La rétention** se lit sur le dossier : purgé, échu ou conservé.
+- **Le périmètre candidat** (`APRES_PURGE`, `DOSSIER_ECHU`) est donné avec son empreinte, SHA-256 des lignes `ZONE clé` triées. C'est elle que la validation retient.
+- `listerLaZone` (`lib/storage.ts`) liste une zone par pages ; c'est le seul accès au stockage de l'inventaire.
+
+**Lecture seule, prouvée deux fois.**
+- `tests/inventaire-stockage` : le serveur de l'inventaire n'écrit pas en base, et n'importe du stockage que la liste ; la liste ne supprime, ne copie ni ne signe rien.
+- `smoke:purge` : chaque classe sur un stockage et une base réels ; les objets des deux zones et les lignes de quatre tables restent identiques ; l'empreinte ne dépend pas de la limite d'affichage ; aucun courriel en sortie.
+
+**Vérifications.**
+- `npm run check` (3477 tests), `npm run build`, `npm run check:audit` et les 25 fumées passent, `smoke:worker -- --base` compris.
+- `smoke:worker --image` passe sur une image construite en local. Au premier passage, elle a échoué : dans l'image, le paquet tombait au chargement (`Dynamic require of "stream"`), car les dépendances CJS de `minio` ont besoin de `require` dans un paquet ESM. La bannière `createRequire` corrige, comme pour `verifier-garde-fous`, et `tests/inventaire-stockage` la vérifie.
+- Contre un vrai Garage v2.4.1 (l'image de production, nœud jetable en IPv4), la commande de l'image a listé 1 205 objets en quarantaine, au-delà d'une page de 1 000, et 3 en confiance. Elle les a classés `DOSSIER_INCONNU` et `HORS_SCHEMA`, avec un périmètre vide et rien de supprimé.
+
+**Ce que la commande ne fait pas.** Elle ne lit aucun octet, ne supprime rien et ne corrige aucune clé en base. Les sauvegardes (E10) contiennent aussi ces objets : relancer l'inventaire après toute restauration.
+
+**Ce qui reste de RF-4.**
+- Lancer l'inventaire et le diagnostic (S.149) sur la production ; faire valider le périmètre et noter son empreinte. Tant que ce n'est pas fait : **non vérifié**.
+- La commande de purge exécutable dans l'image : limitée au périmètre validé, refusant une autre empreinte, éprouvée sur une restauration isolée ; la purge par préfixe de dossier (E4, étape 3).
+- La reprise des réservations de la rédaction assistée (S.148).
+- Les obligations en revue manuelle (B-04).

@@ -299,6 +299,22 @@ if (!argImage) {
       `exploitation · « node dist/diagnostic-donnees.mjs » démarre dans l'image (${/Le diagnostic n'a pas abouti/u.test(sortie) ? "base absente, attendu" : sortie.trim().split("\n").at(-1)})`,
     );
   }
+  /*
+    L'inventaire du stockage (RF-4, S.151) aussi : sans stockage configuré,
+    il le dit et s'arrête, sans rien avoir supprimé.
+  */
+  {
+    const r = spawnSync(
+      "docker",
+      ["run", "--rm", "--network", "none", "-e", `DATABASE_URL=${URL_SANS_BASE}`, "--entrypoint", "node", tag, "dist/inventaire-stockage.mjs"],
+      { encoding: "utf8", timeout: 120_000 },
+    );
+    const sortie = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    verifier(
+      /L'inventaire n'a pas abouti/u.test(sortie) && !/Cannot find module/u.test(sortie),
+      `exploitation · « node dist/inventaire-stockage.mjs » démarre dans l'image (${/L'inventaire n'a pas abouti/u.test(sortie) ? "stockage absent, attendu" : sortie.trim().split("\n").at(-1)})`,
+    );
+  }
   const sonde = (commande) =>
     spawnSync("docker", ["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-c", commande], {
       encoding: "utf8",

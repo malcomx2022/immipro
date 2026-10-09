@@ -44,6 +44,7 @@
     "smoke:diagnostic": "tsx scripts/fumee-diagnostic.mts",
     "paiement:diagnostic": "tsx scripts/diagnostic-paiement.mts",
     "donnees:diagnostic": "tsx scripts/diagnostic-donnees.mts",
+    "stockage:inventaire": "tsx scripts/inventaire-stockage.mts",
     "smoke:graine": "node scripts/fumee-graine.mjs",
     "smoke:purge": "tsx scripts/fumee-purge.mts",
     "smoke:conservation": "tsx scripts/fumee-conservation.mts",

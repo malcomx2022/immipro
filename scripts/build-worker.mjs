@@ -225,6 +225,36 @@ const octetsDiagnosticDonnees =
 console.log(`dist/diagnostic-donnees.mjs — ${(octetsDiagnosticDonnees / 1024).toFixed(0)} Kio`);
 
 /*
+  L'inventaire du stockage (RF-4, S.151, revue E4), même image et même
+  méthode. Il liste les deux zones et ne supprime rien :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/inventaire-stockage.mjs
+*/
+const inventaireStockage = await build({
+  entryPoints: ["scripts/inventaire-stockage.mts"],
+  outfile: "dist/inventaire-stockage.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node24",
+  format: "esm",
+  // `minio` tire des modules CJS (`readable-stream`, `block-stream2`) qui
+  // font `require("stream")` : sans ce `require`, le paquet tombe au
+  // chargement dans l'image — `smoke:worker --image` l'a dit (S.151).
+  banner: {
+    js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
+  },
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsInventaire =
+  Object.values(inventaireStockage.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/inventaire-stockage.mjs — ${(octetsInventaire / 1024).toFixed(0)} Kio`);
+
+/*
   La graine éditoriale (S.120), même image et même méthode : le guide Pays-Bas
   et l'article de départ, que `npm run seed:editorial` chargeait sans pouvoir
   tourner dans l'image.
