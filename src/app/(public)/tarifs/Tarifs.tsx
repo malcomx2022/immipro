@@ -159,14 +159,16 @@ function CartePack({
       }`}
     >
       {/* Le badge passe à la ligne plutôt que d'écraser le sous-titre :
-          la colonne ne fait que 260 px sur la grille de quatre. */}
+          la colonne ne fait que 260 px sur la grille de quatre. Il peut
+          aussi replier son texte : c'est une phrase, et en `flex-none` elle
+          élargissait la page à 436 px sur un écran de 390 (R-E02, S.162). */}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h2 className="text-19 font-semibold text-ink-900">{libelle}</h2>
           <p className="text-14 text-ink-500">{SOUS_TITRES[code]}</p>
         </div>
         {misEnAvant && justification ? (
-          <span className="flex-none rounded-full bg-accent-50 px-2.5 py-1 text-13 font-medium text-accent-700">
+          <span className="max-w-full rounded-full bg-accent-50 px-2.5 py-1 text-13 font-medium text-accent-700">
             {justification}
           </span>
         ) : null}

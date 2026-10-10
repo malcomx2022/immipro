@@ -374,6 +374,22 @@ describe("P-06 — Tarifs", () => {
     expect(screen.queryByText(/le plus choisi|populaire/i)).toBeNull();
   });
 
+  /*
+    R-E02 (recette du 09/10/2026, S.162) : le badge était `flex-none`. Une
+    phrase qui ne rétrécit pas élargissait la page à 436 px sur un écran de
+    390, mesuré dans un vrai navigateur. jsdom ne mesure rien : on vérifie
+    que rien n'interdit au badge de rétrécir ni de replier son texte.
+  */
+  it("le badge peut se replier : une phrase ne doit pas élargir l'écran", () => {
+    render(<Tarifs />);
+    const justification = PACKS.find((p) => p.misEnAvant)?.justification as string;
+    const classes = screen.getByText(justification).className.split(/\s+/u);
+    for (const interdit of ["flex-none", "shrink-0", "whitespace-nowrap", "truncate"]) {
+      expect(classes, interdit).not.toContain(interdit);
+    }
+    expect(classes).toContain("max-w-full");
+  });
+
   it("dit que les frais versés à l'administration ne passent pas par ImmiPro", () => {
     const { container } = render(<Tarifs />);
     expect(container.textContent).toContain(

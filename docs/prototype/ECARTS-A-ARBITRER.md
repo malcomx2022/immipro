@@ -12891,3 +12891,20 @@ Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape
 **Non vérifié.**
 - Un vrai clamd en chargement sur le VPS : le prochain déploiement qui recrée `clamav`, ou un redémarrage du VPS, le montrera dans le journal du worker (`[sondes] antivirus reconnu après N essai(s)`).
 - La lecture de `docker inspect` contre le Docker du VPS : les tests emploient un faux `docker`.
+
+## S.162 — RF-7 : `/tarifs` ne déborde plus à 390 px (R-E02)
+
+**Autorisation.** Le responsable a choisi ce lot de RF-7 le 10/10/2026. Il corrige l'anomalie R-E02, relevée par la recette de l'instance pilote (S.159). Le lot ne touche ni au domaine, ni aux prix, ni aux textes.
+
+**Reproduit.** Au banc de recette (`npm run recette:banc`), avec Chromium à 390 × 844, `/tarifs` mesure 436 px de large. L'élément qui dépasse est le badge du pack mis en avant (`span.flex-none`, bord droit à 436 px), qui porte « Couvre l'ensemble des pièces exigées pour cette destination ». Les pages `/`, `/simulateur`, `/destinations` et `/comment-ca-marche` mesurent 390 px.
+
+**Livré.** Dans `Tarifs.tsx`, la classe `flex-none` du badge est remplacée par `max-w-full`. Le badge passe déjà à la ligne dans son conteneur `flex-wrap` ; il peut désormais aussi rétrécir et replier sa phrase. Sur la grille de quatre colonnes, il ne sort plus de sa colonne de 260 px.
+
+**Vérifications.**
+- Au banc, après correction : `/tarifs` mesure 390 px à 390 px, et le badge 314 px de large sur deux lignes. À 1 280 px, il mesure 203 px, sur trois lignes, dans sa colonne. Les quatre autres pages restent à 390 px. Captures relues.
+- `tests/ui/p0-public.test.tsx` : rien n'interdit au badge de rétrécir (`flex-none`, `shrink-0`, `whitespace-nowrap`, `truncate`), et il porte `max-w-full`. Ce test échoue sur l'ancien code. jsdom ne mesure aucune largeur : la mesure réelle est celle du banc.
+- `npm run check` (3 545 tests), `npm run check:audit`, `npm run build`. Aucune fumée n'est concernée : ni le worker, ni la base, ni l'image ne changent de comportement.
+
+**Non vérifié.** Le rendu sur `immipro.app` après déploiement : la ligne R-P10 de la matrice reste à relever.
+
+**Remarqué, non traité.** À 1 280 px, le libellé « Commencer gratuitement » passe sur deux lignes dans son bouton, sans débordement. C'est hors du périmètre de R-E02 ; à décider.
