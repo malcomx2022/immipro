@@ -13044,3 +13044,6 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
   Le garde-fou sur `z.unknown()` échoue si l'on retire `.optional()`.
 - `npm run check` : 3 563 tests, 0 erreur de lint. `npm run build` et `npm run check:audit` passent aussi.
 - Les 25 fumées de la porte passent, dans l'ordre de la CI, sur la base locale. Elles comprennent `smoke:worker -- --base` et `smoke:graine`, qui relit le référentiel depuis son paquet. `sandbox:paiement` s'abstient, faute de clés.
+- **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact, sans module manquant.
+
+**Non vérifié.** Le rendu des nouveaux messages dans un écran : l'interface envoie des valeurs déjà valides, et ces messages ne s'y montrent que sur une requête mal formée. Le déploiement sur `immipro.app` reste à relever après la fusion.
