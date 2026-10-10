@@ -20,11 +20,13 @@
 #   4. les garde-fous SQL, depuis la nouvelle image : une migration qui
 #      passe sans porter ses contraintes arrête le déploiement avant la
 #      bascule ;
-#   5. basculer (`up -d`), avec le compose reçu ;
+#   5. basculer (`up -d`), avec le compose reçu, puis attendre, dans une
+#      borne, que l'antivirus soit prêt (S.161) ;
 #   6. sonder : la base doit répondre (`"db":"up"`), le code doit être 200
 #      si l'instance répondait 200 avant — une instance inapte (503 sans
 #      panne) n'est pas une panne —, et le worker doit avoir écrit
-#      « worker démarré » ;
+#      « worker démarré ». Si clamd n'est toujours pas prêt au bout de la
+#      borne, le 200 n'est plus exigé : c'est dit au journal ;
 #   7. en cas d'échec, relancer une fois, sonder encore, puis revenir au tag
 #      et au compose précédents.
 #
@@ -44,6 +46,9 @@ DOSSIER="${IMMIPRO_DOSSIER:-/srv/immipro}"
 SONDE_URL="${IMMIPRO_SONDE_URL:-http://127.0.0.1:3000/api/health}"
 SONDE_ESSAIS="${IMMIPRO_SONDE_ESSAIS:-30}"
 SONDE_PAUSE="${IMMIPRO_SONDE_PAUSE:-2}"
+ANTIVIRUS_ATTENTE="${IMMIPRO_ANTIVIRUS_ATTENTE:-300}"
+ANTIVIRUS_PAUSE="${IMMIPRO_ANTIVIRUS_PAUSE:-5}"
+ANTIVIRUS_EN_ATTENTE=non
 SAUVEGARDES_GARDEES=3
 
 dire() { printf '[deployer] %s\n' "$*"; }
@@ -163,7 +168,7 @@ sonder() {
     # échec.
     journal=$(compose "$COMPOSE_EN_SERVICE" "$2" logs --no-color --since "$depuis" worker 2>/dev/null || true)
     if grep -q '"db":"up"' "$corps" &&
-      { [[ "$SANTE_AVANT" != "200" ]] || [[ "$code" == "200" ]]; } &&
+      { [[ "$SANTE_AVANT" != "200" ]] || [[ "$ANTIVIRUS_EN_ATTENTE" == "oui" ]] || [[ "$code" == "200" ]]; } &&
       [[ "$journal" == *"worker démarré"* ]]; then
       rm -f "$corps"
       return 0
@@ -172,12 +177,67 @@ sonder() {
   done
   rm -f "$corps"
   local attendu='base « up » et worker démarré'
-  [[ "$SANTE_AVANT" == "200" ]] && attendu="$attendu, code 200 comme avant"
+  [[ "$SANTE_AVANT" == "200" && "$ANTIVIRUS_EN_ATTENTE" != "oui" ]] && attendu="$attendu, code 200 comme avant"
   dire "sonde en échec après $SONDE_ESSAIS essais (dernier code : $code ; attendu : $attendu)"
   return 1
 }
 
 maintenant() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# L'état de santé d'un service, tel que Docker le tient : `healthy`,
+# `starting`, `unhealthy`, `sans-sonde`, ou `absent` s'il n'a pas de
+# conteneur.
+sante_du_service() {
+  local id
+  id=$(compose "$COMPOSE_EN_SERVICE" "$1" ps -q "$2" 2>/dev/null | head -n 1 || true)
+  [[ -n "$id" ]] || {
+    echo absent
+    return
+  }
+  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}sans-sonde{{end}}' "$id" 2>/dev/null || echo absent
+}
+
+# Le démarrage à froid de l'antivirus — S.161, constat du 09/10/2026.
+#
+# clamd peut charger ses signatures plusieurs minutes. Avant lui, le worker
+# trouve le moteur muet, et l'instance répond 503 : le 9 octobre, la sonde
+# s'est épuisée là-dessus, et seule une relance à la main l'en a sortie.
+# Le worker réessaie désormais le moteur toutes les 30 s pendant 10 min ;
+# il reste à ne pas décider d'un retour arrière pendant ce chargement.
+#
+# On attend donc, dans une borne, que clamd (`clamav`, image tierce que le
+# déploiement ne change pas) et la passerelle (`antivirus`, notre image)
+# soient `healthy`. Au bout de la borne :
+#
+# - clamd n'est pas prêt : la cause n'est pas la version déployée. Le
+#   déploiement ne revient pas en arrière pour cette seule raison — la
+#   purge et les paiements n'en dépendent pas, les pièces attendent en
+#   quarantaine. La sonde n'exige plus le 200, et c'est écrit au journal ;
+# - clamd est prêt mais pas la passerelle : elle vient de la nouvelle
+#   image, la sonde reste stricte, et le retour arrière reste possible.
+attendre_l_antivirus() {
+  local tag=$1 debut=$SECONDS clamd passerelle
+  while :; do
+    clamd=$(sante_du_service "$tag" clamav)
+    passerelle=$(sante_du_service "$tag" antivirus)
+    if [[ "$clamd" == "absent" && "$passerelle" == "absent" ]]; then
+      dire "aucun antivirus dans ce compose : rien à attendre"
+      return 0
+    fi
+    if [[ "$clamd" =~ ^(healthy|sans-sonde|absent)$ && "$passerelle" =~ ^(healthy|sans-sonde|absent)$ ]]; then
+      dire "antivirus prêt après $((SECONDS - debut)) s (clamd : $clamd ; passerelle : $passerelle)"
+      return 0
+    fi
+    ((SECONDS - debut >= ANTIVIRUS_ATTENTE)) && break
+    sleep "$ANTIVIRUS_PAUSE"
+  done
+  if [[ ! "$clamd" =~ ^(healthy|sans-sonde|absent)$ ]]; then
+    ANTIVIRUS_EN_ATTENTE=oui
+    dire "ATTENTION — clamd n'est pas prêt après $ANTIVIRUS_ATTENTE s (état : $clamd) : signatures en chargement, ou panne de clamd. Le déploiement ne reviendra pas en arrière pour cette seule raison, et la sonde n'exige pas le 200. Le worker réessaie le moteur toutes les 30 s pendant 10 min, puis à l'heure pile. Vérifier : docker compose ps clamav antivirus"
+  else
+    dire "la passerelle antivirus n'est pas prête après $ANTIVIRUS_ATTENTE s (état : $passerelle), clamd l'est : elle vient de la version $tag, la sonde reste stricte"
+  fi
+}
 
 if [[ "$COMPOSE_NOUVEAU" == "$COMPOSE_RECU" ]]; then
   [[ -f "$COMPOSE_EN_SERVICE" ]] && cp -p "$COMPOSE_EN_SERVICE" "$COMPOSE_PRECEDENT"
@@ -189,6 +249,7 @@ fi
 
 DEPUIS=$(maintenant)
 compose "$COMPOSE_EN_SERVICE" "$TAG_NOUVEAU" up -d
+attendre_l_antivirus "$TAG_NOUVEAU"
 if ! sonder "$DEPUIS" "$TAG_NOUVEAU"; then
   dire "relance de app et worker"
   DEPUIS=$(maintenant)
@@ -224,6 +285,8 @@ ecrire_variable() {
 printf '%s\n' "$TAG_NOUVEAU" >.deploiement/tag-courant
 ecrire_variable TAG "$TAG_NOUVEAU"
 ecrire_variable GH_OWNER "$PROPRIETAIRE"
-printf '%s %s depuis %s\n' "$(maintenant)" "$TAG_NOUVEAU" "${TAG_PRECEDENT:-aucun}" >>.deploiement/journal
+RESERVE=""
+[[ "$ANTIVIRUS_EN_ATTENTE" == "oui" ]] && RESERVE=" (antivirus pas encore prêt)"
+printf '%s %s depuis %s%s\n' "$(maintenant)" "$TAG_NOUVEAU" "${TAG_PRECEDENT:-aucun}" "$RESERVE" >>.deploiement/journal
 docker image prune -f >/dev/null
-dire "$TAG_NOUVEAU est en service"
+dire "$TAG_NOUVEAU est en service$RESERVE"

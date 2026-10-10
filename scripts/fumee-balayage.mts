@@ -230,7 +230,9 @@ const { moteurPrisEnDefaut, FRAICHEUR_DU_CONSTAT_MS } = await import(
   "../src/domain/exploitation/constats"
 );
 const { constaterLesDependances } = await import("../src/server/exploitation/capacites");
-const { sonderLesServices } = await import("../src/server/exploitation/sondes");
+const { sonderLesServices, reprendreLeMoteurAuDemarrage } = await import(
+  "../src/server/exploitation/sondes"
+);
 const { exigerUnDepotConforme } = await import("../src/server/acces/pieces");
 const { reprendreLesAnalysesEnAttente, analysesEnAttenteDepuis } = await import(
   "../src/server/jobs/quarantaine"
@@ -1069,6 +1071,75 @@ try {
       !moteurPrisEnDefaut((await lireLesConstats()).antivirus),
       "un échec périmé ne ferme plus : une panne réparée n'est pas permanente",
     );
+  }
+
+  console.log("\nUn worker démarré avant clamd (S.161, constat du 09/10/2026)");
+  {
+    /*
+      La passerelle répond 503 tant que clamd charge ses signatures. Le
+      worker démarre, trouve le moteur muet, et l'instance devient inapte.
+    */
+    const capaciteDuMoteur = async () =>
+      constaterLesDependances(process.env, await lireLesConstats()).find((c) => c.cle === "antivirus")
+        ?.capacite;
+    reponseDuMoteur = { statut: 503, corps: '{"error":"clamd injoignable"}' };
+    const demarrage = await sonderLesServices();
+    verifier(demarrage.antivirus === "muet", `au démarrage, le moteur est muet (${demarrage.antivirus})`);
+    verifier((await capaciteDuMoteur()) === "EN_PANNE", "et le balayage se lit en panne : l'instance est inapte");
+
+    // clamd arrive. Sans nouvel essai, rien ne relit le moteur : c'était
+    // le défaut, jusqu'à l'heure pile.
+    reponseDuMoteur = {
+      statut: 200,
+      corps: '{"status":"infected","signature":"Eicar-Test-Signature"}',
+    };
+    verifier(
+      (await capaciteDuMoteur()) === "EN_PANNE",
+      "clamd prêt, l'instance reste inapte tant que personne ne réessaie",
+    );
+
+    // Le chemin du worker : la reprise relit le moteur à intervalle court.
+    reponseDuMoteur = { statut: 503, corps: '{"error":"clamd injoignable"}' };
+    let attentes = 0;
+    const reprise = await reprendreLeMoteurAuDemarrage(demarrage.antivirus, {
+      cadence: 20,
+      duree: 2_000,
+      attendre: async (ms) => {
+        attentes += 1;
+        // clamd devient prêt pendant la deuxième attente.
+        if (attentes === 2) {
+          reponseDuMoteur = {
+            statut: 200,
+            corps: '{"status":"infected","signature":"Eicar-Test-Signature"}',
+          };
+        }
+        await new Promise((ok) => setTimeout(ok, ms));
+      },
+      journal: () => {},
+    });
+    verifier(
+      reprise.issue === "reconnu" && reprise.essais === 2,
+      `la reprise reconnaît le moteur au deuxième essai (${reprise.issue}, ${reprise.essais})`,
+    );
+    verifier(
+      (await capaciteDuMoteur()) === "OPERATIONNELLE",
+      "et le constat en base rend le balayage opérationnel, sans relance du worker",
+    );
+
+    // Un moteur qui reste absent : la reprise s'arrête à sa borne.
+    reponseDuMoteur = { statut: 503, corps: '{"error":"clamd injoignable"}' };
+    const borne = await reprendreLeMoteurAuDemarrage("muet", {
+      cadence: 20,
+      duree: 100,
+      journal: () => {},
+    });
+    verifier(
+      // Cinq essais au plus tiennent dans 100 ms à 20 ms d'intervalle ;
+      // chaque essai prend aussi son temps réel, d'où une fourchette.
+      borne.issue === "muet" && borne.essais >= 1 && borne.essais <= 5,
+      `un moteur toujours absent : des essais bornés, puis la main à la passe horaire (${borne.essais})`,
+    );
+    verifier((await capaciteDuMoteur()) === "EN_PANNE", "et le constat le dit toujours");
   }
 
   console.log("\nLa base refuse un constat qu'aucun code ne doit écrire");

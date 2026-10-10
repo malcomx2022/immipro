@@ -20,6 +20,13 @@ const FAUX_DOCKER = `#!/usr/bin/env bash
 etat="$FAUX_ETAT"
 printf 'TAG=%s %s\\n' "\${TAG:-}" "$*" >> "$etat/appels"
 [[ "$1" == "image" ]] && exit 0
+if [[ "$1" == "inspect" ]]; then
+  case "$*" in
+    *id-clamav*) echo "\${FAUX_SANTE_CLAMAV:-healthy}" ;;
+    *id-antivirus*) echo "\${FAUX_SANTE_PASSERELLE:-healthy}" ;;
+  esac
+  exit 0
+fi
 shift # compose
 args=" $* "
 case "$args" in
@@ -36,6 +43,8 @@ case "$args" in
   *" up "*) printf '%s' "$TAG" > "$etat/en-service"; exit 0 ;;
   *" restart "*) exit 0 ;;
   *" logs "*) echo "worker-1  | worker démarré"; exit 0 ;;
+  *" ps -q clamav "*) [[ -n "\${FAUX_SANTE_CLAMAV:-}" ]] && echo id-clamav; exit 0 ;;
+  *" ps -q antivirus "*) [[ -n "\${FAUX_SANTE_PASSERELLE:-}" ]] && echo id-antivirus; exit 0 ;;
 esac
 exit 0
 `;
@@ -51,7 +60,7 @@ if [[ ! -s "$etat/en-service" ]]; then printf '000'; exit 7; fi
 tag=$(<"$etat/en-service")
 if [[ " \${FAUX_TAGS_MALADES:-} " == *" $tag "* ]]; then
   printf '{"status":"indisponible","db":"down"}' > "$sortie"; printf '503'
-elif [[ "\${FAUX_INAPTE:-}" == 1 ]]; then
+elif [[ "\${FAUX_INAPTE:-}" == 1 || " \${FAUX_TAGS_INAPTES:-} " == *" $tag "* ]]; then
   printf '{"status":"indisponible","aptitude":"INAPTE","db":"up"}' > "$sortie"; printf '503'
 else
   printf '{"status":"ok","aptitude":"OPERATIONNELLE","db":"up"}' > "$sortie"; printf '200'
@@ -256,5 +265,64 @@ describe("la CLI Prisma de l'image", () => {
       "prisma migrate status",
       "prisma migrate deploy",
     ]);
+  });
+});
+
+/**
+ * Le démarrage à froid de l'antivirus — S.161, constat du 09/10/2026.
+ *
+ * clamd chargeait encore ses signatures quand la sonde s'est épuisée sur
+ * un 503 ; seule une relance à la main en est sortie. Le script attend
+ * désormais, dans une borne, clamd et la passerelle. Si clamd n'est
+ * toujours pas prêt, ce n'est pas la version déployée qui est en cause :
+ * pas de retour arrière pour cette seule raison, et le journal le dit.
+ */
+describe("l'antivirus au démarrage", () => {
+  const avecAntivirus = (env: Record<string, string>) =>
+    deployer("bbbbbbb", { IMMIPRO_ANTIVIRUS_ATTENTE: "0", IMMIPRO_ANTIVIRUS_PAUSE: "0", ...env });
+
+  it("prêt : il le dit, et la sonde reste celle d'avant", () => {
+    const r = avecAntivirus({ FAUX_SANTE_CLAMAV: "healthy", FAUX_SANTE_PASSERELLE: "healthy" });
+    expect(r.code).toBe(0);
+    expect(r.sortie).toMatch(/antivirus prêt après \d+ s \(clamd : healthy ; passerelle : healthy\)/u);
+    expect(lire(".deploiement/journal")).not.toMatch(/antivirus/u);
+  });
+
+  it("clamd en chargement et l'instance en 503 : pas de retour arrière, et c'est écrit", () => {
+    const r = avecAntivirus({
+      FAUX_SANTE_CLAMAV: "starting",
+      FAUX_SANTE_PASSERELLE: "unhealthy",
+      FAUX_TAGS_INAPTES: "bbbbbbb",
+    });
+    expect(r.code).toBe(0);
+    expect(r.sortie).toMatch(/ATTENTION — clamd n'est pas prêt après 0 s \(état : starting\)/u);
+    expect(r.sortie).toMatch(/bbbbbbb est en service \(antivirus pas encore prêt\)/u);
+    expect(enService()).toBe("bbbbbbb");
+    expect(appels().some((a) => /restart app worker/u.test(a))).toBe(false);
+    expect(lire(".deploiement/journal")).toMatch(/bbbbbbb depuis aaaaaaa \(antivirus pas encore prêt\)/u);
+  });
+
+  it("clamd en chargement n'excuse pas une base muette : retour arrière", () => {
+    const r = avecAntivirus({ FAUX_SANTE_CLAMAV: "starting", FAUX_TAGS_MALADES: "bbbbbbb" });
+    expect(r.code).toBe(1);
+    expect(r.sortie).toMatch(/aaaaaaa est revenue en service/u);
+    expect(enService()).toBe("aaaaaaa");
+  });
+
+  it("clamd prêt mais pas la passerelle de la nouvelle image : la sonde reste stricte", () => {
+    const r = avecAntivirus({
+      FAUX_SANTE_CLAMAV: "healthy",
+      FAUX_SANTE_PASSERELLE: "unhealthy",
+      FAUX_TAGS_INAPTES: "bbbbbbb",
+    });
+    expect(r.code).toBe(1);
+    expect(r.sortie).toMatch(/la passerelle antivirus n'est pas prête .* elle vient de la version bbbbbbb/u);
+    expect(r.sortie).toMatch(/aaaaaaa est revenue en service/u);
+  });
+
+  it("sans antivirus dans le compose, rien n'est attendu", () => {
+    const r = deployer("bbbbbbb");
+    expect(r.code).toBe(0);
+    expect(r.sortie).toMatch(/aucun antivirus dans ce compose : rien à attendre/u);
   });
 });
