@@ -13093,3 +13093,9 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 - `smoke:files` passe du premier coup, toutes vérifications vertes.
 - `tests/bascule-des-files.test.ts` (9 tests) : la règle, le branchement, la fumée dans la porte.
 - `npm run check` : 3 572 tests, 0 erreur de lint. `npm run build` et `npm run check:audit` passent aussi.
+- Les 26 fumées de la porte passent, dans l'ordre de la CI, `smoke:files` comprise. `sandbox:paiement` s'abstient, faute de clés.
+- **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact. `pg-boss-10` n'est pas dans l'image.
+
+**Non vérifié.**
+- La bascule sur la base réelle de production, au premier déploiement : le journal du worker doit écrire `[files] pg-boss 10 → schéma neuf : …` s'il restait des tâches en attente. Rien ne s'écrit s'il n'y en avait aucune.
+- Un retour arrière réel vers l'image d'avant S.166 : il n'est éprouvé que sur la base jetable de `smoke:files`.
