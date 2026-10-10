@@ -13117,6 +13117,13 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 - Les 26 fumées de la porte passent, dans l'ordre de la CI, `smoke:files` comprise. `sandbox:paiement` s'abstient, faute de clés.
 - **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact. `pg-boss-10` n'est pas dans l'image.
 
+**Déploiement, relevé le 10/10/2026.** 9ade7ea (run 532) est en service à 18 h 47, **sans retour arrière** :
+- les trois jobs sont verts, `Montée des files` comprise ;
+- `deployer.sh` a écrit « antivirus prêt après 6 s » puis « 9ade7ea est en service ». Sa sonde exige « worker démarré » : le worker a donc démarré sur pg-boss 11 et sur la base réelle ;
+- `/api/health` répond 200 ;
+- le prévol CORS est inchangé ;
+- à 390 px sur `immipro.app`, 12 constats sur 12 sont conformes, sans erreur de console.
+
 **Non vérifié.**
-- La bascule sur la base réelle de production, au premier déploiement : le journal du worker doit écrire `[files] pg-boss 10 → schéma neuf : …` s'il restait des tâches en attente. Rien ne s'écrit s'il n'y en avait aucune.
+- Le journal du worker (`[files] pg-boss 10 → schéma neuf : …`) : il n'est pas lisible depuis la session. Le responsable le relève avec `docker compose -f docker-compose.prod.yml logs worker | grep '\[files\]'` ; aucune ligne signifie qu'aucune tâche n'attendait.
 - Un retour arrière réel vers l'image d'avant S.166 : il n'est éprouvé que sur la base jetable de `smoke:files`.
