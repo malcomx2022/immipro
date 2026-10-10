@@ -693,7 +693,7 @@ try {
       `le moteur revenu, la passe remet en file (${JSON.stringify(reprise)})`,
     );
 
-    const enFile = await (await getQueue()).getQueueSize(JOBS.BALAYAGE_PIECE);
+    const enFile = (await (await getQueue()).getQueueStats(JOBS.BALAYAGE_PIECE)).queuedCount;
     verifier(enFile >= 1, `et la tâche est bien dans la file (${enFile})`);
 
     /*
@@ -811,7 +811,7 @@ try {
       Number(
         (
           await db.$queryRawUnsafe<{ n: bigint }[]>(
-            `SELECT count(*) AS n FROM pgboss.job WHERE name = $1 AND data->>'versionId' = $2`,
+            `SELECT count(*) AS n FROM taches.job WHERE name = $1 AND data->>'versionId' = $2`,
             JOBS.BALAYAGE_PIECE,
             versionId,
           )
@@ -899,7 +899,7 @@ try {
       Number(
         (
           await db.$queryRawUnsafe<{ n: bigint }[]>(
-            `SELECT count(*) AS n FROM pgboss.job WHERE name = $1 AND data->>'versionId' = $2`,
+            `SELECT count(*) AS n FROM taches.job WHERE name = $1 AND data->>'versionId' = $2`,
             JOBS.BALAYAGE_PIECE,
             versionId,
           )

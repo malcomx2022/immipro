@@ -13046,4 +13046,56 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 - Les 25 fumées de la porte passent, dans l'ordre de la CI, sur la base locale. Elles comprennent `smoke:worker -- --base` et `smoke:graine`, qui relit le référentiel depuis son paquet. `sandbox:paiement` s'abstient, faute de clés.
 - **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact, sans module manquant.
 
-**Non vérifié.** Le rendu des nouveaux messages dans un écran : l'interface envoie des valeurs déjà valides, et ces messages ne s'y montrent que sur une requête mal formée. Le déploiement sur `immipro.app` reste à relever après la fusion.
+**Déploiement, relevé le 10/10/2026.** 065bde4 (run 531) est en service à 16 h 54 :
+- les trois jobs sont verts ;
+- `deployer.sh` a écrit « antivirus prêt après 6 s » puis « 065bde4 est en service » ;
+- `/api/health` répond 200 ;
+- le prévol CORS est inchangé : 200 depuis `https://immipro.app` sur les deux seaux, 403 pour une autre origine ;
+- une requête mal formée sans session reçoit le refus d'accès français (401, « Ta session a expiré »), puisque l'accès est contrôlé avant la validation.
+
+**Non vérifié.** Un message de validation de zod 4 renvoyé par l'instance en ligne. Les seules routes publiques qui valident un corps sont des `POST` (connexion, inscription, mot de passe, webhooks), et les appeler aurait écrit au moins un compteur de limitation. Ces messages restent couverts par les tests et par le banc de comparaison.
+
+## S.166 — RF-7 : pg-boss 11 dans un schéma neuf, avec transfert (M19 étape 5)
+
+**Autorisation.** Le 10/10/2026, le responsable a choisi ce lot de RF-7 (« pg-boss 11 »), étape 5 de M19. Le blocage relevé ci-dessous a ensuite été arbitré par lui : **schéma neuf avec transfert**, plutôt que sans transfert ou que le report. Le lot ne touche ni au domaine métier, ni au schéma Prisma, ni aux drapeaux commerciaux.
+
+**Reproduit : pg-boss 11 ne migre pas une base de pg-boss 10.**
+- Le magasin de migrations de 11.1.2 ne connaît que le pas 25 → 26 ; celui de 11.0.x est vide.
+- Sur une base jetable écrite par pg-boss 10.4.2 (schéma 24), pg-boss 11 applique ce pas à un schéma qui n'en a pas la forme, échoue (`relation "pgboss.job_common" does not exist`) et laisse le schéma en 24.
+- En production, le worker ne démarrerait plus, et `deployer.sh` reviendrait en arrière.
+- La supervision lisait aussi `pgboss.archive`, une table que la version 11 n'a plus.
+
+**Mise en œuvre de l'option retenue.** Le schéma neuf porte un autre nom, et l'ancien n'est pas renommé. Un renommage aurait cassé le retour arrière automatique : l'image précédente (pg-boss 10) aurait redémarré sur un schéma qu'elle ne sait pas lire. Ici, elle retrouve `pgboss` intact.
+
+**Livré.**
+- **`pg-boss` 11.1.2**, dans le schéma `taches` (`src/lib/queue.ts`). Les politiques de reprise des files sont inchangées. Les défauts sont identiques entre 10 et 11 : 2 reprises, sans délai, expiration à 15 min, rétention de 14 jours.
+- **`src/domain/exploitation/bascule-des-files.ts`** : la règle du transfert.
+  - Ce qui attendait (créée, en reprise, prise par un worker arrêté) est reposé dans `taches` **sous le même identifiant**, départ différé, priorité et clé d'unicité compris.
+  - Rien de terminé, échoué ou annulé ne revient.
+- **`src/lib/transfert-des-files.ts`** : le transfert, au démarrage des files, après leur déclaration.
+  - Il s'exécute sous verrou consultatif : web et worker peuvent démarrer ensemble.
+  - Chaque tâche reprise est marquée `cancelled` dans `pgboss`, avec `{"transfereVers": "taches", "par": "S.166"}`. Sans cette marque, un redémarrage reposerait des tâches déjà traitées et effacées, et une analyse refaite coûterait une lecture au candidat.
+  - Le schéma n'est touché que s'il est bien celui de la version 10 (version 24 au plus).
+- **Supervision** (`src/server/exploitation/taches.ts`) : elle lit les échecs de `taches.job`, et ceux de `pgboss.job` et `pgboss.archive` tant que l'ancien schéma existe.
+- **Fumées** : `fumee-balayage` lit `getQueueStats` (`getQueueSize` n'existe plus), et `fumee-balayage` et `fumee-worker` lisent le schéma `taches`.
+- **`npm run smoke:files`** (nouvelle, dans la porte) : la base de départ est écrite par le vrai pg-boss 10.4.2. Le paquet `pg-boss-10` est une dépendance de développement épinglée, réservée à cette fumée. Elle éprouve :
+  - le refus de pg-boss 11 seul, sans modification ;
+  - la reprise de quatre tâches sous le même identifiant, départ différé gardé ;
+  - qu'aucune tâche terminée ou échouée ne revient ;
+  - l'annotation des anciennes copies et les plannings laissés en place ;
+  - deux transferts concurrents qui ne reposent qu'une fois ;
+  - le traitement des tâches reprises par un worker de la version 11 ;
+  - la supervision des deux schémas ;
+  - le retour arrière, où pg-boss 10 redémarre et ne rejoue rien.
+- **Documentation** : `docs/exploitation/deploiement.md`, section « Les files de tâches : deux schémas ».
+
+**Vérifications.**
+- `smoke:files` passe du premier coup, toutes vérifications vertes.
+- `tests/bascule-des-files.test.ts` (9 tests) : la règle, le branchement, la fumée dans la porte.
+- `npm run check` : 3 572 tests, 0 erreur de lint. `npm run build` et `npm run check:audit` passent aussi.
+- Les 26 fumées de la porte passent, dans l'ordre de la CI, `smoke:files` comprise. `sandbox:paiement` s'abstient, faute de clés.
+- **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact. `pg-boss-10` n'est pas dans l'image.
+
+**Non vérifié.**
+- La bascule sur la base réelle de production, au premier déploiement : le journal du worker doit écrire `[files] pg-boss 10 → schéma neuf : …` s'il restait des tâches en attente. Rien ne s'écrit s'il n'y en avait aucune.
+- Un retour arrière réel vers l'image d'avant S.166 : il n'est éprouvé que sur la base jetable de `smoke:files`.
