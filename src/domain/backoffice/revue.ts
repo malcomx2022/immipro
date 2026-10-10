@@ -43,6 +43,8 @@ export interface PieceEnEchec {
   motif: MotifEchec;
   /** Trace technique de la lecture automatique, pour l'opérateur seul. */
   journal: string;
+  /** Débit réel encore à rendre, corroboré par le grand livre ; ni gratuit ni déjà rendu. */
+  analyseDebitee: boolean;
   /**
    * Ce que le candidat désigne comme faux, quand c'est lui qui a ouvert la
    * revue (S.157) ; `null` sinon.

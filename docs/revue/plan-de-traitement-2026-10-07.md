@@ -1521,6 +1521,14 @@ Les horodatages des migrations à venir sont indicatifs : chacune prend la date 
 
 ## 8. Revue fonctionnelle complémentaire du 09/10/2026 — chantier RF
 
+**Complément du 10/10/2026.** La [revue à jour et ses correctifs RC](revue-complementaire-2026-10-10.md)
+part de main 065bde4/S.165 et distingue la PR #267/S.166 en brouillon.
+Elle conserve les corrections Claude Code et ferme localement cinq écarts
+restants sur simulateur, signalement et B-05, dont O-1 à O-3. Les commandes,
+preuves et limites sont dans ce complément ; les préalables humains et
+la recette pilote ne sont pas déclarés levés.
+
+
 La [revue fonctionnelle](revue-fonctionnelle-2026-10-09.md) a été menée sur
 main 3f089c2/S.141. Le lot documentaire RF-0 a ensuite été rapproché de
 main dd2b58f/S.144 : S.142, S.143 et S.144 sont fusionnés (PR #241 à #243).

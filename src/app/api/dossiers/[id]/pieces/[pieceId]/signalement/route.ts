@@ -11,6 +11,7 @@ import { CHAMPS_SIGNALABLES_MAX } from "@/domain/dossiers/signalement";
  * demande ne crée rien de plus et répond la même chose.
  */
 const demande = z.object({
+  analyseId: z.guid(),
   champs: z.array(z.string().min(1).max(120)).max(CHAMPS_SIGNALABLES_MAX),
 });
 
@@ -24,6 +25,7 @@ export const POST = route({
       applicationId: params.id!,
       pieceId: params.pieceId!,
       userId: acteur!.id,
+      analyseId: corps.analyseId,
       champs: corps.champs,
     });
   },

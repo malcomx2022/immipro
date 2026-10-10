@@ -228,3 +228,18 @@ Relevé sur `immipro.app` le 10/10/2026 après le déploiement de ad50d39 :
 - **O-3.** L'état vide de B-05 dit « Les pièces en échec d'analyse
   d'hier ont toutes été traitées » juste après le traitement d'une pièce
   du jour.
+
+## Complément local du 10/10/2026 — RC
+
+O-1, O-2 et O-3 sont corrigées sur la branche RC ; leur relevé initial
+ci-dessus est conservé. [La revue complémentaire](../revue/revue-complementaire-2026-10-10.md)
+porte les scénarios supplémentaires : lecture remplacée avant signalement,
+aperçu/erreur/décision arrivant après changement de pièce, revue gratuite,
+revue payée et drapeau sans débit dans le grand livre.
+
+P-03 est éprouvé dans Chromium sur le banc : 390 et 1 280 px, trois
+procédures pour deux pays, libellés et liens distincts, sans défilement
+horizontal ni erreur JavaScript. B-05 et C-08 ont leurs tests d'interface ;
+le signalement et le quota sont éprouvés sur PostgreSQL jetable, fournisseurs
+simulés. Ces résultats locaux ne modifient aucun statut de la recette
+pilote ni son bloc de signature.

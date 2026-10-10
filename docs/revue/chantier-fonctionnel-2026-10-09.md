@@ -118,7 +118,7 @@ La préparation Q.A/M.C et la collecte des preuves VPS peuvent avancer pendant l
 
 Ces travaux ne remplacent pas les preuves fonctionnelles et ne doivent pas prolonger artificiellement le délai de sortie de la V1.
 
-## 3. Choix à valider
+## 3. Choix historiques et confirmations restantes
 
 | Choix | Recommandation | Impact |
 |---|---|---|
@@ -132,6 +132,25 @@ Ces travaux ne remplacent pas les preuves fonctionnelles et ne doivent pas prolo
 **Tranchés le 09/10/2026 par le responsable, à l'autorisation de RF-1 :** A-1 sur la recommandation (champ retiré en V1) et A-3 sur la recommandation (« conserver » enregistrable à titre historique, « migrer » refusé). A-2 tranché à l'autorisation de RF-2, sur la recommandation : la lecture devenue obsolète est rendue au candidat, ses jetons restant mesurés.
 
 La validation de ce chantier ne remplace pas les avis M.C/Q.A ni les réponses du prestataire. Une décision ouverte ne bloque que le sous-lot qui en dépend.
+
+## 3.1. Revue complémentaire autorisée le 10/10/2026 — RC / S.167
+
+Le responsable demande de prendre en compte les travaux Claude Code
+actuels avant correction. Base relue : main 065bde4/S.165, PR #267/S.166
+encore en brouillon. RF-0 est fusionné ; A-1/A-3 sont déjà tranchés en
+S.146 et A-2 en S.147. Les fiches ci-dessus gardent l'ordre historique,
+et ces choix ne sont plus à redemander.
+
+La [revue complémentaire](revue-complementaire-2026-10-10.md) rattache
+RC-01 à RC-05 à leurs reproductions : procédure au simulateur,
+signalement de la lecture affichée, réponses B-05 rattachées à leur pièce,
+recrédit justifié et état vide factuel. Un lot de correction cohérent,
+une PR distincte de la maintenance pg-boss, numéro S.167 attribué après
+vérification de S.166 en cours.
+Les correctifs et documents sont préparés sur une branche ; seuls les
+contrôles réellement exécutés sont annoncés. Aucune migration ou reprise
+automatique des anciens crédits. Les suites RF-5 à RF-7 et les préalables
+humains restent suivis par leur matrice et leur protocole.
 
 ## 4. Porte de sortie d'un lot
 

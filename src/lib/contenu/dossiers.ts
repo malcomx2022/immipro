@@ -191,6 +191,7 @@ export const QUOTA: Quota = { restantes: 12, total: 30, pack: "Dossier" };
  * fier assez pour signaler une erreur.
  */
 export const ANALYSE_RESSOURCES: ResultatAnalyse = {
+  id: "00000000-0000-4000-8000-000000000001",
   verdict: "A_CORRIGER",
   fichier: "releve-bancaire.pdf",
   analyseeLe: "2026-09-11T09:38:00Z",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
@@ -84,22 +84,29 @@ export function RevueDesPieces({
   const [motif, setMotif] = useState("");
   const [message, setMessage] = useState("");
   /** L'aperçu que le serveur a signé — jamais un cadre inventé. */
-  const [apercu, setApercu] = useState<{ url: string | null; raison: string | null } | null>(
-    null,
-  );
+  const [apercu, setApercu] = useState<{
+    pour: string;
+    url: string | null;
+    raison: string | null;
+  } | null>(null);
   const [envoi, setEnvoi] = useState<"" | "ouverture" | "decision">("");
-  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [echec, setEchec] = useState<{ pour: string; detail: EchecCandidat } | null>(null);
+  const demandeCourante = useRef(0);
 
   const date = new Date(maintenant);
   const retenue = triees.find((p) => p.id === selection) ?? triees[0];
+  const apercuAffiche = apercu?.pour === retenue?.id ? apercu : null;
   const refus = refusDuMessage(message, decision);
   const manqueAvantOuverture = obstacleALOuverture(motif);
   const manqueAvantDecision = obstacleALaDecision({ motif, decision, message });
 
   /** Changer de pièce remet tout à zéro, aperçu compris. */
   function choisir(cle: string | null) {
+    demandeCourante.current += 1;
+    setEnvoi("");
     setSelection(cle);
     setApercu(null);
+    setDecision("A_CORRIGER");
     setMotif("");
     setMessage("");
     setEchec(null);
@@ -107,31 +114,39 @@ export function RevueDesPieces({
 
   async function ouvrirLaPiece() {
     if (!retenue || manqueAvantOuverture) return;
+    const demande = ++demandeCourante.current;
     setEnvoi("ouverture");
     setEchec(null);
     const resultat = await appeler<{ apercu: string | null; raison: string | null }>(
       `/api/admin/revue/${retenue.id}/consultation`,
       { corps: { motif } },
     );
+    if (demande !== demandeCourante.current) return;
     setEnvoi("");
     if (!resultat.ok) {
-      setEchec(resultat.echec);
+      setEchec({ pour: retenue.id, detail: resultat.echec });
       return;
     }
-    setApercu({ url: resultat.donnees.apercu, raison: resultat.donnees.raison });
+    setApercu({ pour: retenue.id, url: resultat.donnees.apercu, raison: resultat.donnees.raison });
   }
 
   async function trancher() {
     if (!retenue || manqueAvantDecision) return;
+    const demande = ++demandeCourante.current;
     setEnvoi("decision");
     setEchec(null);
     const resultat = await appeler<{ decidee: boolean; quotaRendu: boolean }>(
       `/api/admin/revue/${retenue.id}`,
       { corps: { decision, message, motif } },
     );
+    if (demande !== demandeCourante.current) {
+      // La décision serveur reste effective ; la saisie de la nouvelle pièce reste intacte.
+      if (resultat.ok) router.refresh();
+      return;
+    }
     setEnvoi("");
     if (!resultat.ok) {
-      setEchec(resultat.echec);
+      setEchec({ pour: retenue.id, detail: resultat.echec });
       return;
     }
     // La pièce tranchée sort de la file : la suivante devient la retenue
@@ -144,10 +159,7 @@ export function RevueDesPieces({
 
   return (
     <div className="flex flex-col">
-      <EnteteAdmin
-        titre="Pièces en échec d'analyse"
-        resume={resumeRevue(triees, date)}
-      />
+      <EnteteAdmin titre="Pièces en échec d'analyse" resume={resumeRevue(triees, date)} />
 
       <div className="flex gap-4 p-6">
         <div className="min-w-0 flex-1 overflow-hidden rounded-lg border border-ink-300 bg-white">
@@ -169,14 +181,10 @@ export function RevueDesPieces({
               <div className="grid grid-cols-revue items-center gap-3">
                 <span className="truncate text-ink-900">{piece.piece}</span>
                 <span className="truncate text-ink-700">{piece.dossier}</span>
-                <span
-                  className={cn(horsDelai(piece, date) ? "text-danger" : "text-ink-700")}
-                >
+                <span className={cn(horsDelai(piece, date) ? "text-danger" : "text-ink-700")}>
                   {libelleAge(piece, date)}
                 </span>
-                <span className="truncate text-13 text-ink-700">
-                  {LIBELLE_MOTIF[piece.motif]}
-                </span>
+                <span className="truncate text-13 text-ink-700">{LIBELLE_MOTIF[piece.motif]}</span>
               </div>
             )}
           />
@@ -196,10 +204,10 @@ export function RevueDesPieces({
                 </p>
               ) : null}
 
-              {apercu ? (
-                apercu.url ? (
+              {apercuAffiche ? (
+                apercuAffiche.url ? (
                   <iframe
-                    src={apercu.url}
+                    src={apercuAffiche.url}
                     title={`Aperçu de ${retenue.piece}`}
                     className="h-40 w-full rounded-md border border-ink-300 bg-ink-100"
                   />
@@ -211,7 +219,7 @@ export function RevueDesPieces({
                     role="status"
                     className="text-pretty rounded-md bg-ink-100 p-3.5 text-13 text-ink-700"
                   >
-                    {apercu.raison}
+                    {apercuAffiche.raison}
                   </p>
                 )
               ) : (
@@ -237,9 +245,7 @@ export function RevueDesPieces({
             </section>
 
             <section className="flex flex-col gap-3 rounded-lg border border-ink-300 bg-white p-4">
-              <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">
-                Décision
-              </h2>
+              <h2 className="text-13 font-medium uppercase tracking-wide text-ink-500">Décision</h2>
 
               {/*
                 Le motif vient en premier parce qu'il conditionne
@@ -259,9 +265,8 @@ export function RevueDesPieces({
                   className={cn(CHAMP_CONTROLE, "h-auto py-2.5")}
                 />
                 <span id="motif-aide" className="text-pretty text-13 text-ink-500">
-                  Il part au journal d&apos;audit, avec ton identifiant, à
-                  l&apos;ouverture de la pièce comme à la décision. Le candidat ne le
-                  lit pas.
+                  Il part au journal d&apos;audit, avec ton identifiant, à l&apos;ouverture de la
+                  pièce comme à la décision. Le candidat ne le lit pas.
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -299,10 +304,7 @@ export function RevueDesPieces({
                 <span
                   id="message-aide"
                   role={refus ? "alert" : undefined}
-                  className={cn(
-                    "text-pretty text-13",
-                    refus ? "text-danger" : "text-ink-500",
-                  )}
+                  className={cn("text-pretty text-13", refus ? "text-danger" : "text-ink-500")}
                 >
                   {refus
                     ? `${refus.raison} ${refus.consigne}`
@@ -311,12 +313,14 @@ export function RevueDesPieces({
               </div>
 
               <p className="text-13 text-ink-700">
-                {recrediteLeQuota(decision)
-                  ? "Cette décision rend l'analyse : le quota du candidat est recrédité."
-                  : "Cette décision ne recrédite pas le quota : la lecture a rendu un résultat."}
+                {!retenue.analyseDebitee
+                  ? "Aucune analyse à rendre pour cette lecture : aucun quota supplémentaire à recréditer."
+                  : recrediteLeQuota(decision)
+                    ? "Cette décision rend l'analyse : le quota du candidat est recrédité."
+                    : "Cette décision ne recrédite pas le quota : la lecture a rendu un résultat."}
               </p>
 
-              {echec ? <BlocEchec echec={echec} annonce /> : null}
+              {echec?.pour === retenue.id ? <BlocEchec echec={echec.detail} annonce /> : null}
 
               <div className="flex flex-col gap-2 border-t border-ink-300 pt-3">
                 {/*
@@ -331,9 +335,7 @@ export function RevueDesPieces({
                   raisonDesactivation={manqueAvantDecision ?? "Enregistrement en cours."}
                   onClick={trancher}
                 >
-                  {envoi === "decision"
-                    ? "Enregistrement…"
-                    : "Enregistrer et passer à la suivante"}
+                  {envoi === "decision" ? "Enregistrement…" : "Enregistrer et passer à la suivante"}
                 </Button>
               </div>
 
@@ -358,12 +360,10 @@ function FileVide() {
         <span className="rounded-full bg-success/10 px-3 py-1 text-13 font-medium text-success">
           File à jour
         </span>
-        <h2 className="text-19 font-semibold text-ink-900">
-          Aucune pièce en attente de revue
-        </h2>
+        <h2 className="text-19 font-semibold text-ink-900">Aucune pièce en attente de revue</h2>
         <p className="max-w-lecture text-pretty text-14 text-ink-700">
-          Les pièces en échec d&apos;analyse d&apos;hier ont toutes été traitées. Les
-          nouvelles arrivent ici dans les minutes qui suivent l&apos;échec.
+          Aucune relecture humaine n&apos;est en attente dans cette file. Les nouvelles demandes
+          apparaîtront ici, y compris les erreurs signalées par les candidats.
         </p>
         <p className="pt-2 text-pretty text-13 text-ink-500">{MENTION_ACCES_TRACE}</p>
       </div>

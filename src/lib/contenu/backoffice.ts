@@ -256,6 +256,7 @@ export function piecesEnEchec(maintenant: Date): readonly PieceEnEchec[] {
     deposeeLe: new Date(maintenant.getTime() - ilYAMinutes * 60_000).toISOString(),
     // Le prototype ne garde pas les valeurs désignées : la trace en tient lieu.
     signalement: null,
+    analyseDebitee: true,
   }));
 }
 

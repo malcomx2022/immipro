@@ -412,6 +412,7 @@ export async function analyseDeLaPiece(
     ),
     analyse: analyse
       ? {
+          id: analyse.id,
           verdict: affiche!.verdict,
           verdictLu: verdictAffichable(analyse.verdict),
           relecture,
