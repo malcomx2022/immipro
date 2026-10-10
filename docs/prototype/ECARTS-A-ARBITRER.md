@@ -13155,3 +13155,10 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 **Vérifications.**
 - `smoke:files` passe du premier coup : 9 étapes, toutes vertes.
 - `npm run check` : 3 582 tests, 0 erreur de lint. `npm run build` passe ; les 7 messages `prisma:error … DATABASE_URL` sont ceux des builds précédents, antérieurs à ce lot. `npm run check:audit` passe.
+- Les 26 fumées de la porte passent, dans l'ordre de la CI, `smoke:files` comprise. `sandbox:paiement` s'abstient, faute de clés. `smoke:worker -- --base` a d'abord échoué sur l'import par défaut de pg-boss resté dans la fumée elle-même (`PgBoss is not a constructor`). Après correction, il passe : le worker construit démarre, crée ses 15 files et ses cadences, redémarre sans doublon et s'arrête proprement sur SIGTERM.
+- **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact. pg-boss est embarqué dans `dist/worker.js` ; ni `pg-boss-10` ni `pg-boss-11` ne sont dans l'image.
+
+**Non vérifié.**
+- La migration réelle de `taches` (26 → 45) en production, au premier démarrage de l'image S.168.
+- Un retour arrière réel vers l'image S.166 sur le schéma migré : il n'est éprouvé que sur la base jetable de `smoke:files`.
+- La suppression de `pgboss`, `pg-boss-10` et `pg-boss-11` reste à faire, une fois ces retours arrière exclus.
