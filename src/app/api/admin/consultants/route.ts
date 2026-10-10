@@ -115,20 +115,20 @@ export const PUT = route({
   corps: z.discriminatedUnion("geste", [
     z.object({
       geste: z.literal("habiliter"),
-      consultantId: z.string().uuid(),
+      consultantId: z.guid(),
       countryCode: z.string().length(2).toUpperCase(),
       titre: z.string().trim().min(TITRE_MINIMUM).max(200),
       motif: z.string().trim().min(3).max(500),
     }),
     z.object({
       geste: z.literal("retirer"),
-      consultantId: z.string().uuid(),
+      consultantId: z.guid(),
       countryCode: z.string().length(2).toUpperCase(),
       motif: z.string().trim().min(3).max(500),
     }),
     z.object({
       geste: z.enum(["suspendre", "retablir"]),
-      consultantId: z.string().uuid(),
+      consultantId: z.guid(),
       motif: z.string().trim().min(3).max(500),
     }),
   ]),

@@ -12980,3 +12980,56 @@ Le nouveau test de la pièce du dossier échoue sur l'ancien code. Le scénario 
 **Non vérifié.**
 - Le rendu sur `immipro.app` après déploiement.
 - Le passage automatique à la nouvelle analyse au banc : il exige une analyse réelle. Il est couvert par le test d'écran, pas par un parcours.
+
+## S.165 — RF-7 : zod 4 (M19 étape 4)
+
+**Autorisation.** Le 10/10/2026, le responsable a choisi ce lot de RF-7 (« zod 4 »), étape 4 de M19, dans l'ordre documenté. Une étape, une PR. Ce lot ne touche ni au domaine, ni au schéma Prisma, ni aux règles figées, ni aux drapeaux commerciaux.
+
+**Reproduit.** Un banc temporaire, non versionné, remplace `route()` pour capturer la définition de chaque route : 90 routes, 65 schémas, en comptant ceux du domaine (règles, éditorial, achat, balayage). Il rejoue 9 350 entrées sous zod 3.25.76 et enregistre, pour chacune, l'acceptation, les données produites et le message par champ, comme le composeur les renvoie. Les entrées sont :
+- une palette de valeurs pour chaque champ ;
+- les règles de référence, chacune relue telle quelle puis mutée champ par champ ;
+- les variantes des unions.
+
+La référence révèle un écart antérieur : **des messages anglais sortaient déjà de l'API**, contrairement à la règle « aucune chaîne en anglais dans l'interface ». Trois codes manquaient à la table française :
+- « Invalid discriminator value. Expected 'pack' | 'recharge' | … » : geste, action, achat, bloc éditorial ;
+- « Invalid literal value, expected "docx" » ;
+- « Invalid input » : la valeur d'une condition de règle, et les catégories de l'export du journal.
+
+**Livré.**
+- **`zod` 4.6.5** (au lieu de `^3.23.0`, résolu en 3.25.76). Le SDK Anthropic, `eslint-plugin-react-hooks` et `zod-validation-error` déclarent `^3.25.0 || ^4.0.0` : une seule copie, sans doublon.
+- **`src/server/http/messages-zod.ts`** : la table est posée par `z.config({ customError })`, et non plus `setErrorMap`. Les codes de zod 4 changent :
+  - `invalid_format` remplace `invalid_string` ;
+  - `invalid_value` réunit énumérations et littéraux ;
+  - le type d'un `too_small` se lit dans `origin`.
+  
+  Un champ absent reste « Ce champ est attendu. », y compris pour une énumération. Les trois codes anglais ont désormais leur phrase française :
+  - une union discriminée nomme ses valeurs, lues sur le schéma ;
+  - un littéral dit « Valeurs acceptées : docx. » ;
+  - une union de types dit ce qu'elle accepte, et une valeur permise d'abord.
+  
+  Un code inconnu de la table garde une phrase française plutôt que l'anglais de la bibliothèque.
+- **Identifiants** : les dix `z.string().uuid()` deviennent `z.guid()`. Le `.uuid()` de zod 4 contrôle la version et la variante (RFC 9562) et aurait refusé des identifiants que zod 3 acceptait. `z.guid()` reprend le motif de zod 3 : aucune route ne refuse ce qu'elle acceptait.
+- **`z.unknown()` posé comme champ d'objet** (`admin.contenu.maj`, `admin.regle.maj`) devient `.optional()`. Zod 4 le rend obligatoire ; zod 3 le laissait facultatif.
+- **Prise de rendez-vous** : `errorMap` n'existe plus, `error` le remplace. Le message est inchangé.
+
+**Vérifications.**
+- **Le banc rejoue les mêmes 9 350 entrées sous zod 4.** Aucune acceptation ne bascule, et les données produites sont identiques, y compris les 102 relectures des règles de référence avec leurs défauts (INV-3). Les 247 écarts restants sont tous des messages, et tous voulus :
+  - 103 messages anglais deviennent français ;
+  - 144 « Ce champ attend une autre valeur. » sur une énumération de mauvais type deviennent « Valeurs acceptées : … ».
+  
+  Avant ces ajustements, le même banc avait relevé quatre régressions, corrigées avant validation :
+  - l'énumération absente ;
+  - `z.unknown()` devenu obligatoire ;
+  - `.uuid()` strict ;
+  - `z.record` sans libellé.
+- `tests/api-invariants.test.ts` : 4 cas de plus dans « le message par défaut est français », et 7 tests « zod 4 » :
+  - énumération absente ou inconnue ;
+  - union discriminée ;
+  - union de types ;
+  - priorité du message propre ;
+  - aucune route en `.uuid()` ;
+  - aucun `z.unknown()` obligatoire comme champ ;
+  - relecture de toutes les règles de référence.
+  
+  Le garde-fou sur `z.unknown()` échoue si l'on retire `.optional()`.
+- `npm run check` : 3 563 tests, 0 erreur de lint. `npm run build` et `npm run check:audit` passent aussi.

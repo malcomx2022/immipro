@@ -33,7 +33,7 @@ export const PUT = route({
   acces: "admin",
   limite: "sensible",
   corps: z.object({
-    userId: z.string().uuid(),
+    userId: z.guid(),
     suspendre: z.boolean(),
     motif: z.string().trim().min(3).max(500),
   }),

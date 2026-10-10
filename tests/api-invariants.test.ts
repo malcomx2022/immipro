@@ -14,6 +14,7 @@ import {
 } from "@/domain/simulateur/classement";
 import { versEvaluable } from "@/server/vue/destinations";
 import { REGLES_DE_REFERENCE } from "../prisma/seed/visa-rules.data";
+import { visaRulesSchema } from "@/domain/rules/schema";
 import type { Reponses } from "@/domain/simulateur/questions";
 import { versXOF, convertible, MENTION_HORS_CLASSEMENT } from "@/domain/format/change";
 import { verdictDeConnexion, aBloquer, libelleEchec, ESSAIS_AVANT_BLOCAGE } from "@/domain/comptes/connexion";
@@ -836,6 +837,12 @@ describe("messages de validation — aucune chaîne en anglais", () => {
     [z.enum(["a", "b"]), "c"],
     [z.string().url(), "pas une url"],
     [z.string().max(3), "beaucoup trop long"],
+    // S.165 — trois codes que la table ne traduisait pas, et qui sortaient
+    // en anglais sous zod 3 : union discriminée, littéral, union de types.
+    [z.discriminatedUnion("type", [z.object({ type: z.literal("a") })]), { type: "b" }],
+    [z.literal("docx"), "pdf"],
+    [z.union([z.number(), z.array(z.string())]), true],
+    [z.record(z.string(), z.string()), "pas un objet"],
   ])("le message par défaut est français (%#)", (schema, valeur) => {
     const lu = schema.safeParse(valeur);
     expect(lu.success).toBe(false);
@@ -845,6 +852,76 @@ describe("messages de validation — aucune chaîne en anglais", () => {
           /\b(invalid|expected|received|required|must contain|at least|at most|string|number)\b/iu,
         );
       }
+    }
+  });
+});
+
+/**
+ * Zod 4 — S.165, M19 étape 4. La montée a été rejouée sur 9 350 entrées
+ * contre zod 3 : mêmes acceptations, mêmes données, et deux écarts de
+ * message voulus. Ces tests tiennent ce qui pourrait se perdre ensuite.
+ */
+describe("zod 4 — ce que la montée garde et ce qu'elle dit mieux", () => {
+  const message = (schema: z.ZodType, valeur: unknown) => {
+    const lu = schema.safeParse(valeur);
+    return lu.success ? null : lu.error.issues[0]?.message;
+  };
+
+  it("un choix absent est un champ attendu ; un choix inconnu dit les valeurs permises", () => {
+    const choix = z.object({ devise: z.enum(["XOF", "EUR"]) });
+    expect(message(choix, {})).toBe("Ce champ est attendu.");
+    expect(message(choix, { devise: "USD" })).toBe("Valeurs acceptées : XOF, EUR.");
+    expect(message(choix, { devise: 3 })).toBe("Valeurs acceptées : XOF, EUR.");
+  });
+
+  it("une union discriminée nomme ses valeurs, sous le champ discriminant", () => {
+    const geste = z.discriminatedUnion("geste", [
+      z.object({ geste: z.literal("publier") }),
+      z.object({ geste: z.literal("retirer") }),
+    ]);
+    const lu = geste.safeParse({ geste: "effacer" });
+    expect(lu.success).toBe(false);
+    if (!lu.success) {
+      expect(lu.error.issues[0]?.path).toEqual(["geste"]);
+      expect(lu.error.issues[0]?.message).toBe("Valeurs acceptées : publier, retirer.");
+    }
+  });
+
+  it("une union de types dit ce qu'elle accepte, une valeur permise d'abord", () => {
+    expect(message(z.union([z.number(), z.string(), z.array(z.string())]), true)).toBe(
+      "Ce champ attend un nombre, du texte ou une liste.",
+    );
+    expect(message(z.union([z.enum(["A", "B"]), z.array(z.enum(["A", "B"]))]), "C")).toBe(
+      "Valeurs acceptées : A, B.",
+    );
+  });
+
+  it("un message propre au schéma l'emporte sur la table", () => {
+    const accord = z.literal(true, { error: "Le partage du dossier demande ton accord explicite." });
+    expect(message(accord, false)).toBe("Le partage du dossier demande ton accord explicite.");
+    expect(message(z.string().email("Vérifie l'adresse."), "a@b")).toBe("Vérifie l'adresse.");
+  });
+
+  it("les identifiants restent lus comme sous zod 3 : `z.guid()`, jamais `.uuid()` strict", () => {
+    // Accepté par zod 3, refusé par le `.uuid()` de zod 4 (version 1,
+    // variante hors RFC) : la montée ne doit refuser aucun identifiant.
+    expect(z.guid().safeParse("0B8E3F6C-3B1A-1C2E-1F1D-6A7B8C9D0E1F").success).toBe(true);
+    expect(message(z.guid(), "pas-un-identifiant")).toContain("Identifiant attendu");
+    const sources = ROUTES.map((r) => readFileSync(r, "utf8"));
+    expect(sources.filter((s) => /\.uuid\(\)/u.test(s))).toEqual([]);
+  });
+
+  it("un `z.unknown()` posé comme champ reste facultatif, comme sous zod 3", () => {
+    for (const fichier of ROUTES) {
+      const source = readFileSync(fichier, "utf8");
+      expect(source, fichier).not.toMatch(/^\s{4,}\w+: z\.unknown\(\),$/mu);
+    }
+  });
+
+  it("les règles de référence se relisent toutes, défauts compris (INV-3)", () => {
+    for (const regle of REGLES_DE_REFERENCE) {
+      const lu = visaRulesSchema.safeParse(regle.rules);
+      expect(lu.success, `${regle.countryCode}/${regle.visaType}`).toBe(true);
     }
   });
 });

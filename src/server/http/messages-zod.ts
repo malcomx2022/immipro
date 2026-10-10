@@ -26,53 +26,100 @@ const TYPES: Record<string, string> = {
   date: "une date",
   array: "une liste",
   object: "un ensemble de champs",
+  record: "un ensemble de champs",
 };
 
 const FORMATS: Record<string, string> = {
   email: "Vérifie l'adresse : il manque le @ ou le domaine.",
   url: "Adresse web attendue, commençant par https://.",
   uuid: "Identifiant attendu. Reprends depuis l'écran précédent plutôt que de le saisir.",
+  // Zod 4 rend `.uuid()` strict (version et variante RFC 9562). Les routes
+  // valident par `z.guid()`, le motif permissif de Zod 3 : la montée ne
+  // refuse aucun identifiant qui passait (S.165).
+  guid: "Identifiant attendu. Reprends depuis l'écran précédent plutôt que de le saisir.",
   datetime: "Date et heure attendues, au format ISO.",
   regex: "Le format attendu n'est pas respecté.",
 };
 
-export const messagesFrancais: z.ZodErrorMap = (probleme, contexte) => {
+/** Les valeurs qu'un champ accepte, dites telles quelles. */
+const valeursAcceptees = (valeurs: readonly unknown[]): string =>
+  `Valeurs acceptées : ${valeurs.map(String).join(", ")}.`;
+
+/**
+ * Zod 4 — S.165, M19 étape 4.
+ *
+ * La table est la même ; ce sont les codes qui changent : `invalid_string`
+ * devient `invalid_format`, `invalid_enum_value` et `invalid_literal` se
+ * rejoignent dans `invalid_value`, le type d'un `too_small` se lit dans
+ * `origin`, et un champ absent se reconnaît à son entrée `undefined`.
+ *
+ * Trois cas tombaient jusqu'ici sur le message anglais de Zod, faute
+ * d'entrée dans la table : une union discriminée sur une valeur inconnue
+ * (« Invalid discriminator value »), un littéral (« Invalid literal
+ * value »), une union de types (« Invalid input »). Ils ont maintenant
+ * leur phrase. Un code que la table ne connaît pas garde une phrase
+ * française plutôt que l'anglais de la bibliothèque.
+ */
+export const messagesFrancais = (probleme: z.core.$ZodRawIssue): string => {
   switch (probleme.code) {
-    case z.ZodIssueCode.invalid_type:
-      if (probleme.received === "undefined") return { message: "Ce champ est attendu." };
-      return { message: `Ce champ attend ${TYPES[probleme.expected] ?? "une autre valeur"}.` };
+    case "invalid_type":
+      if (probleme.input === undefined) return "Ce champ est attendu.";
+      return `Ce champ attend ${TYPES[probleme.expected] ?? "une autre valeur"}.`;
 
-    case z.ZodIssueCode.invalid_string:
-      return {
-        message:
-          typeof probleme.validation === "string"
-            ? (FORMATS[probleme.validation] ?? "Le format attendu n'est pas respecté.")
-            : "Le format attendu n'est pas respecté.",
-      };
+    case "invalid_format":
+      return FORMATS[probleme.format] ?? "Le format attendu n'est pas respecté.";
 
-    case z.ZodIssueCode.too_small:
-      if (probleme.type === "string") {
-        return {
-          message:
-            probleme.minimum === 1
-              ? "Ce champ est attendu."
-              : `Au moins ${probleme.minimum} caractères.`,
-        };
+    case "too_small":
+      if (probleme.origin === "string") {
+        return Number(probleme.minimum) === 1
+          ? "Ce champ est attendu."
+          : `Au moins ${probleme.minimum} caractères.`;
       }
-      return { message: `La valeur minimale est ${probleme.minimum}.` };
+      return `La valeur minimale est ${probleme.minimum}.`;
 
-    case z.ZodIssueCode.too_big:
-      if (probleme.type === "string") return { message: `Au plus ${probleme.maximum} caractères.` };
-      return { message: `La valeur maximale est ${probleme.maximum}.` };
+    case "too_big":
+      if (probleme.origin === "string") return `Au plus ${probleme.maximum} caractères.`;
+      return `La valeur maximale est ${probleme.maximum}.`;
 
-    case z.ZodIssueCode.invalid_enum_value:
-      return { message: `Valeurs acceptées : ${probleme.options.join(", ")}.` };
+    case "invalid_value":
+      // Zod 4 rend aussi par ce code une énumération laissée vide.
+      if (probleme.input === undefined) return "Ce champ est attendu.";
+      return valeursAcceptees(probleme.values);
 
-    case z.ZodIssueCode.unrecognized_keys:
-      return { message: `Champs non attendus : ${probleme.keys.join(", ")}.` };
+    case "unrecognized_keys":
+      return `Champs non attendus : ${probleme.keys.join(", ")}.`;
+
+    case "invalid_union": {
+      // Union discriminée : les valeurs se lisent sur le schéma lui-même.
+      if ("discriminator" in probleme && typeof probleme.discriminator === "string") {
+        const valeurs = (
+          probleme.inst as { _zod?: { propValues?: Record<string, Set<unknown>> } } | undefined
+        )?._zod?.propValues?.[probleme.discriminator];
+        if (valeurs && valeurs.size > 0) return valeursAcceptees([...valeurs]);
+      }
+      if (probleme.input === undefined) return "Ce champ est attendu.";
+      // Union : chaque branche dit ce qu'elle attendait. Une valeur permise
+      // se dit d'abord — « une liste » tairait qu'une seule valeur suffit.
+      const valeurs: unknown[] = [];
+      const attendus = new Set<string>();
+      for (const branche of probleme.errors ?? []) {
+        for (const p of branche) {
+          if (p.path.length > 0) continue;
+          if (p.code === "invalid_value") valeurs.push(...p.values);
+          if (p.code === "invalid_type" && TYPES[p.expected]) attendus.add(TYPES[p.expected]!);
+        }
+      }
+      if (valeurs.length > 0) return valeursAcceptees([...new Set(valeurs)]);
+      if (attendus.size > 0) {
+        const liste = [...attendus];
+        const dernier = liste.pop();
+        return `Ce champ attend ${liste.length > 0 ? `${liste.join(", ")} ou ${dernier}` : dernier}.`;
+      }
+      return "Le format attendu n'est pas respecté.";
+    }
 
     default:
-      return { message: contexte.defaultError };
+      return "Le format attendu n'est pas respecté.";
   }
 };
 
@@ -81,4 +128,4 @@ export const messagesFrancais: z.ZodErrorMap = (probleme, contexte) => {
  * composeur de routes : aucune route ne peut répondre sans être passée par
  * là.
  */
-z.setErrorMap(messagesFrancais);
+z.config({ customError: messagesFrancais });

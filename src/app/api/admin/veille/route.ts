@@ -63,7 +63,7 @@ export const PUT = route({
   acces: "veilleur",
   limite: "sensible",
   corps: z.object({
-    id: z.string().uuid(),
+    id: z.guid(),
     /**
      * Ce que le veilleur a trouvé — WF-14 étape 2.
      *
