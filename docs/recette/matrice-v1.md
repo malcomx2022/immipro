@@ -166,7 +166,7 @@ Claude Code.
 | R-P05 | Pages publiques et plan du site | 200 ; plan du site sans page absente | 12 adresses du plan du site en 200 (0,4 à 0,8 s) ; `robots.txt` ferme l'espace privé | Vérifié (pilote) |
 | R-P06 | Pages juridiques avant Q.A | Introuvables, et aucun lien vers elles | Les quatre en 404 ; aucun lien dans l'accueil (M14) | Vérifié (pilote) |
 | R-P07 | Espace privé sans session | Redirection vers la connexion ; API refusée | `/tableau-de-bord`, `/revue`, `/paiements` en 307 vers `/connexion?suite=…` ; `/api/admin/revue` en 401 | Vérifié (pilote) |
-| R-P08 | CORS du stockage, prévol `OPTIONS` | 200 pour `https://immipro.app`, 403 ailleurs | **403 pour toutes les origines, `immipro.app` comprise** (« This CORS request is not allowed ») | **Anomalie R-E01** |
+| R-P08 | CORS du stockage, prévol `OPTIONS` | 200 pour `https://immipro.app`, 403 ailleurs | 09/10 : **403 pour toutes les origines, `immipro.app` comprise**. 10/10, après la pose : 200 pour `https://immipro.app` en `GET` et `PUT` sur les deux seaux ; 403 pour `https://exemple.test`, `https://www.immipro.app` et `DELETE` | **Conforme le 10/10/2026** (R-E01 levée) ; dépôt réel encore à faire (R-P15) |
 | R-P09 | Lecture anonyme d'un seau | Refusée | 403 | Vérifié (pilote) |
 | R-P10 | Pages publiques à 390 px, console | Pas de défilement horizontal, aucune erreur | Neuf pages sans défaut ; **`/tarifs` déborde (436 px)** | **Anomalie R-E02**, corrigée en S.162 (390 px au banc) ; à revoir sur le pilote après déploiement |
 | R-P11 | Détail de `/api/health` | Bloquantes expliquées | Lecture laissée au responsable (choix du 09/10) | Non vérifié (protocole §1) |
@@ -188,6 +188,15 @@ Claude Code.
   `docs/INSTALLATION-GITHUB.md` (S.159).
 - Vérification : les deux `curl` de la procédure, puis un dépôt réel
   (protocole §0 et §4c).
+- **Levée le 10/10/2026.** Le responsable a posé la règle sur les deux
+  seaux et retiré le droit propriétaire. Variante : `aws-cli` sur le réseau
+  `immipro_internal`, `--network host` étant refusé sur le VPS (procédure
+  corrigée). Contrôle depuis la session de développement : 200 et
+  `access-control-allow-origin: https://immipro.app` pour `GET` et `PUT` ;
+  403 pour une autre origine, pour `www` et pour `DELETE`. Les refus portent
+  `access-control-allow-origin: *`, posé par Garage sur ses réponses
+  d'erreur : sans effet, un prévol refusé bloque la requête. Reste le dépôt
+  réel d'une pièce (protocole §4c, R-P15).
 
 **R-E02 — `/tarifs` déborde à 390 px (mineure).** Le badge de
 justification du pack mis en avant (`Tarifs.tsx`, classe `flex-none`)
