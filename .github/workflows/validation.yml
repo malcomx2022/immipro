@@ -129,6 +129,13 @@ jobs:
         run: npm run smoke:worker -- --base
       - run: echo "- **Worker** — paquet exécuté sans base, puis démarré sur une base vierge" >> "$GITHUB_STEP_SUMMARY"
 
+      # pg-boss 11 ne migre pas une base de pg-boss 10 (S.166) : la base de
+      # départ est écrite par le vrai 10.4.2, puis la bascule reprend ce qui
+      # attendait, sans doublon, et un retour arrière retrouve son schéma.
+      - name: Montée des files
+        run: npm run smoke:files
+      - run: echo "- **Montée des files** — base de pg-boss 10 reprise par pg-boss 11, sans perte ni doublon, retour arrière intact" >> "$GITHUB_STEP_SUMMARY"
+
       # Le référentiel de règles se charge depuis l'image (dist/graine-regles.js) :
       # sans lui, une production neuve n'a aucune fiche, et B-02 ne crée pas de règle.
       - name: Chargement du référentiel
