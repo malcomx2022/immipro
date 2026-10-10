@@ -12,7 +12,7 @@ Chaque résultat se reporte dans `docs/recette/matrice-v1.md`, sous la
 ligne indiquée : attendu, observé, preuve (capture, sortie de commande),
 date et nom. Une étape non déroulée reste « non vérifié ».
 
-## 0. D'abord : la règle CORS du stockage (anomalie R-E01, bloquante)
+## 0. D'abord : la règle CORS du stockage (anomalie R-E01, levée le 10/10/2026)
 
 Sans elle, aucune pièce ne peut être déposée depuis un navigateur. Tant
 qu'elle n'est pas posée, les étapes 4 et 5 échouent.

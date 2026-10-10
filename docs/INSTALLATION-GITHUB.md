@@ -94,17 +94,21 @@ cat > /tmp/cors.json <<'JSON'
 JSON
 for b in immipro-quarantaine immipro-documents; do
   $G bucket allow --owner "$b" --key "$ID"            # le temps de poser la règle
-  docker run --rm --network host \
+  docker run --rm --network immipro_internal \
     -e AWS_ACCESS_KEY_ID="$ID" -e AWS_SECRET_ACCESS_KEY="$SECRET" -e AWS_DEFAULT_REGION=us-east-1 \
     -v /tmp/cors.json:/cors.json:ro amazon/aws-cli:2.27.0 \
-    s3api put-bucket-cors --endpoint-url http://127.0.0.1:9000 --bucket "$b" --cors-configuration file:///cors.json
+    s3api put-bucket-cors --endpoint-url http://minio:9000 --bucket "$b" --cors-configuration file:///cors.json
   $G bucket deny --owner "$b" --key "$ID"             # la règle reste, le droit part
 done
 rm /tmp/cors.json; unset SECRET
 ```
 
 Les noms des seaux sont ceux de `MINIO_BUCKET_DOCUMENTS` et
-`MINIO_BUCKET_QUARANTAINE` dans `.env.app`. Vérification, depuis n'importe
+`MINIO_BUCKET_QUARANTAINE` dans `.env.app` ; l'ID et le secret sont
+`MINIO_ROOT_USER` et `MINIO_ROOT_PASSWORD`. Le conteneur `aws-cli` rejoint
+le réseau interne du compose (`immipro_internal`) et parle à Garage par
+son nom de service : sur le VPS, `--network host` est refusé (espaces de
+noms utilisateur), constat du 10/10/2026 lors de la pose réelle. Vérification, depuis n'importe
 quel poste — la première doit répondre `200` avec
 `access-control-allow-origin: https://immipro.app`, la seconde `403` :
 

@@ -12908,3 +12908,22 @@ Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape
 **Non vérifié.** Le rendu sur `immipro.app` après déploiement : la ligne R-P10 de la matrice reste à relever.
 
 **Remarqué, non traité.** À 1 280 px, le libellé « Commencer gratuitement » passe sur deux lignes dans son bouton, sans débordement. C'est hors du périmètre de R-E02 ; à décider.
+
+## S.163 — RF-5 : R-E01 levée sur l'instance pilote
+
+**Ce qui s'est passé.** Le 10/10/2026, le responsable a posé la règle CORS sur les deux seaux de `stockage.immipro.app` (`immipro-quarantaine`, `immipro-documents`). Il a suivi la procédure de S.159, puis retiré le droit propriétaire de la clé. Une variante a été nécessaire : sur le VPS, `docker run --network host` est refusé (espaces de noms utilisateur). Le conteneur `aws-cli` a donc rejoint le réseau `immipro_internal` et parlé à Garage par son nom de service.
+
+**Contrôlé depuis la session de développement** (prévols `OPTIONS`, sans écriture) :
+- `https://immipro.app` obtient 200 et `access-control-allow-origin: https://immipro.app` en `GET` et en `PUT`, sur les deux seaux.
+- `https://exemple.test` et `https://www.immipro.app` reçoivent 403, en `GET`, `PUT` et `DELETE`, sur les deux seaux.
+- `DELETE` depuis `https://immipro.app` reçoit aussi 403.
+- Les refus portent `access-control-allow-origin: *`. C'est Garage qui le pose sur ses réponses d'erreur, pas nginx (`nginx/stockage.conf` n'en ajoute pas). C'est sans effet : un prévol refusé bloque la requête.
+
+**Documentation.**
+- `docs/INSTALLATION-GITHUB.md` : la procédure emploie désormais `--network immipro_internal` et `http://minio:9000`, et nomme les variables de la clé.
+- Matrice : R-P08 est conforme, et R-E01 est levée.
+- Protocole : l'étape 0 est marquée levée.
+
+**R-E02 sur le pilote.** S.162 a été déployée (ad50d39, run du 10/10 à 14 h 24, « antivirus prêt » puis « en service »). Mesurés à 390 px dans Chromium, `/tarifs`, `/`, `/simulateur` et `/destinations` font 390 px, sans erreur de console. Le badge mesure 314 px sur deux lignes et porte `max-w-full`. La ligne R-P10 de la matrice est conforme.
+
+**Non vérifié.** Le dépôt réel d'une pièce depuis un navigateur (protocole §4c, R-P15) reste à faire par le responsable. Il est le seul à prouver la chaîne complète : URL présignée, `PUT`, quarantaine, balayage.
