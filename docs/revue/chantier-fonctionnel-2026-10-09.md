@@ -1,5 +1,5 @@
 # Chantier de correction et de finalisation — ImmiPro
-Date : 9 octobre 2026. **RF-0 autorisé ; RF-1 livré en S.146 (A-1, A-3) ; RF-2 livré en S.147 (A-2) ; RF-3 livré en S.148 ; RF-4 autorisé le 09/10, diagnostics livrés en S.149, supervision E6 livrée en S.150, inventaire du stockage livré en S.151, purges livrées en S.152, réservations de la rédaction assistée livrées en S.153, B-04 (tranche à zéro) livré en S.154 ; RF-5 autorisé le 09/10, sa recette a trouvé un dépôt impossible depuis S.148, correctif urgent livré en S.155, banc local et matrice livrés en S.156, trois anomalies corrigées et livrées en S.157 (préproduction non vérifiée) ; RF-6 autorisé le 09/10, préparation de M.C et dossier de levée livrés en S.158 (aucun préalable levé) ; RF-5 poursuivi sur l'instance pilote en S.159 (contrôles sans écriture, protocole ; R-E01 levée le 10/10 en S.163, dépôt réel encore à faire) ; RF-7 autorisé le 09/10, porte sans tirage anonyme de Docker Hub livrée en S.160, démarrage à froid de l'antivirus livré en S.161, `/tarifs` à 390 px (R-E02) livré en S.162, règles `react-hooks` du React Compiler rétablies en S.164, zod 4 (M19 étape 4) en S.165.**
+Date : 9 octobre 2026. **RF-0 autorisé ; RF-1 livré en S.146 (A-1, A-3) ; RF-2 livré en S.147 (A-2) ; RF-3 livré en S.148 ; RF-4 autorisé le 09/10, diagnostics livrés en S.149, supervision E6 livrée en S.150, inventaire du stockage livré en S.151, purges livrées en S.152, réservations de la rédaction assistée livrées en S.153, B-04 (tranche à zéro) livré en S.154 ; RF-5 autorisé le 09/10, sa recette a trouvé un dépôt impossible depuis S.148, correctif urgent livré en S.155, banc local et matrice livrés en S.156, trois anomalies corrigées et livrées en S.157 (préproduction non vérifiée) ; RF-6 autorisé le 09/10, préparation de M.C et dossier de levée livrés en S.158 (aucun préalable levé) ; RF-5 poursuivi sur l'instance pilote en S.159 (contrôles sans écriture, protocole ; R-E01 levée le 10/10 en S.163, dépôt réel encore à faire) ; RF-7 autorisé le 09/10, porte sans tirage anonyme de Docker Hub livrée en S.160, démarrage à froid de l'antivirus livré en S.161, `/tarifs` à 390 px (R-E02) livré en S.162, règles `react-hooks` du React Compiler rétablies en S.164, zod 4 (M19 étape 4) en S.165, pg-boss 11 dans un schéma neuf (M19 étape 5) en S.166.**
 
 Base du lot documentaire : main dd2b58f / S.144. S.142 à S.144 (PR #241 à #243) sont fusionnés : Stripe-Version, ESLint plat, Next 16. La revue initiale reste épinglée à main 3f089c2/S.141. Aucun numéro S.xxx n'est réservé ; le numéro d'un lot applicatif sera attribué après lecture du registre et des PR en cours.
 
@@ -136,8 +136,10 @@ La validation de ce chantier ne remplace pas les avis M.C/Q.A ni les réponses d
 ## 3.1. Revue complémentaire autorisée le 10/10/2026 — RC / S.167
 
 Le responsable demande de prendre en compte les travaux Claude Code
-actuels avant correction. Base relue : main 065bde4/S.165, PR #267/S.166
-encore en brouillon. RF-0 est fusionné ; A-1/A-3 sont déjà tranchés en
+actuels avant correction. Base initiale relue : main 065bde4/S.165,
+PR #267/S.166 alors en brouillon. Cette PR a été fusionnée pendant la
+validation ; base finale de S.167 : main 9ade7ea/S.166, repris sans conflit.
+RF-0 est fusionné ; A-1/A-3 sont déjà tranchés en
 S.146 et A-2 en S.147. Les fiches ci-dessus gardent l'ordre historique,
 et ces choix ne sont plus à redemander.
 

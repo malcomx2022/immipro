@@ -78,7 +78,7 @@ Un message d'échec est toujours actionnable.
 ## Suivi du chantier fonctionnel — 09/10/2026
 
 L'autorisation initiale RF-0 (09/10) portait sur les documents ; sa PR #244
-est fusionnée. Claude Code a ensuite réalisé les lots jusqu'à S.165.
+est fusionnée. Claude Code a ensuite réalisé les lots jusqu'à S.166.
 A-1 et A-3 sont tranchés en S.146, A-2 en S.147 : relire leurs décisions
 au registre, sans redemander des choix déjà rendus.
 
@@ -100,8 +100,10 @@ Base du lot 0 : main dd2b58f, S.125 à S.144 intégrés. Claude Code a livré
 S.142 (Stripe-Version et dépendances SMTP, PR #241), S.143 (ESLint plat,
 PR #242) et S.144 (Next 16, PR #243). Relire main et les PR ouvertes avant
 chaque lot ; conserver ces changements et leurs décisions.
-Base de la revue du 10/10 : main 065bde4/S.165. La PR #267/S.166
-(pg-boss 11 et transfert) reste un brouillon, relu et séparé du lot RC/S.167.
+Base initiale de la revue du 10/10 : main 065bde4/S.165. La PR #267/S.166
+(pg-boss 11 et transfert), initialement en brouillon, a été fusionnée
+pendant la validation. Base finale de RC/S.167 : main 9ade7ea/S.166 ;
+conserver le schéma neuf, le transfert et les preuves de ce lot.
 Les identifiants
 RF ne réservent aucun numéro S.xxx : attribuer celui-ci au démarrage d'un
 lot applicatif, après vérification du registre et du travail en cours.

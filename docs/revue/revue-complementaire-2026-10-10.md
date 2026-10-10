@@ -4,7 +4,9 @@
 
 ## Base et continuité
 
-Base : `main` **065bde4f06fade645c16552a57951f20a9803788 / S.165**, après fusion de la PR #266. Les PR #244 à #266 ont été rapprochées du chantier ; la PR [#267 / S.166](https://github.com/malcomx2022/immipro/pull/267), pg-boss 11 et transfert des files, a été lue à sa tête `ac49c88`. Elle reste un travail de Claude Code en brouillon au moment de cette revue ; ce lot ne modifie ni les files ni les dépendances.
+Base initiale : `main` **065bde4f06fade645c16552a57951f20a9803788 / S.165**, après fusion de la PR #266. Les PR #244 à #266 ont été rapprochées du chantier ; la PR [#267 / S.166](https://github.com/malcomx2022/immipro/pull/267), pg-boss 11 et transfert des files, a été lue à sa tête `ac49c88`. Elle était un travail de Claude Code en brouillon à l’ouverture de cette revue.
+
+**Actualisation finale :** pendant la validation de la PR #268, #267 a été fusionnée dans `main` **9ade7eab1a8d23e59000bc9b585a32593a4ddddf / S.166**. La branche S.167 a repris ce nouveau main sans conflit, avec les files `taches`, leur transfert, la supervision, les dépendances et les documents de Claude Code conservés. Aucun correctif RC ne modifie ces fichiers de maintenance. La CI de la branche actualisée constitue la porte finale.
 
 | Travaux Claude Code conservés | État observé sur la base |
 |---|---|
@@ -17,6 +19,7 @@ Base : `main` **065bde4f06fade645c16552a57951f20a9803788 / S.165**, après fusio
 | S.156, S.157, S.159, S.163 | Banc, matrice, signalement/historique et protocole pilote présents ; observations O-1 à O-3 encore ouvertes avant RC. |
 | S.158 | Préparation de M.C ; aucun certificateur ni préalable humain inventé. |
 | S.162, S.164, S.165 | Tarifs mobile, règles React rétablies et zod 4 conservés. Les nouveaux identifiants suivent `z.guid()`. |
+| S.166 | pg-boss 11 dans `taches`, transfert de la version 10, supervision des deux schémas et fumée de montée repris après fusion de #267. |
 
 Les anciennes anomalies FON-01 à FON-04 et E5 ne sont pas reprises comme des bugs encore ouverts. La revue lit leurs corrections, la matrice actuelle, les services de simulation, de signalement et de relecture et les composants associés. Elle ne constitue pas une nouvelle recette exhaustive de la V1 ni une inspection de la base de production.
 
@@ -40,6 +43,8 @@ Les résultats définitifs sont consignés après exécution dans la section sui
 
 ### Résultats du lot
 
+Les contrôles locaux ci-dessous ont d’abord porté sur S.165 + RC. La [première CI](https://github.com/malcomx2022/immipro/actions/runs/38076210702) est entièrement verte sur `fa94961`. Après reprise de S.166, la CI complète est relancée sur la nouvelle tête ; son résultat final est consigné dans la PR #268. Les neuf tests de S.166 s’ajoutent aux 3 572 tests de ce premier contrôle.
+
 | Contrôle exécuté | Résultat |
 |---|---|
 | `npm ci --ignore-scripts` et génération Prisma | Verrou de S.165 installé, client généré. |
@@ -53,7 +58,7 @@ Les résultats définitifs sont consignés après exécution dans la section sui
 | `npm run smoke:relecture` | Succès sur PostgreSQL jetable. |
 | Chromium, P-03, 390 et 1 280 px | Trois procédures distinctes pour deux pays ; bons libellés et liens. Largeur du document égale au viewport ; aucune erreur JavaScript. |
 
-Les contrôles navigateur de P-03 passent par l’API et les graines du banc, avec PostgreSQL réel. Les courses B-05 et l’envoi C-08 sont éprouvés dans les tests d’interface ; l’effet des services est vérifié par la fumée PostgreSQL. Une vérification complète du pilote, TalkBack et une nouvelle image Docker de déploiement ne sont pas annoncés comme exécutés. La CI complète de la PR reste une porte distincte avant fusion.
+Les contrôles navigateur de P-03 passent par l’API et les graines du banc, avec PostgreSQL réel. Les courses B-05 et l’envoi C-08 sont éprouvés dans les tests d’interface ; l’effet des services est vérifié par la fumée PostgreSQL. Une vérification complète du pilote, TalkBack et une nouvelle image Docker de déploiement ne sont pas annoncés comme exécutés. La CI complète de la branche actualisée reste la porte avant fusion.
 
 ## Données et limites
 
