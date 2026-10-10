@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type PgBoss from "pg-boss";
+import type { PgBoss, Queue } from "pg-boss";
 import { declarerLesFiles, FILES, JOBS, poster, REPRISES } from "@/lib/queue";
 import { TENTATIVES_AVANT_INCIDENT } from "@/domain/securite/balayage";
 import { TENTATIVES_AVANT_REVUE } from "@/server/jobs/analyse";
@@ -39,11 +39,11 @@ describe("déclaration des files", () => {
    * bon, et personne ne revenait la chercher.
    */
   it("le balayage est repris, et l'incident se lit avant l'épuisement", async () => {
-    const options = new Map<string, PgBoss.Queue | undefined>();
-    const misesAJour = new Map<string, PgBoss.Queue | undefined>();
+    const options = new Map<string, Queue | undefined>();
+    const misesAJour = new Map<string, Queue | undefined>();
     const faux = {
-      createQueue: async (nom: string, o?: PgBoss.Queue) => void options.set(nom, o),
-      updateQueue: async (nom: string, o?: PgBoss.Queue) => void misesAJour.set(nom, o),
+      createQueue: async (nom: string, o?: Queue) => void options.set(nom, o),
+      updateQueue: async (nom: string, o?: Queue) => void misesAJour.set(nom, o),
     };
     await declarerLesFiles(faux as unknown as PgBoss);
 

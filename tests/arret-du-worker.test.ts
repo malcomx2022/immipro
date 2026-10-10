@@ -32,7 +32,7 @@ describe("arreterProprement", () => {
     const sortir = vi.fn();
     const arreter = arreterProprement({ stop } as never, sortir);
     await arreter("SIGTERM");
-    expect(stop).toHaveBeenCalledWith({ graceful: true, wait: true, timeout: DELAI_D_ARRET_MS });
+    expect(stop).toHaveBeenCalledWith({ graceful: true, timeout: DELAI_D_ARRET_MS });
     expect(journal).toHaveBeenCalledWith("worker arrêté");
     expect(sortir).toHaveBeenCalledWith(0);
   });

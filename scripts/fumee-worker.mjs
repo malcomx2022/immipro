@@ -470,7 +470,8 @@ if (commandePasserelle && !argImage) {
 // ── 4. Démarrage réel sur PostgreSQL, base jetable ───────────────────
 
 if (process.argv.includes("--base")) {
-  const { default: PgBoss } = await import("pg-boss");
+  // pg-boss 12 n'exporte plus de défaut : ESM seulement, export nommé (S.168).
+  const { PgBoss } = await import("pg-boss");
   const { Client } = await import("pg");
 
   const source = process.env.DATABASE_URL;

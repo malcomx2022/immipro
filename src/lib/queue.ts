@@ -1,4 +1,4 @@
-import PgBoss from "pg-boss";
+import { PgBoss, type QueueOptions } from "pg-boss";
 import { SCHEMA_DES_FILES } from "@/domain/exploitation/bascule-des-files";
 import { transfererLesTachesDePgBoss10 } from "@/lib/transfert-des-files";
 
@@ -127,7 +127,7 @@ export const FILES: readonly string[] = Object.values(JOBS);
  * reprises : `balayerUnePiece` ne lève pas dans ce cas et la tâche
  * s'achève sur `BLOQUEE`, incident ouvert.
  */
-export const REPRISES: Readonly<Record<string, PgBoss.QueueOptions>> = {
+export const REPRISES: Readonly<Record<string, QueueOptions>> = {
   [JOBS.BALAYAGE_PIECE]: { retryLimit: 6, retryDelay: 10, retryBackoff: true },
   /*
     L'extraction est branchée sur un service réel (22/09/2026), et DOC-11
@@ -178,9 +178,14 @@ let demarrage: Promise<PgBoss> | null = null;
 async function demarrer(): Promise<PgBoss> {
   try {
     /*
-      pg-boss 11 dans son propre schéma — S.166. Il ne sait pas migrer
-      celui de la version 10 ; ce qui y attendait est reposé ici, une
-      fois, après la déclaration des files (sans file, pas d'envoi).
+      Le schéma `taches` — S.166. pg-boss 11 ne savait pas migrer celui
+      de la version 10 ; ce qui y attendait est reposé ici, une fois,
+      après la déclaration des files (sans file, pas d'envoi).
+
+      pg-boss 12 (S.168) migre `taches` sur place au démarrage : ses
+      migrations partent de la version 25, et l'image précédente
+      (pg-boss 11) tourne encore sur le schéma migré — `smoke:files`
+      l'éprouve, retour arrière compris.
     */
     const instance = new PgBoss({ connectionString: process.env.DATABASE_URL!, schema: SCHEMA_DES_FILES });
     await instance.start();

@@ -1,4 +1,4 @@
-import type PgBoss from "pg-boss";
+import type { PgBoss } from "pg-boss";
 
 /**
  * Arrêt propre du worker — revue du 07/10/2026, M9.
@@ -35,7 +35,8 @@ export function arreterProprement(
     enCours = true;
     console.info(`[worker] ${signal} reçu : fin des tâches en cours, ${DELAI_D_ARRET_MS / 1000} s au plus`);
     try {
-      await boss.stop({ graceful: true, wait: true, timeout: DELAI_D_ARRET_MS });
+      // pg-boss 12 attend toujours la fin de l'arrêt : `wait` n'existe plus (S.168).
+      await boss.stop({ graceful: true, timeout: DELAI_D_ARRET_MS });
       console.log("worker arrêté");
       sortir(0);
     } catch (erreur) {

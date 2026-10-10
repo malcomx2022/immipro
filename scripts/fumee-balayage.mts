@@ -693,7 +693,8 @@ try {
       `le moteur revenu, la passe remet en file (${JSON.stringify(reprise)})`,
     );
 
-    const enFile = (await (await getQueue()).getQueueStats(JOBS.BALAYAGE_PIECE)).queuedCount;
+    const [stats] = await (await getQueue()).getQueueStats(JOBS.BALAYAGE_PIECE);
+    const enFile = stats?.queuedCount ?? 0;
     verifier(enFile >= 1, `et la tâche est bien dans la file (${enFile})`);
 
     /*
@@ -1392,7 +1393,7 @@ try {
     La reprise poste un job : pg-boss tient ses propres connexions sur la
     base jetable, et les laisser ouvertes fait échouer le `DROP`.
   */
-  await (await getQueue()).stop({ wait: true }).catch(() => {});
+  await (await getQueue()).stop().catch(() => {});
   await new Promise<void>((ok) => {
     moteur.closeAllConnections();
     moteur.close(() => ok());
