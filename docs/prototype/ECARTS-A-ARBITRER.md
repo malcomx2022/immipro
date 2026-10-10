@@ -12924,4 +12924,6 @@ Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape
 - Matrice : R-P08 est conforme, et R-E01 est levée.
 - Protocole : l'étape 0 est marquée levée.
 
+**R-E02 sur le pilote.** S.162 a été déployée (ad50d39, run du 10/10 à 14 h 24, « antivirus prêt » puis « en service »). Mesurés à 390 px dans Chromium, `/tarifs`, `/`, `/simulateur` et `/destinations` font 390 px, sans erreur de console. Le badge mesure 314 px sur deux lignes et porte `max-w-full`. La ligne R-P10 de la matrice est conforme.
+
 **Non vérifié.** Le dépôt réel d'une pièce depuis un navigateur (protocole §4c, R-P15) reste à faire par le responsable. Il est le seul à prouver la chaîne complète : URL présignée, `PUT`, quarantaine, balayage.

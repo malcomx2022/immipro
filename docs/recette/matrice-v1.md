@@ -168,7 +168,7 @@ Claude Code.
 | R-P07 | Espace privé sans session | Redirection vers la connexion ; API refusée | `/tableau-de-bord`, `/revue`, `/paiements` en 307 vers `/connexion?suite=…` ; `/api/admin/revue` en 401 | Vérifié (pilote) |
 | R-P08 | CORS du stockage, prévol `OPTIONS` | 200 pour `https://immipro.app`, 403 ailleurs | 09/10 : **403 pour toutes les origines, `immipro.app` comprise**. 10/10, après la pose : 200 pour `https://immipro.app` en `GET` et `PUT` sur les deux seaux ; 403 pour `https://exemple.test`, `https://www.immipro.app` et `DELETE` | **Conforme le 10/10/2026** (R-E01 levée) ; dépôt réel encore à faire (R-P15) |
 | R-P09 | Lecture anonyme d'un seau | Refusée | 403 | Vérifié (pilote) |
-| R-P10 | Pages publiques à 390 px, console | Pas de défilement horizontal, aucune erreur | Neuf pages sans défaut ; **`/tarifs` déborde (436 px)** | **Anomalie R-E02**, corrigée en S.162 (390 px au banc) ; à revoir sur le pilote après déploiement |
+| R-P10 | Pages publiques à 390 px, console | Pas de défilement horizontal, aucune erreur | Neuf pages sans défaut ; **`/tarifs` déborde (436 px)** | **Conforme le 10/10/2026** : R-E02 corrigée en S.162 ; sur `immipro.app` après déploiement (ad50d39), `/tarifs`, `/`, `/simulateur` et `/destinations` font 390 px, sans erreur de console |
 | R-P11 | Détail de `/api/health` | Bloquantes expliquées | Lecture laissée au responsable (choix du 09/10) | Non vérifié (protocole §1) |
 | R-P12 | Six services, worker, alertes | `healthy`, limites, battement, sondes | — | Non vérifié (protocole §3) |
 | R-P13 à R-P17 | Parcours candidat sur téléphone | Voir le protocole §4 | — | Non vérifié |
@@ -203,8 +203,9 @@ justification du pack mis en avant (`Tarifs.tsx`, classe `flex-none`)
 porte une phrase qui ne peut pas passer à la ligne : la page fait 436 px.
 **Corrigée en S.162** : le badge peut rétrécir et replier son texte
 (`max-w-full`). Mesuré au banc dans Chromium : `/tarifs` fait 390 px à
-390 px, et le badge tient dans sa colonne de 260 px sur grand écran. Reste
-à relever sur `immipro.app` après le déploiement.
+390 px, et le badge tient dans sa colonne de 260 px sur grand écran.
+Relevé sur `immipro.app` le 10/10/2026 après le déploiement de ad50d39 :
+`/tarifs` fait 390 px, le badge 314 px sur deux lignes (S.163).
 
 ## Signature
 
