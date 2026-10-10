@@ -2,7 +2,7 @@
 
 Ce plan dit comment corriger chacun des constats de la [revue complète du projet](./revue-2026-10-07.md). Chaque point a été relu dans le code de `main` (`fe77108`) avant d'être planifié : plusieurs constats de la revue sont corrigés ou précisés ici, et quatre défauts nouveaux sont apparus pendant la préparation.
 
-**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est livré, S.150 (RF-4, supervision E6) est livré, S.151 (RF-4, inventaire du stockage E4) est livré, S.152 (RF-4, purges : restauration, préfixe, périmètre validé) est livré, S.153 (RF-4, réservations de la rédaction assistée) est livré, S.154 (RF-4, tranche à zéro dite au candidat) est livré, S.155 (correctif urgent : préparation du dépôt en 503 depuis S.148) est livré, S.156 (RF-5, banc de recette local et matrice V1) est livré, S.157 (RF-5, anomalies R-01 à R-03 de la recette) est livré, S.158 (RF-6, préparation de M.C et dossier de levée des préalables) est livré, S.159 (RF-5, recette sur l'instance pilote, sans écriture, et protocole) est proposé, S.160 (RF-7, porte sans tirage anonyme de Docker Hub) est livré, S.161 (RF-7, démarrage à froid de l'antivirus) est livré, S.162 (RF-7, `/tarifs` à 390 px, R-E02) est livré, S.163 (RF-5, R-E01 levée sur le pilote) est livré, S.164 (RF-7, règles `react-hooks` du React Compiler rétablies) est proposé. Tout le reste est à faire.
+**État du code sur main au 09/10/2026 (S.145).** Les lots S.125 (C1, E1, E4, E5), S.126 (E6, E7, F4, M1, F12) S.127 (M3, M2, N1) et S.128 (M5, M4) S.129 (E2, E3 étapes 1 à 4) S.130 (F6, E3 étape 5, F3) S.131 (E11, audit, M17), S.132 (E9), S.133 (E10), S.134 (M19 étape 0, M15), S.135 (F8, F9, F7), S.136 (E8, M11, M12), S.137 (M8, M9, M10), S.138 (M7, F1, F2, M16), S.139 (M13, M14), S.140 (F5, M18), S.141 (M6, F11), S.142 (M19 étape 1), S.143 (M19 étape 2), S.144 (M19 étape 3) et S.145 (correctif de déploiement) sont livrés. S.146 (RF-1 du chantier fonctionnel : FON-01, FON-04, FON-05/M11) est livré, S.147 (RF-2 : FON-02) est livré, S.148 (RF-3 : E5, FON-03) est livré, S.149 (RF-4, diagnostics en lecture seule) est livré, S.150 (RF-4, supervision E6) est livré, S.151 (RF-4, inventaire du stockage E4) est livré, S.152 (RF-4, purges : restauration, préfixe, périmètre validé) est livré, S.153 (RF-4, réservations de la rédaction assistée) est livré, S.154 (RF-4, tranche à zéro dite au candidat) est livré, S.155 (correctif urgent : préparation du dépôt en 503 depuis S.148) est livré, S.156 (RF-5, banc de recette local et matrice V1) est livré, S.157 (RF-5, anomalies R-01 à R-03 de la recette) est livré, S.158 (RF-6, préparation de M.C et dossier de levée des préalables) est livré, S.159 (RF-5, recette sur l'instance pilote, sans écriture, et protocole) est proposé, S.160 (RF-7, porte sans tirage anonyme de Docker Hub) est livré, S.161 (RF-7, démarrage à froid de l'antivirus) est livré, S.162 (RF-7, `/tarifs` à 390 px, R-E02) est livré, S.163 (RF-5, R-E01 levée sur le pilote) est livré, S.164 (RF-7, règles `react-hooks` du React Compiler rétablies) est livré, S.165 (RF-7, zod 4, M19 étape 4) est proposé. Tout le reste est à faire.
 
 ---
 
@@ -1376,7 +1376,7 @@ Un lot par étape, chacun avec la porte complète et `smoke:worker --image`.
 | 1 | Retirer `stripe`, poser `Stripe-Version` dans `appeler()`, correctifs (`next` 15.5.27, `nodemailer`, `postcss`, `tsx`, `prettier`, `smtp-server`) | **Livrée en S.142** (D-31). Rien n'a cassé ; `next`, `postcss`, `tsx` et `prettier` étaient déjà au dernier correctif de leur plage |
 | 2 | ESLint en configuration plate (`eslint.config.mjs` avec `FlatCompat`), `.eslintrc.json` supprimé | **Livrée en S.143.** Mêmes 98 règles et mêmes sévérités ; le script `lint` devient `eslint src`, le périmètre exact de `next lint`. Lire aussi `tests`, `scripts` et `docs` relève 33 remarques : lot à part |
 | 3 | Next 16 : `middleware.ts` devient `proxy.ts`, Turbopack par défaut, `next lint` disparaît | **Livrée en S.144** (Next 16.4.0). `revalidateTag` exige un profil : `{ expire: 0 }` garde l'invalidation immédiate. `eslint-config-next` 16 est plat natif. Deux règles du React Compiler (`set-state-in-effect`, `purity`) sont coupées pour un lot dédié, rétablies en S.164. L'override `postcss` n'est plus utile. Rendu des 136 routes identique, `standalone` vérifiée dans l'image |
-| 4 | zod 4, par `zod/v4` fichier par fichier | `server/http/messages-zod.ts` en entier, `errorMap` de la prise de rendez-vous, messages par défaut |
+| 4 | zod 4, par `zod/v4` fichier par fichier | **Livrée en S.165** (zod 4.6.5, en une fois : la table de messages est globale). Les 9 350 entrées rejouées contre zod 3 donnent les mêmes acceptations et les mêmes données. `.uuid()` devient `z.guid()`, et `z.unknown()` en champ devient `.optional()`. Trois messages anglais de zod 3 deviennent français |
 | 5 | pg-boss 10 → 11 → 12, deux lots | Migration du schéma `pgboss` au démarrage ; v12 en ESM seul ; fumée de montée à écrire |
 | 6 | Prisma 7 | `prisma.config.ts`, adaptateur `@prisma/adapter-pg`, `build-worker.mjs`, `scripts/migrations.mjs`, CLI de l'image |
 | 7 | vitest 5, `@vitejs/plugin-react` 6, jsdom 29 | Développement seulement |
@@ -1679,4 +1679,16 @@ sites sont réécrits sans effet qui recopie un état :
 La réécriture corrige un écart. Un remplacement déposé rouvrait l'ancienne
 analyse ; il reste désormais à l'écran jusqu'à sa propre analyse. Voir le
 registre, entrée S.164.
+
+**RF-7 (S.165), 10/10/2026, zod 4.** M19 étape 4. Un banc a capturé les
+schémas des 90 routes et du domaine, puis rejoué 9 350 entrées sous zod 3
+et sous zod 4. Les acceptations et les données sont identiques, règles de
+référence comprises (INV-3).
+
+Deux familles de messages changent, volontairement :
+- l'anglais que zod 3 laissait passer (unions discriminées, littéraux,
+  unions) devient français ;
+- une énumération du mauvais type nomme désormais ses valeurs.
+
+Voir le registre, entrée S.165.
 Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.

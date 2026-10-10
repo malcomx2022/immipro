@@ -35,7 +35,7 @@ export const PUT = route({
   corps: z.discriminatedUnion("champ", [
     z.object({
       champ: z.literal("payload"),
-      rules: z.unknown(),
+      rules: z.unknown().optional(),
       sourceUrl: z.string().url().optional(),
       nextReviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
       notes: z.string().max(4000).optional(),

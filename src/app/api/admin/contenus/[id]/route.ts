@@ -68,7 +68,7 @@ export const PUT = route({
   corps: z.object({
     titre: z.string().min(3).max(200),
     chapeau: z.string().max(600),
-    corps: z.unknown(),
+    corps: z.unknown().optional(),
     source: z.string().max(200).optional(),
     verifieeLe: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
     pays: z.string().max(80).optional(),

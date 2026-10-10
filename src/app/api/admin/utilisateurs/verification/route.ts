@@ -25,7 +25,7 @@ export const POST = route({
   acces: "admin",
   limite: "sensible",
   corps: z.object({
-    userId: z.string().uuid(),
+    userId: z.guid(),
     motif: z.string().trim().min(MOTIF_MINIMUM_COMPTE).max(500),
   }),
   async traiter({ corps, acteur }) {

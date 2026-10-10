@@ -46,7 +46,7 @@ export const POST = route({
   acces: "candidat_verifie",
   limite: "sensible",
   corps: z.object({
-    dossierId: z.string().uuid(),
+    dossierId: z.guid(),
     achat: schemaAchat,
     devise: z.enum(["XOF", "EUR"]),
   }),

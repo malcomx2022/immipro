@@ -50,11 +50,11 @@ export const POST = route({
   acces: "candidat_verifie",
   limite: "sensible",
   corps: z.object({
-    dossierId: z.string().uuid(),
+    dossierId: z.guid(),
     creneau: z.string().datetime(),
     /** Case non pré-cochée de T-04. Sans elle, rien ne se réserve. */
     accordDePartage: z.literal(true, {
-      errorMap: () => ({ message: "Le partage du dossier demande ton accord explicite." }),
+      error: "Le partage du dossier demande ton accord explicite.",
     }),
   }),
   async traiter({ corps, params, acteur }) {
