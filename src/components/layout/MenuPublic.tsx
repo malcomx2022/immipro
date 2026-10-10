@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
 import { LienBouton } from "@/components/ui/LienBouton";
@@ -34,13 +34,17 @@ export interface LienDuMenu {
 }
 
 export function MenuPublic({ liens }: { liens: readonly LienDuMenu[] }) {
-  const [ouvert, setOuvert] = useState(false);
   const chemin = usePathname();
-
-  // Une navigation ferme le menu, y compris par le bouton retour.
-  useEffect(() => {
+  const [ouvert, setOuvert] = useState(false);
+  // Une navigation ferme le menu, y compris par le bouton retour. Le
+  // chemin vu au rendu précédent est retenu et comparé pendant le rendu,
+  // sans effet (S.164) : revenir ensuite sur la page de départ ne le
+  // rouvre pas.
+  const [cheminVu, setCheminVu] = useState(chemin);
+  if (chemin !== cheminVu) {
+    setCheminVu(chemin);
     setOuvert(false);
-  }, [chemin]);
+  }
 
   const fermer = () => setOuvert(false);
 

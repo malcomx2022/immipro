@@ -17,7 +17,9 @@ export const metadata: Metadata = {
 
 export default async function PagePaiements() {
   await exigerAdmin("/paiements");
-  const aujourdhui = jourCivil(new Date());
+  // Un seul instant pour le jour et l'âge des certifications (S.164).
+  const maintenant = new Date();
+  const aujourdhui = jourCivil(maintenant);
   const [lignes, anterieurs, operateur, dettes, enAttente] = await Promise.all([
     paiements(aujourdhui),
     ecartsAnterieurs(aujourdhui),
@@ -26,7 +28,6 @@ export default async function PagePaiements() {
     // S.158 — une lecture qui échoue ne retire pas l'écran : elle se tait.
     piecesEnAttenteDeCertification().catch(() => null),
   ]);
-  const maintenant = Date.now();
 
   return (
     <Paiements
@@ -49,7 +50,7 @@ export default async function PagePaiements() {
               lisible: true,
               enAttente: enAttente.nombre,
               depuisHeures: enAttente.plusAncienne
-                ? Math.floor((maintenant - enAttente.plusAncienne.getTime()) / 3_600_000)
+                ? Math.floor((maintenant.getTime() - enAttente.plusAncienne.getTime()) / 3_600_000)
                 : 0,
             })
           : null

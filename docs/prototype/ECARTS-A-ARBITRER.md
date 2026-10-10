@@ -12927,3 +12927,56 @@ Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape
 **R-E02 sur le pilote.** S.162 a été déployée (ad50d39, run du 10/10 à 14 h 24, « antivirus prêt » puis « en service »). Mesurés à 390 px dans Chromium, `/tarifs`, `/`, `/simulateur` et `/destinations` font 390 px, sans erreur de console. Le badge mesure 314 px sur deux lignes et porte `max-w-full`. La ligne R-P10 de la matrice est conforme.
 
 **Non vérifié.** Le dépôt réel d'une pièce depuis un navigateur (protocole §4c, R-P15) reste à faire par le responsable. Il est le seul à prouver la chaîne complète : URL présignée, `PUT`, quarantaine, balayage.
+
+## S.164 — RF-7 : les règles `react-hooks` du React Compiler rétablies
+
+**Autorisation.** Le 10/10/2026, le responsable a choisi ce lot de RF-7 (« Règles react-hooks »). Il clôt la suite de M19 étape 3 (S.144). Il ne touche ni au domaine, ni au schéma, ni aux textes, ni aux drapeaux commerciaux.
+
+**Reproduit.** Sur main c3cdf11, `eslint src` avec les deux règles forcées à `error` relève neuf sites :
+- `purity` (2) :
+  - `Date.now()` dans les pages serveur du journal ;
+  - `Date.now()` dans les pages serveur des paiements. Ce site n'était pas compté dans les huit de S.144.
+- `set-state-in-effect` (7) :
+  - la pièce du dossier ;
+  - les partages et les rendez-vous des consentements ;
+  - l'accueil, le simulateur et les résultats ;
+  - le menu public.
+
+Le nouveau test de la pièce du dossier échoue sur l'ancien code. Le scénario : une analyse est affichée, puis « Téléverser une autre version », puis un fichier est déposé. Dès l'arrivée du fichier, l'écran rouvrait l'**ancienne** analyse. L'effet se relançait au changement de `recu`, puis à chaque objet `analyse` neuf livré par une relecture de la page.
+
+**Livré.**
+- **`eslint.config.mjs`** : `react-hooks/set-state-in-effect` et `react-hooks/purity` passent à `error`. Le commentaire décrit les modèles à suivre ; aucune désactivation n'est posée dans `src`.
+- **Réponses du simulateur** (`src/lib/simulation-session.ts`) : la session devient une source externe lue par `useSyncExternalStore`.
+  - L'instantané vaut `null` au rendu serveur et à l'hydratation.
+  - Sa référence est stable tant que la chaîne stockée ne change pas.
+  - `ecrireReponses` et `effacerReponses` préviennent les abonnés.
+  - Si le stockage refuse d'écrire, la mémoire du module prend le relais : l'écran suit le geste comme avec l'ancien état local.
+- **Accueil, simulateur, résultats** : plus de copie locale des réponses.
+  - Les résultats chargent le classement dans un effet qui n'écrit l'état qu'à la réponse, et l'ignorent si les réponses ont changé entre-temps.
+  - « Réessayer » relance la même lecture.
+  - Les états (lecture, vide, prêt, échec) se déduisent au rendu.
+- **Consentements** : les deux chargements au montage n'écrivent l'état qu'à la réponse. Ils sont annulés si l'écran est quitté avant. La relecture après un retrait ou une annulation est inchangée.
+- **Pièce du dossier** : l'ouverture automatique de l'analyse est ajustée pendant le rendu. Elle compare l'analyse elle-même (heure et fichier), pas l'objet reçu, et ne s'ouvre qu'à l'arrivée d'une analyse **nouvelle** après un dépôt.
+- **Menu public** : le chemin vu au rendu précédent est retenu ; un changement ferme le menu pendant le rendu, sans effet. Revenir sur la page d'ouverture ne le rouvre pas.
+- **Journal et paiements (admin)** : une seule lecture de l'horloge par `new Date()`. Le journal en tire `du` et `au` : deux lectures pouvaient enjamber minuit.
+
+**Vérifications.**
+- `npm run lint` : 0 erreur. Le seul avertissement est antérieur (`purge-stockage.ts:45`, hors périmètre).
+- `npm run check` : 3 552 tests. Les nouveaux :
+  - `tests/configuration-eslint.test.ts` : les deux règles sont à `error` ;
+  - `tests/ui/simulation-session.test.tsx` (4) : lecture, écriture et effacement ; référence stable ; stockage refusé à l'écriture ; stockage illisible ;
+  - `tests/ui/navigation.test.tsx` : le menu se ferme au changement de page, et ne se rouvre pas au retour sur la page d'ouverture ;
+  - `tests/ui/p0-dossier2.test.tsx` : un remplacement déposé reste à l'écran jusqu'à sa propre analyse. Ce test échoue sur l'ancien code.
+- `npm run build`, `npm run check:audit`.
+- Au banc (`npm run recette:banc`), Chromium, script `r-s164` : **19 constats sur 19 conformes**, aucune erreur de console :
+  - accueil : réponse choisie dans la feuille, écrite en session et retrouvée au rechargement ;
+  - simulateur complet puis résultats : même classement au rechargement ;
+  - résultats sans réponse : état vide ;
+  - menu à 390 px : fermé après un lien, par le bouton retour, et pas rouvert par « avancer » ;
+  - consentements de la candidate de démonstration : les deux listes sont lues ;
+  - `/journal` et `/paiements` : rendues en 200.
+- Aucune fumée n'est concernée : ni le worker, ni la base, ni l'image ne changent de comportement.
+
+**Non vérifié.**
+- Le rendu sur `immipro.app` après déploiement.
+- Le passage automatique à la nouvelle analyse au banc : il exige une analyse réelle. Il est couvert par le test d'écran, pas par un parcours.

@@ -215,6 +215,11 @@ export function Consentements() {
   );
 }
 
+/** Les lectures de l'écran : elles ne touchent à aucun état (S.164). */
+const lirePartages = () => appeler<{ partages: Partage[] }>("/api/comptes/partages");
+const lireRendezVous = () =>
+  appeler<{ rendezVous: RendezVousDuCandidat[] }>("/api/comptes/rendez-vous");
+
 /**
  * Les dossiers ouverts à un consultant — RG-12.2.
  *
@@ -229,15 +234,23 @@ function Partages() {
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [enCours, setEnCours] = useState<string | null>(null);
 
-  const lire = useCallback(async () => {
-    const r = await appeler<{ partages: Partage[] }>("/api/comptes/partages");
+  const appliquer = useCallback((r: Awaited<ReturnType<typeof lirePartages>>) => {
     if (r.ok) setPartages(r.donnees.partages);
     else setEchec(r.echec);
   }, []);
+  const lire = useCallback(async () => appliquer(await lirePartages()), [appliquer]);
 
+  // S.164 : la lecture au montage n'écrit l'état qu'à son arrivée, et pas
+  // du tout si l'écran a été quitté entre-temps.
   useEffect(() => {
-    void lire();
-  }, [lire]);
+    let actif = true;
+    void lirePartages().then((r) => {
+      if (actif) appliquer(r);
+    });
+    return () => {
+      actif = false;
+    };
+  }, [appliquer]);
 
   async function retirer(id: string) {
     setEnCours(id);
@@ -329,10 +342,7 @@ function RendezVous() {
   const [suite, setSuite] = useState<string | null>(null);
   const [illisible, setIllisible] = useState(false);
 
-  const lire = useCallback(async () => {
-    const r = await appeler<{ rendezVous: RendezVousDuCandidat[] }>(
-      "/api/comptes/rendez-vous",
-    );
+  const appliquer = useCallback((r: Awaited<ReturnType<typeof lireRendezVous>>) => {
     if (!r.ok) {
       setEchec(r.echec);
       setIllisible(true);
@@ -350,10 +360,19 @@ function RendezVous() {
     setIllisible(false);
     setListe(r.donnees.rendezVous);
   }, []);
+  const lire = useCallback(async () => appliquer(await lireRendezVous()), [appliquer]);
 
+  // S.164 : même lecture au montage que les partages, annulée si l'écran
+  // est quitté avant la réponse.
   useEffect(() => {
-    void lire();
-  }, [lire]);
+    let actif = true;
+    void lireRendezVous().then((r) => {
+      if (actif) appliquer(r);
+    });
+    return () => {
+      actif = false;
+    };
+  }, [appliquer]);
 
   async function annuler(reference: string) {
     setEnCours(reference);

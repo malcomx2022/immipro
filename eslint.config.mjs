@@ -28,19 +28,20 @@ const configuration = [
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       /*
         Deux règles du React Compiler, apportées par `eslint-plugin-react-hooks`
-        v7 avec Next 16, coupées le temps d'un lot dédié (décision du
-        09/10/2026, revue M19 étape 3). Elles relèvent huit sites :
-        - `set-state-in-effect` (7) : lectures de `sessionStorage` après le
-          montage (simulateur, accueil, résultats), chargements au montage
-          (consentements), état dérivé (pièce du dossier), fermeture du
-          menu au changement de page ;
-        - `purity` (1) : `Date.now()` dans la page serveur du journal, rendue
-          une fois par requête.
-        Les réécrire touche l'hydratation des écrans : ce n'est pas une
-        montée de version. Les autres règles nouvelles restent actives.
+        v7 avec Next 16. Coupées à la montée (revue M19 étape 3), rétablies
+        par S.164 une fois leurs sites réécrits :
+        - `set-state-in-effect` : les réponses du simulateur se lisent par
+          `useSyncExternalStore` (simulateur, accueil, résultats), les
+          chargements au montage n'écrivent l'état qu'à la réponse
+          (consentements, résultats), l'état dérivé se calcule au rendu
+          (pièce du dossier, menu public) ;
+        - `purity` : les pages serveur du journal et des paiements lisent
+          l'horloge une seule fois, par `new Date()`.
+        Une nouvelle infraction se réécrit selon ces modèles ; elle ne se
+        désactive pas.
       */
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/purity": "off",
+      "react-hooks/set-state-in-effect": "error",
+      "react-hooks/purity": "error",
     },
   },
 ];

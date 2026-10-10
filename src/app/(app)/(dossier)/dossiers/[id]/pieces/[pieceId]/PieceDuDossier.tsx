@@ -185,10 +185,17 @@ export function PieceDuDossier({
   }, [controleEnCours, router]);
 
   // L'analyse d'un fichier qu'on vient de déposer s'ouvre d'elle-même dès
-  // qu'elle arrive : c'est la suite attendue du geste.
-  useEffect(() => {
+  // qu'elle arrive : c'est la suite attendue du geste. Ajusté au rendu
+  // plutôt que par un effet qui rendait une fois de plus (S.164), et sur
+  // l'analyse elle-même — son fichier et son heure — plutôt que sur l'objet
+  // reçu : chaque relecture de la page en livre un nouveau, et l'écran
+  // revenait à l'ancienne analyse pendant le contrôle d'un remplacement.
+  const cleAnalyse = analyse ? `${analyse.analyseeLe}|${analyse.fichier}` : null;
+  const [cleAnalyseVue, setCleAnalyseVue] = useState(cleAnalyse);
+  if (cleAnalyse !== cleAnalyseVue) {
+    setCleAnalyseVue(cleAnalyse);
     if (recu && analyse) setVue("ANALYSE");
-  }, [recu, analyse]);
+  }
 
   // Le réseau est un état de l'écran, pas une erreur de fin d'envoi : le
   // dire avant que la personne appuie lui évite de croire que son geste a

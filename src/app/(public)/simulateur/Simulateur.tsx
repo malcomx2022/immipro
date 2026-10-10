@@ -13,7 +13,7 @@ import {
   repereEtape,
   type Reponses,
 } from "@/domain/simulateur/questions";
-import { ecrireReponses, lireReponses } from "@/lib/simulation-session";
+import { ecrireReponses, useReponsesDeSession } from "@/lib/simulation-session";
 
 /**
  * P-02 — Simulateur, six questions.
@@ -28,13 +28,12 @@ import { ecrireReponses, lireReponses } from "@/lib/simulation-session";
 export function Simulateur() {
   const router = useRouter();
   const [etape, setEtape] = useState(0);
-  const [reponses, setReponses] = useState<Reponses>({});
+  // Lues à la source (S.164) : plus de copie locale ni d'effet au montage.
+  const reponses: Reponses = useReponsesDeSession() ?? {};
   const titre = useRef<HTMLHeadingElement>(null);
   // Le focus se déplace au changement d'étape, jamais au premier rendu
   // (règle clavier 6 : il ne bouge qu'au changement d'écran).
   const premierRendu = useRef(true);
-
-  useEffect(() => setReponses(lireReponses()), []);
 
   useEffect(() => {
     if (premierRendu.current) {
@@ -49,9 +48,7 @@ export function Simulateur() {
   const choisie = reponses[question.cle];
 
   const repondre = (valeur: string) => {
-    const suivantes = { ...reponses, [question.cle]: valeur };
-    setReponses(suivantes);
-    ecrireReponses(suivantes);
+    ecrireReponses({ ...reponses, [question.cle]: valeur });
   };
 
   // Les flèches choisissent, comme dans tout groupe radio (règle clavier 4,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
 import {
@@ -10,7 +10,7 @@ import {
   type CleQuestion,
   type Reponses,
 } from "@/domain/simulateur/questions";
-import { ecrireReponses, lireReponses } from "@/lib/simulation-session";
+import { ecrireReponses, useReponsesDeSession } from "@/lib/simulation-session";
 
 /**
  * Bloc de départ du simulateur sur P-01 — variante retenue : plein écran.
@@ -25,17 +25,15 @@ import { ecrireReponses, lireReponses } from "@/lib/simulation-session";
  */
 export function AccueilSimulateur() {
   const router = useRouter();
-  const [reponses, setReponses] = useState<Reponses>({});
   const [feuille, setFeuille] = useState<CleQuestion | null>(null);
 
   // Les réponses déjà données dans la session reviennent à l'écran : on ne
-  // redemande pas ce qui a été répondu.
-  useEffect(() => setReponses(lireReponses()), []);
+  // redemande pas ce qui a été répondu. Lues à la source (S.164), elles
+  // n'ont plus de copie locale à tenir à jour.
+  const reponses: Reponses = useReponsesDeSession() ?? {};
 
   const repondre = (cle: CleQuestion, valeur: string) => {
-    const suivantes = { ...reponses, [cle]: valeur };
-    setReponses(suivantes);
-    ecrireReponses(suivantes);
+    ecrireReponses({ ...reponses, [cle]: valeur });
     setFeuille(null);
   };
 

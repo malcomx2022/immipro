@@ -32,4 +32,17 @@ describe("configuration ESLint plate", () => {
     // La règle du dépôt, avec son option.
     expect(config.rules["@typescript-eslint/no-unused-vars"]).toEqual([2, { argsIgnorePattern: "^_" }]);
   }, 60_000);
+
+  /*
+    S.164 (RF-7, M19 étape 3) : les deux règles du React Compiler coupées le
+    09/10/2026 sont rétablies, après réécriture des neuf sites. Une
+    réouverture se verrait ici avant de se voir dans le code.
+  */
+  it("set-state-in-effect et purity sont actives", async () => {
+    const config = (await new ESLint().calculateConfigForFile("src/app/layout.tsx")) as {
+      rules: Record<string, unknown[]>;
+    };
+    expect(config.rules["react-hooks/set-state-in-effect"]?.[0]).toBe(2);
+    expect(config.rules["react-hooks/purity"]?.[0]).toBe(2);
+  }, 60_000);
 });

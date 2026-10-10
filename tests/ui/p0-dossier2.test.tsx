@@ -890,6 +890,57 @@ describe("C-07 — ce que l'écran dit une fois le fichier envoyé", () => {
     vi.unstubAllGlobals();
   });
 
+  /*
+    S.164 — l'ouverture de l'analyse suit l'analyse, pas l'objet reçu.
+    L'effet d'avant se relançait à l'arrivée du fichier et à chaque
+    relecture de la page : un remplacement déposé rouvrait aussitôt
+    l'ancienne analyse, avant même que la nouvelle existe.
+  */
+  it("un remplacement déposé reste à l'écran jusqu'à sa propre analyse", async () => {
+    global.fetch = vi.fn().mockImplementation((_url: string, options?: RequestInit) => {
+      const corps =
+        options?.method === "PUT"
+          ? { versionId: "v2", etat: "EN_ANALYSE", analyseraLaPiece: true }
+          : { depot: { url: "https://stockage.test/depot", cle: "cle" }, analyseraLaPiece: true };
+      return Promise.resolve({ ok: true, status: 200, json: async () => corps } as Response);
+    });
+    vi.stubGlobal("XMLHttpRequest", EnvoiReussi);
+    const piece = (analyse: typeof ANALYSE_RESSOURCES) => (
+      <PieceDuDossier
+        dossier={DOSSIER}
+        piece={attestation}
+        quota={QUOTA}
+        analyse={analyse}
+        prixRecharge="3 000 F"
+        volumeRecharge={10}
+      />
+    );
+
+    const { container, rerender } = render(piece(ANALYSE_RESSOURCES));
+    fireEvent.click(screen.getByRole("button", { name: "Téléverser une autre version" }));
+    const champ = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const fichier = new File(["%PDF-1.4"], "releve-v2.pdf", { type: "application/pdf" });
+    Object.defineProperty(fichier, "arrayBuffer", {
+      value: async () => new TextEncoder().encode("%PDF-1.4").buffer,
+    });
+    fireEvent.change(champ, { target: { files: [fichier] } });
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter la pièce" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("« releve-v2.pdf » est bien arrivé"),
+    );
+
+    // Une relecture de la page rend la même analyse, dans un nouvel objet.
+    rerender(piece({ ...ANALYSE_RESSOURCES }));
+    expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe("Résultat d'analyse");
+
+    // La nouvelle analyse arrive : elle s'ouvre d'elle-même.
+    rerender(
+      piece({ ...ANALYSE_RESSOURCES, fichier: "releve-v2.pdf", analyseeLe: "2026-09-18T10:00:00Z" }),
+    );
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Résultat d'analyse");
+    vi.unstubAllGlobals();
+  });
+
   it("dit que le contrôle est en cours, sans promettre au-delà", () => {
     rendrePiece({
       piece: passeport,

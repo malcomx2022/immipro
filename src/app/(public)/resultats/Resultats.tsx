@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
@@ -13,7 +13,7 @@ import { perimetreDuClassement, type Motif } from "@/domain/simulateur/classemen
 import { resumeReponses, type Reponses } from "@/domain/simulateur/questions";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
-import { lireReponses } from "@/lib/simulation-session";
+import { useReponsesDeSession } from "@/lib/simulation-session";
 import { lienOuvrirUnDossier } from "@/domain/comptes/entree-dossier";
 
 /**
@@ -66,27 +66,54 @@ type Etat =
   | { phase: "echec"; echec: EchecCandidat; reponses: Reponses }
   | { phase: "prete"; reponses: Reponses; classement: Classement };
 
-export function Resultats({ connecte = false }: { connecte?: boolean }) {
-  const [etat, setEtat] = useState<Etat>({ phase: "lecture" });
+/** La réponse du serveur, rattachée aux réponses qu'elle classe. */
+type Issue =
+  | { pour: Reponses; ok: true; classement: Classement }
+  | { pour: Reponses; ok: false; echec: EchecCandidat };
 
-  const classer = useCallback(async (reponses: Reponses) => {
-    setEtat({ phase: "lecture" });
-    const resultat = await appeler<Classement>("/api/simulations", { corps: reponses });
-    setEtat(
-      resultat.ok
-        ? { phase: "prete", reponses, classement: resultat.donnees }
-        : { phase: "echec", echec: resultat.echec, reponses },
-    );
-  }, []);
+export function Resultats({ connecte = false }: { connecte?: boolean }) {
+  /*
+    S.164 — l'état se déduit au rendu au lieu d'être recopié par un effet.
+    Les réponses viennent de la session (`null` tant qu'elles ne sont pas
+    lues) ; seule la réponse du serveur est un état, écrite à son arrivée.
+    Une issue qui ne porte pas les réponses courantes ne s'affiche pas :
+    c'est encore la lecture.
+  */
+  const reponses = useReponsesDeSession();
+  const [issue, setIssue] = useState<Issue | null>(null);
+  const [essai, setEssai] = useState(0);
 
   useEffect(() => {
-    const reponses = lireReponses();
-    if (Object.keys(reponses).length === 0) {
-      setEtat({ phase: "vide" });
-      return;
-    }
-    void classer(reponses);
-  }, [classer]);
+    if (!reponses || Object.keys(reponses).length === 0) return;
+    let actif = true;
+    void appeler<Classement>("/api/simulations", { corps: reponses }).then((resultat) => {
+      if (!actif) return;
+      setIssue(
+        resultat.ok
+          ? { pour: reponses, ok: true, classement: resultat.donnees }
+          : { pour: reponses, ok: false, echec: resultat.echec },
+      );
+    });
+    return () => {
+      actif = false;
+    };
+  }, [reponses, essai]);
+
+  const reessayer = () => {
+    setIssue(null);
+    setEssai((n) => n + 1);
+  };
+
+  const etat: Etat =
+    reponses === null
+      ? { phase: "lecture" }
+      : Object.keys(reponses).length === 0
+        ? { phase: "vide" }
+        : issue === null || issue.pour !== reponses
+          ? { phase: "lecture" }
+          : issue.ok
+            ? { phase: "prete", reponses, classement: issue.classement }
+            : { phase: "echec", echec: issue.echec, reponses };
 
   if (etat.phase === "lecture") return <Chargement />;
   if (etat.phase === "vide") return <Vide />;
@@ -101,7 +128,7 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
           Tes destinations
         </h1>
         <BlocEchec echec={etat.echec}>
-          <Button onClick={() => void classer(etat.reponses)}>{etat.echec.action}</Button>
+          <Button onClick={reessayer}>{etat.echec.action}</Button>
           <Link href="/simulateur" className="text-14 font-medium text-ink-700 underline">
             Modifier mes réponses
           </Link>
