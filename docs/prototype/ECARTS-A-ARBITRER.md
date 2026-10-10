@@ -12977,9 +12977,19 @@ Le nouveau test de la pièce du dossier échoue sur l'ancien code. Le scénario 
   - `/journal` et `/paiements` : rendues en 200.
 - Aucune fumée n'est concernée : ni le worker, ni la base, ni l'image ne changent de comportement.
 
-**Non vérifié.**
-- Le rendu sur `immipro.app` après déploiement.
-- Le passage automatique à la nouvelle analyse au banc : il exige une analyse réelle. Il est couvert par le test d'écran, pas par un parcours.
+**Déploiement, relevé le 10/10/2026.** e032dbd (run 530, « Déploiement ») est en service à 16 h 17 :
+- les trois jobs sont verts ;
+- `deployer.sh` a écrit « antivirus prêt après 6 s » puis « e032dbd est en service » ;
+- `/api/health` répond 200 ;
+- le prévol CORS du stockage est inchangé : 200 depuis `https://immipro.app` sur les deux seaux, 403 pour une autre origine.
+
+Dans Chromium à 390 px sur `immipro.app`, sans compte ni écriture côté serveur, **12 constats sur 12 sont conformes**, sans erreur de console :
+- l'accueil retrouve la réponse au rechargement, sans débordement ;
+- le simulateur reprend cette réponse ;
+- les résultats sans réponse affichent l'état vide ;
+- le menu se ferme après un lien et par le bouton retour, et ne se rouvre pas en revenant.
+
+**Non vérifié.** Le passage automatique à la nouvelle analyse après un remplacement : il exige un dépôt et une analyse réels. Le test d'écran le couvre, pas un parcours.
 
 ## S.165 — RF-7 : zod 4 (M19 étape 4)
 
@@ -13033,3 +13043,4 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
   
   Le garde-fou sur `z.unknown()` échoue si l'on retire `.optional()`.
 - `npm run check` : 3 563 tests, 0 erreur de lint. `npm run build` et `npm run check:audit` passent aussi.
+- Les 25 fumées de la porte passent, dans l'ordre de la CI, sur la base locale. Elles comprennent `smoke:worker -- --base` et `smoke:graine`, qui relit le référentiel depuis son paquet. `sandbox:paiement` s'abstient, faute de clés.
