@@ -134,7 +134,7 @@ jobs:
       # attendait, sans doublon, et un retour arrière retrouve son schéma.
       - name: Montée des files
         run: npm run smoke:files
-      - run: echo "- **Montée des files** — base de pg-boss 10 reprise par pg-boss 11, sans perte ni doublon, retour arrière intact" >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "- **Montée des files** — pg-boss 10 puis 11 repris par pg-boss 12, sans perte ni doublon, deux retours arrière intacts" >> "$GITHUB_STEP_SUMMARY"
 
       # Le référentiel de règles se charge depuis l'image (dist/graine-regles.js) :
       # sans lui, une production neuve n'a aucune fiche, et B-02 ne crée pas de règle.

@@ -13158,7 +13158,15 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 - Les 26 fumées de la porte passent, dans l'ordre de la CI, `smoke:files` comprise. `sandbox:paiement` s'abstient, faute de clés. `smoke:worker -- --base` a d'abord échoué sur l'import par défaut de pg-boss resté dans la fumée elle-même (`PgBoss is not a constructor`). Après correction, il passe : le worker construit démarre, crée ses 15 files et ses cadences, redémarre sans doublon et s'arrête proprement sur SIGTERM.
 - **Image** : construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image` sur cette image. Le worker, le service `app` et la passerelle antivirus démarrent depuis l'artefact. pg-boss est embarqué dans `dist/worker.js` ; ni `pg-boss-10` ni `pg-boss-11` ne sont dans l'image.
 
+**Déploiement, relevé le 10/10/2026.** 6cc1299 (run 534) est en service à 22 h 53, **sans retour arrière** :
+- les trois jobs sont verts, `Montée des files` comprise. Les 105 écritures interdites sont refusées par les garde-fous, et l'antivirus est prêt après 6 s ;
+- `/api/health` répond 200 (`{"status":"pilote","db":"up"}`) ;
+- préflight du stockage : 200 pour `https://immipro.app`, 403 pour une autre origine. Un POST d'une autre origine reçoit le 403 français « Cette demande ne vient pas d'ImmiPro » ;
+- parcours public à 390 px (`r-s164-pilote.mjs`) : 12 constats conformes sur 12.
+- La sonde de `deployer.sh` exige « worker démarré » : le worker sous pg-boss 12 a donc démarré sur la base réelle.
+- Le résumé de la porte décrivait encore la montée 10 → 11. Il dit désormais 10 puis 11 → 12 (`validation.yml`, texte seul).
+
 **Non vérifié.**
-- La migration réelle de `taches` (26 → 45) en production, au premier démarrage de l'image S.168.
+- La version du schéma `taches` atteinte en production (45 attendue) : le journal et la base ne sont pas lisibles depuis la session. Le responsable la relève avec `docker compose -f docker-compose.prod.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT version FROM taches.version"'`, et lit le journal du worker (`docker compose -f docker-compose.prod.yml logs worker | grep -iE 'pg-boss|\[files\]|erreur'`).
 - Un retour arrière réel vers l'image S.166 sur le schéma migré : il n'est éprouvé que sur la base jetable de `smoke:files`.
 - La suppression de `pgboss`, `pg-boss-10` et `pg-boss-11` reste à faire, une fois ces retours arrière exclus.
