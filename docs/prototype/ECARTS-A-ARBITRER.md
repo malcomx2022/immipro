@@ -13166,7 +13166,11 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 - La sonde de `deployer.sh` exige « worker démarré » : le worker sous pg-boss 12 a donc démarré sur la base réelle.
 - Le résumé de la porte décrivait encore la montée 10 → 11. Il dit désormais 10 puis 11 → 12 (`validation.yml`, texte seul).
 
+**Relevé du responsable sur le VPS, 10/10/2026, après 3102c74 (PR #270).**
+- `taches.version` vaut **45** : la montée de schéma 26 → 45 est vérifiée en production.
+- `pgboss.version` vaut 24 : l'ancien schéma est intact, conservé pour le retour arrière.
+- Le worker a démarré sans erreur. Ses sondes disent `messagerie : envoye` et `antivirus : reconnu`.
+
 **Non vérifié.**
-- La version du schéma `taches` atteinte en production (45 attendue) : le journal et la base ne sont pas lisibles depuis la session. Le responsable la relève avec `docker compose -f docker-compose.prod.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT version FROM taches.version"'`, et lit le journal du worker (`docker compose -f docker-compose.prod.yml logs worker | grep -iE 'pg-boss|\[files\]|erreur'`).
 - Un retour arrière réel vers l'image S.166 sur le schéma migré : il n'est éprouvé que sur la base jetable de `smoke:files`.
 - La suppression de `pgboss`, `pg-boss-10` et `pg-boss-11` reste à faire, une fois ces retours arrière exclus.
