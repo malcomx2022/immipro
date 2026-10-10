@@ -1,4 +1,6 @@
 import PgBoss from "pg-boss";
+import { SCHEMA_DES_FILES } from "@/domain/exploitation/bascule-des-files";
+import { transfererLesTachesDePgBoss10 } from "@/lib/transfert-des-files";
 
 export const JOBS = {
   /** Balayage antivirus, avant toute promotion (I.D, WF-06 étape 2). */
@@ -125,7 +127,7 @@ export const FILES: readonly string[] = Object.values(JOBS);
  * reprises : `balayerUnePiece` ne lève pas dans ce cas et la tâche
  * s'achève sur `BLOQUEE`, incident ouvert.
  */
-export const REPRISES: Readonly<Record<string, PgBoss.RetryOptions>> = {
+export const REPRISES: Readonly<Record<string, PgBoss.QueueOptions>> = {
   [JOBS.BALAYAGE_PIECE]: { retryLimit: 6, retryDelay: 10, retryBackoff: true },
   /*
     L'extraction est branchée sur un service réel (22/09/2026), et DOC-11
@@ -165,8 +167,8 @@ export const REPRISES: Readonly<Record<string, PgBoss.RetryOptions>> = {
 export async function declarerLesFiles(instance: PgBoss): Promise<void> {
   for (const nom of FILES) {
     const reprises = REPRISES[nom];
-    await instance.createQueue(nom, reprises ? { name: nom, ...reprises } : undefined);
-    if (reprises) await instance.updateQueue(nom, { name: nom, ...reprises });
+    await instance.createQueue(nom, reprises ? { ...reprises } : undefined);
+    if (reprises) await instance.updateQueue(nom, { ...reprises });
   }
 }
 
@@ -175,9 +177,15 @@ let demarrage: Promise<PgBoss> | null = null;
 
 async function demarrer(): Promise<PgBoss> {
   try {
-    const instance = new PgBoss(process.env.DATABASE_URL!);
+    /*
+      pg-boss 11 dans son propre schéma — S.166. Il ne sait pas migrer
+      celui de la version 10 ; ce qui y attendait est reposé ici, une
+      fois, après la déclaration des files (sans file, pas d'envoi).
+    */
+    const instance = new PgBoss({ connectionString: process.env.DATABASE_URL!, schema: SCHEMA_DES_FILES });
     await instance.start();
     await declarerLesFiles(instance);
+    await transfererLesTachesDePgBoss10(instance, FILES);
     return instance;
   } catch (erreur) {
     // Un démarrage raté ne se met pas en cache : la base peut revenir, et

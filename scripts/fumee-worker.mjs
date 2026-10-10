@@ -556,9 +556,9 @@ if (process.argv.includes("--base")) {
     // Les files internes de pg-boss ne nous regardent pas.
     const files = await executer(
       cible,
-      "select name from pgboss.queue where name not like '\\_\\_pgboss\\_\\_%' order by name",
+      "select name from taches.queue where name not like '\\_\\_pgboss\\_\\_%' order by name",
     );
-    const plans = await executer(cible, "select name, cron from pgboss.schedule order by name");
+    const plans = await executer(cible, "select name, cron from taches.schedule order by name");
     return {
       files: files.rows.map((l) => l.name),
       plans: plans.rows.map((l) => `${l.name} → ${l.cron}`),
@@ -595,7 +595,8 @@ if (process.argv.includes("--base")) {
       worker arrêté, vérifie que chaque file déclarée accepte réellement
       un job — c'est ce qui manquait au dépôt d'une pièce.
     */
-    const producteur = new PgBoss(cible.toString());
+    // Le schéma de pg-boss 11 — S.166 : celui que le worker emploie.
+    const producteur = new PgBoss({ connectionString: cible.toString(), schema: "taches" });
     await producteur.start();
     try {
       for (const nom of second.files) {
