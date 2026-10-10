@@ -8,7 +8,7 @@
  * d'incident, sans file de jobs.
  */
 import { getQueue, JOBS, poster } from "@/lib/queue";
-import { sonderLesServices } from "@/server/exploitation/sondes";
+import { reprendreLeMoteurAuDemarrage, sonderLesServices } from "@/server/exploitation/sondes";
 import { demarrerLeBattement } from "./battement";
 import { arreterProprement } from "./arret";
 import { passeDeRetention } from "./retention";
@@ -359,7 +359,16 @@ async function main() {
   // Et une fois tout de suite : attendre l'heure ronde laisserait
   // l'instance sans constat pendant jusqu'à soixante minutes après un
   // déploiement, c'est-à-dire exactement quand on la regarde.
-  console.info("[sondes]", await sonderLesServices());
+  const sondesDuDemarrage = await sonderLesServices();
+  console.info("[sondes]", sondesDuDemarrage);
+
+  // Un moteur muet au démarrage est souvent un clamd qui charge encore ses
+  // signatures : le réessayer toutes les 30 s pendant 10 min, à côté du
+  // travail, plutôt qu'attendre l'heure pile en 503 (S.161, constat du
+  // 09/10/2026). Rien n'attend cette boucle.
+  void reprendreLeMoteurAuDemarrage(sondesDuDemarrage.antivirus).catch((erreur: unknown) =>
+    console.warn("[sondes] reprise de l'antivirus interrompue", erreur),
+  );
 
   // La sonde du conteneur lit ce battement (M15) : un worker figé cesse de
   // battre, et `docker compose ps` le dit `unhealthy`.

@@ -608,6 +608,114 @@ if (process.argv.includes("--base")) {
   } finally {
     await executer(administration, `DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
   }
+
+  /*
+    Le démarrage à froid de l'antivirus — S.161, constat du 09/10/2026.
+
+    clamd chargeait encore ses signatures quand le worker a démarré : le
+    moteur muet a laissé l'instance en 503, et seule une relance du worker
+    l'en a sortie. Ici, la passerelle d'essai répond 503 au premier appel,
+    puis reconnaît EICAR. Le paquet du worker doit écrire le constat
+    « reconnu » de lui-même, sans relance, au premier nouvel essai (30 s).
+    La base est migrée : le constat vit dans `ServiceProbe`.
+  */
+  console.log("\nDémarrage avant clamd (S.161)");
+  // Une base à part : les jobs d'essai postés plus haut seraient traités
+  // par ce worker, dont la sonde des services, et brouilleraient le constat.
+  const froid = new URL(cible);
+  froid.pathname = `/${nomBase}_froid`;
+  await executer(administration, `DROP DATABASE IF EXISTS ${nomBase}_froid WITH (FORCE)`);
+  await executer(administration, `CREATE DATABASE ${nomBase}_froid`);
+  try {
+    const migration = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+      cwd: RACINE,
+      encoding: "utf8",
+      env: { ...process.env, DATABASE_URL: froid.toString() },
+    });
+    verifier(migration.status === 0, "la base jetable est migrée");
+
+    const { createServer } = await import("node:http");
+    let appelsPasserelle = 0;
+    const passerelle = createServer((requete, reponse) => {
+      requete.resume();
+      requete.on("end", () => {
+        appelsPasserelle += 1;
+        if (appelsPasserelle === 1) {
+          reponse.writeHead(503, { "Content-Type": "application/json" });
+          reponse.end('{"error":"clamd injoignable"}');
+        } else {
+          reponse.writeHead(200, { "Content-Type": "application/json" });
+          reponse.end('{"status":"infected","signature":"Eicar-Test-Signature"}');
+        }
+      });
+    });
+    await new Promise((ok) => passerelle.listen(0, "127.0.0.1", ok));
+    const portPasserelle = passerelle.address().port;
+
+    const journalFroid = join(mkdtempSync(join(tmpdir(), "fumee-froid-")), "worker.log");
+    const fd = openSync(journalFroid, "w");
+    const enfant = spawn(commandeWorker[0], commandeWorker.slice(1), {
+      cwd: RACINE,
+      stdio: ["ignore", fd, fd],
+      env: {
+        ...process.env,
+        DATABASE_URL: froid.toString(),
+        NODE_ENV: "production",
+        ANTIVIRUS_URL: `http://127.0.0.1:${portPasserelle}/balayer`,
+      },
+    });
+    closeSync(fd);
+    let arrete = false;
+    enfant.on("exit", () => {
+      arrete = true;
+    });
+    const lireFroid = () => (existsSync(journalFroid) ? readFileSync(journalFroid, "utf8") : "");
+    const constat = async () =>
+      (
+        await executer(
+          froid,
+          `select succeeded from "ServiceProbe" where service = 'antivirus'`,
+        ).catch(() => ({ rows: [] }))
+      ).rows[0]?.succeeded;
+
+    try {
+      const limiteDemarrage = Date.now() + 90_000;
+      while (Date.now() < limiteDemarrage && !arrete && !lireFroid().includes("worker démarré")) {
+        await new Promise((suite) => setTimeout(suite, 200));
+      }
+      verifier(lireFroid().includes("worker démarré"), "le worker démarre, moteur muet");
+      verifier(
+        (await constat()) === false,
+        "le constat du démarrage dit le moteur muet : l'instance est inapte",
+      );
+
+      const limiteReprise = Date.now() + 75_000;
+      while (Date.now() < limiteReprise && !arrete && (await constat()) !== true) {
+        await new Promise((suite) => setTimeout(suite, 500));
+      }
+      verifier(
+        (await constat()) === true,
+        `sans relance, le worker réessaie et le constat devient « reconnu » (${appelsPasserelle} appel(s) à la passerelle)`,
+      );
+      verifier(
+        /\[sondes\] antivirus reconnu après 1 essai\(s\)/u.test(lireFroid()),
+        "le journal du worker le dit",
+      );
+    } finally {
+      if (!arrete) {
+        enfant.kill("SIGTERM");
+        await new Promise((suite) => enfant.once("exit", suite));
+      }
+      await new Promise((ok) => {
+        passerelle.closeAllConnections();
+        passerelle.close(() => ok());
+      });
+    }
+    if ((await constat()) !== true)
+      console.log(`\n--- sortie observée ---\n${lireFroid().trim()}\n`);
+  } finally {
+    await executer(administration, `DROP DATABASE IF EXISTS ${nomBase}_froid WITH (FORCE)`);
+  }
 }
 
 console.log(

@@ -12846,3 +12846,48 @@ Tout cela est rangé dans `docs/recette/protocole-pilote.md`. Pour chaque étape
 - Le run réel de la porte et du déploiement sur GitHub : il se verra sur la PR, puis au déploiement qui suivra la fusion.
 - Le VPS tire toujours ses images de Docker Hub (`deployer.sh`, `compose pull`). Elles sont épinglées et déjà présentes. Ce tirage ne se fait qu'une fois par déploiement, depuis l'adresse du VPS, et n'a jamais échoué. Il n'est pas changé : changer la référence d'une image du compose recréerait le conteneur, base comprise.
 - `scripts/restauration-controle.sh` se lance à la main hors du VPS. Il garde `postgres:16-alpine` par défaut, que `IMAGE_POSTGRES` remplace.
+
+## S.161 — RF-7 : le démarrage à froid de l'antivirus
+
+**Autorisation et choix.** Le responsable a choisi ce lot de RF-7 le 10/10/2026. Il traite le constat d'exploitation du 09/10/2026 (déploiement de 87fbdef), sur les pistes 3 et 4 recommandées. Pour `deployer.sh`, il a choisi « attendre puis signaler » : un clamd encore en chargement ne déclenche pas de retour arrière, et le journal le dit. Le lot ne change ni schéma, ni compose, ni règle métier en dehors de la reprise du moteur.
+
+**Reproduit sur l'ancien code.**
+- Un paquet `dist/worker.js` démarré sur une base migrée, face à une passerelle qui répond 503 au premier appel puis reconnaît EICAR :
+  - le constat reste « muet » ;
+  - un seul appel est fait à la passerelle en 75 s ;
+  - l'instance reste inapte jusqu'à la passe horaire.
+- `deployer.sh` avec clamd en `starting` et la nouvelle version en 503 : retour arrière.
+
+**Livré.**
+- **La règle** (`src/domain/exploitation/reprise-du-moteur.ts`) :
+  - seul un moteur muet se reprend ;
+  - 30 s entre deux essais, 10 min au plus. La fenêtre couvre le `start_period` de la passerelle (180 s) et un premier chargement des signatures.
+- **Le worker** (`sondes.ts`, `worker.ts`) :
+  - `sonderLeMoteur` isole la sonde du moteur et son constat ; `sonderLesServices` l'emploie.
+  - `reprendreLeMoteurAuDemarrage` réessaie après un démarrage muet. Elle n'est pas attendue : le worker travaille pendant ce temps. Ses minuteries ne retiennent pas le processus, et l'arrêt propre (M9) n'a rien à défaire.
+  - Le journal dit le début de la reprise et son issue (`[sondes] antivirus reconnu après N essai(s)`, ou « la passe horaire prend la suite »).
+  - Aucun `depends_on` n'est ajouté : la purge et les paiements tournent pendant ce temps, comme le compose l'a décidé.
+- **`deployer.sh`.** Après `up -d`, le script attend que `clamav` et `antivirus` soient `healthy`, 300 s au plus (`IMMIPRO_ANTIVIRUS_ATTENTE`). Au bout de la borne :
+  - **clamd n'est pas prêt** (image tierce que le déploiement ne change pas) : avertissement, la sonde n'exige plus le 200, pas de retour arrière pour cette seule raison. La ligne du journal porte « (antivirus pas encore prêt) ». La base et « worker démarré » restent exigés : une base muette fait toujours revenir en arrière.
+  - **clamd est prêt mais pas la passerelle** (notre image) : la sonde reste stricte.
+  - **Aucun antivirus dans le compose** : rien n'est attendu.
+- **Documentation** : `docs/exploitation/deploiement.md` (étapes 5 et 6, paragraphe « démarrage à froid ») et DOC-11, RG-06.14.
+
+**Vérifications.**
+- `tests/reprise-du-moteur.test.ts` (8) : la règle, la fenêtre contre le `start_period` du compose, la reprise avec une horloge simulée, et le branchement dans le worker.
+- `tests/deployer.test.ts` (5 nouveaux, 18 au total) : antivirus prêt, clamd en chargement, base muette, passerelle seule en défaut, sans antivirus.
+- Les nouveaux tests échouent sur l'ancien code.
+- `smoke:balayage`, section « Un worker démarré avant clamd ». Avec le vrai moteur d'essai et la vraie base :
+  - le moteur est muet, le balayage en panne ;
+  - clamd prêt, rien ne change sans nouvel essai ;
+  - avec la reprise, le balayage devient opérationnel ;
+  - un moteur toujours absent s'arrête à la borne.
+- `smoke:worker -- --base`, troisième démarrage : le **paquet** du worker, sur une base jetable migrée, obtient le constat « reconnu » de lui-même au premier nouvel essai. Sur l'ancien paquet : ✗.
+- `npm run check` : 3 544 tests.
+- `npm run check:audit`, `shellcheck`.
+- Les 25 fumées de la porte, `smoke:worker -- --base` compris. Ce mode ajoute environ 35 s à la porte : une migration de base jetable, puis un nouvel essai à 30 s.
+- `smoke:worker -- --image` sur l'image construite par BuildKit avec le miroir de S.160. Pour cet essai local seulement, le certificat du proxy de la session est ajouté au Dockerfile.
+
+**Non vérifié.**
+- Un vrai clamd en chargement sur le VPS : le prochain déploiement qui recrée `clamav`, ou un redémarrage du VPS, le montrera dans le journal du worker (`[sondes] antivirus reconnu après N essai(s)`).
+- La lecture de `docker inspect` contre le Docker du VPS : les tests emploient un faux `docker`.
