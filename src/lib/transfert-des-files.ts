@@ -1,4 +1,4 @@
-import type PgBoss from "pg-boss";
+import type { PgBoss } from "pg-boss";
 import { db } from "@/lib/db";
 import {
   ETATS_A_TRANSFERER,

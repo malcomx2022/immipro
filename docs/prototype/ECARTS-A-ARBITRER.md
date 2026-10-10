@@ -13127,3 +13127,31 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 **Non vérifié.**
 - Le journal du worker (`[files] pg-boss 10 → schéma neuf : …`) : il n'est pas lisible depuis la session. Le responsable le relève avec `docker compose -f docker-compose.prod.yml logs worker | grep '\[files\]'` ; aucune ligne signifie qu'aucune tâche n'attendait.
 - Un retour arrière réel vers l'image d'avant S.166 : il n'est éprouvé que sur la base jetable de `smoke:files`.
+
+## S.168 — RF-7 : pg-boss 12, migration sur place de `taches` (M19 étape 5, fin)
+
+**Autorisation.** Le 10/10/2026, le responsable a choisi ce lot de RF-7 (« pg-boss 12 »), seconde moitié de l'étape 5 de M19. Le numéro S.167 ayant été pris par la revue complémentaire (PR #268, fusionnée sur main d6437cb), ce lot reprend main d6437cb et prend S.168. Il ne touche ni au domaine métier, ni au schéma Prisma, ni aux drapeaux commerciaux, et conserve S.166 (schéma `taches`, transfert depuis `pgboss`) et S.167.
+
+**Ce que la montée change.**
+- **pg-boss 12 n'est publié qu'en ESM** et n'a plus d'export par défaut : `import { PgBoss } from "pg-boss"`. Le paquet CommonJS du worker (esbuild) l'embarque sans difficulté : pg-boss 12 n'utilise ni `import.meta` ni `await` de premier niveau. `dist/worker.js` passe de 4,1 à 4,9 Mo.
+- **`stop({ wait })` disparaît** : `stop` attend désormais toujours la fin. L'arrêt propre du worker (`arret.ts`) garde `graceful` et son délai.
+- **`getQueueStats` rend un tableau** (fumée de balayage).
+- **Le schéma** : pg-boss 12 enchaîne ses migrations depuis la version 25. Il **migre `taches` sur place** de 26 (pg-boss 11) à 45, sans nouveau schéma ni transfert. Sur `pgboss` (version 24), il refuse, comme pg-boss 11 : la raison du schéma neuf de S.166 tient toujours.
+
+**Reproduit et éprouvé sur base jetable, avant toute décision.**
+- pg-boss 12 sur `taches` écrit par pg-boss 11.1.2 : migré en 45. La tâche en attente, la tâche différée et le planning sont gardés.
+- **Retour arrière** : l'image S.166 (pg-boss 11) sur le schéma migré démarre, poste, traite, planifie et marque un échec voulu. Pendant 15 s, avec supervision, maintenance et surveillance des plannings forcées chaque seconde, elle ne lève aucune erreur. La migration sur place est donc sûre pour le retour arrière automatique de `deployer.sh`, sans avoir besoin d'un nouveau schéma.
+
+**Livré.**
+- `pg-boss` ^12.37.1 ; l'import nommé dans `queue.ts`, `transfert-des-files.ts` et `arret.ts`.
+- `npm run smoke:files`, réécrite pour rejouer le chemin réel de la production, chaque état écrit par la vraie version :
+  - `pgboss` par 10.4.2, puis `taches` par 11.1.2, puis la montée par `getQueue()` (12) ;
+  - le refus sur `pgboss`, la migration de `taches`, la conservation des tâches et des plannings, le transfert de ce qui restait dans `pgboss` ;
+  - deux transferts concurrents, le traitement par la version 12, la supervision des deux schémas ;
+  - **les deux retours arrière** : l'image S.166 sur `taches` migré, et l'image d'avant S.166 sur `pgboss`.
+- `pg-boss-11` (11.1.2, épinglée) rejoint `pg-boss-10` en dépendance de développement réservée à la fumée. Un test en garde l'épinglage et l'absence des dépendances de production.
+- `docs/exploitation/deploiement.md` : paragraphe « pg-boss 12 (S.168) ».
+
+**Vérifications.**
+- `smoke:files` passe du premier coup : 9 étapes, toutes vertes.
+- `npm run check` : 3 582 tests, 0 erreur de lint. `npm run build` passe ; les 7 messages `prisma:error … DATABASE_URL` sont ceux des builds précédents, antérieurs à ce lot. `npm run check:audit` passe.

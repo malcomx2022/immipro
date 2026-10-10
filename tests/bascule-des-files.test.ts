@@ -81,6 +81,18 @@ describe("le branchement", () => {
     );
   });
 
+  it("les versions d'avant ne servent qu'à la fumée : épinglées, en développement seulement (S.168)", () => {
+    const paquet = JSON.parse(readFileSync("package.json", "utf8")) as {
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    expect(paquet.devDependencies["pg-boss-10"]).toBe("npm:pg-boss@10.4.2");
+    expect(paquet.devDependencies["pg-boss-11"]).toBe("npm:pg-boss@11.1.2");
+    expect(paquet.dependencies["pg-boss-10"]).toBeUndefined();
+    expect(paquet.dependencies["pg-boss-11"]).toBeUndefined();
+    expect(paquet.dependencies["pg-boss"]).toMatch(/^\^12\./u);
+  });
+
   it("la fumée de montée fait partie de la porte", () => {
     const porte = readFileSync(".github/workflows/validation.yml", "utf8");
     expect(porte).toMatch(/run: npm run smoke:files/u);

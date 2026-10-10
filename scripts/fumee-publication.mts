@@ -2297,7 +2297,7 @@ try {
     `DROP` — et, pire, la coupure remonte en `error` non traité qui masque
     le bilan de la fumée.
   */
-  await (await getQueue()).stop({ wait: true }).catch(() => {});
+  await (await getQueue()).stop().catch(() => {});
   await db.$disconnect();
   await surLAdministration(`DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
 }

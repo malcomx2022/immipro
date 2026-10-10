@@ -1,27 +1,32 @@
 /**
- * La montée des files, de pg-boss 10 à pg-boss 11 — S.166, M19 étape 5.
+ * La montée des files — S.166 (pg-boss 10 → 11), S.168 (11 → 12), M19
+ * étape 5.
  *
- * pg-boss 11 ne sait pas migrer une base de pg-boss 10 : il travaille
- * dans un schéma neuf (`taches`), et ce qui attendait dans l'ancien
- * (`pgboss`) y est reposé au démarrage. La règle est dans
- * `src/domain/exploitation/bascule-des-files.ts`.
+ * La production a vécu deux bascules, et la fumée les rejoue dans l'ordre
+ * sur une base jetable, chaque état écrit par la vraie version :
  *
- * La base de départ est construite par le vrai pg-boss 10.4.2 — le paquet
- * `pg-boss-10`, dépendance de développement réservée à cette fumée — avec
- * une tâche dans chaque état qui compte. Puis :
+ * - **pg-boss 10.4.2** (`pg-boss-10`) a laissé le schéma `pgboss`
+ *   (version 24). pg-boss 11 ne sait pas le migrer : S.166 l'a laissé
+ *   intact, et ce qui y attendait est transféré dans le schéma neuf
+ *   `taches` (règle : `src/domain/exploitation/bascule-des-files.ts`).
+ * - **pg-boss 11.1.2** (`pg-boss-11`) a ensuite écrit `taches` (version
+ *   26) : files, plannings, tâches en attente.
+ * - **pg-boss 12**, celui de l'application, migre `taches` sur place.
+ *   Ses migrations partent de la version 25 : rien ne se perd.
  *
- * - pg-boss 11 seul, sur le schéma de la version 10, refuse de démarrer
- *   (la reproduction) ;
- * - `getQueue()` démarre pg-boss 11 dans `taches` et reprend ce qui
- *   attendait, sous le même identifiant, départ différé compris ; rien de
- *   ce qui était terminé ne revient ;
- * - l'ancien schéma garde sa version et ses plannings ; les tâches
- *   reprises y sont annulées, avec la mention du transfert ;
+ * Elle éprouve :
+ * - pg-boss 12 seul sur `pgboss` refuse, sans le modifier (la raison du
+ *   schéma neuf de S.166 tient toujours) ;
+ * - `getQueue()` migre `taches`, garde les tâches de la version 11 sous
+ *   leur identifiant, départ différé compris, garde les plannings, et
+ *   transfère ce qui attendait encore dans `pgboss` ;
  * - deux transferts concurrents ne reposent rien deux fois ;
- * - les tâches reprises sont traitées par un worker de la version 11 ;
+ * - un worker de la version 12 traite ce qui attendait ;
  * - la supervision lit les échecs des deux schémas ;
- * - un retour arrière vers pg-boss 10 redémarre sur son schéma intact et
- *   ne rejoue pas ce qui a été transféré.
+ * - retour arrière vers l'image S.166 : pg-boss 11 redémarre sur `taches`
+ *   migré, traite, planifie et fait sa maintenance sans erreur ;
+ * - retour arrière vers l'image d'avant S.166 : pg-boss 10 redémarre sur
+ *   `pgboss` et ne rejoue pas ce qui a été transféré.
  *
  *     DATABASE_URL=postgresql://…/postgres npm run smoke:files
  */
@@ -57,118 +62,119 @@ async function sur(url: URL, texte: string, valeurs: unknown[] = []) {
   }
 }
 
+const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 console.log(`Montée des files sur une base jetable (${nomBase})`);
 await sur(administration, `DROP DATABASE IF EXISTS ${nomBase} WITH (FORCE)`);
 await sur(administration, `CREATE DATABASE ${nomBase}`);
 process.env.DATABASE_URL = cible.toString();
 
 const { default: PgBoss10 } = await import("pg-boss-10");
-const { default: PgBoss11 } = await import("pg-boss");
+const { default: PgBoss11 } = await import("pg-boss-11");
+const { PgBoss: PgBoss12 } = await import("pg-boss");
 const { JOBS, FILES, declarerLesFiles, getQueue } = await import("../src/lib/queue");
 const { transfererLesTachesDePgBoss10 } = await import("../src/lib/transfert-des-files");
 const { sonderLesTachesEnEchec } = await import("../src/server/exploitation/taches");
 const { db } = await import("../src/lib/db");
 
 const etat = async (schema: string, id: string) =>
-  (await sur(cible, `SELECT state::text AS state, output FROM ${schema}.job WHERE id = $1`, [id])).rows[0] as
-    | { state: string; output: Record<string, unknown> | null }
-    | undefined;
+  (await sur(cible, `SELECT state::text AS state, output, start_after FROM ${schema}.job WHERE id = $1`, [id]))
+    .rows[0] as { state: string; output: Record<string, unknown> | null; start_after: Date } | undefined;
+const version = async (schema: string) =>
+  (await sur(cible, `SELECT version::int AS v FROM ${schema}.version`)).rows[0]?.v as number | undefined;
 
 let code = 0;
 try {
-  // ── La base de pg-boss 10, telle que la production l'a laissée ─────
-  console.log("\nLa base de départ, écrite par pg-boss 10.4.2");
+  // ── 1. pg-boss 10, avant S.166 ─────────────────────────────────────
+  console.log("\n1. Le schéma « pgboss », écrit par pg-boss 10.4.2");
   const v10 = new PgBoss10(cible.toString());
   await v10.start();
   await declarerLesFiles(v10 as never);
-  const plusTard = new Date(Date.now() + 2 * 3_600_000);
-  const cree = (await v10.send(JOBS.BALAYAGE_PIECE, { versionId: "v-cree" }))!;
-  const differe = (await v10.sendAfter(JOBS.ANALYSE_DOCUMENT, { versionId: "v-differe" }, {}, plusTard))!;
-  const enReprise = (await v10.send(JOBS.DIVERGENCE_REGLEMENTAIRE, { nouvelleId: "r-reprise" }))!;
-  await sur(cible, "UPDATE pgboss.job SET state = 'retry', retry_count = 1 WHERE id = $1", [enReprise]);
-  const abandonne = (await v10.send(JOBS.BALAYAGE_PIECE, { versionId: "v-abandonne" }))!;
-  const termine = (await v10.send(JOBS.BALAYAGE_PIECE, { versionId: "v-termine" }))!;
-  // Un worker arrêté en pleine tâche, puis une tâche menée à son terme.
-  await sur(cible, "UPDATE pgboss.job SET state = 'active', started_on = now() WHERE id = $1", [abandonne]);
-  await sur(cible, "UPDATE pgboss.job SET state = 'completed', completed_on = now() WHERE id = $1", [termine]);
-  const echouee = (await v10.send(JOBS.ANALYSE_DOCUMENT, { versionId: "v-echouee" }))!;
-  await sur(cible, "UPDATE pgboss.job SET state = 'failed', completed_on = now() WHERE id = $1", [echouee]);
+  const v10Attente = (await v10.send(JOBS.BALAYAGE_PIECE, { versionId: "v10-attente" }))!;
+  const v10Termine = (await v10.send(JOBS.BALAYAGE_PIECE, { versionId: "v10-termine" }))!;
+  await sur(cible, "UPDATE pgboss.job SET state = 'completed', completed_on = now() WHERE id = $1", [v10Termine]);
+  const v10Echouee = (await v10.send(JOBS.ANALYSE_DOCUMENT, { versionId: "v10-echouee" }))!;
+  await sur(cible, "UPDATE pgboss.job SET state = 'failed', completed_on = now() WHERE id = $1", [v10Echouee]);
   await v10.schedule(JOBS.RECONCILIATION_PAIEMENT, "*/15 * * * *");
   await v10.stop({ graceful: false, wait: true });
-  const version10 = (await sur(cible, "SELECT version::int AS v FROM pgboss.version")).rows[0].v;
-  verifier(version10 === 24, `pg-boss 10 a posé son schéma (version ${version10})`);
+  verifier((await version("pgboss")) === 24, "pg-boss 10 a posé son schéma (version 24)");
 
-  // ── La reproduction : pg-boss 11 seul ne démarre pas ─────────────
-  console.log("\nAvant S.166 : pg-boss 11 sur le schéma de la version 10");
+  // ── 2. pg-boss 11, l'image S.166 ───────────────────────────────────
+  console.log("\n2. Le schéma « taches », écrit par pg-boss 11.1.2 (image S.166)");
+  const v11 = new PgBoss11({ connectionString: cible.toString(), schema: "taches" });
+  await v11.start();
+  await declarerLesFiles(v11 as never);
+  const plusTard = new Date(Date.now() + 2 * 3_600_000);
+  const cree = (await v11.send(JOBS.BALAYAGE_PIECE, { versionId: "v11-cree" }))!;
+  const differe = (await v11.sendAfter(JOBS.ANALYSE_DOCUMENT, { versionId: "v11-differe" }, {}, plusTard))!;
+  const enReprise = (await v11.send(JOBS.DIVERGENCE_REGLEMENTAIRE, { nouvelleId: "r-reprise" }))!;
+  await sur(cible, "UPDATE taches.job SET state = 'retry', retry_count = 1 WHERE id = $1", [enReprise]);
+  for (const [file, cron] of [
+    [JOBS.RECONCILIATION_PAIEMENT, "*/15 * * * *"],
+    [JOBS.SONDE_SERVICES, "0 * * * *"],
+  ] as const) {
+    await v11.schedule(file, cron);
+  }
+  await v11.stop({ graceful: false, wait: true });
+  verifier((await version("taches")) === 26, "pg-boss 11 a posé son schéma (version 26)");
+
+  // ── 3. La raison du schéma neuf tient toujours ────────────────────
+  console.log("\n3. pg-boss 12 seul, sur le schéma de la version 10");
   let refus = "";
-  const seul = new PgBoss11(cible.toString());
+  const seul = new PgBoss12(cible.toString());
   seul.on("error", () => undefined);
   try {
     await seul.start();
-    await seul.stop({ graceful: false, wait: true });
+    await seul.stop({ graceful: false });
   } catch (erreur) {
     refus = (erreur as Error).message;
   }
-  verifier(refus !== "", `il refuse de démarrer (${refus || "il a démarré"})`);
-  verifier(
-    (await sur(cible, "SELECT version::int AS v FROM pgboss.version")).rows[0].v === 24,
-    "et ne laisse rien de modifié : l'ancien schéma reste en version 24",
-  );
+  verifier(refus !== "", `il refuse de démarrer (${refus.slice(0, 80) || "il a démarré"})`);
+  verifier((await version("pgboss")) === 24, "et laisse « pgboss » en version 24");
 
-  // ── La bascule, par le code de l'application ─────────────────────
-  console.log("\nLa bascule : getQueue()");
+  // ── 4. La montée, par le code de l'application ───────────────────
+  console.log("\n4. La montée : getQueue() (pg-boss 12)");
   const boss = await getQueue();
-  const version11 = (await sur(cible, "SELECT version::int AS v FROM taches.version")).rows[0].v;
-  verifier(version11 >= 26, `pg-boss 11 travaille dans le schéma « taches » (version ${version11})`);
-  const filesNeuves = (await sur(cible, "SELECT name FROM taches.queue")).rows.map((l) => l.name as string);
-  verifier(FILES.every((f) => filesNeuves.includes(f)), `les ${FILES.length} files y sont déclarées`);
-
-  const neuves = new Map(
-    (await sur(cible, "SELECT id::text AS id, name, data, start_after FROM taches.job")).rows.map((l) => [l.id, l]),
-  );
+  const v12 = await version("taches");
+  verifier(v12 !== undefined && v12 > 26, `« taches » est migré sur place (version ${v12})`);
   for (const [id, quoi] of [
     [cree, "créée"],
     [differe, "différée"],
     [enReprise, "en reprise"],
-    [abandonne, "abandonnée en cours"],
   ] as const) {
-    verifier(neuves.has(id), `la tâche ${quoi} est reprise, sous le même identifiant`);
+    verifier((await etat("taches", id)) !== undefined, `la tâche ${quoi} de pg-boss 11 est toujours là, sous son identifiant`);
   }
-  verifier(
-    neuves.get(cree)?.data?.versionId === "v-cree",
-    "ses données sont celles de l'ancienne",
-  );
-  const depart = neuves.get(differe)?.start_after as Date | undefined;
+  const depart = (await etat("taches", differe))?.start_after;
   verifier(
     depart !== undefined && Math.abs(depart.getTime() - plusTard.getTime()) < 1000,
-    "le départ différé est gardé : elle ne part pas sur-le-champ",
+    "le départ différé est gardé",
   );
-  verifier(!neuves.has(termine) && !neuves.has(echouee), "rien de ce qui était terminé ou échoué ne revient");
-
-  for (const id of [cree, differe, enReprise, abandonne]) {
-    const ancien = await etat("pgboss", id);
-    verifier(
-      ancien?.state === "cancelled" && ancien.output?.transfereVers === "taches",
-      `l'ancienne copie (${id.slice(0, 8)}) est annulée, avec la mention du transfert`,
-    );
-  }
-  verifier((await etat("pgboss", termine))?.state === "completed", "la tâche terminée n'est pas touchée");
+  const plannings = (await boss.getSchedules()).map((p) => p.name).sort();
   verifier(
-    (await sur(cible, "SELECT count(*)::int AS n FROM pgboss.schedule")).rows[0].n === 1,
-    "les plannings de l'ancien schéma restent en place, pour un retour arrière",
+    plannings.includes(JOBS.RECONCILIATION_PAIEMENT) && plannings.includes(JOBS.SONDE_SERVICES),
+    `les plannings de pg-boss 11 sont gardés (${plannings.join(", ")})`,
+  );
+  verifier((await etat("taches", v10Attente)) !== undefined, "la tâche restée dans « pgboss » est transférée");
+  verifier(
+    (await etat("pgboss", v10Attente))?.output?.transfereVers === "taches",
+    "et marquée transférée dans l'ancien schéma",
+  );
+  verifier(
+    (await etat("taches", v10Termine)) === undefined && (await etat("taches", v10Echouee)) === undefined,
+    "rien de terminé ou d'échoué ne revient",
   );
 
-  // ── Rejouer, et deux processus à la fois ─────────────────────────
-  console.log("\nRejouer, et deux processus à la fois");
+  // ── 5. Rejouer, et deux processus à la fois ──────────────────────
+  console.log("\n5. Rejouer, et deux processus à la fois");
   const tardive = await (async () => {
-    // L'ancien processus web a encore posté pendant le déploiement.
+    // L'ancien processus web de l'image d'avant S.166 a encore posté.
     const encore = new PgBoss10(cible.toString());
     await encore.start();
-    const id = (await encore.send(JOBS.BALAYAGE_PIECE, { versionId: "v-tardive" }))!;
+    const id = (await encore.send(JOBS.BALAYAGE_PIECE, { versionId: "v10-tardive" }))!;
     await encore.stop({ graceful: false, wait: true });
     return id;
   })();
-  const second = new PgBoss11({ connectionString: cible.toString(), schema: "taches" });
+  const second = new PgBoss12({ connectionString: cible.toString(), schema: "taches" });
   await second.start();
   const [un, deux] = await Promise.all([
     transfererLesTachesDePgBoss10(boss, FILES, () => undefined),
@@ -178,31 +184,28 @@ try {
     un.transferees + deux.transferees === 1 && un.dejaPresentes + deux.dejaPresentes === 0,
     `la tâche tardive est reprise une fois, pas deux (${JSON.stringify([un, deux])})`,
   );
-  const copies = (await sur(cible, "SELECT count(*)::int AS n FROM taches.job WHERE id = $1", [tardive])).rows[0].n;
-  verifier(copies === 1, "une seule copie dans le schéma neuf");
-  const rejoue = await transfererLesTachesDePgBoss10(boss, FILES, () => undefined);
-  verifier(rejoue.transferees === 0, "un redémarrage ne reprend plus rien");
-  await second.stop({ graceful: false, wait: true });
+  verifier(
+    (await sur(cible, "SELECT count(*)::int AS n FROM taches.job WHERE id = $1", [tardive])).rows[0].n === 1,
+    "une seule copie dans « taches »",
+  );
+  verifier((await transfererLesTachesDePgBoss10(boss, FILES, () => undefined)).transferees === 0, "un redémarrage ne reprend plus rien");
+  await second.stop({ graceful: false });
 
-  // ── Les tâches reprises sont traitées ───────────────────────────
-  console.log("\nUn worker de la version 11 traite ce qui a été repris");
+  // ── 6. Le worker de la version 12 traite ce qui attendait ────────
+  console.log("\n6. Un worker de pg-boss 12 traite ce qui attendait");
   const vus = new Set<string>();
   await boss.work(JOBS.BALAYAGE_PIECE, { pollingIntervalSeconds: 0.5 }, async (taches) => {
     for (const t of taches) vus.add(t.id);
   });
   const limite = Date.now() + 15_000;
-  while (Date.now() < limite && !(vus.has(cree) && vus.has(abandonne) && vus.has(tardive))) {
-    await new Promise((r) => setTimeout(r, 250));
-  }
+  while (Date.now() < limite && !(vus.has(cree) && vus.has(v10Attente) && vus.has(tardive))) await attendre(250);
   await boss.offWork(JOBS.BALAYAGE_PIECE);
-  verifier(
-    vus.has(cree) && vus.has(abandonne) && vus.has(tardive),
-    `les balayages repris sont traités (${vus.size})`,
-  );
-  verifier((await etat("taches", cree))?.state === "completed", "et terminés dans le schéma neuf");
+  verifier(vus.has(cree), "la tâche de pg-boss 11 est traitée");
+  verifier(vus.has(v10Attente) && vus.has(tardive), "les tâches transférées de pg-boss 10 sont traitées");
+  verifier((await etat("taches", cree))?.state === "completed", "et terminées dans « taches »");
 
-  // ── La supervision lit les deux schémas ─────────────────────────
-  console.log("\nLa supervision des tâches en échec");
+  // ── 7. La supervision lit les deux schémas ───────────────────────
+  console.log("\n7. La supervision des tâches en échec");
   const echecNeuf = (await boss.send(JOBS.DIVERGENCE_REGLEMENTAIRE, { nouvelleId: "r-echec" }))!;
   await sur(cible, "UPDATE taches.job SET state = 'failed', completed_on = now() WHERE id = $1", [echecNeuf]);
   const supervision = await sonderLesTachesEnEchec();
@@ -210,21 +213,45 @@ try {
     supervision.lisible &&
       supervision.parFile[JOBS.ANALYSE_DOCUMENT] === 1 &&
       supervision.parFile[JOBS.DIVERGENCE_REGLEMENTAIRE] === 1,
-    `l'échec d'avant la bascule et celui d'après se lisent (${JSON.stringify(supervision.parFile)})`,
+    `l'échec de « pgboss » et celui de « taches » se lisent (${JSON.stringify(supervision.parFile)})`,
   );
+  await boss.stop({ graceful: false });
 
-  // ── Le retour arrière ───────────────────────────────────────────
-  console.log("\nRetour arrière : l'image précédente, pg-boss 10");
-  const retour = new PgBoss10(cible.toString());
-  await retour.start();
-  const reprises = await retour.fetch(JOBS.BALAYAGE_PIECE, { batchSize: 10 });
-  verifier(true, "pg-boss 10 redémarre sur son schéma");
-  verifier(reprises.length === 0, `il ne rejoue pas ce qui a été transféré (${reprises.length})`);
-  const encore = (await retour.send(JOBS.BALAYAGE_PIECE, { versionId: "v-retour" }))!;
-  verifier(typeof encore === "string", "et il poste comme avant");
-  await retour.stop({ graceful: false, wait: true });
+  // ── 8. Retour arrière vers l'image S.166 ─────────────────────────
+  console.log("\n8. Retour arrière : l'image S.166 (pg-boss 11) sur « taches » migré");
+  const alertes: string[] = [];
+  const retour11 = new PgBoss11({
+    connectionString: cible.toString(),
+    schema: "taches",
+    superviseIntervalSeconds: 1,
+    maintenanceIntervalSeconds: 1,
+    cronMonitorIntervalSeconds: 1,
+    cronWorkerIntervalSeconds: 1,
+    queueCacheIntervalSeconds: 1,
+  });
+  retour11.on("error", (e: Error) => alertes.push(e.message));
+  await retour11.start();
+  verifier(true, "pg-boss 11 redémarre");
+  const vus11 = new Set<string>();
+  await retour11.work(JOBS.BALAYAGE_PIECE, { pollingIntervalSeconds: 0.5 }, async (taches: { id: string }[]) => {
+    for (const t of taches) vus11.add(t.id);
+  });
+  const apres = (await retour11.send(JOBS.BALAYAGE_PIECE, { versionId: "v11-retour" }))!;
+  const limite11 = Date.now() + 8_000;
+  while (Date.now() < limite11 && !vus11.has(apres)) await attendre(250);
+  await attendre(3_000); // laisser passer maintenance et surveillance des plannings
+  verifier(typeof apres === "string" && vus11.has(apres), "il poste et traite comme avant");
+  verifier(alertes.length === 0, `sa maintenance tourne sans erreur (${alertes.join(" | ") || "aucune"})`);
+  await retour11.stop({ graceful: false, wait: true });
 
-  await boss.stop({ graceful: false, wait: true });
+  // ── 9. Retour arrière vers l'image d'avant S.166 ─────────────────
+  console.log("\n9. Retour arrière : l'image d'avant S.166 (pg-boss 10) sur « pgboss »");
+  const retour10 = new PgBoss10(cible.toString());
+  await retour10.start();
+  const rejouees = await retour10.fetch(JOBS.BALAYAGE_PIECE, { batchSize: 10 });
+  verifier(rejouees.length === 0, `il ne rejoue pas ce qui a été transféré (${rejouees.length})`);
+  verifier(typeof (await retour10.send(JOBS.BALAYAGE_PIECE, { versionId: "v10-retour" })) === "string", "et il poste comme avant");
+  await retour10.stop({ graceful: false, wait: true });
 } catch (erreur) {
   console.error(erreur);
   code = 1;
