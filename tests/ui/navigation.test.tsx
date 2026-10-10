@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 let chemin = "/";
 vi.mock("next/navigation", () => ({ usePathname: () => chemin }));
@@ -71,5 +71,29 @@ describe("les barres de navigation", () => {
     const src = readFileSync("src/app/(app)/(dossier)/layout.tsx", "utf8");
     expect(src.match(/<LienDeNavigation/gu)).toHaveLength(2);
     expect(src).toContain("NAVIGATION_CANDIDAT");
+  });
+});
+
+/*
+  Une navigation ferme le menu mobile — S.164. La fermeture passait par un
+  effet sur le chemin ; le menu retient désormais la page où il a été
+  ouvert, et un autre chemin le trouve fermé.
+*/
+describe("le menu mobile suit la page", () => {
+  it("ouvert sur une page, fermé sur la suivante, sans geste", () => {
+    chemin = "/tarifs";
+    const { rerender } = render(<Header />);
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeDefined();
+
+    chemin = "/destinations";
+    rerender(<Header />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute("aria-expanded", "false");
+
+    // Revenir sur la page d'origine ne le rouvre pas : il a été fermé.
+    chemin = "/tarifs";
+    rerender(<Header />);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
