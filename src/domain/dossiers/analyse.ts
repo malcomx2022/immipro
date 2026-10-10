@@ -30,6 +30,8 @@ export interface ChampLu {
 }
 
 export interface ResultatAnalyse {
+  /** Identité de la lecture affichée : un signalement ne vise pas une lecture ultérieure. */
+  id: string;
   verdict: VerdictAnalyse;
   /** Nom du fichier analysé, tel que déposé. */
   fichier: string;

@@ -808,6 +808,20 @@ export async function fileDeRevue(): Promise<PieceEnEchec[]> {
     }
   }
 
+  // Un verdict ou un drapeau historique ne prouve pas qu'un quota reste à rendre.
+  // Un seul relevé pour la file entière, sans requête par pièce.
+  const credits = file.length
+    ? await db.analysisCredit.findMany({
+        where: {
+          analysisId: { in: file.map((r) => r.analysisId) },
+          reason: { in: ["ANALYSE", "ANALYSE_RENDUE"] },
+        },
+        select: { analysisId: true, delta: true },
+      })
+    : [];
+  const debitees = new Set(credits.filter((c) => c.delta === -1).map((c) => c.analysisId));
+  const rendues = new Set(credits.filter((c) => c.delta === 1).map((c) => c.analysisId));
+
   return file.map((r) => {
     const document = r.analysis.version.document;
     const champs = designes.get(r.analysisId);
@@ -820,6 +834,8 @@ export async function fileDeRevue(): Promise<PieceEnEchec[]> {
       // Trace technique : pour l'opérateur seul, jamais pour le candidat
       // (DOC-12 §16, règle 3 — l'exception assumée du message B-02).
       journal: r.analysis.engineLog ?? "Aucune trace enregistrée.",
+      analyseDebitee:
+        r.analysis.creditConsumed && debitees.has(r.analysisId) && !rendues.has(r.analysisId),
       signalement: champs ? resumeDuSignalement(champs) : null,
     };
   });

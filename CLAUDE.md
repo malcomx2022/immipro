@@ -77,21 +77,34 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
-Le responsable a autorisé le **lot RF-0**, limité aux documents. Les lots
-RF-1 à RF-7 restent planifiés ; les choix A-1 à A-3 ne sont pas tranchés.
-Une autorisation ultérieure vaut pour le lot demandé et ses travaux nécessaires.
+L'autorisation initiale RF-0 (09/10) portait sur les documents ; sa PR #244
+est fusionnée. Claude Code a ensuite réalisé les lots jusqu'à S.166.
+A-1 et A-3 sont tranchés en S.146, A-2 en S.147 : relire leurs décisions
+au registre, sans redemander des choix déjà rendus.
+
+Le 10/10, le responsable a demandé de revoir les travaux récents, puis de
+corriger les bugs front et backend et d'actualiser les documents. Cette
+instruction autorise le lot complémentaire RC / S.167 décrit dans la
+[revue du 10/10](docs/revue/revue-complementaire-2026-10-10.md).
+Les autorisations et décisions déjà consignées restent acquises.
 
 Ordre de lecture : ce fichier, [DOC-11](docs/DOC-11-workflows.md),
 [DOC-12](docs/DOC-12-prototype.md), les dernières décisions du
 [registre](docs/prototype/ECARTS-A-ARBITRER.md), le
 [plan historique](docs/revue/plan-de-traitement-2026-10-07.md), puis la
 [revue fonctionnelle](docs/revue/revue-fonctionnelle-2026-10-09.md) et le
-[chantier RF](docs/revue/chantier-fonctionnel-2026-10-09.md).
+[chantier RF](docs/revue/chantier-fonctionnel-2026-10-09.md), puis la
+[revue complémentaire](docs/revue/revue-complementaire-2026-10-10.md).
 
 Base du lot 0 : main dd2b58f, S.125 à S.144 intégrés. Claude Code a livré
 S.142 (Stripe-Version et dépendances SMTP, PR #241), S.143 (ESLint plat,
 PR #242) et S.144 (Next 16, PR #243). Relire main et les PR ouvertes avant
-chaque lot ; conserver ces changements et leurs décisions. Les identifiants
+chaque lot ; conserver ces changements et leurs décisions.
+Base initiale de la revue du 10/10 : main 065bde4/S.165. La PR #267/S.166
+(pg-boss 11 et transfert), initialement en brouillon, a été fusionnée
+pendant la validation. Base finale de RC/S.167 : main 9ade7ea/S.166 ;
+conserver le schéma neuf, le transfert et les preuves de ce lot.
+Les identifiants
 RF ne réservent aucun numéro S.xxx : attribuer celui-ci au démarrage d'un
 lot applicatif, après vérification du registre et du travail en cours.
 
@@ -104,8 +117,14 @@ Pour chaque lot applicatif autorisé :
 - une PR, une entrée de suivi, un rattachement WF/RG/écran et les écarts restants ;
 - reproduction du comportement, puis test du résultat voulu ; courses et
   interruptions éprouvées sur une base jetable ;
-- traiter FON-01 à FON-04, le reliquat E5 et C-05/M11 selon les dépendances
-  du chantier, sans considérer les choix ouverts comme approuvés ;
+- conserver FON-01 à FON-04, E5 et C-05/M11 corrigés en S.146 à S.148
+  et S.155 ; ne les rouvrir qu’avec une nouvelle reproduction ;
+- rattacher un signalement à l’identité de la lecture affichée ; un
+  champ de même nom ne prouve pas que la lecture est la même ;
+- rattacher une réponse asynchrone B-05 à sa demande et sa pièce ;
+  conserver la saisie suivante après une décision tardive ;
+- ne rendre que le débit réel encore dû : le grand livre fait foi,
+  et décision, rendu, avis et audit tiennent dans la même transaction ;
 - garder l'historique des anciennes pièces ; empêcher ses effets sur la
   pièce courante ; partager la règle de reprise gratuite et respecter les
   états figés lors d'un arbitrage ;

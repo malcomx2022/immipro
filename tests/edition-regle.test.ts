@@ -550,7 +550,7 @@ describe("aucune action auditée n'est déclarée sans être écrite", () => {
   it("l'écran n'invente aucun aperçu", () => {
     const ecran = sansCommentaires(lire("src/app/(admin)/revue/RevueDesPieces.tsx"));
     expect(ecran).not.toMatch(/page 1 sur|aperçu de la pièce/iu);
-    expect(ecran).toContain("apercu.url");
+    expect(ecran).toContain("apercuAffiche.url");
   });
 });
 

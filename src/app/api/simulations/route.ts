@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { reglesPubliees, mentionDe } from "@/server/acces/regles";
+import { reglesPubliees, mentionDe, payload } from "@/server/acces/regles";
 import { versEvaluable } from "@/server/vue/destinations";
 import { classer, TROIS_MEILLEURES } from "@/domain/simulateur/classement";
 import { rangAffiche } from "@/domain/destinations/fiche";
@@ -53,6 +53,7 @@ export const POST = route({
           slug: r.destination.slug,
           code: r.destination.code,
           pays: r.destination.pays,
+          procedure: regle ? payload(regle).libelle : null,
           motifs: r.motifs,
           // La réserve vient telle quelle du classement, qui sait pourquoi
           // le budget n'y est pas entré (I.B). La route la composait
@@ -66,8 +67,10 @@ export const POST = route({
       ecartees: resultat.ecartees.map((e) => {
         const regle = regleDe(e.destination.slug);
         return {
+          slug: e.destination.slug,
           code: e.destination.code,
           pays: e.destination.pays,
+          procedure: regle ? payload(regle).libelle : null,
           motif: e.motif,
           ecart: e.ecart,
           // INV-8 aussi ici : un écart chiffré — « 12 000 000 F demandés » —

@@ -21,6 +21,7 @@ export async function signalerUneErreurDeLecture(demande: {
   applicationId: string;
   pieceId: string;
   userId: string;
+  analyseId: string;
   champs: readonly string[];
 }): Promise<{ dejaEnRelecture: boolean }> {
   const dossier = await dossierDuCandidat(demande.applicationId, demande.userId);
@@ -43,6 +44,11 @@ export async function signalerUneErreurDeLecture(demande: {
     throw echec("etat_incompatible", {
       corps:
         "La dernière version de cette pièce n'a pas encore été lue : il n'y a rien à signaler pour l'instant. Reviens quand le résultat s'affiche.",
+    });
+  }
+  if (lecture.id !== demande.analyseId) {
+    throw echec("etat_incompatible", {
+      corps: "La lecture de cette pièce a changé depuis l'ouverture de la page. Recharge-la avant de signaler une erreur : ton signalement n'a pas été enregistré.",
     });
   }
   if (lecture.review) return { dejaEnRelecture: true };

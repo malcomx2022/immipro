@@ -33,14 +33,17 @@ interface Retenue {
   slug: string;
   code: string;
   pays: string;
+  procedure: string | null;
   motifs: Motif[];
   reserve?: string;
   mention?: Mention;
 }
 
 interface Ecartee {
+  slug: string;
   code: string;
   pays: string;
+  procedure: string | null;
   motif: string;
   ecart: string;
   mention?: Mention;
@@ -149,11 +152,9 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
           tabIndex={-1}
           className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-32"
         >
-          {titre(retenues.length, aucuneNePasse)}
+          {titre(new Set(retenues.map((d) => d.code)).size, aucuneNePasse)}
         </h1>
-        <p className="text-pretty text-16 text-ink-700">
-          {resumeReponses(etat.reponses)}
-        </p>
+        <p className="text-pretty text-16 text-ink-700">{resumeReponses(etat.reponses)}</p>
         <Link
           href="/simulateur"
           className="flex min-h-touch items-center self-start rounded-full border border-ink-300 px-3.5 text-14 text-ink-900 hover:bg-ink-100"
@@ -178,6 +179,9 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
                     <span className="font-mono text-13 text-ink-500">{d.rang}</span>
                     <h2 className="text-19 font-semibold text-ink-900">{d.pays}</h2>
                   </div>
+                  {d.procedure ? (
+                    <p className="text-pretty text-14 text-ink-700">{d.procedure}</p>
+                  ) : null}
                 </div>
               </div>
 
@@ -207,6 +211,7 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
                 pleineLargeur
               >
                 Voir la fiche {d.pays}
+                {d.procedure ? ` — ${d.procedure}` : ""}
               </LienBouton>
             </Card>
           ))}
@@ -216,14 +221,13 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
       {ecartees.length > 0 ? (
         <section className="flex flex-col gap-3 rounded-lg bg-ink-100 p-5">
           <h2 className="text-19 font-semibold text-ink-900">
-            {aucuneNePasse ? "Ce qu'il manque, destination par destination" : "Destinations écartées"}
+            {aucuneNePasse
+              ? "Ce qu'il manque, destination par destination"
+              : "Destinations écartées"}
           </h2>
           <ul className="flex flex-col gap-3">
             {ecartees.map((d) => (
-              <li
-                key={`${d.code}-${d.motif}`}
-                className="flex items-start gap-3 rounded-md bg-white p-3.5"
-              >
+              <li key={d.slug} className="flex items-start gap-3 rounded-md bg-white p-3.5">
                 <span
                   aria-hidden="true"
                   className="flex h-10 w-10 flex-none items-center justify-center rounded-sm bg-ink-100 font-mono text-13 text-ink-700"
@@ -232,6 +236,7 @@ export function Resultats({ connecte = false }: { connecte?: boolean }) {
                 </span>
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-16 font-medium text-ink-900">{d.pays}</span>
+                  {d.procedure ? <span className="text-14 text-ink-700">{d.procedure}</span> : null}
                   <span className="text-14 text-ink-700">{d.motif}</span>
                   {/* L'écart est chiffré : c'est ce qui rend le manque
                       franchissable plutôt que définitif (RG-01.3). */}
@@ -342,13 +347,7 @@ function Chargement() {
 function Vide() {
   return (
     <div className="mx-auto flex w-full max-w-decision flex-col items-start gap-5 px-4 py-12 md:px-12">
-      <Image
-        src="/illustrations/empty-resultats.svg"
-        alt=""
-        width={160}
-        height={120}
-        unoptimized
-      />
+      <Image src="/illustrations/empty-resultats.svg" alt="" width={160} height={120} unoptimized />
       <h1
         id="contenu"
         tabIndex={-1}
@@ -357,8 +356,8 @@ function Vide() {
         Aucune réponse à classer pour le moment
       </h1>
       <p className="text-pretty text-16 text-ink-700">
-        Tes réponses ne sont gardées que le temps de la session, sur cet appareil.
-        Reprends les six questions : il n&apos;y a ni compte à créer, ni attente.
+        Tes réponses ne sont gardées que le temps de la session, sur cet appareil. Reprends les six
+        questions : il n&apos;y a ni compte à créer, ni attente.
       </p>
       <LienBouton href="/simulateur" className="min-h-action">
         Lancer le simulateur

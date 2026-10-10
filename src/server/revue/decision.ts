@@ -102,7 +102,7 @@ export async function trancherLaRevue(
   }
 
   const document = revue.analysis.version.document;
-  const rendu = recrediteLeQuota(tranche.decision);
+  const rendu = recrediteLeQuota(tranche.decision) && revue.analysis.creditConsumed;
 
   /*
     Une revue se tranche une fois — revue du 07/10/2026, F4.
@@ -119,14 +119,14 @@ export async function trancherLaRevue(
     qui n'existe pas. Le corps est le message de l'opérateur tel quel —
     c'est lui que le candidat doit lire, et le résumer le trahirait.
   */
-  const appliquee = await db.$transaction(async (tx) => {
+  const suite = await db.$transaction(async (tx) => {
     const { count } = await tx.manualReview.updateMany({
       where: { id: revue.id, decidedAt: null },
       data: {
         reviewerId: operateur.id,
         decision: tranche.decision,
         message: tranche.message,
-        creditRefunded: rendu,
+        creditRefunded: false,
         decidedAt: new Date(),
       },
     });
@@ -136,6 +136,31 @@ export async function trancherLaRevue(
           "Cette pièce vient d'être tranchée par un autre membre de l'équipe. Recharge la file pour voir sa décision.",
       });
     }
+    // Une lecture gratuite ou déjà rendue ne donne pas droit à un crédit supplémentaire.
+    // Le rendu, sa trace et la décision tiennent dans la même transaction.
+    const debit = rendu
+      ? await tx.analysisCredit.findFirst({
+          where: {
+            applicationId: document.applicationId,
+            analysisId: revue.analysisId,
+            reason: "ANALYSE",
+            delta: -1,
+          },
+          select: { id: true },
+        })
+      : null;
+    const quotaRendu = debit
+      ? await rendreUneAnalyse(
+          document.applicationId,
+          revue.analysisId,
+          "Analyse rendue après revue manuelle",
+          undefined,
+          tx,
+        )
+      : false;
+    if (quotaRendu) {
+      await tx.manualReview.update({ where: { id: revue.id }, data: { creditRefunded: true } });
+    }
     /*
       RF-2, FON-02 — la décision porte sur **une version**. Une revue
       ouverte sur la v1 et tranchée après le dépôt d'une v2 écrivait son
@@ -143,42 +168,34 @@ export async function trancherLaRevue(
       l'annonçait comme le verdict de la pièce. Elle reste consignée sur
       la revue ; la pièce et l'avis suivent le fichier courant.
     */
-    const courante = await ecrireSurLaPieceCourante(
-      tx,
-      document.id,
-      revue.analysis.version.rank,
-      { status: tranche.decision, feedback: tranche.message, analyzedAt: new Date() },
-    );
-    if (!courante) return false;
-    await tx.notification.create({
-      data: {
-        userId: document.application.userId,
-        applicationId: document.applicationId,
-        kind: "ANALYSE",
-        title: TITRE_DE_LA_DECISION[tranche.decision],
-        body: tranche.message,
-      },
+    const courante = await ecrireSurLaPieceCourante(tx, document.id, revue.analysis.version.rank, {
+      status: tranche.decision,
+      feedback: tranche.message,
+      analyzedAt: new Date(),
     });
-    return true;
-  });
-
-  // Au journal, la décision retenue, et elle seule.
-  await journaliser({
-    acteurId: operateur.id,
-    action: "revue.decision",
-    cible: `document:${document.id}`,
-    motif: tranche.motif,
-    details: { decision: tranche.decision, appliquee },
-  });
-
-  if (rendu) {
-    await rendreUneAnalyse(
-      document.applicationId,
-      revue.analysisId,
-      "Analyse rendue après revue manuelle",
+    if (courante)
+      await tx.notification.create({
+        data: {
+          userId: document.application.userId,
+          applicationId: document.applicationId,
+          kind: "ANALYSE",
+          title: TITRE_DE_LA_DECISION[tranche.decision],
+          body: tranche.message,
+        },
+      });
+    await journaliser(
+      {
+        acteurId: operateur.id,
+        action: "revue.decision",
+        cible: `document:${document.id}`,
+        motif: tranche.motif,
+        details: { decision: tranche.decision, appliquee: courante, quotaRendu },
+      },
+      tx,
     );
-  }
+    return { appliquee: courante, quotaRendu };
+  });
 
   await recalculerCompletude(document.applicationId);
-  return { decidee: true, quotaRendu: rendu, appliquee };
+  return { decidee: true, ...suite };
 }

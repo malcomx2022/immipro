@@ -15,6 +15,27 @@ de design, sa mise à jour appartient à qui l'a écrit.
 
 ---
 
+## S.167 — Complément de revue du 10/10/2026, de S.165 à S.166
+
+Le responsable a demandé une revue à jour puis les corrections front et
+backend. La [revue complémentaire](../revue/revue-complementaire-2026-10-10.md)
+porte RC-01 à RC-05 : procédure nommée au simulateur (O-1), identité du
+signalement, réponses tardives B-05, recrédit fondé sur le grand livre
+(O-2) et état vide factuel (O-3). Les correctifs sont préparés en PR avec
+tests ; la fusion et le déploiement restent distincts. Le numéro S.167
+est attribué après vérification de S.166 en cours ; aucun historique
+n'est réécrit.
+
+S.146 à S.166 sont conservés ; A-1 à A-3 sont déjà tranchés. La PR #267,
+S.166/pg-boss, était en brouillon à l’ouverture de la revue et a été
+fusionnée pendant la CI. La branche S.167 reprend main 9ade7ea sans
+conflit ni duplication. Les préalables Q.A/M.C et la recette pilote restent
+ceux du dossier de levée et de la matrice. Les commandes et limites de RC
+sont dans la revue complémentaire ; aucune correction de données anciennes
+n'est déclenchée par ce suivi.
+
+---
+
 ## A · La note de complétude, écartée le 13/09
 
 > « Traitement de C-09 : clos. Dénombrement des manques en tête d'écran et

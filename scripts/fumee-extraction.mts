@@ -1380,6 +1380,8 @@ try {
     const MESSAGE =
       "La photo est trop sombre pour lire la date d'expiration. Reprends-la près d'une fenêtre, sans flash, en cadrant la page entière.";
 
+    const quotaAvantRevue = await solde(p.application.id);
+
     const issues = await Promise.allSettled(
       operateurs.map((o) =>
         trancherLaRevue(
@@ -1391,6 +1393,10 @@ try {
     );
     const reussies = issues.filter((i) => i.status === "fulfilled").length;
     verifier(reussies === 1, `une seule décision est retenue (${reussies} sur 2)`);
+    verifier(await solde(p.application.id) === quotaAvantRevue,
+      "une lecture technique déjà rendue ne crée pas une analyse gratuite à la revue");
+    verifier((await db.manualReview.findUniqueOrThrow({ where: { id: revue.id } })).creditRefunded === false,
+      "la revue ne prétend pas rendre une analyse déjà rendue");
     verifier(
       (await db.notification.count({ where: { applicationId: p.application.id } })) === avisAvant + 1,
       "un seul avis part au candidat",
@@ -1399,6 +1405,34 @@ try {
       where: { analysisId: analyse!.id, reason: "ANALYSE_RENDUE" },
     });
     verifier(rendus <= 1, `l'analyse n'est rendue qu'une fois au plus (${rendus})`);
+  }
+
+  console.log("\nLa revue humaine ne rend que le coût réel de la lecture");
+  {
+    const { fileDeRevue } = await import("../src/server/lecture/backoffice");
+    for (const [consommee, debitee] of [[false, false], [true, true], [true, false]]) {
+      const p = await piece({ dateCible: "2027-09-01" });
+      const lecture = await db.documentAnalysis.create({ data: { versionId: p.version.id,
+        verdict: "CONFORME", title: "Lecture du fichier", body: "Le fichier est lisible.",
+        creditConsumed: consommee } });
+      if (debitee) {
+        const octroi = await db.analysisCredit.findFirstOrThrow({ where: { applicationId: p.application.id, delta: { gt: 0 } } });
+        await db.analysisCredit.create({ data: { applicationId: p.application.id, delta: -1,
+          reason: "ANALYSE", analysisId: lecture.id, versionId: p.version.id, grantId: octroi.id } });
+      }
+      const revue = await db.manualReview.create({ data: { analysisId: lecture.id, reason: "SIGNALE_PAR_LE_CANDIDAT" } });
+      verifier((await fileDeRevue()).find((r) => r.id === revue.id)?.analyseDebitee === debitee,
+        "B-05 fonde le recrédit annoncé sur le grand livre, pas le seul drapeau");
+      const operateur = await db.user.create({ data: { email: `cout-revue-${consommee}-${debitee}-${process.pid}@exemple.test`, role: "ADMIN" } });
+      const avant = await solde(p.application.id);
+      const suite = await trancherLaRevue(revue.id, operateur,
+        { decision: "ILLISIBLE", message: "La date est illisible. Reprends la photo en cadrant la page entière.", motif: "Relecture du coût réel" });
+      verifier(await solde(p.application.id) === avant + (debitee ? 1 : 0),
+        debitee ? "une lecture payée est rendue une fois" : "une lecture gratuite ne crée pas une analyse supplémentaire");
+      verifier(suite.quotaRendu === debitee, "la réponse dit si un rendu a réellement été écrit");
+      verifier((await db.manualReview.findUniqueOrThrow({ where: { id: revue.id } })).creditRefunded === debitee,
+        "la revue porte le rendu réellement effectué");
+    }
   }
 
   console.log("\nLa décision d'une revue manuelle parvient au candidat");
@@ -1650,7 +1684,8 @@ try {
       `lue conforme, sans relecture (${lue.analyse?.verdict})`,
     );
 
-    const demande = { applicationId: p.application.id, pieceId: p.document.id, userId: p.user.id };
+    const demande = { applicationId: p.application.id, pieceId: p.document.id, userId: p.user.id,
+      analyseId: lue.analyse!.id };
     let inconnu = "accepté";
     await signalerUneErreurDeLecture({ ...demande, champs: ["Numéro inventé"] }).catch(() => {
       inconnu = "refusé";
@@ -1700,11 +1735,36 @@ try {
       applicationId: figee.application.id,
       pieceId: figee.document.id,
       userId: figee.user.id,
+      analyseId: (await analyseDe(figee.version.id))!.id,
       champs: [AUTRE_CHOSE],
     }).catch(() => {
       surFige = "refusé";
     });
     verifier(surFige === "refusé", "un dossier déposé ne se signale plus");
+  }
+
+  console.log("\nSignalement : un ancien écran ne désigne pas une nouvelle lecture");
+  {
+    const { signalerUneErreurDeLecture } = await import("../src/server/dossiers/signalement");
+    const { AUTRE_CHOSE } = await import("../src/domain/dossiers/signalement");
+    reponseDuService = reponseDeLecture({ piece_identifiee: "passeport", obstacle: null,
+      champs: { passeport_validite_min: "2029-03-01" } });
+    const p = await piece({ dateCible: "2027-09-01" });
+    await analyserUnePiece(p.tache, lExtracteur());
+    const ancienne = (await analyseDe(p.version.id))!;
+    const v2 = await db.documentVersion.create({ data: { documentId: p.document.id, rank: 2,
+      objectKey: "nouvelle-version.pdf", checksum: "nouvelle-empreinte", scanState: "SAINE",
+      scannedAt: new Date() } });
+    const nouvelle = await db.documentAnalysis.create({ data: { versionId: v2.id,
+      verdict: "CONFORME", title: "Lecture de la nouvelle version", body: "Cette pièce est lisible.",
+      fields: ancienne.fields!, creditConsumed: false } });
+    const demandeAncienne = { applicationId: p.application.id, pieceId: p.document.id,
+      userId: p.user.id, analyseId: ancienne.id, champs: [AUTRE_CHOSE] };
+    let refusee = false;
+    await signalerUneErreurDeLecture(demandeAncienne).catch(() => { refusee = true; });
+    verifier(refusee, "l'identité d'une ancienne lecture est refusée, même avec les mêmes intitulés");
+    verifier(await db.manualReview.count({ where: { analysisId: nouvelle.id } }) === 0,
+      "aucune revue ouverte par erreur sur le nouveau fichier");
   }
 
   console.log("\nC-08 — l'exigence vient du référentiel, elle ne se devine pas");

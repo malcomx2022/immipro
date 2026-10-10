@@ -761,8 +761,10 @@ function Analyse({
             {/* Un dossier déposé ou clos garde ses pièces telles quelles : rien à relire. */}
             {attendUneSuite(dossier) ? (
               <Signalement
+                key={analyse.id}
                 dossierId={dossier.id}
                 pieceId={piece.id}
+                analyseId={analyse.id}
                 lus={lignes.map((c) => c.intitule)}
               />
             ) : null}
@@ -844,10 +846,12 @@ function Analyse({
 function Signalement({
   dossierId,
   pieceId,
+  analyseId,
   lus,
 }: {
   dossierId: string;
   pieceId: string;
+  analyseId: string;
   lus: readonly string[];
 }) {
   const [ouvert, setOuvert] = useState(false);
@@ -865,7 +869,7 @@ function Signalement({
     setEchec(null);
     const resultat = await appeler<{ dejaEnRelecture: boolean }>(
       `/api/dossiers/${dossierId}/pieces/${pieceId}/signalement`,
-      { corps: { champs: designes } },
+      { corps: { champs: designes, analyseId } },
     );
     setEnvoi(false);
     if (!resultat.ok) {
@@ -909,7 +913,11 @@ function Signalement({
         Une personne de l&apos;équipe relit la pièce elle-même. Le signalement ne consomme pas
         d&apos;analyse.
       </p>
-      {echec ? <BlocEchec echec={echec} annonce /> : null}
+      {echec ? (
+        <BlocEchec echec={echec} annonce>
+          <Button variante="secondaire" onClick={() => router.refresh()}>Recharger la lecture</Button>
+        </BlocEchec>
+      ) : null}
       <Button
         type="submit"
         pleineLargeur
