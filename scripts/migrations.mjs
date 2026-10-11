@@ -101,16 +101,17 @@ try {
     en développement, où la base a été façonnée par `migrate dev`, et la
     production reçoit un schéma qui n'a pas la colonne.
   */
-  const derive = spawnSync(
-    "npx",
-    [
-      "prisma", "migrate", "diff",
-      "--from-url", cible.toString(),
-      "--to-schema-datamodel", "prisma/schema.prisma",
-      "--exit-code",
-    ],
-    { encoding: "utf8" },
-  );
+  /*
+    Prisma 7 (S.169) a retiré `--from-url` et `--to-schema-datamodel` : la
+    base vient de `prisma.config.mjs`, donc de `DATABASE_URL`, que `lancer`
+    pose sur la base jetable.
+  */
+  const derive = lancer("npx", [
+    "prisma", "migrate", "diff",
+    "--from-config-datasource",
+    "--to-schema", "prisma/schema.prisma",
+    "--exit-code",
+  ]);
   const ecart = `${derive.stdout ?? ""}${derive.stderr ?? ""}`;
   verifier(
     derive.status === 0,

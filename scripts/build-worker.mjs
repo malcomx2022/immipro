@@ -28,12 +28,14 @@
  * ── Ce qui reste hors du paquet, et pourquoi ──────────────────────────
  *
  * `@prisma/client` et le client généré `.prisma/client` : ils chargent
- * leurs moteurs par chemin de fichier à l'exécution, et les empaqueter
- * casse cette résolution. Ce sont les deux seules dépendances que l'image
- * finale doit copier — tout le reste est dans le paquet.
+ * leur compilateur de requêtes par chemin de fichier à l'exécution (un
+ * wasm depuis Prisma 7, S.169), et les empaqueter casse cette résolution.
+ * Ce sont les deux seules dépendances que l'image finale doit copier —
+ * tout le reste est dans le paquet, l'adaptateur `@prisma/adapter-pg` et
+ * `pg` compris.
  *
- * CommonJS et non ESM : `@prisma/client` et `pg-boss` sont publiés en CJS,
- * et le paquet est l'unique point d'entrée d'un conteneur, pas une
+ * CommonJS et non ESM : `@prisma/client`, resté externe, est publié en CJS
+ * (pg-boss 12, ESM seul depuis S.168, s'empaquette sans difficulté), et le paquet est l'unique point d'entrée d'un conteneur, pas une
  * bibliothèque. Le dépôt n'a pas de `"type": "module"`, donc `.js` est
  * déjà du CJS — la commande du conteneur reste `node dist/worker.js`.
  */

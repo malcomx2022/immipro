@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { creerClientPrisma } from "../../src/lib/client-prisma";
 import { empreinte } from "../../src/server/securite/secret";
 import { checklistDepuis, echeancesDepuis } from "../../src/server/acces/dossiers";
 import { payload } from "../../src/server/acces/regles";
@@ -36,7 +36,7 @@ import { LONGUEUR_MINIMALE } from "../../src/domain/comptes/mot-de-passe";
  * `DEMO_MOT_DE_PASSE` pour qui veut le garder d'une passe à l'autre. Il
  * n'est plus écrit dans le dépôt.
  */
-const prisma = new PrismaClient();
+const prisma = creerClientPrisma();
 
 /** Un domaine réservé (RFC 2606) : aucun courrier de démonstration ne part chez quelqu'un. */
 const EMAIL = "aline.dossou@immipro.test";

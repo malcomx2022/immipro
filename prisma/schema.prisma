@@ -2,9 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// L'URL de la base n'est plus ici depuis Prisma 7 (S.169) : la CLI la lit
+// dans `prisma.config.mjs`, et le client la reçoit par son adaptateur
+// (`src/lib/client-prisma.ts`).
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ═══════════════════════════════════════════════════════════

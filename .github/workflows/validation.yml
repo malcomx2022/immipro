@@ -105,9 +105,11 @@ jobs:
         run: npm run build
       - run: echo "- **Construction** — \`next build\` + paquet du worker" >> "$GITHUB_STEP_SUMMARY"
 
-      # `prisma validate` lit le schéma sans toucher à une base : l'URL doit
-      # être syntaxiquement valide, rien de plus. Celle du service ferait
-      # croire à une vérification de la base, qui a lieu plus bas.
+      # `prisma validate` lit le schéma sans toucher à une base. Depuis
+      # Prisma 7 (S.169), l'URL n'est plus dans le schéma mais dans
+      # `prisma.config.mjs` ; celle-ci n'est jamais contactée. Celle du
+      # service ferait croire à une vérification de la base, qui a lieu
+      # plus bas.
       - name: Schéma Prisma
         run: npx prisma validate
         env:

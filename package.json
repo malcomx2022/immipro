@@ -17,7 +17,7 @@
     "check:copy": "tsx scripts/check-forbidden-copy.ts",
     "check:audit": "tsx scripts/audit.mts",
     "check": "npm run lint && npm run typecheck && npm run test && npm run check:copy",
-    "seed:rules": "tsx prisma/seed/visa-rules.ts",
+    "seed:rules": "tsx --env-file-if-exists=.env prisma/seed/visa-rules.ts",
     "worker": "tsx src/server/jobs/worker.ts",
     "smoke:worker": "node scripts/fumee-worker.mjs",
     "smoke:migrations": "node scripts/migrations.mjs",
@@ -60,12 +60,13 @@
     "db:deploy": "prisma migrate deploy",
     "db:garde-fous": "node scripts/garde-fous.mjs",
     "db:studio": "prisma studio",
-    "seed:demo": "tsx prisma/seed/demonstration.ts",
-    "seed:editorial": "tsx prisma/seed/editorial.ts"
+    "seed:demo": "tsx --env-file-if-exists=.env prisma/seed/demonstration.ts",
+    "seed:editorial": "tsx --env-file-if-exists=.env prisma/seed/editorial.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
-    "@prisma/client": "^6.0.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "clsx": "^2.1.0",
     "minio": "^8.0.0",
     "next": "^16.4.0",
@@ -95,11 +96,16 @@
     "pg-boss-11": "npm:pg-boss@11.1.2",
     "postcss": "^8.5.29",
     "prettier": "^3.9.9",
-    "prisma": "^6.0.0",
+    "prisma": "^7.10.0",
     "smtp-server": "^3.19.18",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.23.15",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "overrides": {
+    "prisma": {
+      "mysql2": "^3.24.5"
+    }
   }
 }
