@@ -482,6 +482,13 @@ describe("l'IA : un adaptateur présent ne se lit jamais « absent » faute de c
     expect(lue(env, "extraction").capacite).toBe("NON_CONFIGUREE");
     expect(
       lue({ ...env, AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible" }, "extraction").capacite,
+    ).toBe("NON_CONFIGUREE");
+    // L'autorisation désigne une société : le code et l'origine validée (S.171).
+    expect(
+      lue(
+        { ...env, AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible", AI_OPENAI_ORIGINE_AUTORISEE: "https://api.exemple.test" },
+        "extraction",
+      ).capacite,
     ).toBe("CONFIGUREE_NON_VERIFIEE");
   });
 

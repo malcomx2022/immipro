@@ -13298,3 +13298,47 @@ Poursuivre par L1, puis le chantier documenté. Modèle/OAuth réel, paiement
 réel, qualité IA, image applicative, restauration et préalables Q.A/M.C
 ne sont pas qualifiés par ces tests. S.170 est proposé ; fusion, déploiement
 et signature de recette restent des étapes distinctes.
+
+## S.171 — REV11-L1 : destination des documents (REV-IA-02, WF-06)
+
+**Autorisation.** Le 11/10/2026, à « suivant », deuxième lot du chantier REV11 (« poursuivre par L1 », CLAUDE.md). Main relu : `54faaa7`, avec #274 (revue REV11) et #275 (S.170 / REV11-L0) fusionnées, et aucune PR ouverte. Le lot prend S.171. Il conserve S.169 (client et CLI Prisma 7), S.170 (banc isolé) et pg-boss 12. Aucune migration, aucune montée de dépendance.
+
+**Arbitrage du responsable, 11/10/2026.** La revue laissait ouvert un choix : l'identité du prestataire autorisé. Le responsable retient de **lier l'autorisation à l'origine**. Pour `openai_compatible`, une nouvelle variable `AI_OPENAI_ORIGINE_AUTORISEE` (par exemple `https://api.mistral.ai`, sans chemin) doit être égale à l'origine de `AI_OPENAI_URL`. Sinon, aucune pièce ne part : revue humaine, analyse recréditée, cause dite dans B-07. Le refus des redirections était déjà tranché par la revue et n'a pas été redemandé.
+
+**Reproduit sur l'ancien code.**
+- DIA-04 (`scripts/recette/diagnostic-ia.mts`) : une réponse 307 vers une autre origine retransmet la pièce, avec 1 appel et des octets reçus à la destination.
+- Le même défaut existe hors du périmètre nommé par la revue. Le SDK Anthropic suit aussi la redirection : 1 appel reçu ailleurs, contre 0 avec `redirect: "manual"`. Or `ANTHROPIC_BASE_URL` peut désigner une autre adresse que l'API d'Anthropic.
+- L'autorisation générique : `AI_PIECES_SOUS_TRAITANT_AUTORISE=openai_compatible` autorise les pièces vers `https://api.mistral.ai/v1` comme vers `https://autre-prestataire.example/v1`.
+
+**Correction.**
+- **Aucune redirection n'est suivie, sur les trois sorties** :
+  - l'adaptateur compatible (`redirect: "manual"`) ;
+  - l'échange du jeton Google, dont l'assertion signée vaut un jeton ;
+  - le client Anthropic (`OPTIONS_DU_CLIENT`, `fetchOptions.redirect = "manual"`).
+
+  Une réponse 3xx devient `non_configure` : la tâche n'est pas rejouée, la pièce part en revue humaine et l'analyse est recréditée par le chemin existant du worker. La cause dit quelle variable revoir (`AI_OPENAI_URL`, `token_uri`, `ANTHROPIC_BASE_URL`), sans recopier l'adresse de renvoi ni la clé. Aucune exception, pas même vers la même origine : la réponse ne serait plus celle du point déclaré.
+- **`autorisationDesPieces`** (domaine pur) : le code du sous-traitant, puis l'origine déclarée, lisible (https ou boucle locale, sans chemin, paramètre ni identifiant) et égale à celle de l'URL appelée. Chaque refus dit quoi poser et par qui. `piecesAutoriseesChez` et B-07 (`etatDesFonctions`) s'appuient sur cette fonction. La rédaction ne reçoit aucune pièce et n'a pas cette garde.
+- Banc de recette : `AI_OPENAI_ORIGINE_AUTORISEE` est neutralisée avec les autres variables. `smoke:recette` branche réellement le parent avant de vérifier la neutralisation.
+
+**Éprouvé.**
+- `tests/ia-redirections.test.ts`, 31 tests sur des serveurs HTTP locaux :
+  - statuts 301, 302, 303, 307 et 308, vers la même origine, vers une autre origine et vers une destination HTTP non autorisée ;
+  - la destination ne reçoit rien, et le chemin de même origine non plus ;
+  - la cause est actionnable et ne contient ni adresse ni clé ;
+  - les mêmes statuts pour le jeton Google et le SDK Anthropic ;
+  - le client de l'application porte l'option ;
+  - l'origine déclarée, l'autorisation et le changement d'adresse sans revue.
+
+  **26 de ces 31 tests échouent sur l'ancien code** ; tous passent après correction. DIA-04 devient vert dans le diagnostic, et ce fichier le reprend en régression dans la porte.
+- Les attentes des autres diagnostics ne sont pas touchées : DIA-01 à DIA-03 et DIA-05 restent rouges (lots L2 à L4).
+
+**Vérifications.**
+- `npm run check` : 3 638 tests passent, 0 erreur de lint. Le seul avertissement est antérieur au lot.
+- `npm run check:audit` : aucune vulnérabilité élevée sans motif.
+- Fumées de la porte, `smoke:recette` comprise : à compléter avec les résultats de la passe.
+
+**Effet au déploiement.** Une installation qui envoie déjà des pièces à un fournisseur compatible cesse de les envoyer tant que `AI_OPENAI_ORIGINE_AUTORISEE` n'est pas posée. Elle les envoie en revue humaine, et B-07 dit quoi poser. Rien ne change pour Anthropic, le fournisseur par défaut, ni pour la rédaction.
+
+**Non vérifié.**
+- Un prestataire réel. La région, le modèle et le DPA restent à documenter avec lui (L5).
+- La configuration réelle du pilote, en particulier si l'extraction y passe déjà par `openai_compatible` : à relever dans B-07 après déploiement.

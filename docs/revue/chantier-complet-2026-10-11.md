@@ -23,9 +23,9 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 
 | Ordre | Lot | Priorité | État |
 |---|---|---|---|
-| 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 proposé, tests locaux passés |
-| 2 | L1 — Destination des documents | P1 | Prochain lot |
-| 3 | L2 — Mesure des usages IA | P1 | À réaliser |
+| 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 fusionné (PR #275) |
+| 2 | L1 — Destination des documents | P1 | S.171 proposé, tests locaux passés |
+| 3 | L2 — Mesure des usages IA | P1 | Prochain lot |
 | 4 | L3 — Validité des avis IA | P1 | À réaliser |
 | 5 | L4 — Relecture unique par version | P1 | À réaliser |
 | 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
@@ -69,6 +69,14 @@ recette navigateur. Aucune migration ni reprise de données. Ce lot facilite
 l'exécution sûre de tous les suivants.
 
 ## REV11-L1 — Maîtriser la destination des documents
+
+**Suivi du 11/10 : S.171 proposé sur main `54faaa7`.** Aucune redirection
+n'est suivie : adaptateur compatible, jeton Google, client Anthropic. Une
+réponse 3xx devient `non_configure` (revue humaine, analyse recréditée,
+pas de rejeu). L'autorisation des pièces désigne la société par son
+origine (`AI_OPENAI_ORIGINE_AUTORISEE`, arbitrage du responsable).
+`tests/ia-redirections.test.ts` reprend DIA-04 en régression ; 26 des 31
+tests échouent sur l'ancien code. Voir le registre, entrée S.171.
 
 **P1 · M · REV-IA-02 · WF-06 · server/ia/openai-compatible.ts.**
 

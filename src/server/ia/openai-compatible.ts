@@ -94,6 +94,20 @@ type Reponse =
 
 /** Le statut HTTP d'une réponse en erreur, traduit en cause neutre. */
 export function causeDuStatut(statut: number): { cause: CauseDAppel; detail: string } {
+  /*
+    Une redirection n'est jamais suivie — S.171, REV11-L1. `fetch` la
+    suivait, et retransmettait le corps — la pièce — à l'adresse que le
+    serveur désignait, quelle qu'elle soit : l'adresse validée n'était que
+    la première étape. Aucun renvoi n'est suivi, même vers la même
+    origine : la réponse ne serait plus celle du point déclaré. Ce n'est
+    pas passager — l'exploitant déclare l'adresse qui répond directement.
+  */
+  if (statut >= 300 && statut < 400) {
+    return {
+      cause: "non_configure",
+      detail: `le fournisseur renvoie vers une autre adresse (réponse ${statut}) : rien n'y a été envoyé ; déclarer dans AI_OPENAI_URL l'adresse qui répond directement`,
+    };
+  }
   if (statut === 401 || statut === 403) {
     return { cause: "non_configure", detail: `la clé d'appel est refusée (réponse ${statut})` };
   }
@@ -184,6 +198,8 @@ async function envoyer(
       },
       body: JSON.stringify({ model: config.modele, ...corps }),
       signal: AbortSignal.timeout(delaiMs),
+      // Jamais suivie : le corps porte la pièce (REV11-L1, S.171).
+      redirect: "manual",
     });
   } catch (erreur) {
     const nom = (erreur as { name?: unknown })?.name;

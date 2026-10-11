@@ -86,6 +86,8 @@ export async function jetonGoogle(
         assertion,
       }).toString(),
       signal: AbortSignal.timeout(DELAI_ECHANGE_MS),
+      // L'assertion signée vaut un jeton : elle ne suit aucun renvoi (S.171).
+      redirect: "manual",
     });
   } catch (erreur) {
     const nom = (erreur as { name?: unknown })?.name;
@@ -96,6 +98,13 @@ export async function jetonGoogle(
 
   if (!reponse.ok) {
     await reponse.body?.cancel().catch(() => undefined);
+    if (reponse.status >= 300 && reponse.status < 400) {
+      return {
+        ok: false,
+        cause: "non_configure",
+        detail: `le service de jetons renvoie vers une autre adresse (réponse ${reponse.status}) : l'assertion ne l'a pas suivie ; vérifier token_uri dans le compte de service`,
+      };
+    }
     if (reponse.status === 400 || reponse.status === 401 || reponse.status === 403) {
       return {
         ok: false,

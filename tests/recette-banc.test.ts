@@ -51,6 +51,7 @@ const complet = {
     token_uri: "https://oauth2.googleapis.com/token",
   }),
   AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible",
+  AI_OPENAI_ORIGINE_AUTORISEE: "https://europe-west4-aiplatform.googleapis.com",
   AI_OPENAI_PDF: "image_url",
 };
 
