@@ -13211,7 +13211,16 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 - Les 27 fumées de la porte ont été lancées dans l'ordre de la CI. 24 passaient au premier passage ; les trois autres repassent après le correctif de la bannière. `sandbox:paiement` s'abstient faute de clés.
 - **Image** construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image`. Au premier passage, l'image a fait échouer `node dist/diagnostic-donnees.mjs`, sur le même `require` manquant. Après le correctif, l'image reconstruite passe les 25 contrôles : le worker, le service `app`, la passerelle et les commandes d'exploitation démarrent depuis l'artefact. La CLI de l'image est en 7.10.0, et les deux commandes Prisma de `deployer.sh` l'atteignent : elles s'arrêtent sur la base absente (P1001), preuve qu'elles ont trouvé `prisma.config.mjs`.
 
+**Déploiement, relevé le 11/10/2026.** ec32f65 (run 537) est en service à 06 h 42, **sans retour arrière**. Il remplace bbf1500, et la santé avant déploiement était à 200.
+- Les trois jobs sont verts, y compris les étapes de la porte qui avaient échoué sur le premier commit de la PR : changement de rôle, graine éditoriale, diagnostic.
+- **La CLI Prisma 7 de l'image, contre la base réelle** : `Loaded Prisma config from prisma.config.mjs`, puis `Datasource "db": PostgreSQL database "immipro", schema "public" at "postgres:5432"`, puis `58 migrations found`, puis `No pending migrations to apply`.
+- `deployer.sh` annonce « aucune migration en attente » : aucune sauvegarde préalable n'était due.
+- Les garde-fous refusent bien les 105 écritures interdites. L'antivirus est prêt après 7 s.
+- La sonde de `deployer.sh` exige que le worker ait démarré : le worker sous Prisma 7 (adaptateur `pg`) a donc démarré sur la base réelle.
+- `/api/health` répond 200 (`{"status":"pilote","db":"up"}`) : le service `app` lit la base par l'adaptateur.
+- Préflight du stockage : 200 pour `https://immipro.app`, 403 pour une autre origine. Un POST d'une autre origine reçoit le 403 français.
+- Parcours public à 390 px (`r-s164-pilote.mjs`) : 12 constats conformes sur 12.
+
 **Non vérifié.**
-- Le déploiement réel : `migrate status` et `migrate deploy` lancés depuis l'image contre la base de production.
 - Le comportement du pool `pg` sous la charge réelle du pilote.
 - Un retour arrière réel vers l'image S.168.
