@@ -1,5 +1,5 @@
 import { route } from "@/server/http/route";
-import { MOTIF_FORMULATION_REFUSEE, refusDesRemarques } from "@/domain/redaction/commande";
+import { DETAIL_AVIS_MAL_FORME, lireLaCritique } from "@/domain/redaction/commande";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
@@ -131,6 +131,16 @@ export const POST = route({
     if (avis.etat === "RELUE" && mesure.etat !== "CONNUE") {
       avis = { ...avis, etat: "SANS_AVIS", cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE };
     }
+    // Le contrat de l'adaptateur ne dispense pas la publication de sa
+    // propre garde : aucun avis partiel ou injecté ne doit être daté.
+    if (avis.etat === "RELUE") {
+      const lue = lireLaCritique({ remarques: avis.remarques });
+      if ("cause" in lue) {
+        avis = { ...avis, etat: "SANS_AVIS", cause: lue.cause, motif: lue.motif, detail: DETAIL_AVIS_MAL_FORME };
+      } else {
+        avis = { ...avis, remarques: lue };
+      }
+    }
 
     if (avis.etat === "SANS_AVIS") {
       /*
@@ -145,20 +155,7 @@ export const POST = route({
         `Relecture non aboutie (${avis.cause}) : aucun avis rendu`,
       );
       console.warn(`[relecture] ${MOTIF_DAPPEL[avis.cause]} — ${avis.detail}`);
-      return { relue: false, disponible: true, remarques: null };
-    }
-
-    /*
-      Une remarque qui promet un résultat écarte toute la relecture (revue
-      M7) : elle s'affiche au candidat, et INV-2 vaut pour tout ce qui est
-      généré. L'analyse est rendue, la version reste non relue, et l'écran
-      dit pourquoi.
-    */
-    const faute = refusDesRemarques(avis.remarques);
-    if (faute) {
-      await rendreLaReservationDeRedaction(params.id!, debit.ligne, "Relecture écartée : formulation refusée");
-      console.warn(`[relecture] relecture écartée — ${faute.code} « ${faute.extrait} »`);
-      return { relue: false, disponible: true, remarques: null, motif: MOTIF_FORMULATION_REFUSEE };
+      return { relue: false, disponible: true, remarques: null, ...(avis.motif ? { motif: avis.motif } : {}) };
     }
 
     /*

@@ -152,9 +152,17 @@ Une vraie liste vide datée signifie « relue sans remarque » ; sans date,
 le texte reste non relu. Les formulations interdites sont contrôlées en aval
 et un résultat refusé rend l'analyse réservée. Le coût IA consommé reste distinct.
 
-Deux limites confirmées nécessitent correction : une liste entièrement
-mal formée peut être filtrée en liste vide favorable ; deux demandes
-simultanées peuvent relire et débiter deux fois la même version.
+**S.174 / REV11-L3.** Une remarque mal formée refuse l'avis entier,
+y compris une liste mixte ou trop longue ; aucun filtrage en avis favorable.
+Une vraie liste vide reste acceptée. Les deux valeurs d'une incohérence
+doivent être nommées et non vides ; leur vocabulaire est contrôlé aussi.
+Les deux adaptateurs et la route protègent la publication. Un refus rend
+la réservation une fois, sans effacer la consommation chez le fournisseur
+ni provoquer un nouvel appel automatique. Le candidat reçoit une explication
+et garde sa version. [Contrat, quota et historique](exploitation/avis-ia.md).
+
+Limite restant à corriger en L4 : deux demandes simultanées peuvent encore
+relire et débiter deux fois la même version (DIA-07).
 
 Sources : [service](../src/server/redaction/service.ts),
 [mise en forme](../src/server/redaction/mise-en-forme.ts),

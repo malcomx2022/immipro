@@ -420,7 +420,7 @@ export const critiqueCompatible =
     if (!reponse.ok) {
       return { etat: "SANS_AVIS", cause: reponse.cause, detail: reponse.detail, ...usageDUnEchec(reponse, appel) };
     }
-    const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
+    const echoue = (cause: CauseDAppel, detail: string): Extract<Relecture, { etat: "SANS_AVIS" }> => ({
       etat: "SANS_AVIS",
       cause,
       detail,
@@ -439,7 +439,7 @@ export const critiqueCompatible =
       return echoue("reponse_illisible", "la réponse n'est pas du JSON");
     }
     const relue = lireLaCritique(charge);
-    if ("cause" in relue) return echoue(relue.cause, "la réponse n'a pas la forme annoncée au schéma");
+    if ("cause" in relue) return { ...echoue(relue.cause, "L'avis reçu ne peut pas être publié."), motif: relue.motif };
     return {
       etat: "RELUE",
       remarques: relue,

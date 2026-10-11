@@ -197,3 +197,14 @@ reste enregistrée même si le contenu est refusé. B-07 distingue l'usage
 incomplet du tarif absent ; l'export ajoute « Mesure » et laisse les inconnus
 vides. Les données historiques ne sont pas réécrites. D1 demeure en analyses.
 Lire [procédure, workflows et migration](exploitation/mesure-ia.md).
+
+## Validité des avis — S.174 / REV11-L3
+
+Anthropic et compatible utilisent le même validateur pur. Une vraie liste
+vide reste un avis ; une liste mixte, mal formée ou trop longue est refusée
+entièrement. Genres, texte et deux écarts d'une incohérence sont validés,
+y compris le vocabulaire des sources/valeurs affichées. La route vérifie
+aussi le résultat avant de dater la version. Consommation observée conservée,
+quota réservé rendu une fois, aucune relance automatique pour cette cause.
+Aucun avis historique réécrit. Lire [le contrat et le rôle du fournisseur
+dans WF-08](exploitation/avis-ia.md). La concurrence reste L4.

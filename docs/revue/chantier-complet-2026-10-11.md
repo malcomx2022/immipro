@@ -26,7 +26,7 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 fusionné (PR #275) |
 | 2 | L1 — Destination des documents | P1 | S.171/S.172 fusionnés via #276/#278 ; [preuves](lot-l1-2026-10-11.md) |
 | 3 | L2 — Mesure des usages IA | P1 | S.173 proposé ; [preuves et limites](lot-l2-2026-10-11.md) |
-| 4 | L3 — Validité des avis IA | P1 | À réaliser |
+| 4 | L3 — Validité des avis IA | P1 | S.174 proposé ; validateur, POST/quota et documentation, à revoir avant intégration |
 | 5 | L4 — Relecture unique par version | P1 | À réaliser |
 | 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
 | 7 | L6 — Recette front et parcours candidat | P2 | À réaliser |
@@ -128,6 +128,16 @@ des lignes historiques. Les zéros anciens ne permettent pas de reconstruire
 des jetons réels ; aucun montant ou journal historique inventé.
 
 ## REV11-L3 — Refuser les avis mal formés
+
+**Proposition S.174, 11/10.** Base `3d985f8`, L2 #280 et arbitrage Claude
+#282 conservés. Une remarque invalide refuse l'avis entier, même liste
+mixte ; aucune troncature. Deux adaptateurs et garde de publication dans
+la route ; vraie liste vide acceptée. Consommation conservée, réservation
+rendue une fois, message candidat distinct. 3 792 tests, 28 intégrations
+existantes vertes et nouvelle fumée POST sur les deux fournisseurs.
+DIA-05 passe ; DIA-07 reste L4. Aucun avis historique réécrit, aucune
+fusion ni mise en production. [Preuves L3](lot-l3-2026-10-11.md),
+[contrat fournisseur/WF-08](../exploitation/avis-ia.md).
 
 **P1 · M · REV-IA-03 · WF-08/RG-08.4 · domaine de relecture et adaptateurs.**
 

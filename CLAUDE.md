@@ -79,6 +79,24 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.174 / REV11-L3 — validité des avis.** Autorisation « L3 », base
+`3d985f8` : L2 #280 fusionné, arbitrage Claude #282 conservé ; les règles
+de #280 font foi, ne pas réintroduire la version #281.
+Lire [le suivi L3](docs/revue/lot-l3-2026-10-11.md) et
+[le contrat des avis](docs/exploitation/avis-ia.md).
+Politique : une seule remarque invalide refuse tout l'avis, même liste
+mixte ; aucune troncature au-delà de huit. Une vraie liste vide est valide.
+Genres produits uniquement, titres/corps et deux sources/valeurs d'une
+incohérence non blancs, autres genres sans écarts. Vocabulaire commun sur
+tous les champs affichés. Deux adaptateurs + garde de publication dans
+la route ; motif candidat `avis_mal_forme`, formulation refusée conservée.
+Usage L2 enregistré avant refus, aucune date ni remarque publiée,
+réservation rendue une fois et aucun rejeu automatique pour ce motif.
+Ne pas requalifier les avis historiques sans réponse source. Conserver
+DIA-05/CTRL-02 et `smoke:avis-ia` dans la porte commune. D1, INV-1/2/6,
+WF-08/RG-08.4/08.9. DIA-07/concurrence reste L4 ; mobile B-07 reste L7.
+Proposition sans fusion/déploiement ni levée Q.A/M.C. Prochain lot : L4.
+
 **S.173 / REV11-L2 — mesure des usages.** Autorisation « L2 », main
 `47b39b0` relu : S.171/S.172 et #278 intégrés, aucune PR concurrente au
 démarrage. Base finale `16636d4` : #279 conserve le relevé Claude du

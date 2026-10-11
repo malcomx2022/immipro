@@ -1,5 +1,5 @@
 import type { EchecCandidat } from "@/domain/echecs/catalogue";
-import { MOTIF_FORMULATION_REFUSEE } from "./commande";
+import { MOTIF_AVIS_MAL_FORME, MOTIF_FORMULATION_REFUSEE } from "./commande";
 
 /**
  * Ce que l'écran dit quand une mise en forme ou une relecture n'a rien
@@ -42,6 +42,14 @@ export const RELECTURE_ECARTEE: EchecCandidat = {
   ton: "echec",
 };
 
+export const RELECTURE_MAL_FORMEE: EchecCandidat = {
+  titre: "L'analyse n'a pas pu être utilisée",
+  corps: "Les remarques reçues étaient incomplètes ou mal formées. Cette version reste sans avis de relecture.",
+  conserve: "Aucune analyse n'a été décomptée de ton quota, et ta version est intacte.",
+  action: "Relis ta version dans l'éditeur ; tu peux demander une nouvelle analyse plus tard.",
+  ton: "echec",
+};
+
 /** L'issue d'une mise en forme qui n'a pas produit de version, ou `null` si le service n'existe pas ici. */
 export function issueDeLaMiseEnForme(reponse: {
   disponible: boolean;
@@ -52,4 +60,5 @@ export function issueDeLaMiseEnForme(reponse: {
 }
 
 export const issueDeLaRelecture = (reponse: { motif?: string | null }): EchecCandidat =>
-  reponse.motif === MOTIF_FORMULATION_REFUSEE ? RELECTURE_ECARTEE : RELECTURE_SANS_AVIS;
+  reponse.motif === MOTIF_FORMULATION_REFUSEE ? RELECTURE_ECARTEE :
+    reponse.motif === MOTIF_AVIS_MAL_FORME ? RELECTURE_MAL_FORMEE : RELECTURE_SANS_AVIS;
