@@ -1,3 +1,4 @@
+import { mesurerLesJetons, DETAIL_MESURE_INCOMPLETE, type MesureDeJetons } from "@/domain/ia/usage";
 import { fetchSansRedirection } from "@/lib/ia-transport";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import {
@@ -88,10 +89,11 @@ type Reponse =
       texte: string;
       fin: string | null;
       refus: boolean;
-      jetonsEntree: number;
-      jetonsSortie: number;
+      mesure: MesureDeJetons;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
-  | { ok: false; cause: CauseDAppel; detail: string };
+  | { ok: false; cause: CauseDAppel; detail: string; mesure?: MesureDeJetons; reponseDecodee?: true };
 
 /** Le statut HTTP d'une réponse en erreur, traduit en cause neutre. */
 export function causeDuStatut(statut: number): { cause: CauseDAppel; detail: string } {
@@ -131,21 +133,26 @@ export function causeDuStatut(statut: number): { cause: CauseDAppel; detail: str
   };
 }
 
-const lireReponse = (charge: unknown): Omit<Extract<Reponse, { ok: true }>, "ok"> | null => {
+const lireReponse = (charge: unknown): Reponse => {
   const c = charge as {
     choices?: { finish_reason?: unknown; message?: { content?: unknown; refusal?: unknown } }[];
     usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
   } | null;
-  const choix = c?.choices?.[0];
-  if (!choix?.message) return null;
-  const nombre = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  // Mesurer avant de lire le contenu : une enveloppe refusée peut avoir coûté.
+  const mesure = mesurerLesJetons(c?.usage?.prompt_tokens, c?.usage?.completion_tokens);
+  if (mesure.etat !== "CONNUE") {
+    return { ok: false, cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE, mesure, reponseDecodee: true };
+  }
+  const choix = Array.isArray(c?.choices) ? c.choices[0] : undefined;
+  if (!choix?.message) {
+    return { ok: false, cause: "reponse_illisible", detail: "la réponse n'a pas la forme d'une complétion", mesure, reponseDecodee: true };
+  }
   const refus = typeof choix.message.refusal === "string" && choix.message.refusal.length > 0;
   return {
+    ok: true, mesure, jetonsEntree: mesure.jetonsEntree, jetonsSortie: mesure.jetonsSortie,
     texte: typeof choix.message.content === "string" ? choix.message.content : "",
     fin: typeof choix.finish_reason === "string" ? choix.finish_reason : null,
     refus: refus || choix.finish_reason === "content_filter",
-    jetonsEntree: nombre(c?.usage?.prompt_tokens),
-    jetonsSortie: nombre(c?.usage?.completion_tokens),
   };
 };
 
@@ -188,6 +195,7 @@ async function envoyer(
     return { reponse: { ok: false, cause: autorisation.cause, detail: autorisation.detail }, statut: null };
   }
   const url = new URL("chat/completions", config.base.href.endsWith("/") ? config.base : `${config.base.href}/`);
+  const inconnue = mesurerLesJetons(undefined, undefined);
   let reponse: Response;
   try {
     reponse = await fetchSansRedirection(url, {
@@ -207,8 +215,8 @@ async function envoyer(
     return {
       reponse:
         nom === "TimeoutError" || nom === "AbortError"
-          ? { ok: false, cause: "delai_depasse", detail: `sans réponse après ${delaiMs} ms` }
-          : { ok: false, cause: "injoignable", detail: "le service n'a pas répondu" },
+          ? { ok: false, cause: "delai_depasse", detail: `sans réponse après ${delaiMs} ms`, mesure: inconnue }
+          : { ok: false, cause: "injoignable", detail: "le service n'a pas répondu", mesure: inconnue },
       statut: null,
     };
   }
@@ -216,18 +224,11 @@ async function envoyer(
   if (!reponse.ok) {
     // Le corps n'est pas lu : il peut contenir un écho de la demande.
     await reponse.body?.cancel().catch(() => undefined);
-    return { reponse: { ok: false, ...causeDuStatut(reponse.status) }, statut: reponse.status };
+    return { reponse: { ok: false, ...causeDuStatut(reponse.status), mesure: inconnue }, statut: reponse.status };
   }
 
   const charge = await reponse.json().catch(() => null);
-  const lue = lireReponse(charge);
-  if (!lue) {
-    return {
-      reponse: { ok: false, cause: "reponse_illisible", detail: "la réponse n'a pas la forme d'une complétion" },
-      statut: reponse.status,
-    };
-  }
-  return { reponse: { ok: true, ...lue }, statut: reponse.status };
+  return { reponse: lireReponse(charge), statut: reponse.status };
 }
 
 /**
@@ -260,6 +261,13 @@ const mesure = (config: ConfigurationCompatible): AppelMesure => ({
   modele: config.modele,
 });
 
+/** Compatibilité des résultats de transport ; la persistance utilise la mesure canonique. */
+const usageDUnEchec = (reponse: Extract<Reponse, { ok: false }>, appel: AppelMesure) => ({
+  jetonsEntree: reponse.reponseDecodee ? reponse.mesure?.jetonsEntree ?? null : 0,
+  jetonsSortie: reponse.reponseDecodee ? reponse.mesure?.jetonsSortie ?? null : 0,
+  ...(reponse.mesure ? { appel: { ...appel, mesure: reponse.mesure } } : {}),
+});
+
 // ── Lecture des pièces ──────────────────────────────────────────────────
 
 /** Lit les octets d'une pièce déjà vérifiée (type, taille) par l'appelant. */
@@ -276,7 +284,6 @@ export async function lireDesOctetsCompatible(
     detail,
     jetonsEntree: 0,
     jetonsSortie: 0,
-    appel,
   });
 
   const donnees = `data:${type};base64,${octets.toString("base64")}`;
@@ -306,7 +313,9 @@ export async function lireDesOctetsCompatible(
     },
     DELAI_EXTRACTION_MS,
   );
-  if (!reponse.ok) return sansJetons(reponse.cause, reponse.detail);
+  if (!reponse.ok) return {
+    ...sansJetons(reponse.cause, reponse.detail), ...usageDUnEchec(reponse, appel),
+  };
 
   const echoue = (cause: Extract<Lecture, { etat: "NON_LUE" }>["cause"], detail: string): Lecture => ({
     etat: "NON_LUE",
@@ -314,7 +323,7 @@ export async function lireDesOctetsCompatible(
     detail,
     jetonsEntree: reponse.jetonsEntree,
     jetonsSortie: reponse.jetonsSortie,
-    appel,
+    appel: { ...appel, mesure: reponse.mesure },
   });
   if (reponse.refus) return echoue("refus", "le service de lecture a refusé de traiter la pièce");
   if (reponse.fin === "length") {
@@ -337,7 +346,7 @@ export async function lireDesOctetsCompatible(
     pieceIdentifiee: relue.pieceIdentifiee,
     jetonsEntree: reponse.jetonsEntree,
     jetonsSortie: reponse.jetonsSortie,
-    appel,
+    appel: { ...appel, mesure: reponse.mesure },
   };
 }
 
@@ -366,7 +375,7 @@ export const redacteurCompatible =
       DELAI_REDACTION_MS,
     );
     if (!reponse.ok) {
-      return { etat: "SANS_TEXTE", cause: reponse.cause, detail: reponse.detail, jetonsEntree: 0, jetonsSortie: 0 };
+      return { etat: "SANS_TEXTE", cause: reponse.cause, detail: reponse.detail, ...usageDUnEchec(reponse, appel) };
     }
     const echoue = (cause: CauseDAppel, detail: string): Redaction => ({
       etat: "SANS_TEXTE",
@@ -374,7 +383,7 @@ export const redacteurCompatible =
       detail,
       jetonsEntree: reponse.jetonsEntree,
       jetonsSortie: reponse.jetonsSortie,
-      appel,
+      appel: { ...appel, mesure: reponse.mesure },
     });
     if (reponse.refus) return echoue("refus", "le service a refusé d'écrire cette pièce");
     // Un texte coupé au plafond ne devient pas une version datée.
@@ -388,7 +397,7 @@ export const redacteurCompatible =
       texte,
       jetonsEntree: reponse.jetonsEntree,
       jetonsSortie: reponse.jetonsSortie,
-      appel,
+      appel: { ...appel, mesure: reponse.mesure },
     };
   };
 
@@ -409,7 +418,7 @@ export const critiqueCompatible =
       DELAI_REDACTION_MS,
     );
     if (!reponse.ok) {
-      return { etat: "SANS_AVIS", cause: reponse.cause, detail: reponse.detail, jetonsEntree: 0, jetonsSortie: 0 };
+      return { etat: "SANS_AVIS", cause: reponse.cause, detail: reponse.detail, ...usageDUnEchec(reponse, appel) };
     }
     const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
       etat: "SANS_AVIS",
@@ -417,7 +426,7 @@ export const critiqueCompatible =
       detail,
       jetonsEntree: reponse.jetonsEntree,
       jetonsSortie: reponse.jetonsSortie,
-      appel,
+      appel: { ...appel, mesure: reponse.mesure },
     });
     if (reponse.refus) return echoue("refus", "le service a refusé de relire cette pièce");
     if (reponse.fin === "length") {
@@ -436,6 +445,6 @@ export const critiqueCompatible =
       remarques: relue,
       jetonsEntree: reponse.jetonsEntree,
       jetonsSortie: reponse.jetonsSortie,
-      appel,
+      appel: { ...appel, mesure: reponse.mesure },
     };
   };

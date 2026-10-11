@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import { coutMicrosDesJetons } from "@/domain/backoffice/couts";
+import { mesurerLesJetons, compteurValide, type MesureDeJetons } from "@/domain/ia/usage";
 import {
   FOURNISSEUR_PAR_DEFAUT,
   tarifDu,
@@ -109,8 +110,8 @@ export function causeDeLErreur(
 
 /** Le texte que le modèle a rendu, concaténé. Les blocs de réflexion sont ignorés. */
 export const texteRendu = (message: Anthropic.Message): string =>
-  message.content
-    .filter((bloc): bloc is Anthropic.TextBlock => bloc.type === "text")
+  (Array.isArray(message?.content) ? message.content : [])
+    .filter((bloc): bloc is Anthropic.TextBlock => bloc?.type === "text" && typeof bloc.text === "string")
     .map((bloc) => bloc.text)
     .join("");
 
@@ -121,21 +122,17 @@ export const texteRendu = (message: Anthropic.Message): string =>
  * a coûté ses jetons. L'omettre en ferait un appel gratuit dans B-07, ce
  * que l'invariant appelle un dépassement silencieux.
  *
- * Le prix du jeton n'est pas mesuré tant qu'aucun tarif n'est configuré ;
- * `costMicros` porte alors zéro, et B-07 ne le lit pas — il recalcule
- * depuis les jetons et le tarif du jour, pour qu'une ligne écrite avant le
- * tarif ne compte pas comme gratuite. La route de rédaction écrivait `0`
- * en dur, ce qui donnait le même nombre pour une raison différente : elle
- * ne l'aurait pas mis à jour le jour du tarif. C'est la divergence que
- * cette fonction a déjà coûté une fois, et la raison pour laquelle elle
- * n'existe plus qu'ici.
+ * L2 : une consommation inconnue, partielle ou invalide persiste des
+ * compteurs NULL et un état explicite. Le vrai 0/0 observé laisse une
+ * ligne CONNUE. Sans tarif, costMicros vaut NULL ; B-07 recalcule au tarif
+ * courant et refuse de présenter une somme incomplète comme un coût total.
  */
 export async function noterLesJetons(
   userId: string,
   applicationId: string,
   operation: string,
-  jetonsEntree: number,
-  jetonsSortie: number,
+  jetonsEntree: number | null,
+  jetonsSortie: number | null,
   /**
    * Chez qui l'appel est parti — S.94. Absent quand aucun appel n'a eu
    * lieu (rien n'est alors écrit, zéro jeton) ; la ligne est sinon datée
@@ -143,9 +140,18 @@ export async function noterLesJetons(
    * fournisseur**, jamais à celui d'un autre.
    */
   appel?: AppelMesure,
-): Promise<void> {
-  if (jetonsEntree === 0 && jetonsSortie === 0) return;
+): Promise<MesureDeJetons> {
+  const declaree = appel?.mesure;
+  const mesure = declaree
+    ? mesurerLesJetons(declaree.jetonsEntree, declaree.jetonsSortie)
+    : mesurerLesJetons(jetonsEntree, jetonsSortie);
+  // Garder la qualification d'une valeur rejetée, même normalisée en NULL.
+  if (declaree?.etat === "INVALIDE" && mesure.etat !== "CONNUE") mesure.etat = "INVALIDE";
+  // Les refus avant appel restent sans ligne. Un zéro réellement observé est enregistré.
+  if (!appel && jetonsEntree === 0 && jetonsSortie === 0) return mesure;
   const fournisseur = appel?.fournisseur ?? FOURNISSEUR_PAR_DEFAUT;
+  const cout = mesure.etat === "CONNUE"
+    ? coutMicrosDesJetons(tarifDu(process.env, fournisseur), mesure.jetonsEntree, mesure.jetonsSortie) : null;
   await db.aiUsage.create({
     data: {
       userId,
@@ -153,16 +159,19 @@ export async function noterLesJetons(
       operation,
       provider: fournisseur,
       model: appel?.modele ?? null,
-      inputTokens: jetonsEntree,
-      outputTokens: jetonsSortie,
-      costMicros:
-        coutMicrosDesJetons(tarifDu(process.env, fournisseur), jetonsEntree, jetonsSortie) ?? 0,
+      inputTokens: mesure.jetonsEntree,
+      outputTokens: mesure.jetonsSortie,
+      usageState: mesure.etat,
+      // Un tarif excessif ne doit pas faire rejouer un appel déjà facturable.
+      costMicros: compteurValide(cout) ? cout : null,
     },
   });
+  return mesure;
 }
 
 /** Le fournisseur et le modèle d'un appel qui a eu lieu. */
 export interface AppelMesure {
   fournisseur: CodeFournisseur;
   modele: string;
+  mesure?: MesureDeJetons;
 }

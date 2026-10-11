@@ -313,3 +313,24 @@ Voir [le relevé et les limites](../revue/lot-l1-2026-10-11.md). Le navigateur
 n'est pas rejoué dans L1 ; les deux assertions de rendu UI sont exécutées
 sous jsdom. Fournisseur réel/région/DPA, mesure inconnue, avis mal formés et
 concurrence de relecture restent à qualifier/corriger dans leurs lots.
+
+## REV11-L2 — S.173, 11/10/2026
+
+Base finale `16636d4`, après relevé Claude du pilote L1. D1 en analyses,
+publication prudente sans mesure complète, historique conservé.
+
+| Scénario | Résultat observé | Preuve | Statut |
+|---|---|---|---|
+| Usage absent/partiel/négatif/fractionnaire/hors INTEGER | Aucun verdict automatique ; compteur inconnu NULL, revue humaine et rendu unique | HTTP/SDK + `smoke:extraction` PostgreSQL, deux fournisseurs | Vérifié, simulations |
+| Enveloppe vide annonçant 120/30 | Aucun verdict ; usage et coût connus conservés | DIA-03 et worker | Vérifié, simulations |
+| Vrai 0/0 | Ligne CONNUE ; publication selon règles ; une analyse payée | Tests et worker | Vérifié, simulations |
+| Rejeu et deux workers | Rejeu sans appel supplémentaire ; course avec un verdict/un rendu et mesure par appel effectivement parti | PostgreSQL | Vérifié, simulations |
+| Texte/avis sans mesure | Aucun texte publié ; POST réel : pas de date ni remarque, solde 30 → 30 | `smoke:redaction`, `smoke:usages-ia` | Vérifié, simulations |
+| Migration/historique | Trois anciennes lignes inchangées ; états non requalifiés et diagnostic sans écriture | `smoke:usages-ia` | Vérifié, base jetable |
+| B-07/API/CSV | Alerte malgré tarif, coût incomplet indisponible, cellules inconnues vides | Next standalone, API et export ; React/jsdom et Chromium bureau/tablette | Vérifié, banc |
+| B-07 mobile 390 px | Débordement horizontal ; reprise dans L7 | Chromium | Anomalie, non validé |
+| Modèle/facture/DPA réels | Aucun service réel appelé | L5 | Non vérifié |
+
+[Suivi et limites L2](../revue/lot-l2-2026-10-11.md),
+[workflow du provider et rapprochement](../exploitation/mesure-ia.md).
+Aucune signature de recette globale, fusion ou levée Q.A/M.C par L2.

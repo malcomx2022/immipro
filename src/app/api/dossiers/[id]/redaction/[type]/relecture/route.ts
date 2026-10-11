@@ -14,6 +14,7 @@ import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { laCritique } from "@/server/redaction/service";
 import { noterLesJetons } from "@/server/redaction/usage";
+import { DETAIL_MESURE_INCOMPLETE } from "@/domain/ia/usage";
 import { MOTIF_DAPPEL } from "@/domain/ia/appel";
 
 /**
@@ -101,7 +102,7 @@ export const POST = route({
     });
 
     const reponses = await reponsesDeLEntretien(piece.documentId);
-    const avis = await laCritique()(derniere.body, {
+    let avis = await laCritique()(derniere.body, {
       // La pièce et la destination sont nommées : ce qui écrit pour le
       // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
       piece: piece.libelle,
@@ -119,7 +120,7 @@ export const POST = route({
     });
 
     // INV-6 — ce qui a été consommé est écrit, même quand rien n'est rendu.
-    await noterLesJetons(
+    const mesure = await noterLesJetons(
       acteur!.id,
       params.id!,
       `relecture:${piece.type}`,
@@ -127,6 +128,9 @@ export const POST = route({
       avis.jetonsSortie,
       avis.appel,
     );
+    if (avis.etat === "RELUE" && mesure.etat !== "CONNUE") {
+      avis = { ...avis, etat: "SANS_AVIS", cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE };
+    }
 
     if (avis.etat === "SANS_AVIS") {
       /*

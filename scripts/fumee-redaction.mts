@@ -286,6 +286,35 @@ async function ceQueLEcranDit(dossier: { id: string; userId: string }, documentI
 const relireVersion = (id: string) => db.documentVersion.findUniqueOrThrow({ where: { id } });
 
 try {
+  console.log("\nREV11-L2 : aucun texte ni avis publié sans mesure de consommation");
+  {
+    for (const fournisseur of ["anthropic", "openai_compatible"] as const) {
+      for (const invalide of [false, true]) {
+        const p = await piece({ avecTexte: false });
+        const entree = invalide ? -12 : 120;
+        const sortie = invalide ? 1.5 : undefined;
+        reponseDuService = { statut: 200, corps: JSON.stringify(fournisseur === "anthropic"
+          ? { ...JSON.parse(messageDe(LETTRE).corps), usage: { input_tokens: entree, output_tokens: sortie } }
+          : { choices: [{ message: { content: LETTRE }, finish_reason: "stop" }], usage: { prompt_tokens: entree, completion_tokens: sortie } }) };
+        recusParLeService.length = 0;
+        const redacteur = leRedacteur(fournisseur === "anthropic" ? process.env : {
+          AI_FOURNISSEUR_REDACTION: fournisseur, AI_OPENAI_URL: `http://127.0.0.1:${portService}/v1`,
+          AI_OPENAI_MODEL: "modele-essai", AI_OPENAI_API_KEY: "cle-d-essai",
+        });
+        const produit = await mettreEnForme(p.application.id, p.user.id, {
+          type: "lettre-motivation", libelle: MATIERE.piece, objet: MATIERE.objet, pays: MATIERE.pays,
+          questions: [{ section: "PARCOURS", intitule: "Quel est ton parcours ?" }],
+        } as never, MATIERE.reponses, redacteur);
+        const usage = await db.aiUsage.findFirstOrThrow({ where: { applicationId: p.application.id } });
+        verifier(!produit.produite && await db.documentVersion.count({ where: { documentId: p.document.id } }) === 0,
+          `${fournisseur}/L2 : aucune version publiée sans mesure valide`);
+        verifier(await solde(p.application.id) === 5 && recusParLeService.length === 1,
+          `${fournisseur}/L2 : réservation rendue sans relance facturable`);
+        verifier(usage.usageState === (invalide ? "INVALIDE" : "PARTIELLE") && usage.inputTokens === (invalide ? null : 120) && usage.outputTokens === null && usage.costMicros === null,
+          `${fournisseur}/L2 : coût inconnu et compteur connu conservés`);
+      }
+    }
+  }
   console.log("\nLe défaut : une version jamais relue, devant une clé posée");
   {
     const p = await piece();
@@ -452,7 +481,7 @@ try {
       Les jetons ont bien été consommés : INV-6 veut qu'ils soient
       écrits quand même. C'est la route qui le fait, avec cette valeur.
     */
-    verifier(produit.jetonsSortie > 0, "les jetons consommés restent comptés");
+    verifier(produit.jetonsSortie !== null && produit.jetonsSortie > 0, "les jetons consommés restent comptés");
   }
 
   console.log("\nUne relecture réelle date la version et écrit ses remarques");

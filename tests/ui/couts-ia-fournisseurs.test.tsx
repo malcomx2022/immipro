@@ -12,6 +12,22 @@ import { etatDesFonctions, type ConsommationDuFournisseur } from "@/domain/ia/fo
 const base = { metriques: [], serie: [], candidats: [], tarife: false };
 
 describe("B-07 — fournisseurs d'IA", () => {
+  it("signale une consommation à rapprocher même avec tarif et zéro observé", () => {
+    render(<CoutsIa {...base} tarife={true}
+      parFournisseur={[{ fournisseur: "anthropic", modele: "synthetique", appels: 1,
+        jetonsEntree: 0, jetonsSortie: 0, appelsARapprocher: 1, coutMicros: null, devise: "EUR" },
+        { fournisseur: "anthropic", modele: "tarif-excessif", appels: 1,
+          jetonsEntree: 120, jetonsSortie: 30, coutMicros: null, devise: "EUR" }]} />);
+    const alerte = screen.getByRole("alert");
+    expect(within(alerte).getByText("Consommation à rapprocher")).toBeTruthy();
+    expect(alerte.textContent).toContain("Ne pas relancer");
+    const table = screen.getByRole("table", { name: "Consommation par fournisseur et par modèle" });
+    expect(within(table).getByText("mesure à rapprocher")).toBeTruthy();
+    expect(within(table).queryByText("sans tarif")).toBeNull();
+    expect(within(table).getByText("coût indisponible")).toBeTruthy();
+    expect(within(table).getAllByText("0 observés · incomplet")).toHaveLength(2);
+    expect(screen.getByText(/empêchent de conclure sur tous les dépassements/u)).toBeTruthy();
+  });
   it("dit qui sert chaque fonction, et pourquoi la lecture n'est pas branchée", () => {
     render(
       <CoutsIa

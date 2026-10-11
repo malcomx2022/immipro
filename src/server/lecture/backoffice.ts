@@ -1,6 +1,7 @@
+import { usageARapprocher } from "@/domain/ia/usage";
 import { db } from "@/lib/db";
 import { resumeDuSignalement } from "@/domain/dossiers/signalement";
-import type { Transaction } from "@prisma/client";
+import type { Prisma, Transaction } from "@prisma/client";
 import { ecartOuvert } from "@/domain/backoffice/ecart";
 import { etapeDe, sommeARendre, type DetteFedaPay } from "@/domain/paiement/remboursement";
 import { depuisMineur, prixPayeMineur } from "@/domain/facturation/montants";
@@ -861,6 +862,7 @@ export async function fileDeRevue(): Promise<PieceEnEchec[]> {
 export interface LigneDeCout {
   dossierId: string;
   appels: number;
+  appelsARapprocher: number;
   jetonsEntree: number;
   jetonsSortie: number;
   /** `null` sans tarif configuré. */
@@ -977,6 +979,17 @@ export type TarifsIA = TarifIA | null | ((fournisseur: CodeFournisseur) => Tarif
 const tarifDe = (tarifs: TarifsIA, fournisseur: CodeFournisseur): TarifIA | null =>
   typeof tarifs === "function" ? tarifs(fournisseur) : tarifs;
 
+/** Mesures incomplètes et zéros historiques sans preuve ; lecture seule. */
+const USAGES_A_RAPPROCHER: Prisma.AiUsageWhereInput = {
+  OR: [
+    { usageState: { in: ["INCONNUE", "PARTIELLE", "INVALIDE"] } },
+    { usageState: null, OR: [
+      { inputTokens: 0, outputTokens: 0 }, { inputTokens: null }, { outputTokens: null },
+      { inputTokens: { lt: 0 } }, { outputTokens: { lt: 0 } },
+    ] },
+  ],
+};
+
 export async function coutsParDossier(
   tarifs: TarifsIA = (fournisseur) => tarifDu(process.env, fournisseur),
 ): Promise<LigneDeCout[]> {
@@ -986,11 +999,11 @@ export async function coutsParDossier(
     deux est la somme de deux tarifs — ou rien, si l'un manque ou si leurs
     devises diffèrent. Une somme partielle se lirait comme un coût complet.
   */
-  const parFournisseur = await db.aiUsage.groupBy({
+  const [parFournisseur, incomplets] = await Promise.all([db.aiUsage.groupBy({
     by: ["applicationId", "provider"],
     _sum: { inputTokens: true, outputTokens: true },
     _count: { _all: true },
-  });
+  }), db.aiUsage.groupBy({ by: ["applicationId"], where: USAGES_A_RAPPROCHER, _count: { _all: true } })]);
   const usages = [
     ...parFournisseur
       .reduce((dossiers, u) => {
@@ -1059,11 +1072,13 @@ export async function coutsParDossier(
       const achat = effectif ? { currency: effectif.devise } : premier;
       const jetonsEntree = u._sum.inputTokens ?? 0;
       const jetonsSortie = u._sum.outputTokens ?? 0;
-      const coutMicros = u.cout;
+      const appelsARapprocher = incomplets.find((i) => i.applicationId === u.applicationId)?._count._all ?? 0;
+      const coutMicros = appelsARapprocher > 0 ? null : u.cout;
       return [
         {
           dossierId: u.applicationId,
           appels: u._count._all,
+          appelsARapprocher,
           jetonsEntree,
           jetonsSortie,
           coutMicros,
@@ -1073,7 +1088,7 @@ export async function coutsParDossier(
           partDuPrix:
             prix && coutMicros !== null ? coutMicros / 1_000_000 / prix : null,
           quotaJetons: pack?.tokensIA ?? null,
-          partDuQuota: partDuQuotaIA(jetonsEntree + jetonsSortie, pack?.tokensIA ?? null),
+          partDuQuota: appelsARapprocher > 0 ? null : partDuQuotaIA(jetonsEntree + jetonsSortie, pack?.tokensIA ?? null),
           fournisseurs: u.fournisseurs,
         },
       ];
@@ -1103,14 +1118,15 @@ export async function coutsParDossier(
 export async function consommationParJour(depuis: Date): Promise<Journee[]> {
   const usages = await db.aiUsage.findMany({
     where: { createdAt: { gte: depuis } },
-    select: { createdAt: true, inputTokens: true, outputTokens: true },
+    select: { createdAt: true, inputTokens: true, outputTokens: true, usageState: true },
   });
 
   const parJour = new Map<string, Journee>();
   for (const u of usages) {
     const jour = jourCivil(u.createdAt);
     const cumul = parJour.get(jour) ?? { jour, jetons: 0, appels: 0 };
-    cumul.jetons += u.inputTokens + u.outputTokens;
+    cumul.jetons += Math.max(0, u.inputTokens ?? 0) + Math.max(0, u.outputTokens ?? 0);
+    if (usageARapprocher(u.usageState, u.inputTokens, u.outputTokens)) cumul.appelsARapprocher = (cumul.appelsARapprocher ?? 0) + 1;
     cumul.appels += 1;
     parJour.set(jour, cumul);
   }
@@ -1130,24 +1146,26 @@ export async function consommationParJour(depuis: Date): Promise<Journee[]> {
 export async function consommationParFournisseur(
   tarifs: TarifsIA = (fournisseur) => tarifDu(process.env, fournisseur),
 ): Promise<ConsommationDuFournisseur[]> {
-  const lignes = await db.aiUsage.groupBy({
+  const [lignes, incomplets] = await Promise.all([db.aiUsage.groupBy({
     by: ["provider", "model"],
     _sum: { inputTokens: true, outputTokens: true },
     _count: { _all: true },
-  });
+  }), db.aiUsage.groupBy({ by: ["provider", "model"], where: USAGES_A_RAPPROCHER, _count: { _all: true } })]);
   return lignes
     .map((l) => {
       const fournisseur = fournisseurDeLUsage(l.provider);
       const tarif = tarifDe(tarifs, fournisseur);
+      const appelsARapprocher = incomplets.find((i) => i.provider === l.provider && i.model === l.model)?._count._all ?? 0;
       const jetonsEntree = l._sum.inputTokens ?? 0;
       const jetonsSortie = l._sum.outputTokens ?? 0;
       return {
         fournisseur,
         modele: l.model,
         appels: l._count._all,
+        appelsARapprocher,
         jetonsEntree,
         jetonsSortie,
-        coutMicros: coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie),
+        coutMicros: appelsARapprocher > 0 ? null : coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie),
         devise: tarif?.devise ?? null,
       };
     })
@@ -1170,6 +1188,7 @@ export async function appelsDeLaPeriode(periode: { du: string; au: string }): Pr
       createdAt: true,
       provider: true,
       model: true,
+      usageState: true,
       inputTokens: true,
       outputTokens: true,
       applicationId: true,
@@ -1180,6 +1199,7 @@ export async function appelsDeLaPeriode(periode: { du: string; au: string }): Pr
     horodatage: l.createdAt.toISOString(),
     fournisseur: fournisseurDeLUsage(l.provider),
     modele: l.model,
+    mesure: l.usageState,
     jetonsEntree: l.inputTokens,
     jetonsSortie: l.outputTokens,
     dossierId: l.applicationId,

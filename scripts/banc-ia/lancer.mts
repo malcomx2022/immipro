@@ -112,14 +112,14 @@ if (fournisseur !== "simulation" && !(fournisseur in FOURNISSEURS)) {
  * ------------------------------------------------------------------ */
 
 interface Mesure {
-  jetonsEntree: number;
-  jetonsSortie: number;
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
   millisecondes: number;
 }
 
-type Lecteur = (type: TypeLisible, octets: Buffer, demande: DemandeDeLecture, cas: CasDeLecture) => Promise<LectureObtenue & { jetonsEntree: number; jetonsSortie: number }>;
-type Ecrivain = (matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ texte: string | null; detail: string | null; jetonsEntree: number; jetonsSortie: number }>;
-type Relecteur = (texte: string, matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ remarques: readonly RemarqueProduite[] | null; detail: string | null; jetonsEntree: number; jetonsSortie: number }>;
+type Lecteur = (type: TypeLisible, octets: Buffer, demande: DemandeDeLecture, cas: CasDeLecture) => Promise<LectureObtenue & { jetonsEntree: number | null; jetonsSortie: number | null }>;
+type Ecrivain = (matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ texte: string | null; detail: string | null; jetonsEntree: number | null; jetonsSortie: number | null }>;
+type Relecteur = (texte: string, matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ remarques: readonly RemarqueProduite[] | null; detail: string | null; jetonsEntree: number | null; jetonsSortie: number | null }>;
 
 function adaptateurs(): { modele: string; lire: Lecteur; ecrire: Ecrivain; relire: Relecteur } {
   if (fournisseur === "simulation") {
@@ -300,8 +300,8 @@ async function main() {
     redactions.push({
       note,
       mesure: {
-        jetonsEntree: ecrit.jetonsEntree + relu.jetonsEntree,
-        jetonsSortie: ecrit.jetonsSortie + relu.jetonsSortie,
+        jetonsEntree: ecrit.jetonsEntree === null || relu.jetonsEntree === null ? null : ecrit.jetonsEntree + relu.jetonsEntree,
+        jetonsSortie: ecrit.jetonsSortie === null || relu.jetonsSortie === null ? null : ecrit.jetonsSortie + relu.jetonsSortie,
         millisecondes: msE + msR,
       },
       texte: ecrit.texte,
@@ -317,11 +317,11 @@ async function main() {
     redactions.map((r) => r.note),
   );
   const jetons = (liste: readonly { mesure: Mesure }[]) => ({
-    entree: liste.reduce((s, l) => s + l.mesure.jetonsEntree, 0),
-    sortie: liste.reduce((s, l) => s + l.mesure.jetonsSortie, 0),
+    entree: liste.some((l) => l.mesure.jetonsEntree === null) ? null : liste.reduce((s, l) => s + (l.mesure.jetonsEntree ?? 0), 0),
+    sortie: liste.some((l) => l.mesure.jetonsSortie === null) ? null : liste.reduce((s, l) => s + (l.mesure.jetonsSortie ?? 0), 0),
   });
   const tarif = fournisseur === "simulation" ? null : tarifDu(process.env, fournisseur);
-  const cout = (j: { entree: number; sortie: number }) => coutMicrosDesJetons(tarif, j.entree, j.sortie);
+  const cout = (j: { entree: number | null; sortie: number | null }) => coutMicrosDesJetons(tarif, j.entree, j.sortie);
 
   const resultat = {
     fournisseur,
@@ -365,7 +365,7 @@ type Resultat = {
   modele: string;
   horodatage: string;
   synthese: SyntheseDuBanc;
-  jetons: { lecture: { entree: number; sortie: number }; redaction: { entree: number; sortie: number } };
+  jetons: { lecture: { entree: number | null; sortie: number | null }; redaction: { entree: number | null; sortie: number | null } };
   tarif: { devise: string } | null;
   coutMicros: { lecture: number | null; redaction: number | null };
   lectures: readonly { note: NoteDeLecture; mesure: Mesure; cause: string | null }[];

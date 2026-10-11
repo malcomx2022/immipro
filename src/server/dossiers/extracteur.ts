@@ -1,3 +1,4 @@
+import { mesurerLesJetons, DETAIL_MESURE_INCOMPLETE } from "@/domain/ia/usage";
 /**
  * L'extraction documentaire, branchée — WF-06 étape 5, 22/09/2026.
  *
@@ -77,15 +78,15 @@ export type Lecture = (
       etat: "LUE";
       bruts: ChampsExtraits;
       pieceIdentifiee: string | null;
-      jetonsEntree: number;
-      jetonsSortie: number;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
   | {
       etat: "NON_LUE";
       cause: CauseDeNonLecture;
       detail: string;
-      jetonsEntree: number;
-      jetonsSortie: number;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
 ) & {
   /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
@@ -222,12 +223,12 @@ export async function lireDesOctets(
       coûts à partir de ces nombres.
     */
     const { cause, detail } = classer(erreur, CHAINE);
-    return sansJetons(cause, detail);
+    return { ...sansJetons(cause, detail), appel: { fournisseur: "anthropic", modele, mesure: mesurerLesJetons(undefined, undefined) } };
   }
 
-  const jetonsEntree = message.usage.input_tokens;
-  const jetonsSortie = message.usage.output_tokens;
-  const appel: AppelMesure = { fournisseur: "anthropic", modele };
+  const mesure = mesurerLesJetons(message?.usage?.input_tokens, message?.usage?.output_tokens);
+  const { jetonsEntree, jetonsSortie } = mesure;
+  const appel: AppelMesure = { fournisseur: "anthropic", modele, mesure };
   const echoue = (cause: CauseDeNonLecture, detail: string): Lecture => ({
     etat: "NON_LUE",
     cause,
@@ -243,6 +244,8 @@ export async function lireDesOctets(
     seconde est une réponse mal formée, la première n'en est pas une.
     Les distinguer met dans `engineLog` ce qu'un exploitant peut suivre.
   */
+  if (mesure.etat !== "CONNUE") return echoue("reponse_illisible", DETAIL_MESURE_INCOMPLETE);
+
   if (message.stop_reason === "refusal") {
     return echoue("refus", "le service de lecture a refusé de traiter la pièce");
   }

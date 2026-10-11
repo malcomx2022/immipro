@@ -1,3 +1,4 @@
+import { mesurerLesJetons, DETAIL_MESURE_INCOMPLETE } from "@/domain/ia/usage";
 /**
  * La mise en forme et l'analyse critique, branchées — WF-08, 22/09/2026.
  *
@@ -49,8 +50,8 @@ import type { AppelMesure } from "@/server/ia/appel";
 
 /** Ce qu'une mise en forme rend, dans les deux cas. Les jetons sont toujours là. */
 export type Redaction = (
-  | { etat: "ECRITE"; texte: string; jetonsEntree: number; jetonsSortie: number }
-  | { etat: "SANS_TEXTE"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number }
+  | { etat: "ECRITE"; texte: string; jetonsEntree: number | null; jetonsSortie: number | null }
+  | { etat: "SANS_TEXTE"; cause: CauseDAppel; detail: string; jetonsEntree: number | null; jetonsSortie: number | null }
 ) & {
   /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
   appel?: AppelMesure;
@@ -60,10 +61,10 @@ export type Relecture = (
   | {
       etat: "RELUE";
       remarques: readonly RemarqueProduite[];
-      jetonsEntree: number;
-      jetonsSortie: number;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
-  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number }
+  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; jetonsEntree: number | null; jetonsSortie: number | null }
 ) & {
   /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
   appel?: AppelMesure;
@@ -123,8 +124,10 @@ export const redacteurClaude =
     }
 
     let message: Anthropic.Message;
+    let mesureInterrompue = mesurerLesJetons(undefined, undefined);
+    let fluxTermine = false;
     try {
-      message = await leClient(cle)
+      const flux = leClient(cle)
         .messages.stream(
           {
             model: modele,
@@ -133,7 +136,17 @@ export const redacteurClaude =
           },
           { timeout: DELAI_REDACTION_MS },
         )
-        .finalMessage();
+        .on("streamEvent", (evenement) => {
+          if (evenement.type === "message_start") {
+            // Le zéro initial de sortie ne mesure pas encore le texte diffusé.
+            mesureInterrompue = mesurerLesJetons(evenement.message?.usage?.input_tokens, undefined);
+          } else if (evenement.type === "message_delta" && evenement.delta.stop_reason) {
+            const invalide = mesureInterrompue.etat === "INVALIDE";
+            mesureInterrompue = mesurerLesJetons(mesureInterrompue.jetonsEntree, evenement.usage?.output_tokens);
+            if (invalide) mesureInterrompue.etat = "INVALIDE";
+          } else if (evenement.type === "message_stop") fluxTermine = true;
+        });
+      message = await flux.finalMessage();
     } catch (erreur) {
       /*
         Aucun jeton n'est compté : sans réponse, l'usage n'est pas connu.
@@ -141,12 +154,14 @@ export const redacteurClaude =
         que B-07 recalcule des coûts à partir de ces nombres.
       */
       const { cause, detail } = classer(erreur, CHAINE);
-      return sansJetons("SANS_TEXTE", cause, detail);
+      return { ...sansJetons("SANS_TEXTE", cause, detail),
+        jetonsEntree: mesureInterrompue.jetonsEntree, jetonsSortie: mesureInterrompue.jetonsSortie,
+        appel: { fournisseur: "anthropic", modele, mesure: mesureInterrompue } };
     }
 
-    const jetonsEntree = message.usage.input_tokens;
-    const jetonsSortie = message.usage.output_tokens;
-    const appel: AppelMesure = { fournisseur: "anthropic", modele };
+    const mesure = fluxTermine ? mesurerLesJetons(message?.usage?.input_tokens, message?.usage?.output_tokens) : mesureInterrompue;
+    const { jetonsEntree, jetonsSortie } = mesure;
+    const appel: AppelMesure = { fournisseur: "anthropic", modele, mesure };
     const echoue = (cause: CauseDAppel, detail: string): Redaction => ({
       etat: "SANS_TEXTE",
       cause,
@@ -156,7 +171,9 @@ export const redacteurClaude =
       appel,
     });
 
-    if (message.stop_reason === "refusal") {
+    if (!fluxTermine || mesure.etat !== "CONNUE") return echoue("reponse_illisible", DETAIL_MESURE_INCOMPLETE);
+
+  if (message.stop_reason === "refusal") {
       return echoue("refus", "le service a refusé d'écrire cette pièce");
     }
 
@@ -198,12 +215,12 @@ export const critiqueClaude =
       );
     } catch (erreur) {
       const { cause, detail } = classer(erreur, CHAINE);
-      return sansJetons("SANS_AVIS", cause, detail);
+      return { ...sansJetons("SANS_AVIS", cause, detail), appel: { fournisseur: "anthropic", modele, mesure: mesurerLesJetons(undefined, undefined) } };
     }
 
-    const jetonsEntree = message.usage.input_tokens;
-    const jetonsSortie = message.usage.output_tokens;
-    const appel: AppelMesure = { fournisseur: "anthropic", modele };
+    const mesure = mesurerLesJetons(message?.usage?.input_tokens, message?.usage?.output_tokens);
+    const { jetonsEntree, jetonsSortie } = mesure;
+    const appel: AppelMesure = { fournisseur: "anthropic", modele, mesure };
     const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
       etat: "SANS_AVIS",
       cause,
@@ -213,7 +230,9 @@ export const critiqueClaude =
       appel,
     });
 
-    if (message.stop_reason === "refusal") {
+    if (mesure.etat !== "CONNUE") return echoue("reponse_illisible", DETAIL_MESURE_INCOMPLETE);
+
+  if (message.stop_reason === "refusal") {
       return echoue("refus", "le service a refusé de relire cette pièce");
     }
     if (message.stop_reason === "max_tokens") {

@@ -227,6 +227,10 @@ jobs:
       # version non relue ne se lit jamais « rien à reprendre », une
       # relecture qui n'aboutit pas ne date rien et ne débite rien, et une
       # relecture réelle sans remarque reste un résultat.
+      - name: Mesures IA et migration des historiques
+        run: npm run smoke:usages-ia
+      - run: echo "- **Mesures IA** — compteurs valides ou NULL, coûts inconnus signalés, historiques non réécrits, diagnostic en lecture seule" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Chaîne de rédaction
         run: npm run smoke:redaction
       - run: echo "- **Rédaction assistée** — aucun avis rendu sans lecture, relecture datée sur la version, jetons comptés même sans résultat" >> "$GITHUB_STEP_SUMMARY"

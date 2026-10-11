@@ -22,7 +22,7 @@ export const GET = route({
       dossiers,
       // La mesure sur dix dossiers réels reste à faire : tant qu'elle
       // manque, les quotas de la grille sont des ordres de grandeur.
-      dossiersMesures: dossiers.length,
+      dossiersMesures: dossiers.filter((d) => d.appelsARapprocher === 0).length,
     };
   },
 });

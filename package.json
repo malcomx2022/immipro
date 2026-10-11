@@ -29,6 +29,7 @@
     "smoke:courrier": "tsx scripts/fumee-courrier.mts",
     "smoke:balayage": "tsx scripts/fumee-balayage.mts",
     "smoke:extraction": "tsx scripts/fumee-extraction.mts",
+    "smoke:usages-ia": "tsx scripts/fumee-usages-ia.mts",
     "smoke:redaction": "tsx scripts/fumee-redaction.mts",
     "smoke:rappels": "tsx scripts/fumee-rappels.mts",
     "smoke:montee": "tsx scripts/fumee-montee.mts",

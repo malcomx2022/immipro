@@ -13398,3 +13398,46 @@ Le déploiement intermédiaire de `c8f19e2` (run 541, S.171 seul) a lui aussi ab
 **Non vérifié.**
 - La configuration IA du pilote, à relever par le responsable dans B-07. Si l'extraction y passe par `openai_compatible`, il faut poser `AI_OPENAI_ORIGINE_AUTORISEE`. Sans elle, les pièces partent en revue humaine.
 - Aucun appel réel à un fournisseur, et aucun dépôt de pièce sur le pilote.
+
+## S.173 — REV11-L2 : consommation observée et rapprochement IA
+
+**Autorisation et continuité.** « L2 », 11/10/2026. Main initial `47b39b0`,
+Claude S.171/S.172 intégrés via #276/#278, aucune PR ouverte. Relecture finale
+`16636d4` : conserver #279 et le relevé Claude du déploiement pilote L1.
+Aucun code remplacé par ce relevé. D1, Prisma 7, pg-boss 12, autorisation
+d'origine et refus des redirections conservés. Numéro libre après relecture.
+
+**Politique de publication retenue avant code.** Réponse reçue sans mesure
+complète valide : aucune publication automatique ; revue humaine en WF-06,
+aucun texte ni avis daté en WF-08, réservation réellement due rendue, cause
+permanente sans relance automatique facturable. Le quota reste en analyses.
+Les reprises réseau existantes demeurent bornées, distinctes de ce cas.
+
+**Reproduction.** DIA-01/02/03 : faux zéro, compteurs négatifs/fractionnaires,
+usage connu perdu sur enveloppe vide. Treize attentes HTTP initiales rouges
+sur `47b39b0`, avec fixtures conformes au domaine. Le SDK Anthropic levait
+une exception quand `usage` manquait ; les types ne validaient pas la réponse.
+
+**Correction.** Mesure pure, quatre états, inconnus `NULL`, vrai zéro
+consigné, côté valide conservé, y compris contenu/flux refusés. AiUsage et
+historique d'analyse portent le même état ; coût absent ou hors INTEGER
+inconnu, aucune erreur SQL de compteur induisant un rejeu. B-07 alerte,
+API/CSV distinguent inconnus et zéro. Extension de schéma sans réécriture,
+contraintes sur nouveaux états, diagnostic historique en lecture seule.
+Voir [politique et exploitation](../exploitation/mesure-ia.md).
+
+**Éprouvé.** INV-6/D1, WF-06/RG-06.15, WF-08/RG-08.8,
+WF-16/RG-16.3, C-08/B-05/R-04/B-07. Porte : 184 fichiers / 3 701 tests,
+32 nouveaux L2 ; 28 suites d'intégration ; 113 refus SQL / 13 permis.
+Extraction 366 assertions, mesures/rejeu/course sur deux fournisseurs ;
+rédaction 74 assertions ; migration avant/après sans changer trois lignes
+historiques, diagnostic sans écriture. Vrai POST de relecture : un appel,
+aucun avis daté, solde 30 → 30, débit/rendu uniques ; B-07/API/CSV réels.
+Chromium bureau/tablette : alerte et coût incomplet visibles, sans erreur JS.
+Voir [commandes, preuves et limites](../revue/lot-l2-2026-10-11.md).
+
+**Restants.** DIA-01/02/03 passent, DIA-05 reste L3 ; DIA-07 reste L4.
+Mobile B-07 à 390 px déborde : constat reporté en L7, recette non validée.
+Rapprochement manuel sans import de facture ni reconstitution automatique.
+Aucun prestataire réel, image, déploiement L2 ou levée Q.A/M.C attestés.
+Proposition indépendante pour revue, sans fusion automatique. Prochain L3.

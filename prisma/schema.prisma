@@ -774,10 +774,12 @@ model AiUsage {
   /// ainsi sans être réécrit (`fournisseurDeLUsage`).
   provider      String?
   model         String?
-  inputTokens   Int
-  outputTokens  Int
-  costMicros    Int
+  inputTokens   Int?
+  outputTokens  Int?
+  costMicros    Int?
   createdAt     DateTime     @default(now())
+  /// Nul avant L2 : ne pas inventer la qualification des usages historiques.
+  usageState    String?
 
   @@index([applicationId, createdAt])
   @@index([userId])
@@ -944,10 +946,11 @@ model DocumentAnalysis {
   body           String
   /// Trace technique de la lecture, pour l'opérateur seul (B-05).
   engineLog      String?
-  inputTokens    Int             @default(0)
-  outputTokens   Int             @default(0)
+  inputTokens    Int?            @default(0)
+  outputTokens   Int?            @default(0)
   creditConsumed Boolean         @default(true)
   analyzedAt     DateTime        @default(now())
+  usageState     String?
 
   review ManualReview?
 

@@ -62,6 +62,11 @@ describe("B-07 — la période de l'export est bornée, jamais tronquée", () =>
 });
 
 describe("B-07 — ce que le fichier des appels contient", () => {
+  it("exporte les compteurs inconnus vides et conserve la mesure partielle sans coût inventé", () => {
+    const csv = fichierCsv(exportDesAppels(PERIODE, [APPEL({ jetonsEntree: 120, jetonsSortie: null, mesure: "PARTIELLE" })], tousTarifes));
+    expect(csv).toContain(";120;;;EUR;dossier-1;PARTIELLE");
+    expect(csv).toContain("Jetons observés (entrée + sortie);120");
+  });
   it("porte exactement les colonnes de B-07, sans compte ni opération", () => {
     expect(COLONNES_APPELS).toEqual([
       "Horodatage (UTC)",
@@ -73,6 +78,7 @@ describe("B-07 — ce que le fichier des appels contient", () => {
       "Coût",
       "Devise",
       "Dossier",
+      "Mesure",
     ]);
     const colonnes = COLONNES_APPELS.join(" ").toLowerCase();
     expect(colonnes).not.toMatch(/utilisateur|compte|nom|courriel|email|opération/u);
@@ -130,7 +136,7 @@ describe("B-07 — ce que le fichier des appels contient", () => {
     const csv = fichierCsv(exportDesAppels(PERIODE, [APPEL(), APPEL()], tousTarifes));
     expect(csv).toContain("Période;du 2026-09-01 au 2026-09-30");
     expect(csv).toContain("Appels;2");
-    expect(csv).toContain("Jetons (entrée + sortie);2200000");
+    expect(csv).toContain("Jetons observés (entrée + sortie);2200000");
     expect(csv).not.toContain("Attestation");
   });
 

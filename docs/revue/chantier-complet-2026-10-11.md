@@ -24,8 +24,8 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | Ordre | Lot | Priorité | État |
 |---|---|---|---|
 | 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 fusionné (PR #275) |
-| 2 | L1 — Destination des documents | P1 | S.171 / #276 proposé ; S.172 / #277 complément, [preuves](lot-l1-2026-10-11.md) |
-| 3 | L2 — Mesure des usages IA | P1 | Prochain lot |
+| 2 | L1 — Destination des documents | P1 | S.171/S.172 fusionnés via #276/#278 ; [preuves](lot-l1-2026-10-11.md) |
+| 3 | L2 — Mesure des usages IA | P1 | S.173 proposé ; [preuves et limites](lot-l2-2026-10-11.md) |
 | 4 | L3 — Validité des avis IA | P1 | À réaliser |
 | 5 | L4 — Relecture unique par version | P1 | À réaliser |
 | 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
@@ -100,6 +100,13 @@ des redirections ; éventuelle identité persistée à concevoir séparément.
 Diagnostic DIA-04 à transformer en test de régression après correction.
 
 ## REV11-L2 — Mesurer la consommation sans inventer des zéros
+
+**Suivi : S.173, base `47b39b0`.** Politique prudente retenue avant
+implémentation : aucun résultat automatique sans mesure complète valide.
+Mesures inconnues `NULL`, états explicites, coûts connus conservés sur
+contenu rejeté, B-07/CSV et diagnostic historiques. Migration et recette
+HTTP dans `smoke:usages-ia`. DIA-01/02/03 passent ; voir [suivi L2](lot-l2-2026-10-11.md).
+Proposition sans fusion/déploiement ; prochain L3.
 
 **P1 · M/L · REV-IA-01 · INV-6/D1 · WF-06/08/16.**
 
@@ -197,6 +204,11 @@ Toute nouvelle correction front doit partir d'une reproduction et recevoir
 un test du résultat attendu, avec fumée du service impliqué.
 
 ## REV11-L7 — Fiabiliser exploitation et données antérieures
+
+**Constat L2 à reprendre :** B-07 déborde horizontalement dans Chromium
+390 px (navigation, métriques et formulaire d'export). L'alerte de mesure
+et l'export sont éprouvés en HTTP/bureau ; le mobile reste à corriger et
+revalider avec les écrans d'exploitation.
 
 **P2 · M/L · WF-09/10/14/15/16 · dépendances RF-4 existantes.**
 

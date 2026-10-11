@@ -13,7 +13,7 @@ Oui, ImmiPro peut proposer plusieurs fournisseurs d'IA au choix, et le code s'y 
 Les vraies difficultés ne sont pas techniques :
 
 1. **Données personnelles.** Chaque fournisseur ajouté est un nouveau sous-traitant qui reçoit des pièces d'identité.
-2. **Quota.** INV-6 compte en jetons, et un jeton n'a pas la même taille d'un fournisseur à l'autre.
+2. **Consommation.** Les jetons servent à surveiller la marge ; D1 a fixé le quota candidat en analyses. Un jeton n'a pas la même taille ni le même prix chez deux fournisseurs.
 3. **Qualité.** Un autre modèle peut lire moins bien une pièce. Le produit ne la déclarera jamais conforme à tort, mais il enverra plus de pièces en revue humaine.
 
 ---
@@ -148,7 +148,7 @@ Chaque lot passe `npm run check` et `npm run build`. Aucun ne change le comporte
 Les décisions prises pour l'implémentation sont celles recommandées plus haut, et aucune ne peut être contournée depuis un écran :
 
 - **option A** : l'exploitant choisit le fournisseur par configuration, fonction par fonction ;
-- **quota en jetons** (§4.2, option a) ;
+- **quota en analyses depuis D1 (09/10)** ; jetons pour consommation et marge, sans conversion automatique ;
 - **aucune bascule automatique** ;
 - **garde des pièces** : elles ne partent chez un autre sous-traitant que sur autorisation écrite.
 
@@ -187,3 +187,13 @@ Ce manifeste reste une comparaison manuelle à qualifier en L5 ; le code
 `openai_compatible` et la présence d'une clé ne valent pas validation
 nominative ou géographique. D1 reste en analyses ; les options historiques
 de quota de ce document ne remplacent pas les décisions du registre.
+
+## Mesures — S.173 / REV11-L2
+
+Mesure complète exigée avant publication automatique, compteurs entiers
+positifs ou nuls, mesures absentes/partielles/invalides qualifiées dans
+`AiUsage.usageState`, inconnus en `NULL`, vrai zéro conservé. La mesure connue
+reste enregistrée même si le contenu est refusé. B-07 distingue l'usage
+incomplet du tarif absent ; l'export ajoute « Mesure » et laisse les inconnus
+vides. Les données historiques ne sont pas réécrites. D1 demeure en analyses.
+Lire [procédure, workflows et migration](exploitation/mesure-ia.md).
