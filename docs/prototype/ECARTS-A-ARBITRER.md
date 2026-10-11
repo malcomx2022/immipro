@@ -13401,7 +13401,7 @@ Le déploiement intermédiaire de `c8f19e2` (run 541, S.171 seul) a lui aussi ab
 
 ## S.173 — REV11-L2 : mesure des usages IA (REV-IA-01, INV-6/D1, WF-06/08/16)
 
-**Autorisation.** Le 11/10/2026, à « L2 », troisième lot du chantier REV11. Main relu : `47b39b0`, avec S.171 (#276) et S.172 (#277, porté sur main par #278) fusionnés et déployés. La PR de relevé #279 était ouverte, sans code. Le lot prend S.173. Il conserve Prisma 7, pg-boss 12, le banc de S.170 et les gardes de S.171/S.172.
+**Autorisation.** Le 11/10/2026, à « L2 », troisième lot du chantier REV11. Main relu : `47b39b0`, avec S.171 (#276) et S.172 (#277, porté sur main par #278) fusionnés et déployés. Le relevé de déploiement a été fusionné par #279 pendant le lot ; la PR #281 porte S.173 sur `16636d4`. Le lot prend S.173. Il conserve Prisma 7, pg-boss 12, le banc de S.170 et les gardes de S.171/S.172.
 
 **Arbitrages du responsable (11/10).**
 - Une réponse valide **sans mesure** est publiée : l'appel est inscrit avec un usage inconnu, et B-07 demande un rapprochement. Le quota se compte en analyses (D1) et n'en dépend pas.
@@ -13460,6 +13460,12 @@ Le déploiement intermédiaire de `c8f19e2` (run 541, S.171 seul) a lui aussi ab
   - une mise en forme sans mesure est écrite et décomptée, et son appel est inscrit avec un usage inconnu ;
   - une mesure invalide n'écrit aucune version, rend l'analyse et garde la part connue.
 - `smoke:diagnostic` compte les deux constats. La garde reposée sur l'historique refuse toute nouvelle consommation négative, et le diagnostic n'écrit rien.
+- **Les 28 fumées de la porte passent en local**, dans l'ordre de la CI, `smoke:recette` comprise ; `sandbox:paiement` s'abstient, faute de clés.
+- **Image candidate construite et éprouvée** :
+  - `smoke:worker --image` passe : worker, app et passerelle antivirus démarrent depuis l'artefact ;
+  - la CLI Prisma de l'image applique les 59 migrations sur une base neuve ;
+  - les deux contraintes y sont posées `NOT VALID` (non validées sur l'historique) ;
+  - la commande `diagnostic-donnees` de l'image rend `USAGE_PERDU` et `JETONS_NEGATIFS`.
 
 **Effet au déploiement.** La migration est additive, sans réécriture. Une image antérieure qui reviendrait ignorerait la colonne ; seule une mesure négative lui serait désormais refusée par la base.
 
