@@ -400,6 +400,8 @@ function FournisseursIA({
                     <td className="px-3 py-2 text-right text-ink-900">
                       {l.appelsARapprocher
                         ? "mesure à rapprocher"
+                        : l.coutMicros === null && l.devise !== null
+                          ? "coût indisponible"
                         : l.coutMicros === null || l.devise === null
                         ? "sans tarif"
                         : `${MONTANT.format(l.coutMicros / 1_000_000)} ${l.devise}`}
