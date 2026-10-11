@@ -1,5 +1,14 @@
 # Banc comparatif des API d'IA — 02/10/2026 (S.99)
 
+**Actualisation du 11/10/2026.** Ce comparatif reste historique : modèles,
+tarifs, accès, résidence et conservation doivent être revalidés avant essai
+ou choix. Aucun fournisseur réel n'a été appelé dans la nouvelle revue.
+Le défaut du code S.168 est `claude-opus-5`, sans validation de disponibilité
+réelle ici. Les règles de quota et de précision ci-dessous sont corrigées
+selon D1 et les preuves de la [revue complète](revue/revue-complete-2026-10-11.md).
+Voir la [documentation d'exécution](IA-workflows.md) pour les paramètres,
+les données transmises et la place de l'IA dans chaque workflow.
+
 **Statut : comparaison documentaire, sans décision.** La direction a demandé de ne plus donner la priorité à l'API d'Anthropic et de comparer les fournisseurs sur pied d'égalité. Ce document compare les fournisseurs à partir de leurs pages officielles, lues le 02/10/2026. Il dit aussi ce qu'il faudrait changer dans le code pour chacun, et propose un essai réel pour départager les finalistes.
 
 Il complète `docs/IA-fournisseurs.md` (S.94), qui décrit l'architecture : un fournisseur par fonction, choisi par configuration, sans bascule automatique, et des pièces qui ne partent chez un sous-traitant que sur autorisation écrite. **Rien n'est changé dans le code** : Anthropic reste le défaut tant que la décision n'est pas prise.
@@ -42,8 +51,8 @@ Tous les prix sont en USD par million de jetons (entrée / sortie), hors taxes. 
 
 Deux règles du produit restent vraies quel que soit le fournisseur :
 
-- un modèle moins bon envoie plus de pièces en revue humaine, mais n'en déclare aucune conforme à tort (S.94) ;
-- tout appel est débité du quota en jetons (INV-6).
+- les contrôles déterministes décident du verdict, mais un schéma JSON ne garantit pas la vérité des faits extraits : les fausses conformités doivent être mesurées au banc ;
+- le quota candidat est en **analyses** (D1/INV-6) ; les jetons mesurent la consommation et la marge. Les appels non aboutis suivent les règles de rendu de réservation, indépendamment du coût fournisseur déjà consommé.
 
 ---
 
@@ -85,13 +94,13 @@ Le même document ne fait pas le même nombre de jetons chez deux fournisseurs. 
 | Mistral Large 3 | 0,0024 $ | 0,0078 $ | 0,03 $ |
 | Mistral Small 4 | 0,0008 $ | 0,0027 $ | 0,01 $ |
 | Claude Sonnet 5.5 | 0,012 $ | 0,041 $ | 0,14 $ |
-| Claude Opus 5.5 (défaut actuel) | 0,024 $ | 0,082 $ | 0,27 $ |
+| Claude Opus 5.5 (référence historique du tableau) | 0,024 $ | 0,082 $ | 0,27 $ |
 | GPT-6 Luna | 0,0006 $ | 0,002 $ | 0,007 $ |
 
 Deux réserves :
 
 - **Les modèles de raisonnement** (GPT-6, Gemini 3) facturent leurs jetons de réflexion en sortie. Leur coût réel peut dépasser ce tableau.
-- **Le quota d'un pack (INV-6)** est exprimé en jetons, et non en argent (S.94 §4.2, option a). Changer de fournisseur change donc la vitesse à laquelle un pack s'épuise, et non son prix. À revoir si le fournisseur retenu compte ses jetons très différemment.
+- **Le quota d'un pack (D1/INV-6)** est exprimé en analyses. Changer de fournisseur modifie le coût et la marge, sans convertir ce quota en jetons ou en monnaie. Les jetons du pack servent de référence de surveillance, pas de plafond candidat supplémentaire.
 
 ---
 

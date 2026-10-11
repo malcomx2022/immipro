@@ -77,6 +77,34 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### Revue complète du 11/10/2026 — REV11
+
+Lire la [revue complète](docs/revue/revue-complete-2026-10-11.md), le
+[chantier](docs/revue/chantier-complet-2026-10-11.md) et la
+[documentation IA/workflows](docs/IA-workflows.md) après les décisions du
+registre. Base testée : `bbf1500` / S.168, S.167 / PR #268 fusionnée.
+S.169 / PR #272 prépare Prisma 7 : vérifier son état avant modification,
+conserver son client et ses outils après fusion. Aucun chantier concurrent
+de dépendances ne doit remplacer les corrections fonctionnelles proposées.
+
+REV11 apporte une revue, des diagnostics et un plan avant intégration ;
+elle ne corrige pas les cinq groupes d'anomalies IA reproduits. Les
+diagnostics manuels `scripts/recette/diagnostic-ia.mts` et
+`diagnostic-relecture.mts` expriment les résultats voulus et sont encore
+rouges. Les faire passer par une correction puis les intégrer à la porte
+du lot concerné ; ne pas modifier leurs attentes pour accepter le défaut.
+
+Conserver D1 : quota en **analyses**, jetons pour consommation et marge.
+Une mesure inconnue n'est pas une consommation nulle. Un parseur JSON ne
+prouve pas la vérité des champs extraits. Vérifier destination des octets,
+validité d'un avis et revendication de la relecture par version, au-delà
+du verrou du grand livre. Le banc sans fournisseur doit aussi neutraliser
+Vertex ; les simulations ne prouvent ni DPA, ni modèle réel, ni paiement.
+
+Les lots REV11-L0 à L9 sont un ordre de travail proposé, pas des numéros
+S.xxx réservés. Ne marquer un préalable levé qu'avec sa preuve réelle ;
+les règles Q.A/M.C et les reports V2 restent inchangés.
+
 L'autorisation initiale RF-0 (09/10) portait sur les documents ; sa PR #244
 est fusionnée. Claude Code a ensuite réalisé les lots jusqu'à S.166.
 A-1 et A-3 sont tranchés en S.146, A-2 en S.147 : relire leurs décisions
