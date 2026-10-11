@@ -43,6 +43,8 @@ import {
   texteExploitable,
   type MatiereDeLaPiece,
   type RemarqueProduite,
+  type MotifAvisRefuse,
+  DETAIL_AVIS_MAL_FORME,
 } from "@/domain/redaction/commande";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import { leClient } from "@/lib/ai";
@@ -64,7 +66,7 @@ export type Relecture = (
       jetonsEntree: number | null;
       jetonsSortie: number | null;
     }
-  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; jetonsEntree: number | null; jetonsSortie: number | null }
+  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; motif?: MotifAvisRefuse; jetonsEntree: number | null; jetonsSortie: number | null }
 ) & {
   /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
   appel?: AppelMesure;
@@ -221,7 +223,7 @@ export const critiqueClaude =
     const mesure = mesurerLesJetons(message?.usage?.input_tokens, message?.usage?.output_tokens);
     const { jetonsEntree, jetonsSortie } = mesure;
     const appel: AppelMesure = { fournisseur: "anthropic", modele, mesure };
-    const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
+    const echoue = (cause: CauseDAppel, detail: string): Extract<Relecture, { etat: "SANS_AVIS" }> => ({
       etat: "SANS_AVIS",
       cause,
       detail,
@@ -248,7 +250,7 @@ export const critiqueClaude =
 
     const relue = lireLaCritique(charge);
     if ("cause" in relue) {
-      return echoue(relue.cause, "la réponse n'a pas la forme annoncée au schéma");
+      return { ...echoue(relue.cause, DETAIL_AVIS_MAL_FORME), motif: relue.motif };
     }
 
     return { etat: "RELUE", remarques: relue, jetonsEntree, jetonsSortie, appel };

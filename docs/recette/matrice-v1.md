@@ -334,3 +334,24 @@ publication prudente sans mesure complète, historique conservé.
 [Suivi et limites L2](../revue/lot-l2-2026-10-11.md),
 [workflow du provider et rapprochement](../exploitation/mesure-ia.md).
 Aucune signature de recette globale, fusion ou levée Q.A/M.C par L2.
+
+## REV11-L3 — S.174, 11/10/2026
+
+Base `3d985f8`, L2 #280 fusionné, arbitrage Claude #282 conservé.
+
+| Scénario | Résultat observé | Preuve | Statut |
+|---|---|---|---|
+| Vraie liste vide | Avis daté sans remarque, une analyse ; rejeu séquentiel gratuit | Domaine, deux fournisseurs, POST Next et R-04 | Vérifié, simulations |
+| Liste entièrement invalide ou mixte | Aucun avis daté ni remarque publiée ; texte intact | 58 POST authentifiés, PostgreSQL | Vérifié, simulations |
+| Genre/texte/écarts invalides, plus de huit remarques | Avis entier refusé, aucune troncature | Domaine et HTTP/SDK Anthropic/compatible | Vérifié, simulations |
+| Formulation interdite dans titre/corps/source/valeur | Avis refusé ; motif candidat existant | HTTP, PostgreSQL, UI | Vérifié, simulations |
+| Consommation et réservation | 120/30 et coût conservés ; rendu unique sur refus, pas de double rendu horaire | Grand livre et AiUsage | Vérifié, base jetable |
+| Adaptateur injecté annonçant RELUE avec contenu invalide | La vraie route refuse la publication | Traitement compilé, acteur/service injectés ; sans gardes HTTP | Vérifié, simulations |
+| Message candidat et chargement | Pas d'avis favorable après refus, quota/texte intact, retour éditeur | React/jsdom, HTML Next et Chromium réel sur les deux fournisseurs, bureau/mobile 390 px | Vérifié, banc |
+| Ancien avis douteux sans réponse source | Aucune date ni remarque historique réécrite | Snapshot avant/après | Vérifié, base jetable |
+| Deux relectures concurrentes | Hors correction L3, DIA-07 reste L4 | Diagnostic de concurrence | Non corrigé |
+| Qualité, modèle, OAuth, DPA et facture réels | Aucun fournisseur réel appelé | L5 | Non vérifié |
+
+[Rapport L3](../revue/lot-l3-2026-10-11.md),
+[contrat des avis et rôle du provider](../exploitation/avis-ia.md).
+Aucune signature de recette globale ou levée Q.A/M.C.

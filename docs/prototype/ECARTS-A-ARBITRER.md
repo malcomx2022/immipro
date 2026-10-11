@@ -13449,3 +13449,44 @@ Proposition indépendante pour revue, sans fusion automatique. Prochain L3.
 #280 a été fusionnée la première, ce qui a mis #281 en conflit. Le responsable a retenu la version de main et fait fermer #281 sans fusion. **RG-06.15, RG-08.8 et RG-16.3, telles que #280 les définit, remplacent l'arbitrage donné pour #281.** Il ne faut pas le rouvrir, ni réintroduire la colonne `usageMeasure` ou l'énumération `MesureDUsage` de #281.
 
 Le diagnostic IA, rejoué sur main `c27b300`, donne CTRL-01, CTRL-02 et DIA-01 à DIA-04 verts, ainsi que DIA-06. DIA-05 reste rouge (L3).
+
+## S.174 — REV11-L3 : validité des avis IA
+
+**Autorisation et continuité.** « L3 », 11/10/2026. Main `3d985f8` relu :
+#280 fusionné, #282 consigne que la version de main fait foi, #281 fermée
+sans fusion. Conserver ce choix, D1, origine L1, mesure L2, Prisma 7 et
+pg-boss 12. Aucune PR concurrente ouverte à la relecture finale.
+
+**Politique retenue avant code.** Une remarque mal formée refuse tout
+l'avis, même liste mixte ; au-delà de huit, refus sans troncature. Une
+vraie liste vide reste un avis. Incohérence : exactement deux sources/valeurs
+textuelles non blanches. Autres genres sans écarts. Vocabulaire commun
+sur tous les champs affichés. Aucun avis ancien requalifié sans réponse source.
+
+**Correction et workflow.** Validateur pur partagé par Anthropic/compatible
+et garde de publication dans la route ; motif candidat `avis_mal_forme`,
+formulation refusée conservée. Usage enregistré avant refus, aucun avis daté
+ni remarque publiée, texte intact et rendu unique de réservation. Pas de
+relance automatique pour cette cause ; reprises réseau existantes distinctes.
+INV-1/2/6, WF-08/RG-08.4/08.8/08.9, R-04/B-07.
+
+**Éprouvé.** 186 fichiers / 3 792 tests, 91 nouveaux L3. 75 attentes du
+nouveau contrat rouges avant correction, 12 témoins valides verts. DIA-05
+passe sans modifier son attente, CTRL-02 conservé. 28 suites d'intégration
+existantes vertes, plus `smoke:avis-ia` : 321 assertions positives, 58 vrais
+POST sur deux fournisseurs, deux avis injectés à la garde de publication.
+Aucun avis historique réécrit, coûts connus conservés, solde 30 → 22 pour
+huit avis valides, rendu unique des échecs et reprise horaire sans double rendu.
+Deux anciens tests de filtrage resserrés selon le contrat, sans accepter
+le défaut. Types/lint/vocabulaire, audit et build passent.
+Chromium réel sur les deux fournisseurs : un clic/un POST, refus explicite,
+base sans date ni remarque, retour éditeur, bureau/mobile 390 px sans
+débordement de R-04 ni erreur JS. Ce contrôle ne qualifie pas tous les mobiles.
+
+Voir [rapport, preuves et limites](../revue/lot-l3-2026-10-11.md) et
+[contrat fournisseur / WF-08](../exploitation/avis-ia.md). Nouvelle fumée et
+diagnostic IA dans la porte commune. DIA-07 rejoué : deux appels/deux débits
+sous concurrence ; anomalie volontairement maintenue pour L4. Mobile B-07
+reste L7. Aucune qualification fournisseur/OAuth/DPA/facture/paiement réel,
+aucune levée Q.A/M.C, fusion ou mise en production par cette proposition.
+Prochain lot : L4.

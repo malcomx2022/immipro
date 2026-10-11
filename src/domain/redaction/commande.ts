@@ -220,10 +220,11 @@ export const refusDuTexteRedige = (texte: string): Faute | null =>
  * à dire.
  */
 export const refusDesRemarques = (
-  remarques: readonly Pick<RemarqueProduite, "titre" | "corps">[],
+  remarques: readonly Pick<RemarqueProduite, "titre" | "corps" | "ecarts">[],
 ): Faute | null => {
   for (const r of remarques) {
-    const faute = refusDuTexteRedige(`${r.titre}\n${r.corps}`);
+    const textes = [r.titre, r.corps, ...(r.ecarts?.flatMap(e => [e.source, e.valeur]) ?? [])];
+    const faute = refusDuTexteRedige(textes.join("\n"));
     if (faute) return faute;
   }
   return null;
@@ -231,6 +232,10 @@ export const refusDesRemarques = (
 
 /** Le motif que la route rend quand le texte ou la relecture est écarté. */
 export const MOTIF_FORMULATION_REFUSEE = "formulation_refusee" as const;
+export const MOTIF_AVIS_MAL_FORME = "avis_mal_forme" as const;
+export type MotifAvisRefuse = typeof MOTIF_FORMULATION_REFUSEE | typeof MOTIF_AVIS_MAL_FORME;
+export const DETAIL_AVIS_MAL_FORME =
+  "L'avis reçu est incomplet ou mal formé : aucune remarque ni date de relecture ne sont publiées.";
 
 /* ------------------------------------------------------------------ *
  * L'analyse critique.
@@ -342,15 +347,18 @@ const estObjet = (v: unknown): v is Record<string, unknown> =>
 const lireLEcart = (v: unknown): { source: string; valeur: string } | null => {
   if (!estObjet(v)) return null;
   const { source, valeur } = v;
-  return typeof source === "string" && typeof valeur === "string" ? { source, valeur } : null;
+  return typeof source === "string" && source.trim() !== "" &&
+    typeof valeur === "string" && valeur.trim() !== ""
+    ? { source: source.trim(), valeur: valeur.trim() } : null;
 };
 
 /**
  * Relit la charge sans lui faire confiance.
  *
  * Le schéma est annoncé à l'appel ; il n'est pas une garantie que ce
- * module peut invoquer. Une remarque mal formée est **écartée**, et non
- * réparée : une remarque sans corps ne dirait rien au candidat, et une
+ * module peut invoquer. Une remarque mal formée refuse **tout l'avis** :
+ * filtrer une liste mixte présenterait un avis partiel comme complet.
+ * Une remarque sans corps ne dirait rien au candidat, et une
  * incohérence sans ses deux valeurs retomberait dans le « document non
  * conforme » que la doctrine d'erreur du projet interdit.
  *
@@ -360,20 +368,21 @@ const lireLEcart = (v: unknown): { source: string; valeur: string } | null => {
  */
 export function lireLaCritique(
   charge: unknown,
-): readonly RemarqueProduite[] | { cause: CauseDAppel } {
-  if (!estObjet(charge)) return { cause: "reponse_illisible" };
+): readonly RemarqueProduite[] | { cause: CauseDAppel; motif: MotifAvisRefuse } {
+  const malForme = { cause: "reponse_illisible", motif: MOTIF_AVIS_MAL_FORME } as const;
+  if (!estObjet(charge)) return malForme;
   const brutes = charge.remarques;
-  if (!Array.isArray(brutes)) return { cause: "reponse_illisible" };
+  if (!Array.isArray(brutes) || brutes.length > REMARQUES_MAXI) return malForme;
 
   const remarques: RemarqueProduite[] = [];
-  for (const brute of brutes.slice(0, REMARQUES_MAXI)) {
-    if (!estObjet(brute)) continue;
+  for (const brute of brutes) {
+    if (!estObjet(brute)) return malForme;
     const { genre, titre, corps } = brute;
     if (typeof genre !== "string" || !(GENRES_PRODUITS as readonly string[]).includes(genre)) {
-      continue;
+      return malForme;
     }
-    if (typeof titre !== "string" || titre.trim() === "") continue;
-    if (typeof corps !== "string" || corps.trim() === "") continue;
+    if (typeof titre !== "string" || titre.trim() === "") return malForme;
+    if (typeof corps !== "string" || corps.trim() === "") return malForme;
 
     const paire = Array.isArray(brute.ecarts) && brute.ecarts.length === 2
       ? ([lireLEcart(brute.ecarts[0]), lireLEcart(brute.ecarts[1])] as const)
@@ -381,7 +390,10 @@ export function lireLaCritique(
 
     // Une incohérence sans ses deux valeurs n'est pas une incohérence
     // qu'on peut présenter : elle dit qu'il y a un écart sans dire lequel.
-    if (genre === "INCOHERENCE" && !(paire?.[0] && paire[1])) continue;
+    if (genre === "INCOHERENCE" && !(paire?.[0] && paire[1])) return malForme;
+    // Null au schéma ; undefined après normalisation ou pour un ancien
+    // adaptateur. Les autres genres ne portent aucune paire d'écarts.
+    if (genre !== "INCOHERENCE" && brute.ecarts != null) return malForme;
 
     remarques.push({
       genre: genre as GenreProduit,
@@ -389,6 +401,9 @@ export function lireLaCritique(
       corps: corps.trim(),
       ...(paire?.[0] && paire[1] ? { ecarts: [paire[0], paire[1]] as const } : {}),
     });
+  }
+  if (refusDesRemarques(remarques)) {
+    return { cause: "reponse_illisible", motif: MOTIF_FORMULATION_REFUSEE };
   }
   return remarques;
 }

@@ -1,0 +1,504 @@
+{
+  "date": "2026-10-11",
+  "lot": "REV11-L3",
+  "session": "S.174",
+  "base": "3d985f850154dcdc358d203f92fa312ba14ff176",
+  "simulation": true,
+  "sourceClaudeConservee": [
+    "PR #280 fusionnée",
+    "arbitrage #282, #281 fermée"
+  ],
+  "avant": {
+    "nouveauxContrats": {
+      "echecs": 75,
+      "temoinsValides": 12
+    },
+    "diagnostic": {
+      "base": "reproduire sur le commit indiqué dans le rapport REV11",
+      "simulation": true,
+      "resultats": [
+        {
+          "id": "CTRL-01",
+          "controle": "Lecture normale avec mesure",
+          "attendu": "LUE, 120/30",
+          "observe": {
+            "etat": "LUE",
+            "entree": 120,
+            "sortie": 30
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-01",
+          "controle": "Une mesure absente ne devient pas une lecture gratuite mesurée",
+          "attendu": "absence signalée, pas LUE à 0/0",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": null,
+            "sortie": null
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-02",
+          "controle": "Les compteurs transmis au grand livre sont des entiers positifs ou nuls",
+          "attendu": "pas LUE avec jetons négatifs/fractionnaires",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": null,
+            "sortie": null
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-03",
+          "controle": "Une enveloppe inexploitable garde les jetons réellement annoncés",
+          "attendu": "NON_LUE, 120/30",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": 120,
+            "sortie": 30
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-04",
+          "controle": "La pièce ne suit pas une redirection vers une autre origine",
+          "attendu": "0 appel à l’autre origine",
+          "observe": {
+            "appelsAilleurs": 0,
+            "octetsRecusAilleurs": false
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-05",
+          "controle": "Une liste entièrement mal formée ne devient pas un avis sans remarque",
+          "attendu": "SANS_AVIS",
+          "observe": {
+            "etat": "RELUE",
+            "remarques": 0
+          },
+          "conforme": false
+        },
+        {
+          "id": "CTRL-02",
+          "controle": "Une véritable liste vide reste un résultat",
+          "attendu": "RELUE, 0 remarque",
+          "observe": {
+            "etat": "RELUE",
+            "remarques": 0
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-06",
+          "controle": "Le banc sans fournisseur neutralise aussi l’authentification Vertex",
+          "attendu": [],
+          "observe": [],
+          "conforme": true
+        }
+      ],
+      "echecs": 1
+    }
+  },
+  "validationLocale": {
+    "check": {
+      "code": 0,
+      "fichiers": 186,
+      "tests": 3792,
+      "nouveauxL3": 91
+    },
+    "build": {
+      "code": 0,
+      "artefacts": [
+        "Next standalone",
+        "worker",
+        "outils exploitation"
+      ]
+    },
+    "audit": {
+      "code": 0,
+      "exceptionEleveePreexistante": 1,
+      "modereesPreexistantes": 4
+    },
+    "integrationsExistantes": [
+      {
+        "commande": "npx prisma validate",
+        "code": 0,
+        "secondes": 1.02,
+        "assertions_ok": 0,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:migrations",
+        "code": 0,
+        "secondes": 4.27,
+        "assertions_ok": 7,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:worker -- --base",
+        "code": 0,
+        "secondes": 37.74,
+        "assertions_ok": 48,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:recette",
+        "code": 0,
+        "secondes": 19.05,
+        "assertions_ok": 7,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:files",
+        "code": 0,
+        "secondes": 6.6,
+        "assertions_ok": 25,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:graine",
+        "code": 0,
+        "secondes": 4.35,
+        "assertions_ok": 12,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:tunnel",
+        "code": 0,
+        "secondes": 3.14,
+        "assertions_ok": 88,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:fedapay",
+        "code": 0,
+        "secondes": 3.35,
+        "assertions_ok": 36,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:reconciliation",
+        "code": 0,
+        "secondes": 5.11,
+        "assertions_ok": 69,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:consultation",
+        "code": 0,
+        "secondes": 3.36,
+        "assertions_ok": 73,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:conservation",
+        "code": 0,
+        "secondes": 4.58,
+        "assertions_ok": 51,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:remboursement",
+        "code": 0,
+        "secondes": 4.01,
+        "assertions_ok": 161,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:courrier",
+        "code": 0,
+        "secondes": 3.86,
+        "assertions_ok": 37,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:balayage",
+        "code": 0,
+        "secondes": 5.06,
+        "assertions_ok": 123,
+        "abstention": true
+      },
+      {
+        "commande": "npm run smoke:extraction",
+        "code": 0,
+        "secondes": 6.24,
+        "assertions_ok": 366,
+        "abstention": true
+      },
+      {
+        "commande": "npm run smoke:usages-ia",
+        "code": 0,
+        "secondes": 5.07,
+        "assertions_ok": 18,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:redaction",
+        "code": 0,
+        "secondes": 3.29,
+        "assertions_ok": 74,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:rappels",
+        "code": 0,
+        "secondes": 5.02,
+        "assertions_ok": 51,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:transitions",
+        "code": 0,
+        "secondes": 16.07,
+        "assertions_ok": 133,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:publication",
+        "code": 0,
+        "secondes": 4.32,
+        "assertions_ok": 168,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:juridique",
+        "code": 0,
+        "secondes": 2.62,
+        "assertions_ok": 30,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:relecture",
+        "code": 0,
+        "secondes": 2.87,
+        "assertions_ok": 12,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:facturation",
+        "code": 0,
+        "secondes": 3.31,
+        "assertions_ok": 52,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:role",
+        "code": 0,
+        "secondes": 5.9,
+        "assertions_ok": 10,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:editoriale",
+        "code": 0,
+        "secondes": 5.42,
+        "assertions_ok": 10,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:diagnostic",
+        "code": 0,
+        "secondes": 5.79,
+        "assertions_ok": 28,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:purge",
+        "code": 0,
+        "secondes": 5.79,
+        "assertions_ok": 99,
+        "abstention": true
+      },
+      {
+        "commande": "npm run smoke:montee",
+        "code": 0,
+        "secondes": 4.53,
+        "assertions_ok": 66,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:depot",
+        "code": 0,
+        "secondes": 3.23,
+        "assertions_ok": 43,
+        "abstention": false
+      },
+      {
+        "commande": "npm run sandbox:paiement",
+        "code": 0,
+        "secondes": 0.52,
+        "assertions_ok": 0,
+        "abstention": true
+      }
+    ],
+    "avisIa": {
+      "code": 0,
+      "assertionsPositives": 321,
+      "fournisseurs": [
+        "anthropic",
+        "openai_compatible"
+      ],
+      "casParFournisseur": 29,
+      "postAuthentifies": 58,
+      "gardePublicationInjectee": 2,
+      "jetonsEntree": 120,
+      "jetonsSortie": 30,
+      "coutMicrosConserve": 810,
+      "analysesValides": 8,
+      "soldeAvant": 30,
+      "soldeApres": 22,
+      "avisHistoriqueInchange": true
+    },
+    "diagnostic": {
+      "base": "reproduire sur le commit indiqué dans le rapport REV11",
+      "simulation": true,
+      "resultats": [
+        {
+          "id": "CTRL-01",
+          "controle": "Lecture normale avec mesure",
+          "attendu": "LUE, 120/30",
+          "observe": {
+            "etat": "LUE",
+            "entree": 120,
+            "sortie": 30
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-01",
+          "controle": "Une mesure absente ne devient pas une lecture gratuite mesurée",
+          "attendu": "absence signalée, pas LUE à 0/0",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": null,
+            "sortie": null
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-02",
+          "controle": "Les compteurs transmis au grand livre sont des entiers positifs ou nuls",
+          "attendu": "pas LUE avec jetons négatifs/fractionnaires",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": null,
+            "sortie": null
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-03",
+          "controle": "Une enveloppe inexploitable garde les jetons réellement annoncés",
+          "attendu": "NON_LUE, 120/30",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": 120,
+            "sortie": 30
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-04",
+          "controle": "La pièce ne suit pas une redirection vers une autre origine",
+          "attendu": "0 appel à l’autre origine",
+          "observe": {
+            "appelsAilleurs": 0,
+            "octetsRecusAilleurs": false
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-05",
+          "controle": "Une liste entièrement mal formée ne devient pas un avis sans remarque",
+          "attendu": "SANS_AVIS",
+          "observe": {
+            "etat": "SANS_AVIS",
+            "remarques": null
+          },
+          "conforme": true
+        },
+        {
+          "id": "CTRL-02",
+          "controle": "Une véritable liste vide reste un résultat",
+          "attendu": "RELUE, 0 remarque",
+          "observe": {
+            "etat": "RELUE",
+            "remarques": 0
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-06",
+          "controle": "Le banc sans fournisseur neutralise aussi l’authentification Vertex",
+          "attendu": [],
+          "observe": [],
+          "conforme": true
+        }
+      ],
+      "echecs": 0
+    },
+    "navigateur": [
+      {
+        "fournisseur": "anthropic",
+        "desktop": true,
+        "mobile390": {
+          "largeur": 390,
+          "contenu": 390
+        },
+        "messageMalForme": true,
+        "sansAvisFavorable": true,
+        "sansDateDAvis": true,
+        "retourEditeur": true,
+        "post": 1,
+        "erreursJS": []
+      },
+      {
+        "fournisseur": "openai_compatible",
+        "desktop": true,
+        "mobile390": {
+          "largeur": 390,
+          "contenu": 390
+        },
+        "messageMalForme": true,
+        "sansAvisFavorable": true,
+        "sansDateDAvis": true,
+        "retourEditeur": true,
+        "post": 1,
+        "erreursJS": []
+      }
+    ]
+  },
+  "concurrenceRestante": {
+    "lot": "L4",
+    "diagnostic": {
+      "id": "DIA-07",
+      "simulation": true,
+      "attendu": {
+        "appels": 1,
+        "debit": 1,
+        "relue": true
+      },
+      "observe": {
+        "appels": 2,
+        "debit": 2,
+        "relue": true,
+        "reponses": [
+          "fulfilled",
+          "fulfilled"
+        ]
+      },
+      "conforme": false
+    }
+  },
+  "limites": [
+    "aucun prestataire réel qualifié",
+    "aucun OAuth/DPA/facture/paiement réel",
+    "aucun historique requalifié sans réponse source",
+    "B-07 mobile reste L7",
+    "Q.A/M.C non levés",
+    "aucune fusion ni mise en production L3"
+  ]
+}

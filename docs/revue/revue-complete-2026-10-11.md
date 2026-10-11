@@ -151,6 +151,13 @@ une requête HTTP complète avec base.
 Attendu : `SANS_AVIS` pour une liste entièrement mal formée. Le témoin
 CTRL-02 vérifie qu'une vraie liste vide doit rester un résultat valide.
 
+**Traitement proposé S.174 / L3.** Avis entier refusé au premier défaut,
+y compris liste mixte ou trop longue ; deux fournisseurs et route protégés,
+consommation conservée et quota rendu. DIA-05 et CTRL-02 passent sans
+changer leurs attentes. Le vrai POST et PostgreSQL confirment l'absence
+de date/remarque publiée ; le rendu R-04 distingue les deux vides.
+Voir [résultats et limites](lot-l3-2026-10-11.md).
+
 ### REV-IA-04 — Banc de recette insuffisamment neutralisé pour Vertex
 
 **P1 — DIA-06 — isolation des tests.**

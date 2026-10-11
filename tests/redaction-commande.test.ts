@@ -153,7 +153,7 @@ describe("relire la réponse sans lui faire confiance", () => {
    * définition même du « document non conforme » que la doctrine d'erreur
    * du projet interdit.
    */
-  it("écarte une incohérence qui ne nomme pas ses deux valeurs", () => {
+  it("refuse tout l'avis mixte si une incohérence ne nomme pas ses deux valeurs", () => {
     const lues = lireLaCritique(
       charge([
         { genre: "INCOHERENCE", titre: "Deux dates", corps: "Corrige.", ecarts: null },
@@ -168,11 +168,10 @@ describe("relire la réponse sans lui faire confiance", () => {
         },
       ]),
     );
-    expect(Array.isArray(lues) && lues).toHaveLength(1);
-    expect(Array.isArray(lues) && lues[0]!.ecarts).toHaveLength(2);
+    expect(lues).toMatchObject({ cause: "reponse_illisible", motif: "avis_mal_forme" });
   });
 
-  it("écarte une remarque sans corps, un genre inconnu, et borne la liste", () => {
+  it("refuse les remarques mal formées et une liste trop longue", () => {
     const lues = lireLaCritique(
       charge([
         { genre: "FORME", titre: "Sans corps", corps: "   " },
@@ -184,8 +183,7 @@ describe("relire la réponse sans lui faire confiance", () => {
         })),
       ]),
     );
-    expect(Array.isArray(lues) && lues.length).toBeLessThanOrEqual(REMARQUES_MAXI);
-    expect(Array.isArray(lues) && lues.every((r) => r.genre === "A_RENFORCER")).toBe(true);
+    expect(lues).toMatchObject({ cause: "reponse_illisible", motif: "avis_mal_forme" });
   });
 });
 
