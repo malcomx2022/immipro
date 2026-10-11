@@ -13335,7 +13335,7 @@ et signature de recette restent des étapes distinctes.
 **Vérifications.**
 - `npm run check` : 3 638 tests passent, 0 erreur de lint. Le seul avertissement est antérieur au lot.
 - `npm run check:audit` : aucune vulnérabilité élevée sans motif.
-- Fumées de la porte, `smoke:recette` comprise : à compléter avec les résultats de la passe.
+- `npm run build` passe. Les 28 fumées de la porte passent dans l'ordre de la CI, `smoke:recette` comprise ; `sandbox:paiement` s'abstient, faute de clés. La CI de la PR #276 est verte sur a978f9a.
 
 **Effet au déploiement.** Une installation qui envoie déjà des pièces à un fournisseur compatible cesse de les envoyer tant que `AI_OPENAI_ORIGINE_AUTORISEE` n'est pas posée. Elle les envoie en revue humaine, et B-07 dit quoi poser. Rien ne change pour Anthropic, le fournisseur par défaut, ni pour la rédaction.
 
