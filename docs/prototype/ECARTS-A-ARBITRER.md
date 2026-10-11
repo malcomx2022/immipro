@@ -13224,3 +13224,44 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 **Non vérifié.**
 - Le comportement du pool `pg` sous la charge réelle du pilote.
 - Un retour arrière réel vers l'image S.168.
+## REV11 — Revue complète, tests et chantier IA/front/backend — 11/10/2026
+
+**Demande.** Revue complète avec tests unitaires, intégrations, fonctionnels,
+plan de correction et documentation du fournisseur IA et de ses workflows.
+Cette entrée est une revue documentaire et des outils de diagnostic ; elle
+ne prend aucun numéro de lot applicatif ni ne livre une correction métier.
+
+**Base et continuité.** Main `bbf1500` / S.168. S.167 / PR #268 fusionnée et
+montées pg-boss conservées. PR #272 / S.169 Prisma 7 recensée, en cours au
+gel de la base ; éviter tout travail concurrent sur ses dépendances/client.
+
+**Livrables.** [Revue](../revue/revue-complete-2026-10-11.md),
+[chantier](../revue/chantier-complet-2026-10-11.md),
+[IA/workflows](../IA-workflows.md), diagnostics manuels IA/concurrence et
+script Chromium local. CLAUDE.md, DOC-11, benchmark et matrice actualisés.
+D1 est conservé : analyses pour le quota, jetons pour consommation/marge.
+
+**Preuves locales.** 179 fichiers / 3 582 tests passent ; 26 fumées avec
+PostgreSQL passent ; types/lint/copie/audit/build et Prisma validate passent.
+105 garde-fous SQL refusés / 9 permis. Chromium : 45 navigations, connexions
+de trois rôles, session API et refus administratifs vérifiés. Dépôt PDF
+synthétique → revue sans modèle puis décision opérateur via UI, confirmé
+en base. Six attentes IA et une attente de concurrence échouent : cinq
+groupes distincts restant à corriger, non masqués dans les diagnostics.
+
+**Restants.** Isolation Vertex du banc, destination après redirection,
+mesure absente/invalide/perdue, critique mal formée et double relecture
+payante. Qualification réelle du fournisseur et du paiement, données
+antérieures/restauration, recette finale et préalables Q.A/M.C. Nginx local
+non achevé (image absente, téléchargement réseau refusé), ShellCheck et image
+applicative non éprouvés localement. Une revue ou une PR ne vaut ni fusion,
+ni déploiement, ni certification V1.
+
+**Actualisation pendant la revue.** PR #272 / S.169 fusionnée sur `ec32f65`.
+Livrables rebasés en conservant son client Prisma 7, CLI, dépendances et
+documents. Nouvelle installation, Prisma 7.10.0 généré, check : 179 fichiers
+/ 3 586 tests passent ; audit/build/Prisma validate et les 26 fumées passent.
+Diagnostics IA et concurrence : mêmes défauts. Nouveau banc S.169 :
+45 navigations, neuf contrôles conformes, aucun débordement ni erreur JS.
+REV-BANC-01 s'ajoute : un port occupé peut faire annoncer un banc prêt
+alors que son enfant web a échoué. L0 doit aussi contrôler le démarrage.

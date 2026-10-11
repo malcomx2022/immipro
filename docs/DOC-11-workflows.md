@@ -583,3 +583,16 @@ ORDER BY next_review_at;
 | **Lot 4 — Humain** | WF-12 | Consultants vérifiés référencés |
 
 WF-14 est dans le lot 1 **malgré son caractère interne** : sans veille, le référentiel se périme avant même le lancement, et l'ensemble du produit perd sa valeur.
+
+## Annexe d'exécution et revue du 11/10/2026
+
+La [documentation IA/workflows](IA-workflows.md) décrit le fournisseur
+configuré par fonction, les données transmises, les appels WF-06/WF-08,
+les traitements déterministes et la mesure WF-16. Elle ne modifie aucun
+invariant ni le quota en analyses arrêté en D1.
+
+La [revue complète](revue/revue-complete-2026-10-11.md) distingue tests
+unitaires/contrats, intégrations PostgreSQL, navigation et gestes réellement
+éprouvés. Le [chantier](revue/chantier-complet-2026-10-11.md) ordonne les
+corrections proposées avant intégration. Une suite verte ne certifie ni
+la précision d'un modèle réel, ni un paiement, ni la levée des préalables.

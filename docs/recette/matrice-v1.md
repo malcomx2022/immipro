@@ -243,3 +243,42 @@ horizontal ni erreur JavaScript. B-05 et C-08 ont leurs tests d'interface ;
 le signalement et le quota sont éprouvés sur PostgreSQL jetable, fournisseurs
 simulés. Ces résultats locaux ne modifient aucun statut de la recette
 pilote ni son bloc de signature.
+
+## Complément de revue du 11/10/2026 — REV11
+
+Base `bbf1500` / S.168, après fusion S.167 ; PR #272 / Prisma 7 recensée,
+non incluse dans cette base testée. Voir la
+[revue complète](../revue/revue-complete-2026-10-11.md) et son
+[chantier](../revue/chantier-complet-2026-10-11.md).
+
+179 fichiers / 3 582 tests passent, 26 fumées PostgreSQL passent, build et
+contrôles de types/copie/audit passent. Chromium : 45 navigations mobile
+390 px et back-office bureau, trois connexions par formulaire/Entrée,
+session API reconnue et deux refus HTTP 403 sur API admin. Aucun débordement
+ni erreur JavaScript observé sur ces visites. Les quatre pages juridiques
+du banc restent volontairement 404 avant validation des textes.
+
+Dépôt PDF synthétique par le navigateur puis antivirus/worker : version
+saine, `ILLISIBLE` sans provider et `creditConsumed=false`, file de revue
+technique affichée. Une décision opérateur conforme, avec motif et message,
+est enregistrée via UI et vérifiée en base. Ce parcours utilise S3/SMTP/AV
+simulés ; il ne qualifie pas l'extraction par un modèle réel.
+
+Diagnostics complémentaires : six attentes IA et une attente de concurrence
+échouent, réparties en cinq groupes. Ils restent ouverts au chantier et
+ne sont pas assimilés à des tests verts. Sandbox paiement sans clé : non
+éprouvé. Nginx local : image indisponible et téléchargement refusé ; contrôle
+à terminer sur la porte CI / environnement prévu. Pas de preuve locale
+supplémentaire d'image, Firefox/WebKit, TalkBack, sauvegarde/restauration,
+qualité fournisseur IA ni encaissement réel.
+
+Cette entrée ajoute des preuves locales ciblées ; elle ne coche pas les
+gestes non rejoués et ne modifie ni signature pilote ni Q.A/M.C.
+
+**Après fusion S.169.** Base finale `ec32f65` / Prisma 7.10.0. Les contrôles
+sont rejoués : 179 fichiers / 3 586 tests, 26 fumées, audit et build passent.
+Nouveau banc et nouvelle base : 45 navigations et neuf contrôles de session,
+connexion et droits conformes, sans erreur JS ni débordement. Diagnostics
+toujours rouges. REV-BANC-01 (annonce de disponibilité malgré échec du
+serveur sur port occupé) est ajouté au chantier L0. Aucun préalable de
+lancement n'est levé par cette actualisation.

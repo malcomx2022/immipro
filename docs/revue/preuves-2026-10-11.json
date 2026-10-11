@@ -1,0 +1,755 @@
+{
+  "date": "2026-10-11",
+  "base_initiale": "bbf1500e5762e1c192c46ba9c01f1faa23af7b06",
+  "base_finale": "ec32f6564c9578068a09e22746ecd435a9e7341d",
+  "environnement": {
+    "node": "24.19.0",
+    "prisma": "7.10.0",
+    "postgresql": "16",
+    "prestataires": "simulés, aucun fournisseur ni paiement réel",
+    "production": "aucun accès"
+  },
+  "porte_locale": {
+    "check": {
+      "code": 0,
+      "fichiers": 179,
+      "tests": 3586,
+      "types_lint_copie": "réussis"
+    },
+    "audit": {
+      "code": 0,
+      "elevee_acceptee_existante": 1,
+      "avis_moderes": 4
+    },
+    "build": {
+      "code": 0,
+      "artefacts": [
+        "Next standalone",
+        "worker"
+      ]
+    },
+    "garde_fous_sql": {
+      "refus": 105,
+      "permissions": 9
+    }
+  },
+  "integrations": [
+    {
+      "commande": "npx prisma validate",
+      "code": 0,
+      "secondes": 2.6,
+      "controles_rapportes": 0,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:migrations",
+      "code": 0,
+      "secondes": 8.44,
+      "controles_rapportes": 7,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:worker -- --base",
+      "code": 0,
+      "secondes": 43.82,
+      "controles_rapportes": 48,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:files",
+      "code": 0,
+      "secondes": 7.38,
+      "controles_rapportes": 25,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:graine",
+      "code": 0,
+      "secondes": 5.93,
+      "controles_rapportes": 12,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:tunnel",
+      "code": 0,
+      "secondes": 4.51,
+      "controles_rapportes": 88,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:fedapay",
+      "code": 0,
+      "secondes": 4.42,
+      "controles_rapportes": 36,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:reconciliation",
+      "code": 0,
+      "secondes": 6.97,
+      "controles_rapportes": 69,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:consultation",
+      "code": 0,
+      "secondes": 4.75,
+      "controles_rapportes": 73,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:conservation",
+      "code": 0,
+      "secondes": 5.41,
+      "controles_rapportes": 51,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:remboursement",
+      "code": 0,
+      "secondes": 5.4,
+      "controles_rapportes": 161,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:courrier",
+      "code": 0,
+      "secondes": 4.77,
+      "controles_rapportes": 37,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:balayage",
+      "code": 0,
+      "secondes": 5.59,
+      "controles_rapportes": 123,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:extraction",
+      "code": 0,
+      "secondes": 6.15,
+      "controles_rapportes": 186,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:redaction",
+      "code": 0,
+      "secondes": 3.69,
+      "controles_rapportes": 62,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:rappels",
+      "code": 0,
+      "secondes": 5.93,
+      "controles_rapportes": 51,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:transitions",
+      "code": 0,
+      "secondes": 17.71,
+      "controles_rapportes": 133,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:publication",
+      "code": 0,
+      "secondes": 5.15,
+      "controles_rapportes": 168,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:juridique",
+      "code": 0,
+      "secondes": 3.4,
+      "controles_rapportes": 30,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:relecture",
+      "code": 0,
+      "secondes": 5.31,
+      "controles_rapportes": 12,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:facturation",
+      "code": 0,
+      "secondes": 7.99,
+      "controles_rapportes": 52,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:role",
+      "code": 0,
+      "secondes": 15.82,
+      "controles_rapportes": 10,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:editoriale",
+      "code": 0,
+      "secondes": 11.95,
+      "controles_rapportes": 10,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:diagnostic",
+      "code": 0,
+      "secondes": 12.14,
+      "controles_rapportes": 28,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:purge",
+      "code": 0,
+      "secondes": 10.42,
+      "controles_rapportes": 99,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:montee",
+      "code": 0,
+      "secondes": 4.92,
+      "controles_rapportes": 66,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run smoke:depot",
+      "code": 0,
+      "secondes": 3.61,
+      "controles_rapportes": 43,
+      "portee": "PostgreSQL réel et services externes simulés"
+    },
+    {
+      "commande": "npm run sandbox:paiement",
+      "code": 0,
+      "secondes": 0.7,
+      "controles_rapportes": 0,
+      "portee": "abstention explicite, sans clé"
+    }
+  ],
+  "diagnostic_ia": {
+    "base": "ec32f6564c9578068a09e22746ecd435a9e7341d",
+    "simulation": true,
+    "resultats": [
+      {
+        "id": "CTRL-01",
+        "controle": "Lecture normale avec mesure",
+        "attendu": "LUE, 120/30",
+        "observe": {
+          "etat": "LUE",
+          "entree": 120,
+          "sortie": 30
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-01",
+        "controle": "Une mesure absente ne devient pas une lecture gratuite mesurée",
+        "attendu": "absence signalée, pas LUE à 0/0",
+        "observe": {
+          "etat": "LUE",
+          "entree": 0,
+          "sortie": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-02",
+        "controle": "Les compteurs transmis au grand livre sont des entiers positifs ou nuls",
+        "attendu": "pas LUE avec jetons négatifs/fractionnaires",
+        "observe": {
+          "etat": "LUE",
+          "entree": -12,
+          "sortie": 1.5
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-03",
+        "controle": "Une enveloppe inexploitable garde les jetons réellement annoncés",
+        "attendu": "NON_LUE, 120/30",
+        "observe": {
+          "etat": "NON_LUE",
+          "entree": 0,
+          "sortie": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-04",
+        "controle": "La pièce ne suit pas une redirection vers une autre origine",
+        "attendu": "0 appel à l’autre origine",
+        "observe": {
+          "appelsAilleurs": 1,
+          "octetsRecusAilleurs": true
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-05",
+        "controle": "Une liste entièrement mal formée ne devient pas un avis sans remarque",
+        "attendu": "SANS_AVIS",
+        "observe": {
+          "etat": "RELUE",
+          "remarques": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "CTRL-02",
+        "controle": "Une véritable liste vide reste un résultat",
+        "attendu": "RELUE, 0 remarque",
+        "observe": {
+          "etat": "RELUE",
+          "remarques": 0
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-06",
+        "controle": "Le banc sans fournisseur neutralise aussi l’authentification Vertex",
+        "attendu": [],
+        "observe": [
+          "extraction",
+          "redaction"
+        ],
+        "conforme": false
+      }
+    ],
+    "echecs": 6
+  },
+  "diagnostic_relecture": {
+    "id": "DIA-07",
+    "simulation": true,
+    "attendu": {
+      "appels": 1,
+      "debit": 1,
+      "relue": true
+    },
+    "observe": {
+      "appels": 2,
+      "debit": 2,
+      "relue": true,
+      "reponses": [
+        "fulfilled",
+        "fulfilled"
+      ]
+    },
+    "conforme": false
+  },
+  "navigateur": {
+    "navigations": [
+      {
+        "role": "public",
+        "chemin": "/",
+        "statut": 200,
+        "destination": "/",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/comment-ca-marche",
+        "statut": 200,
+        "destination": "/comment-ca-marche",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/tarifs",
+        "statut": 200,
+        "destination": "/tarifs",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/simulateur",
+        "statut": 200,
+        "destination": "/simulateur",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/resultats",
+        "statut": 200,
+        "destination": "/resultats",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/destinations",
+        "statut": 200,
+        "destination": "/destinations",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/destinations/pays-bas",
+        "statut": 200,
+        "destination": "/destinations/pays-bas",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/conditions",
+        "statut": 404,
+        "destination": "/conditions",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/mentions-legales",
+        "statut": 404,
+        "destination": "/mentions-legales",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/donnees-personnelles",
+        "statut": 404,
+        "destination": "/donnees-personnelles",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/guides",
+        "statut": 200,
+        "destination": "/guides",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/guides/pays-bas",
+        "statut": 200,
+        "destination": "/guides/pays-bas",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/articles",
+        "statut": 200,
+        "destination": "/articles",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/contact",
+        "statut": 404,
+        "destination": "/contact",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/inscription",
+        "statut": 200,
+        "destination": "/inscription",
+        "debordement": 0
+      },
+      {
+        "role": "public",
+        "chemin": "/mot-de-passe",
+        "statut": 200,
+        "destination": "/mot-de-passe",
+        "debordement": 0
+      },
+      {
+        "role": "anonyme",
+        "chemin": "/tableau-de-bord",
+        "statut": 200,
+        "destination": "/connexion?suite=%2Ftableau-de-bord",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/tableau-de-bord",
+        "statut": 200,
+        "destination": "/tableau-de-bord",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/profil",
+        "statut": 200,
+        "destination": "/profil",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/comparateur",
+        "statut": 200,
+        "destination": "/comparateur",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/notifications",
+        "statut": 200,
+        "destination": "/notifications",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/services",
+        "statut": 200,
+        "destination": "/services",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/consentements",
+        "statut": 200,
+        "destination": "/consentements",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/compte/rappels",
+        "statut": 200,
+        "destination": "/compte/rappels",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/compte/mes-donnees",
+        "statut": 200,
+        "destination": "/compte/mes-donnees",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/nouveau",
+        "statut": 200,
+        "destination": "/dossiers/nouveau",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/IDENTIFIANT_SYNTHETIQUE",
+        "statut": 200,
+        "destination": "/dossiers/IDENTIFIANT_SYNTHETIQUE",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/IDENTIFIANT_SYNTHETIQUE/completude",
+        "statut": 200,
+        "destination": "/dossiers/IDENTIFIANT_SYNTHETIQUE/completude",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/IDENTIFIANT_SYNTHETIQUE/echeancier",
+        "statut": 200,
+        "destination": "/dossiers/IDENTIFIANT_SYNTHETIQUE/echeancier",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/IDENTIFIANT_SYNTHETIQUE/redaction",
+        "statut": 200,
+        "destination": "/dossiers/IDENTIFIANT_SYNTHETIQUE/redaction",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/IDENTIFIANT_SYNTHETIQUE/pieces/IDENTIFIANT_SYNTHETIQUE",
+        "statut": 200,
+        "destination": "/dossiers/IDENTIFIANT_SYNTHETIQUE/pieces/IDENTIFIANT_SYNTHETIQUE",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/dossiers/IDENTIFIANT_SYNTHETIQUE/pieces/IDENTIFIANT_SYNTHETIQUE/versions",
+        "statut": 200,
+        "destination": "/dossiers/IDENTIFIANT_SYNTHETIQUE/pieces/IDENTIFIANT_SYNTHETIQUE/versions",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/paiement/pack",
+        "statut": 200,
+        "destination": "/paiement/pack",
+        "debordement": 0
+      },
+      {
+        "role": "candidat",
+        "chemin": "/revue",
+        "statut": 200,
+        "destination": "/tableau-de-bord",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/veille",
+        "statut": 200,
+        "destination": "/veille",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/couts-ia",
+        "statut": 200,
+        "destination": "/couts-ia",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/revue",
+        "statut": 200,
+        "destination": "/revue",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/journal",
+        "statut": 200,
+        "destination": "/journal",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/contenus",
+        "statut": 200,
+        "destination": "/contenus",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/utilisateurs",
+        "statut": 200,
+        "destination": "/utilisateurs",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/textes-juridiques",
+        "statut": 200,
+        "destination": "/textes-juridiques",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/paiements",
+        "statut": 200,
+        "destination": "/paiements",
+        "debordement": 0
+      },
+      {
+        "role": "admin",
+        "chemin": "/habilitations",
+        "statut": 200,
+        "destination": "/habilitations",
+        "debordement": 0
+      },
+      {
+        "role": "veilleur",
+        "chemin": "/veille",
+        "statut": 200,
+        "destination": "/veille",
+        "debordement": 0
+      },
+      {
+        "role": "veilleur",
+        "chemin": "/habilitations",
+        "statut": 200,
+        "destination": "/tableau-de-bord",
+        "debordement": 0
+      }
+    ],
+    "actions": [
+      {
+        "action": "anonyme renvoyé vers connexion",
+        "conforme": true
+      },
+      {
+        "action": "connexion par formulaire et touche Entrée",
+        "role": "aline.dossou",
+        "conforme": true
+      },
+      {
+        "action": "session candidat reconnue par API dossiers",
+        "statut": 200,
+        "conforme": true
+      },
+      {
+        "action": "refus candidat sur API administrative",
+        "chemin": "/api/admin/couts-ia",
+        "statut": 403,
+        "conforme": true
+      },
+      {
+        "action": "refus candidat sur API administrative",
+        "chemin": "/api/admin/utilisateurs",
+        "statut": 403,
+        "conforme": true
+      },
+      {
+        "action": "candidat écarté de la revue opérateur",
+        "conforme": true
+      },
+      {
+        "action": "connexion par formulaire et touche Entrée",
+        "role": "admin",
+        "conforme": true
+      },
+      {
+        "action": "connexion par formulaire et touche Entrée",
+        "role": "veilleur",
+        "conforme": true
+      },
+      {
+        "action": "veilleur écarté des habilitations admin",
+        "conforme": true
+      }
+    ],
+    "erreursJS": []
+  },
+  "gestes_navigateur": [
+    {
+      "action": "garde HTTP candidat vers API admin",
+      "chemin": "/api/admin/couts-ia",
+      "observe": 403,
+      "conforme": true
+    },
+    {
+      "action": "garde HTTP candidat vers API admin",
+      "chemin": "/api/admin/utilisateurs",
+      "observe": 403,
+      "conforme": true
+    },
+    {
+      "action": "téléversement navigateur → S3 simulé → antivirus → worker → revue sans IA",
+      "observe": {
+        "scan": "SAINE",
+        "analyses": 1,
+        "quotaAvant": 29,
+        "quotaApres": 29
+      },
+      "conforme": true
+    },
+    {
+      "action": "décision opérateur via formulaire réel",
+      "observe": "CONFORME",
+      "conforme": true
+    }
+  ],
+  "banc_port_occupe": {
+    "app": "EADDRINUSE",
+    "annonce": "Banc prêt malgré échec du serveur",
+    "etat": "défaut confirmé, lot L0"
+  },
+  "non_verifies": [
+    "modèle IA réel et qualité",
+    "DPA/résidence réels",
+    "paiement sandbox réel",
+    "nginx local : image absente/tirage refusé",
+    "ShellCheck local",
+    "image Docker applicative dans cette revue locale",
+    "Firefox/WebKit/TalkBack",
+    "restauration et données production",
+    "préalables Q.A/M.C"
+  ]
+}
