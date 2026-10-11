@@ -146,6 +146,8 @@ describe("lecture seule", () => {
     const entree = build.slice(build.indexOf('outfile: "dist/inventaire-stockage.mjs"'));
     expect(entree.length).toBeGreaterThan(0);
     // Les dépendances CJS de `minio` exigent `require` dans un paquet ESM.
-    expect(entree.slice(0, entree.indexOf("});"))).toContain("createRequire");
+    // La bannière est commune à tous les paquets ESM depuis S.169 (Prisma 7).
+    expect(entree.slice(0, entree.indexOf("});"))).toContain("banner: REQUIRE_EN_ESM");
+    expect(build).toMatch(/const REQUIRE_EN_ESM = \{\s*js: 'import \{ createRequire/u);
   });
 });

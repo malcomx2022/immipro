@@ -44,6 +44,17 @@ import { build } from "esbuild";
 
 const EXTERNES = ["@prisma/client", ".prisma/client"];
 
+/*
+  Les paquets ESM qui embarquent du CommonJS ont besoin du `require` de Node.
+  `pg` en est : `minio` le demandait déjà (S.151), et depuis Prisma 7 (S.169)
+  chaque commande qui touche la base l'embarque, par l'adaptateur
+  `@prisma/adapter-pg`. Sans cette bannière, elles tombaient au chargement
+  sur « Dynamic require of "events" is not supported ».
+*/
+const REQUIRE_EN_ESM = {
+  js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
+};
+
 const resultat = await build({
   entryPoints: ["src/server/jobs/worker.ts"],
   outfile: "dist/worker.js",
@@ -138,6 +149,7 @@ const sandbox = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -165,6 +177,7 @@ const role = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -191,6 +204,7 @@ const diagnostic = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -215,6 +229,7 @@ const diagnosticDonnees = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -242,9 +257,7 @@ const inventaireStockage = await build({
   // `minio` tire des modules CJS (`readable-stream`, `block-stream2`) qui
   // font `require("stream")` : sans ce `require`, le paquet tombe au
   // chargement dans l'image — `smoke:worker --image` l'a dit (S.151).
-  banner: {
-    js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
-  },
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -271,9 +284,7 @@ for (const nom of ["purge-retention", "purge-inventaire"]) {
     platform: "node",
     target: "node24",
     format: "esm",
-    banner: {
-      js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
-    },
+    banner: REQUIRE_EN_ESM,
     external: EXTERNES,
     tsconfig: "tsconfig.json",
     sourcemap: true,
@@ -305,6 +316,7 @@ const editoriale = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -336,9 +348,7 @@ const gardeFous = await build({
   target: "node24",
   format: "esm",
   // `pg` est publié en CJS : son `require` de modules Node doit exister en ESM.
-  banner: {
-    js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
-  },
+  banner: REQUIRE_EN_ESM,
   external: [...EXTERNES, "pg-native"],
   define: {
     __SQL_GARDE_FOUS__: JSON.stringify(readFileSync("scripts/verifier-garde-fous.sql", "utf8")),

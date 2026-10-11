@@ -13174,3 +13174,44 @@ La référence révèle un écart antérieur : **des messages anglais sortaient 
 **Non vérifié.**
 - Un retour arrière réel vers l'image S.166 sur le schéma migré : il n'est éprouvé que sur la base jetable de `smoke:files`.
 - La suppression de `pgboss`, `pg-boss-10` et `pg-boss-11` reste à faire, une fois ces retours arrière exclus.
+
+## S.169 — RF-7 : Prisma 7, adaptateur pg et configuration de la CLI (M19 étape 6)
+
+**Autorisation.** Le 11/10/2026, le responsable a choisi ce lot de RF-7 (« Prisma 7 »), étape 6 de M19, dans l'ordre documenté. Aucune PR n'était ouverte. Le lot reprend main bbf1500, conserve S.166 à S.168, et revoit l'exception deepmerge-ts comme le demande le point 3 de RF-7. Il ne touche ni au domaine métier, ni au schéma de la base, ni aux migrations, ni aux drapeaux commerciaux.
+
+**Reproduit sur l'ancien code, avant toute modification.**
+- La CLI Prisma 7 refuse le schéma : `P1012 The datasource property url is no longer supported in schema files`.
+- `smoke:migrations`, une fois le schéma accepté, échoue sur la dérive : `migrate diff` n'a plus `--from-url` ni `--to-schema-datamodel`.
+- Le client Prisma 7 n'ouvre plus de connexion lui-même : il exige un adaptateur.
+
+**Ce que la montée change.**
+- **L'URL quitte le schéma.** La CLI la lit dans `prisma.config.mjs`. Le fichier est en JavaScript sans aucun import, et non en `prisma.config.ts` avec `defineConfig` : dans l'image, la CLI vit dans `/opt/prisma-cli` (M15) et le fichier dans `/app`, dont le `node_modules` n'a pas `prisma`. Il est copié dans l'image à côté de `prisma/`. Il charge `.env` s'il existe, comme le faisait Prisma 6, sans remplacer une variable déjà posée.
+- **Un seul point de construction du client** : `src/lib/client-prisma.ts`, avec l'adaptateur `@prisma/adapter-pg`. L'application, le worker, les trois graines et la graine éditoriale de l'image y passent. Le pool est désormais celui de `pg` : il ignore `connection_limit` et `pool_timeout` dans l'URL. L'attente d'une connexion libre est bornée à 10 s, comme sous Prisma 6 ; sans ce réglage, `pg` attendrait sans fin.
+- **`smoke:migrations`** utilise `--from-config-datasource` et `--to-schema`. Vérifié dans les deux sens : avec un champ ajouté au schéma sans migration, la commande rend 2 ; sans dérive, elle rend 0.
+- **CLI de l'image** passée en 7.10.0 (`docker/prisma-cli`), égale au verrou racine.
+- **Paquets ESM de l'image.** L'adaptateur embarque `pg`, publié en CommonJS, dans chaque commande qui touche la base. Sans le `require` de Node, `changer-role`, `diagnostic-paiement`, `diagnostic-donnees`, `graine-editoriale` et `sandbox-paiement` tombaient au chargement sur `Dynamic require of "events" is not supported`. Trois fumées (`smoke:role`, `smoke:editoriale`, `smoke:diagnostic`) et `smoke:worker --image` l'ont dit. La bannière `createRequire`, déjà posée pour `minio` en S.151, est désormais commune à tous les paquets ESM, et un test y veille.
+- Les graines de développement chargent `.env` par `tsx --env-file-if-exists`, puisque le client ne le fait plus.
+
+**Audit.**
+- Prisma 7 épingle `mysql2` 3.15.3 pour sa CLI, et cette version porte un avis élevé (GHSA-3f6p-5ww8-9rcr). Une surcharge limitée à `prisma` la porte en ^3.24.5, à la racine comme dans le verrou de l'image, plutôt qu'une exception. Elle ne sert qu'aux bases MySQL et au Studio, que le projet n'utilise pas.
+- **deepmerge-ts, revu** : `@prisma/config` 7.10.0 l'épingle toujours en 7.1.5. L'exception D-34 reste, avec son motif mis à jour.
+
+**Comportements éprouvés sur base jetable, avec le client Prisma 7.**
+- Les 58 migrations s'appliquent avec la CLI 7, et le schéma ne dérive pas.
+- P2002 (unicité), P2025 (enregistrement absent) et P2034 gardent leurs codes. P2034 est le conflit sérialisable qu'attend le changement de rôle.
+- Une requête brute en conflit sérialisable rend P2010 avec le code 40001. Le code n'en dépend nulle part.
+- Les dates restent des `Date`, `count(*)` un `bigint`, `numeric` un `Decimal`, le JSON un objet.
+- Une URL portant `?schema=public` ou `connection_limit` est acceptée.
+- **Retour arrière** : la CLI Prisma 6.19.3 lit une base migrée par Prisma 7 comme à jour, et `migrate diff` n'y voit aucune différence. Le lot n'ajoute aucune migration.
+
+**Vérifications.**
+- `npm run check` : 3 586 tests passent, dont quatre nouveaux tests de garde dans `tests/image-production.test.ts` : la configuration est copiée dans l'image et n'importe rien, `mysql2` est forcé, et chaque paquet ESM a le `require` de Node. Lint : 0 erreur ; le seul avertissement est antérieur au lot, dans `purge-stockage.ts`.
+- `npm run build` passe. Pendant le prérendu, les pages lisent les liens juridiques sans base joignable ; elles retombent sur leur repli comme avant, avec 14 lignes `prisma:error` au lieu de 7 auparavant.
+- `npm run check:audit` : aucune vulnérabilité élevée sans motif.
+- Les 27 fumées de la porte ont été lancées dans l'ordre de la CI. 24 passaient au premier passage ; les trois autres repassent après le correctif de la bannière. `sandbox:paiement` s'abstient faute de clés.
+- **Image** construite localement par le `Dockerfile` (seul ajout : le certificat du proxy de la session), puis `smoke:worker -- --image`. Au premier passage, l'image a fait échouer `node dist/diagnostic-donnees.mjs`, sur le même `require` manquant. Après le correctif, l'image reconstruite passe les 25 contrôles : le worker, le service `app`, la passerelle et les commandes d'exploitation démarrent depuis l'artefact. La CLI de l'image est en 7.10.0, et les deux commandes Prisma de `deployer.sh` l'atteignent : elles s'arrêtent sur la base absente (P1001), preuve qu'elles ont trouvé `prisma.config.mjs`.
+
+**Non vérifié.**
+- Le déploiement réel : `migrate status` et `migrate deploy` lancés depuis l'image contre la base de production.
+- Le comportement du pool `pg` sous la charge réelle du pilote.
+- Un retour arrière réel vers l'image S.168.
