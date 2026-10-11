@@ -180,11 +180,15 @@ Tarifs Anthropic : `AI_TARIF_ENTREE_PAR_MILLION`,
 coût affiché comme une facture réelle ; la valorisation B-07 dépend des
 tarifs courants. Le chantier prévoit de préciser la datation des prix.
 
-Le diagnostic révèle que l'adaptateur compatible accepte des compteurs
-absents ou invalides et perd une mesure connue si l'enveloppe est inexploitable.
-**Une mesure inconnue ne doit pas devenir un coût nul.** La représentation
-d'un usage inconnu et la politique de rapprochement doivent être arrêtées
-dans le lot de correction sans changer D1.
+**S.173 / REV11-L2.** Les compteurs sont validés avant le contenu, pour
+les deux fournisseurs. Une réponse sans mesure complète ne publie aucun
+résultat automatique ; revue humaine en WF-06, aucun texte/avis en WF-08,
+réservation rendue sans relance automatique pour cette cause. Un côté
+inconnu persiste `NULL` avec `usageState` ; un vrai zéro est enregistré.
+Les coûts connus d'un contenu refusé restent conservés. B-07 signale
+les appels à rapprocher et ne présente pas un coût incomplet comme nul.
+Lire [la procédure et la migration](exploitation/mesure-ia.md). Les
+reprises de transport bornées et le quota D1 en analyses restent distincts.
 
 ## 6. Qualification, exploitation et limites actuelles
 
@@ -224,3 +228,5 @@ mesurer ses résultats. L0 préserve ce second usage et les règles D1/INV-6.
 Les reproductions et leurs attentes figurent dans la
 [revue complète](revue/revue-complete-2026-10-11.md). Les corrections sont
 ordonnées dans le [chantier](revue/chantier-complet-2026-10-11.md).
+
+Mise à jour L2 : base `47b39b0` ; [preuves, écarts et recette HTTP](revue/lot-l2-2026-10-11.md).

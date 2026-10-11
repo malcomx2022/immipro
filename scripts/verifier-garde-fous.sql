@@ -858,6 +858,30 @@ SELECT refuse(
 -- `scripts/fumee-remboursement.mts` : ce fichier-ci ne sait dire qu'une
 -- chose, qu'une écriture est refusée.
 
+SELECT refuse('L2 · mesure connue sans compteur', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-0','u1','synthétique',NULL,30,NULL,'CONNUE')$q$);
+
+SELECT refuse('L2 · mesure inconnue avec compteur', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-1','u1','synthétique',120,NULL,NULL,'INCONNUE')$q$);
+
+SELECT refuse('L2 · mesure partielle avec deux compteurs', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-2','u1','synthétique',120,30,NULL,'PARTIELLE')$q$);
+
+SELECT refuse('L2 · mesure invalide annoncée complète', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-3','u1','synthétique',120,30,NULL,'INVALIDE')$q$);
+
+SELECT refuse('L2 · compteur négatif explicite', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-4','u1','synthétique',-1,30,0,'CONNUE')$q$);
+
+SELECT refuse('L2 · état de mesure inconnu', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-5','u1','synthétique',120,30,0,'AUTRE')$q$);
+
+SELECT refuse('L2 · coût attribué à une mesure partielle', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-6','u1','synthétique',120,NULL,0,'PARTIELLE')$q$);
+
+SELECT refuse('L2 · coût négatif connu', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-refus-7','u1','synthétique',120,30,-1,'CONNUE')$q$);
+
+SELECT passe('L2 · CONNUE', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-passe-0','u1','synthétique',0,0,0,'CONNUE')$q$);
+
+SELECT passe('L2 · INCONNUE', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-passe-1','u1','synthétique',NULL,NULL,NULL,'INCONNUE')$q$);
+
+SELECT passe('L2 · PARTIELLE', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-passe-2','u1','synthétique',120,NULL,NULL,'PARTIELLE')$q$);
+
+SELECT passe('L2 · INVALIDE', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-passe-3','u1','synthétique',NULL,30,NULL,'INVALIDE')$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

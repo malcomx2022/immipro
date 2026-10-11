@@ -131,3 +131,12 @@ et prévoit la restauration (`docs/exploitation/deploiement.md`).
 `tests/schema-domaine.test.ts` compare les enums du schéma aux unions du
 domaine, sans base ni client généré. Les deux vocabulaires sont écrits deux
 fois ; ce test échoue le jour où l'un bouge sans l'autre.
+
+## Mesure L2 — S.173
+
+Migration `20261011160000_mesure_des_usages_ia` : états de mesure ajoutés,
+compteurs et coût rendus nullables sans réécriture historique. `NULL` signifie
+inconnu ; seul l'état `CONNUE` avec deux entiers autorise une mesure complète.
+Les contraintes encadrent les nouveaux états explicites. Migrer avant
+app/worker ; lire [la procédure](../docs/exploitation/mesure-ia.md) pour
+la lecture historique et les limites d'un retour applicatif.

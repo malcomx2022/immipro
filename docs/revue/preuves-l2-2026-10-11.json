@@ -1,0 +1,381 @@
+{
+  "lot": "REV11-L2",
+  "registre": "S.173",
+  "date": "2026-10-11",
+  "base_reproduction": "47b39b0ca4129d72ef21a430886cb02f90723c91",
+  "base_finale": "16636d4",
+  "continuite_claude": "S.171/S.172 et relevé #279 conservés ; aucun déploiement L2 réalisé ici",
+  "politique": "aucune publication automatique sans mesure complète valide de la réponse ; D1 en analyses",
+  "unitaires": {
+    "fichiers": 184,
+    "tests": 3701,
+    "nouveaux_L2": 32,
+    "reproduction_base": {
+      "fichier": "tests/ia-usages.test.ts",
+      "rouges": 13,
+      "fixtures": "conformes à la demande du domaine"
+    }
+  },
+  "diagnostic_ia": {
+    "base": "reproduire sur le commit indiqué dans le rapport REV11",
+    "simulation": true,
+    "resultats": [
+      {
+        "id": "CTRL-01",
+        "controle": "Lecture normale avec mesure",
+        "attendu": "LUE, 120/30",
+        "observe": {
+          "etat": "LUE",
+          "entree": 120,
+          "sortie": 30
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-01",
+        "controle": "Une mesure absente ne devient pas une lecture gratuite mesurée",
+        "attendu": "absence signalée, pas LUE à 0/0",
+        "observe": {
+          "etat": "NON_LUE",
+          "entree": null,
+          "sortie": null
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-02",
+        "controle": "Les compteurs transmis au grand livre sont des entiers positifs ou nuls",
+        "attendu": "pas LUE avec jetons négatifs/fractionnaires",
+        "observe": {
+          "etat": "NON_LUE",
+          "entree": null,
+          "sortie": null
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-03",
+        "controle": "Une enveloppe inexploitable garde les jetons réellement annoncés",
+        "attendu": "NON_LUE, 120/30",
+        "observe": {
+          "etat": "NON_LUE",
+          "entree": 120,
+          "sortie": 30
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-04",
+        "controle": "La pièce ne suit pas une redirection vers une autre origine",
+        "attendu": "0 appel à l’autre origine",
+        "observe": {
+          "appelsAilleurs": 0,
+          "octetsRecusAilleurs": false
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-05",
+        "controle": "Une liste entièrement mal formée ne devient pas un avis sans remarque",
+        "attendu": "SANS_AVIS",
+        "observe": {
+          "etat": "RELUE",
+          "remarques": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "CTRL-02",
+        "controle": "Une véritable liste vide reste un résultat",
+        "attendu": "RELUE, 0 remarque",
+        "observe": {
+          "etat": "RELUE",
+          "remarques": 0
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-06",
+        "controle": "Le banc sans fournisseur neutralise aussi l’authentification Vertex",
+        "attendu": [],
+        "observe": [],
+        "conforme": true
+      }
+    ],
+    "echecs": 1
+  },
+  "verification": {
+    "lint_types_copie": "passe",
+    "audit": "passe, exception deepmerge-ts préexistante et quatre avis modérés",
+    "build": "standalone et worker/diagnostic passent",
+    "sql": {
+      "refus": 113,
+      "permis": 13
+    },
+    "extracteur": {
+      "assertions": 366,
+      "nouvelles_L2": 102
+    },
+    "redaction": {
+      "assertions": 74
+    },
+    "migration_usage_http": {
+      "assertions": 18,
+      "historiques_inchanges": 3,
+      "diagnostic_lecture_seule": true
+    }
+  },
+  "integrations": [
+    {
+      "commande": "npx prisma validate",
+      "code": 0,
+      "secondes": 1.39,
+      "assertions_ok": 0,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:migrations",
+      "code": 0,
+      "secondes": 4.74,
+      "assertions_ok": 7,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:worker -- --base",
+      "code": 0,
+      "secondes": 37.25,
+      "assertions_ok": 48,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:recette",
+      "code": 0,
+      "secondes": 17.44,
+      "assertions_ok": 7,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:files",
+      "code": 0,
+      "secondes": 6.57,
+      "assertions_ok": 25,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:graine",
+      "code": 0,
+      "secondes": 4.4,
+      "assertions_ok": 12,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:tunnel",
+      "code": 0,
+      "secondes": 3.06,
+      "assertions_ok": 88,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:fedapay",
+      "code": 0,
+      "secondes": 3.07,
+      "assertions_ok": 36,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:reconciliation",
+      "code": 0,
+      "secondes": 4.64,
+      "assertions_ok": 69,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:consultation",
+      "code": 0,
+      "secondes": 3.21,
+      "assertions_ok": 73,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:conservation",
+      "code": 0,
+      "secondes": 4.24,
+      "assertions_ok": 51,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:remboursement",
+      "code": 0,
+      "secondes": 3.84,
+      "assertions_ok": 161,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:courrier",
+      "code": 0,
+      "secondes": 3.49,
+      "assertions_ok": 37,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:balayage",
+      "code": 0,
+      "secondes": 4.34,
+      "assertions_ok": 123,
+      "abstention": true
+    },
+    {
+      "commande": "npm run smoke:extraction",
+      "code": 0,
+      "secondes": 8.25,
+      "assertions_ok": 366,
+      "abstention": true
+    },
+    {
+      "commande": "npm run smoke:usages-ia",
+      "code": 0,
+      "secondes": 5.29,
+      "assertions_ok": 18,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:redaction",
+      "code": 0,
+      "secondes": 3.24,
+      "assertions_ok": 74,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:rappels",
+      "code": 0,
+      "secondes": 5.19,
+      "assertions_ok": 51,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:transitions",
+      "code": 0,
+      "secondes": 15.09,
+      "assertions_ok": 133,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:publication",
+      "code": 0,
+      "secondes": 4.51,
+      "assertions_ok": 168,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:juridique",
+      "code": 0,
+      "secondes": 2.68,
+      "assertions_ok": 30,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:relecture",
+      "code": 0,
+      "secondes": 2.68,
+      "assertions_ok": 12,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:facturation",
+      "code": 0,
+      "secondes": 3.56,
+      "assertions_ok": 52,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:role",
+      "code": 0,
+      "secondes": 5.85,
+      "assertions_ok": 10,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:editoriale",
+      "code": 0,
+      "secondes": 5.26,
+      "assertions_ok": 10,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:diagnostic",
+      "code": 0,
+      "secondes": 5.51,
+      "assertions_ok": 28,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:purge",
+      "code": 0,
+      "secondes": 5.21,
+      "assertions_ok": 99,
+      "abstention": true
+    },
+    {
+      "commande": "npm run smoke:montee",
+      "code": 0,
+      "secondes": 4.04,
+      "assertions_ok": 66,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:depot",
+      "code": 0,
+      "secondes": 3.24,
+      "assertions_ok": 43,
+      "abstention": false
+    },
+    {
+      "commande": "npm run sandbox:paiement",
+      "code": 0,
+      "secondes": 0.48,
+      "assertions_ok": 0,
+      "abstention": true
+    }
+  ],
+  "recette_http": {
+    "http": 200,
+    "reponse": {
+      "relue": false,
+      "disponible": true,
+      "remarques": null
+    },
+    "appels": 1,
+    "versionNonDatee": true,
+    "aucuneRemarque": true,
+    "solde": 30,
+    "debits": 1,
+    "rendus": 1,
+    "mesure": "PARTIELLE",
+    "entree": 120,
+    "sortie": null
+  },
+  "recette_chromium": {
+    "desktop": true,
+    "tablette": true,
+    "alertes": 2,
+    "erreursJS": [],
+    "mesureAvecTarif": "indisponible",
+    "mobile": {
+      "largeur": 390,
+      "contenu": 531
+    },
+    "mobileAReprendre": "REV11-L7"
+  },
+  "limites": [
+    "DIA-05 reste L3",
+    "DIA-07 reste L4",
+    "B-07 mobile 390 px : contenu 531 px, reprise L7",
+    "Aucun fournisseur/OAuth/facture/DPA/paiement réel",
+    "Aucune image, fusion ni déploiement L2",
+    "Q.A/M.C inchangés"
+  ],
+  "ci": {
+    "statut": "à relever dans le corps de la PR après publication",
+    "portee": "ce JSON consigne les preuves locales antérieures à la PR"
+  }
+}

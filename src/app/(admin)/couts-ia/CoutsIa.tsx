@@ -86,6 +86,7 @@ export function CoutsIa({
 }: CoutsIaProps) {
   const vide = aucuneMesure(metriques);
   const sansAppel = serieVide(serie);
+  const aRapprocher = parFournisseur.reduce((n, l) => n + (l.appelsARapprocher ?? 0), 0);
   /*
     Sans tarif, la marge n'existe pas : `partDuPrix` vaut `null`, et une
     ligne « marge » ne peut pas en sortir. Le filtre est là quand même —
@@ -100,7 +101,9 @@ export function CoutsIa({
       <EnteteAdmin
         titre="Coûts IA"
         resume={
-          vide
+          aRapprocher > 0
+            ? "Consommation partiellement mesurée : des appels demandent un rapprochement."
+            : vide
             ? "Aucune mesure enregistrée : l'écran attend les premières écritures dans AiUsage."
             : tarife
               ? "Consommation et coûts de la période."
@@ -109,6 +112,18 @@ export function CoutsIa({
       />
 
       <div className="flex flex-col gap-5 p-6">
+        {aRapprocher > 0 ? (
+          <section role="alert" className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
+            <h2 className="text-16 font-semibold text-ink-900">Consommation à rapprocher</h2>
+            <p className="max-w-lecture-large text-pretty text-14 text-ink-700">
+              {NOMBRE.format(aRapprocher)} appel{aRapprocher > 1 ? "s" : ""} avec une mesure absente, partielle, invalide ou un zéro historique non qualifié.
+              Les jetons affichés sont uniquement ceux observés ; les coûts et les ratios incomplets restent indisponibles.
+            </p>
+            <p className="max-w-lecture-large text-pretty text-13 text-ink-500">
+              Exporter les appels et les rapprocher du relevé fournisseur. Ne pas relancer l&apos;IA pour reconstruire une consommation passée.
+            </p>
+          </section>
+        ) : null}
         {tarife ? null : (
           <section className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
             <h2 className="text-16 font-semibold text-ink-900">
@@ -177,7 +192,9 @@ export function CoutsIa({
               {MENTION_DEPASSEMENTS_NON_CALCULABLES} {MENTION_QUOTA_SANS_TARIF}
             </p>
           ) : null}
-          {audela.length === 0 ? (
+          {audela.length === 0 && aRapprocher > 0 ? (
+            <p className="text-14 text-ink-700">Des mesures incomplètes empêchent de conclure sur tous les dépassements.</p>
+          ) : audela.length === 0 ? (
             <p className="text-14 text-ink-700">{MENTION_AUCUN_DEPASSEMENT}</p>
           ) : (
             <>
@@ -265,10 +282,11 @@ function Histogramme({ serie }: { serie: readonly Journee[] }) {
         <li
           key={j.jour}
           className="flex h-full flex-1 flex-col justify-end border-b-2 border-ink-300"
-          title={`${jourEnFrancais(j.jour)} · ${nombre.format(j.jetons)} jetons`}
+          title={`${jourEnFrancais(j.jour)} · ${nombre.format(j.jetons)} jetons${j.appelsARapprocher ? " observés, mesure incomplète" : ""}`}
         >
           <span className="sr-only">
             {jourEnFrancais(j.jour)} : {nombre.format(j.jetons)} jetons,{" "}
+            {j.appelsARapprocher ? `${j.appelsARapprocher} appel(s) à rapprocher, ` : ""}
             {j.appels === 0
               ? "aucun appel"
               : `${nombre.format(j.appels)} appel${j.appels > 1 ? "s" : ""}`}
@@ -377,10 +395,12 @@ function FournisseursIA({
                       {l.modele ?? "non consigné (avant S.94)"}
                     </td>
                     <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.appels)}</td>
-                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsEntree)}</td>
-                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsSortie)}</td>
+                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsEntree)}{l.appelsARapprocher ? " observés · incomplet" : ""}</td>
+                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsSortie)}{l.appelsARapprocher ? " observés · incomplet" : ""}</td>
                     <td className="px-3 py-2 text-right text-ink-900">
-                      {l.coutMicros === null || l.devise === null
+                      {l.appelsARapprocher
+                        ? "mesure à rapprocher"
+                        : l.coutMicros === null || l.devise === null
                         ? "sans tarif"
                         : `${MONTANT.format(l.coutMicros / 1_000_000)} ${l.devise}`}
                     </td>

@@ -304,6 +304,7 @@ drapeau compatible seul n'identifie pas une société ou une région validée.
 - RG-06.12 : le candidat signale une erreur de lecture en désignant, parmi les valeurs montrées, celles qui sont fausses, ou « autre chose » ; il ne saisit pas la bonne valeur. Le signalement ouvre la revue manuelle de la lecture affichée (motif « Signalé par le candidat »), une seule par lecture, ne consomme pas d'analyse, se trace au journal au nom du candidat, et n'est plus possible sur un dossier déposé ou clos. L'opérateur voit en B-05 les valeurs désignées. L'historique des versions de la pièce se consulte en lecture seule (S.157, RF-5, R-03). Le signalement transmet l'identité de cette lecture (`analyseId`) ; si la lecture courante a changé, la demande est refusée avant écriture et le candidat doit recharger la page (RC-02, 10/10/2026).
 - RG-06.13 : un envoi coupé par le réseau repart de lui-même, une fois, avec le même fichier : au retour du réseau, ou après cinq secondes si le navigateur se dit en ligne. Hors ligne sans envoi en cours, l'écran ne promet pas d'envoi automatique ; une relance qui échoue aussi laisse la main au candidat (« Réessayer l'envoi ») (S.157, RF-5, R-02).
 - RG-06.14 : le moteur de balayage est éprouvé (fichier d'essai EICAR) au démarrage du worker, puis à chaque heure. Trouvé muet au démarrage, il est réessayé toutes les 30 s pendant 10 min, sans relance du worker ; tant qu'il n'est pas reconnu, l'instance se dit inapte et les pièces attendent en quarantaine, sans arrêter ni la purge ni les paiements. Un déploiement attend clamd et la passerelle 300 s au plus, et ne revient pas en arrière pour un clamd encore en chargement ; il le dit au journal (S.161, RF-7).
+- RG-06.15 (S.173, REV11-L2) : une réponse reçue avec mesure absente, partielle ou invalide ne publie pas de verdict automatique ; revue humaine, cause permanente et rendu du débit réellement dû, sans relance automatique pour cette cause. La mesure connue est conservée même sur contenu refusé. Un vrai zéro est distingué des compteurs inconnus `NULL` ; aucun usage historique n'est requalifié automatiquement. Voir [procédure de mesure IA](exploitation/mesure-ia.md).
 
 **Cas limites**
 
@@ -370,6 +371,7 @@ drapeau compatible seul n'identifie pas une société ou une région validée.
 - RG-08.5 : la rédaction assistée — proposition de texte à partir des réponses, reformulation, analyse critique, recoupements qui exigent la lecture automatique de pièces — est un droit des packs Dossier et Dossier Pro, dérivé de la couverture attribuée au dossier et jamais du dernier pack acheté par le compte. Une recharge d'analyses ne l'ouvre pas. Tous les packs gardent l'entretien guidé, l'écriture et la réécriture manuelles, les versions, les exports et les recoupements déterministes. Un refus ne perd jamais les réponses, le texte ni les versions (arbitrage S.80).
 - RG-08.6 : le fournisseur de la mise en forme et de la relecture est choisi par l'exploitant (`AI_FOURNISSEUR_REDACTION`) : Anthropic par défaut, ou une API compatible OpenAI. Les consignes, le schéma de la relecture et la lecture des réponses sont les mêmes quel que soit le fournisseur ; une réponse hors schéma, coupée ou refusée ne produit ni version ni avis. Aucune bascule automatique vers un autre fournisseur (arbitrage S.94).
 - RG-08.7 : le débit d'une mise en forme ou d'une relecture réserve l'analyse jusqu'à une échéance de trente minutes, posée avant l'appel. L'issue la solde dans la même écriture : le texte devenu version, l'avis daté, ou le rendu d'un échec. Une réservation restée sans issue à l'échéance — processus interrompu — est rendue par la reprise horaire, une seule fois ; le débit garde la trace de la rédaction, que lit le remboursement d'une montée. Les débits antérieurs ne sont pas repris (S.153, RF-4).
+- RG-08.8 (S.173, REV11-L2) : sans mesure complète valide de la réponse, la mise en forme ne publie aucune version et la relecture ne date aucun avis ni aucune remarque ; réservation rendue, consommation observée conservée. Les recoupements déterministes restent disponibles.
 
 ---
 
@@ -555,6 +557,7 @@ ORDER BY next_review_at;
 
 - RG-16.1 : le coût marginal moyen d'un dossier doit rester inférieur à 15 % du prix du pack correspondant.
 - RG-16.2 : tout dépassement individuel déclenche une analyse — c'est souvent le signe d'un usage détourné ou d'une boucle de correction mal bornée.
+- RG-16.3 (S.173, REV11-L2) : les mesures incomplètes et les zéros historiques non qualifiés déclenchent une alerte de rapprochement dans B-07. Coûts et ratios incomplets restent indisponibles, même avec tarif ; l'export distingue mesure inconnue et vrai zéro. Le rapprochement ne rappelle pas le modèle et ne modifie aucun historique automatiquement.
 
 ---
 

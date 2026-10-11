@@ -1,3 +1,4 @@
+import { usageARapprocher } from "@/domain/ia/usage";
 import { nomDatable, nombre, texte, vide, type Cellule } from "@/domain/format/csv";
 import { jourCivil } from "@/domain/format/fuseau";
 import { coutMicrosDesJetons, type TarifIA } from "@/domain/backoffice/couts";
@@ -52,10 +53,11 @@ export interface AppelIA {
   /** Déjà résolu : une ligne antérieure à S.94 vaut le fournisseur par défaut. */
   fournisseur: CodeFournisseur;
   modele: string | null;
-  jetonsEntree: number;
-  jetonsSortie: number;
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
   /** La référence du dossier, nulle pour un appel qui n'en a pas. */
   dossierId: string | null;
+  mesure?: string | null;
 }
 
 const JOUR_ISO = /^(\d{4})-(\d{2})-(\d{2})$/u;
@@ -107,10 +109,11 @@ export const COLONNES_APPELS: readonly string[] = [
   "Coût",
   "Devise",
   "Dossier",
+  "Mesure",
 ];
 
 export const MENTION_COUT_RECALCULE =
-  "Coût recalculé à la lecture, au tarif en vigueur le jour de l'export. Une cellule vide signifie que le fournisseur n'a pas de tarif de jeton : ce n'est pas un coût nul.";
+  "Coût recalculé à la lecture, au tarif en vigueur le jour de l'export. Une cellule de coût vide signifie un tarif absent ou une mesure à rapprocher ; une cellule de jetons vide signifie un compteur inconnu. Ce ne sont pas des zéros.";
 
 export const MENTION_SANS_DONNEE_CANDIDAT_EXPORT =
   "Aucune donnée de candidat dans ce fichier : ni compte, ni nom, ni nature d'opération. La référence du dossier est celle de l'écran B-07.";
@@ -123,17 +126,18 @@ type Tarifs = (fournisseur: CodeFournisseur) => TarifIA | null;
 /** Un appel, en cellules. Le coût est celui de **son** fournisseur, jamais d'un autre. */
 export function ligneDeLAppel(a: AppelIA, tarifs: Tarifs): readonly Cellule[] {
   const tarif = tarifs(a.fournisseur);
-  const micros = coutMicrosDesJetons(tarif, a.jetonsEntree, a.jetonsSortie);
+  const micros = usageARapprocher(a.mesure, a.jetonsEntree, a.jetonsSortie) ? null : coutMicrosDesJetons(tarif, a.jetonsEntree, a.jetonsSortie);
   return [
     texte(a.horodatage),
     texte(jourDeLAppel(a)),
     texte(FOURNISSEURS[a.fournisseur].libelle),
     texte(a.modele ?? MODELE_NON_CONSIGNE),
-    nombre(a.jetonsEntree),
-    nombre(a.jetonsSortie),
+    a.jetonsEntree === null ? vide : nombre(a.jetonsEntree),
+    a.jetonsSortie === null ? vide : nombre(a.jetonsSortie),
     micros === null ? vide : nombre(micros / 1_000_000, 6),
     tarif === null ? vide : texte(tarif.devise),
     texte(a.dossierId ?? SANS_DOSSIER),
+    texte(a.mesure ?? "historique non qualifié"),
   ];
 }
 
@@ -149,12 +153,12 @@ export function exportDesAppels(
   tarifs: Tarifs,
 ): readonly (readonly Cellule[])[] {
   const tries = [...appels].sort((a, b) => a.horodatage.localeCompare(b.horodatage));
-  const jetons = tries.reduce((s, a) => s + a.jetonsEntree + a.jetonsSortie, 0);
+  const jetons = tries.reduce((s, a) => s + Math.max(0, a.jetonsEntree ?? 0) + Math.max(0, a.jetonsSortie ?? 0), 0);
   return [
     [texte("Détail des appels IA ImmiPro")],
     [texte("Période"), texte(`du ${periode.du} au ${periode.au}`)],
     [texte("Appels"), nombre(tries.length)],
-    [texte("Jetons (entrée + sortie)"), nombre(jetons)],
+    [texte("Jetons observés (entrée + sortie)"), nombre(jetons)],
     [texte("Coût"), texte(MENTION_COUT_RECALCULE)],
     [texte("Confidentialité"), texte(MENTION_SANS_DONNEE_CANDIDAT_EXPORT)],
     ...(tries.length === 0

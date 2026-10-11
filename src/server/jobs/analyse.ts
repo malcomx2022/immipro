@@ -1,6 +1,7 @@
 import type { Prisma, ReviewReason } from "@prisma/client";
 import { db } from "@/lib/db";
 import { noterLesJetons } from "@/server/ia/appel";
+import { DETAIL_MESURE_INCOMPLETE } from "@/domain/ia/usage";
 import { payload } from "@/server/acces/regles";
 import { lectureAPayer } from "@/server/dossiers/reprise-gratuite";
 import {
@@ -277,12 +278,12 @@ export async function analyserUnePiece(
   }
   const entame = debit?.octroi ?? null;
 
-  const lu = await extraire(
+  let lu = await extraire(
     { objectKey: version.objectKey, mimeType: version.mimeType },
     demande,
   );
 
-  await noterLesJetons(
+  const mesure = await noterLesJetons(
     application.userId,
     tache.applicationId,
     `analyse:${document.code}`,
@@ -290,6 +291,10 @@ export async function analyserUnePiece(
     lu.jetonsSortie,
     lu.appel,
   );
+  if (lu.etat === "LUE" && mesure.etat !== "CONNUE") {
+    lu = { ...lu, etat: "NON_LUE", cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE,
+      jetonsEntree: mesure.jetonsEntree, jetonsSortie: mesure.jetonsSortie };
+  }
 
   if (lu.etat === "NON_LUE") {
     const tentatives = version.analysisAttempts + 1;
@@ -333,8 +338,9 @@ export async function analyserUnePiece(
           title: "Cette pièce demande une relecture",
           body: MESSAGE_AU_CANDIDAT[lu.cause],
           engineLog: `${MOTIF_DE_NON_LECTURE[lu.cause]} — ${lu.detail}`,
-          inputTokens: lu.jetonsEntree,
-          outputTokens: lu.jetonsSortie,
+          inputTokens: lu.appel ? mesure.jetonsEntree : lu.jetonsEntree,
+          outputTokens: lu.appel ? mesure.jetonsSortie : lu.jetonsSortie,
+          usageState: lu.appel ? mesure.etat : null,
           // Rien n'a été pris sur ce chemin : ni par le débit quand la
           // reprise est gratuite, ni après le rendu ci-dessous.
           creditConsumed: false,
@@ -475,8 +481,9 @@ export async function analyserUnePiece(
         fields: lu.bruts as never,
         title: verdict.titre,
         body: verdict.corps,
-        inputTokens: lu.jetonsEntree,
-        outputTokens: lu.jetonsSortie,
+        inputTokens: mesure.jetonsEntree,
+        outputTokens: mesure.jetonsSortie,
+        usageState: mesure.etat,
       },
     });
     /*

@@ -33,6 +33,7 @@ import { spawnSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Client } from "pg";
+import { jourCivil } from "../src/domain/format/fuseau";
 
 const source = process.env.DATABASE_URL;
 if (!source) {
@@ -375,6 +376,75 @@ const analyseDe = (versionId: string) =>
 let premiere!: Awaited<ReturnType<typeof piece>>;
 
 try {
+  console.log("\nREV11-L2 : mesure explicite, publication prudente et grand livre réel");
+  {
+    const { coutsParDossier, consommationParFournisseur, appelsDeLaPeriode } = await import("../src/server/lecture/backoffice");
+    const contenu = { piece_identifiee: "passeport", obstacle: null, champs: { passeport_validite_min: "2029-03-01" } };
+    const cas = [
+      { nom: "absente", entree: undefined, sortie: undefined, etat: "INCONNUE", e: null, s: null },
+      { nom: "partielle", entree: 120, sortie: undefined, etat: "PARTIELLE", e: 120, s: null },
+      { nom: "négative", entree: -12, sortie: 30, etat: "INVALIDE", e: null, s: 30 },
+      { nom: "fractionnaire", entree: 120, sortie: 1.5, etat: "INVALIDE", e: 120, s: null },
+      { nom: "hors INTEGER", entree: 2 ** 31, sortie: 30, etat: "INVALIDE", e: null, s: 30 },
+      { nom: "enveloppe vide", entree: 120, sortie: 30, etat: "CONNUE", e: 120, s: 30, vide: true },
+      { nom: "vrai zéro", entree: 0, sortie: 0, etat: "CONNUE", e: 0, s: 0 },
+    ];
+    for (const fournisseur of ["anthropic", "openai_compatible"] as const) {
+      for (const c of cas) {
+        recusParLeService.length = 0;
+        const corps = fournisseur === "anthropic"
+          ? { ...JSON.parse(reponseDeLecture(contenu).corps), content: c.vide ? [] : [{ type: "text", text: JSON.stringify(contenu) }], usage: { input_tokens: c.entree, output_tokens: c.sortie } }
+          : { choices: c.vide ? [] : [{ message: { content: JSON.stringify(contenu) }, finish_reason: "stop" }], usage: { prompt_tokens: c.entree, completion_tokens: c.sortie } };
+        reponseDuService = { statut: 200, corps: JSON.stringify(corps) };
+        const p = await piece({ dateCible: "2027-09-01" });
+        const extracteur = fournisseur === "anthropic" ? lExtracteur() : lExtracteur({
+          AI_FOURNISSEUR_EXTRACTION: fournisseur, AI_OPENAI_URL: `http://127.0.0.1:${portService}/v1`,
+          AI_OPENAI_MODEL: "modele-essai", AI_OPENAI_API_KEY: "cle-d-essai", AI_OPENAI_PDF: "oui",
+          AI_PIECES_SOUS_TRAITANT_AUTORISE: fournisseur, AI_OPENAI_ORIGINE_AUTORISEE: `http://127.0.0.1:${portService}`,
+        });
+        const suite = await analyserUnePiece(p.tache, extracteur);
+        const analyse = await analyseDe(p.version.id);
+        const usage = await db.aiUsage.findFirstOrThrow({ where: { applicationId: p.application.id } });
+        const vraiZero = c.nom === "vrai zéro";
+        verifier(suite === "TERMINEE" && recusParLeService.length === 1,
+          `${fournisseur}/${c.nom} : aucun échec SQL ni reprise automatique après appel`);
+        verifier(usage.usageState === c.etat && usage.inputTokens === c.e && usage.outputTokens === c.s && usage.provider === fournisseur,
+          `${fournisseur}/${c.nom} : mesure conservée, NULL distinct de zéro`);
+        verifier(analyse?.usageState === c.etat && analyse.inputTokens === c.e && analyse.outputTokens === c.s,
+          `${fournisseur}/${c.nom} : l'historique d'analyse porte la même mesure`);
+        verifier(analyse?.verdict === (vraiZero ? "CONFORME" : "ILLISIBLE") && analyse.creditConsumed === vraiZero,
+          `${fournisseur}/${c.nom} : publication seulement avec mesure et contenu valides`);
+        const mouvements = await db.analysisCredit.findMany({ where: { applicationId: p.application.id } });
+        verifier(await solde(p.application.id) === (vraiZero ? 4 : 5) && mouvements.filter(m => m.delta === -1).length === 1 && mouvements.filter(m => m.delta === 1).length === (vraiZero ? 0 : 1),
+          `${fournisseur}/${c.nom} : D1 en analyses, débit/rendu réels uniques`);
+        const tarif = { entreeParMillion: 3, sortieParMillion: 15, devise: "EUR" };
+        const ligne = (await coutsParDossier(tarif)).find(l => l.dossierId === p.application.id)!;
+        verifier(ligne.appelsARapprocher === (c.etat === "CONNUE" ? 0 : 1) &&
+          ligne.coutMicros === (c.etat === "CONNUE" ? c.e! * 3 + c.s! * 15 : null),
+          `${fournisseur}/${c.nom} : B-07 garde le coût connu et signale les inconnus`);
+        await analyserUnePiece(p.tache, extracteur);
+        verifier(recusParLeService.length === 1 && await db.aiUsage.count({ where: { applicationId: p.application.id } }) === 1 && await solde(p.application.id) === (vraiZero ? 4 : 5),
+          `${fournisseur}/${c.nom} : rejeu sans appel ni mesure ni rendu supplémentaire`);
+      }
+    }
+    // Deux workers avant le verdict : chaque appel réel garde son usage ; le
+    // grand livre et le verdict restent uniques, sans crédit offert par la course.
+    reponseDuService = { statut: 200, corps: JSON.stringify({ ...JSON.parse(reponseDeLecture(contenu).corps), usage: { input_tokens: 120 } }) };
+    const q = await piece({ dateCible: "2027-09-01" });
+    recusParLeService.length = 0;
+    await Promise.all([analyserUnePiece(q.tache, lExtracteur()), analyserUnePiece(q.tache, lExtracteur())]);
+    const mouvements = await db.analysisCredit.findMany({ where: { applicationId: q.application.id } });
+    verifier(await solde(q.application.id) === 5 && mouvements.filter(m => m.delta === -1).length === 1 && mouvements.filter(m => m.delta === 1).length === 1,
+      "L2/concurrence : une réservation rendue exactement une fois");
+    verifier(await db.documentAnalysis.count({ where: { versionId: q.version.id } }) === 1 &&
+      await db.aiUsage.count({ where: { applicationId: q.application.id } }) === recusParLeService.length,
+      "L2/concurrence : un verdict, une mesure par appel réellement parti");
+    verifier((await consommationParFournisseur({ entreeParMillion: 3, sortieParMillion: 15, devise: "EUR" })).every(l => l.coutMicros === null && (l.appelsARapprocher ?? 0) > 0),
+      "L2/B-07 : total fournisseur incomplet indisponible même avec tarif");
+    const jour = jourCivil(new Date());
+    verifier((await appelsDeLaPeriode({ du: jour, au: jour })).some(l => l.mesure === "PARTIELLE" && l.jetonsSortie === null),
+      "L2/export : état et compteur absent remontent sans zéro inventé");
+  }
   console.log("\nREV11-L1 : refus de renvoi, rendu de quota et revue par le vrai job");
   {
     let appelsAuRenvoi = 0;

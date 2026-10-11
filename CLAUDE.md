@@ -79,6 +79,26 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.173 / REV11-L2 — mesure des usages.** Autorisation « L2 », main
+`47b39b0` relu : S.171/S.172 et #278 intégrés, aucune PR concurrente au
+démarrage. Base finale `16636d4` : #279 conserve le relevé Claude du
+déploiement pilote L1 ; aucun changement de code par ce relevé. Lire [le suivi L2](docs/revue/lot-l2-2026-10-11.md) et
+[la procédure de mesure](docs/exploitation/mesure-ia.md).
+Politique de publication retenue : réponse reçue sans mesure complète
+valide → aucune publication automatique, revue humaine en extraction,
+aucun texte/avis daté en rédaction ; quota réellement dû rendu, sans
+relance automatique pour cette cause. D1 reste en analyses.
+Conserver le validateur pur et les états `CONNUE`, `PARTIELLE`, `INCONNUE`,
+`INVALIDE` ; inconnus en `NULL`, vrai zéro enregistré, mesure conservée
+avant validation du contenu et après interruption du flux. Ne pas
+réécrire les états nuls historiques. B-07 signale le rapprochement et
+son export distingue les inconnus. Migration avant app/worker ;
+`smoke:usages-ia` dans la porte, diagnostic en lecture seule dans l'image.
+DIA-01/02/03 passent ; DIA-05 reste L3, DIA-07 reste L4. Aucune attente
+historique des tests de transport Claude n'est assouplie. Mobile B-07
+390 px : débordement à reprendre en L7. Proposition L2 sans fusion,
+déploiement ni levée Q.A/M.C. Prochain lot : L3.
+
 **S.172 / complément REV11-L1, PR #277.** Claude a ouvert #276 / S.171
 pendant le travail L1. Cette proposition est désormais basée sur sa branche
 `claude/elegant-dijkstra-86egeb`, sans remplacer son lot ou son arbitrage.

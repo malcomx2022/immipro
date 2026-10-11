@@ -408,6 +408,7 @@ export interface ConsommationDuFournisseur {
   fournisseur: CodeFournisseur;
   modele: string | null;
   appels: number;
+  appelsARapprocher?: number;
   jetonsEntree: number;
   jetonsSortie: number;
   /** Au tarif de ce fournisseur ; `null` sans tarif — jamais zéro. */

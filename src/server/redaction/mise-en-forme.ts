@@ -8,6 +8,7 @@ import type { PieceARediger } from "@/server/lecture/redaction";
 import type { Redacteur } from "./adaptateur";
 import { leRedacteur } from "./service";
 import { noterLesJetons } from "./usage";
+import { DETAIL_MESURE_INCOMPLETE } from "@/domain/ia/usage";
 
 /**
  * La mise en forme d'une pièce, du débit au texte — WF-08 étape 3 ; revue
@@ -54,7 +55,7 @@ export async function mettreEnForme(
     reserveJusquA: echeanceDeLaReservation(new Date()),
   });
 
-  const produit = await redacteur({
+  let produit = await redacteur({
     // La pièce et la destination sont nommées : ce qui écrit pour le
     // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
     piece: piece.libelle,
@@ -75,7 +76,7 @@ export async function mettreEnForme(
     Un appel interrompu, ou un texte écarté, a coûté ; ne pas l'écrire en
     ferait un appel gratuit dans B-07.
   */
-  await noterLesJetons(
+  const mesure = await noterLesJetons(
     acteurId,
     dossierId,
     `redaction:${piece.type}`,
@@ -83,6 +84,9 @@ export async function mettreEnForme(
     produit.jetonsSortie,
     produit.appel,
   );
+  if (produit.etat === "ECRITE" && mesure.etat !== "CONNUE") {
+    produit = { ...produit, etat: "SANS_TEXTE", cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE };
+  }
 
   if (produit.etat === "SANS_TEXTE") {
     /**

@@ -87,14 +87,16 @@ export function tarifDepuisEnvironnement(
 /** Coût de jetons déjà consommés, en micro-unités. `null` sans tarif. */
 export function coutMicrosDesJetons(
   tarif: TarifIA | null,
-  jetonsEntree: number,
-  jetonsSortie: number,
+  jetonsEntree: number | null,
+  jetonsSortie: number | null,
 ): number | null {
-  if (tarif === null) return null;
+  if (tarif === null || jetonsEntree === null || jetonsSortie === null ||
+    !Number.isInteger(jetonsEntree) || !Number.isInteger(jetonsSortie) || jetonsEntree < 0 || jetonsSortie < 0) return null;
   const unites =
     (jetonsEntree * tarif.entreeParMillion + jetonsSortie * tarif.sortieParMillion) /
     1_000_000;
-  return Math.round(unites * 1_000_000);
+  const cout = Math.round(unites * 1_000_000);
+  return Number.isSafeInteger(cout) && cout >= 0 ? cout : null;
 }
 
 /* ── Le quota du pack, la grandeur qui tient sans tarif ──────────────── */
@@ -327,6 +329,7 @@ export function plafondQuotidien(depenses: readonly number[]): number | null {
 
 /** Une journée de consommation. Les jetons se comptent sans tarif. */
 export interface Journee {
+  appelsARapprocher?: number;
   /** ISO court, `AAAA-MM-JJ`. */
   jour: string;
   jetons: number;
