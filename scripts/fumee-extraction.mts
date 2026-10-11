@@ -742,6 +742,116 @@ try {
   }
 
   /*
+    REV11-L2, S.173 — 11/10/2026. Une mesure inconnue n'est pas une
+    consommation nulle. Reproduit sur main `47b39b0` : une réponse sans
+    mesure était publiée à 0/0 et ne laissait aucune ligne au grand livre ;
+    des compteurs négatifs, fractionnaires ou hors entier partaient vers
+    des colonnes entières, et l'écriture échouait en SQL **après** l'appel —
+    le job se rejouait, et l'appel se payait deux fois.
+  */
+  console.log("\nREV11-L2 : mesure absente, partielle ou invalide, par le vrai job");
+  {
+    const LU = { piece_identifiee: "passeport", obstacle: null, champs: { passeport_validite_min: "2029-03-01" } };
+    const avecMesure = (usage: unknown): ReponseDuService => {
+      const message = JSON.parse(reponseDeLecture(LU).corps) as Record<string, unknown>;
+      if (usage === undefined) delete message.usage;
+      else message.usage = usage;
+      return { statut: 200, corps: JSON.stringify(message) };
+    };
+    const usagesDe = (applicationId: string) => db.aiUsage.findMany({ where: { applicationId } });
+
+    // Sans mesure : la lecture est publiée (arbitrage du 11/10), l'analyse
+    // reste débitée (D1), et l'appel est inscrit avec un usage inconnu.
+    {
+      recusParLeService.length = 0;
+      reponseDuService = avecMesure(undefined);
+      const p = await piece({ dateCible: "2027-09-01" });
+      const suite = await analyserUnePiece(p.tache, lExtracteur());
+      const analyse = await analyseDe(p.version.id);
+      const usages = await usagesDe(p.application.id);
+      verifier(suite === "TERMINEE" && recusParLeService.length === 1, `sans mesure : un appel, une issue (${suite})`);
+      verifier((await relireDocument(p.document.id)).status === "CONFORME", "sans mesure : la lecture est publiée");
+      verifier(
+        analyse?.usageMeasure === "INCONNUE" && analyse.creditConsumed === true,
+        `sans mesure : l'analyse le dit (${analyse?.usageMeasure}) et reste débitée`,
+      );
+      verifier(
+        usages.length === 1 && usages[0]!.usageMeasure === "INCONNUE" && usages[0]!.provider === "anthropic",
+        `sans mesure : l'appel est inscrit, usage inconnu (${usages.map((u) => u.usageMeasure).join(",")})`,
+      );
+      verifier((await solde(p.application.id)) === 4, "sans mesure : le quota se compte en analyses (D1)");
+    }
+
+    // Une mesure partielle garde sa part connue.
+    {
+      reponseDuService = avecMesure({ input_tokens: 4210 });
+      const p = await piece({ dateCible: "2027-09-01" });
+      await analyserUnePiece(p.tache, lExtracteur());
+      const [u] = await usagesDe(p.application.id);
+      verifier(
+        u?.usageMeasure === "ENTREE_SEULE" && u.inputTokens === 4210 && u.outputTokens === 0,
+        `mesure partielle : la part connue est inscrite (${u?.usageMeasure} ${u?.inputTokens}/${u?.outputTokens})`,
+      );
+    }
+
+    // Un zéro mesuré est une mesure : il s'inscrit (il était ignoré).
+    {
+      reponseDuService = avecMesure({ input_tokens: 0, output_tokens: 0 });
+      const p = await piece({ dateCible: "2027-09-01" });
+      await analyserUnePiece(p.tache, lExtracteur());
+      const usages = await usagesDe(p.application.id);
+      verifier(
+        usages.length === 1 && usages[0]!.usageMeasure === "MESUREE",
+        `zéro mesuré : l'appel est inscrit (${usages.length})`,
+      );
+    }
+
+    // Une mesure invalide : aucune erreur SQL, aucun rejeu payé, revue
+    // humaine et analyse rendue ; la part connue reste inscrite.
+    for (const [cas, usage, entree] of [
+      ["négative et fractionnaire", { input_tokens: -12, output_tokens: 1.5 }, 0],
+      ["hors entier SQL", { input_tokens: 1e12, output_tokens: 96 }, 0],
+      ["en chaîne", { input_tokens: "4210", output_tokens: 96 }, 0],
+    ] as const) {
+      recusParLeService.length = 0;
+      reponseDuService = avecMesure(usage);
+      const p = await piece({ dateCible: "2027-09-01" });
+      let suite: string;
+      try {
+        suite = await analyserUnePiece(p.tache, lExtracteur());
+      } catch (erreur) {
+        suite = `erreur : ${(erreur as Error).message.split("\n")[0]}`;
+      }
+      const document = await relireDocument(p.document.id);
+      const analyse = await analyseDe(p.version.id);
+      const revues = await db.manualReview.count({ where: { analysisId: analyse?.id ?? "" } });
+      const usages = await usagesDe(p.application.id);
+      verifier(suite === "TERMINEE", `mesure ${cas} : le job s'achève sans erreur SQL ni reprise (${suite})`);
+      verifier(
+        document.status === "ILLISIBLE" && analyse?.creditConsumed === false && revues === 1,
+        `mesure ${cas} : revue humaine, analyse non débitée (${document.status})`,
+      );
+      verifier(
+        (analyse?.engineLog ?? "").includes("nombre entier de jetons"),
+        `mesure ${cas} : le journal dit pourquoi (${analyse?.engineLog})`,
+      );
+      verifier((await solde(p.application.id)) === 5, `mesure ${cas} : l'analyse est rendue`);
+      verifier(
+        usages.length === 1 &&
+          usages[0]!.inputTokens === entree &&
+          usages[0]!.outputTokens === 96 * Number(cas !== "négative et fractionnaire") &&
+          usages[0]!.usageMeasure === (cas === "négative et fractionnaire" ? "INCONNUE" : "SORTIE_SEULE"),
+        `mesure ${cas} : l'appel est inscrit avec sa part connue (${usages.map((u) => `${u.usageMeasure} ${u.inputTokens}/${u.outputTokens}`).join(",")})`,
+      );
+      const rejeu = await analyserUnePiece(p.tache, lExtracteur());
+      verifier(
+        rejeu === "TERMINEE" && recusParLeService.length === 1 && (await usagesDe(p.application.id)).length === 1,
+        `mesure ${cas} : un rejeu ne rappelle pas le modèle (${recusParLeService.length} appel)`,
+      );
+    }
+  }
+
+  /*
     RF-2, FON-02 — 09/10/2026. Une version ancienne ne commande pas
     la pièce courante. L'analyse vérifiait que sa version n'avait pas déjà
     de verdict, jamais qu'elle était encore la dernière : le verdict d'une

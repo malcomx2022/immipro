@@ -13398,3 +13398,72 @@ Le déploiement intermédiaire de `c8f19e2` (run 541, S.171 seul) a lui aussi ab
 **Non vérifié.**
 - La configuration IA du pilote, à relever par le responsable dans B-07. Si l'extraction y passe par `openai_compatible`, il faut poser `AI_OPENAI_ORIGINE_AUTORISEE`. Sans elle, les pièces partent en revue humaine.
 - Aucun appel réel à un fournisseur, et aucun dépôt de pièce sur le pilote.
+
+## S.173 — REV11-L2 : mesure des usages IA (REV-IA-01, INV-6/D1, WF-06/08/16)
+
+**Autorisation.** Le 11/10/2026, à « L2 », troisième lot du chantier REV11. Main relu : `47b39b0`, avec S.171 (#276) et S.172 (#277, porté sur main par #278) fusionnés et déployés. La PR de relevé #279 était ouverte, sans code. Le lot prend S.173. Il conserve Prisma 7, pg-boss 12, le banc de S.170 et les gardes de S.171/S.172.
+
+**Arbitrages du responsable (11/10).**
+- Une réponse valide **sans mesure** est publiée : l'appel est inscrit avec un usage inconnu, et B-07 demande un rapprochement. Le quota se compte en analyses (D1) et n'en dépend pas.
+- L'état de la mesure est une **colonne additive**. L'énumération `MesureDUsage` (`MESUREE`, `ENTREE_SEULE`, `SORTIE_SEULE`, `INCONNUE`) est portée par `AiUsage.usageMeasure` et `DocumentAnalysis.usageMeasure`. Elle reste nulle sur l'historique, qui n'est jamais réécrit.
+- L'état « partiel » proposé a été précisé en deux valeurs, pour que l'export sache quel compteur manque.
+
+**Reproduit d'abord, sur `47b39b0`.**
+- Le diagnostic `scripts/recette/diagnostic-ia.mts` constate trois anomalies :
+  - DIA-01 : une réponse sans mesure est lue `LUE` à 0/0 ;
+  - DIA-02 : des compteurs −12/1,5 sont lus `LUE` à −12/1,5 ;
+  - DIA-03 : une enveloppe sans choix donne `NON_LUE` à 0/0, au lieu des 120/30 jetons annoncés.
+- L'ancien `noterLesJetons` ignorait tout appel à 0/0 : un appel sans mesure disparaissait de B-07.
+- Écriture directe au grand livre :
+  - −12/1,5 est enregistré −12/1, sans erreur ;
+  - 10¹² lève une erreur SQL (« out of range for type integer ») **après** l'appel. L'écriture précède la consignation dans le job : il échouait, la file le rejouait, et l'appel était payé deux fois.
+
+**Correction.**
+- Le domaine pur `src/domain/ia/usage.ts` lit chaque compteur comme connu, absent ou invalide :
+  - connu : un entier sûr, positif ou nul, d'au plus 2 147 483 647 ;
+  - absent : `undefined` ou `null` ;
+  - invalide : toute autre valeur, chaîne comprise.
+- Les trois sorties suivent la même règle : compatible, Anthropic, et rédaction ou relecture.
+  - Les jetons valent `number | null`.
+  - Une mesure invalide rend l'enveloppe non conforme : la cause est `reponse_illisible`, qui ne se rejoue pas, et la part connue est conservée.
+  - Une enveloppe sans contenu exploitable, ou une réponse qui n'est pas du JSON, garde ses jetons et son appel (`repondu`).
+  - Un refus HTTP, un délai ou un PDF non déclaré ne laissent aucun appel inscrit.
+- Le grand livre (`noterLesJetons`) inscrit tout appel auquel le fournisseur a répondu, avec l'état de sa mesure et sa seule part connue. Un zéro mesuré s'inscrit aussi. Le job d'analyse écrit le même état sur `DocumentAnalysis`.
+- Migration additive `20261011150000_mesure_des_usages` :
+  - un type et deux colonnes nullables ;
+  - deux contraintes `NOT VALID` qui refusent toute nouvelle consommation négative, sans relire l'historique.
+- B-07 :
+  - une alerte « Consommation à rapprocher » donne le nombre d'appels sans mesure complète ;
+  - chaque ligne fournisseur indique « dont N à rapprocher », et son coût devient « au moins … » ;
+  - l'export ajoute la colonne « Mesure du fournisseur » ; un compteur inconnu y laisse sa cellule vide, et l'en-tête compte les « Appels à rapprocher ».
+- Le diagnostic des données (lecture seule) gagne deux constats :
+  - `USAGE_PERDU` : les lectures antérieures, au verdict lu, à 0/0 et sans état de mesure ;
+  - `JETONS_NEGATIFS`.
+- Le banc `banc:ia` rapporte « non mesuré » au lieu d'additionner un zéro.
+- DOC-11 gagne la règle **RG-16.3**, et RG-06.7 y renvoie.
+- Seule retouche hors du lot : le diagnostic DIA-02 reçoit un transtypage `(n as number)`, sans effet sur ce qu'il vérifie. Ses attentes sont inchangées.
+
+**Vérifications.**
+- `tests/ia-mesure-des-usages.test.ts` : 35 tests, sur des serveurs HTTP locaux et le vrai SDK Anthropic, flux diffusé compris.
+- Deux tests d'export et un test de rendu B-07 sont ajoutés.
+- Sur l'ancien code, avec le seul module de domaine ajouté, **17 des 18 tests d'adaptateur et 3 tests d'export échouent**. Tous passent après correction.
+- Le diagnostic IA montre CTRL-01, DIA-01, DIA-02, DIA-03, DIA-04, CTRL-02 et DIA-06 verts. DIA-05 reste rouge, pour L3.
+- `npm run check` : 183 fichiers, 3 707 tests, 0 erreur de lint. Le seul avertissement est antérieur au lot.
+- `npm run check:audit` : aucune vulnérabilité élevée sans motif. `npm run build` passe.
+- Garde-fous sur une base migrée : 107 écritures refusées, 10 posées, 0 acceptée à tort.
+- `smoke:extraction`, par le vrai job sur PostgreSQL :
+  - sans mesure : pièce `CONFORME`, `usageMeasure=INCONNUE`, une ligne `AiUsage` inconnue, quota 5 → 4 ;
+  - mesure partielle : la ligne est inscrite `ENTREE_SEULE` à 4210/0 ;
+  - zéro mesuré : la ligne est inscrite ;
+  - mesure négative, hors entier ou en chaîne : le job s'achève sans erreur SQL, la pièce part en revue humaine, l'analyse est rendue (quota 5), la part connue est inscrite, et le rejeu ne rappelle pas le modèle.
+- `smoke:redaction` :
+  - une mise en forme sans mesure est écrite et décomptée, et son appel est inscrit avec un usage inconnu ;
+  - une mesure invalide n'écrit aucune version, rend l'analyse et garde la part connue.
+- `smoke:diagnostic` compte les deux constats. La garde reposée sur l'historique refuse toute nouvelle consommation négative, et le diagnostic n'écrit rien.
+
+**Effet au déploiement.** La migration est additive, sans réécriture. Une image antérieure qui reviendrait ignorerait la colonne ; seule une mesure négative lui serait désormais refusée par la base.
+
+**Non vérifié.**
+- Un fournisseur réel qui omet l'usage (L5).
+- La valeur réelle du diagnostic `USAGE_PERDU` sur le pilote, à faire lancer par le responsable.
+- Le rendu de B-07 en navigateur : il n'est éprouvé que sous jsdom.

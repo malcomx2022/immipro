@@ -44,15 +44,25 @@ import {
   type RemarqueProduite,
 } from "@/domain/redaction/commande";
 import type { CauseDAppel } from "@/domain/ia/appel";
+import { DETAIL_MESURE_INVALIDE, lireLesJetons } from "@/domain/ia/usage";
 import { leClient } from "@/lib/ai";
 import type { AppelMesure } from "@/server/ia/appel";
 
-/** Ce qu'une mise en forme rend, dans les deux cas. Les jetons sont toujours là. */
+/**
+ * Ce qu'une mise en forme rend, dans les deux cas. Les jetons sont toujours
+ * là : `null` pour un compteur que le fournisseur n'a pas transmis (S.173).
+ */
 export type Redaction = (
-  | { etat: "ECRITE"; texte: string; jetonsEntree: number; jetonsSortie: number }
-  | { etat: "SANS_TEXTE"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number }
+  | { etat: "ECRITE"; texte: string; jetonsEntree: number | null; jetonsSortie: number | null }
+  | {
+      etat: "SANS_TEXTE";
+      cause: CauseDAppel;
+      detail: string;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
+    }
 ) & {
-  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
+  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a abouti à une réponse. */
   appel?: AppelMesure;
 };
 
@@ -60,12 +70,18 @@ export type Relecture = (
   | {
       etat: "RELUE";
       remarques: readonly RemarqueProduite[];
-      jetonsEntree: number;
-      jetonsSortie: number;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
-  | { etat: "SANS_AVIS"; cause: CauseDAppel; detail: string; jetonsEntree: number; jetonsSortie: number }
+  | {
+      etat: "SANS_AVIS";
+      cause: CauseDAppel;
+      detail: string;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
+    }
 ) & {
-  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
+  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a abouti à une réponse. */
   appel?: AppelMesure;
 };
 
@@ -144,8 +160,9 @@ export const redacteurClaude =
       return sansJetons("SANS_TEXTE", cause, detail);
     }
 
-    const jetonsEntree = message.usage.input_tokens;
-    const jetonsSortie = message.usage.output_tokens;
+    const mesure = lireLesJetons(message.usage?.input_tokens, message.usage?.output_tokens);
+    const jetonsEntree = mesure.entree;
+    const jetonsSortie = mesure.sortie;
     const appel: AppelMesure = { fournisseur: "anthropic", modele };
     const echoue = (cause: CauseDAppel, detail: string): Redaction => ({
       etat: "SANS_TEXTE",
@@ -155,6 +172,8 @@ export const redacteurClaude =
       jetonsSortie,
       appel,
     });
+    // Une mesure invalide rend l'enveloppe non conforme (S.173).
+    if (mesure.invalide) return echoue("reponse_illisible", DETAIL_MESURE_INVALIDE);
 
     if (message.stop_reason === "refusal") {
       return echoue("refus", "le service a refusé d'écrire cette pièce");
@@ -201,8 +220,9 @@ export const critiqueClaude =
       return sansJetons("SANS_AVIS", cause, detail);
     }
 
-    const jetonsEntree = message.usage.input_tokens;
-    const jetonsSortie = message.usage.output_tokens;
+    const mesure = lireLesJetons(message.usage?.input_tokens, message.usage?.output_tokens);
+    const jetonsEntree = mesure.entree;
+    const jetonsSortie = mesure.sortie;
     const appel: AppelMesure = { fournisseur: "anthropic", modele };
     const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
       etat: "SANS_AVIS",
@@ -212,6 +232,7 @@ export const critiqueClaude =
       jetonsSortie,
       appel,
     });
+    if (mesure.invalide) return echoue("reponse_illisible", DETAIL_MESURE_INVALIDE);
 
     if (message.stop_reason === "refusal") {
       return echoue("refus", "le service a refusé de relire cette pièce");

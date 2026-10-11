@@ -31,6 +31,7 @@ const APPEL = (surcharge: Partial<AppelIA> = {}): AppelIA => ({
   jetonsEntree: 1_000_000,
   jetonsSortie: 100_000,
   dossierId: "dossier-1",
+  mesure: "MESUREE",
   ...surcharge,
 });
 const PERIODE = { du: "2026-09-01", au: "2026-09-30" };
@@ -73,6 +74,7 @@ describe("B-07 — ce que le fichier des appels contient", () => {
       "Coût",
       "Devise",
       "Dossier",
+      "Mesure du fournisseur",
     ]);
     const colonnes = COLONNES_APPELS.join(" ").toLowerCase();
     expect(colonnes).not.toMatch(/utilisateur|compte|nom|courriel|email|opération/u);
@@ -132,6 +134,32 @@ describe("B-07 — ce que le fichier des appels contient", () => {
     expect(csv).toContain("Appels;2");
     expect(csv).toContain("Jetons (entrée + sortie);2200000");
     expect(csv).not.toContain("Attestation");
+  });
+
+  it("S.173 — un appel non mesuré laisse ses cellules vides et se compte à rapprocher", () => {
+    const csv = fichierCsv(
+      exportDesAppels(
+        PERIODE,
+        [
+          APPEL(),
+          APPEL({ jetonsEntree: null, jetonsSortie: null, mesure: "INCONNUE", dossierId: "dossier-2" }),
+          APPEL({ jetonsSortie: null, mesure: "ENTREE_SEULE", dossierId: "dossier-3" }),
+        ],
+        tousTarifes,
+      ),
+    );
+    expect(csv).toContain(";modele-essai;;;;;dossier-2;non mesurée");
+    expect(csv).toContain(";modele-essai;1000000;;;;dossier-3;entrée seule, sortie non mesurée");
+    expect(csv).toContain("4,500000;EUR;dossier-1;mesurée");
+    expect(csv).toContain("Appels à rapprocher;2;");
+    // Les totaux ne comptent que la part mesurée, et ne l'inventent pas.
+    expect(csv).toContain("Jetons (entrée + sortie);2100000");
+  });
+
+  it("S.173 — une ligne antérieure n'est pas requalifiée", () => {
+    const csv = fichierCsv(exportDesAppels(PERIODE, [APPEL({ mesure: null })], tousTarifes));
+    expect(csv).toContain("dossier-1;non qualifiée (avant S.173)");
+    expect(csv).not.toContain("Appels à rapprocher");
   });
 
   it("atteste l'absence d'appel sur une période vide, au lieu d'un fichier vide", () => {

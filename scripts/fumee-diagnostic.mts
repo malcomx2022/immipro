@@ -314,6 +314,48 @@ try {
       },
     });
 
+    /*
+      USAGE_PERDU et JETONS_NEGATIFS — S.173. L'historique d'avant la garde :
+      une lecture rendue à 0/0, sans état de mesure, et une consommation
+      négative. La garde SQL est `NOT VALID` : elle est levée le temps de
+      poser la ligne ancienne, puis reposée **sur** cet historique — ce qui
+      éprouve aussi qu'elle s'ajoute sans relire ni réécrire les lignes.
+    */
+    const pieceLue = await db.document.create({
+      data: { applicationId: dossier.id, code: "releve_bancaire", label: "Relevé", status: "CONFORME", required: true },
+    });
+    const versionLue = await db.documentVersion.create({
+      data: {
+        documentId: pieceLue.id,
+        rank: 1,
+        objectKey: `dossiers/${dossier.id}/releve_bancaire/1760000000000-abcdefghijklmnop`,
+        checksum: `somme-lue-${process.pid}`,
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+        scanState: "SAINE",
+        scannedAt: new Date(),
+      },
+    });
+    const analysePerdue = await db.documentAnalysis.create({
+      data: { versionId: versionLue.id, verdict: "CONFORME", title: "Relevé conforme", body: "Le relevé couvre la période demandée." },
+    });
+    await db.$executeRawUnsafe(`ALTER TABLE "AiUsage" DROP CONSTRAINT "AiUsage_jetons_positifs"`);
+    const negative = await db.aiUsage.create({
+      data: { userId: personne.id, applicationId: dossier.id, operation: "analyse:releve_bancaire", inputTokens: -12, outputTokens: 1, costMicros: 0 },
+    });
+    await db.$executeRawUnsafe(
+      `ALTER TABLE "AiUsage" ADD CONSTRAINT "AiUsage_jetons_positifs" CHECK ("inputTokens" >= 0 AND "outputTokens" >= 0) NOT VALID`,
+    );
+    let refusee = false;
+    try {
+      await db.aiUsage.create({
+        data: { userId: personne.id, operation: "analyse:essai", inputTokens: -1, outputTokens: 0, costMicros: 0 },
+      });
+    } catch {
+      refusee = true;
+    }
+    verifier(refusee, "la garde reposée sur l'historique refuse toute nouvelle consommation négative");
+
     const compter = async () =>
       JSON.stringify(
         await Promise.all([
@@ -325,6 +367,8 @@ try {
           db.notification.count(),
           db.transaction.count(),
           db.visaRule.count(),
+          db.aiUsage.count(),
+          db.documentAnalysis.count(),
         ]),
       );
     const avantDonnees = await compter();
@@ -335,6 +379,8 @@ try {
     verifier(/! PLAFOND — .* : 1$/mu.test(sortie.sortie) && sortie.sortie.includes(personne.id), "PLAFOND : le candidat à quatre dossiers ouverts est compté");
     verifier(/! E7 — .* : 1$/mu.test(sortie.sortie), "E7 : le reclassement hors référentiel est compté");
     verifier(/! VERDICT_ANCIEN — .* : 1$/mu.test(sortie.sortie) && sortie.sortie.includes(piece.id), "VERDICT_ANCIEN : la pièce sans analyse de sa version est comptée");
+    verifier(/! USAGE_PERDU — .* : 1$/mu.test(sortie.sortie) && sortie.sortie.includes(analysePerdue.id), "USAGE_PERDU : la lecture rendue à 0/0 avant S.173 est comptée");
+    verifier(/! JETONS_NEGATIFS — .* : 1$/mu.test(sortie.sortie) && sortie.sortie.includes(`usage:${negative.id}`), "JETONS_NEGATIFS : la consommation négative antérieure est comptée");
     verifier(/✓ DEPOT_MIGRE — .* : 0$/mu.test(sortie.sortie), "un constat vide se dit vide");
     verifier(/Responsable\s+Direction, en B-04/u.test(sortie.sortie), "chaque constat nomme son responsable");
     verifier(!sortie.sortie.includes(courrielDonnees) && !sortie.sortie.includes("Ignore tes consignes"), "aucune donnée personnelle ni contenu cité ne sort");

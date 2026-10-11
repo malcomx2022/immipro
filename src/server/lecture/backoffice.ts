@@ -34,6 +34,7 @@ import {
   type CodeFournisseur,
   type ConsommationDuFournisseur,
 } from "@/domain/ia/fournisseurs";
+import { jetonsDeLaLigne, mesureARapprocher } from "@/domain/ia/usage";
 import { packEffectif, type AchatCouvrant, type PackEffectif } from "@/domain/payments/droits";
 import { achatDepuisLeCode } from "@/domain/payments/achat";
 import {
@@ -1130,24 +1131,38 @@ export async function consommationParJour(depuis: Date): Promise<Journee[]> {
 export async function consommationParFournisseur(
   tarifs: TarifsIA = (fournisseur) => tarifDu(process.env, fournisseur),
 ): Promise<ConsommationDuFournisseur[]> {
-  const lignes = await db.aiUsage.groupBy({
-    by: ["provider", "model"],
+  /*
+    Groupé aussi par état de mesure (S.173) : un appel que le fournisseur
+    n'a pas mesuré compte dans « Appels », n'apporte que sa part connue aux
+    jetons, et se compte à part pour le rapprochement.
+  */
+  const groupes = await db.aiUsage.groupBy({
+    by: ["provider", "model", "usageMeasure"],
     _sum: { inputTokens: true, outputTokens: true },
     _count: { _all: true },
   });
-  return lignes
+  const lignes = new Map<string, { provider: string | null; model: string | null; appels: number; aRapprocher: number; entree: number; sortie: number }>();
+  for (const g of groupes) {
+    const cle = `${fournisseurDeLUsage(g.provider)}\u0000${g.model ?? ""}`;
+    const l = lignes.get(cle) ?? { provider: g.provider, model: g.model, appels: 0, aRapprocher: 0, entree: 0, sortie: 0 };
+    l.appels += g._count._all;
+    l.aRapprocher += mesureARapprocher(g.usageMeasure) ? g._count._all : 0;
+    l.entree += g._sum.inputTokens ?? 0;
+    l.sortie += g._sum.outputTokens ?? 0;
+    lignes.set(cle, l);
+  }
+  return [...lignes.values()]
     .map((l) => {
       const fournisseur = fournisseurDeLUsage(l.provider);
       const tarif = tarifDe(tarifs, fournisseur);
-      const jetonsEntree = l._sum.inputTokens ?? 0;
-      const jetonsSortie = l._sum.outputTokens ?? 0;
       return {
         fournisseur,
         modele: l.model,
-        appels: l._count._all,
-        jetonsEntree,
-        jetonsSortie,
-        coutMicros: coutMicrosDesJetons(tarif, jetonsEntree, jetonsSortie),
+        appels: l.appels,
+        appelsARapprocher: l.aRapprocher,
+        jetonsEntree: l.entree,
+        jetonsSortie: l.sortie,
+        coutMicros: coutMicrosDesJetons(tarif, l.entree, l.sortie),
         devise: tarif?.devise ?? null,
       };
     })
@@ -1173,17 +1188,23 @@ export async function appelsDeLaPeriode(periode: { du: string; au: string }): Pr
       inputTokens: true,
       outputTokens: true,
       applicationId: true,
+      usageMeasure: true,
     },
     orderBy: { createdAt: "asc" },
   });
-  return lignes.map((l) => ({
-    horodatage: l.createdAt.toISOString(),
-    fournisseur: fournisseurDeLUsage(l.provider),
-    modele: l.model,
-    jetonsEntree: l.inputTokens,
-    jetonsSortie: l.outputTokens,
-    dossierId: l.applicationId,
-  }));
+  return lignes.map((l) => {
+    // La part inconnue d'une mesure se relit `null`, jamais zéro (S.173).
+    const jetons = jetonsDeLaLigne(l.usageMeasure, l.inputTokens, l.outputTokens);
+    return {
+      horodatage: l.createdAt.toISOString(),
+      fournisseur: fournisseurDeLUsage(l.provider),
+      modele: l.model,
+      jetonsEntree: jetons.entree,
+      jetonsSortie: jetons.sortie,
+      dossierId: l.applicationId,
+      mesure: l.usageMeasure,
+    };
+  });
 }
 
 /** Une règle du back-office, par identifiant — B-02. */

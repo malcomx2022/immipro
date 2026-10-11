@@ -123,7 +123,7 @@ try {
     "pas LUE avec jetons négatifs/fractionnaires",
     { etat: invalide.etat, entree: invalide.jetonsEntree, sortie: invalide.jetonsSortie },
     invalide.etat !== "LUE" ||
-      [invalide.jetonsEntree, invalide.jetonsSortie].every((n) => Number.isInteger(n) && n >= 0),
+      [invalide.jetonsEntree, invalide.jetonsSortie].every((n) => Number.isInteger(n) && (n as number) >= 0),
   );
 
   charge = { choices: [], usage: { prompt_tokens: 120, completion_tokens: 30 } };

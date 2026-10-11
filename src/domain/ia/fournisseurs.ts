@@ -408,6 +408,12 @@ export interface ConsommationDuFournisseur {
   fournisseur: CodeFournisseur;
   modele: string | null;
   appels: number;
+  /**
+   * Appels dont le fournisseur n'a pas mesuré tous les jetons (S.173). Les
+   * jetons et le coût de la ligne n'en comptent que la part mesurée : un
+   * minorant, à rapprocher de la facture.
+   */
+  appelsARapprocher: number;
   jetonsEntree: number;
   jetonsSortie: number;
   /** Au tarif de ce fournisseur ; `null` sans tarif — jamais zéro. */

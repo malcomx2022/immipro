@@ -84,8 +84,9 @@ export interface MatiereDeLaPiece {
 export interface TexteProduit {
   /** Le corps entier, paragraphes séparés par une ligne vide. */
   texte: string;
-  jetonsEntree: number;
-  jetonsSortie: number;
+  /** `null` : le fournisseur n'a pas transmis ce compteur (S.173). */
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
 }
 
 export interface RemarqueProduite {
@@ -97,8 +98,8 @@ export interface RemarqueProduite {
 
 export interface CritiqueProduite {
   remarques: readonly RemarqueProduite[];
-  jetonsEntree: number;
-  jetonsSortie: number;
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
 }
 
 /**

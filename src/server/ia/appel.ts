@@ -2,11 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import { coutMicrosDesJetons } from "@/domain/backoffice/couts";
-import {
-  FOURNISSEUR_PAR_DEFAUT,
-  tarifDu,
-  type CodeFournisseur,
-} from "@/domain/ia/fournisseurs";
+import { tarifDu, type CodeFournisseur } from "@/domain/ia/fournisseurs";
+import { etatDeMesure, partConnue } from "@/domain/ia/usage";
 
 /**
  * La plomberie que les deux chaînes d'appel au modèle partagent — WF-06,
@@ -121,6 +118,22 @@ export const texteRendu = (message: Anthropic.Message): string =>
  * a coûté ses jetons. L'omettre en ferait un appel gratuit dans B-07, ce
  * que l'invariant appelle un dépassement silencieux.
  *
+ * ── Ce qui décide d'écrire — S.173, REV11-L2 ────────────────────────
+ *
+ * La ligne s'écrivait dès qu'un compteur n'était pas nul, et l'appel sans
+ * mesure disparaissait : un fournisseur qui ne transmet pas l'usage
+ * passait pour gratuit, sans trace. Ce qui décide est désormais **la
+ * réponse du fournisseur** (`appel`) : présente, l'appel a eu lieu et a pu
+ * être facturé, et il s'inscrit — mesuré, en partie, ou pas du tout, et
+ * l'état le dit (`usageMeasure`). Absente, aucun appel n'a abouti à une
+ * réponse, et rien n'est écrit. Un zéro mesuré est une mesure : il
+ * s'inscrit aussi.
+ *
+ * Les compteurs arrivent déjà validés (`domain/ia/usage.ts`) : des entiers
+ * positifs qui tiennent dans la colonne, ou `null`. Aucune écriture ne peut
+ * plus échouer en SQL après l'appel à cause d'eux — l'échec faisait
+ * rejouer le job, et payer l'appel deux fois.
+ *
  * Le prix du jeton n'est pas mesuré tant qu'aucun tarif n'est configuré ;
  * `costMicros` porte alors zéro, et B-07 ne le lit pas — il recalcule
  * depuis les jetons et le tarif du jour, pour qu'une ligne écrite avant le
@@ -134,29 +147,32 @@ export async function noterLesJetons(
   userId: string,
   applicationId: string,
   operation: string,
-  jetonsEntree: number,
-  jetonsSortie: number,
+  jetonsEntree: number | null,
+  jetonsSortie: number | null,
   /**
-   * Chez qui l'appel est parti — S.94. Absent quand aucun appel n'a eu
-   * lieu (rien n'est alors écrit, zéro jeton) ; la ligne est sinon datée
-   * de son fournisseur et de son modèle, et tarifée au prix **de ce
-   * fournisseur**, jamais à celui d'un autre.
+   * Chez qui l'appel est parti — S.94. Absent quand aucun appel n'a abouti
+   * à une réponse : rien n'est alors écrit. La ligne est sinon datée de son
+   * fournisseur et de son modèle, et tarifée au prix **de ce fournisseur**,
+   * jamais à celui d'un autre.
    */
   appel?: AppelMesure,
 ): Promise<void> {
-  if (jetonsEntree === 0 && jetonsSortie === 0) return;
-  const fournisseur = appel?.fournisseur ?? FOURNISSEUR_PAR_DEFAUT;
+  if (!appel) return;
+  const entree = partConnue(jetonsEntree);
+  const sortie = partConnue(jetonsSortie);
   await db.aiUsage.create({
     data: {
       userId,
       applicationId,
       operation,
-      provider: fournisseur,
-      model: appel?.modele ?? null,
-      inputTokens: jetonsEntree,
-      outputTokens: jetonsSortie,
-      costMicros:
-        coutMicrosDesJetons(tarifDu(process.env, fournisseur), jetonsEntree, jetonsSortie) ?? 0,
+      provider: appel.fournisseur,
+      model: appel.modele,
+      inputTokens: entree,
+      outputTokens: sortie,
+      usageMeasure: etatDeMesure(jetonsEntree, jetonsSortie),
+      // La part connue, au tarif de ce fournisseur : un minorant quand la
+      // mesure est incomplète, et B-07 le dit.
+      costMicros: coutMicrosDesJetons(tarifDu(process.env, appel.fournisseur), entree, sortie) ?? 0,
     },
   });
 }

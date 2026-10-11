@@ -24,7 +24,8 @@ import {
   type CauseDeNonLecture,
   type DemandeDeLecture,
 } from "@/domain/dossiers/extraction";
-import { lExtracteur, type Extracteur } from "@/server/dossiers/extracteur";
+import { lExtracteur, type Extracteur, type Lecture } from "@/server/dossiers/extracteur";
+import { etatDeMesure, partConnue } from "@/domain/ia/usage";
 import { EchecHttp } from "@/server/http/echecs";
 import { conserverFauteDeQuota } from "./balayage";
 
@@ -92,6 +93,19 @@ export type Suite = "TERMINEE" | "A_REPRENDRE";
  * d'admettre que quelqu'un doit regarder.
  */
 export const TENTATIVES_AVANT_REVUE = 3;
+
+/**
+ * Les jetons qu'une analyse garde de sa lecture — S.173, REV11-L2.
+ *
+ * La part connue, et l'état de la mesure qui dit laquelle l'est. Sans
+ * réponse du fournisseur, aucun état : rien n'a été mesuré, parce que
+ * rien n'a été consommé.
+ */
+const jetonsDeLAnalyse = (lu: Lecture) => ({
+  inputTokens: partConnue(lu.jetonsEntree),
+  outputTokens: partConnue(lu.jetonsSortie),
+  usageMeasure: lu.appel ? etatDeMesure(lu.jetonsEntree, lu.jetonsSortie) : null,
+});
 
 /**
  * Le motif du rendu d'une lecture devenue sans objet — choix A-2 du
@@ -333,8 +347,7 @@ export async function analyserUnePiece(
           title: "Cette pièce demande une relecture",
           body: MESSAGE_AU_CANDIDAT[lu.cause],
           engineLog: `${MOTIF_DE_NON_LECTURE[lu.cause]} — ${lu.detail}`,
-          inputTokens: lu.jetonsEntree,
-          outputTokens: lu.jetonsSortie,
+          ...jetonsDeLAnalyse(lu),
           // Rien n'a été pris sur ce chemin : ni par le débit quand la
           // reprise est gratuite, ni après le rendu ci-dessous.
           creditConsumed: false,
@@ -475,8 +488,7 @@ export async function analyserUnePiece(
         fields: lu.bruts as never,
         title: verdict.titre,
         body: verdict.corps,
-        inputTokens: lu.jetonsEntree,
-        outputTokens: lu.jetonsSortie,
+        ...jetonsDeLAnalyse(lu),
       },
     });
     /*

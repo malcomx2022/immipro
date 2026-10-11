@@ -79,6 +79,15 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.173 / REV11-L2, mesure des usages IA (proposé).** Arbitrages du 11/10 :
+une réponse sans mesure est **publiée**, l'appel inscrit avec un usage
+inconnu et B-07 demande un rapprochement ; l'état de mesure est une
+colonne additive (`usageMeasure`, nulle sur l'historique, jamais
+réécrite). Une mesure invalide rend l'enveloppe non conforme
+(`reponse_illisible`, sans rejeu). Ne pas rouvrir ces choix. Règle
+RG-16.3 de DOC-11 ; DIA-01/02/03 passent. Poursuivre par L3 (DIA-05).
+S.172 (#277) est sur main par #278 et déployé avec S.171 (`47b39b0`).
+
 **S.172 / complément REV11-L1, PR #277.** Claude a ouvert #276 / S.171
 pendant le travail L1. Cette proposition est désormais basée sur sa branche
 `claude/elegant-dijkstra-86egeb`, sans remplacer son lot ou son arbitrage.

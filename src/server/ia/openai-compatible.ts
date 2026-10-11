@@ -1,5 +1,6 @@
 import { fetchSansRedirection } from "@/lib/ia-transport";
 import type { CauseDAppel } from "@/domain/ia/appel";
+import { DETAIL_MESURE_INVALIDE, lireLesJetons } from "@/domain/ia/usage";
 import {
   DELAI_EXTRACTION_MS,
   TYPES_LISIBLES,
@@ -81,17 +82,29 @@ export interface ConfigurationCompatible {
   pdf: FormeDuPdf | null;
 }
 
-/** Ce que rend un appel : la réponse lue, ou la cause de son absence. */
+/** Les jetons qu'une réponse annonce : `null` pour un compteur inconnu (S.173). */
+interface Jetons {
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
+}
+
+/**
+ * Ce que rend un appel : la réponse lue, ou la cause de son absence.
+ *
+ * `repondu` dit qu'un échec est venu **après** une réponse du fournisseur
+ * — une enveloppe sans contenu exploitable, ou une mesure invalide. L'appel
+ * a alors eu lieu et a pu être facturé : ses jetons connus sont conservés
+ * (DIA-03), et le grand livre l'inscrit. Un refus HTTP, un délai ou une
+ * coupure n'en ont pas.
+ */
 type Reponse =
-  | {
+  | ({
       ok: true;
       texte: string;
       fin: string | null;
       refus: boolean;
-      jetonsEntree: number;
-      jetonsSortie: number;
-    }
-  | { ok: false; cause: CauseDAppel; detail: string };
+    } & Jetons)
+  | { ok: false; cause: CauseDAppel; detail: string; repondu?: Jetons };
 
 /** Le statut HTTP d'une réponse en erreur, traduit en cause neutre. */
 export function causeDuStatut(statut: number): { cause: CauseDAppel; detail: string } {
@@ -131,22 +144,35 @@ export function causeDuStatut(statut: number): { cause: CauseDAppel; detail: str
   };
 }
 
-const lireReponse = (charge: unknown): Omit<Extract<Reponse, { ok: true }>, "ok"> | null => {
+const lireReponse = (
+  charge: unknown,
+): Omit<Extract<Reponse, { ok: true }>, "ok" | keyof Jetons> | null => {
   const c = charge as {
     choices?: { finish_reason?: unknown; message?: { content?: unknown; refusal?: unknown } }[];
-    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
   } | null;
-  const choix = c?.choices?.[0];
+  const choix = Array.isArray(c?.choices) ? c.choices[0] : undefined;
   if (!choix?.message) return null;
-  const nombre = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
   const refus = typeof choix.message.refusal === "string" && choix.message.refusal.length > 0;
   return {
     texte: typeof choix.message.content === "string" ? choix.message.content : "",
     fin: typeof choix.finish_reason === "string" ? choix.finish_reason : null,
     refus: refus || choix.finish_reason === "content_filter",
-    jetonsEntree: nombre(c?.usage?.prompt_tokens),
-    jetonsSortie: nombre(c?.usage?.completion_tokens),
   };
+};
+
+/*
+  La mesure se lit **à part** du contenu — S.173, REV11-L2. Elle valait
+  zéro dès qu'un compteur manquait ou n'était pas un nombre fini, et elle
+  disparaissait avec une enveloppe sans choix : trois façons de rendre
+  gratuit un appel facturé. Elle est lue pour ce qu'elle est, connue,
+  absente ou invalide (`domain/ia/usage.ts`).
+*/
+const lireLaMesure = (charge: unknown) => {
+  const usage =
+    charge !== null && typeof charge === "object"
+      ? (charge as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown } | null }).usage
+      : undefined;
+  return lireLesJetons(usage?.prompt_tokens, usage?.completion_tokens);
 };
 
 /** Le porteur de l'en-tête `Authorization`, ou la cause qui empêche de l'obtenir. */
@@ -220,14 +246,33 @@ async function envoyer(
   }
 
   const charge = await reponse.json().catch(() => null);
-  const lue = lireReponse(charge);
-  if (!lue) {
+  const mesure = lireLaMesure(charge);
+  const jetons: Jetons = { jetonsEntree: mesure.entree, jetonsSortie: mesure.sortie };
+  /*
+    Une mesure invalide rend l'enveloppe non conforme (arbitrage du
+    11/10) : une réponse qui contredit son propre protocole ne fait pas
+    foi pour le reste. `reponse_illisible` ne se rejoue pas — l'appel
+    n'est pas payé deux fois —, et la part connue reste inscrite.
+  */
+  if (mesure.invalide) {
     return {
-      reponse: { ok: false, cause: "reponse_illisible", detail: "la réponse n'a pas la forme d'une complétion" },
+      reponse: { ok: false, cause: "reponse_illisible", detail: DETAIL_MESURE_INVALIDE, repondu: jetons },
       statut: reponse.status,
     };
   }
-  return { reponse: { ok: true, ...lue }, statut: reponse.status };
+  const lue = lireReponse(charge);
+  if (!lue) {
+    return {
+      reponse: {
+        ok: false,
+        cause: "reponse_illisible",
+        detail: "la réponse n'a pas la forme d'une complétion",
+        repondu: jetons,
+      },
+      statut: reponse.status,
+    };
+  }
+  return { reponse: { ok: true, ...lue, ...jetons }, statut: reponse.status };
 }
 
 /**
@@ -270,13 +315,13 @@ export async function lireDesOctetsCompatible(
   demande: DemandeDeLecture,
 ): Promise<Lecture> {
   const appel = mesure(config);
+  // Aucun appel n'a abouti à une réponse : rien n'est consommé, rien n'est inscrit.
   const sansJetons = (cause: Extract<Lecture, { etat: "NON_LUE" }>["cause"], detail: string): Lecture => ({
     etat: "NON_LUE",
     cause,
     detail,
     jetonsEntree: 0,
     jetonsSortie: 0,
-    appel,
   });
 
   const donnees = `data:${type};base64,${octets.toString("base64")}`;
@@ -306,7 +351,11 @@ export async function lireDesOctetsCompatible(
     },
     DELAI_EXTRACTION_MS,
   );
-  if (!reponse.ok) return sansJetons(reponse.cause, reponse.detail);
+  if (!reponse.ok) {
+    return reponse.repondu
+      ? { etat: "NON_LUE", cause: reponse.cause, detail: reponse.detail, ...reponse.repondu, appel }
+      : sansJetons(reponse.cause, reponse.detail);
+  }
 
   const echoue = (cause: Extract<Lecture, { etat: "NON_LUE" }>["cause"], detail: string): Lecture => ({
     etat: "NON_LUE",
@@ -366,7 +415,9 @@ export const redacteurCompatible =
       DELAI_REDACTION_MS,
     );
     if (!reponse.ok) {
-      return { etat: "SANS_TEXTE", cause: reponse.cause, detail: reponse.detail, jetonsEntree: 0, jetonsSortie: 0 };
+      return reponse.repondu
+        ? { etat: "SANS_TEXTE", cause: reponse.cause, detail: reponse.detail, ...reponse.repondu, appel }
+        : { etat: "SANS_TEXTE", cause: reponse.cause, detail: reponse.detail, jetonsEntree: 0, jetonsSortie: 0 };
     }
     const echoue = (cause: CauseDAppel, detail: string): Redaction => ({
       etat: "SANS_TEXTE",
@@ -409,7 +460,9 @@ export const critiqueCompatible =
       DELAI_REDACTION_MS,
     );
     if (!reponse.ok) {
-      return { etat: "SANS_AVIS", cause: reponse.cause, detail: reponse.detail, jetonsEntree: 0, jetonsSortie: 0 };
+      return reponse.repondu
+        ? { etat: "SANS_AVIS", cause: reponse.cause, detail: reponse.detail, ...reponse.repondu, appel }
+        : { etat: "SANS_AVIS", cause: reponse.cause, detail: reponse.detail, jetonsEntree: 0, jetonsSortie: 0 };
     }
     const echoue = (cause: CauseDAppel, detail: string): Relecture => ({
       etat: "SANS_AVIS",

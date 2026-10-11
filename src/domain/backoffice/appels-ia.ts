@@ -2,6 +2,7 @@ import { nomDatable, nombre, texte, vide, type Cellule } from "@/domain/format/c
 import { jourCivil } from "@/domain/format/fuseau";
 import { coutMicrosDesJetons, type TarifIA } from "@/domain/backoffice/couts";
 import { FOURNISSEURS, type CodeFournisseur } from "@/domain/ia/fournisseurs";
+import { mesureARapprocher, type EtatDeMesure } from "@/domain/ia/usage";
 
 /**
  * Export du détail des appels IA — B-07, WF-16.
@@ -34,6 +35,13 @@ import { FOURNISSEURS, type CodeFournisseur } from "@/domain/ia/fournisseurs";
  * refusée avec ce qu'il faut faire — et les lignes d'une période valide
  * partent toutes.
  *
+ * ── Une mesure absente n'est pas un zéro — S.173 ──────────────────────
+ *
+ * Un appel dont le fournisseur n'a pas mesuré les jetons s'inscrit avec un
+ * usage inconnu. Sa cellule de jetons reste vide, son coût aussi, et la
+ * dernière colonne dit ce que le fournisseur a mesuré. L'en-tête compte
+ * les appels à rapprocher de la facture du fournisseur.
+ *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
@@ -52,10 +60,13 @@ export interface AppelIA {
   /** Déjà résolu : une ligne antérieure à S.94 vaut le fournisseur par défaut. */
   fournisseur: CodeFournisseur;
   modele: string | null;
-  jetonsEntree: number;
-  jetonsSortie: number;
+  /** `null` : le fournisseur n'a pas mesuré ce compteur (S.173). */
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
   /** La référence du dossier, nulle pour un appel qui n'en a pas. */
   dossierId: string | null;
+  /** Ce que le fournisseur a mesuré ; `null` pour une ligne antérieure à S.173. */
+  mesure: EtatDeMesure | null;
 }
 
 const JOUR_ISO = /^(\d{4})-(\d{2})-(\d{2})$/u;
@@ -107,10 +118,23 @@ export const COLONNES_APPELS: readonly string[] = [
   "Coût",
   "Devise",
   "Dossier",
+  "Mesure du fournisseur",
 ];
 
 export const MENTION_COUT_RECALCULE =
-  "Coût recalculé à la lecture, au tarif en vigueur le jour de l'export. Une cellule vide signifie que le fournisseur n'a pas de tarif de jeton : ce n'est pas un coût nul.";
+  "Coût recalculé à la lecture, au tarif en vigueur le jour de l'export. Une cellule vide signifie que le fournisseur n'a pas de tarif de jeton, ou qu'il n'a pas mesuré l'appel : ce n'est pas un coût nul.";
+
+/** Ce que dit la colonne « Mesure du fournisseur ». */
+export const LIBELLE_DE_MESURE: Record<EtatDeMesure, string> = {
+  MESUREE: "mesurée",
+  ENTREE_SEULE: "entrée seule, sortie non mesurée",
+  SORTIE_SEULE: "sortie seule, entrée non mesurée",
+  INCONNUE: "non mesurée",
+};
+export const MESURE_NON_QUALIFIEE = "non qualifiée (avant S.173)";
+
+export const MENTION_APPELS_A_RAPPROCHER =
+  "Appels dont le fournisseur n'a pas mesuré tous les jetons : à rapprocher de sa facture. Les totaux de jetons n'en comptent que la part mesurée.";
 
 export const MENTION_SANS_DONNEE_CANDIDAT_EXPORT =
   "Aucune donnée de candidat dans ce fichier : ni compte, ni nom, ni nature d'opération. La référence du dossier est celle de l'écran B-07.";
@@ -123,17 +147,22 @@ type Tarifs = (fournisseur: CodeFournisseur) => TarifIA | null;
 /** Un appel, en cellules. Le coût est celui de **son** fournisseur, jamais d'un autre. */
 export function ligneDeLAppel(a: AppelIA, tarifs: Tarifs): readonly Cellule[] {
   const tarif = tarifs(a.fournisseur);
-  const micros = coutMicrosDesJetons(tarif, a.jetonsEntree, a.jetonsSortie);
+  const micros =
+    a.jetonsEntree === null || a.jetonsSortie === null
+      ? null
+      : coutMicrosDesJetons(tarif, a.jetonsEntree, a.jetonsSortie);
   return [
     texte(a.horodatage),
     texte(jourDeLAppel(a)),
     texte(FOURNISSEURS[a.fournisseur].libelle),
     texte(a.modele ?? MODELE_NON_CONSIGNE),
-    nombre(a.jetonsEntree),
-    nombre(a.jetonsSortie),
+    a.jetonsEntree === null ? vide : nombre(a.jetonsEntree),
+    a.jetonsSortie === null ? vide : nombre(a.jetonsSortie),
     micros === null ? vide : nombre(micros / 1_000_000, 6),
-    tarif === null ? vide : texte(tarif.devise),
+    // Une devise sans coût ne dit rien : elles vont ensemble.
+    micros === null || tarif === null ? vide : texte(tarif.devise),
     texte(a.dossierId ?? SANS_DOSSIER),
+    texte(a.mesure === null ? MESURE_NON_QUALIFIEE : LIBELLE_DE_MESURE[a.mesure]),
   ];
 }
 
@@ -149,12 +178,16 @@ export function exportDesAppels(
   tarifs: Tarifs,
 ): readonly (readonly Cellule[])[] {
   const tries = [...appels].sort((a, b) => a.horodatage.localeCompare(b.horodatage));
-  const jetons = tries.reduce((s, a) => s + a.jetonsEntree + a.jetonsSortie, 0);
+  const jetons = tries.reduce((s, a) => s + (a.jetonsEntree ?? 0) + (a.jetonsSortie ?? 0), 0);
+  const aRapprocher = tries.filter((a) => mesureARapprocher(a.mesure)).length;
   return [
     [texte("Détail des appels IA ImmiPro")],
     [texte("Période"), texte(`du ${periode.du} au ${periode.au}`)],
     [texte("Appels"), nombre(tries.length)],
     [texte("Jetons (entrée + sortie)"), nombre(jetons)],
+    ...(aRapprocher > 0
+      ? [[texte("Appels à rapprocher"), nombre(aRapprocher), texte(MENTION_APPELS_A_RAPPROCHER)]]
+      : []),
     [texte("Coût"), texte(MENTION_COUT_RECALCULE)],
     [texte("Confidentialité"), texte(MENTION_SANS_DONNEE_CANDIDAT_EXPORT)],
     ...(tries.length === 0

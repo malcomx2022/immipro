@@ -111,15 +111,24 @@ if (fournisseur !== "simulation" && !(fournisseur in FOURNISSEURS)) {
  * Les adaptateurs du produit, ou une simulation.
  * ------------------------------------------------------------------ */
 
+/**
+ * Les jetons d'un cas : `null` quand le fournisseur ne les a pas mesurés
+ * (S.173). Une somme qui en contient un est inconnue, pas sous-estimée :
+ * le banc qualifie un fournisseur, et une mesure manquante en fait partie.
+ */
 interface Mesure {
-  jetonsEntree: number;
-  jetonsSortie: number;
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
   millisecondes: number;
 }
 
-type Lecteur = (type: TypeLisible, octets: Buffer, demande: DemandeDeLecture, cas: CasDeLecture) => Promise<LectureObtenue & { jetonsEntree: number; jetonsSortie: number }>;
-type Ecrivain = (matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ texte: string | null; detail: string | null; jetonsEntree: number; jetonsSortie: number }>;
-type Relecteur = (texte: string, matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ remarques: readonly RemarqueProduite[] | null; detail: string | null; jetonsEntree: number; jetonsSortie: number }>;
+type Jetons = { jetonsEntree: number | null; jetonsSortie: number | null };
+type Lecteur = (type: TypeLisible, octets: Buffer, demande: DemandeDeLecture, cas: CasDeLecture) => Promise<LectureObtenue & Jetons>;
+type Ecrivain = (matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ texte: string | null; detail: string | null } & Jetons>;
+type Relecteur = (texte: string, matiere: MatiereDeLaPiece, cas: CasDeRedaction) => Promise<{ remarques: readonly RemarqueProduite[] | null; detail: string | null } & Jetons>;
+
+const ajouter = (a: number | null, b: number | null): number | null => (a === null || b === null ? null : a + b);
+const lisible = (n: number | null): string => (n === null ? "non mesuré" : String(n));
 
 function adaptateurs(): { modele: string; lire: Lecteur; ecrire: Ecrivain; relire: Relecteur } {
   if (fournisseur === "simulation") {
@@ -300,8 +309,8 @@ async function main() {
     redactions.push({
       note,
       mesure: {
-        jetonsEntree: ecrit.jetonsEntree + relu.jetonsEntree,
-        jetonsSortie: ecrit.jetonsSortie + relu.jetonsSortie,
+        jetonsEntree: ajouter(ecrit.jetonsEntree, relu.jetonsEntree),
+        jetonsSortie: ajouter(ecrit.jetonsSortie, relu.jetonsSortie),
         millisecondes: msE + msR,
       },
       texte: ecrit.texte,
@@ -317,11 +326,12 @@ async function main() {
     redactions.map((r) => r.note),
   );
   const jetons = (liste: readonly { mesure: Mesure }[]) => ({
-    entree: liste.reduce((s, l) => s + l.mesure.jetonsEntree, 0),
-    sortie: liste.reduce((s, l) => s + l.mesure.jetonsSortie, 0),
+    entree: liste.reduce<number | null>((s, l) => ajouter(s, l.mesure.jetonsEntree), 0),
+    sortie: liste.reduce<number | null>((s, l) => ajouter(s, l.mesure.jetonsSortie), 0),
   });
   const tarif = fournisseur === "simulation" ? null : tarifDu(process.env, fournisseur);
-  const cout = (j: { entree: number; sortie: number }) => coutMicrosDesJetons(tarif, j.entree, j.sortie);
+  const cout = (j: { entree: number | null; sortie: number | null }) =>
+    j.entree === null || j.sortie === null ? null : coutMicrosDesJetons(tarif, j.entree, j.sortie);
 
   const resultat = {
     fournisseur,
@@ -365,7 +375,10 @@ type Resultat = {
   modele: string;
   horodatage: string;
   synthese: SyntheseDuBanc;
-  jetons: { lecture: { entree: number; sortie: number }; redaction: { entree: number; sortie: number } };
+  jetons: {
+    lecture: { entree: number | null; sortie: number | null };
+    redaction: { entree: number | null; sortie: number | null };
+  };
   tarif: { devise: string } | null;
   coutMicros: { lecture: number | null; redaction: number | null };
   lectures: readonly { note: NoteDeLecture; mesure: Mesure; cause: string | null }[];
@@ -374,7 +387,11 @@ type Resultat = {
 
 function rapport(r: Resultat): string {
   const cout = (micros: number | null) =>
-    micros === null || r.tarif === null ? "tarif non renseigné" : `${(micros / 1_000_000).toFixed(4)} ${r.tarif.devise}`;
+    r.tarif === null
+      ? "tarif non renseigné"
+      : micros === null
+        ? "non calculable : mesure absente"
+        : `${(micros / 1_000_000).toFixed(4)} ${r.tarif.devise}`;
   const moyenne = (liste: readonly { mesure: Mesure }[]) =>
     liste.length === 0 ? 0 : Math.round(liste.reduce((s, l) => s + l.mesure.millisecondes, 0) / liste.length);
   const lignesLecture = r.lectures.map(({ note, mesure, cause }) => {
@@ -391,10 +408,10 @@ function rapport(r: Resultat): string {
     ]
       .filter(Boolean)
       .join(" · ");
-    return `| ${note.id} | ${note.verdictAttendu} | ${note.verdictObtenu} | ${mesure.jetonsEntree} / ${mesure.jetonsSortie} | ${mesure.millisecondes} | ${remarque || "—"} |`;
+    return `| ${note.id} | ${note.verdictAttendu} | ${note.verdictObtenu} | ${lisible(mesure.jetonsEntree)} / ${lisible(mesure.jetonsSortie)} | ${mesure.millisecondes} | ${remarque || "—"} |`;
   });
   const lignesRedaction = r.redactions.map(({ note, mesure, incident }) =>
-    `| ${note.id} | ${note.ecrite ? "oui" : "non"} | ${note.incoherenceAttendue ? (note.incoherenceRelevee ? "relevée" : "**manquée**") : "—"} | ${mesure.jetonsEntree} / ${mesure.jetonsSortie} | ${[...note.aVerifier, incident ?? ""].filter(Boolean).join(" ") || "—"} |`,
+    `| ${note.id} | ${note.ecrite ? "oui" : "non"} | ${note.incoherenceAttendue ? (note.incoherenceRelevee ? "relevée" : "**manquée**") : "—"} | ${lisible(mesure.jetonsEntree)} / ${lisible(mesure.jetonsSortie)} | ${[...note.aVerifier, incident ?? ""].filter(Boolean).join(" ") || "—"} |`,
   );
 
   return `# Banc IA — ${r.fournisseur} · ${r.modele}
@@ -410,8 +427,8 @@ ${resume(r.synthese)
 
 | | Jetons entrée / sortie | Coût | Durée moyenne |
 |---|---|---|---|
-| Lecture des pièces | ${r.jetons.lecture.entree} / ${r.jetons.lecture.sortie} | ${cout(r.coutMicros.lecture)} | ${moyenne(r.lectures)} ms |
-| Rédaction et relecture | ${r.jetons.redaction.entree} / ${r.jetons.redaction.sortie} | ${cout(r.coutMicros.redaction)} | ${moyenne(r.redactions)} ms |
+| Lecture des pièces | ${lisible(r.jetons.lecture.entree)} / ${lisible(r.jetons.lecture.sortie)} | ${cout(r.coutMicros.lecture)} | ${moyenne(r.lectures)} ms |
+| Rédaction et relecture | ${lisible(r.jetons.redaction.entree)} / ${lisible(r.jetons.redaction.sortie)} | ${cout(r.coutMicros.redaction)} | ${moyenne(r.redactions)} ms |
 
 ## Pièces
 

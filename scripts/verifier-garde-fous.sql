@@ -369,6 +369,27 @@ SELECT refuse(
   $q$INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body)
      VALUES ('an2','v3','CONFORME','Titre','Corps actionnable de la remarque.')$q$);
 
+-- Une mesure inconnue n'est pas une consommation nulle, et une mesure
+-- négative n'en est pas une (11/10/2026, REV11-L2, S.173).
+SELECT refuse(
+  'INV-6 · des jetons négatifs au grand livre des usages',
+  $q$INSERT INTO "AiUsage" (id, "userId", operation, "inputTokens", "outputTokens", "costMicros")
+     VALUES ('au1','u1','analyse:essai',-12,1,0)$q$);
+
+SELECT refuse(
+  'INV-6 · des jetons négatifs sur une analyse',
+  $q$WITH v AS (
+       INSERT INTO "DocumentVersion" (id, "documentId", rank, "objectKey", checksum)
+       VALUES ('v18','d1',18,'minio/nn','nn1') RETURNING id)
+     INSERT INTO "DocumentAnalysis" (id, "versionId", verdict, title, body, "inputTokens")
+     SELECT 'an3', v.id, 'CONFORME', 'Titre', 'Corps actionnable de la remarque.', -1 FROM v$q$);
+
+SELECT passe(
+  'INV-6 · un appel inscrit avec un usage inconnu',
+  $q$INSERT INTO "AiUsage" (id, "userId", operation, "inputTokens", "outputTokens", "costMicros",
+       "usageMeasure")
+     VALUES ('au2','u1','analyse:essai',0,0,0,'INCONNUE')$q$);
+
 SELECT refuse(
   'RG-06.3 · une revue décidée sans message au candidat',
   $q$INSERT INTO "ManualReview" (id, "analysisId", reason, decision, "decidedAt")

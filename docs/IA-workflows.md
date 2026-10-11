@@ -180,11 +180,30 @@ Tarifs Anthropic : `AI_TARIF_ENTREE_PAR_MILLION`,
 coût affiché comme une facture réelle ; la valorisation B-07 dépend des
 tarifs courants. Le chantier prévoit de préciser la datation des prix.
 
-Le diagnostic révèle que l'adaptateur compatible accepte des compteurs
-absents ou invalides et perd une mesure connue si l'enveloppe est inexploitable.
-**Une mesure inconnue ne doit pas devenir un coût nul.** La représentation
-d'un usage inconnu et la politique de rapprochement doivent être arrêtées
-dans le lot de correction sans changer D1.
+**Une mesure inconnue ne devient pas un coût nul — S.173 / REV11-L2,
+proposé.** Le diagnostic avait reproduit trois défauts (DIA-01 à DIA-03) :
+une réponse sans mesure donnait une lecture à 0/0 absente de `AiUsage` ;
+des compteurs négatifs ou fractionnaires partaient vers les colonnes
+entières (−12/1,5 écrit −12/1, 10¹² en erreur SQL **après** l'appel, donc
+rejoué et payé deux fois) ; une enveloppe sans choix perdait ses 120/30
+jetons. Arbitrage du 11/10, appliqué aux trois sorties (compatible,
+Anthropic, rédaction et relecture) :
+
+- chaque compteur est lu connu, absent ou invalide (`domain/ia/usage.ts`) ;
+- un appel auquel le fournisseur a répondu s'inscrit toujours, avec l'état
+  `usageMeasure` (`MESUREE`, `ENTREE_SEULE`, `SORTIE_SEULE`, `INCONNUE`) et
+  sa seule part connue ; un zéro mesuré s'inscrit aussi ;
+- **sans mesure**, la réponse est publiée et l'analyse décomptée (D1) ; B-07
+  affiche « Consommation à rapprocher » et ses coûts deviennent un minorant ;
+  l'export ajoute la colonne « Mesure du fournisseur » ;
+- une mesure **invalide** rend l'enveloppe non conforme : `reponse_illisible`,
+  sans rejeu, revue humaine ou aucune version écrite, analyse rendue ;
+- la base refuse toute nouvelle consommation négative (contrainte
+  `NOT VALID`) ; le diagnostic des données compte `USAGE_PERDU` (lectures
+  antérieures à 0/0) et `JETONS_NEGATIFS`, sans rien réécrire.
+
+DIA-01 à DIA-03 passent. Le banc `banc:ia` rapporte « non mesuré » au lieu
+d'additionner un zéro. Un vrai fournisseur sans usage reste à observer en L5.
 
 ## 6. Qualification, exploitation et limites actuelles
 

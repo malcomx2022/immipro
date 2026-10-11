@@ -24,9 +24,9 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | Ordre | Lot | Priorité | État |
 |---|---|---|---|
 | 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 fusionné (PR #275) |
-| 2 | L1 — Destination des documents | P1 | S.171 / #276 proposé ; S.172 / #277 complément, [preuves](lot-l1-2026-10-11.md) |
-| 3 | L2 — Mesure des usages IA | P1 | Prochain lot |
-| 4 | L3 — Validité des avis IA | P1 | À réaliser |
+| 2 | L1 — Destination des documents | P1 | S.171 / #276 et S.172 (#277, porté par #278) fusionnés, `47b39b0` déployé ; [preuves](lot-l1-2026-10-11.md) |
+| 3 | L2 — Mesure des usages IA | P1 | S.173 proposé ; DIA-01/02/03 verts |
+| 4 | L3 — Validité des avis IA | P1 | Prochain lot |
 | 5 | L4 — Relecture unique par version | P1 | À réaliser |
 | 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
 | 7 | L6 — Recette front et parcours candidat | P2 | À réaliser |
@@ -100,6 +100,17 @@ des redirections ; éventuelle identité persistée à concevoir séparément.
 Diagnostic DIA-04 à transformer en test de régression après correction.
 
 ## REV11-L2 — Mesurer la consommation sans inventer des zéros
+
+**Suivi du 11/10 : S.173 proposé sur main `47b39b0`.** Arbitrages du
+responsable : une réponse valide sans mesure est **publiée**, l'appel
+inscrit avec un usage inconnu et B-07 demande un rapprochement ; l'état de
+mesure est une **colonne additive** (`MesureDUsage`, nulle sur
+l'historique). Une mesure invalide rend l'enveloppe non conforme
+(`reponse_illisible`, sans rejeu), ce qu'exige DIA-02. Contrainte SQL
+`NOT VALID` contre les jetons négatifs, constats `USAGE_PERDU` et
+`JETONS_NEGATIFS` au diagnostic des données. DIA-01/02/03 passent ;
+DIA-05 (L3) et DIA-07 (L4) restent rouges. Détail et preuves au registre
+(S.173).
 
 **P1 · M/L · REV-IA-01 · INV-6/D1 · WF-06/08/16.**
 

@@ -72,6 +72,13 @@ l'autorisation des pièces chez un fournisseur compatible désigne l'origine
 validée (`AI_OPENAI_ORIGINE_AUTORISEE`). Éprouvé sur serveurs locaux :
 aucun prestataire réel, aucune région ni DPA vérifiés (L5).
 
+**S.173 / REV11-L2, proposition du 11/10.** Une mesure de jetons absente
+n'est plus une consommation nulle (DIA-01 à DIA-03 verts) : la lecture est
+publiée, l'appel inscrit avec un usage inconnu, et B-07 affiche
+« Consommation à rapprocher » ; une mesure invalide envoie la pièce en revue
+humaine sans rejeu. Éprouvé sur serveurs locaux, job réel et PostgreSQL ;
+B-07 rendu sous jsdom, sans navigateur. Aucun fournisseur réel observé (L5).
+
 ## Candidat
 
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |

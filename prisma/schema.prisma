@@ -774,14 +774,30 @@ model AiUsage {
   /// ainsi sans être réécrit (`fournisseurDeLUsage`).
   provider      String?
   model         String?
+  /// La part **connue** de la mesure ; zéro pour une part inconnue, que
+  /// `usageMeasure` désigne — S.173.
   inputTokens   Int
   outputTokens  Int
   costMicros    Int
+  /// Ce que le fournisseur a mesuré. Nul sur les lignes antérieures à
+  /// S.173 : non qualifiées, jamais réécrites.
+  usageMeasure  MesureDUsage?
   createdAt     DateTime     @default(now())
 
   @@index([applicationId, createdAt])
   @@index([userId])
   @@index([createdAt])
+}
+
+/// L'état d'une mesure de jetons — REV11-L2, S.173 (`domain/ia/usage.ts`).
+///
+/// Une mesure inconnue n'est pas une consommation nulle : les colonnes de
+/// jetons portent la part connue, et cet état dit laquelle l'est.
+enum MesureDUsage {
+  MESUREE
+  ENTREE_SEULE
+  SORTIE_SEULE
+  INCONNUE
 }
 
 /// Le dernier constat d'un service extérieur — I.C, 22/09/2026.
@@ -946,6 +962,9 @@ model DocumentAnalysis {
   engineLog      String?
   inputTokens    Int             @default(0)
   outputTokens   Int             @default(0)
+  /// Ce que le fournisseur a mesuré pour cette lecture — S.173. Nul quand
+  /// aucun fournisseur n'a répondu, et sur les lignes antérieures.
+  usageMeasure   MesureDUsage?
   creditConsumed Boolean         @default(true)
   analyzedAt     DateTime        @default(now())
 

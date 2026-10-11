@@ -99,7 +99,8 @@ const service = createServer((requete: IncomingMessage, reponse: ServerResponse)
     if (reponseDuService.statut === 200 && corps.includes('"stream":true')) {
       const message = JSON.parse(reponseDuService.corps) as {
         content: { text: string }[];
-        usage: { input_tokens: number; output_tokens: number };
+        // Absente quand le service ne mesure pas (S.173).
+        usage?: { input_tokens?: unknown; output_tokens?: unknown };
         stop_reason: string;
       };
       const texte = message.content[0]?.text ?? "";
@@ -113,7 +114,7 @@ const service = createServer((requete: IncomingMessage, reponse: ServerResponse)
       evenement("content_block_stop", { index: 0 });
       evenement("message_delta", {
         delta: { stop_reason: message.stop_reason, stop_sequence: null },
-        usage: { output_tokens: message.usage.output_tokens },
+        usage: { output_tokens: message.usage?.output_tokens },
       });
       evenement("message_stop", {});
       return reponse.end();
@@ -362,6 +363,58 @@ try {
     verifier((await solde(p.application.id)) === avant - 1, "et cette mise en forme-là est décomptée");
   }
 
+  /*
+    REV11-L2, S.173. Une mise en forme dont le service ne mesure pas les
+    jetons est publiée (arbitrage du 11/10) et décomptée en analyses (D1) ;
+    l'appel s'inscrit avec un usage inconnu au lieu de disparaître. Une
+    mesure invalide n'écrit pas de version, rend l'analyse, et garde la
+    part connue.
+  */
+  console.log("\nREV11-L2 : une mise en forme sans mesure ou à mesure invalide");
+  {
+    const PIECE = {
+      type: "lettre-motivation",
+      libelle: MATIERE.piece,
+      objet: MATIERE.objet,
+      pays: MATIERE.pays,
+      questions: [{ section: "PARCOURS", intitule: "Quel est ton parcours ?" }],
+    } as never;
+    const avecMesure = (usage: unknown): ReponseDuService => {
+      const m = JSON.parse(messageDe(LETTRE).corps) as Record<string, unknown>;
+      if (usage === undefined) delete m.usage;
+      else m.usage = usage;
+      return { statut: 200, corps: JSON.stringify(m) };
+    };
+
+    const p = await piece({ avecTexte: false });
+    const avant = await solde(p.application.id);
+    reponseDuService = avecMesure(undefined);
+    const sansMesure = await mettreEnForme(p.application.id, p.user.id, PIECE, MATIERE.reponses);
+    let usages = await db.aiUsage.findMany({ where: { applicationId: p.application.id } });
+    verifier(sansMesure.produite, "sans mesure : la version est écrite");
+    verifier((await solde(p.application.id)) === avant - 1, "sans mesure : la mise en forme est décomptée (D1)");
+    verifier(
+      usages.length === 1 && usages[0]!.usageMeasure === "INCONNUE",
+      `sans mesure : l'appel est inscrit, usage inconnu (${usages.map((u) => u.usageMeasure).join(",")})`,
+    );
+
+    const q = await piece({ avecTexte: false });
+    const avantQ = await solde(q.application.id);
+    reponseDuService = avecMesure({ input_tokens: 3200, output_tokens: -4 });
+    const invalide = await mettreEnForme(q.application.id, q.user.id, PIECE, MATIERE.reponses);
+    usages = await db.aiUsage.findMany({ where: { applicationId: q.application.id } });
+    verifier(!invalide.produite, "mesure invalide : aucune version n'est écrite");
+    verifier((await solde(q.application.id)) === avantQ, "mesure invalide : l'analyse est rendue");
+    verifier(
+      usages.length === 1 && usages[0]!.usageMeasure === "ENTREE_SEULE" && usages[0]!.inputTokens === 3200,
+      `mesure invalide : la part connue reste inscrite (${usages.map((u) => `${u.usageMeasure} ${u.inputTokens}/${u.outputTokens}`).join(",")})`,
+    );
+    verifier(
+      (await db.documentVersion.count({ where: { documentId: q.document.id } })) === 0,
+      "mesure invalide : la pièce reste sans texte",
+    );
+  }
+
   console.log("\nUne rédaction interrompue rend sa réservation à l'échéance (RF-4, S.153)");
   {
     const p = await piece({ avecTexte: false });
@@ -452,7 +505,7 @@ try {
       Les jetons ont bien été consommés : INV-6 veut qu'ils soient
       écrits quand même. C'est la route qui le fait, avec cette valeur.
     */
-    verifier(produit.jetonsSortie > 0, "les jetons consommés restent comptés");
+    verifier(produit.jetonsSortie !== null && produit.jetonsSortie > 0, "les jetons consommés restent comptés");
   }
 
   console.log("\nUne relecture réelle date la version et écrit ses remarques");
@@ -478,7 +531,7 @@ try {
 
     // Ce que la route écrit, dans la même transaction.
     if (avis.etat === "RELUE") {
-      await noterLesJetons(p.user.id, p.application.id, "relecture:lettre-motivation", avis.jetonsEntree, avis.jetonsSortie);
+      await noterLesJetons(p.user.id, p.application.id, "relecture:lettre-motivation", avis.jetonsEntree, avis.jetonsSortie, avis.appel);
       await db.$transaction([
         ...avis.remarques.map((r) =>
           db.critiqueFinding.create({

@@ -70,25 +70,33 @@ import {
 } from "@/domain/ia/fournisseurs";
 import { VARIABLE_COMPTE_DE_SERVICE, lireCompteDeService } from "@/domain/ia/compte-de-service";
 import { lireUnePiece, tailleDUnePiece } from "@/lib/storage";
+import { DETAIL_MESURE_INVALIDE, lireLesJetons } from "@/domain/ia/usage";
 
-/** Ce qu'une lecture rend, dans les deux cas. Les jetons sont toujours là. */
+/**
+ * Ce qu'une lecture rend, dans les deux cas. Les jetons sont toujours là :
+ * un nombre quand le fournisseur l'a mesuré, `null` quand il ne l'a pas
+ * dit (S.173) — jamais un zéro qui passerait pour une mesure.
+ */
 export type Lecture = (
   | {
       etat: "LUE";
       bruts: ChampsExtraits;
       pieceIdentifiee: string | null;
-      jetonsEntree: number;
-      jetonsSortie: number;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
   | {
       etat: "NON_LUE";
       cause: CauseDeNonLecture;
       detail: string;
-      jetonsEntree: number;
-      jetonsSortie: number;
+      jetonsEntree: number | null;
+      jetonsSortie: number | null;
     }
 ) & {
-  /** Chez qui l'appel est parti (S.94) ; absent quand aucun appel n'a eu lieu. */
+  /**
+   * Chez qui l'appel est parti (S.94) ; présent dès que le fournisseur a
+   * répondu, absent quand aucun appel n'a abouti à une réponse.
+   */
   appel?: AppelMesure;
 };
 
@@ -225,8 +233,11 @@ export async function lireDesOctets(
     return sansJetons(cause, detail);
   }
 
-  const jetonsEntree = message.usage.input_tokens;
-  const jetonsSortie = message.usage.output_tokens;
+  // La mesure, lue pour ce qu'elle est (S.173) : une adresse déclarée dans
+  // `ANTHROPIC_BASE_URL` peut rendre n'importe quoi à la place.
+  const mesure = lireLesJetons(message.usage?.input_tokens, message.usage?.output_tokens);
+  const jetonsEntree = mesure.entree;
+  const jetonsSortie = mesure.sortie;
   const appel: AppelMesure = { fournisseur: "anthropic", modele };
   const echoue = (cause: CauseDeNonLecture, detail: string): Lecture => ({
     etat: "NON_LUE",
@@ -236,6 +247,7 @@ export async function lireDesOctets(
     jetonsSortie,
     appel,
   });
+  if (mesure.invalide) return echoue("reponse_illisible", DETAIL_MESURE_INVALIDE);
 
   /*
     Un refus et une réponse tronquée se ressemblent — aucune des deux ne

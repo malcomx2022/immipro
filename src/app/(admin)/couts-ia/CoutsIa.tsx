@@ -25,6 +25,7 @@ import {
 } from "@/domain/backoffice/couts";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { ExportDesAppels } from "./ExportDesAppels";
+import { COMMENT_RAPPROCHER, phraseDesAppelsARapprocher } from "@/domain/ia/usage";
 import {
   FOURNISSEURS,
   MENTION_CHOIX_DU_FOURNISSEUR,
@@ -122,6 +123,8 @@ export function CoutsIa({
             </p>
           </section>
         )}
+
+        <ConsommationARapprocher parFournisseur={parFournisseur} />
 
         <FournisseursIA fonctions={fonctions} parFournisseur={parFournisseur} />
 
@@ -291,6 +294,38 @@ const NOMBRE = new Intl.NumberFormat("fr-FR");
 const MONTANT = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 });
 
 /**
+ * Les appels à rapprocher — S.173, REV11-L2.
+ *
+ * Un fournisseur qui ne transmet pas sa mesure rendait la consommation de
+ * l'écran incomplète, sans que rien ne le montre : ses appels comptaient
+ * zéro jeton, ou disparaissaient. Ils sont désormais inscrits avec un
+ * usage inconnu, et cette alerte en donne le nombre. Le quota, lui, se
+ * compte en analyses (D1) : il n'en dépend pas.
+ */
+function ConsommationARapprocher({
+  parFournisseur,
+}: {
+  parFournisseur: readonly ConsommationDuFournisseur[];
+}) {
+  const aRapprocher = parFournisseur.reduce((n, l) => n + l.appelsARapprocher, 0);
+  if (aRapprocher === 0) return null;
+  return (
+    <section
+      aria-labelledby="consommation-a-rapprocher"
+      className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2"
+    >
+      <h2 id="consommation-a-rapprocher" className="text-16 font-semibold text-ink-900">
+        Consommation à rapprocher
+      </h2>
+      <p className="max-w-lecture-large text-pretty text-14 text-ink-700">
+        {phraseDesAppelsARapprocher(aRapprocher)}
+      </p>
+      <p className="max-w-lecture-large text-pretty text-13 text-ink-500">{COMMENT_RAPPROCHER}</p>
+    </section>
+  );
+}
+
+/**
  * Les fournisseurs d'IA — S.94.
  *
  * Deux questions, dans l'ordre où un exploitant se les pose : qui sert
@@ -376,13 +411,20 @@ function FournisseursIA({
                     <td className="px-3 py-2 font-mono text-13 text-ink-700">
                       {l.modele ?? "non consigné (avant S.94)"}
                     </td>
-                    <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.appels)}</td>
+                    <td className="px-3 py-2 text-right text-ink-900">
+                      {NOMBRE.format(l.appels)}
+                      {l.appelsARapprocher > 0 ? (
+                        <span className="block text-13 text-warning">
+                          dont {NOMBRE.format(l.appelsARapprocher)} à rapprocher
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsEntree)}</td>
                     <td className="px-3 py-2 text-right text-ink-900">{NOMBRE.format(l.jetonsSortie)}</td>
                     <td className="px-3 py-2 text-right text-ink-900">
                       {l.coutMicros === null || l.devise === null
                         ? "sans tarif"
-                        : `${MONTANT.format(l.coutMicros / 1_000_000)} ${l.devise}`}
+                        : `${l.appelsARapprocher > 0 ? "au moins " : ""}${MONTANT.format(l.coutMicros / 1_000_000)} ${l.devise}`}
                     </td>
                   </tr>
                 ))}
