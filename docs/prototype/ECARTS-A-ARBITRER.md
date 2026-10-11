@@ -13441,3 +13441,11 @@ Mobile B-07 à 390 px déborde : constat reporté en L7, recette non validée.
 Rapprochement manuel sans import de facture ni reconstitution automatique.
 Aucun prestataire réel, image, déploiement L2 ou levée Q.A/M.C attestés.
 Proposition indépendante pour revue, sans fusion automatique. Prochain L3.
+
+**Deux propositions pour L2 — arbitrage du 11/10, en soirée.** Claude avait préparé en parallèle une autre version de L2 (PR #281, branche `claude/elegant-dijkstra-86egeb`), sans base commune avec celle-ci. Ses choix étaient inverses, et le responsable les lui avait donnés le même jour :
+- une réponse sans mesure était publiée, avec un usage inconnu ;
+- l'état de la mesure était porté par une colonne additive, les jetons restant des entiers non nuls.
+
+#280 a été fusionnée la première, ce qui a mis #281 en conflit. Le responsable a retenu la version de main et fait fermer #281 sans fusion. **RG-06.15, RG-08.8 et RG-16.3, telles que #280 les définit, remplacent l'arbitrage donné pour #281.** Il ne faut pas le rouvrir, ni réintroduire la colonne `usageMeasure` ou l'énumération `MesureDUsage` de #281.
+
+Le diagnostic IA, rejoué sur main `c27b300`, donne CTRL-01, CTRL-02 et DIA-01 à DIA-04 verts, ainsi que DIA-06. DIA-05 reste rouge (L3).
