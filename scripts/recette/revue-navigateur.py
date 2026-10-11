@@ -40,6 +40,7 @@ with sync_playwright() as p:
  for path in ['/','/comment-ca-marche','/tarifs','/simulateur','/resultats','/destinations','/destinations/pays-bas','/conditions','/mentions-legales','/donnees-personnelles','/guides','/guides/pays-bas','/articles','/contact','/inscription','/mot-de-passe']:
   check(path,'public')
  check('/tableau-de-bord','anonyme')
+ actions.append({'action':'anonyme renvoyé vers connexion','conforme':results[-1].get('destination','').startswith('/connexion?')})
  login('aline.dossou@immipro.test')
  for path in ['/tableau-de-bord','/profil','/comparateur','/notifications','/services','/consentements','/compte/rappels','/compte/mes-donnees','/dossiers/nouveau',f'/dossiers/{app}',f'/dossiers/{app}/completude',f'/dossiers/{app}/echeancier',f'/dossiers/{app}/redaction',f'/dossiers/{app}/pieces/{piece}',f'/dossiers/{app}/pieces/{piece}/versions','/paiement/pack']:
   check(path,'candidat')
@@ -50,11 +51,13 @@ with sync_playwright() as p:
   statut=page.evaluate('(path) => fetch(path).then(r => r.status)',path)
   actions.append({'action':'refus candidat sur API administrative','chemin':path,'statut':statut,'conforme':statut==403})
  check('/revue','candidat')
+ actions.append({'action':'candidat écarté de la revue opérateur','conforme':results[-1].get('destination')=='/tableau-de-bord'})
  c.clear_cookies();page.set_viewport_size({'width':1280,'height':900});login('admin@immipro.test')
  for path in ['/veille','/couts-ia','/revue','/journal','/contenus','/utilisateurs','/textes-juridiques','/paiements','/habilitations']:
   check(path,'admin')
  c.clear_cookies();login('veilleur@immipro.test')
  check('/veille','veilleur');check('/habilitations','veilleur')
+ actions.append({'action':'veilleur écarté des habilitations admin','conforme':results[-1].get('destination')=='/tableau-de-bord'})
  pathlib.Path(args.sortie).parent.mkdir(parents=True,exist_ok=True)
  pathlib.Path(args.sortie).write_text(json.dumps({'navigations':results,'actions':actions,'erreursJS':errors},ensure_ascii=False,indent=2))
  print(json.dumps({'pages':len(results),'erreurs':errors,'navigation_non200':[r for r in results if r.get('statut')!=200],'debordements':[r for r in results if r.get('debordement',0)>1],'actions':actions},ensure_ascii=False,indent=2))

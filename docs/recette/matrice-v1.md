@@ -274,3 +274,11 @@ qualité fournisseur IA ni encaissement réel.
 
 Cette entrée ajoute des preuves locales ciblées ; elle ne coche pas les
 gestes non rejoués et ne modifie ni signature pilote ni Q.A/M.C.
+
+**Après fusion S.169.** Base finale `ec32f65` / Prisma 7.10.0. Les contrôles
+sont rejoués : 179 fichiers / 3 586 tests, 26 fumées, audit et build passent.
+Nouveau banc et nouvelle base : 45 navigations et neuf contrôles de session,
+connexion et droits conformes, sans erreur JS ni débordement. Diagnostics
+toujours rouges. REV-BANC-01 (annonce de disponibilité malgré échec du
+serveur sur port occupé) est ajouté au chantier L0. Aucun préalable de
+lancement n'est levé par cette actualisation.

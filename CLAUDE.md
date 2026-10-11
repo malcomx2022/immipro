@@ -82,9 +82,9 @@ Un message d'échec est toujours actionnable.
 Lire la [revue complète](docs/revue/revue-complete-2026-10-11.md), le
 [chantier](docs/revue/chantier-complet-2026-10-11.md) et la
 [documentation IA/workflows](docs/IA-workflows.md) après les décisions du
-registre. Base testée : `bbf1500` / S.168, S.167 / PR #268 fusionnée.
-S.169 / PR #272 prépare Prisma 7 : vérifier son état avant modification,
-conserver son client et ses outils après fusion. Aucun chantier concurrent
+registre. Base initiale : `bbf1500` / S.168 ; base finale : `ec32f65` / S.169.
+S.167 / PR #268 et S.169 / PR #272 (Prisma 7) sont fusionnées.
+Conserver leur code, le client Prisma et ses outils. Aucun chantier concurrent
 de dépendances ne doit remplacer les corrections fonctionnelles proposées.
 
 REV11 apporte une revue, des diagnostics et un plan avant intégration ;
@@ -99,7 +99,8 @@ Une mesure inconnue n'est pas une consommation nulle. Un parseur JSON ne
 prouve pas la vérité des champs extraits. Vérifier destination des octets,
 validité d'un avis et revendication de la relecture par version, au-delà
 du verrou du grand livre. Le banc sans fournisseur doit aussi neutraliser
-Vertex ; les simulations ne prouvent ni DPA, ni modèle réel, ni paiement.
+Vertex et vérifier son propre démarrage (REV-BANC-01) ; les simulations
+ne prouvent ni DPA, ni modèle réel, ni paiement.
 
 Les lots REV11-L0 à L9 sont un ordre de travail proposé, pas des numéros
 S.xxx réservés. Ne marquer un préalable levé qu'avec sa preuve réelle ;

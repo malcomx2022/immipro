@@ -1743,7 +1743,7 @@ Q.A/M.C et les preuves d'exploitation restent des conditions de lancement.
 ## Complément du 11/10/2026 — REV11
 
 Le [chantier complet](chantier-complet-2026-10-11.md) prolonge ce plan en
-conservant S.167 et S.168 et la PR #272 / S.169 en cours. Il traite cinq
+conservant S.167, S.168 et S.169 / PR #272, fusionnée pendant la revue. Il traite cinq
 groupes de défauts IA reproduits, puis la qualification réelle et la recette
 restante. Voir la [revue et les preuves](revue-complete-2026-10-11.md).
 Les identifiants REV11-Lx ne remplacent pas les numéros S.xxx ni les

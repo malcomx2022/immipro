@@ -235,7 +235,7 @@ try {
 console.log(
   JSON.stringify(
     {
-      base: "bbf1500/S.168",
+    base: "reproduire sur le commit indiqué dans le rapport REV11",
       simulation: true,
       resultats,
       echecs: resultats.filter((r) => !r.conforme).length,

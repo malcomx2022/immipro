@@ -6,10 +6,10 @@ référentiel figé, grand livre des analyses, services remplaçables, preuves
 sur base jetable et une PR par lot. Les corrections proposées ci-dessous
 ne sont pas intégrées par cette revue. Le plan est présenté avant leur intégration.
 
-Base auditée : `bbf1500` / S.168. S.167 / PR #268 et les montées pg-boss
-récentes sont intégrées et conservées. La PR #272 / S.169 de Claude Code
-prépare Prisma 7 : relire son état avant chaque lot, utiliser son client et
-son CLI après fusion, éviter toute montée concurrente de Prisma/package-lock.
+Base initiale auditée : `bbf1500` / S.168. Base finale : `ec32f65` / S.169,
+après fusion de la PR #272 pendant la revue. S.167 / PR #268, pg-boss 12
+et Prisma 7 de Claude Code sont conservés. Relire main avant chaque lot,
+utiliser son client et son CLI, éviter toute montée concurrente de Prisma/package-lock.
 Les numéros REV11-Lx sont des identifiants de plan ; attribuer S.xxx au
 démarrage de chaque lot applicatif après vérification du registre et des PR.
 
@@ -22,6 +22,12 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 ## REV11-L0 — Isoler réellement le banc et établir les régressions
 
 **P1 · S/M · anomalie REV-IA-04 · WF-06/08 · scripts/recette/banc.mts.**
+
+Inclure REV-BANC-01 (P2) : ne jamais annoncer un banc prêt après échec
+d'un enfant, port occupé ou expiration du délai de démarrage. Interroger
+le serveur lancé par cette passe et fermer les services après échec.
+Tester deux bancs à bases distinctes sur le même port, puis un démarrage
+sans serveur répondant ; une autre instance saine ne valide pas celle-ci.
 
 Neutraliser l'ensemble des voies de branchement IA, y compris le compte de
 service Google et ses paramètres. Préférer une construction explicite de
@@ -192,9 +198,10 @@ Ces exigences proviennent de CLAUDE.md et du dossier de lancement existant.
 
 **P2 · effort selon lot · PR #272 et plan M19.**
 
-Laisser S.169/Prisma 7 suivre sa revue et sa porte complète. Après fusion,
-rejouer les diagnostics IA et le scénario de concurrence avec son client,
-le CLI de migration et l'image réellement construite. Vérifier les avis
+S.169/Prisma 7 est fusionné ; sa conception du client, du CLI et de l'image
+est conservée. Les diagnostics IA et le scénario de concurrence sont
+rejoués sur cette base dans REV11. Pour toute maintenance suivante, éprouver
+aussi l'image réellement construite. Vérifier les avis
 d'audit résiduels au lieu de supposer leur disparition. Traiter l'exception
 élevée `deepmerge-ts` et les quatre avis modérés selon leur chaîne réelle.
 Les étapes Vitest/Tailwind restantes suivent le plan M19 existant ; une

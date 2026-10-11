@@ -13247,3 +13247,12 @@ antérieures/restauration, recette finale et préalables Q.A/M.C. Nginx local
 non achevé (image absente, téléchargement réseau refusé), ShellCheck et image
 applicative non éprouvés localement. Une revue ou une PR ne vaut ni fusion,
 ni déploiement, ni certification V1.
+
+**Actualisation pendant la revue.** PR #272 / S.169 fusionnée sur `ec32f65`.
+Livrables rebasés en conservant son client Prisma 7, CLI, dépendances et
+documents. Nouvelle installation, Prisma 7.10.0 généré, check : 179 fichiers
+/ 3 586 tests passent ; audit/build/Prisma validate et les 26 fumées passent.
+Diagnostics IA et concurrence : mêmes défauts. Nouveau banc S.169 :
+45 navigations, neuf contrôles conformes, aucun débordement ni erreur JS.
+REV-BANC-01 s'ajoute : un port occupé peut faire annoncer un banc prêt
+alors que son enfant web a échoué. L0 doit aussi contrôler le démarrage.

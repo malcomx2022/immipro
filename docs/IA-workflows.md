@@ -1,6 +1,8 @@
 # IA : fournisseurs, configuration et intervention dans les workflows
 
-État du code revu le **11/10/2026**, main `bbf1500` / S.168. Ce document
+État du code revu le **11/10/2026**, base initiale `bbf1500` / S.168,
+base finale `ec32f65` / S.169 après fusion Prisma 7. Les chemins IA sont
+inchangés par cette fusion. Ce document
 décrit l'exécution de l'application. Claude Code est l'outil de développement
 du projet ; il ne détermine pas automatiquement le fournisseur utilisé en
 production. Les décisions D1 et les invariants de CLAUDE.md restent applicables.

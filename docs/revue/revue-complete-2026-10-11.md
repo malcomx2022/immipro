@@ -9,7 +9,10 @@ fusion ou déploiement n'est effectué par cette revue.
 
 ## 1. Base de travail et corrections Claude Code conservées
 
-La revue porte sur main **`bbf1500e5762e1c192c46ba9c01f1faa23af7b06`**, S.168.
+La revue commence sur main **`bbf1500e5762e1c192c46ba9c01f1faa23af7b06`**, S.168,
+puis est rattachée à **`ec32f6564c9578068a09e22746ecd435a9e7341d`**, S.169,
+après fusion Prisma 7 pendant les essais. Les preuves initiales et celles
+de la base finale sont distinguées au §8.
 Le checkout, le code Claude, CLAUDE.md, DOC-11, les décisions du registre,
 les revues précédentes et la porte CI ont été relus avant les essais.
 
@@ -20,9 +23,10 @@ les revues précédentes et la porte CI ont été relus avant les essais.
   transfert et de montée du schéma production sont conservées ; la
   [PR #271](https://github.com/malcomx2022/immipro/pull/271) est fusionnée.
 - La [PR #272](https://github.com/malcomx2022/immipro/pull/272),
-  **S.169 / Prisma 7**, est en cours au moment du gel de la base. Ses
+  **S.169 / Prisma 7**, était en cours au moment du gel initial. Ses
   changements de client, CLI, image, seeds et tests ont été recensés.
-  La base testée ici reste Prisma 6 ; aucune montée concurrente n'est proposée.
+  Après fusion, ses changements sont conservés et les contrôles rejoués ;
+  aucune montée concurrente n'est proposée.
 - Le périmètre V1 et les reports V2 sont inchangés. Consultants/marketplace
   V2 ne deviennent pas des fonctionnalités V1 manquantes à implémenter.
 
@@ -31,6 +35,9 @@ Cet inventaire ne signifie pas que 62 parcours complets ou 73 endpoints
 ont chacun été exécutés. Les preuves sont distinguées ci-dessous.
 
 ## 2. Résultats exécutés et limites de preuve
+
+Ce tableau conserve les résultats initiaux S.168. Le §8 donne les résultats
+rejoués après la fusion S.169, dont 3 586 tests au lieu de 3 582.
 
 Essais sur Node **24.19.0**, PostgreSQL **16** dans un conteneur privé,
 bases jetables, HTTP/S3/SMTP/antivirus simulés sur la boucle locale.
@@ -208,6 +215,24 @@ paiement réel, qualification IA et recette complète pilote restent ouverts.
 
 ## 6. Autres corrections documentaires et risques à qualifier
 
+### REV-BANC-01 — Banc déclaré prêt malgré un serveur non démarré
+
+**P2 — contrôle de validité de la recette — scripts/recette/banc.mts.**
+Au redémarrage sur un port déjà occupé par le précédent banc, le processus
+web a échoué avec `EADDRINUSE`, mais le lanceur a affiché « Banc prêt » :
+son contrôle de santé a interrogé le serveur déjà présent. Le code ne
+conditionne pas non plus cette annonce à une réponse de santé après la
+dernière attente. La nouvelle recette S.169 utilise un port distinct et
+le bon processus standalone ; cette tentative conflictuelle n'est pas
+comptée parmi ses visites réussies.
+
+Reproduction : deux bancs locaux, bases jetables distinctes, même port,
+environnement sans configuration fournisseur. Le second doit s'arrêter
+avec une erreur actionnable, fermer ses services et ne jamais annoncer
+sa disponibilité. L0 doit contrôler la vie de ses enfants, le délai de
+démarrage et l'identité du serveur interrogé. Ce point s'ajoute aux cinq
+groupes IA ; il ne démontre pas une panne de l'application en production.
+
 Le benchmark IA affirmait encore un quota en jetons et l'impossibilité
 d'une fausse conformité. Ces passages sont corrigés : **D1 fixe un quota
 en analyses**, la mesure de jetons sert au coût/marge et un parseur ne
@@ -271,3 +296,36 @@ le dépôt et toute la matrice ; le dépôt et la décision décrits au §5 ont
 leurs attentes, porte complète verte sur le code final de Claude, parcours
 de la matrice achevés et preuves des préalables réels consignées. Le seul
 nombre de tests réussis ne suffit pas à autoriser le lancement.
+
+## 8. Validation de la base finale après fusion Prisma 7
+
+La PR #272 a été fusionnée pendant la revue. Les livrables sont rattachés
+à main **`ec32f65` / S.169**, en préservant tous ses fichiers et décisions,
+y compris le nouveau client Prisma, le CLI et la conception de l'image.
+Les compléments du registre et du plan ont été réunis avec ceux de Claude.
+
+Installation verrouillée et génération du client **Prisma 7.10.0** réussies.
+`npm run check` : **179 fichiers / 3 586 tests passent**, types, lint et copie
+passent. Les quatre tests supplémentaires proviennent de la base Claude.
+`check:audit` passe avec les mêmes avis résiduels. `npm run build` passe
+pour Next et le worker. Prisma validate et les **26 fumées** passent encore,
+avec **1 680 contrôles rapportés** et **105 refus / 9 permissions SQL**.
+La fumée worker reconstruit elle-même son artefact dans une arborescence
+isolée ; ces preuves ne reposent pas sur l'ancien worker S.168.
+
+Les diagnostics IA et de concurrence sont rejoués sur cette base : mêmes
+six attentes IA en échec et même double appel/débit en DIA-07. Aucune
+correction de ces défauts n'est attribuée à la migration Prisma.
+
+Un nouveau serveur standalone et worker S.169, nouvelle base jetable,
+port distinct et aucune configuration IA, servent la recette finale :
+**45 navigations et neuf contrôles conformes**, zéro erreur JavaScript,
+zéro débordement. Les absences juridiques attendues restent explicitement
+signalées. Le sandbox paiement reste non éprouvé et les limites locales
+nginx/ShellCheck/image du §2 demeurent. Les preuves Q.A/M.C ne changent pas.
+
+Le dépôt PDF et la décision opérateur décrits au §5 ont aussi été rejoués
+sur ce nouveau banc : version saine, traitement sans IA et décision finale
+`CONFORME` confirmés en base. Les sorties structurées des contrôles sont
+consignées dans [preuves-2026-10-11.json](preuves-2026-10-11.json), avec
+identifiants synthétiques anonymisés et limites de preuve explicites.
