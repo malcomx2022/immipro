@@ -27,8 +27,8 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | 2 | L1 — Destination des documents | P1 | S.171/S.172 fusionnés via #276/#278 ; [preuves](lot-l1-2026-10-11.md) |
 | 3 | L2 — Mesure des usages IA | P1 | S.173 fusionné #280 ; arbitrage Claude #282 ; [preuves et limites](lot-l2-2026-10-11.md) |
 | 4 | L3 — Validité des avis IA | P1 | S.174 fusionné #283 ; [preuves](lot-l3-2026-10-11.md) |
-| 5 | L4 — Relecture unique par version | P1 | S.175 proposé ; [preuves et limites](lot-l4-2026-10-11.md), à revoir avant intégration |
-| 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
+| 5 | L4 — Relecture unique par version | P1 | S.175 fusionné #284 ; [preuves et limites](lot-l4-2026-10-11.md) |
+| 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | S.176 proposé : banc corrigé ; [essais réels et preuves à compléter](lot-l5-2026-10-12.md) |
 | 7 | L6 — Recette front et parcours candidat | P2 | À réaliser |
 | 8 | L7 — Exploitation et données antérieures | P2 | À réaliser |
 | 9 | L8 — Paiement, conformité et lancement | Préalables Q.A/M.C | À réaliser avec les preuves externes |
@@ -187,6 +187,14 @@ aucun effacement de grand livre. Dépend de L2/L3 pour les états d'échec.
 ## REV11-L5 — Qualifier les fournisseurs IA en conditions réelles
 
 **Préalable IA · L · WF-06/08/16 · après L0–L4.**
+
+**Suivi S.176, 12/10/2026.** Base `0d82d23` / #284 fusionné. Banc
+corrigé et éprouvé localement, lettres de référence et mesures par appel,
+[protocole](../exploitation/qualification-ia.md) et [preuves L5](lot-l5-2026-10-12.md).
+Aucun accès commercial configuré : qualification réelle, tarifs/modèles,
+DPA/région/conservation, factures, choix et relevé du déploiement restent
+non vérifiés. L5 n'est pas clôturé ; critères initiaux ci-dessous conservés.
+
 
 Le code et les simulations ne permettent pas de choisir un prestataire
 par sa qualité réelle. Revalider disponibilité des modèles et tarifs,

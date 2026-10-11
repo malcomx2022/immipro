@@ -14,7 +14,7 @@ Les vraies difficultés ne sont pas techniques :
 
 1. **Données personnelles.** Chaque fournisseur ajouté est un nouveau sous-traitant qui reçoit des pièces d'identité.
 2. **Consommation.** Les jetons servent à surveiller la marge ; D1 a fixé le quota candidat en analyses. Un jeton n'a pas la même taille ni le même prix chez deux fournisseurs.
-3. **Qualité.** Un autre modèle peut lire moins bien une pièce. Le produit ne la déclarera jamais conforme à tort, mais il enverra plus de pièces en revue humaine.
+3. **Qualité.** Un autre modèle peut lire moins bien une pièce. Les contrôles déterministes utilisent les faits extraits : un fait inventé peut produire une fausse conformité. Le banc doit la mesurer ; un schéma JSON ne prouve pas la vérité.
 
 ---
 
@@ -223,3 +223,16 @@ de la consultation. Après un arrêt brutal, une reprise explicite après
 une fois n'est pas attestée. Voir [son intervention détaillée dans WF-08,
 reprises et migration](exploitation/relecture-concurrente.md). Les tests
 Anthropic/compatible sont locaux et synthétiques ; qualification réelle L5.
+
+
+## Qualification — S.176 / REV11-L5
+
+Le banc exige un manifeste d'essai, trace chaque mesure L2 et ajoute dix
+lettres/avis de référence aux trente pièces et dix rédactions S.99.
+Les erreurs, abstentions, inventions, avis mal formés et coûts estimés
+restent visibles. Simulations et HTTP local sont explicitement des
+vérifications du banc. Aucun fournisseur réel qualifié, aucun tarif/modèle
+revalidé, aucune preuve DPA ou région obtenue par cette proposition.
+Lire [protocole, secrets et rapprochement](exploitation/qualification-ia.md)
+et [le suivi L5](revue/lot-l5-2026-10-12.md). La décision S.99 reste ouverte,
+extraction/rédaction séparées ; Q.A/M.C non levés.

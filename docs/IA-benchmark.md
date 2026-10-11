@@ -259,35 +259,29 @@ Le reste se juge à l'aveugle. `banc:ia:aveugle` mélange les lettres des fourni
 | Lecteur crédule (`--simulation credule`), qui remplit chaque champ vide | Disqualifié sur L07, L10, L17, L18, L23, L28 et L30 |
 | Faux serveur compatible OpenAI en local | Le chemin réel de l'adaptateur passe, bloc PDF compris, avec le coût calculé sur le tarif déclaré |
 
-**Pour faire passer un finaliste** : déclarer ses variables comme en production (S.94), puis lancer le banc.
+**Actualisation S.176 / REV11-L5 — 12/10/2026.** Le banc exige désormais
+un manifeste pour tout passage fournisseur, refuse les sélections vides et
+conserve la mesure canonique L2 par appel. Dix lettres de référence fixes
+complètent les trente pièces et dix rédactions, soit au plus soixante
+invocations. Les témoins simulés respectent L3. Les sources et tableaux S.99
+ci-dessus restent historiques : aucun modèle, tarif ou engagement contractuel
+n'est revalidé par cette correction.
+
+Lire [la procédure de qualification](exploitation/qualification-ia.md), son
+manifeste et [les résultats/limites L5](revue/lot-l5-2026-10-12.md). Avec les
+secrets/configurations injectés dans le seul environnement d'essai :
 
 ```bash
-# Anthropic
-ANTHROPIC_API_KEY=… AI_MODEL=claude-sonnet-5-5 npm run banc:ia -- --fournisseur anthropic
-
-# Tout fournisseur compatible OpenAI (ici OpenAI)
-AI_OPENAI_URL=https://api.openai.com/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=gpt-6.1-sol \
-  AI_OPENAI_PDF=oui npm run banc:ia -- --fournisseur openai_compatible
-
-# Puis, une fois tous les finalistes passés
-npm run banc:ia:aveugle -- banc-ia-resultats/<passage 1> banc-ia-resultats/<passage 2> …
+npm run banc:ia -- --fournisseur anthropic --manifeste work/candidat.json
+npm run banc:ia -- --fournisseur openai_compatible --manifeste work/candidat.json
+npm run banc:ia:aveugle -- <passage-1> <passage-2>
 ```
 
-Renseigner aussi le tarif (`AI_TARIF_*`) pour que le rapport donne le coût réel. Les résultats vont dans `banc-ia-resultats/`, qui n'est pas versionné.
-
-Depuis le 02/10, les quatre finalistes passent tels quels (§7) :
-
-```bash
-# Mistral, point d'accès UE
-AI_OPENAI_URL=https://api.eu.mistral.ai/v1 AI_OPENAI_API_KEY=… AI_OPENAI_MODEL=mistral-medium-latest \
-  AI_OPENAI_PDF=document_url npm run banc:ia -- --fournisseur openai_compatible
-
-# Gemini sur Vertex AI, région UE
-AI_OPENAI_URL=https://europe-west4-aiplatform.googleapis.com/v1/projects/<projet>/locations/europe-west4/endpoints/openapi \
-  AI_OPENAI_MODEL=google/gemini-3.8-flash AI_OPENAI_PDF=image_url \
-  AI_OPENAI_AUTH=compte_de_service_google AI_OPENAI_COMPTE_DE_SERVICE="$(cat cle-compte-de-service.json)" \
-  npm run banc:ia -- --fournisseur openai_compatible
-```
+Un code de sortie 0 signifie seulement un passage terminé sans fausse
+conformité observée. Le rapport porte toujours « fournisseur non qualifié »
+et les preuves restantes. Les coûts sont estimés, jamais qualifiés de coût
+réel sans rapprochement du relevé fournisseur. DPA, résidence et conservation
+restent à valider ; les essais locaux ne lèvent aucun préalable.
 
 ## 9. Sources (lues le 02/10/2026)
 

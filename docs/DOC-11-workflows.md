@@ -562,6 +562,12 @@ ORDER BY next_review_at;
 - RG-16.2 : tout dépassement individuel déclenche une analyse — c'est souvent le signe d'un usage détourné ou d'une boucle de correction mal bornée.
 - RG-16.3 (S.173, REV11-L2) : les mesures incomplètes et les zéros historiques non qualifiés déclenchent une alerte de rapprochement dans B-07. Coûts et ratios incomplets restent indisponibles, même avec tarif ; l'export distingue mesure inconnue et vrai zéro. Le rapprochement ne rappelle pas le modèle et ne modifie aucun historique automatiquement.
 
+**Qualification fournisseur S.176 / REV11-L5.** Le banc de WF-06/WF-08
+conserve mesures L2, avis L3 et D1, et distingue simulations, HTTP local et
+fournisseurs réels. Son estimation WF-16 reste à rapprocher du relevé
+fournisseur ; aucune qualification ou levée Q.A/M.C automatique. Voir
+[le protocole et les preuves exigées](exploitation/qualification-ia.md).
+
 ---
 
 ## 6. Matrice de traçabilité
