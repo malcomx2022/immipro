@@ -11,10 +11,10 @@
  * commande peut être relancée sans risque. (La graine de développement, elle,
  * remet les textes d'origine.)
  */
-import { PrismaClient } from "@prisma/client";
+import { creerClientPrisma } from "../src/lib/client-prisma";
 import { chargerEditorial } from "../prisma/seed/editorial-contenu";
 
-const db = new PrismaClient();
+const db = creerClientPrisma();
 let code = 0;
 try {
   for (const r of await chargerEditorial(db, { ecraser: false })) {

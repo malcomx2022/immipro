@@ -28,12 +28,14 @@
  * ── Ce qui reste hors du paquet, et pourquoi ──────────────────────────
  *
  * `@prisma/client` et le client généré `.prisma/client` : ils chargent
- * leurs moteurs par chemin de fichier à l'exécution, et les empaqueter
- * casse cette résolution. Ce sont les deux seules dépendances que l'image
- * finale doit copier — tout le reste est dans le paquet.
+ * leur compilateur de requêtes par chemin de fichier à l'exécution (un
+ * wasm depuis Prisma 7, S.169), et les empaqueter casse cette résolution.
+ * Ce sont les deux seules dépendances que l'image finale doit copier —
+ * tout le reste est dans le paquet, l'adaptateur `@prisma/adapter-pg` et
+ * `pg` compris.
  *
- * CommonJS et non ESM : `@prisma/client` et `pg-boss` sont publiés en CJS,
- * et le paquet est l'unique point d'entrée d'un conteneur, pas une
+ * CommonJS et non ESM : `@prisma/client`, resté externe, est publié en CJS
+ * (pg-boss 12, ESM seul depuis S.168, s'empaquette sans difficulté), et le paquet est l'unique point d'entrée d'un conteneur, pas une
  * bibliothèque. Le dépôt n'a pas de `"type": "module"`, donc `.js` est
  * déjà du CJS — la commande du conteneur reste `node dist/worker.js`.
  */
@@ -41,6 +43,17 @@ import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
 const EXTERNES = ["@prisma/client", ".prisma/client"];
+
+/*
+  Les paquets ESM qui embarquent du CommonJS ont besoin du `require` de Node.
+  `pg` en est : `minio` le demandait déjà (S.151), et depuis Prisma 7 (S.169)
+  chaque commande qui touche la base l'embarque, par l'adaptateur
+  `@prisma/adapter-pg`. Sans cette bannière, elles tombaient au chargement
+  sur « Dynamic require of "events" is not supported ».
+*/
+const REQUIRE_EN_ESM = {
+  js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
+};
 
 const resultat = await build({
   entryPoints: ["src/server/jobs/worker.ts"],
@@ -136,6 +149,7 @@ const sandbox = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -163,6 +177,7 @@ const role = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -189,6 +204,7 @@ const diagnostic = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -213,6 +229,7 @@ const diagnosticDonnees = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -240,9 +257,7 @@ const inventaireStockage = await build({
   // `minio` tire des modules CJS (`readable-stream`, `block-stream2`) qui
   // font `require("stream")` : sans ce `require`, le paquet tombe au
   // chargement dans l'image — `smoke:worker --image` l'a dit (S.151).
-  banner: {
-    js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
-  },
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -269,9 +284,7 @@ for (const nom of ["purge-retention", "purge-inventaire"]) {
     platform: "node",
     target: "node24",
     format: "esm",
-    banner: {
-      js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
-    },
+    banner: REQUIRE_EN_ESM,
     external: EXTERNES,
     tsconfig: "tsconfig.json",
     sourcemap: true,
@@ -303,6 +316,7 @@ const editoriale = await build({
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: REQUIRE_EN_ESM,
   external: EXTERNES,
   tsconfig: "tsconfig.json",
   sourcemap: true,
@@ -334,9 +348,7 @@ const gardeFous = await build({
   target: "node24",
   format: "esm",
   // `pg` est publié en CJS : son `require` de modules Node doit exister en ESM.
-  banner: {
-    js: 'import { createRequire as __creerRequire } from "node:module"; const require = __creerRequire(import.meta.url);',
-  },
+  banner: REQUIRE_EN_ESM,
   external: [...EXTERNES, "pg-native"],
   define: {
     __SQL_GARDE_FOUS__: JSON.stringify(readFileSync("scripts/verifier-garde-fous.sql", "utf8")),

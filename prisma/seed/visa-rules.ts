@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { creerClientPrisma } from "../../src/lib/client-prisma";
 import {
   visaRulesSchema,
   SCHEMA_VERSION,
@@ -7,7 +7,7 @@ import {
 import { refusDuReferentiel } from "../../src/domain/backoffice/regle";
 import { REGLES_DE_REFERENCE } from "./visa-rules.data";
 
-const prisma = new PrismaClient();
+const prisma = creerClientPrisma();
 
 async function main() {
   for (const r of REGLES_DE_REFERENCE) {

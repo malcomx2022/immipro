@@ -3,6 +3,11 @@
   "private": true,
   "description": "La CLI Prisma de l'image de production, à version exacte : celle du verrou racine (M15).",
   "dependencies": {
-    "prisma": "6.19.3"
+    "prisma": "7.10.0"
+  },
+  "overrides": {
+    "prisma": {
+      "mysql2": "^3.24.5"
+    }
   }
 }

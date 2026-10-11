@@ -132,6 +132,8 @@ describe("une passe de purge à la fois, et la même partout", () => {
     const build = readFileSync("scripts/build-worker.mjs", "utf8");
     expect(build).toContain('for (const nom of ["purge-retention", "purge-inventaire"])');
     const entree = build.slice(build.indexOf('for (const nom of ["purge-retention"'));
-    expect(entree.slice(0, entree.indexOf("});"))).toContain("createRequire");
+    // La bannière est commune à tous les paquets ESM depuis S.169 (Prisma 7).
+    expect(entree.slice(0, entree.indexOf("});"))).toContain("banner: REQUIRE_EN_ESM");
+    expect(build).toMatch(/const REQUIRE_EN_ESM = \{\s*js: 'import \{ createRequire/u);
   });
 });

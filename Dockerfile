@@ -51,8 +51,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Le worker, un seul fichier.
 #
 # Tout ce qu'il utilise y est empaqueté, sauf `@prisma/client` et le
-# client généré `.prisma/client` : ceux-là chargent leurs moteurs par
-# chemin à l'exécution et ne s'empaquettent pas. Ils n'ont pas besoin
+# client généré `.prisma/client` : ceux-là chargent leur compilateur de
+# requêtes (wasm depuis Prisma 7, S.169) par chemin à l'exécution et ne
+# s'empaquettent pas. Ils n'ont pas besoin
 # d'être copiés ici — la sortie `standalone` de Next les embarque déjà
 # pour l'application, et les deux services partagent la même image.
 #
@@ -63,8 +64,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
 # Les migrations Prisma : le déploiement les applique depuis l'image
 # (`docker compose run --rm app prisma migrate deploy`). Le schéma
 # et les migrations doivent donc être dans l'image finale — la sortie
-# `standalone` de Next ne les embarque pas.
+# `standalone` de Next ne les embarque pas. Depuis Prisma 7 (S.169), la
+# CLI lit l'URL de la base dans `prisma.config.mjs`, et non plus dans le
+# schéma : sans ce fichier, `migrate deploy` ne saurait pas où migrer.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.mjs ./prisma.config.mjs
 
 # La CLI Prisma pour les migrations : le `standalone` ne la trace pas. Elle
 # vient de l'étage `prisma-cli`, à version exacte, et se trouve par le PATH

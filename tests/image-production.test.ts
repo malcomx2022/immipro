@@ -73,6 +73,30 @@ describe("la CLI Prisma de l'image — M15", () => {
   });
 });
 
+describe("Prisma 7 dans l'image — M19 étape 6, S.169", () => {
+  it("la CLI trouve l'URL de la base : la configuration est copiée à côté des migrations", () => {
+    expect(actif(DOCKERFILE)).toMatch(/COPY --from=builder \S+ \/app\/prisma\.config\.mjs \.\/prisma\.config\.mjs/u);
+  });
+
+  it("la configuration n'importe rien : `/app` n'a pas `prisma` dans son node_modules", () => {
+    expect(lire("prisma.config.mjs")).not.toMatch(/^\s*import\s/mu);
+    expect(lire("prisma/schema.prisma")).not.toMatch(/^\s*url\s*=/mu);
+  });
+
+  it("le mysql2 de la CLI est forcé au-delà de l'avis GHSA-3f6p-5ww8-9rcr, ici et dans l'image", () => {
+    for (const fichier of ["package.json", "docker/prisma-cli/package.json"]) {
+      expect(JSON.parse(lire(fichier)).overrides?.prisma?.mysql2, fichier).toBe("^3.24.5");
+    }
+  });
+
+  it("chaque paquet ESM de l'image a le `require` de Node : `pg` y est embarqué", () => {
+    const blocs = lire("scripts/build-worker.mjs").split("await build({").slice(1);
+    const esm = blocs.filter((b) => /format: "esm"/u.test(b.split("});")[0]!));
+    expect(esm.length).toBeGreaterThanOrEqual(8);
+    for (const bloc of esm) expect(bloc.split("});")[0]).toMatch(/banner: REQUIRE_EN_ESM/u);
+  });
+});
+
 describe("le compose de production — M15, D-28", () => {
   it("chaque service tourne ses journaux et a une limite mémoire", () => {
     expect(COMPOSE).toMatch(/x-journaux: &journaux\n {2}driver: local\n {2}options:\n {4}max-size: 10m\n {4}max-file: "5"/u);
