@@ -243,6 +243,12 @@ jobs:
       - name: Diagnostics IA contractuels
         run: npx tsx scripts/recette/diagnostic-ia.mts
 
+      # REV11-L4 : PostgreSQL, checkpoints de processus et vrais POST Next.
+      - name: Relecture exclusive par version
+        run: npm run smoke:relecture-exclusive
+      - name: Diagnostic de concurrence inchangé
+        run: npx tsx scripts/recette/diagnostic-relecture.mts
+
       # Les rappels d'échéance, contre un vrai serveur SMTP. Ce qu'elle
       # tient : un courrier part une fois, une urgence déjà rappelée ne
       # repart pas le lendemain, et une coupure ne marque rien — la

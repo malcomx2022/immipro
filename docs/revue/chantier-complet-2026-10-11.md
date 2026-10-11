@@ -25,9 +25,9 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 |---|---|---|---|
 | 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 fusionné (PR #275) |
 | 2 | L1 — Destination des documents | P1 | S.171/S.172 fusionnés via #276/#278 ; [preuves](lot-l1-2026-10-11.md) |
-| 3 | L2 — Mesure des usages IA | P1 | S.173 proposé ; [preuves et limites](lot-l2-2026-10-11.md) |
-| 4 | L3 — Validité des avis IA | P1 | S.174 proposé ; validateur, POST/quota et documentation, à revoir avant intégration |
-| 5 | L4 — Relecture unique par version | P1 | À réaliser |
+| 3 | L2 — Mesure des usages IA | P1 | S.173 fusionné #280 ; arbitrage Claude #282 ; [preuves et limites](lot-l2-2026-10-11.md) |
+| 4 | L3 — Validité des avis IA | P1 | S.174 fusionné #283 ; [preuves](lot-l3-2026-10-11.md) |
+| 5 | L4 — Relecture unique par version | P1 | S.175 proposé ; [preuves et limites](lot-l4-2026-10-11.md), à revoir avant intégration |
 | 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
 | 7 | L6 — Recette front et parcours candidat | P2 | À réaliser |
 | 8 | L7 — Exploitation et données antérieures | P2 | À réaliser |
@@ -154,6 +154,17 @@ une fois, usage fournisseur conservé. Aucun changement d'un avis historique
 sans preuve de la réponse ayant produit cet avis. DIA-05 + CTRL-02 à conserver.
 
 ## REV11-L4 — Une seule relecture payante par version en cours
+
+**Proposition S.175, 11/10.** Main `2066230`, L3 #283 fusionné et derniers
+arbitrages Claude relus avant code. Réservation durable/FIFO atomiques,
+propriétaire unique, échéance et reprise horaire/explicite, aucune transaction
+SQL pendant l'appel. Avis obsolète/expiré non publié, consommation conservée ;
+second onglet en attente puis consultation sans nouvel appel. DIA-07 passe
+inchangé, PostgreSQL/POST authentifiés/Chromium deux onglets éprouvés.
+Migration additive, diagnostic en lecture seule et drainage avant bascule.
+Voir [rapport](lot-l4-2026-10-11.md) et [WF-08 / fournisseur / exploitation](../exploitation/relecture-concurrente.md).
+Pas de fusion, déploiement ou qualification réelle par cette proposition ;
+prochain lot L5. Critères initiaux conservés ci-dessous.
 
 **P1 · M/L · REV-IA-05 · WF-08 · route relecture, réservation et quota.**
 

@@ -79,6 +79,28 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.175 / REV11-L4 — relecture exclusive par version.** Autorisation « L4 »,
+main `2066230` relu avant modification : #283/L3 fusionné, arbitrage Claude
+#282 et version L2 #280 conservés, aucune PR concurrente au démarrage.
+Lire [le suivi L4](docs/revue/lot-l4-2026-10-11.md) et
+[réservation, fournisseur et exploitation](docs/exploitation/relecture-concurrente.md).
+Conserver le verrou du grand livre/FIFO : réservation durable et débit
+atomiques avant réseau, une seule `EN_COURS` par version. Le second onglet
+consulte sans POST payant, même à quota 1. Aucune transaction SQL pendant
+l'appel. Usage L2 avant refus/publication ; contrôles d'avis L3 inchangés.
+Date, remarques, débit soldé et fin du jeton dans la même transaction ;
+propriété/échéance/version courante vérifiées dans l'écriture. Une réponse
+ancienne/expirée ne publie pas, ne touche pas au débit de la reprise ; une
+version remplacée rend le débit encore dû (A-2). Reprise horaire S.153 et
+reprise explicite après échéance ferment le jeton avec son rendu unique.
+Migration additive avant app/worker, drainage des anciens processus ; aucun
+backfill de réservations anciennes sans preuve, aucun grand livre effacé.
+Conserver DIA-07 inchangé, `smoke:relecture-exclusive`, L2/L3 et diagnostics
+IA dans la porte commune. Pas de garantie d'appel fournisseur unique après
+arrêt brutal et reprise : ne pas inventer les jetons perdus. D1, INV-1/2/6,
+WF-08/RG-08.10, R-04/B-07. Proposition sans fusion/déploiement ni levée Q.A/M.C.
+Prochain lot : L5, qualification réelle des fournisseurs ; mobile B-07 reste L7.
+
 **S.174 / REV11-L3 — validité des avis.** Autorisation « L3 », base
 `3d985f8` : L2 #280 fusionné, arbitrage Claude #282 conservé ; les règles
 de #280 font foi, ne pas réintroduire la version #281.

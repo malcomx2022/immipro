@@ -11,11 +11,7 @@ import {
   trierRemarques,
   type Remarque,
 } from "@/domain/redaction/relecture";
-import {
-  TITRE_ECARTES,
-  TITRE_RECOUPEMENTS,
-  type Recoupements,
-} from "@/domain/redaction/coherence";
+import { TITRE_ECARTES, TITRE_RECOUPEMENTS, type Recoupements } from "@/domain/redaction/coherence";
 import { EnteteDossier } from "../../../EnteteDossier";
 import { LancerLAnalyse } from "./LancerLAnalyse";
 
@@ -78,6 +74,8 @@ export interface RelectureProps {
    * à proposer plutôt qu'une absence à expliquer.
    */
   analysePossible: boolean;
+  /** Réservation durable active sur la version affichée. */
+  analyseEnCours?: boolean;
   /** La couverture du dossier ouvre l'analyse critique (arbitrage S.80). */
   redactionAssistee: boolean;
   /** Le chemin vers ce qui ouvre l'analyse critique — voir `Redaction`. */
@@ -93,6 +91,7 @@ export function Relecture({
   recoupements,
   texteExistant,
   analysePossible,
+  analyseEnCours = false,
   redactionAssistee,
   lienDesPacks = "/tarifs",
   relectureLe,
@@ -202,15 +201,11 @@ export function Relecture({
           « Relancer » qui ne relance rien vaut moins qu'une absence.
         */}
         {etat === "A_ANALYSER" ? (
-          <LancerLAnalyse dossierId={id} type={type} />
+          <LancerLAnalyse dossierId={id} type={type} analyseEnCours={analyseEnCours} />
         ) : etat === "RESERVEE_AU_PACK" && !premiere ? (
           // Arbitrage S.80 : ni un bouton qui lancerait une analyse refusée,
           // ni un silence — le chemin vers ce qui l'ouvre.
-          <LienBouton
-            href={lienDesPacks}
-            pleineLargeur
-            className="min-h-action md:w-auto"
-          >
+          <LienBouton href={lienDesPacks} pleineLargeur className="min-h-action md:w-auto">
             {ACTION_RELECTURE[etat]}
           </LienBouton>
         ) : (

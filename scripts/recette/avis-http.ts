@@ -237,7 +237,7 @@ export async function recetteHttpDesAvis(db: PrismaClient, url: string): Promise
             exige(
               debits.length === 1 &&
                 debits[0]!.reservedUntil === null &&
-                debits[0]!.versionId === (cas.valide ? version.id : null) &&
+                debits[0]!.versionId === version.id &&
                 rendus.length === (cas.valide ? 0 : 1) &&
                 mouvements.reduce((n, l) => n + l.delta, 0) === 30 - consommation,
               `${libelle} : un débit, rendu unique si refus, solde exact`,

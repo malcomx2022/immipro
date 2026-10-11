@@ -207,4 +207,19 @@ y compris le vocabulaire des sources/valeurs affichées. La route vérifie
 aussi le résultat avant de dater la version. Consommation observée conservée,
 quota réservé rendu une fois, aucune relance automatique pour cette cause.
 Aucun avis historique réécrit. Lire [le contrat et le rôle du fournisseur
-dans WF-08](exploitation/avis-ia.md). La concurrence reste L4.
+dans WF-08](exploitation/avis-ia.md). La concurrence est traitée en L4 ci-dessous.
+
+
+## Réservation des critiques — S.175 / REV11-L4
+
+Une demande simultanée sur une même version ne déclenche plus deux critiques.
+Le fournisseur choisi reçoit un seul appel pendant la réservation active ;
+le second onglet consulte l'état durable ou l'avis existant. L'usage observé
+est conservé même pour une version remplacée ou une réponse trop tardive.
+Les droits, l'origine, la mesure L2 et la validation L3 précèdent toujours
+la publication. Aucune bascule de fournisseur ni relecture automatique lors
+de la consultation. Après un arrêt brutal, une reprise explicite après
+échéance peut appeler de nouveau : la facturation prestataire exactement
+une fois n'est pas attestée. Voir [son intervention détaillée dans WF-08,
+reprises et migration](exploitation/relecture-concurrente.md). Les tests
+Anthropic/compatible sont locaux et synthétiques ; qualification réelle L5.

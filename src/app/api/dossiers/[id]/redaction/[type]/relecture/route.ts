@@ -4,12 +4,11 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { pieceARediger, reponsesDeLEntretien } from "@/server/lecture/redaction";
 import {
-  debiterUneAnalyse,
-  rendreLaReservationDeRedaction,
-  solderLaReservationDeRedaction,
-} from "@/server/acces/quota";
-import { echeanceDeLaReservation } from "@/domain/redaction/reservation";
-import { NOTE_REDACTION_ASSISTEE } from "@/domain/payments/montee";
+  reserverLaRelecture,
+  commencerLaRelecture,
+  publierLaRelecture,
+  refuserLaRelecture,
+} from "@/server/redaction/relecture-reservation";
 import { exigerRedactionAssistee } from "@/server/acces/droits";
 import { redactionConfiguree } from "@/server/redaction/redacteur";
 import { laCritique } from "@/server/redaction/service";
@@ -93,99 +92,110 @@ export const POST = route({
       return { relue: false, disponible: false, remarques: null };
     }
 
-    // INV-6 — le débit précède l'appel, comme partout ailleurs. Sa
-    // réservation porte une échéance (S.153) : une interruption avant
-    // l'avis daté est rendue par la reprise horaire.
-    const debit = await debiterUneAnalyse(params.id!, undefined, {
-      note: `${NOTE_REDACTION_ASSISTEE} — Relecture (${piece.type})`,
-      reserveJusquA: echeanceDeLaReservation(new Date()),
-    });
+    const prise = await reserverLaRelecture(params.id!, derniere.id, piece.type);
+    if (prise.etat === "RELUE") return { relue: true, disponible: true, remarques: null };
+    if (prise.etat === "EN_COURS")
+      return { relue: false, disponible: true, remarques: null, enCours: true };
+    if (prise.etat === "OBSOLETE")
+      return { relue: false, disponible: true, remarques: null, motif: "version_remplacee" };
 
-    const reponses = await reponsesDeLEntretien(piece.documentId);
-    let avis = await laCritique()(derniere.body, {
-      // La pièce et la destination sont nommées : ce qui écrit pour le
-      // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
-      piece: piece.libelle,
-      objet: piece.objet,
-      // La règle figée à l'ouverture (INV-3), jamais celle publiée
-      // aujourd'hui : on relit au regard de la procédure sur laquelle le
-      // dossier a été ouvert.
-      pays: piece.pays,
-      reponses,
-      questions: piece.questions.map((q, rang) => ({
-        rang,
-        section: q.section,
-        intitule: q.intitule,
-      })),
-    });
-
-    // INV-6 — ce qui a été consommé est écrit, même quand rien n'est rendu.
-    const mesure = await noterLesJetons(
-      acteur!.id,
-      params.id!,
-      `relecture:${piece.type}`,
-      avis.jetonsEntree,
-      avis.jetonsSortie,
-      avis.appel,
-    );
-    if (avis.etat === "RELUE" && mesure.etat !== "CONNUE") {
-      avis = { ...avis, etat: "SANS_AVIS", cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE };
-    }
-    // Le contrat de l'adaptateur ne dispense pas la publication de sa
-    // propre garde : aucun avis partiel ou injecté ne doit être daté.
-    if (avis.etat === "RELUE") {
-      const lue = lireLaCritique({ remarques: avis.remarques });
-      if ("cause" in lue) {
-        avis = { ...avis, etat: "SANS_AVIS", cause: lue.cause, motif: lue.motif, detail: DETAIL_AVIS_MAL_FORME };
-      } else {
-        avis = { ...avis, remarques: lue };
+    try {
+      const reponses = await reponsesDeLEntretien(piece.documentId);
+      if (!(await commencerLaRelecture(params.id!, prise.reservation))) {
+        return { relue: false, disponible: true, remarques: null, motif: "relecture_interrompue" };
       }
-    }
+      let avis = await laCritique()(derniere.body, {
+        // La pièce et la destination sont nommées : ce qui écrit pour le
+        // candidat n'a pas à déchiffrer un segment de route ni un code ISO.
+        piece: piece.libelle,
+        objet: piece.objet,
+        // La règle figée à l'ouverture (INV-3), jamais celle publiée
+        // aujourd'hui : on relit au regard de la procédure sur laquelle le
+        // dossier a été ouvert.
+        pays: piece.pays,
+        reponses,
+        questions: piece.questions.map((q, rang) => ({
+          rang,
+          section: q.section,
+          intitule: q.intitule,
+        })),
+      });
 
-    if (avis.etat === "SANS_AVIS") {
-      /*
+      // INV-6 — ce qui a été consommé est écrit, même quand rien n'est rendu.
+      const mesure = await noterLesJetons(
+        acteur!.id,
+        params.id!,
+        `relecture:${piece.type}`,
+        avis.jetonsEntree,
+        avis.jetonsSortie,
+        avis.appel,
+      );
+      if (avis.etat === "RELUE" && mesure.etat !== "CONNUE") {
+        avis = {
+          ...avis,
+          etat: "SANS_AVIS",
+          cause: "reponse_illisible",
+          detail: DETAIL_MESURE_INCOMPLETE,
+        };
+      }
+      // Le contrat de l'adaptateur ne dispense pas la publication de sa
+      // propre garde : aucun avis partiel ou injecté ne doit être daté.
+      if (avis.etat === "RELUE") {
+        const lue = lireLaCritique({ remarques: avis.remarques });
+        if ("cause" in lue) {
+          avis = {
+            ...avis,
+            etat: "SANS_AVIS",
+            cause: lue.cause,
+            motif: lue.motif,
+            detail: DETAIL_AVIS_MAL_FORME,
+          };
+        } else {
+          avis = { ...avis, remarques: lue };
+        }
+      }
+
+      if (avis.etat === "SANS_AVIS") {
+        /*
         Aucune date n'est posée : la version reste non relue, et l'écran
         continuera de dire qu'elle ne l'a pas été. C'est tout l'objet de
         ce lot — une relecture qui n'a pas abouti ne doit pas se lire
         comme une relecture sans remarque.
       */
-      await rendreLaReservationDeRedaction(
+        await refuserLaRelecture(
+          params.id!,
+          prise.reservation,
+          `Relecture non aboutie (${avis.cause}) : aucun avis rendu`,
+        );
+        console.warn(`[relecture] ${MOTIF_DAPPEL[avis.cause]} — ${avis.detail}`);
+        return {
+          relue: false,
+          disponible: true,
+          remarques: null,
+          ...(avis.motif ? { motif: avis.motif } : {}),
+        };
+      }
+
+      const publication = await publierLaRelecture(params.id!, prise.reservation, avis.remarques);
+      if (publication !== "RELUE") {
+        return {
+          relue: false,
+          disponible: true,
+          remarques: null,
+          motif: publication === "OBSOLETE" ? "version_remplacee" : "relecture_interrompue",
+        };
+      }
+      return { relue: true, disponible: true, remarques: avis.remarques.length };
+    } catch (erreur) {
+      // Un échec connu libère immédiatement ; un arrêt brutal reste couvert
+      // par l'échéance S.153. Ne jamais reprendre l'appel automatiquement.
+      await refuserLaRelecture(
         params.id!,
-        debit.ligne,
-        `Relecture non aboutie (${avis.cause}) : aucun avis rendu`,
+        prise.reservation,
+        "Relecture interrompue : aucun avis publié",
+        "INTERROMPUE",
       );
-      console.warn(`[relecture] ${MOTIF_DAPPEL[avis.cause]} — ${avis.detail}`);
-      return { relue: false, disponible: true, remarques: null, ...(avis.motif ? { motif: avis.motif } : {}) };
+      throw erreur;
     }
-
-    /*
-      Les remarques et la date, ensemble ou pas du tout. Séparées, une
-      interruption entre les deux écritures laisserait soit des remarques
-      qu'aucune relecture ne date — invisibles à l'écran —, soit une
-      relecture datée sans ses remarques, qui se lirait « rien à
-      reprendre ». Le second cas est celui que ce lot corrige : il ne
-      sera pas réintroduit par une transaction manquante.
-    */
-    await db.$transaction([
-      ...avis.remarques.map((r) =>
-        db.critiqueFinding.create({
-          data: {
-            versionId: derniere.id,
-            kind: r.genre,
-            title: r.titre,
-            body: r.corps,
-            gaps: r.ecarts ? (r.ecarts as never) : undefined,
-          },
-        }),
-      ),
-      db.documentVersion.update({
-        where: { id: derniere.id },
-        data: { critiquedAt: new Date() },
-      }),
-      // Et le solde de la réservation, qui nomme la version relue (S.153).
-      solderLaReservationDeRedaction(db, debit.ligne, derniere.id),
-    ]);
-
-    return { relue: true, disponible: true, remarques: avis.remarques.length };
   },
 });

@@ -912,6 +912,7 @@ model DocumentVersion {
   /// Les débits qui la réservent et les rendus qui les soldent (RF-3, E5).
   credits  AnalysisCredit[]
   findings CritiqueFinding[]
+  relectures RelectureReservation[]
 
   @@unique([documentId, rank])
   @@unique([documentId, checksum])
@@ -1038,7 +1039,8 @@ model AnalysisCredit {
   /// RF-3, E5, 09/10/2026. Un arrêt entre le débit et le verdict laissait
   /// un débit que le rejeu ne retrouvait pas : il débitait de nouveau. Le
   /// rejeu reprend désormais la réservation ouverte de sa version. Nul
-  /// pour la rédaction assistée et pour les lignes antérieures.
+  /// pour les lignes antérieures sans identité certaine. La relecture L4
+  /// nomme sa version dès la réservation ; la mise en forme à son issue.
   versionId     String?
   version       DocumentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
   note          String?
@@ -1048,6 +1050,7 @@ model AnalysisCredit {
   /// réservations échues sans issue. Nulle partout ailleurs.
   reservedUntil DateTime?
   createdAt     DateTime     @default(now())
+  relecture     RelectureReservation?
 
   @@index([applicationId, createdAt])
   @@index([grantId])
@@ -1059,6 +1062,34 @@ model AnalysisCredit {
 // ═══════════════════════════════════════════════════════════
 // Rédaction assistée
 // ═══════════════════════════════════════════════════════════
+
+enum EtatReservationRelecture {
+  EN_COURS
+  RELUE
+  SANS_AVIS
+  EXPIREE
+  OBSOLETE
+  INTERROMPUE
+}
+
+/// REV11-L4 : une tentative durable, propriétaire de son appel et de son débit.
+/// L'index partiel SQL autorise une seule EN_COURS par version. Les tentatives
+/// soldées restent à l'historique ; aucun appel réseau sous transaction SQL.
+model RelectureReservation {
+  id            String @id @default(uuid())
+  versionId     String
+  version       DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  creditId      String @unique
+  credit        AnalysisCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
+  state         EtatReservationRelecture @default(EN_COURS)
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+  callStartedAt DateTime?
+  finishedAt    DateTime?
+
+  @@index([versionId])
+  @@index([state, expiresAt])
+}
 
 /// Réponse à une question de l'entretien guidé (R-02, WF-08).
 ///

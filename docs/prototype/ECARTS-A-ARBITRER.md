@@ -13490,3 +13490,51 @@ sous concurrence ; anomalie volontairement maintenue pour L4. Mobile B-07
 reste L7. Aucune qualification fournisseur/OAuth/DPA/facture/paiement réel,
 aucune levée Q.A/M.C, fusion ou mise en production par cette proposition.
 Prochain lot : L4.
+
+## S.175 — REV11-L4 : une relecture propriétaire de sa version
+
+**Autorisation et continuité.** « L4 » avec relecture préalable et mise à
+jour des fichiers Claude, 11/10/2026. Main `2066230` : #283/L3 fusionné,
+#280/L2 fait foi, arbitrage Claude #282 conservé. CLAUDE.md, DOC-11/12,
+registre et code relus avant modification ; aucune PR concurrente au départ.
+D1, S.80/droits, S.92/FIFO, S.147/A-2, S.153/reprise, L1/L2/L3, Prisma 7
+et pg-boss 12 conservés. Numéro libre au démarrage.
+
+**Reproduction et plan avant code.** DIA-07 inchangé sur main : deux appels,
+deux débits sur une version. Réservation durable exclusive/debit atomiques
+avant réseau, publication conditionnelle et reprise après échéance ; second
+onglet en attente puis consultation sans nouvel appel. Le rendu d'une version
+remplacée suit A-2, sans effacer la consommation fournisseur.
+
+**Correction.** `RelectureReservation`, propriétaire unique `EN_COURS` par
+version en SQL, liée au débit FIFO et à l'échéance de trente minutes.
+Transactions courtes sous le verrou existant ; aucun appel réseau dedans.
+Propriété, échéance et version courante conditionnent la publication ; date,
+remarques, débit soldé et fin du jeton ensemble. Usage L2 écrit avant les
+contrôles/publication, validité L3 intacte. Refus, interruption, obsolescence,
+reprise horaire ou explicite après expiration rendent le débit encore dû une
+fois. Ancien jeton sans effet sur la reprise. R-04 retrouve l'attente depuis
+la base et consulte sans POST payant ni relance automatique ; chargement
+terminé avant rafraîchissement vers une nouvelle version.
+
+**Éprouvé.** 188 fichiers / 3 805 tests, 13 nouveaux L4 ; types/lint/copy,
+build et audit passent. 30 suites PostgreSQL : les 29 existantes restent
+vertes, L3 garde ses 321 assertions. Nouvelle fumée : 64 assertions de
+traitement, 32 HTTP sur deux fournisseurs locaux ; Chromium deux onglets
+sur chacun, recharge pendant appel, consultation sans POST, un avis/un
+appel/une analyse/un usage, mobile 390/390 et zéro erreur JS. Quota 1/30,
+v2 rapide/v1 lente, interruptions réelles aux checkpoints, expiration et
+reprises concurrentes, échecs, unicité et contraintes SQL, rollback de
+publication. DIA-07 désormais vert sans changer ses attentes ; diagnostics
+L1–L3 maintenus. 60 migrations sans dérive, clés étrangères indexées,
+113 refus/13 permis historiques. INV-1/2/6, D1, WF-08/RG-08.10, R-04/B-07.
+
+Voir [preuves et limites](../revue/lot-l4-2026-10-11.md) et
+[workflow fournisseur, diagnostic et exploitation](../exploitation/relecture-concurrente.md).
+Migration additive avant app/worker, drainage des anciens appels ; aucune
+réservation antérieure inventée, aucun grand livre ou avis historique effacé.
+DIA-07 et la fumée rejoignent la porte commune. Un arrêt brutal peut perdre
+la mesure avant persistance ; pas de zéro fabriqué ni garantie de facturation
+prestataire exactement une fois après reprise. Aucune qualification réelle,
+fusion/déploiement ou levée Q.A/M.C par cette proposition. Prochain L5 ;
+mobile B-07 reste L7.
