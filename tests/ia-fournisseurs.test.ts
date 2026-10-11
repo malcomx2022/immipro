@@ -89,7 +89,14 @@ describe("le domaine choisit, et ne devine rien", () => {
     expect(piecesAutoriseesChez({}, "anthropic")).toBe(true);
     expect(piecesAutoriseesChez({}, "openai_compatible")).toBe(false);
     expect(piecesAutoriseesChez({ AI_PIECES_SOUS_TRAITANT_AUTORISE: "anthropic" }, "openai_compatible")).toBe(false);
-    expect(piecesAutoriseesChez({ AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible" }, "openai_compatible")).toBe(true);
+    // Le code seul ne désigne aucune société (S.171) : l'origine validée doit être celle de l'adresse.
+    expect(piecesAutoriseesChez({ AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible" }, "openai_compatible")).toBe(false);
+    expect(
+      piecesAutoriseesChez(
+        { ...COMPATIBLE, AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible", AI_OPENAI_ORIGINE_AUTORISEE: new URL(COMPATIBLE.AI_OPENAI_URL).origin },
+        "openai_compatible",
+      ),
+    ).toBe(true);
   });
 
   it("l'écran dit pourquoi la lecture n'est pas branchée chez un fournisseur non autorisé", () => {
@@ -186,6 +193,7 @@ describe("les résolveurs suivent la configuration", () => {
       ...COMPATIBLE,
       AI_FOURNISSEUR_EXTRACTION: "openai_compatible",
       AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible",
+      AI_OPENAI_ORIGINE_AUTORISEE: new URL(COMPATIBLE.AI_OPENAI_URL).origin,
     };
     expect(lExtracteur(env)).not.toBe(EXTRACTEUR_NON_BRANCHE);
     expect(extractionConfiguree(env)).toBe(true);

@@ -48,6 +48,7 @@ export function environnementDuBanc(
     AI_OPENAI_MODEL: "",
     AI_OPENAI_PDF: "non",
     AI_PIECES_SOUS_TRAITANT_AUTORISE: "",
+    AI_OPENAI_ORIGINE_AUTORISEE: "",
     FEDAPAY_API_KEY: "",
     STRIPE_API_KEY: "",
     FEDAPAY_SECRET_KEY: "",

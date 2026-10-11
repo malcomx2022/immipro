@@ -50,12 +50,25 @@ de sélecteur de modèle.
 | `AI_OPENAI_COMPTE_DE_SERVICE` | Compte de service Google en JSON ou base64. Matériel secret à fournir hors dépôt. |
 | `AI_OPENAI_PDF` | `oui` / `file`, `document_url` ou `image_url`, selon le protocole PDF du fournisseur. Vide / `non` : le PDF n'est pas envoyé à cet adaptateur. |
 | `AI_PIECES_SOUS_TRAITANT_AUTORISE` | Doit valoir exactement `openai_compatible` pour autoriser l'extraction par cet adaptateur. Une clé seule ne suffit pas. |
+| `AI_OPENAI_ORIGINE_AUTORISEE` | Depuis S.171 (REV11-L1) : origine de la société validée, sans chemin (`https://api.mistral.ai`). Elle doit être celle de `AI_OPENAI_URL`, sinon aucune pièce ne part et B-07 dit pourquoi. |
 
 Un code fournisseur inconnu ou une configuration incomplète ne déclenche
 aucun basculement vers un autre prestataire. Le code `openai_compatible`
-désigne un **protocole**, pas une société ni une région. Il faut associer
-l'URL réelle à un prestataire, un modèle et une région documentés. La
-variable d'autorisation technique ne remplace pas le DPA ni sa validation.
+désigne un **protocole**, pas une société ni une région. Depuis S.171,
+l'autorisation des pièces nomme aussi l'origine validée
+(`AI_OPENAI_ORIGINE_AUTORISEE`) : une URL qui change sans que
+l'autorisation soit revue n'envoie plus de pièce. La région et le modèle
+restent à documenter avec le prestataire. La variable d'autorisation
+technique ne remplace pas le DPA ni sa validation.
+
+**Destination des octets (REV-IA-02, S.171).** Aucune des trois sorties
+ne suit de redirection : l'adaptateur compatible, l'échange du jeton
+Google et le client Anthropic (`OPTIONS_DU_CLIENT`). Une réponse 3xx
+devient `non_configure` (pièce en revue humaine, analyse recréditée, non
+rejouée), avec une cause qui dit quelle variable revoir ; le serveur
+désigné par le renvoi ne reçoit rien. `tests/ia-redirections.test.ts`
+reprend DIA-04 en régression dans la porte : 301, 302, 303, 307 et 308,
+même origine, autre origine et destination HTTP non autorisée.
 
 Pour Vertex, le serveur signe une assertion du compte de service et échange
 celle-ci contre un jeton OAuth ; il renouvelle le jeton avant expiration et

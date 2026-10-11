@@ -68,6 +68,7 @@ const env = {
     token_uri: "https://oauth2.googleapis.com/token",
   }),
   AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible",
+  AI_OPENAI_ORIGINE_AUTORISEE: `http://127.0.0.1:${portPiege}`,
   AI_OPENAI_PDF: "image_url",
   STRIPE_SECRET_KEY: "cle-synthetique",
   FEDAPAY_SECRET_KEY: "cle-synthetique",

@@ -26,6 +26,14 @@ import {
  * sans clé — et l'écran B-07 dit pourquoi. La rédaction ne reçoit aucune
  * pièce et n'a pas cette garde.
  *
+ * **L'autorisation désigne une société, pas un protocole** — S.171,
+ * REV11-L1. `openai_compatible` est un protocole que servent Mistral,
+ * Google, OpenAI ou n'importe quel serveur : l'autorisation porte donc
+ * aussi l'origine validée (`AI_OPENAI_ORIGINE_AUTORISEE`), qui doit être
+ * celle de `AI_OPENAI_URL`. Changer d'adresse sans revoir l'autorisation
+ * arrête l'envoi des pièces ; cela ne change jamais de sous-traitant en
+ * silence.
+ *
  * **Aucune bascule automatique.** Un fournisseur en panne rend sa cause
  * ordinaire (`injoignable`, `service_sature`…) ; rien ne réessaie chez un
  * autre, qui recevrait une pièce que personne ne lui a destinée.
@@ -103,6 +111,13 @@ export const VARIABLE_DU_CHOIX: Record<FonctionIA, string> = {
 
 /** L'autorisation écrite d'envoyer des pièces à un autre sous-traitant qu'Anthropic. */
 export const VARIABLE_AUTORISATION_PIECES = "AI_PIECES_SOUS_TRAITANT_AUTORISE";
+
+/**
+ * L'origine du sous-traitant compatible validé pour les pièces — S.171.
+ * `https://api.mistral.ai`, sans chemin : la société qu'on a validée,
+ * reconnaissable à son adresse, et non le protocole qu'elle parle.
+ */
+export const VARIABLE_ORIGINE_AUTORISEE = "AI_OPENAI_ORIGINE_AUTORISEE";
 
 /** Le fournisseur compatible OpenAI lit les PDF seulement si l'exploitant le déclare. */
 export const VARIABLE_PDF_COMPATIBLE = "AI_OPENAI_PDF";
@@ -246,9 +261,76 @@ export function manqueDuFournisseur(env: Environnement, code: CodeFournisseur): 
   return null;
 }
 
+/**
+ * Une origine déclarée : `https://hôte[:port]`, sans chemin, sans
+ * paramètre ni identifiant — ou `null`. Les mêmes schémas qu'une adresse
+ * de base : https, ou http sur la boucle locale seulement.
+ */
+export function origineDeclaree(valeur: string): string | null {
+  const url = adresseDeBase(valeur);
+  if (!url) return null;
+  if (url.username || url.password || url.search || url.hash) return null;
+  if (url.pathname !== "/" && url.pathname !== "") return null;
+  return url.origin;
+}
+
+/** Les pièces peuvent-elles partir chez ce fournisseur, et sinon pourquoi. */
+export type AutorisationDesPieces = { autorisee: true } | { autorisee: false; raison: string };
+
+/**
+ * L'autorisation d'envoyer des pièces d'identité — RG-06.7, S.171.
+ *
+ * Anthropic, sous-traitant par défaut, n'en demande pas. Un fournisseur
+ * compatible en demande deux : son code dans `AI_PIECES_SOUS_TRAITANT_AUTORISE`,
+ * et l'origine validée dans `AI_OPENAI_ORIGINE_AUTORISEE`, égale à celle
+ * de `AI_OPENAI_URL`. Chaque refus dit quoi poser, et par qui.
+ */
+export function autorisationDesPieces(env: Environnement, code: CodeFournisseur): AutorisationDesPieces {
+  if (code === FOURNISSEUR_PAR_DEFAUT) return { autorisee: true };
+  const ecrite = lire(env, VARIABLE_AUTORISATION_PIECES);
+  if (ecrite.toLowerCase() !== code) {
+    return {
+      autorisee: false,
+      /*
+        La valeur écrite est citée quand elle n'est pas le code — 06/10/2026.
+        `oui` posé en production laissait la lecture non branchée, et rien ne
+        disait que la variable attend le **code** du sous-traitant autorisé :
+        un « oui » ne dit pas lequel, et une autorisation doit le dire.
+      */
+      raison:
+        ecrite === ""
+          ? `les pièces d'identité ne partent chez ${FOURNISSEURS[code].libelle} qu'une fois la sous-traitance tranchée : ${VARIABLE_AUTORISATION_PIECES}=${code}, posée par qui a validé la conformité`
+          : `${VARIABLE_AUTORISATION_PIECES} vaut « ${ecrite} » : elle attend le code du sous-traitant autorisé, ici ${code}, et non une approbation générale`,
+    };
+  }
+
+  const actuelle = adresseDeBase(lire(env, "AI_OPENAI_URL"))?.origin ?? null;
+  const declaree = lire(env, VARIABLE_ORIGINE_AUTORISEE);
+  if (declaree === "") {
+    return {
+      autorisee: false,
+      raison: `l'autorisation ne désigne aucune société : ${VARIABLE_ORIGINE_AUTORISEE}=${actuelle ?? "<origine de AI_OPENAI_URL>"}, l'origine du sous-traitant validé, posée par qui a validé la conformité`,
+    };
+  }
+  const origine = origineDeclaree(declaree);
+  if (origine === null) {
+    return {
+      autorisee: false,
+      raison: `${VARIABLE_ORIGINE_AUTORISEE} vaut « ${declaree} », qui n'est pas une origine : écrire https://hôte, sans chemin`,
+    };
+  }
+  if (actuelle !== origine) {
+    return {
+      autorisee: false,
+      raison: `AI_OPENAI_URL désigne ${actuelle ?? "une adresse illisible"}, mais la sous-traitance a été validée pour ${origine} : les pièces ne partent pas tant que l'autorisation n'a pas été revue pour la nouvelle adresse`,
+    };
+  }
+  return { autorisee: true };
+}
+
 /** Des pièces d'identité peuvent-elles partir chez ce fournisseur ? */
 export const piecesAutoriseesChez = (env: Environnement, code: CodeFournisseur): boolean =>
-  code === FOURNISSEUR_PAR_DEFAUT || lire(env, VARIABLE_AUTORISATION_PIECES).toLowerCase() === code;
+  autorisationDesPieces(env, code).autorisee;
 
 /** Ce fournisseur lit-il les PDF, dans cette configuration ? */
 export function litLesPdf(env: Environnement, code: CodeFournisseur): boolean {
@@ -305,19 +387,8 @@ export function etatDesFonctions(env: Environnement): readonly EtatDeLaFonction[
     }
     const code = choix.fournisseur;
     const manque = manqueDuFournisseur(env, code);
-    /*
-      La valeur écrite est citée quand elle n'est pas le code — 06/10/2026.
-      `oui` posé en production laissait la lecture non branchée, et rien ne
-      disait que la variable attend le **code** du sous-traitant autorisé :
-      un « oui » ne dit pas lequel, et une autorisation doit le dire.
-    */
-    const ecrite = lire(env, VARIABLE_AUTORISATION_PIECES);
-    const interdit =
-      fonction === "extraction" && !piecesAutoriseesChez(env, code)
-        ? ecrite === ""
-          ? `les pièces d'identité ne partent chez ${FOURNISSEURS[code].libelle} qu'une fois la sous-traitance tranchée : ${VARIABLE_AUTORISATION_PIECES}=${code}, posée par qui a validé la conformité`
-          : `${VARIABLE_AUTORISATION_PIECES} vaut « ${ecrite} » : elle attend le code du sous-traitant autorisé, ici ${code}, et non une approbation générale`
-        : null;
+    const autorisation = fonction === "extraction" ? autorisationDesPieces(env, code) : null;
+    const interdit = autorisation && !autorisation.autorisee ? autorisation.raison : null;
     const raison = manque ?? interdit;
     return {
       fonction,

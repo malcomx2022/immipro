@@ -92,6 +92,13 @@ export function causeDeLErreur(
   }
   if (erreur instanceof Anthropic.APIConnectionTimeoutError) return horsDelai;
   if (erreur instanceof Anthropic.APIConnectionError) return muet;
+  // Le client ne suit aucune redirection (`OPTIONS_DU_CLIENT`, S.171).
+  if (erreur instanceof Anthropic.APIError && typeof erreur.status === "number" && erreur.status >= 300 && erreur.status < 400) {
+    return {
+      cause: "non_configure",
+      detail: `${chaine.service} renvoie vers une autre adresse (réponse ${erreur.status}) : rien n'y a été envoyé ; vérifier ANTHROPIC_BASE_URL`,
+    };
+  }
   if (erreur instanceof Anthropic.APIError) {
     return { cause: "injoignable", detail: `réponse ${erreur.status ?? "sans code"}` };
   }

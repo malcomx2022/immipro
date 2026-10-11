@@ -89,8 +89,15 @@ DIA-06 passe ; DIA-01 à DIA-05 et DIA-07 restent rouges, sans attentes assoupli
 Le 503 de paiement attendu est toléré seulement par le banc ; la santé de
 production reste inchangée. Le script `recette-documentaire.py` rejoue une
 nouvelle version sur un banc neuf puis vérifie le quota et la décision humaine.
-S.170 est proposé avec ses tests ; fusion, déploiement et lancement restent
-des états distincts. Poursuivre par L1, après relecture de main et du registre.
+S.170 est fusionné (PR #275) ; déploiement et lancement restent des états
+distincts.
+
+**S.171 / REV11-L1, destination des documents.** Aucune redirection n'est
+suivie (compatible, jeton Google, client Anthropic) : une 3xx devient
+`non_configure`. Arbitrage du 11/10 : l'autorisation des pièces chez un
+fournisseur compatible désigne l'origine validée (`AI_OPENAI_ORIGINE_AUTORISEE`,
+égale à celle de `AI_OPENAI_URL`). Ne pas rouvrir ce choix. Poursuivre par
+L2, après relecture de main et du registre.
 
 Lire la [revue complète](docs/revue/revue-complete-2026-10-11.md), le
 [chantier](docs/revue/chantier-complet-2026-10-11.md) et la

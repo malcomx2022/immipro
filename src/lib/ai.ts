@@ -19,9 +19,22 @@ import { FOURNISSEURS } from "@/domain/ia/fournisseurs";
  */
 let client: Anthropic | null = null;
 
+/**
+ * Les options du client, hors clé — S.171, REV11-L1.
+ *
+ * Le SDK suit les redirections par défaut, et retransmet alors la pièce à
+ * l'adresse que le serveur désigne (`ANTHROPIC_BASE_URL` peut en désigner
+ * une autre que l'API d'Anthropic). Une réponse 3xx devient une erreur,
+ * traduite en `non_configure` : rien ne part ailleurs.
+ */
+export const OPTIONS_DU_CLIENT = {
+  maxRetries: 0,
+  fetchOptions: { redirect: "manual" },
+} as const satisfies Omit<ConstructorParameters<typeof Anthropic>[0] & object, "apiKey">;
+
 export function leClient(cle: string): Anthropic {
   if (client) return client;
-  client = new Anthropic({ apiKey: cle, maxRetries: 0 });
+  client = new Anthropic({ apiKey: cle, ...OPTIONS_DU_CLIENT });
   return client;
 }
 

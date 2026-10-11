@@ -66,6 +66,12 @@ Les 45 navigations/neuf contrôles et le dépôt/revue humaine ont été rejoué
 Voir [preuves, commandes et limites](../revue/lot-l0-2026-10-11.md).
 Ce complément conserve les statuts antérieurs et les préalables de signature.
 
+**S.171 / REV11-L1, proposition du 11/10.** Une pièce ne suit plus aucune
+redirection (DIA-04 vert, repris par `tests/ia-redirections.test.ts`), et
+l'autorisation des pièces chez un fournisseur compatible désigne l'origine
+validée (`AI_OPENAI_ORIGINE_AUTORISEE`). Éprouvé sur serveurs locaux :
+aucun prestataire réel, aucune région ni DPA vérifiés (L5).
+
 ## Candidat
 
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |
