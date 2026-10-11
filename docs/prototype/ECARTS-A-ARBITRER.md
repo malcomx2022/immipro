@@ -13538,3 +13538,38 @@ la mesure avant persistance ; pas de zéro fabriqué ni garantie de facturation
 prestataire exactement une fois après reprise. Aucune qualification réelle,
 fusion/déploiement ou levée Q.A/M.C par cette proposition. Prochain L5 ;
 mobile B-07 reste L7.
+
+### Relevé du déploiement de S.173, S.174 et S.175 (L2 à L4) — 11/10/2026, soirée
+
+Relevé par Claude Code, en lecture seule, sur main `0d82d23`.
+
+**Déploiements.** Les trois runs ont abouti sans retour arrière :
+
+| Run | Lot | Commit | En service à |
+|---|---|---|---|
+| 544 | L2, #280 | `c27b300` | 16 h 07 |
+| 546 | L3, #283 | `2066230` | run vert, heure non relevée |
+| 547 | L4, #284 | `0d82d23` | 20 h 40 |
+
+Le run 547 a d'abord fait la sauvegarde préalable `avant-0d82d23.dump.gpg`, puis appliqué `20261011210000_relecture_exclusive` avec la CLI de l'image : 60 migrations en tout. Les garde-fous ont refusé 113 écritures, en ont posé 13 et n'en ont accepté aucune à tort ; les cas « L2 · … » de la migration de mesure sont présents. L'antivirus était prêt en 7 s.
+
+La porte `valider` du run 547 couvre les étapes « Mesures IA », « Validité des avis IA », « Diagnostics IA contractuels », « Relecture exclusive par version » et « Diagnostic de concurrence inchangé ».
+
+**Contrôles sur l'instance pilote, après 20 h 40.**
+- `/api/health` répond 200, avec `{"status":"pilote","db":"up"}`.
+- Le préflight CORS du stockage répond 200 pour immipro.app et 403 pour une autre origine.
+- Un POST venu d'une autre origine reçoit le 403 français.
+- B-07 (`/couts-ia`) sans session renvoie 307 vers la connexion.
+- La page publique à 390 px passe 12 constats sur 12.
+
+**Contrôles locaux sur `0d82d23`.**
+- `npm run check` : 188 fichiers, 3 805 tests.
+- `diagnostic-ia.mts` : CTRL-01, CTRL-02 et DIA-01 à DIA-06 sont conformes.
+- `diagnostic-relecture.mts` : DIA-07 est conforme, avec un seul appel.
+
+**Non vérifié sur le pilote.**
+- L'écran B-07 connecté et son alerte de rapprochement.
+- Un refus d'avis réel et une relecture ouverte dans deux onglets.
+- Le diagnostic des données sur les usages historiques, à lancer côté serveur par le responsable.
+- Un fournisseur réel (L5).
+- B-07 mobile, à 390 px (L7).
