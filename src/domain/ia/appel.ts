@@ -65,7 +65,7 @@ export const appelSeReprend = (cause: CauseDAppel): boolean =>
  * copie.
  */
 export const MOTIF_DAPPEL: Record<CauseDAppel, string> = {
-  non_configure: "aucune clé d'appel au modèle n'est configurée",
+  non_configure: "la configuration d'appel au modèle est absente ou refusée",
   injoignable: "le service n'a pas répondu",
   delai_depasse: "le service n'a rien rendu dans le délai imparti",
   service_sature: "le service a refusé la demande faute de capacité",

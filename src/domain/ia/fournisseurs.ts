@@ -316,7 +316,7 @@ export function autorisationDesPieces(env: Environnement, code: CodeFournisseur)
   if (origine === null) {
     return {
       autorisee: false,
-      raison: `${VARIABLE_ORIGINE_AUTORISEE} vaut « ${declaree} », qui n'est pas une origine : écrire https://hôte, sans chemin`,
+      raison: `${VARIABLE_ORIGINE_AUTORISEE} contient une valeur qui n'est pas une origine : écrire https://hôte, sans chemin ni identifiant`,
     };
   }
   if (actuelle !== origine) {

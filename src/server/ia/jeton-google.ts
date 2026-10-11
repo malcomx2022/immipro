@@ -1,3 +1,4 @@
+import { fetchSansRedirection } from "@/lib/ia-transport";
 import { createSign } from "node:crypto";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import {
@@ -78,7 +79,7 @@ export async function jetonGoogle(
 
   let reponse: Response;
   try {
-    reponse = await fetch(compte.adresseJeton, {
+    reponse = await fetchSansRedirection(compte.adresseJeton, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
       body: new URLSearchParams({

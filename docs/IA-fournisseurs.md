@@ -176,3 +176,14 @@ Les décisions prises pour l'implémentation sont celles recommandées plus haut
 - La décision de conformité (§4.1) et la page `/donnees-personnelles` : la variable d'autorisation n'en tient lieu que lorsqu'elle est posée par qui a tranché.
 - Le jeu d'évaluation des pièces (§4.3) avant d'activer la lecture chez un autre fournisseur.
 - Un repli explicite pour la rédaction (lot 5) : non implémenté, et à décider.
+
+## Destination — S.172 / REV11-L1
+
+Le [lot L1](revue/lot-l1-2026-10-11.md) refuse les redirections sur tous les
+transports IA, y compris OAuth. Aucun prestataire n'est changé implicitement.
+Lire la [fiche d'exploitation](exploitation/destination-ia.md) pour les
+effets WF-06/WF-08 et le manifeste proposé société/URL/région/modèle/fonctions.
+Ce manifeste reste une comparaison manuelle à qualifier en L5 ; le code
+`openai_compatible` et la présence d'une clé ne valent pas validation
+nominative ou géographique. D1 reste en analyses ; les options historiques
+de quota de ce document ne remplacent pas les décisions du registre.

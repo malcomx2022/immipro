@@ -1,0 +1,427 @@
+{
+  "date": "2026-10-11",
+  "lot": "S.172 / complément REV11-L1 de Claude S.171",
+  "statut": "proposé, ni fusionné ni déployé",
+  "baseMainAuDemarrage": "54faaa70f7cb4731adc7b3ddba02d40d2f82d8fc",
+  "baseClaudeCommit": "98ca7e0d7a914bccdf49e49961f83bc581876ace",
+  "basePR": 276,
+  "PRComplement": 277,
+  "branche": "fix/rev11-l1-destinations",
+  "environnement": {
+    "node": "24.19.0",
+    "prisma": "7.10.0",
+    "pgBoss": "12.37.1",
+    "postgres": "16-alpine",
+    "reseau": "serveurs HTTP en boucle locale uniquement, SDK réel",
+    "donnees": "clés, comptes et octets synthétiques"
+  },
+  "reproductionComplement": {
+    "commitClaude": "a978f9ab87b450eaed1893d87b4eb4ebbb548251",
+    "tests": 29,
+    "echecsAttendus": 7,
+    "controlesPasses": 22,
+    "defauts": [
+      "écho du corps 3xx dans cinq erreurs SDK",
+      "logs de l’échange sous ANTHROPIC_LOG=debug",
+      "origine invalide avec identifiants recopiée dans B-07"
+    ],
+    "donnees": "entièrement synthétiques"
+  },
+  "passeHistoriqueAvantDecouverteClaude": {
+    "commitAutonome": "4afdb4ab378970640d34725634ca8d99615ddd63",
+    "baseMain": "54faaa7",
+    "checkTests": 3651,
+    "reproduction": {
+      "tests": 36,
+      "echecsAttendus": 35,
+      "controleDirectPasse": 1,
+      "DIA04Avant": {
+        "id": "DIA-04",
+        "controle": "La pièce ne suit pas une redirection vers une autre origine",
+        "attendu": "0 appel à l’autre origine",
+        "observe": {
+          "appelsAilleurs": 1,
+          "octetsRecusAilleurs": true
+        },
+        "conforme": false
+      }
+    },
+    "statut": "remplacée par le complément à Claude pour éviter deux propositions concurrentes"
+  },
+  "check": {
+    "code": 0,
+    "fichiers": 182,
+    "tests": 3669,
+    "testsClaudeConserves": 31,
+    "nouveauxTestsComplement": 31,
+    "regressionsTransportDiagnostic": 29,
+    "regressionsUI": 2,
+    "types": "passé",
+    "lint": "passé, avertissement antérieur purge-stockage.ts",
+    "copie": "passé",
+    "frontiereClientServeur": "passée sans assouplissement"
+  },
+  "build": {
+    "code": 0,
+    "artefacts": [
+      ".next/standalone",
+      "dist/worker.js"
+    ],
+    "limite": "sans base applicative ; requêtes de pages statiques indisponibles, construction terminée"
+  },
+  "audit": {
+    "code": 0,
+    "eleveesAccepteesExistantes": 1,
+    "avisModeresExistants": 4,
+    "dependancesModifiees": false
+  },
+  "integrations": [
+    {
+      "commande": "npx prisma validate",
+      "code": 0,
+      "secondes": 1.5,
+      "assertions_ok": 0,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:migrations",
+      "code": 0,
+      "secondes": 7.07,
+      "assertions_ok": 7,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:worker -- --base",
+      "code": 0,
+      "secondes": 40.5,
+      "assertions_ok": 48,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:recette",
+      "code": 0,
+      "secondes": 22.23,
+      "assertions_ok": 7,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:files",
+      "code": 0,
+      "secondes": 7.08,
+      "assertions_ok": 25,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:graine",
+      "code": 0,
+      "secondes": 6.11,
+      "assertions_ok": 12,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:tunnel",
+      "code": 0,
+      "secondes": 4.22,
+      "assertions_ok": 88,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:fedapay",
+      "code": 0,
+      "secondes": 3.93,
+      "assertions_ok": 36,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:reconciliation",
+      "code": 0,
+      "secondes": 6.27,
+      "assertions_ok": 69,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:consultation",
+      "code": 0,
+      "secondes": 4.45,
+      "assertions_ok": 73,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:conservation",
+      "code": 0,
+      "secondes": 5.51,
+      "assertions_ok": 51,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:remboursement",
+      "code": 0,
+      "secondes": 4.87,
+      "assertions_ok": 161,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:courrier",
+      "code": 0,
+      "secondes": 4.52,
+      "assertions_ok": 37,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:balayage",
+      "code": 0,
+      "secondes": 5.51,
+      "assertions_ok": 123,
+      "abstention": true
+    },
+    {
+      "commande": "npm run smoke:extraction",
+      "code": 0,
+      "secondes": 6.42,
+      "assertions_ok": 264,
+      "abstention": true
+    },
+    {
+      "commande": "npm run smoke:redaction",
+      "code": 0,
+      "secondes": 4.26,
+      "assertions_ok": 62,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:rappels",
+      "code": 0,
+      "secondes": 5.9,
+      "assertions_ok": 51,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:transitions",
+      "code": 0,
+      "secondes": 17.77,
+      "assertions_ok": 133,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:publication",
+      "code": 0,
+      "secondes": 5.56,
+      "assertions_ok": 168,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:juridique",
+      "code": 0,
+      "secondes": 3.54,
+      "assertions_ok": 30,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:relecture",
+      "code": 0,
+      "secondes": 3.23,
+      "assertions_ok": 12,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:facturation",
+      "code": 0,
+      "secondes": 3.77,
+      "assertions_ok": 52,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:role",
+      "code": 0,
+      "secondes": 6.33,
+      "assertions_ok": 10,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:editoriale",
+      "code": 0,
+      "secondes": 5.15,
+      "assertions_ok": 10,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:diagnostic",
+      "code": 0,
+      "secondes": 5.72,
+      "assertions_ok": 28,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:purge",
+      "code": 0,
+      "secondes": 5.13,
+      "assertions_ok": 99,
+      "abstention": true
+    },
+    {
+      "commande": "npm run smoke:montee",
+      "code": 0,
+      "secondes": 3.96,
+      "assertions_ok": 66,
+      "abstention": false
+    },
+    {
+      "commande": "npm run smoke:depot",
+      "code": 0,
+      "secondes": 3.04,
+      "assertions_ok": 43,
+      "abstention": false
+    },
+    {
+      "commande": "npm run sandbox:paiement",
+      "code": 0,
+      "secondes": 0.44,
+      "assertions_ok": 0,
+      "abstention": true
+    }
+  ],
+  "gardeFousSQL": {
+    "refuses": 105,
+    "permis": 9
+  },
+  "parcoursJob": {
+    "casRedirections": 10,
+    "casOrigineAbsenteDifferente": 2,
+    "transports": [
+      "anthropic",
+      "openai_compatible"
+    ],
+    "statuts": [
+      301,
+      302,
+      303,
+      307,
+      308
+    ],
+    "assertionsAjoutees": 78,
+    "assertionsTotalesFumeeExtraction": 264,
+    "appelsDestinationRenvoi": 0,
+    "premierEnvoiOrigineRefusee": 0,
+    "quotaAvant": 5,
+    "quotaApres": 5,
+    "reservationEtRenduReels": true,
+    "creditConsumed": false,
+    "verdict": "ILLISIBLE",
+    "revue": "ECHEC_TECHNIQUE",
+    "rejeuSansSecondAppelRenduRevue": true,
+    "execution": "handler analyserUnePiece direct avec PostgreSQL et stockage HTTP réel, pas nouveau dépôt navigateur"
+  },
+  "UI": {
+    "moteur": "React/jsdom",
+    "ecrans": [
+      "C-08",
+      "B-05"
+    ],
+    "constats": [
+      "prise en charge humaine pour le candidat",
+      "variable de destination à revoir indiquée à l’opérateur",
+      "aucune analyse encore à rendre annoncée"
+    ],
+    "navigateurRejoue": false
+  },
+  "diagnosticsApres": {
+    "base": "reproduire sur le commit indiqué dans le rapport REV11",
+    "simulation": true,
+    "resultats": [
+      {
+        "id": "CTRL-01",
+        "controle": "Lecture normale avec mesure",
+        "attendu": "LUE, 120/30",
+        "observe": {
+          "etat": "LUE",
+          "entree": 120,
+          "sortie": 30
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-01",
+        "controle": "Une mesure absente ne devient pas une lecture gratuite mesurée",
+        "attendu": "absence signalée, pas LUE à 0/0",
+        "observe": {
+          "etat": "LUE",
+          "entree": 0,
+          "sortie": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-02",
+        "controle": "Les compteurs transmis au grand livre sont des entiers positifs ou nuls",
+        "attendu": "pas LUE avec jetons négatifs/fractionnaires",
+        "observe": {
+          "etat": "LUE",
+          "entree": -12,
+          "sortie": 1.5
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-03",
+        "controle": "Une enveloppe inexploitable garde les jetons réellement annoncés",
+        "attendu": "NON_LUE, 120/30",
+        "observe": {
+          "etat": "NON_LUE",
+          "entree": 0,
+          "sortie": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "DIA-04",
+        "controle": "La pièce ne suit pas une redirection vers une autre origine",
+        "attendu": "0 appel à l’autre origine",
+        "observe": {
+          "appelsAilleurs": 0,
+          "octetsRecusAilleurs": false
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-05",
+        "controle": "Une liste entièrement mal formée ne devient pas un avis sans remarque",
+        "attendu": "SANS_AVIS",
+        "observe": {
+          "etat": "RELUE",
+          "remarques": 0
+        },
+        "conforme": false
+      },
+      {
+        "id": "CTRL-02",
+        "controle": "Une véritable liste vide reste un résultat",
+        "attendu": "RELUE, 0 remarque",
+        "observe": {
+          "etat": "RELUE",
+          "remarques": 0
+        },
+        "conforme": true
+      },
+      {
+        "id": "DIA-06",
+        "controle": "Le banc sans fournisseur neutralise aussi l’authentification Vertex",
+        "attendu": [],
+        "observe": [],
+        "conforme": true
+      }
+    ],
+    "echecs": 4
+  },
+  "diagnosticRelecture": "non rejoué dans L1, défaut DIA-07 de la revue/L0 conservé pour L4",
+  "arbitrageClaudeConserve": "AI_OPENAI_ORIGINE_AUTORISEE égale à l’origine de AI_OPENAI_URL, sinon aucun premier envoi des pièces",
+  "identiteConfiguration": "garde d’origine automatique de S.171 conservée ; manifeste supplémentaire proposé, comparaison manuelle sans liaison automatique au manifeste ni identité persistée",
+  "CI": "à vérifier sur le commit final de la PR #277, basée sur #276",
+  "nonQualifies": [
+    "fournisseur et OAuth réels",
+    "région réelle et DPA",
+    "qualité IA",
+    "image applicative",
+    "paiement réel",
+    "Q.A/M.C"
+  ]
+}
