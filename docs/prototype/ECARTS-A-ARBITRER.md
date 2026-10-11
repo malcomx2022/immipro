@@ -13377,3 +13377,24 @@ rouges, DIA-07 non corrigé. Prochain L2 : mesures sans zéros inventés et
 quota D1 en analyses. Pas de navigateur supplémentaire, d'image, de
 fournisseur réel ou de levée Q.A/M.C attestés. S.172 proposé via #277,
 complément à #276 ; aucune fusion ou déploiement automatique.
+
+### Relevé du déploiement de S.171 et S.172 — 11/10/2026
+
+L'ordre de fusion n'a pas suivi celui que #277 proposait. #276 / S.171 est entrée dans main à 13 h 37 (`c8f19e2`). #277 / S.172 a été fusionnée 18 s plus tard, mais dans la branche de #276, et non dans main. La PR #278 a porté sur main le contenu de `577f013`, sans aucun ajout. Sa CI était verte sur `e561a87`, et la fusion à 13 h 50 a produit `47b39b0`.
+
+**`47b39b0` est en service depuis 14 h 00 (run 542), sans retour arrière.** Les trois jobs sont verts :
+- `valider` : 28 fumées, dont l'extraction (« redirections IA refusées sans second envoi ») ;
+- `build` : l'image a été construite, les commandes des conteneurs ont été rejouées contre elle, puis elle a été poussée ;
+- `deploy` : les garde-fous refusent 105 écritures, en posent 9 et n'en acceptent aucune à tort ; l'antivirus est prêt en 7 s ; le journal se termine par « 47b39b0 est en service ».
+
+Le déploiement intermédiaire de `c8f19e2` (run 541, S.171 seul) a lui aussi abouti ; il a été remplacé 12 minutes plus tard.
+
+**Contrôles sur l'instance pilote après 14 h 00.**
+- `/api/health` répond 200, avec `{"status":"pilote","db":"up"}`.
+- Le préflight CORS du stockage répond 200 pour `https://immipro.app` et 403 pour une autre origine.
+- Un POST sur `/api/comptes/session` venu d'une autre origine reçoit le 403 français « Cette demande ne vient pas d'ImmiPro ».
+- La page publique à 390 px : 12 constats conformes sur 12, sans erreur de console.
+
+**Non vérifié.**
+- La configuration IA du pilote, à relever par le responsable dans B-07. Si l'extraction y passe par `openai_compatible`, il faut poser `AI_OPENAI_ORIGINE_AUTORISEE`. Sans elle, les pièces partent en revue humaine.
+- Aucun appel réel à un fournisseur, et aucun dépôt de pièce sur le pilote.
