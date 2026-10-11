@@ -189,6 +189,16 @@ exclusive durable et une reprise après interruption. Le diagnostic remplace
 uniquement le composeur HTTP pour fournir l'acteur ; une régression HTTP
 authentifiée doit compléter la preuve au moment de la correction.
 
+**Traitement proposé S.175 / L4, 11/10.** Main `2066230`, Claude et registre
+relus avant modification. Réservation durable exclusive/FIFO atomiques avant
+réseau, publication conditionnée au propriétaire, à l'échéance et à la version
+courante ; restitution unique et reprise S.153. DIA-07 inchangé passe : un
+appel/un débit. Vrais POST authentifiés et Chromium à deux onglets sur les
+deux fournisseurs locaux complètent le diagnostic. Voir [preuves et limites](lot-l4-2026-10-11.md) et
+[exploitation / rôle du fournisseur](../exploitation/relecture-concurrente.md).
+Le constat initial ci-dessus reste l'historique de la reproduction ; aucune
+qualification réelle, fusion ou mise en production attestée ici.
+
 ## 5. Front : ce qui a réellement été éprouvé
 
 Les 45 visites couvrent les pages publiques courantes, espaces compte,

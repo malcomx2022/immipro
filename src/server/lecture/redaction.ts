@@ -101,9 +101,7 @@ export async function pieceARediger(
 }
 
 /** Réponses déjà données, pour que l'entretien reprenne où il s'est arrêté. */
-export async function reponsesDeLEntretien(
-  documentId: string,
-): Promise<Record<number, string>> {
+export async function reponsesDeLEntretien(documentId: string): Promise<Record<number, string>> {
   const lignes = await db.interviewAnswer.findMany({
     where: { documentId },
     orderBy: { rank: "asc" },
@@ -182,6 +180,7 @@ export interface VueDeLaRelecture {
   texteExistant: boolean;
   /** Le service peut être appelé — jamais « il l'a été ». */
   analysePossible: boolean;
+  analyseEnCours: boolean;
   /** La couverture du dossier ouvre l'analyse critique (arbitrage S.80). */
   redactionAssistee: boolean;
   /** Date de la version relue, ISO `AAAA-MM-JJ`. */
@@ -202,6 +201,14 @@ export async function vueDeLaRelecture(
     select: { id: true, uploadedAt: true, body: true, critiquedAt: true },
   });
 
+  const analyseEnCours = Boolean(
+    derniere &&
+    !derniere.critiquedAt &&
+    (await db.relectureReservation.findFirst({
+      where: { versionId: derniere.id, state: "EN_COURS", expiresAt: { gt: new Date() } },
+      select: { id: true },
+    })),
+  );
   const remarques = derniere?.critiquedAt ? await remarquesDeLaVersion(derniere.id) : null;
 
   /*
@@ -214,6 +221,7 @@ export async function vueDeLaRelecture(
     recoupements: derniere?.body ? recoupements(derniere.body, faits) : AUCUN_RECOUPEMENT,
     texteExistant: derniere !== null,
     analysePossible,
+    analyseEnCours,
     redactionAssistee,
     relectureLe: (derniere?.uploadedAt ?? new Date()).toISOString().slice(0, 10),
   };

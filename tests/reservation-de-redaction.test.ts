@@ -55,11 +55,17 @@ describe("chaque débit de rédaction porte son échéance, et chaque issue la s
 
   it("la relecture réserve avant l'appel, et solde avec l'avis daté", () => {
     const route = lire("src/app/api/dossiers/[id]/redaction/[type]/relecture/route.ts");
-    expect(route.indexOf("reserveJusquA: echeanceDeLaReservation(")).toBeLessThan(route.indexOf("await laCritique()("));
-    const transaction = route.slice(route.indexOf("await db.$transaction(["));
-    const fin = transaction.indexOf("]);");
-    expect(transaction.slice(0, fin)).toContain("data: { critiquedAt: new Date() }");
-    expect(transaction.slice(0, fin)).toContain("solderLaReservationDeRedaction(db, debit.ligne, derniere.id)");
+    expect(route.indexOf("await reserverLaRelecture(")).toBeLessThan(
+      route.indexOf("await laCritique()("),
+    );
+    const reservation = lire("src/server/redaction/relecture-reservation.ts");
+    expect(reservation).toContain("reserveJusquA: echeance");
+    const publication = reservation.slice(
+      reservation.indexOf("export async function publierLaRelecture"),
+    );
+    expect(publication).toContain("sousVerrouDuGrandLivre(");
+    expect(publication).toContain("data: { critiquedAt: maintenant }");
+    expect(publication).toContain("solderLaReservationDeRedaction(tx, r.creditId, r.versionId)");
     expect(route).not.toContain("rendreUneTentative");
   });
 });
@@ -70,10 +76,18 @@ describe("le grand livre", () => {
   it("solder et rendre sont conditionnels : une réservation ne se règle qu'une fois", () => {
     const solder = quota.slice(quota.indexOf("export function solderLaReservationDeRedaction"));
     expect(solder.slice(0, solder.indexOf("\n}"))).toContain("reservedUntil: { not: null }");
-    const rendre = quota.slice(quota.indexOf("export async function rendreLaReservationDeRedaction"));
+    const rendre = quota.slice(
+      quota.indexOf("export async function rendreLaReservationDeRedaction"),
+    );
     const corps = rendre.slice(0, rendre.indexOf("\n}"));
     expect(corps).toContain("sousVerrouDuGrandLivre(");
-    expect(corps).toMatch(/reservedUntil: \{ not: null \}[\s\S]*if \(!debit\) return false;/u);
+    expect(corps).toContain("rendreLaReservationDeRedactionSousVerrou(");
+    const coeur = quota.slice(
+      quota.indexOf("export async function rendreLaReservationDeRedactionSousVerrou"),
+    );
+    expect(coeur.slice(0, coeur.indexOf("\n}"))).toMatch(
+      /reservedUntil: \{ not: null \}[\s\S]*if \(!debit\) return false;/u,
+    );
   });
 
   it("le débit d'une rédaction n'est pas une réservation de lecture (RF-3)", () => {

@@ -355,3 +355,31 @@ Base `3d985f8`, L2 #280 fusionné, arbitrage Claude #282 conservé.
 [Rapport L3](../revue/lot-l3-2026-10-11.md),
 [contrat des avis et rôle du provider](../exploitation/avis-ia.md).
 Aucune signature de recette globale ou levée Q.A/M.C.
+
+## REV11-L4 — S.175, 11/10/2026
+
+Base main `2066230`, L3 #283 fusionné, instructions et code Claude relus avant
+modification ; L2 #280 et arbitrage #282 conservés. Proposition de correction,
+recette locale synthétique ; aucun déploiement ou préalable de lancement attesté.
+
+| Cas WF-08/R-04 | Attendu | Preuve exécutée | État |
+|---|---|---|---|
+| Deux demandes même version, quota 1/30 | Un appel, un débit ; second « en cours » | Traitement PostgreSQL, DIA-07 inchangé et vrais POST sur deux fournisseurs | Corrigé, banc |
+| Deux onglets anciens | Attente, recharge durable, consultation sans POST supplémentaire | Chromium sur Anthropic/compatible, base un avis/un usage/un débit | Éprouvé localement |
+| Réponse retardée | Aucun verrou SQL gardé pendant réseau, second POST termine en cours | Traitement et HTTP avec rendez-vous fournisseur | Éprouvé |
+| Nouvelle version pendant appel | Ancien avis non publié, débit rendu, usage gardé | Traitement et POST réel | Éprouvé |
+| v2 rapide, v1 lente | Avis v2 conservé, seul quota net v2 payé, deux usages | Traitement réel et PostgreSQL | Éprouvé |
+| Arrêt avant appel / après retour et usage | Débit durable sans faux avis ; rendu à échéance, reprise explicite | Processus réellement arrêtés aux checkpoints injectés | Éprouvé, adaptateur synthétique |
+| Expiration et deux reprises | Une nouvelle propriétaire ; ancien jeton sans effet | PostgreSQL, course reprise horaire/publication | Éprouvé |
+| Fournisseur sans avis / exception | Rendu et libération uniques, aucun avis daté | Traitement et régressions L2/L3 | Éprouvé |
+| Unicité / état-date / échéance / publication interrompue | Refus SQL et rollback atomique | Nouvelle fumée PostgreSQL | Éprouvé |
+| Session/origine/propriété/pack refusés | Aucun appel ni réservation supplémentaire | Vrais POST Next authentifiés | Éprouvé |
+| R-04 mobile | Attente et résultat consultables, sans débordement | Chromium 390/390, zéro erreur JS, deux fournisseurs | Éprouvé localement |
+
+188 fichiers / 3 805 tests ; 30 suites PostgreSQL vertes. Nouvelle fumée :
+64 assertions de traitement, 32 HTTP ; quatre contrôles supplémentaires quand
+Chromium est activé. DIA-07 et la fumée sont dans la porte commune. Les 29
+suites existantes et diagnostics IA conservent leurs attentes métier.
+[Rapport](../revue/lot-l4-2026-10-11.md) · [Fournisseur, reprise et migration](../exploitation/relecture-concurrente.md).
+Qualification fournisseur réelle L5, mobile B-07 L7 ; autres parcours, supports,
+préalables Q.A/M.C et reports V2 restent à qualifier dans leurs lots.

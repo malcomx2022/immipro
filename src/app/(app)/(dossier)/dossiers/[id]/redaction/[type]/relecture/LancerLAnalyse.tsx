@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/Button";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/domain/echecs/catalogue";
+import {
+  RELECTURE_EN_COURS,
+  RELECTURE_REMPLACEE,
+  RELECTURE_INTERROMPUE,
+} from "@/domain/redaction/relecture-reservation";
 import { issueDeLaRelecture } from "@/domain/redaction/issues";
 
 /**
@@ -20,9 +25,18 @@ import { issueDeLaRelecture } from "@/domain/redaction/issues";
  * avant le clic : un geste qui coûte s'annonce, il ne se découvre pas au
  * compteur.
  */
-export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: string }) {
+export function LancerLAnalyse({
+  dossierId,
+  type,
+  analyseEnCours = false,
+}: {
+  dossierId: string;
+  type: string;
+  analyseEnCours?: boolean;
+}) {
   const router = useRouter();
   const [envoi, setEnvoi] = useState(false);
+  const [attente, setAttente] = useState<string | null>(null);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const [sansAvis, setSansAvis] = useState<EchecCandidat | null>(null);
 
@@ -30,13 +44,30 @@ export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: s
     setEnvoi(true);
     setEchec(null);
     setSansAvis(null);
-    const resultat = await appeler<{ relue: boolean; disponible: boolean; motif?: string | null }>(
-      `/api/dossiers/${dossierId}/redaction/${type}/relecture`,
-      { corps: {} },
-    );
+    const resultat = await appeler<{
+      relue: boolean;
+      disponible: boolean;
+      enCours?: boolean;
+      motif?: string | null;
+    }>(`/api/dossiers/${dossierId}/redaction/${type}/relecture`, { corps: {} });
     if (!resultat.ok) {
       setEnvoi(false);
       setEchec(resultat.echec);
+      return;
+    }
+    if (
+      resultat.donnees.enCours ||
+      resultat.donnees.motif === "version_remplacee" ||
+      resultat.donnees.motif === "relecture_interrompue"
+    ) {
+      setEnvoi(false);
+      setAttente(
+        resultat.donnees.enCours
+          ? RELECTURE_EN_COURS
+          : resultat.donnees.motif === "version_remplacee"
+            ? RELECTURE_REMPLACEE
+            : RELECTURE_INTERROMPUE,
+      );
       return;
     }
     /*
@@ -51,6 +82,9 @@ export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: s
       setSansAvis(issueDeLaRelecture(resultat.donnees));
       return;
     }
+    // Une nouvelle version peut apparaître au rafraîchissement et garder
+    // ce composant monté : ne pas lui transmettre un chargement terminé.
+    setEnvoi(false);
     router.refresh();
   }
 
@@ -62,9 +96,28 @@ export function LancerLAnalyse({ dossierId, type }: { dossierId: string; type: s
         Un bouton grisé et muet laisserait croire à une panne pendant les
         secondes que l'analyse prend.
       */}
-      <Button onClick={lancer} chargement={envoi} pleineLargeur className="md:w-auto">
-        {envoi ? "Analyse en cours…" : "Lancer l'analyse"}
-      </Button>
+      {analyseEnCours || attente ? (
+        <>
+          <p role="status" className="max-w-lecture-large text-pretty text-14 text-ink-700">
+            {attente ?? RELECTURE_EN_COURS}
+          </p>
+          <Button
+            onClick={() => {
+              setAttente(null);
+              router.refresh();
+            }}
+            variante="secondaire"
+            pleineLargeur
+            className="md:w-auto"
+          >
+            Consulter le résultat
+          </Button>
+        </>
+      ) : (
+        <Button onClick={lancer} chargement={envoi} pleineLargeur className="md:w-auto">
+          {envoi ? "Analyse en cours…" : "Lancer l'analyse"}
+        </Button>
+      )}
       {sansAvis ? <BlocEchec echec={sansAvis} /> : null}
       {echec ? <BlocEchec echec={echec} /> : null}
     </div>

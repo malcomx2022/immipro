@@ -161,8 +161,15 @@ la réservation une fois, sans effacer la consommation chez le fournisseur
 ni provoquer un nouvel appel automatique. Le candidat reçoit une explication
 et garde sa version. [Contrat, quota et historique](exploitation/avis-ia.md).
 
-Limite restant à corriger en L4 : deux demandes simultanées peuvent encore
-relire et débiter deux fois la même version (DIA-07).
+**S.175 / REV11-L4.** La réservation exclusive par version et son débit
+sont désormais atomiques avant réseau. Le second onglet reçoit « en cours »
+ou l'avis existant, même à quota 1. Aucun réseau sous transaction SQL ;
+l'avis n'est publié que par sa propriétaire encore valide, sur la version
+courante. Réponse ancienne/expirée écartée, usage conservé et débit encore dû
+rendu une fois ; reprise horaire S.153 et reprise explicite après expiration.
+R-04 consulte sans relancer l'IA. DIA-07 passe inchangé ; vrais POST et deux
+onglets éprouvés sur les deux fournisseurs simulés. La qualification réelle
+reste L5. [Étapes, limites après interruption et migration](exploitation/relecture-concurrente.md).
 
 Sources : [service](../src/server/redaction/service.ts),
 [mise en forme](../src/server/redaction/mise-en-forme.ts),

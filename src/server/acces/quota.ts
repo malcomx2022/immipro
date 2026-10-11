@@ -174,30 +174,40 @@ export async function debiterUneAnalyse(
     reserveJusquA?: Date;
   } = {},
 ): Promise<{ ligne: string; octroi: string | null; reprise: boolean }> {
-  return sousVerrouDuGrandLivre(applicationId, async (tx) => {
-    if (options.versionId) {
-      const ouverte = await reservationOuverte(applicationId, options.versionId, tx);
-      if (ouverte) return { ...ouverte, reprise: true };
-    }
-    const lignes = await lignesDuGrandLivre(applicationId, tx);
-    const restantes = lignes.reduce((n, l) => n + l.delta, 0);
-    if (restantes <= 0) throw echec("quota_epuise");
-    const grantId = octroiAEntamer(lignes);
-    const ligne = await tx.analysisCredit.create({
-      data: {
-        applicationId,
-        delta: -1,
-        reason: "ANALYSE",
-        analysisId: analysisId ?? null,
-        grantId,
-        versionId: options.versionId ?? null,
-        note: options.note ?? null,
-        reservedUntil: options.reserveJusquA ?? null,
-      },
-      select: { id: true },
-    });
-    return { ligne: ligne.id, octroi: grantId, reprise: false };
+  return sousVerrouDuGrandLivre(applicationId, (tx) =>
+    debiterUneAnalyseSousVerrou(tx, applicationId, analysisId, options),
+  );
+}
+
+/** Appelant déjà sous le verrou du grand livre ; aucune transaction imbriquée. */
+export async function debiterUneAnalyseSousVerrou(
+  tx: Prisma.TransactionClient,
+  applicationId: string,
+  analysisId: string | undefined,
+  options: { note?: string; versionId?: string; reserveJusquA?: Date } = {},
+): Promise<{ ligne: string; octroi: string | null; reprise: boolean }> {
+  if (options.versionId) {
+    const ouverte = await reservationOuverte(applicationId, options.versionId, tx);
+    if (ouverte) return { ...ouverte, reprise: true };
+  }
+  const lignes = await lignesDuGrandLivre(applicationId, tx);
+  const restantes = lignes.reduce((n, l) => n + l.delta, 0);
+  if (restantes <= 0) throw echec("quota_epuise");
+  const grantId = octroiAEntamer(lignes);
+  const ligne = await tx.analysisCredit.create({
+    data: {
+      applicationId,
+      delta: -1,
+      reason: "ANALYSE",
+      analysisId: analysisId ?? null,
+      grantId,
+      versionId: options.versionId ?? null,
+      note: options.note ?? null,
+      reservedUntil: options.reserveJusquA ?? null,
+    },
+    select: { id: true },
   });
+  return { ligne: ligne.id, octroi: grantId, reprise: false };
 }
 
 /**
@@ -402,18 +412,33 @@ export async function rendreLaReservationDeRedaction(
   ligne: string,
   note: string,
 ): Promise<boolean> {
-  return sousVerrouDuGrandLivre(applicationId, async (tx) => {
-    const debit = await tx.analysisCredit.findFirst({
-      where: { id: ligne, applicationId, reason: "ANALYSE", reservedUntil: { not: null } },
-      select: { grantId: true },
-    });
-    if (!debit) return false;
-    await tx.analysisCredit.update({ where: { id: ligne }, data: { reservedUntil: null } });
-    await tx.analysisCredit.create({
-      data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", grantId: debit.grantId, note },
-    });
-    return true;
+  return sousVerrouDuGrandLivre(applicationId, (tx) =>
+    rendreLaReservationDeRedactionSousVerrou(tx, applicationId, ligne, note),
+  );
+}
+
+/** Même verrou pour restitution et fin de la revendication de relecture (L4). */
+export async function rendreLaReservationDeRedactionSousVerrou(
+  tx: Prisma.TransactionClient,
+  applicationId: string,
+  ligne: string,
+  note: string,
+  etat: "SANS_AVIS" | "EXPIREE" | "OBSOLETE" | "INTERROMPUE" = "INTERROMPUE",
+): Promise<boolean> {
+  const debit = await tx.analysisCredit.findFirst({
+    where: { id: ligne, applicationId, reason: "ANALYSE", reservedUntil: { not: null } },
+    select: { grantId: true },
   });
+  if (!debit) return false;
+  await tx.relectureReservation.updateMany({
+    where: { creditId: ligne, state: "EN_COURS" },
+    data: { state: etat, finishedAt: new Date() },
+  });
+  await tx.analysisCredit.update({ where: { id: ligne }, data: { reservedUntil: null } });
+  await tx.analysisCredit.create({
+    data: { applicationId, delta: 1, reason: "ANALYSE_RENDUE", grantId: debit.grantId, note },
+  });
+  return true;
 }
 
 /**
@@ -434,7 +459,17 @@ export async function rendreLesReservationsDeRedactionEchues(
   });
   let rendues = 0;
   for (const debit of echues) {
-    if (await rendreLaReservationDeRedaction(debit.applicationId, debit.id, NOTE_RESERVATION_RENDUE)) {
+    if (
+      await sousVerrouDuGrandLivre(debit.applicationId, (tx) =>
+        rendreLaReservationDeRedactionSousVerrou(
+          tx,
+          debit.applicationId,
+          debit.id,
+          NOTE_RESERVATION_RENDUE,
+          "EXPIREE",
+        ),
+      )
+    ) {
       rendues += 1;
     }
   }

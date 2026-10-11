@@ -405,10 +405,14 @@ describe("S.92 — le remboursement du supplément se rejoue sans se contredire"
 
   it("le débit prend le même verrou, et nomme l'octroi qu'il entame", () => {
     const quota = readFileSync("src/server/acces/quota.ts", "utf8");
-    expect(quota).toMatch(/pg_advisory_xact_lock\(hashtextextended\(\$\{`grand-livre:\$\{applicationId\}`\}, 0\)\)/u);
+    expect(quota).toMatch(
+      /pg_advisory_xact_lock\(hashtextextended\(\$\{`grand-livre:\$\{applicationId\}`\}, 0\)\)/u,
+    );
     const debit = /export async function debiterUneAnalyse[\s\S]*?\n\}$/mu.exec(quota)![0];
     expect(debit).toMatch(/sousVerrouDuGrandLivre/u);
-    expect(debit).toMatch(/const grantId = octroiAEntamer\(lignes\)/u);
+    expect(debit).toContain("debiterUneAnalyseSousVerrou(tx, applicationId, analysisId, options)");
+    const coeur = /export async function debiterUneAnalyseSousVerrou[\s\S]*?\n\}/mu.exec(quota)![0];
+    expect(coeur).toMatch(/const grantId = octroiAEntamer\(lignes\)/u);
   });
 });
 

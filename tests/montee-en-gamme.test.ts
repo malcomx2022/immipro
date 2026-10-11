@@ -378,10 +378,19 @@ describe("S.92 — le remboursement automatique du supplément", () => {
 
   it("les débits de rédaction portent leur trace, écrite avant l'appel", () => {
     // La mise en forme débite dans `mettreEnForme` depuis la revue M7.
-    const relecture = readFileSync("src/app/api/dossiers/[id]/redaction/[type]/relecture/route.ts", "utf8");
+    const relecture = readFileSync(
+      "src/app/api/dossiers/[id]/redaction/[type]/relecture/route.ts",
+      "utf8",
+    );
     const miseEnForme = readFileSync("src/server/redaction/mise-en-forme.ts", "utf8");
-    expect(relecture).toMatch(/debiterUneAnalyse\(params\.id!, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u);
-    expect(miseEnForme).toMatch(/debiterUneAnalyse\(dossierId, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u);
+    expect(relecture).toContain("reserverLaRelecture(params.id!, derniere.id, piece.type)");
+    const reservation = readFileSync("src/server/redaction/relecture-reservation.ts", "utf8");
+    expect(reservation).toMatch(
+      /debiterUneAnalyseSousVerrou\(tx, applicationId, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u,
+    );
+    expect(miseEnForme).toMatch(
+      /debiterUneAnalyse\(dossierId, undefined, \{\s*note: `\$\{NOTE_REDACTION_ASSISTEE\}/u,
+    );
     expect(NOTE_REDACTION_ASSISTEE).toBe("Rédaction assistée");
   });
 });
