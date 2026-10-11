@@ -264,6 +264,14 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 ### WF-06 — Constitution du dossier et analyse documentaire
 
+**Complément S.172 / REV11-L1 — RG-06.7 et RG-06.3.** Aucun transport IA ne suit une
+redirection HTTP, même sur la même origine. Le refus `non_configure` ne
+se rejoue pas automatiquement : revue technique, analyse rendue, cause
+actionnable en B-05, prise en charge humaine en C-08. Le refus couvre aussi
+les appels rédaction/relecture WF-08 et l'échange OAuth Google. Voir
+[destination et identité proposée](exploitation/destination-ia.md) ; le
+drapeau compatible seul n'identifie pas une société ou une région validée.
+
 | | |
 |---|---|
 | **Acteurs** | CAND, SYS |

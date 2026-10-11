@@ -212,6 +212,7 @@ try {
     }),
     AI_OPENAI_PDF: "image_url",
     AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible",
+    AI_OPENAI_ORIGINE_AUTORISEE: "https://europe-west4-aiplatform.googleapis.com",
   };
   const branchees = etatDesFonctions(environnementDuBanc(env))
     .filter((f) => f.branche)

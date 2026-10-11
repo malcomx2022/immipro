@@ -300,3 +300,16 @@ connexion et droits conformes, sans erreur JS ni débordement. Diagnostics
 toujours rouges. REV-BANC-01 (annonce de disponibilité malgré échec du
 serveur sur port occupé) est ajouté au chantier L0. Aucun préalable de
 lancement n'est levé par cette actualisation.
+
+## Complément REV11-L1 / S.172 — preuves worker, confidentialité et interfaces
+
+WF-06 / RG-06.3 et RG-06.7, WF-08 / RG-08.6, C-08 et B-05 : transports
+HTTP locaux, job réel sur PostgreSQL et rendu React candidat/opérateur.
+301/302/303/307/308 : même origine, autre origine, chaîne, HTTP distant et
+Location absent ; zéro appel aux destinations de renvoi. OAuth et vrai SDK
+Anthropic éprouvés. Réservation/rendu 5 → 5, revue technique, rejeu sans
+second appel/rendu ; aucune conformité ou avis fabriqué.
+Voir [le relevé et les limites](../revue/lot-l1-2026-10-11.md). Le navigateur
+n'est pas rejoué dans L1 ; les deux assertions de rendu UI sont exécutées
+sous jsdom. Fournisseur réel/région/DPA, mesure inconnue, avis mal formés et
+concurrence de relecture restent à qualifier/corriger dans leurs lots.

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { fetchSansRedirection } from "./ia-transport";
 import { FOURNISSEURS } from "@/domain/ia/fournisseurs";
 
 /**
@@ -29,6 +30,8 @@ let client: Anthropic | null = null;
  */
 export const OPTIONS_DU_CLIENT = {
   maxRetries: 0,
+  fetch: fetchSansRedirection,
+  logLevel: "off",
   fetchOptions: { redirect: "manual" },
 } as const satisfies Omit<ConstructorParameters<typeof Anthropic>[0] & object, "apiKey">;
 

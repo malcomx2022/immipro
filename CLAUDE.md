@@ -79,6 +79,22 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.172 / complément REV11-L1, PR #277.** Claude a ouvert #276 / S.171
+pendant le travail L1. Cette proposition est désormais basée sur sa branche
+`claude/elegant-dijkstra-86egeb`, sans remplacer son lot ou son arbitrage.
+Conserver `AI_OPENAI_ORIGINE_AUTORISEE` : l'origine des pièces compatibles
+doit être celle explicitement autorisée ; le banc la neutralise.
+Le complément ajoute la suppression du corps/en-têtes 3xx avant le SDK,
+les logs SDK coupés et les preuves worker/quota/rejeu/rendus C-08/B-05.
+Voir [suivi L1](docs/revue/lot-l1-2026-10-11.md) et
+[destination IA](docs/exploitation/destination-ia.md). L'origine est une
+garde automatique, mais ne prouve pas société, région ou DPA. Le manifeste
+complémentaire reste une comparaison manuelle pour L5. DIA-04/06 passent ;
+DIA-01/02/03/05 et DIA-07 restent à corriger. D1 reste en analyses.
+Prochain lot L2, sans inventer de mesures historiques. S.171 et S.172 sont
+des propositions distinctes ; aucun déploiement ou préalable Q.A/M.C
+n'est attesté ici.
+
 **Démarrage des corrections, S.170 / REV11-L0.** Le responsable a demandé le
 11/10 de commencer en dix lots prioritaires. Lire le
 [suivi L0](docs/revue/lot-l0-2026-10-11.md) et ses preuves. Cette proposition

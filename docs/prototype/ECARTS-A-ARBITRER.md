@@ -13342,3 +13342,38 @@ et signature de recette restent des étapes distinctes.
 **Non vérifié.**
 - Un prestataire réel. La région, le modèle et le DPA restent à documenter avec lui (L5).
 - La configuration réelle du pilote, en particulier si l'extraction y passe déjà par `openai_compatible` : à relever dans B-07 après déploiement.
+
+## S.172 — Complément REV11-L1 : confidentialité et preuves worker/UI
+
+**Autorisation et continuité.** « L1 », le 11/10/2026. Passe initiale sur
+main `54faaa7`, puis #276 / S.171 de Claude découvert pendant publication
+de #277. #277 devient un complément basé sur `98ca7e0`, garde l'arbitrage
+`AI_OPENAI_ORIGINE_AUTORISEE` et ses 31 tests. S.172 est attribué après
+relecture du registre. Prisma 7, pg-boss 12, D1 et Q.A/M.C conservés.
+Aucune migration, dépendance ou donnée historique modifiée.
+
+**Reproduction et correction.** Sur Claude `a978f9a`, sept attentes
+complémentaires rouges : cinq échos sensibles dans les erreurs SDK 3xx,
+logs d'échange sous `ANTHROPIC_LOG=debug`, origine invalide avec identifiants
+recopiée en B-07. Corps/en-têtes 3xx écartés avant le SDK, logs SDK coupés,
+valeur d'origine invalide omise. Les causes/variables de Claude restent.
+Le transport demeure sans renvoi implicite ni changement de fournisseur.
+Le motif générique de configuration n'affirme plus qu'une clé manque.
+
+**Preuves finales.** WF-06/RG-06.3/RG-06.7, WF-08/RG-08.6, C-08/B-05.
+Porte : 182 fichiers / 3 669 tests, dont 31 propres au complément.
+Lint/types/copie, audit/build, 27 fumées PostgreSQL ; 105 refus SQL / 9 permis.
+Extraction : 78 assertions ajoutées, dix redirections sans second envoi
+et deux origines refusées sans premier envoi ; quota 5 → 5, revue
+technique et rejeu sans second appel/rendu. Rendus React/jsdom candidat
+et opérateur. Aucun test de Claude assoupli.
+Voir [preuves et commandes](../revue/lot-l1-2026-10-11.md).
+
+**Restants.** La garde d'origine est automatique ; le
+[manifeste proposé](../exploitation/destination-ia.md) reste une comparaison
+manuelle pour société/région/modèle/fonctions, sans identité persistée.
+L5 qualifie le prestataire réel. DIA-04/06 passent ; DIA-01/02/03/05 restent
+rouges, DIA-07 non corrigé. Prochain L2 : mesures sans zéros inventés et
+quota D1 en analyses. Pas de navigateur supplémentaire, d'image, de
+fournisseur réel ou de levée Q.A/M.C attestés. S.172 proposé via #277,
+complément à #276 ; aucune fusion ou déploiement automatique.

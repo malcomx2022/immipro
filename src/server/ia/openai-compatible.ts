@@ -1,3 +1,4 @@
+import { fetchSansRedirection } from "@/lib/ia-transport";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import {
   DELAI_EXTRACTION_MS,
@@ -189,7 +190,7 @@ async function envoyer(
   const url = new URL("chat/completions", config.base.href.endsWith("/") ? config.base : `${config.base.href}/`);
   let reponse: Response;
   try {
-    reponse = await fetch(url, {
+    reponse = await fetchSansRedirection(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${autorisation.valeur}`,

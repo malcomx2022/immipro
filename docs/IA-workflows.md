@@ -202,11 +202,15 @@ Revalider les tarifs et les références historiques de
 
 Deux précautions sont désormais appuyées par une reproduction :
 
-- L'adaptateur suit actuellement un HTTP 307 vers une autre origine et lui
-  transmet le corps du document. Le chantier doit refuser les redirections
-  ou les contrôler explicitement avant tout nouvel envoi.
+- **S.171 / #276 et complément S.172 / #277, proposés** : les transports compatible, SDK Anthropic
+  et OAuth Google refusent tous les 3xx, même sur la même origine. DIA-04
+  passe ; le worker ouvre une revue technique et rend l'analyse réservée,
+  sans reprise automatique ou renvoi. Les interfaces candidat/opérateur
+  suivent ce résultat. Voir [L1](revue/lot-l1-2026-10-11.md) et
+  [destinations et manifeste proposé](exploitation/destination-ia.md).
+  Le lien prestataire/URL/région/modèle/fonctions reste à qualifier en L5.
 - La revue a reproduit l'héritage du compte Vertex dans le banc de recette.
-  **S.170 / REV11-L0, proposé** : l'environnement est construit par liste
+  **S.170 / REV11-L0, fusionné par #275** : l'environnement est construit par liste
   autorisée ; clés fixes, compte Google, choix et autorisation IA sont
   neutralisés. Le diagnostic DIA-06 et les régressions Anthropic/compatible/
   Vertex passent. Le dépôt navigateur suivi du worker aboutit à la revue
