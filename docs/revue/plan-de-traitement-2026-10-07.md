@@ -1749,3 +1749,10 @@ restante. Voir la [revue et les preuves](revue-complete-2026-10-11.md).
 Les identifiants REV11-Lx ne remplacent pas les numéros S.xxx ni les
 décisions antérieures. Aucun point n'est déclaré corrigé par la publication
 de ce complément documentaire.
+
+**S.170 / REV11-L0, proposé le 11/10.** À la demande de commencer les dix
+lots, l'isolation IA/paiement et la supervision du banc sont corrigées sur
+main `d4fb08c`, en conservant S.169. Tests, fumée du vrai banc et recette
+documentaire passent ; DIA-06 devient vert. Voir le
+[suivi et les écarts restants](lot-l0-2026-10-11.md). Les autres lots du
+chantier REV11 restent à réaliser ; cette proposition n'est pas un déploiement.

@@ -13265,3 +13265,36 @@ Diagnostics IA et concurrence : mêmes défauts. Nouveau banc S.169 :
 45 navigations, neuf contrôles conformes, aucun débordement ni erreur JS.
 REV-BANC-01 s'ajoute : un port occupé peut faire annoncer un banc prêt
 alors que son enfant web a échoué. L0 doit aussi contrôler le démarrage.
+
+## S.170 — REV11-L0 : isolation et supervision du banc de recette
+
+**Autorisation.** Le 11/10/2026, le responsable demande « commençons la
+correction en dix lots prioritaires ». Premier lot du chantier REV11.
+Numéro attribué après relecture du registre et des PR ouvertes, sur main
+`d4fb08c` (#273 et #274 fusionnées). S.169 déployé est pris en compte ;
+client/CLI Prisma 7, pg-boss 12 et corrections de Claude conservés.
+
+**Correction proposée.** REV-IA-04 et REV-BANC-01, WF-06/WF-08 et recette
+WF-15. Environnement du banc construit par liste autorisée ; Anthropic,
+compatible et compte Google neutralisés, ainsi que les noms actuels et
+historiques des clés de paiement. Port contrôlé avant suppression de base,
+santé privée de cette passe exigée, attente bornée, supervision des enfants
+et fermeture après échec/SIGTERM. Le banc tolère seulement les bloquantes
+de paiement qu'il coupe volontairement ; la santé de production garde ses
+conditions. Aucune migration, reprise de données ou montée de dépendance.
+
+**Preuves.** 180 fichiers / 3 607 tests, dont 21 nouveaux ; build, types,
+lint/copie/audit passent. 27 fumées PostgreSQL, dont `smoke:recette` ajouté
+à la porte commune CI/déploiement. Collision avant destruction, perte du
+worker, échec de graine et reprise/arrêt complet passent. Chromium :
+45 navigations/neuf contrôles sans débordement ni erreur JS ; nouvelle
+version PDF saine, analyse `ILLISIBLE`, `creditConsumed=false`, quota
+29 → 29 ; décision opérateur réelle `CONFORME`. Aucun appel au piège IA.
+La commande `recette-documentaire.py` permet de rejouer ce dernier parcours.
+Voir [suivi, commandes et preuves](../revue/lot-l0-2026-10-11.md).
+
+**Restants.** DIA-06 passe ; DIA-01 à DIA-05 et DIA-07 restent rouges.
+Poursuivre par L1, puis le chantier documenté. Modèle/OAuth réel, paiement
+réel, qualité IA, image applicative, restauration et préalables Q.A/M.C
+ne sont pas qualifiés par ces tests. S.170 est proposé ; fusion, déploiement
+et signature de recette restent des étapes distinctes.

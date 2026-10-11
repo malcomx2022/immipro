@@ -19,7 +19,32 @@ responsable indispensable au lancement. Effort indicatif : S < 2 h,
 M 0,5–1 jour, L > 1 jour. Les chiffrages sont à réviser après conception ;
 ils ne valent ni date de livraison ni autorisation d'encaissement.
 
+## Suivi des dix lots autorisés le 11/10
+
+| Ordre | Lot | Priorité | État |
+|---|---|---|---|
+| 1 | L0 — Isolation et supervision du banc | P1/P2 | S.170 proposé, tests locaux passés |
+| 2 | L1 — Destination des documents | P1 | Prochain lot |
+| 3 | L2 — Mesure des usages IA | P1 | À réaliser |
+| 4 | L3 — Validité des avis IA | P1 | À réaliser |
+| 5 | L4 — Relecture unique par version | P1 | À réaliser |
+| 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | Après L0–L4, preuves prestataire/modèle requises |
+| 7 | L6 — Recette front et parcours candidat | P2 | À réaliser |
+| 8 | L7 — Exploitation et données antérieures | P2 | À réaliser |
+| 9 | L8 — Paiement, conformité et lancement | Préalables Q.A/M.C | À réaliser avec les preuves externes |
+| 10 | L9 — Maintenances restantes | P2 | À réaliser après relecture du travail de Claude |
+
+Chaque lot conserve une PR et un numéro S.xxx attribué au démarrage. Les
+preuves de qualification/lancement restent distinctes des corrections de code.
+
 ## REV11-L0 — Isoler réellement le banc et établir les régressions
+
+**Suivi du 11/10 : S.170 proposé sur main `d4fb08c`.** Correction préparée,
+21 régressions et fumée du banc réel passent ; recette navigateur éprouvée.
+Voir [le lot et les limites](lot-l0-2026-10-11.md) et
+[les preuves](preuves-l0-2026-10-11.json). Une proposition testée ne vaut pas
+fusion ni déploiement. Le responsable a autorisé le démarrage des dix lots ;
+S.170 couvre L0, les neuf suivants restent à exécuter.
 
 **P1 · S/M · anomalie REV-IA-04 · WF-06/08 · scripts/recette/banc.mts.**
 

@@ -596,3 +596,10 @@ unitaires/contrats, intégrations PostgreSQL, navigation et gestes réellement
 éprouvés. Le [chantier](revue/chantier-complet-2026-10-11.md) ordonne les
 corrections proposées avant intégration. Une suite verte ne certifie ni
 la précision d'un modèle réel, ni un paiement, ni la levée des préalables.
+
+**S.170 / REV11-L0, proposé le 11/10.** Les parcours WF-06/WF-08 sans
+fournisseur sont éprouvés sur un banc qui neutralise aussi Vertex et les
+anciens identifiants de paiement. Le démarrage et l'arrêt sont supervisés.
+Le dépôt PDF puis la revue WF-15 passent sans consommation d'analyse utile.
+Voir [les corrections et preuves](revue/lot-l0-2026-10-11.md). Les règles
+métier et la configuration de production restent celles des lots de Claude.
