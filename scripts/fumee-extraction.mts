@@ -68,7 +68,7 @@ async function surLAdministration(texte: string): Promise<void> {
  * Le service de lecture d'essai.
  * ------------------------------------------------------------------ */
 
-type ReponseDuService = { statut: number; corps: string };
+type ReponseDuService = { statut: number; corps: string; redirection?: string };
 
 const reponseDeLecture = (charge: unknown, entree = 4210, sortie = 96): ReponseDuService => ({
   statut: 200,
@@ -92,7 +92,8 @@ const service = createServer((requete: IncomingMessage, reponse: ServerResponse)
   requete.on("data", (bloc: Buffer) => morceaux.push(bloc));
   requete.on("end", () => {
     recusParLeService.push(Buffer.concat(morceaux).toString("utf8"));
-    reponse.writeHead(reponseDuService.statut, { "Content-Type": "application/json" });
+    reponse.writeHead(reponseDuService.statut, { "Content-Type": "application/json",
+      ...(reponseDuService.redirection ? { Location: reponseDuService.redirection } : {}) });
     reponse.end(reponseDuService.corps);
   });
 });
@@ -374,6 +375,80 @@ const analyseDe = (versionId: string) =>
 let premiere!: Awaited<ReturnType<typeof piece>>;
 
 try {
+  console.log("\nREV11-L1 : refus de renvoi, rendu de quota et revue par le vrai job");
+  {
+    let appelsAuRenvoi = 0;
+    const destination = createServer((req, res) => {
+      appelsAuRenvoi++;
+      req.resume();
+      res.end("ne doit pas être appelé");
+    });
+    await new Promise<void>((ok) => destination.listen(0, "127.0.0.1", ok));
+    const renvoi = `http://127.0.0.1:${(destination.address() as AddressInfo).port}/piece?secret=SECRET_LOCATION`;
+    try {
+      for (const origine of ["", "https://autre-prestataire.exemple.test"]) {
+        recusParLeService.length = 0;
+        const p = await piece({ dateCible: "2027-09-01" });
+        const { etatDesFonctions } = await import("../src/domain/ia/fournisseurs");
+        const env = { AI_FOURNISSEUR_EXTRACTION: "openai_compatible",
+          AI_OPENAI_URL: `http://127.0.0.1:${portService}/v1`, AI_OPENAI_MODEL: "modele-essai",
+          AI_OPENAI_API_KEY: "cle-d-essai", AI_OPENAI_PDF: "oui",
+          AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible", AI_OPENAI_ORIGINE_AUTORISEE: origine };
+        const suite = await analyserUnePiece(p.tache, lExtracteur(env));
+        const analyse = await analyseDe(p.version.id);
+        verifier(suite === "TERMINEE" && recusParLeService.length === 0 && appelsAuRenvoi === 0,
+          "origine absente/différente : aucun premier envoi, job terminé");
+        verifier(analyse?.verdict === "ILLISIBLE" && analyse.creditConsumed === false &&
+          (await db.manualReview.count({ where: { analysisId: analyse?.id, reason: "ECHEC_TECHNIQUE" } })) === 1,
+          "origine absente/différente : revue technique sans conformité");
+        verifier((await solde(p.application.id)) === 5,
+          "origine absente/différente : réservation rendue, quota 5 → 5");
+        verifier(etatDesFonctions(env).find(f => f.fonction === "extraction")?.branche === false &&
+          /AI_OPENAI_ORIGINE_AUTORISEE|autorisation n'a pas été revue/u.test(
+            etatDesFonctions(env).find(f => f.fonction === "extraction")?.raison ?? ""),
+          "origine absente/différente : B-07 explique l'autorisation à revoir");
+      }
+      for (const fournisseur of ["anthropic", "openai_compatible"] as const) {
+        for (const statut of [301, 302, 303, 307, 308]) {
+          recusParLeService.length = 0;
+          reponseDuService = { statut, redirection: renvoi, corps: "ECHO_SENSIBLE" };
+          const p = await piece({ dateCible: "2027-09-01" });
+          const extracteur = fournisseur === "anthropic" ? lExtracteur() : lExtracteur({
+            AI_FOURNISSEUR_EXTRACTION: fournisseur, AI_OPENAI_URL: `http://127.0.0.1:${portService}/v1`,
+            AI_OPENAI_MODEL: "modele-essai", AI_OPENAI_API_KEY: "cle-d-essai", AI_OPENAI_PDF: "oui",
+            AI_PIECES_SOUS_TRAITANT_AUTORISE: fournisseur,
+            AI_OPENAI_ORIGINE_AUTORISEE: `http://127.0.0.1:${portService}`,
+          });
+          const suite = await analyserUnePiece(p.tache, extracteur);
+          const analyse = await analyseDe(p.version.id);
+          const document = await relireDocument(p.document.id);
+          const revues = await db.manualReview.count({ where: { analysisId: analyse?.id, reason: "ECHEC_TECHNIQUE" } });
+          const mouvements = await db.analysisCredit.findMany({ where: { applicationId: p.application.id } });
+          verifier(suite === "TERMINEE" && recusParLeService.length === 1 && appelsAuRenvoi === 0,
+            `${fournisseur} ${statut} : un seul appel configuré, aucun renvoi ni reprise automatique`);
+          verifier(recusParLeService[0]?.includes(p.octets.toString("base64")) === true,
+            `${fournisseur} ${statut} : vrai transfert initial des octets synthétiques`);
+          verifier(document.status === "ILLISIBLE" && analyse?.creditConsumed === false && revues === 1,
+            `${fournisseur} ${statut} : revue technique ouverte, aucun verdict de conformité`);
+          verifier((await solde(p.application.id)) === 5 && mouvements.filter(m => m.delta === -1).length === 1 &&
+            mouvements.filter(m => m.delta === 1).length === 1,
+            `${fournisseur} ${statut} : réservation puis rendu réel, quota 5 → 5`);
+          verifier(/AI_OPENAI_URL|ANTHROPIC_BASE_URL/u.test(analyse?.engineLog ?? "") &&
+            !/SECRET_LOCATION|ECHO_SENSIBLE|cle-d-essai|http:\/\//u.test(analyse?.engineLog ?? ""),
+            `${fournisseur} ${statut} : cause actionnable sans clé, URL ou écho du corps`);
+          verifier(document.feedback?.includes("tu n'as rien à refaire") === true,
+            `${fournisseur} ${statut} : le candidat voit la prise en charge humaine`);
+          await analyserUnePiece(p.tache, extracteur);
+          verifier(recusParLeService.length === 1 && (await solde(p.application.id)) === 5 &&
+            (await db.manualReview.count({ where: { analysisId: analyse?.id } })) === 1,
+            `${fournisseur} ${statut} : rejeu sans appel, rendu ou revue supplémentaire`);
+        }
+      }
+    } finally {
+      await new Promise<void>((ok, non) => destination.close(e => e ? non(e) : ok()));
+    }
+  }
+
   console.log("\nCe qui part au service de lecture : des octets, et rien d'autre");
   {
     recusParLeService.length = 0;

@@ -217,7 +217,10 @@ jobs:
       # lieu d'accuser le fichier.
       - name: Chaîne d'extraction
         run: npm run smoke:extraction
-      - run: echo "- **Extraction documentaire** — octets transmis sans URL, mesure déterministe des durées, saturation rejouée sans débit" >> "$GITHUB_STEP_SUMMARY"
+      # S.171 / REV11-L1 : le vrai job refuse aussi les cinq renvois HTTP
+      # compatible/Anthropic, refuse une origine non autorisée avant envoi,
+      # rend le quota et ouvre une revue technique.
+      - run: echo "- **Extraction documentaire** — octets sans URL, redirections IA refusées sans second envoi, réservation rendue et revue ouverte, saturation rejouée sans débit" >> "$GITHUB_STEP_SUMMARY"
 
       # La mise en forme et la relecture d'une pièce rédigée, contre le
       # vrai SDK parlant à un service d'essai. Ce qu'elle tient : une

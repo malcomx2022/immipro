@@ -5,6 +5,8 @@ import { Resultats } from "@/app/(public)/resultats/Resultats";
 import { PieceDuDossier } from "@/app/(app)/(dossier)/dossiers/[id]/pieces/[pieceId]/PieceDuDossier";
 import { piecesEnEchec } from "@/lib/contenu/backoffice";
 import { ANALYSE_RESSOURCES, DOSSIERS, PIECES_PAR_DOSSIER, QUOTA } from "@/lib/contenu/dossiers";
+import { causeDuStatut } from "@/server/ia/openai-compatible";
+import { MESSAGE_AU_CANDIDAT } from "@/domain/dossiers/extraction";
 
 const { appeler, refresh } = vi.hoisted(() => ({ appeler: vi.fn(), refresh: vi.fn() }));
 vi.mock("@/lib/api", () => ({ appeler }));
@@ -18,6 +20,28 @@ beforeEach(() => {
 });
 
 describe("revue complémentaire — réponses et faits affichés", () => {
+  it("L1 : l'opérateur voit la correction de destination et aucun quota encore dû", () => {
+    const piece = { ...piecesEnEchec(new Date(maintenant))[0]!, motif: "ECHEC_TECHNIQUE" as const,
+      journal: causeDuStatut(308).detail, analyseDebitee: false };
+    render(<RevueDesPieces pieces={[piece]} maintenant={maintenant} />);
+    expect(screen.getByText(/déclarer dans AI_OPENAI_URL/)).toBeDefined();
+    expect(screen.getByText(/Aucune analyse à rendre pour cette lecture/)).toBeDefined();
+    expect(screen.queryByText(/SECRET_LOCATION|ECHO_SENSIBLE/)).toBeNull();
+  });
+
+  it("L1 : le candidat voit la revue humaine après refus de destination", () => {
+    const dossier = DOSSIERS[0]!;
+    const piece = { ...PIECES_PAR_DOSSIER[dossier.id]![0]!, etat: "ILLISIBLE" as const };
+    const analyse = { ...ANALYSE_RESSOURCES, verdict: "ILLISIBLE" as const, verdictLu: "ILLISIBLE" as const,
+      titre: "Cette pièce demande une relecture", corps: MESSAGE_AU_CANDIDAT.non_configure,
+      champs: [], relecture: { etat: "EN_COURS" as const, signalee: false } };
+    render(<PieceDuDossier dossier={dossier} piece={piece} quota={QUOTA} analyse={analyse}
+      autorise prixRecharge="3 000 F" volumeRecharge={10} />);
+    expect(screen.getByText(MESSAGE_AU_CANDIDAT.non_configure)).toBeDefined();
+    expect(screen.queryByText(/adresse finale|HTTP 308/)).toBeNull();
+    expect(appeler).not.toHaveBeenCalled();
+  });
+
   it("ne montre pas l'aperçu d'une pièce après sélection d'une autre", async () => {
     let terminer!: (value: unknown) => void;
     appeler.mockReturnValue(
