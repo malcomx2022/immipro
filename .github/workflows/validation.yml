@@ -131,6 +131,13 @@ jobs:
         run: npm run smoke:worker -- --base
       - run: echo "- **Worker** — paquet exécuté sans base, puis démarré sur une base vierge" >> "$GITHUB_STEP_SUMMARY"
 
+      # S.170 / REV11-L0 : le banc doit isoler les identifiants du parent,
+      # refuser un second démarrage sur son port et fermer app/worker/services
+      # si un enfant s'arrête. Le vrai standalone et le vrai worker sont lancés.
+      - name: Banc de recette isolé et supervisé
+        run: npm run smoke:recette
+      - run: echo "- **Banc de recette** — isolation IA/paiement, collision de port, arrêt complet après perte du worker" >> "$GITHUB_STEP_SUMMARY"
+
       # pg-boss 11 ne migre pas une base de pg-boss 10 (S.166) : la base de
       # départ est écrite par le vrai 10.4.2, puis la bascule reprend ce qui
       # attendait, sans doublon, et un retour arrière retrouve son schéma.

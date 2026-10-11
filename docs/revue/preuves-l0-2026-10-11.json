@@ -1,0 +1,470 @@
+{
+  "date": "2026-10-11",
+  "lot": "S.170 / REV11-L0",
+  "statut": "proposé ; preuves locales, fusion et déploiement distincts",
+  "baseCommit": "d4fb08c8ec487c4854e092da901a0c563b54d395",
+  "branche": "fix/rev11-l0-banc",
+  "environnement": {
+    "node": "24.19.0",
+    "prisma": "7.10.0",
+    "pgBoss": "12.37.1",
+    "postgres": "16",
+    "navigateur": "Chromium système",
+    "services": "S3, antivirus et SMTP locaux simulés",
+    "donnees": "comptes et PDF synthétiques"
+  },
+  "check": {
+    "code": 0,
+    "fichiers": 180,
+    "tests": 3607,
+    "regressionsBanc": 21,
+    "lint": "0 erreur, avertissement antérieur purge-stockage.ts",
+    "types": "passé",
+    "copie": "passé"
+  },
+  "build": {
+    "code": 0,
+    "artefacts": [
+      ".next/standalone",
+      "dist/worker.js"
+    ],
+    "imageApplicative": "non construite dans ce lot"
+  },
+  "audit": {
+    "code": 0,
+    "eleveesSansMotif": 0,
+    "eleveeAcceptee": "deepmerge-ts : exception antérieure",
+    "avisModeres": 4
+  },
+  "integration": {
+    "fumees": 27,
+    "toutesPassent": true,
+    "commandes": [
+      {
+        "commande": "npx prisma validate",
+        "code": 0,
+        "secondes": 1.06,
+        "assertions_ok": 0,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:migrations",
+        "code": 0,
+        "secondes": 4.22,
+        "assertions_ok": 7,
+        "abstention": false,
+        "preuve": "migrations-reprise.log",
+        "incident_initial": "Adaptateur psql local ciblait le conteneur de la revue précédente ; corrigé pour ce serveur de test puis commande rejouée."
+      },
+      {
+        "commande": "npm run smoke:worker -- --base",
+        "code": 0,
+        "secondes": 37.85,
+        "assertions_ok": 48,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:recette",
+        "code": 0,
+        "secondes": 9.15,
+        "assertions_ok": 7,
+        "abstention": false,
+        "preuve": "smoke-recette-final.log"
+      },
+      {
+        "commande": "npm run smoke:files",
+        "code": 0,
+        "secondes": 7.11,
+        "assertions_ok": 25,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:graine",
+        "code": 0,
+        "secondes": 5.27,
+        "assertions_ok": 12,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:tunnel",
+        "code": 0,
+        "secondes": 3.22,
+        "assertions_ok": 88,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:fedapay",
+        "code": 0,
+        "secondes": 3.33,
+        "assertions_ok": 36,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:reconciliation",
+        "code": 0,
+        "secondes": 4.67,
+        "assertions_ok": 69,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:consultation",
+        "code": 0,
+        "secondes": 3.39,
+        "assertions_ok": 73,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:conservation",
+        "code": 0,
+        "secondes": 4.62,
+        "assertions_ok": 51,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:remboursement",
+        "code": 0,
+        "secondes": 3.91,
+        "assertions_ok": 161,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:courrier",
+        "code": 0,
+        "secondes": 3.58,
+        "assertions_ok": 37,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:balayage",
+        "code": 0,
+        "secondes": 4.31,
+        "assertions_ok": 123,
+        "abstention": true
+      },
+      {
+        "commande": "npm run smoke:extraction",
+        "code": 0,
+        "secondes": 4.69,
+        "assertions_ok": 186,
+        "abstention": true
+      },
+      {
+        "commande": "npm run smoke:redaction",
+        "code": 0,
+        "secondes": 3.0,
+        "assertions_ok": 62,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:rappels",
+        "code": 0,
+        "secondes": 4.91,
+        "assertions_ok": 51,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:transitions",
+        "code": 0,
+        "secondes": 15.29,
+        "assertions_ok": 133,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:publication",
+        "code": 0,
+        "secondes": 4.94,
+        "assertions_ok": 168,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:juridique",
+        "code": 0,
+        "secondes": 2.85,
+        "assertions_ok": 30,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:relecture",
+        "code": 0,
+        "secondes": 2.63,
+        "assertions_ok": 12,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:facturation",
+        "code": 0,
+        "secondes": 3.55,
+        "assertions_ok": 52,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:role",
+        "code": 0,
+        "secondes": 6.04,
+        "assertions_ok": 10,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:editoriale",
+        "code": 0,
+        "secondes": 5.32,
+        "assertions_ok": 10,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:diagnostic",
+        "code": 0,
+        "secondes": 5.9,
+        "assertions_ok": 28,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:purge",
+        "code": 0,
+        "secondes": 9.34,
+        "assertions_ok": 99,
+        "abstention": true
+      },
+      {
+        "commande": "npm run smoke:montee",
+        "code": 0,
+        "secondes": 8.42,
+        "assertions_ok": 66,
+        "abstention": false
+      },
+      {
+        "commande": "npm run smoke:depot",
+        "code": 0,
+        "secondes": 5.09,
+        "assertions_ok": 43,
+        "abstention": false
+      },
+      {
+        "commande": "npm run sandbox:paiement",
+        "code": 0,
+        "secondes": 0.82,
+        "assertions_ok": 0,
+        "abstention": true
+      }
+    ],
+    "gardeFousSql": {
+      "refus": 105,
+      "permis": 9
+    }
+  },
+  "bancReel": {
+    "code": 0,
+    "controles": [
+      "Le vrai standalone et le vrai worker atteignent la santé authentifiée",
+      "État privé propre à cette passe : extraction, rédaction et paiement non configurés malgré le parent complet",
+      "Deux bases sur le même port : le second banc échoue avant de supprimer sa base",
+      "Perte du worker après démarrage : code 1, app/worker arrêtés et ports web/S3/antivirus/SMTP fermés",
+      "Échec d'une graine : code 1, aucun banc prêt et les trois services déjà ouverts sont fermés",
+      "Reprise sur le port libéré puis SIGTERM : code 0, aucun enfant ni service conservé",
+      "Aucun appel au piège HTTP IA pendant la recette du banc"
+    ],
+    "appelsPiegeHttp": 0,
+    "controleSante": "détail privé avec jeton propre à la passe ; paiement volontairement absent seul toléré"
+  },
+  "navigation": {
+    "code": 0,
+    "navigations": 45,
+    "erreursJs": [],
+    "debordements": [],
+    "controles": [
+      {
+        "action": "anonyme renvoyé vers connexion",
+        "conforme": true
+      },
+      {
+        "action": "connexion par formulaire et touche Entrée",
+        "role": "aline.dossou",
+        "conforme": true
+      },
+      {
+        "action": "session candidat reconnue par API dossiers",
+        "statut": 200,
+        "conforme": true
+      },
+      {
+        "action": "refus candidat sur API administrative",
+        "chemin": "/api/admin/couts-ia",
+        "statut": 403,
+        "conforme": true
+      },
+      {
+        "action": "refus candidat sur API administrative",
+        "chemin": "/api/admin/utilisateurs",
+        "statut": 403,
+        "conforme": true
+      },
+      {
+        "action": "candidat écarté de la revue opérateur",
+        "conforme": true
+      },
+      {
+        "action": "connexion par formulaire et touche Entrée",
+        "role": "admin",
+        "conforme": true
+      },
+      {
+        "action": "connexion par formulaire et touche Entrée",
+        "role": "veilleur",
+        "conforme": true
+      },
+      {
+        "action": "veilleur écarté des habilitations admin",
+        "conforme": true
+      }
+    ],
+    "pagesAbsentesAttendues": [
+      "/conditions",
+      "/mentions-legales",
+      "/donnees-personnelles",
+      "/contact"
+    ]
+  },
+  "recetteDocumentaire": {
+    "code": 0,
+    "simulation": true,
+    "resultats": [
+      {
+        "controle": "Dépôt navigateur puis traitement de la nouvelle version sans IA",
+        "scan": "SAINE",
+        "analyse": {
+          "verdict": "ILLISIBLE",
+          "creditConsumed": false
+        },
+        "quotaAvant": 29,
+        "quotaApres": 29,
+        "conforme": true
+      },
+      {
+        "controle": "Décision opérateur via formulaire réel",
+        "statut": "CONFORME",
+        "conforme": true
+      }
+    ],
+    "erreursJS": [],
+    "appelsPiegeHttp": 0
+  },
+  "diagnosticsRestants": {
+    "ia": {
+      "code": 1,
+      "resultats": [
+        {
+          "id": "CTRL-01",
+          "controle": "Lecture normale avec mesure",
+          "attendu": "LUE, 120/30",
+          "observe": {
+            "etat": "LUE",
+            "entree": 120,
+            "sortie": 30
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-01",
+          "controle": "Une mesure absente ne devient pas une lecture gratuite mesurée",
+          "attendu": "absence signalée, pas LUE à 0/0",
+          "observe": {
+            "etat": "LUE",
+            "entree": 0,
+            "sortie": 0
+          },
+          "conforme": false
+        },
+        {
+          "id": "DIA-02",
+          "controle": "Les compteurs transmis au grand livre sont des entiers positifs ou nuls",
+          "attendu": "pas LUE avec jetons négatifs/fractionnaires",
+          "observe": {
+            "etat": "LUE",
+            "entree": -12,
+            "sortie": 1.5
+          },
+          "conforme": false
+        },
+        {
+          "id": "DIA-03",
+          "controle": "Une enveloppe inexploitable garde les jetons réellement annoncés",
+          "attendu": "NON_LUE, 120/30",
+          "observe": {
+            "etat": "NON_LUE",
+            "entree": 0,
+            "sortie": 0
+          },
+          "conforme": false
+        },
+        {
+          "id": "DIA-04",
+          "controle": "La pièce ne suit pas une redirection vers une autre origine",
+          "attendu": "0 appel à l’autre origine",
+          "observe": {
+            "appelsAilleurs": 1,
+            "octetsRecusAilleurs": true
+          },
+          "conforme": false
+        },
+        {
+          "id": "DIA-05",
+          "controle": "Une liste entièrement mal formée ne devient pas un avis sans remarque",
+          "attendu": "SANS_AVIS",
+          "observe": {
+            "etat": "RELUE",
+            "remarques": 0
+          },
+          "conforme": false
+        },
+        {
+          "id": "CTRL-02",
+          "controle": "Une véritable liste vide reste un résultat",
+          "attendu": "RELUE, 0 remarque",
+          "observe": {
+            "etat": "RELUE",
+            "remarques": 0
+          },
+          "conforme": true
+        },
+        {
+          "id": "DIA-06",
+          "controle": "Le banc sans fournisseur neutralise aussi l’authentification Vertex",
+          "attendu": [],
+          "observe": [],
+          "conforme": true
+        }
+      ],
+      "echecs": 5
+    },
+    "relecture": {
+      "code": 1,
+      "id": "DIA-07",
+      "simulation": true,
+      "attendu": {
+        "appels": 1,
+        "debit": 1,
+        "relue": true
+      },
+      "observe": {
+        "appels": 2,
+        "debit": 2,
+        "relue": true,
+        "reponses": [
+          "fulfilled",
+          "fulfilled"
+        ]
+      },
+      "conforme": false
+    }
+  },
+  "nonVerifie": [
+    "modèle et OAuth réels",
+    "qualité des extractions",
+    "paiement sandbox sans clé",
+    "image applicative de ce lot",
+    "restauration",
+    "ShellCheck/nginx locaux",
+    "Firefox/WebKit/TalkBack",
+    "préalables de lancement Q.A/M.C"
+  ]
+}

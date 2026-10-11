@@ -54,6 +54,18 @@ Les parcours ont été pilotés par un navigateur Chromium, à 390 px pour le
 candidat et 1 280 px pour l'opérateur. L'état a été relu en base après
 chaque geste.
 
+**S.170 / REV11-L0, proposition du 11/10.** L'environnement du banc est
+construit par liste autorisée et neutralise aussi Vertex/anciens noms des
+clés de paiement. La disponibilité exige l'état privé de cette passe et
+une base accessible ; seul le paiement volontairement coupé peut rester
+bloquant dans cette recette. Un échec ferme enfants et services.
+`smoke:recette` vérifie le vrai banc dans la porte commune ;
+`scripts/recette/recette-documentaire.py` rejoue R-K04/R-O01 sur un banc
+neuf, avec lecture de la nouvelle version et du quota en base.
+Les 45 navigations/neuf contrôles et le dépôt/revue humaine ont été rejoués.
+Voir [preuves, commandes et limites](../revue/lot-l0-2026-10-11.md).
+Ce complément conserve les statuts antérieurs et les préalables de signature.
+
 ## Candidat
 
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |

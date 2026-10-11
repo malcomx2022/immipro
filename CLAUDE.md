@@ -79,6 +79,19 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**Démarrage des corrections, S.170 / REV11-L0.** Le responsable a demandé le
+11/10 de commencer en dix lots prioritaires. Lire le
+[suivi L0](docs/revue/lot-l0-2026-10-11.md) et ses preuves. Cette proposition
+reprend main `d4fb08c` (#273 et #274 fusionnées), conserve Prisma 7 et pg-boss 12.
+Elle isole l'environnement du banc, contrôle son propre démarrage et arrête
+ses enfants/services après échec. `smoke:recette` rejoint la porte commune.
+DIA-06 passe ; DIA-01 à DIA-05 et DIA-07 restent rouges, sans attentes assouplies.
+Le 503 de paiement attendu est toléré seulement par le banc ; la santé de
+production reste inchangée. Le script `recette-documentaire.py` rejoue une
+nouvelle version sur un banc neuf puis vérifie le quota et la décision humaine.
+S.170 est proposé avec ses tests ; fusion, déploiement et lancement restent
+des états distincts. Poursuivre par L1, après relecture de main et du registre.
+
 Lire la [revue complète](docs/revue/revue-complete-2026-10-11.md), le
 [chantier](docs/revue/chantier-complet-2026-10-11.md) et la
 [documentation IA/workflows](docs/IA-workflows.md) après les décisions du

@@ -9,7 +9,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { generateKeyPairSync } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { environnementDuBanc } from "./environnement";
 import {
   lireDesOctetsCompatible,
   critiqueCompatible,
@@ -194,7 +194,7 @@ try {
     vide.etat === "RELUE" && vide.remarques.length === 0,
   );
 
-  // Reproduit seulement le nettoyage d’environnement du banc, sans le
+  // Appelle la construction réellement utilisée par le banc, sans le
   // démarrer et sans faire d’échange OAuth. La clé est générée ici.
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const env: Record<string, string> = {
@@ -213,13 +213,7 @@ try {
     AI_OPENAI_PDF: "image_url",
     AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible",
   };
-  const source = readFileSync(new URL("./banc.mts", import.meta.url), "utf8");
-  const boucle = /for \(const cle of \[([^\]]+)\]\) \{\s*delete env\[cle\];\s*\}/u.exec(source);
-  if (!boucle)
-    throw new Error("Le nettoyage du banc a changé : adapter ce diagnostic avant de conclure.");
-  const supprimees = [...boucle[1]!.matchAll(/"([^"]+)"/gu)].map((m) => m[1]!);
-  for (const cle of supprimees) delete env[cle];
-  const branchees = etatDesFonctions(env)
+  const branchees = etatDesFonctions(environnementDuBanc(env))
     .filter((f) => f.branche)
     .map((f) => f.fonction);
   constater(
@@ -235,7 +229,7 @@ try {
 console.log(
   JSON.stringify(
     {
-    base: "reproduire sur le commit indiqué dans le rapport REV11",
+      base: "reproduire sur le commit indiqué dans le rapport REV11",
       simulation: true,
       resultats,
       echecs: resultats.filter((r) => !r.conforme).length,

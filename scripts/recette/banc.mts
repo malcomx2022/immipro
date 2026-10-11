@@ -23,13 +23,15 @@
  * Ctrl-C arrête tout ; la base est gardée pour relire après coup, et
  * supprimée au lancement suivant.
  */
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
 import { SMTPServer } from "smtp-server";
 import { demarrerUnFauxStockage } from "../faux-stockage";
+import { environnementDuBanc } from "./environnement";
+import { ProcessusDuBanc, verifierPortDisponible } from "./processus";
 
 const arg = (nom: string, defaut: string) => {
   const i = process.argv.indexOf(`--${nom}`);
@@ -38,7 +40,9 @@ const arg = (nom: string, defaut: string) => {
 const PORT = Number(arg("port", "3100"));
 const BASE = arg("base", "immipro_recette");
 if (!/^immipro_recette\w*$/u.test(BASE)) {
-  console.error("✗ --base doit commencer par immipro_recette : le banc supprime cette base à chaque lancement.");
+  console.error(
+    "✗ --base doit commencer par immipro_recette : le banc supprime cette base à chaque lancement.",
+  );
   process.exit(2);
 }
 if (!existsSync(".next/standalone/server.js") || !existsSync("dist/worker.js")) {
@@ -69,139 +73,198 @@ async function surLAdministration(texte: string): Promise<void> {
 }
 
 const etape = (texte: string) => console.log(`\n▸ ${texte}`);
-
-/* ── La base ─────────────────────────────────────────────────────── */
-etape(`Base jetable ${BASE}`);
-await surLAdministration(`DROP DATABASE IF EXISTS ${BASE} WITH (FORCE)`);
-await surLAdministration(`CREATE DATABASE ${BASE}`);
-const envBase = { ...process.env, DATABASE_URL: cible.toString() };
-const migration = spawnSync("npx", ["prisma", "migrate", "deploy"], { encoding: "utf8", env: envBase });
-if (migration.status !== 0) {
-  console.error(`${migration.stdout ?? ""}${migration.stderr ?? ""}`);
-  process.exit(1);
-}
-console.log("  ✓ migrations appliquées");
-
-/* ── Les services simulés ────────────────────────────────────────── */
-etape("Services simulés");
-const stockage = await demarrerUnFauxStockage();
-console.log(`  ✓ stockage S3 : http://localhost:${stockage.port}`);
-
-const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
-const antivirus = createServer((requete, reponse) => {
-  const morceaux: Buffer[] = [];
-  requete.on("data", (b: Buffer) => morceaux.push(b));
-  requete.on("end", () => {
-    const infecte = Buffer.concat(morceaux).toString("latin1").includes("EICAR-STANDARD-ANTIVIRUS-TEST-FILE");
-    reponse.writeHead(200, { "Content-Type": "application/json" });
-    reponse.end(infecte ? '{"status":"infected","signature":"Eicar-Test-Signature"}' : '{"status":"clean"}');
-  });
+const fermetures: (() => Promise<void>)[] = [];
+let arret: Promise<void> | undefined;
+let codeSortie = 0;
+const enfants = new ProcessusDuBanc((erreur) => {
+  console.error(`✗ ${erreur.message}`);
+  void terminer(1);
 });
-await new Promise<void>((ok) => antivirus.listen(0, "127.0.0.1", ok));
-const portAntivirus = (antivirus.address() as { port: number }).port;
-console.log(`  ✓ antivirus : EICAR reconnue, le reste sain (${EICAR.length} octets d'EICAR pour l'essayer)`);
-
-mkdirSync(".recette/courriers", { recursive: true });
-let numero = 0;
-const smtp = new SMTPServer({
-  disabledCommands: ["AUTH", "STARTTLS"],
-  authOptional: true,
-  onData(flux, session, fini) {
-    let contenu = "";
-    flux.on("data", (bloc: Buffer) => (contenu += bloc.toString("utf8")));
-    flux.on("end", () => {
-      numero += 1;
-      const vers = session.envelope.rcptTo.map((r) => r.address).join(", ");
-      const fichier = `.recette/courriers/${String(numero).padStart(3, "0")}.eml`;
-      writeFileSync(fichier, contenu);
-      const code = /code[^\n]{0,60}?(\d{6})/iu.exec(contenu.replace(/=\r?\n/gu, ""))?.[1];
-      console.log(`  ✉ ${vers} — ${fichier}${code ? ` — code ${code}` : ""}`);
-      fini();
-    });
-  },
-});
-await new Promise<void>((ok) => smtp.listen(0, "127.0.0.1", () => ok()));
-const portSmtp = (smtp.server.address() as { port: number }).port;
-console.log(`  ✓ courrier capturé dans .recette/courriers/`);
-
-/* ── L'environnement de l'application ────────────────────────────── */
-const env: NodeJS.ProcessEnv = {
-  ...process.env,
-  NODE_ENV: "production",
-  PORT: String(PORT),
-  APP_URL: `http://localhost:${PORT}`,
-  DATABASE_URL: cible.toString(),
-  MINIO_ENDPOINT: "127.0.0.1",
-  MINIO_PORT: String(stockage.port),
-  MINIO_USE_SSL: "false",
-  MINIO_ROOT_USER: "essai",
-  MINIO_ROOT_PASSWORD: "essai-mot-de-passe",
-  MINIO_BUCKET_DOCUMENTS: "immipro-documents",
-  MINIO_BUCKET_QUARANTAINE: "immipro-quarantaine",
-  MINIO_PUBLIC_URL: `http://localhost:${stockage.port}`,
-  ANTIVIRUS_URL: `http://127.0.0.1:${portAntivirus}/scan`,
-  SMTP_URL: `smtp://127.0.0.1:${portSmtp}`,
-  SMTP_FROM: "recette@immipro.test",
-  ETAT_DE_SERVICE_JETON: randomBytes(16).toString("hex"),
-};
-// Aucun fournisseur réel n'est joignable depuis le banc.
-for (const cle of ["ANTHROPIC_API_KEY", "AI_OPENAI_API_KEY", "FEDAPAY_API_KEY", "STRIPE_API_KEY", "PAIEMENT_FOURNISSEURS"]) {
-  delete env[cle];
+function terminer(code: number): Promise<void> {
+  codeSortie = Math.max(codeSortie, code);
+  arret ??= (async () => {
+    await enfants.arreter();
+    // Fermer aussi les services ouverts avant un échec de graine/démarrage.
+    // Une connexion SMTP laissée ouverte ne doit pas empêcher l'arrêt.
+    let borne: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.allSettled(fermetures.map((fermer) => fermer())),
+      new Promise<void>((ok) => {
+        borne = setTimeout(ok, 3_000);
+      }),
+    ]);
+    clearTimeout(borne);
+    process.exit(codeSortie);
+  })();
+  return arret;
 }
+process.on("SIGINT", () => {
+  void terminer(0);
+});
+process.on("SIGTERM", () => {
+  void terminer(0);
+});
 
-/* ── Le référentiel et le jeu de démonstration ───────────────────── */
-etape("Référentiel et jeu de démonstration");
-const motDePasse = randomBytes(9).toString("base64url");
-for (const [nom, commande] of [
-  ["règles", ["npx", "tsx", "prisma/seed/visa-rules.ts"]],
-  ["éditorial", ["npx", "tsx", "prisma/seed/editorial.ts"]],
-  ["démonstration", ["npx", "tsx", "prisma/seed/demonstration.ts"]],
-] as const) {
-  const r = spawnSync(commande[0], commande.slice(1), {
+async function demarrer(): Promise<void> {
+  await verifierPortDisponible(PORT);
+  const envAutorise = environnementDuBanc(process.env);
+
+  /* ── La base ─────────────────────────────────────────────────────── */
+  etape(`Base jetable ${BASE}`);
+  await surLAdministration(`DROP DATABASE IF EXISTS ${BASE} WITH (FORCE)`);
+  await surLAdministration(`CREATE DATABASE ${BASE}`);
+  const envBase = { ...envAutorise, DATABASE_URL: cible.toString() };
+  const migration = spawnSync("npx", ["prisma", "migrate", "deploy"], {
     encoding: "utf8",
-    env: { ...env, NODE_ENV: "development", SEED_DEMO_BASE: BASE, DEMO_MOT_DE_PASSE: motDePasse },
+    env: envBase,
   });
-  if (r.status !== 0) {
-    console.error(`✗ graine ${nom} :\n${r.stdout ?? ""}${r.stderr ?? ""}`);
-    process.exit(1);
+  if (migration.status !== 0) {
+    console.error(`${migration.stdout ?? ""}${migration.stderr ?? ""}`);
+    throw new Error(
+      "La migration du banc a échoué : vérifier DATABASE_URL et les journaux Prisma.",
+    );
   }
-  const comptes = (r.stdout ?? "").split("\n").filter((l) => l.startsWith("✓"));
-  console.log(`  ✓ ${nom}${comptes.length ? `\n${comptes.map((l) => `      ${l}`).join("\n")}` : ""}`);
+  console.log("  ✓ migrations appliquées");
+
+  /* ── Les services simulés ────────────────────────────────────────── */
+  etape("Services simulés");
+  const stockage = await demarrerUnFauxStockage();
+  fermetures.push(stockage.arreter);
+  console.log(`  ✓ stockage S3 : http://localhost:${stockage.port}`);
+
+  const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+  const antivirus = createServer((requete, reponse) => {
+    const morceaux: Buffer[] = [];
+    requete.on("data", (b: Buffer) => morceaux.push(b));
+    requete.on("end", () => {
+      const infecte = Buffer.concat(morceaux)
+        .toString("latin1")
+        .includes("EICAR-STANDARD-ANTIVIRUS-TEST-FILE");
+      reponse.writeHead(200, { "Content-Type": "application/json" });
+      reponse.end(
+        infecte ? '{"status":"infected","signature":"Eicar-Test-Signature"}' : '{"status":"clean"}',
+      );
+    });
+  });
+  fermetures.push(
+    () =>
+      new Promise<void>((ok) => {
+        antivirus.closeAllConnections();
+        antivirus.close(() => ok());
+      }),
+  );
+  await new Promise<void>((ok, non) => {
+    antivirus.once("error", non);
+    antivirus.listen(0, "127.0.0.1", ok);
+  });
+  const portAntivirus = (antivirus.address() as { port: number }).port;
+  console.log(
+    `  ✓ antivirus : http://127.0.0.1:${portAntivirus}/scan — EICAR reconnue, le reste sain (${EICAR.length} octets d'EICAR pour l'essayer)`,
+  );
+
+  mkdirSync(".recette/courriers", { recursive: true });
+  let numero = 0;
+  const smtp = new SMTPServer({
+    disabledCommands: ["AUTH", "STARTTLS"],
+    authOptional: true,
+    onData(flux, session, fini) {
+      let contenu = "";
+      flux.on("data", (bloc: Buffer) => (contenu += bloc.toString("utf8")));
+      flux.on("end", () => {
+        numero += 1;
+        const vers = session.envelope.rcptTo.map((r) => r.address).join(", ");
+        const fichier = `.recette/courriers/${String(numero).padStart(3, "0")}.eml`;
+        writeFileSync(fichier, contenu);
+        const code = /code[^\n]{0,60}?(\d{6})/iu.exec(contenu.replace(/=\r?\n/gu, ""))?.[1];
+        console.log(`  ✉ ${vers} — ${fichier}${code ? ` — code ${code}` : ""}`);
+        fini();
+      });
+    },
+  });
+  fermetures.push(() => new Promise<void>((ok) => smtp.close(ok)));
+  await new Promise<void>((ok, non) => {
+    smtp.once("error", non);
+    smtp.listen(0, "127.0.0.1", () => ok());
+  });
+  const portSmtp = (smtp.server.address() as { port: number }).port;
+  console.log(`  ✓ courrier : smtp://127.0.0.1:${portSmtp} — capturé dans .recette/courriers/`);
+
+  /* ── L'environnement de l'application ────────────────────────────── */
+  const env: NodeJS.ProcessEnv = {
+    ...envAutorise,
+    NODE_ENV: "production",
+    PORT: String(PORT),
+    APP_URL: `http://localhost:${PORT}`,
+    DATABASE_URL: cible.toString(),
+    MINIO_ENDPOINT: "127.0.0.1",
+    MINIO_PORT: String(stockage.port),
+    MINIO_USE_SSL: "false",
+    MINIO_ROOT_USER: "essai",
+    MINIO_ROOT_PASSWORD: "essai-mot-de-passe",
+    MINIO_BUCKET_DOCUMENTS: "immipro-documents",
+    MINIO_BUCKET_QUARANTAINE: "immipro-quarantaine",
+    MINIO_PUBLIC_URL: `http://localhost:${stockage.port}`,
+    ANTIVIRUS_URL: `http://127.0.0.1:${portAntivirus}/scan`,
+    SMTP_URL: `smtp://127.0.0.1:${portSmtp}`,
+    SMTP_FROM: "recette@immipro.test",
+    ETAT_DE_SERVICE_JETON: randomBytes(16).toString("hex"),
+  };
+
+  /* ── Le référentiel et le jeu de démonstration ───────────────────── */
+  etape("Référentiel et jeu de démonstration");
+  const motDePasse = randomBytes(9).toString("base64url");
+  for (const [nom, commande] of [
+    ["règles", ["npx", "tsx", "prisma/seed/visa-rules.ts"]],
+    ["éditorial", ["npx", "tsx", "prisma/seed/editorial.ts"]],
+    ["démonstration", ["npx", "tsx", "prisma/seed/demonstration.ts"]],
+  ] as const) {
+    const r = spawnSync(commande[0], commande.slice(1), {
+      encoding: "utf8",
+      env: { ...env, NODE_ENV: "development", SEED_DEMO_BASE: BASE, DEMO_MOT_DE_PASSE: motDePasse },
+    });
+    if (r.status !== 0) {
+      console.error(`✗ graine ${nom} :\n${r.stdout ?? ""}${r.stderr ?? ""}`);
+      throw new Error(`La graine ${nom} a échoué : vérifier son journal avant de relancer.`);
+    }
+    const comptes = (r.stdout ?? "").split("\n").filter((l) => l.startsWith("✓"));
+    console.log(
+      `  ✓ ${nom}${comptes.length ? `\n${comptes.map((l) => `      ${l}`).join("\n")}` : ""}`,
+    );
+  }
+  console.log(`  Mot de passe des comptes de démonstration : ${motDePasse}`);
+
+  /* ── L'application et le worker ──────────────────────────────────── */
+  etape("Application et worker");
+  const lancer = (nom: string, commande: string, args: string[]) => {
+    const enfant = enfants.lancer(nom, commande, args, { env, stdio: ["ignore", "pipe", "pipe"] });
+    console.log(`  [${nom}] démarré (pid ${enfant.pid})`);
+    enfant.stdout!.on("data", (b: Buffer) => process.stdout.write(`  [${nom}] ${b}`));
+    enfant.stderr!.on("data", (b: Buffer) => process.stdout.write(`  [${nom}] ${b}`));
+  };
+  // Comme le Dockerfile : le `standalone` n'embarque ni `public/` ni `.next/static/`.
+  cpSync("public", ".next/standalone/public", { recursive: true });
+  cpSync(".next/static", ".next/standalone/.next/static", { recursive: true });
+  env.HOSTNAME = "127.0.0.1";
+  lancer("app", process.execPath, [".next/standalone/server.js"]);
+  lancer("worker", process.execPath, ["dist/worker.js"]);
+
+  await enfants.attendrePret({
+    url: `http://127.0.0.1:${PORT}/api/health`,
+    jeton: env.ETAT_DE_SERVICE_JETON!,
+    bloquantesPermises: ["paiements", "ouverture_paiement", "remboursement"],
+  });
+  console.log(`\n✓ Banc prêt : http://localhost:${PORT}`);
+  console.log(
+    `  Détail de l'état de service : /api/health avec l'en-tête « Authorization: Bearer ${env.ETAT_DE_SERVICE_JETON} »`,
+  );
+  console.log("  Ctrl-C pour arrêter.");
 }
-console.log(`  Mot de passe des comptes de démonstration : ${motDePasse}`);
 
-/* ── L'application et le worker ──────────────────────────────────── */
-etape("Application et worker");
-const enfants: ChildProcess[] = [];
-const lancer = (nom: string, commande: string, args: string[]) => {
-  const enfant = spawn(commande, args, { env, stdio: ["ignore", "pipe", "pipe"] });
-  enfant.stdout!.on("data", (b: Buffer) => process.stdout.write(`  [${nom}] ${b}`));
-  enfant.stderr!.on("data", (b: Buffer) => process.stdout.write(`  [${nom}] ${b}`));
-  enfant.on("exit", (code) => console.log(`  [${nom}] arrêté (${code})`));
-  enfants.push(enfant);
-};
-// Comme le Dockerfile : le `standalone` n'embarque ni `public/` ni `.next/static/`.
-cpSync("public", ".next/standalone/public", { recursive: true });
-cpSync(".next/static", ".next/standalone/.next/static", { recursive: true });
-env.HOSTNAME = "127.0.0.1";
-lancer("app", "node", [".next/standalone/server.js"]);
-lancer("worker", "node", ["dist/worker.js"]);
-
-for (let i = 0; i < 120; i++) {
-  const pret = await fetch(`http://localhost:${PORT}/api/health`).then((r) => r.ok).catch(() => false);
-  if (pret) break;
-  await new Promise((ok) => setTimeout(ok, 500));
+try {
+  await demarrer();
+} catch (erreur) {
+  console.error(
+    `✗ ${erreur instanceof Error ? erreur.message : "Le démarrage a échoué : vérifier le journal du banc."}`,
+  );
+  await terminer(1);
 }
-console.log(`\n✓ Banc prêt : http://localhost:${PORT}`);
-console.log(`  Détail de l'état de service : /api/health avec l'en-tête « Authorization: Bearer ${env.ETAT_DE_SERVICE_JETON} »`);
-console.log("  Ctrl-C pour arrêter.");
-
-const arreter = async () => {
-  for (const enfant of enfants) enfant.kill("SIGTERM");
-  await stockage.arreter();
-  antivirus.close();
-  smtp.close(() => undefined);
-  process.exit(0);
-};
-process.on("SIGINT", arreter);
-process.on("SIGTERM", arreter);

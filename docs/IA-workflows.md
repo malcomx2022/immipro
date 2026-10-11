@@ -192,10 +192,17 @@ Deux précautions sont désormais appuyées par une reproduction :
 - L'adaptateur suit actuellement un HTTP 307 vers une autre origine et lui
   transmet le corps du document. Le chantier doit refuser les redirections
   ou les contrôler explicitement avant tout nouvel envoi.
-- Le banc de recette neutralise les clés fixes mais pas le compte de service
-  Vertex. Le lancer depuis un environnement disposant de ce compte peut
-  encore brancher l'IA. Les exécutions de cette revue n'avaient aucun compte
-  réel ; la preuve Vertex est une vérification de configuration synthétique.
+- La revue a reproduit l'héritage du compte Vertex dans le banc de recette.
+  **S.170 / REV11-L0, proposé** : l'environnement est construit par liste
+  autorisée ; clés fixes, compte Google, choix et autorisation IA sont
+  neutralisés. Le diagnostic DIA-06 et les régressions Anthropic/compatible/
+  Vertex passent. Le dépôt navigateur suivi du worker aboutit à la revue
+  humaine avec `creditConsumed=false` et quota inchangé. Aucun appel n'est
+  reçu au piège HTTP local. Voir le [lot L0](revue/lot-l0-2026-10-11.md).
+
+Le banc applicatif `recette:banc` sert la recette sans fournisseur ; le banc
+de qualité `banc:ia` utilise le fournisseur explicitement configuré pour
+mesurer ses résultats. L0 préserve ce second usage et les règles D1/INV-6.
 
 Les reproductions et leurs attentes figurent dans la
 [revue complète](revue/revue-complete-2026-10-11.md). Les corrections sont
