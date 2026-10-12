@@ -81,7 +81,9 @@ Un message d'échec est toujours actionnable.
 
 **S.176 / REV11-L5 — banc de qualification, essais réels à compléter.**
 Autorisation « lot suivant » puis « L5 » ; base `0d82d23` / #284 fusionné,
-aucune PR concurrente à la relecture. S.99 et les décisions L1–L4 relus,
+aucune PR concurrente à la première relecture. Base finale `186008f` :
+#285 consigne le déploiement pilote L2–L4 ; relevé Claude relu et conservé,
+aucun code changé par ce relevé. S.99 et les décisions L1–L4 relus,
 #280/L2 et arbitrage Claude #282 conservés. Lire
 [le suivi L5](docs/revue/lot-l5-2026-10-12.md) et
 [le protocole fournisseur](docs/exploitation/qualification-ia.md).

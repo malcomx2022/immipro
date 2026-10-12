@@ -3,7 +3,6 @@
   "suivi": "S.176",
   "dateLocale": "2026-10-12",
   "fuseau": "Africa/Lagos",
-  "base": "0d82d234c9f92caf227364ca02db6f84214775df",
   "statut": "BANC_CORRIGE_QUALIFICATION_REELLE_A_COMPLETER",
   "autorisation": "lot suivant, puis L5",
   "reproduction": {
@@ -194,5 +193,12 @@
   "M_C": "NON_LEVE",
   "fusion": "NON_REALISEE_PAR_CE_LOT",
   "deploiement": "NON_REALISE",
-  "ci": "Preuves locales ; consulter la porte commune GitHub sur la PR pour son résultat."
+  "ci": "Preuves locales ; consulter la porte commune GitHub sur la PR pour son résultat.",
+  "baseInitiale": "0d82d234c9f92caf227364ca02db6f84214775df",
+  "baseFinale": "186008f3c2383d6c6d5282d5f84929ea0c5a02e6",
+  "releveClaudeConserve": {
+    "pr": 285,
+    "nature": "déploiement pilote L2–L4, documentation seulement",
+    "fournisseurReel": "NON_VERIFIE"
+  }
 }
