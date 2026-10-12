@@ -567,6 +567,11 @@ conserve mesures L2, avis L3 et D1, et distingue simulations, HTTP local et
 fournisseurs réels. Son estimation WF-16 reste à rapprocher du relevé
 fournisseur ; aucune qualification ou levée Q.A/M.C automatique. Voir
 [le protocole et les preuves exigées](exploitation/qualification-ia.md).
+Complément S.177 : campagne Vertex seule autorisée, 5 000 XOF global,
+réserve prudente durable avant les appels du banc et arrêt sur coût inconnu ;
+aucun changement de quota D1 ni de configuration de production.
+[Protocole budgétaire](exploitation/qualification-vertex-l5.md).
+
 
 ---
 

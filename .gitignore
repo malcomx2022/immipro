@@ -22,3 +22,6 @@ next-env.d.ts
 # Résultats du banc des fournisseurs d IA (S.99) : produits localement, jamais versionnés.
 /banc-ia-resultats/
 .recette/
+
+# Campagne Vertex L5 : budget durable privé, ne jamais réinitialiser entre passages.
+.qualification-vertex/

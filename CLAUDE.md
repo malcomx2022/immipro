@@ -79,6 +79,29 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.177 / complément L5 — campagne Vertex autorisée, 5 000 XOF au total.**
+Base `5ada263` / #286 fusionné ; dernière logique Claude et S.176 relus.
+Décision du responsable : Gemini 3.8 Flash sur Vertex seulement, projet
+`projetanatt`, région `europe-west1`, compte `immipro-vertex-ai`. Aucun autre
+prestataire pour ces essais, aucun changement de production implicite.
+Lire [la campagne et la reprise](docs/exploitation/qualification-vertex-l5.md).
+Disponibilité/modèle exact, tarifs, limites facturées, change et frais restent
+à vérifier ; ne pas substituer un autre Gemini. Exemple volontairement bloqué.
+Clé à configurer par le responsable, jamais lire/copier le coffre de production.
+Conserver le journal privé global `.qualification-vertex` entre tous les
+passages/machines : verrou exclusif, réserve prudente synchronisée avant
+réseau, deux échanges possibles couverts, arrondi supérieur, pas de rendu ni
+reset automatique. Plafond insuffisant : arrêt avant OAuth/modèle. Usage
+inconnue ou borne dépassée : arrêt et rapprochement ; crash/journal illisible
+ne permettent pas de reprendre à zéro. Pas de baisse de réserve sans preuve.
+Réserve prudente distincte de facture/coût mesuré ; hypothèses tarifaires
+non vérifiées → aucun appel payant. Destination/projet/région/compte/modèle
+contrôlés, manifeste et campagne cohérents ; L1–L4 et D1 conservés.
+Tests HTTP/SDK synthétiques ne qualifient pas Vertex. Deux grilles humaines
+pour le seul fournisseur, aucun second prestataire pour le mélange. S.99,
+L5 et Q.A/M.C restent ouverts ; revue avant intégration/déploiement.
+
+
 **S.176 / REV11-L5 — banc de qualification, essais réels à compléter.**
 Autorisation « lot suivant » puis « L5 » ; base `0d82d23` / #284 fusionné,
 aucune PR concurrente à la première relecture. Base finale `186008f` :

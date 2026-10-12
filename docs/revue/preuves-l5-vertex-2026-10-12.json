@@ -1,0 +1,69 @@
+{
+  "suivi": "S.177",
+  "lot": "REV11-L5 complément Vertex",
+  "dateLocale": "2026-10-12",
+  "fuseau": "Africa/Lagos",
+  "base": "5ada263eb7f0807f44ac28cdf971bd5199403145",
+  "autorisation": {
+    "fournisseur": "Vertex AI seulement",
+    "modeleDemande": "Gemini 3.8 Flash",
+    "projet": "projetanatt",
+    "region": "europe-west1",
+    "compteDeService": "immipro-vertex-ai",
+    "plafondGlobal": 5000,
+    "devise": "XOF",
+    "perimetre": "tous les passages/reprises de la campagne, aucune modification de production"
+  },
+  "qualiteLocale": {
+    "check": "PASSE",
+    "fichiersTests": 191,
+    "tests": 3879,
+    "nouveauxTests": 32,
+    "types": "PASSE",
+    "lintSrcEtComplement": "PASSE",
+    "copy": "PASSE",
+    "audit": "PASSE exceptions préexistantes conservées",
+    "buildAppWorker": "PASSE"
+  },
+  "preuvesBudget": {
+    "fichiersReels": true,
+    "verrouOuverturesConcurrentes": true,
+    "reservationFsyncAvantHttp": true,
+    "journalEntrePassages": true,
+    "plafondAvantSixiemeAppel": true,
+    "deuxEchangesMajoresEtArrondiSuperieur": true,
+    "usageInconnueBloqueEtReserveConservee": true,
+    "sortieSousProcessusApresReservation": true,
+    "pasDeResetApresCrashCorruptionChangementBorne": true,
+    "cliEtAdaptateursAvecTransportSynthetique": true,
+    "sixièmePassageOAuth": 0,
+    "sixièmePassageModele": 0,
+    "racineTemporaireDesTests": true,
+    "cleRSA": "GENEREE_POUR_TESTS_NON_REELLE"
+  },
+  "borneDeCoutReelle": "NON_VERIFIEE_EXEMPLE_BLOQUANT",
+  "modeleDisponible": "NON_VERIFIE",
+  "configurationCourante": {
+    "revision": "74",
+    "observationsCurrent": true,
+    "secrets": 0,
+    "variablesRuntime": 0,
+    "identitesSortantes": 0,
+    "hotesVertexOAuthDocumentationAutorises": false
+  },
+  "appelsGoogleReels": 0,
+  "depensesReellesDesEssaisXof": 0,
+  "journalCampagneReelleCree": false,
+  "sourcesSha256": {
+    "src/domain/banc-ia/campagne-vertex.ts": "97166030f64a0aa5a19cd1d97b24d6775797e6e03a6edf8fc1a168ac400a50b9",
+    "scripts/banc-ia/budget-vertex.ts": "94fed7074e4c60cc4f34dbd43c51ae94b423ee4625ad23199f6ab90e86807b37",
+    "scripts/banc-ia/lancer.mts": "1158b6ad9591fa9c9c4df917728688ee8b07ce263360d12327a7db02af5dd1ce",
+    "tests/banc-ia-vertex-budget.test.ts": "0405e9f79695c746a3f2f57d66892f69e991fad1e942891ac115c55ae238b793"
+  },
+  "qualification": "NON_EFFECTUEE",
+  "Q_A": "NON_LEVE",
+  "M_C": "NON_LEVE",
+  "fusionDeCeComplement": "NON_REALISEE",
+  "deploiementDeCeComplement": "NON_REALISE",
+  "ci": "Consulter la porte commune de la PR pour les preuves externes."
+}
