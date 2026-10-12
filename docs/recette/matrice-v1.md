@@ -80,6 +80,14 @@ par appel et incidents éprouvés sur HTTP local Anthropic/compatible.
 Aucun fournisseur réel, DPA, région, coût facturé ou configuration déployée
 qualifié. Les lignes dépendantes d'un service réel restent non vérifiées.
 
+**S.178 / L6, proposition du 12/10.** Gestes candidat automatisés dans Chromium
+390/1280 px avec la vraie application, worker et PostgreSQL, fournisseurs
+scriptés locaux uniquement. Téléphone normalisé conservé, code email réel capturé,
+ouverture/checklist, paiement signé/attribution, dépôt/mesure et retrait du
+consentement. [Preuves détaillées et limites](../revue/lot-l6-2026-10-12.md).
+Ne remplace pas la qualification L5, Firefox/WebKit ou un lecteur d'écran humain.
+Les lignes non couvertes restent non vérifiées.
+
 ## Candidat
 
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |

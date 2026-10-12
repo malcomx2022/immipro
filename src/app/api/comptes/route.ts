@@ -4,6 +4,11 @@ import { route } from "@/server/http/route";
 import { inscrire, emettreUnCode } from "@/server/acces/comptes";
 import { ouvrirSession, attributsCookie, COOKIE_SESSION } from "@/server/securite/session";
 import { envoyerCodeDeVerification, envoyerCompteDejaOuvert } from "@/server/courrier";
+import {
+  CHAMP_TELEPHONE,
+  normaliserTelephone,
+  TELEPHONE_INTERNATIONAL,
+} from "@/domain/comptes/profil";
 import { LONGUEUR_MINIMALE } from "@/domain/comptes/mot-de-passe";
 import { versionAcceptee } from "@/domain/comptes/acceptation";
 import { pagesPubliees } from "@/server/juridique/lecture";
@@ -31,6 +36,11 @@ export const POST = route({
     prenom: z.string().trim().min(1).max(80).optional(),
     nom: z.string().trim().min(1).max(80).optional(),
     pays: z.string().length(2).optional(),
+    telephone: z
+      .string()
+      .transform(normaliserTelephone)
+      .pipe(z.string().regex(TELEPHONE_INTERNATIONAL, CHAMP_TELEPHONE.aide))
+      .optional(),
   }),
   async traiter({ corps }) {
     const { user, existait } = await inscrire(corps);

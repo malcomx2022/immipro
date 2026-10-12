@@ -163,7 +163,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 **Étapes**
 
 1. Création de compte : email + mot de passe, sessions en base. *(OAuth Google : V2, hors périmètre V1.)*
-2. Vérification de l'email par lien à usage unique, validité 24 h.
+2. Vérification de l'email par code à six chiffres à usage unique, validité dix minutes (`code-verification.ts`, mise en cohérence documentaire S.178). Un renvoi invalide les codes précédents.
 3. Reprise automatique des réponses du simulateur dans le profil — le candidat ne resaisit rien.
 4. Complément progressif du profil : téléphone (format international, indispensable au Mobile Money), diplômes, certifications, expérience.
 5. Consentements distincts et journalisés : CGU, politique de confidentialité, traitement des pièces d'identité, communications marketing (optionnel, décoché par défaut).
@@ -172,7 +172,7 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 - RG-02.1 : le consentement au traitement des pièces d'identité est **séparé** de l'acceptation des CGU et révocable.
 - RG-02.2 : aucune pièce ne peut être téléversée avant ce consentement.
-- RG-02.3 : le numéro de téléphone est validé par format avant tout paiement Mobile Money.
+- RG-02.3 : le numéro de téléphone est validé par format avant tout paiement Mobile Money. Téléphone facultatif à l'inscription ; s'il est renseigné, normaliser et valider le format international avant enregistrement. Ne jamais deviner l'indicatif ni modifier un compte existant depuis une inscription répétée (S.178).
 
 ---
 
