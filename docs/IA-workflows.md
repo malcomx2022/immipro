@@ -245,3 +245,21 @@ Les reproductions et leurs attentes figurent dans la
 ordonnées dans le [chantier](revue/chantier-complet-2026-10-11.md).
 
 Mise à jour L2 : base `47b39b0` ; [preuves, écarts et recette HTTP](revue/lot-l2-2026-10-11.md).
+
+
+## Qualification réelle — S.176 / REV11-L5, 12/10/2026
+
+WF-06 : trente pièces factices passent les mêmes consignes, schémas,
+mesures L2 et décisions déterministes ; compter fausses conformités,
+inventions, erreurs et abstentions. WF-08 : dix générations, critiques et
+avis sur dix lettres fixes ; L3 reste exigé, puis deux lectures humaines
+à l'aveugle jugent la fidélité. WF-16 : mesures canoniques par appel,
+modèle/adresse déclarés, estimation au tarif daté et rapprochement externe.
+Le banc contourne uniquement stockage et persistance candidat : aucun
+`AiUsage` factice, aucun débit de pack et aucune bascule entre sociétés.
+
+[Procédure et manifeste](exploitation/qualification-ia.md) ;
+[preuves et reste à faire](revue/lot-l5-2026-10-12.md). Aucune clé/API
+commerciale accessible dans l'environnement revu ; aucun modèle, tarif,
+DPA, résidence, facture ou fournisseur déployé qualifié. Le code par défaut
+ne vaut pas relevé du déploiement. S.99 et les préalables Q.A/M.C restent ouverts.

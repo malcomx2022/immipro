@@ -72,6 +72,14 @@ l'autorisation des pièces chez un fournisseur compatible désigne l'origine
 validée (`AI_OPENAI_ORIGINE_AUTORISEE`). Éprouvé sur serveurs locaux :
 aucun prestataire réel, aucune région ni DPA vérifiés (L5).
 
+**S.176 / REV11-L5, proposition du 12/10.** Banc de qualification corrigé,
+trente pièces/dix rédactions/dix lettres de référence, mesures canoniques
+par appel et incidents éprouvés sur HTTP local Anthropic/compatible.
+[Protocole](../exploitation/qualification-ia.md) et
+[preuves/limites](../revue/lot-l5-2026-10-12.md).
+Aucun fournisseur réel, DPA, région, coût facturé ou configuration déployée
+qualifié. Les lignes dépendantes d'un service réel restent non vérifiées.
+
 ## Candidat
 
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |

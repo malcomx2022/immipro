@@ -13539,6 +13539,7 @@ prestataire exactement une fois après reprise. Aucune qualification réelle,
 fusion/déploiement ou levée Q.A/M.C par cette proposition. Prochain L5 ;
 mobile B-07 reste L7.
 
+
 ### Relevé du déploiement de S.173, S.174 et S.175 (L2 à L4) — 11/10/2026, soirée
 
 Relevé par Claude Code, en lecture seule, sur main `0d82d23`.
@@ -13573,3 +13574,45 @@ La porte `valider` du run 547 couvre les étapes « Mesures IA », « Validité 
 - Le diagnostic des données sur les usages historiques, à lancer côté serveur par le responsable.
 - Un fournisseur réel (L5).
 - B-07 mobile, à 390 px (L7).
+
+## S.176 — REV11-L5 : qualification préparée, fournisseurs réels à éprouver
+
+**Autorisation et continuité.** « lot suivant », puis « L5 », 12/10/2026.
+Base `0d82d23` : #284/L4 fusionné, aucune PR concurrente au départ ni à
+la première relecture. Base finale `186008f` : #285 reprend le relevé
+Claude du déploiement pilote L2–L4, relu et conservé intégralement ;
+aucun code changé par ce relevé. CLAUDE.md, DOC-11/12, S.99, D1 et L1–L4 relus. Conserver
+#280/L2 et arbitrage Claude #282, origine L1, avis L3, réservation L4,
+Prisma 7, pg-boss 12 et les décisions de quota. Aucun fournisseur choisi.
+
+**Reproduction.** Le filtre INEXISTANT rendait zéro cas, code 0 et « aucune
+fausse conformité ». Le banc perdait l'état canonique de mesure et pouvait
+afficher le zéro de compatibilité d'un échec. Témoin simulé sans sources
+invalide sous L3 ; critique seulement sur la génération variable.
+
+**Correction proposée.** Sélection/manifeste/présence des pièces avant
+réseau, mesures L2 par appel, dix lettres fixes et témoins L3, dossier
+unique, provenance/empreintes, incidents/latences et coûts estimés séparés.
+Statuts simulation/local/réel explicites ; qualification jamais automatique.
+Aucun pack, grand livre, historique ou donnée candidat modifié. Aucune
+configuration de production ou bascule entre sociétés. INV-1/2/6, D1,
+WF-06/RG-06.7, WF-08/RG-08.2/08.4/08.9/08.10, WF-16/RG-16.1–16.3.
+
+**Éprouvé.** 21 nouveaux tests unitaires et 21 CLI/HTTP fonctionnels sur
+les vrais adaptateurs Anthropic/compatible, serveurs et clés synthétiques.
+Refus, 401, 429, 503, timeout, mesures absentes/partielles, avis invalides,
+coût et garde de contenu. Simulation parfaite 30/30 verdicts ; crédule
+sort 2 sur les sept pièges historiques. Garde éditoriale inchangée après
+correction d'un témoin ; suite/porte et preuves finales dans
+[le suivi L5](../revue/lot-l5-2026-10-12.md). Nouveaux tests dans check,
+donc dans la porte commune ; régressions L1–L4 conservées.
+
+**Reste à faire.** Aucun secret/identité fournisseur configuré, hôtes API/docs
+commerciales absents de la politique courante. Aucun appel payant exécuté.
+Candidats et budget à confirmer, accès sécurisés à configurer ; puis modèles,
+tarifs, formats/paramètres, trente pièces/lettres/avis et incidents distants,
+deux grilles humaines, DPA/résidence/conservation, rapprochement facture,
+choix extraction/rédaction et relevé du déploiement. S.99 reste ouvert.
+Lire [la procédure](../exploitation/qualification-ia.md) et son manifeste.
+**L5 non clôturé**, Q.A/M.C non levés ; aucun merge/déploiement par cette
+proposition. L6 peut avancer sur ses parcours indépendants.

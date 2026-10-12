@@ -79,6 +79,30 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.176 / REV11-L5 — banc de qualification, essais réels à compléter.**
+Autorisation « lot suivant » puis « L5 » ; base `0d82d23` / #284 fusionné,
+aucune PR concurrente à la première relecture. Base finale `186008f` :
+#285 consigne le déploiement pilote L2–L4 ; relevé Claude relu et conservé,
+aucun code changé par ce relevé. S.99 et les décisions L1–L4 relus,
+#280/L2 et arbitrage Claude #282 conservés. Lire
+[le suivi L5](docs/revue/lot-l5-2026-10-12.md) et
+[le protocole fournisseur](docs/exploitation/qualification-ia.md).
+Refuser sélection vide/inconnue avant réseau, toutes les pièces présentes
+avant appels, manifeste obligatoire pour fournisseur. Conserver mesure
+canonique L2, inconnus NULL, vrai zéro, absence d'appel distincte ; aucun
+zéro de compatibilité transformé en mesure. Dix références fixes complètent
+trente pièces/dix rédactions ; témoins et avis respectent L3. Dossier unique,
+identité/adresse déclarées, commit/empreintes et relevé par fonction/appel.
+Simulation et HTTP local ne qualifient aucun fournisseur ; code 0 n'est pas
+une qualification, prix déclaré n'est pas facture, URL n'est pas DPA/région.
+Aucun fournisseur réel accessible ni appelé : modèles/tarifs actuels,
+incidents distants, deux grilles humaines, DPA/conservation/résidence,
+rapprochement, choix séparés et configuration déployée restent à prouver.
+Ne pas marquer L5 terminé ni lever Q.A/M.C. D1, INV-1/2/6, WF-06/08/16.
+Les nouveaux tests passent par check/porte commune ; attentes L1–L4 intactes.
+Proposition sans fusion/déploiement. L6 seulement sur les parcours indépendants.
+
+
 **S.175 / REV11-L4 — relecture exclusive par version.** Autorisation « L4 »,
 main `2066230` relu avant modification : #283/L3 fusionné, arbitrage Claude
 #282 et version L2 #280 conservés, aucune PR concurrente au démarrage.

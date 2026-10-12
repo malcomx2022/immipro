@@ -46,7 +46,8 @@ import { jetonGoogle, oublierLeJetonGoogle } from "./jeton-google";
  * d'échec sont ceux du domaine — les mêmes que pour Anthropic. Une
  * réponse hors schéma finit en `reponse_illisible`, et une pièce n'est
  * jamais déclarée conforme sans lecture : un modèle moins bon envoie plus
- * de pièces en revue humaine, il n'en valide aucune à tort.
+ * de pièces en revue humaine. Un fait inventé peut toutefois produire une fausse conformité :
+ * le banc la mesure, le schéma JSON ne prouve pas la vérité.
  *
  * ── Ce qui peut varier, et se dit ───────────────────────────────────
  *

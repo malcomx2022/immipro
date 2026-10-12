@@ -1,0 +1,204 @@
+{
+  "lot": "REV11-L5",
+  "suivi": "S.176",
+  "dateLocale": "2026-10-12",
+  "fuseau": "Africa/Lagos",
+  "statut": "BANC_CORRIGE_QUALIFICATION_REELLE_A_COMPLETER",
+  "autorisation": "lot suivant, puis L5",
+  "reproduction": {
+    "avant": {
+      "cas": 0,
+      "code": 0,
+      "conclusion": "Aucune fausse conformité."
+    },
+    "apres": {
+      "code": 1,
+      "sortie": "",
+      "erreur": "--pieces contient un cas inconnu, vide ou répété.\n"
+    }
+  },
+  "qualiteLocale": {
+    "check": "PASSE",
+    "fichiers": 190,
+    "tests": 3847,
+    "nouveauxTests": 42,
+    "nouveauxFichiersTests": 2,
+    "unitairesL5": 21,
+    "cliHttpL5": 21,
+    "types": "PASSE",
+    "lint": "PASSE avec avertissement préexistant purge-stockage.ts",
+    "copy": "PASSE",
+    "audit": "PASSE avec exceptions existantes conservées",
+    "build": "PASSE app et worker"
+  },
+  "simulations": {
+    "parfaite": {
+      "nature": "SIMULATION",
+      "fournisseurQualifie": false,
+      "pieces": 30,
+      "redactions": 10,
+      "references": 10,
+      "invocations": 60,
+      "synthese": {
+        "pieces": 30,
+        "champs": {
+          "total": 45,
+          "justes": 45,
+          "manquees": 0,
+          "inventees": 0,
+          "fausses": 0
+        },
+        "identifications": {
+          "attendues": 28,
+          "justes": 28
+        },
+        "obstacles": {
+          "attendus": 2,
+          "justes": 2,
+          "signalesATort": 0
+        },
+        "echecsTechniques": 0,
+        "verdicts": {
+          "justes": 30,
+          "revuesHumaines": 2
+        },
+        "fausseConformite": [],
+        "disqualifie": false,
+        "redactions": {
+          "total": 10,
+          "ecrites": 10,
+          "avecVocabulaireInterdit": 0,
+          "avecNombresAjoutes": 0,
+          "incoherences": {
+            "attendues": 2,
+            "relevees": 2
+          }
+        }
+      },
+      "referencesToutesValides": true
+    },
+    "credule": {
+      "nature": "SIMULATION",
+      "fournisseurQualifie": false,
+      "pieces": 30,
+      "redactions": 10,
+      "references": 10,
+      "invocations": 60,
+      "synthese": {
+        "pieces": 30,
+        "champs": {
+          "total": 45,
+          "justes": 38,
+          "manquees": 0,
+          "inventees": 7,
+          "fausses": 0
+        },
+        "identifications": {
+          "attendues": 28,
+          "justes": 26
+        },
+        "obstacles": {
+          "attendus": 2,
+          "justes": 0,
+          "signalesATort": 0
+        },
+        "echecsTechniques": 0,
+        "verdicts": {
+          "justes": 23,
+          "revuesHumaines": 0
+        },
+        "fausseConformite": [
+          "L07",
+          "L10",
+          "L17",
+          "L18",
+          "L23",
+          "L28",
+          "L30"
+        ],
+        "disqualifie": true,
+        "redactions": {
+          "total": 10,
+          "ecrites": 10,
+          "avecVocabulaireInterdit": 0,
+          "avecNombresAjoutes": 0,
+          "incoherences": {
+            "attendues": 2,
+            "relevees": 0
+          }
+        }
+      },
+      "referencesToutesValides": true
+    }
+  },
+  "httpLocal": {
+    "adaptateurs": [
+      "anthropic",
+      "openai_compatible"
+    ],
+    "vraisSousProcessusCli": true,
+    "incidents": [
+      "401",
+      "429",
+      "503",
+      "refus",
+      "mesure absente",
+      "mesure partielle",
+      "avis mal formé",
+      "timeout transport compatible 30 ms"
+    ],
+    "usageRefusConserve": true,
+    "costTest": {
+      "entree": 48,
+      "sortie": 12,
+      "coutMicros": 72,
+      "devise": "USD"
+    },
+    "preflightSansAppel": [
+      "cas inconnu",
+      "pièce absente"
+    ],
+    "cle": "SYNTHETIQUE",
+    "fournisseurReelQualifie": false
+  },
+  "sourcesSha256": {
+    "scripts/banc-ia/lancer.mts": "621d5253556d7c9ee7aa019e7e76940c2c4732368d1c37a61aa70446f742a1ae",
+    "scripts/banc-ia/manifeste.ts": "8d4c2a69ac68b719d5222fd6f2f7663be587377138fafac25da6856b10f6ede2",
+    "scripts/banc-ia/resultats.ts": "c8b81699df6dc4dc1f2208bcbf6fc56ba86d841301ff8da222c74ac937898224",
+    "src/domain/banc-ia/qualification.ts": "fd922aa290f576c699971bca2bdb33a2f84feb5d1e52a134f49941ac3c2ac8e0",
+    "src/domain/banc-ia/lettres-reference.ts": "b8379520f61b1f5bb2a694a27ed888cccccd98a73396b013a9dccb1e5977cf00",
+    "tests/banc-ia-qualification.test.ts": "ae174cdf1edb73f77880ee5c0e67cb6cd2453eba587add1ef40c0f0256f38ae3",
+    "tests/banc-ia-http.test.ts": "9e389be28eca4cd08d14cfb7b617b90e6488d2ff994511073f44676226708bed"
+  },
+  "configurationObservee": {
+    "revision": "67",
+    "observationsCourantes": true,
+    "secretsConfigures": 0,
+    "variablesRuntimeConfigurees": 0,
+    "identitesSortantes": 0,
+    "reseau": "restreint, API/docs commerciales IA hors destinations autorisées"
+  },
+  "preuvesReelles": {
+    "modeles_tarifs_parametres": "NON_VERIFIE",
+    "banc_chez_fournisseur": "NON_VERIFIE",
+    "incidents_distants": "NON_VERIFIE",
+    "grilles_humaines": "NON_VERIFIE",
+    "dpa_residence_conservation": "NON_VERIFIE",
+    "rapprochement_facture": "NON_VERIFIE",
+    "choix_extraction_redaction": "NON_VERIFIE",
+    "configuration_deployee": "NON_VERIFIE"
+  },
+  "appelsCommerciaux": 0,
+  "Q_A": "NON_LEVE",
+  "M_C": "NON_LEVE",
+  "fusion": "NON_REALISEE_PAR_CE_LOT",
+  "deploiement": "NON_REALISE",
+  "ci": "Preuves locales ; consulter la porte commune GitHub sur la PR pour son résultat.",
+  "baseInitiale": "0d82d234c9f92caf227364ca02db6f84214775df",
+  "baseFinale": "186008f3c2383d6c6d5282d5f84929ea0c5a02e6",
+  "releveClaudeConserve": {
+    "pr": 285,
+    "nature": "déploiement pilote L2–L4, documentation seulement",
+    "fournisseurReel": "NON_VERIFIE"
+  }
+}
