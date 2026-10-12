@@ -236,3 +236,11 @@ revalidé, aucune preuve DPA ou région obtenue par cette proposition.
 Lire [protocole, secrets et rapprochement](exploitation/qualification-ia.md)
 et [le suivi L5](revue/lot-l5-2026-10-12.md). La décision S.99 reste ouverte,
 extraction/rédaction séparées ; Q.A/M.C non levés.
+
+
+**S.177 — autorisation d'essai du 12/10.** Vertex seulement, projet
+`projetanatt`, région `europe-west1`, Gemini 3.8 Flash demandé. Plafond global
+5 000 XOF, clés fournies par le responsable hors chat/dépôt. Aucun autre
+fournisseur et aucune bascule ; il s'agit des essais, pas d'un changement de
+production ni d'une qualification acquise. [Borne vérifiée et budget durable](exploitation/qualification-vertex-l5.md)
+obligatoires avant réseau ; absence de preuve du coût borne les essais à zéro appel.

@@ -13616,3 +13616,38 @@ choix extraction/rédaction et relevé du déploiement. S.99 reste ouvert.
 Lire [la procédure](../exploitation/qualification-ia.md) et son manifeste.
 **L5 non clôturé**, Q.A/M.C non levés ; aucun merge/déploiement par cette
 proposition. L6 peut avancer sur ses parcours indépendants.
+
+
+## S.177 — Complément L5 : Vertex seul, budget global de 5 000 XOF
+
+**Décision du responsable, 12/10/2026.** Gemini 3.8 Flash sur Vertex AI
+uniquement, projet `projetanatt`, région `europe-west1`, compte de service
+`immipro-vertex-ai`. Plafond 5 000 F pour toute la durée des essais, interprété
+en XOF dans le contexte béninois. Pas d'autre fournisseur, pas de dépassement
+silencieux. Clés ajoutées par le responsable dans la configuration sécurisée ;
+aucune lecture/copie du coffre de production. L'autorisation concerne les essais.
+Base `5ada263` : #286/S.176 fusionné ; consignes, décisions et code Claude
+relus avant modification. Aucune PR concurrente au départ, numéro libre.
+
+**Plan puis correction.** Le manifeste S.176 limitait les invocations, sans
+plafond monétaire durable. Campagne nominative avec destination/projet/région/
+compte/modèle, tarif majoré et borne vérifiée avant tout appel. Exemple
+non vérifié bloquant. Verrou et journal privés globaux à la racine Git,
+réserve écrite/fsync avant réseau, deux échanges facturables possibles,
+entiers BigInt/arrondi supérieur. Réserve jamais rendue automatiquement,
+plafond insuffisant refusé avant OAuth/modèle. Mesure inconnue ou limite
+dépassée bloque la campagne ; crash, corruption ou changement de borne
+n'inventent pas un nouveau budget. Aucun quota, avis ou historique candidat
+modifié. D1, L1–L4, INV-1/2/6, WF-06/08/16 conservés.
+
+**Éprouvé et limites.** Tests de destination/borne, vrai système de fichiers,
+concurrence, interruptions en sous-processus, plafond avant HTTP et vrais
+CLI avec OAuth/SDK synthétiques. Aucun serveur Google ni clé réelle utilisé.
+[Suivi et preuves](../revue/lot-l5-vertex-2026-10-12.md),
+[protocole et configuration](../exploitation/qualification-vertex-l5.md).
+Disponibilité du modèle demandé, prix/limites/frais/change actuels et accès
+sécurisés restent à vérifier. Une borne déclarée ne prouve pas la facturation.
+Si un coût total ne peut être borné, ne lancer aucun appel payant. Grilles
+humaines indépendantes pour le seul fournisseur retenu ; pas de comparaison
+avec un prestataire non autorisé. Aucune qualification commerciale,
+changement de production, fusion/déploiement ou levée Q.A/M.C par ce complément.

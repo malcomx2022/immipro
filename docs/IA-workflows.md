@@ -263,3 +263,13 @@ Le banc contourne uniquement stockage et persistance candidat : aucun
 commerciale accessible dans l'environnement revu ; aucun modèle, tarif,
 DPA, résidence, facture ou fournisseur déployé qualifié. Le code par défaut
 ne vaut pas relevé du déploiement. S.99 et les préalables Q.A/M.C restent ouverts.
+
+
+**S.177, décision du responsable :** essais L5 uniquement chez Vertex
+`projetanatt/europe-west1`, Gemini 3.8 Flash demandé, 5 000 XOF global.
+[Campagne et journal budgétaire](exploitation/qualification-vertex-l5.md).
+Réservation prudente avant tous les appels WF-06/WF-08 du banc, mesures L2
+et avis L3 inchangés ; arrêt avant réseau si plafond insuffisant, reprise
+bloquée sur mesure inconnue. WF-16 distingue réserve prudente, consommation
+mesurée et facture à rapprocher. Aucun quota candidat ni configuration de
+production changé. Modèle/prix/limites réels et qualification toujours à prouver.

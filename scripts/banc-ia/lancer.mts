@@ -81,6 +81,12 @@ import { avisDeReference, LETTRES_DE_REFERENCE } from "@/domain/banc-ia/lettres-
 import { lireLaCritique } from "@/domain/redaction/commande";
 import { versObtenue, versTexte, versRemarques, type MesureDuBanc } from "./resultats";
 import { lireManifeste } from "./manifeste";
+import {
+  lireCampagneVertex,
+  verifierDestinationVertex,
+  type CampagneVertex,
+} from "@/domain/banc-ia/campagne-vertex";
+import { BudgetVertex } from "./budget-vertex";
 import { REGLES_DE_REFERENCE } from "../../prisma/seed/visa-rules.data";
 
 /* ------------------------------------------------------------------ *
@@ -91,6 +97,7 @@ const { values: options } = parseArgs({
   options: {
     fournisseur: { type: "string" },
     manifeste: { type: "string" },
+    "campagne-vertex": { type: "string" },
     sortie: { type: "string" },
     simulation: { type: "string" },
     pieces: { type: "string" },
@@ -298,6 +305,11 @@ const chronometrer = async <T,>(f: () => Promise<T>): Promise<[T, number]> => {
   return [r, Math.round(performance.now() - debut)];
 };
 
+let budgetActif: BudgetVertex | null = null;
+async function fermerLeBudget() {
+  await budgetActif?.fermer();
+}
+
 async function main() {
   const selection = selectionnerLesCas({
     pieces: options.pieces,
@@ -362,6 +374,55 @@ async function main() {
       "Adresse fournisseur invalide : https, ou http sur la boucle locale, sans identifiant ni paramètres.",
     );
   }
+  let campagneVertex: CampagneVertex | null = null;
+  const vertexDeclare =
+    fournisseur === "openai_compatible" &&
+    (process.env.AI_OPENAI_AUTH === "compte_de_service_google" ||
+      baseDeclaree?.hostname.endsWith("aiplatform.googleapis.com"));
+  if (vertexDeclare && !options["campagne-vertex"]) {
+    arreter(
+      "Essai Vertex refusé : --campagne-vertex obligatoire pour le plafond global de 5 000 XOF.",
+    );
+  }
+  if (options["campagne-vertex"]) {
+    campagneVertex = lireCampagneVertex(
+      JSON.parse(await readFile(options["campagne-vertex"], "utf8")),
+    );
+    const config =
+      fournisseur === "openai_compatible" ? configurationCompatible(process.env) : null;
+    if (!config || config.authentification.mode !== "compte_de_service_google") {
+      return arreter(
+        "Campagne Vertex : configuration du compte de service absente ou incompatible.",
+      );
+    }
+    verifierDestinationVertex({
+      fournisseur,
+      base: config.base,
+      modele: config.modele,
+      pdf: config.pdf,
+      auth: config.authentification.mode,
+      email: config.authentification.compte.email,
+    });
+    if (
+      manifeste?.regionDeclaree !== campagneVertex.region ||
+      manifeste.sourceTarif !== campagneVertex.sourceTarif
+    ) {
+      return arreter(
+        "Le manifeste et la campagne doivent désigner la même région et la même source tarifaire.",
+      );
+    }
+    const tarif = tarifDu(process.env, "openai_compatible");
+    if (
+      !tarif ||
+      tarif.devise !== campagneVertex.deviseTarif ||
+      Math.ceil(tarif.entreeParMillion * 1_000_000) >
+        campagneVertex.tarifEntreeMicrosDeviseParMillion! ||
+      Math.ceil(tarif.sortieParMillion * 1_000_000) >
+        campagneVertex.tarifSortieMicrosDeviseParMillion!
+    ) {
+      arreter("Tarif absent, devise différente ou prix supérieur à la borne : aucun appel Vertex.");
+    }
+  }
   const adresse = baseDeclaree?.href ?? null;
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   const arbreModifie =
@@ -373,6 +434,37 @@ async function main() {
         ? "SERVEUR_LOCAL"
         : "FOURNISSEUR_REEL";
   const { modele, lire, ecrire, relire } = adaptateurs();
+  if (campagneVertex) {
+    const racine = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+    }).trim();
+    budgetActif = await BudgetVertex.ouvrir(
+      path.join(racine, ".qualification-vertex", campagneVertex.id),
+      campagneVertex,
+    );
+  }
+  const sousPlafond = async <T extends AvecMesure>(
+    cas: string,
+    fonction: string,
+    f: () => Promise<T>,
+  ): Promise<[T, number]> => {
+    await budgetActif?.reserver(cas, fonction);
+    try {
+      const retour = await chronometrer(f);
+      await budgetActif?.terminer(retour[0].mesure);
+      return retour;
+    } catch (e) {
+      if (budgetActif?.etat().enCours)
+        await budgetActif.terminer({
+          etat: "INCONNUE",
+          jetonsEntree: null,
+          jetonsSortie: null,
+          fournisseur: "openai_compatible",
+          modele: campagneVertex!.modele,
+        });
+      throw e;
+    }
+  };
   const horodatage = new Date().toISOString();
   const nomDuPassage = `${fournisseur}-${modele}-${horodatage}-${randomUUID().slice(0, 8)}`.replace(
     /[^\w.-]/gu,
@@ -387,6 +479,8 @@ async function main() {
       {
         nature,
         manifeste,
+        campagneVertex,
+        budgetVertex: budgetActif?.etat() ?? null,
         adresse,
         modele,
         commit,
@@ -416,6 +510,7 @@ async function main() {
   ) => {
     appels.push({ cas, fonction, mesure, millisecondes, incident });
     await writeFile(path.join(dossier, "appels.json"), JSON.stringify(appels, null, 2));
+    budgetActif?.exigerSuite();
   };
   console.log(`Banc IA — ${fournisseur} · ${modele}`);
   console.log(`${casDeLecture.length} pièces, ${casDeRedaction.length} rédactions.\n`);
@@ -423,7 +518,9 @@ async function main() {
   const lectures: { note: NoteDeLecture; mesure: Mesure; cause: string | null }[] = [];
   for (const cas of casDeLecture) {
     const { type, octets } = fichiers.find((f) => f.id === cas.id)!;
-    const [obtenue, ms] = await chronometrer(() => lire(type, octets, demandeDe(cas), cas));
+    const [obtenue, ms] = await sousPlafond(cas.id, "extraction", () =>
+      lire(type, octets, demandeDe(cas), cas),
+    );
     await tracer(
       cas.id,
       "extraction",
@@ -468,7 +565,7 @@ async function main() {
   }[] = [];
   for (const cas of casDeRedaction) {
     const matiere = matiereDe(cas);
-    const [ecrit, msE] = await chronometrer(() => ecrire(matiere, cas));
+    const [ecrit, msE] = await sousPlafond(cas.id, "redaction", () => ecrire(matiere, cas));
     await tracer(cas.id, "redaction", ecrit.mesure, msE, ecrit.detail);
     const [relu, msR] =
       ecrit.texte === null
@@ -488,10 +585,12 @@ async function main() {
             },
             0,
           ] as const)
-        : await chronometrer(() => relire(ecrit.texte!, matiere, cas));
+        : await sousPlafond(cas.id, "relecture", () => relire(ecrit.texte!, matiere, cas));
     await tracer(cas.id, "relecture", relu.mesure, msR, relu.detail);
     const lettre = LETTRES_DE_REFERENCE.find((r) => r.id === cas.id)!;
-    const [reference, msRef] = await chronometrer(() => relire(lettre.texte, matiere, cas));
+    const [reference, msRef] = await sousPlafond(cas.id, "avis_reference", () =>
+      relire(lettre.texte, matiere, cas),
+    );
     await tracer(cas.id, "avis_reference", reference.mesure, msRef, reference.detail);
     references.push({
       id: cas.id,
@@ -561,6 +660,8 @@ async function main() {
     format: "REV11-L5-1",
     qualification,
     manifeste,
+    campagneVertex,
+    budgetVertex: budgetActif?.etat() ?? null,
     configuration: {
       adresse,
       pdf:
@@ -776,4 +877,6 @@ try {
       : "Manifeste invalide : vérifier la procédure L5.",
   );
   process.exitCode = 1;
+} finally {
+  await fermerLeBudget();
 }
