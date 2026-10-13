@@ -13651,3 +13651,28 @@ Si un coût total ne peut être borné, ne lancer aucun appel payant. Grilles
 humaines indépendantes pour le seul fournisseur retenu ; pas de comparaison
 avec un prestataire non autorisé. Aucune qualification commerciale,
 changement de production, fusion/déploiement ou levée Q.A/M.C par ce complément.
+
+
+## S.178 — REV11-L6 : téléphone perdu et recette candidat locale
+
+**Proposition du 12/10/2026**, base `f216611` (#287), dernière logique Claude
+relue avant modification ; aucune PR concurrente ni numéro S.178 au départ.
+
+**Reproduction.** Chromium 390 px : numéro Mobile Money renseigné, POST sans
+`telephone`, `User.phone = NULL`. Quatre tests du résultat attendu rouges avant
+correction ; témoins téléphone facultatif et compte existant conservés.
+
+**Correction WF-02 / RG-02.3.** Normalisation/format international partagés entre
+inscription et profil ; validation UI, route et service ; téléphone enregistré
+seulement pour le nouveau compte. Pas de migration, indicatif implicite ni mutation
+d'un compte existant. DOC-11 actualisé au code email existant de dix minutes.
+
+**Banc explicite.** `--parcours` fournit des réponses IA et un checkout scriptés
+sur loopback ; vraie app/worker/base, SMTP capturé, S3/antivirus locaux, webhook
+signé et effets métier. Préchargeur limité au banc, destinations externes refusées.
+Le banc sans option conserve l'absence d'IA/paiement et ses gardes S.170.
+
+[Contrôles, limites et reste de L6](../revue/lot-l6-2026-10-12.md).
+Pas de fournisseur commercial éprouvé, pas de levée L5/Q.A/M.C, pas de fusion
+ou déploiement par cette proposition. L6 demeure ouverte tant que ses critères
+navigateur, accessibilité et tous les gestes de la matrice ne sont pas couverts.

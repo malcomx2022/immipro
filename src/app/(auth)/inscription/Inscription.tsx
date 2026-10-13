@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import {
-  documentsALire,
-  reserveDeLAcceptation,
-  type Publiees,
-} from "@/domain/comptes/acceptation";
+import { documentsALire, reserveDeLAcceptation, type Publiees } from "@/domain/comptes/acceptation";
 import { BlocEchec } from "@/components/ui/BlocEchec";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { LienNouvelOnglet } from "@/components/ui/LienNouvelOnglet";
+import {
+  CHAMP_TELEPHONE,
+  normaliserTelephone,
+  TELEPHONE_INTERNATIONAL,
+} from "@/domain/comptes/profil";
 import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
@@ -55,7 +56,9 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
   const idJauge = useId();
 
   const longueurOk = motDePasseRecevable(motDePasse);
-  const complet = Boolean(nom && email && longueurOk && conditions);
+  const telephoneNormalise = normaliserTelephone(telephone);
+  const telephoneOk = telephoneNormalise === "" || TELEPHONE_INTERNATIONAL.test(telephoneNormalise);
+  const complet = Boolean(nom && email && longueurOk && conditions && telephoneOk);
 
   async function creer() {
     if (!complet || envoi) return;
@@ -66,6 +69,7 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
       corps: {
         email: email.trim(),
         motDePasse,
+        ...(telephoneNormalise ? { telephone: telephoneNormalise } : {}),
         ...(prenom ? { prenom } : {}),
         ...(reste.length > 0 ? { nom: reste.join(" ") } : {}),
       },
@@ -82,7 +86,9 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
     ? "Accepte les conditions d'utilisation pour créer le compte."
     : !longueurOk
       ? "Le mot de passe doit faire au moins dix caractères."
-      : "Renseigne ton nom et ton adresse email.";
+      : !telephoneOk
+        ? CHAMP_TELEPHONE.aide
+        : "Renseigne ton nom et ton adresse email.";
 
   return (
     <form
@@ -132,8 +138,9 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
             type="tel"
             name="tel"
             autoComplete="tel"
-            placeholder="97 00 00 42"
-            aide="Bénin, +229. Sert au paiement, jamais à la publicité."
+            placeholder="+229 01 97 00 00 42"
+            aide={`${CHAMP_TELEPHONE.aide} Facultatif ici, tu peux le renseigner plus tard.`}
+            erreur={telephoneOk ? undefined : CHAMP_TELEPHONE.aide}
             value={telephone}
             onChange={(e) => setTelephone(e.target.value)}
           />
@@ -186,8 +193,8 @@ export function Inscription({ publiees }: { publiees: Publiees }) {
         {/* RG-02.1 : le consentement aux pièces d'identité est séparé, et
             l'écran dit où il sera demandé plutôt que de le glisser ici. */}
         <p className="text-pretty rounded-md bg-ink-100 p-3.5 text-13 text-ink-500">
-          Le consentement au traitement de tes pièces d&apos;identité est demandé
-          séparément, au moment du premier téléversement.
+          Le consentement au traitement de tes pièces d&apos;identité est demandé séparément, au
+          moment du premier téléversement.
         </p>
       </div>
 

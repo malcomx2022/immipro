@@ -1,3 +1,4 @@
+import { TELEPHONE_INTERNATIONAL } from "@/domain/comptes/profil";
 import { z } from "zod";
 import { route } from "@/server/http/route";
 import { db } from "@/lib/db";
@@ -21,7 +22,6 @@ import { ADRESSE_FACTURATION, NOM_FACTURATION } from "@/domain/facturation/factu
  * en-tête annonce —, et derrière `next/headers` aucune fumée ne pouvait
  * relire la ligne après coup.
  */
-const TELEPHONE = /^\+[1-9]\d{7,14}$/u;
 
 export const GET = route({
   nom: "comptes.profil",
@@ -61,7 +61,7 @@ export const PUT = route({
     telephone: z
       .string()
       .regex(
-        TELEPHONE,
+        TELEPHONE_INTERNATIONAL,
         "Indicatif pays compris, sans espaces : +229 pour le Bénin, +225 pour la Côte d'Ivoire.",
       )
       .optional(),

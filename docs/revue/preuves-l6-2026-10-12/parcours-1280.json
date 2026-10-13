@@ -1,0 +1,49 @@
+{
+  "simulation": true,
+  "navigateur": "chromium",
+  "largeur": 1280,
+  "resultats": [
+    {
+      "controle": "Six réponses au clavier et recommandations calculées",
+      "conforme": true
+    },
+    {
+      "controle": "Inscription, téléphone normalisé en base, courrier capturé, vérification par Entrée",
+      "conforme": true
+    },
+    {
+      "controle": "Ouverture réelle, règle figée et checklist persistée sans date inventée",
+      "conforme": true
+    },
+    {
+      "controle": "Checkout intercepté localement, webhook signé réel et attribution de 30 analyses",
+      "conforme": true,
+      "commercial": false
+    },
+    {
+      "controle": "Consentement accordé, téléversement réel, antivirus, worker et lecture IA synthétique mesurée",
+      "analyse": {
+        "scanState": "SAINE",
+        "verdict": "A_CORRIGER",
+        "creditConsumed": true,
+        "inputTokens": 120,
+        "outputTokens": 30
+      },
+      "conforme": true
+    },
+    {
+      "controle": "Remplacement par un autre fichier, deux versions, nouvelle analyse débitée et historique ouvert",
+      "conforme": true
+    },
+    {
+      "controle": "Retrait du consentement, nouveau dépôt fermé et quota inchangé",
+      "conforme": true
+    },
+    {
+      "controle": "Pièce facultative synthétique préparée : écriture manuelle, version, export DOCX et critique IA synthétique débitée",
+      "conforme": true,
+      "fixture": true
+    }
+  ],
+  "erreursJS": []
+}

@@ -1,9 +1,20 @@
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
-import { correspond, empreinte, aRecalculer, empreinteRapide, codeANChiffres } from "@/server/securite/secret";
+import {
+  correspond,
+  empreinte,
+  aRecalculer,
+  empreinteRapide,
+  codeANChiffres,
+} from "@/server/securite/secret";
 import { fermerToutesLesSessions } from "@/server/securite/session";
 import { lireEchecsSansCompte, noterEchecSansCompte } from "@/server/acces/echecs-sans-compte";
+import {
+  CHAMP_TELEPHONE,
+  normaliserTelephone,
+  TELEPHONE_INTERNATIONAL,
+} from "@/domain/comptes/profil";
 import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
 import { LONGUEUR_CODE, VALIDITE_MINUTES } from "@/domain/comptes/code-verification";
 import {
@@ -31,6 +42,7 @@ export interface Inscription {
   prenom?: string;
   nom?: string;
   pays?: string;
+  telephone?: string;
 }
 
 /**
@@ -43,11 +55,17 @@ export interface Inscription {
  * utilisée » transformerait le formulaire d'inscription en outil de
  * vérification d'adresses.
  */
-export async function inscrire(donnees: Inscription): Promise<{ user: User | null; existait: boolean }> {
+export async function inscrire(
+  donnees: Inscription,
+): Promise<{ user: User | null; existait: boolean }> {
   if (!motDePasseRecevable(donnees.motDePasse)) {
     throw echec("champs_invalides", {
       champs: { motDePasse: "Au moins dix caractères." },
     });
+  }
+  const telephone = normaliserTelephone(donnees.telephone ?? "");
+  if (telephone && !TELEPHONE_INTERNATIONAL.test(telephone)) {
+    throw echec("champs_invalides", { champs: { telephone: CHAMP_TELEPHONE.aide } });
   }
   const email = normaliserEmail(donnees.email);
   const existant = await db.user.findUnique({ where: { email }, select: { id: true } });
@@ -60,14 +78,14 @@ export async function inscrire(donnees: Inscription): Promise<{ user: User | nul
       firstName: donnees.prenom ?? null,
       lastName: donnees.nom ?? null,
       countryCode: donnees.pays ?? null,
+      phone: telephone || null,
     },
   });
   return { user, existait: false };
 }
 
 export type ResultatConnexion =
-  | { ouverte: true; user: User }
-  | { ouverte: false; verdict: Verdict; message: string };
+  { ouverte: true; user: User } | { ouverte: false; verdict: Verdict; message: string };
 
 /**
  * Connexion.
@@ -175,9 +193,7 @@ export async function connecter(
       lockedUntil: null,
       // Empreinte produite avec des paramètres dépassés : elle se réécrit à
       // la connexion réussie, sans migration ni réinitialisation de masse.
-      ...(aRecalculer(user.passwordHash!)
-        ? { passwordHash: await empreinte(motDePasse) }
-        : {}),
+      ...(aRecalculer(user.passwordHash!) ? { passwordHash: await empreinte(motDePasse) } : {}),
     },
   });
   if (ouverte.count === 0) {
@@ -302,8 +318,7 @@ export async function consommerUnCode(
  * mauvaise adresse ne vérifie jamais la nouvelle.
  */
 export type IssueDeLaCorrection =
-  | { issue: "corrigee"; email: string; code: string }
-  | { issue: "deja_prise"; email: string };
+  { issue: "corrigee"; email: string; code: string } | { issue: "deja_prise"; email: string };
 
 export async function corrigerLAdresse(
   userId: string,
@@ -319,7 +334,10 @@ export async function corrigerLAdresse(
     : await correspond(motDePasse, LEURRE);
   if (!juste) {
     throw echec("champs_invalides", {
-      champs: { motDePasse: "Ce mot de passe ne correspond pas à ton compte. Saisis celui choisi à l'inscription." },
+      champs: {
+        motDePasse:
+          "Ce mot de passe ne correspond pas à ton compte. Saisis celui choisi à l'inscription.",
+      },
     });
   }
   if (user.emailVerified) {
@@ -332,7 +350,10 @@ export async function corrigerLAdresse(
   }
   if (email === user.email) {
     throw echec("champs_invalides", {
-      champs: { email: "C'est déjà l'adresse de ton compte. Vérifie l'orthographe, ou demande un nouveau code." },
+      champs: {
+        email:
+          "C'est déjà l'adresse de ton compte. Vérifie l'orthographe, ou demande un nouveau code.",
+      },
     });
   }
 
@@ -343,7 +364,8 @@ export async function corrigerLAdresse(
     await db.user.update({ where: { id: userId }, data: { email } });
   } catch (erreur) {
     // Prise entre la lecture et l'écriture : même réponse qu'une adresse prise.
-    if ((erreur as { code?: unknown } | null)?.code === "P2002") return { issue: "deja_prise", email };
+    if ((erreur as { code?: unknown } | null)?.code === "P2002")
+      return { issue: "deja_prise", email };
     throw erreur;
   }
   const code = await emettreUnCode(userId, "VERIFICATION_EMAIL");

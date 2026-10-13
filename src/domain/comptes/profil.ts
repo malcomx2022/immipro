@@ -154,3 +154,6 @@ export function normaliserTelephone(valeur: string): string {
   const net = valeur.replace(/[\s.\-()]/gu, "");
   return net.startsWith("00") ? `+${net.slice(2)}` : net;
 }
+
+/** Format international partagé par le profil et l’inscription ; aucun pays deviné. */
+export const TELEPHONE_INTERNATIONAL = /^\+[1-9]\d{7,14}$/u;

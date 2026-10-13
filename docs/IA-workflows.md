@@ -273,3 +273,18 @@ et avis L3 inchangés ; arrêt avant réseau si plafond insuffisant, reprise
 bloquée sur mesure inconnue. WF-16 distingue réserve prudente, consommation
 mesurée et facture à rapprocher. Aucun quota candidat ni configuration de
 production changé. Modèle/prix/limites réels et qualification toujours à prouver.
+
+
+## Recette fonctionnelle locale — S.178 / L6
+
+Le banc `--parcours` fait traverser WF-05 (checkout et webhook), WF-06
+(dépôt → antivirus → extraction → règles déterministes → verdict et quota)
+et WF-08 (version et export) par la vraie application et son worker.
+Les réponses du fournisseur compatible sont scriptées sur loopback ; les
+jetons 120/30 sont des valeurs synthétiques servant à vérifier la persistance.
+Les modes panne, illisible et sans usage sont des commandes du faux serveur,
+jamais des configurations commerciales. Le préchargeur détourne Stripe vers
+ce serveur et refuse les destinations externes. Sans cette option explicite,
+le banc ne branche aucun fournisseur. Aucun résultat de cette recette ne
+qualifie Gemini, la fidélité du modèle, le coût, le DPA ou la résidence.
+[Reproduction et limites](revue/lot-l6-2026-10-12.md).

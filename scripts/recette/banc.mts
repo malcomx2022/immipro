@@ -13,7 +13,11 @@
  *     npm run recette:banc                 # http://localhost:3100
  *     npm run recette:banc -- --port 3200 --base immipro_recette2
  *
- * Ce que le banc **ne simule pas** : la lecture par le modèle (aucune clé :
+ * Option explicite `--parcours` : IA et checkout scriptés sur la boucle locale,
+ * préchargeur interdisant les autres destinations HTTP. Aucune qualification
+ * commerciale ; les identifiants du parent restent écartés.
+ *
+ * Par défaut, ce que le banc **ne simule pas** : la lecture par le modèle (aucune clé :
  * la pièce part en revue humaine, comme en production sans fournisseur),
  * le paiement (aucun rail : l'achat le dit), nginx et ses certificats. Les
  * lignes de la matrice qui en dépendent restent « non vérifié » ici.
@@ -23,6 +27,8 @@
  * Ctrl-C arrête tout ; la base est gardée pour relire après coup, et
  * supprimée au lancement suivant.
  */
+import path from "node:path";
+import { fournisseursDuParcours } from "./fournisseurs-parcours";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -210,6 +216,31 @@ async function demarrer(): Promise<void> {
     ETAT_DE_SERVICE_JETON: randomBytes(16).toString("hex"),
   };
 
+  // Option explicite : les clés du parent restent neutralisées, les seules
+  // valeurs ajoutées sont synthétiques et les destinations sur la boucle locale.
+  const parcours = process.argv.includes("--parcours");
+  if (parcours) {
+    const faux = await fournisseursDuParcours(env.APP_URL!);
+    fermetures.push(faux.arreter);
+    const origine = `http://127.0.0.1:${faux.port}`;
+    Object.assign(env, {
+      RECETTE_PARCOURS_URL: origine,
+      AI_FOURNISSEUR_EXTRACTION: "openai_compatible",
+      AI_FOURNISSEUR_REDACTION: "openai_compatible",
+      AI_OPENAI_URL: `${origine}/v1`,
+      AI_OPENAI_MODEL: "recette-synthetique-L6",
+      AI_OPENAI_API_KEY: "synthetique",
+      AI_OPENAI_AUTH: "cle",
+      AI_OPENAI_PDF: "file",
+      AI_PIECES_SOUS_TRAITANT_AUTORISE: "openai_compatible",
+      AI_OPENAI_ORIGINE_AUTORISEE: origine,
+      PAIEMENT_FOURNISSEURS: "STRIPE",
+      STRIPE_API_KEY: "sk_test_recette_locale",
+      STRIPE_WEBHOOK_SECRET: faux.secret,
+    });
+    console.log(`  ✓ parcours scriptés uniquement locaux : ${origine} (aucun prestataire réel)`);
+  }
+
   /* ── Le référentiel et le jeu de démonstration ───────────────────── */
   etape("Référentiel et jeu de démonstration");
   const motDePasse = randomBytes(9).toString("base64url");
@@ -245,8 +276,11 @@ async function demarrer(): Promise<void> {
   cpSync("public", ".next/standalone/public", { recursive: true });
   cpSync(".next/static", ".next/standalone/.next/static", { recursive: true });
   env.HOSTNAME = "127.0.0.1";
-  lancer("app", process.execPath, [".next/standalone/server.js"]);
-  lancer("worker", process.execPath, ["dist/worker.js"]);
+  const prechargement = parcours
+    ? ["--import", path.resolve("scripts/recette/transport-parcours.mjs")]
+    : [];
+  lancer("app", process.execPath, [...prechargement, ".next/standalone/server.js"]);
+  lancer("worker", process.execPath, [...prechargement, "dist/worker.js"]);
 
   await enfants.attendrePret({
     url: `http://127.0.0.1:${PORT}/api/health`,

@@ -29,7 +29,7 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | 4 | L3 — Validité des avis IA | P1 | S.174 fusionné #283 ; [preuves](lot-l3-2026-10-11.md) |
 | 5 | L4 — Relecture unique par version | P1 | S.175 fusionné #284, déployé `0d82d23` (run 547) ; [preuves et limites](lot-l4-2026-10-11.md) |
 | 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | S.176 fusionné #286 ; S.177 proposé : Vertex seul, 5 000 XOF ; [preuves réelles à compléter](lot-l5-vertex-2026-10-12.md) |
-| 7 | L6 — Recette front et parcours candidat | P2 | À réaliser |
+| 7 | L6 — Recette front et parcours candidat | P2 | En cours : S.178, recette locale et téléphone ; critères restants ouverts |
 | 8 | L7 — Exploitation et données antérieures | P2 | À réaliser |
 | 9 | L8 — Paiement, conformité et lancement | Préalables Q.A/M.C | À réaliser avec les preuves externes |
 | 10 | L9 — Maintenances restantes | P2 | À réaliser après relecture du travail de Claude |
@@ -219,6 +219,11 @@ Choix extraction/rédaction à justifier séparément. Aucun basculement
 automatique entre sociétés. Documenter le fournisseur effectivement déployé.
 
 ## REV11-L6 — Terminer la recette front et les parcours candidat
+
+**S.178, proposition du 12/10 :** téléphone perdu à l'inscription corrigé,
+banc de gestes locaux et preuves SQL. [Résultats et reprise](lot-l6-2026-10-12.md).
+Firefox/WebKit et lecteur d'écran non vérifiés ; ce complément ne ferme pas L6.
+
 
 **P2 · L · WF-01 à WF-10 · front et routes associées.**
 

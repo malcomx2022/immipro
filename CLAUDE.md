@@ -79,6 +79,17 @@ Un message d'échec est toujours actionnable.
 
 ### Revue complète du 11/10/2026 — REV11
 
+**S.178 / L6 — téléphone conservé et parcours candidat locaux.**
+Base `f216611` / #287 fusionné ; décisions Claude relues avant correction.
+Le téléphone Mobile Money était saisi mais perdu avant le POST : normalisation
+internationale partagée, validation UI/API/service et persistance à la création.
+Facultatif, aucun indicatif deviné ; l'inscription répétée ne modifie aucun compte.
+`recette:banc -- --parcours` active seulement des réponses IA/Stripe scriptées
+locales : aucun fournisseur réel, pas une preuve de qualification L5.
+[Recette, preuves et reprise](docs/revue/lot-l6-2026-10-12.md).
+L6 reste ouverte : Firefox/WebKit refusés par la politique CDN, lecteur d'écran
+humain et couverture navigateur complète à terminer. Aucun déploiement implicite.
+
 **S.177 / complément L5 — campagne Vertex autorisée, 5 000 XOF au total.**
 Base `5ada263` / #286 fusionné ; dernière logique Claude et S.176 relus.
 Décision du responsable : Gemini 3.8 Flash sur Vertex seulement, projet
