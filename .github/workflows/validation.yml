@@ -155,6 +155,25 @@ jobs:
           retention-days: 7
       - run: echo "- **Photographies** — huit gabarits publics, variantes mobiles, sources et publication préservées, six profils navigateur" >> "$GITHUB_STEP_SUMMARY"
 
+      # L6 : les parcours authentifiés — candidat, achat scripté, dépôt,
+      # coupure, revue B-05, rédaction, double onglet, quota épuisé, dépôt
+      # déclaré et clôture — sur la vraie app, le vrai worker et une base
+      # jetable, avec les seuls fournisseurs scriptés du banc `--parcours`.
+      # Les mêmes six profils ; aucun prestataire réel n'est qualifié ici.
+      - name: Parcours candidat et back-office — Chromium, Firefox et WebKit
+        id: parcours
+        run: npm run test:parcours
+      - name: Preuves de recette des parcours
+        if: always() && (steps.parcours.outcome == 'success' || steps.parcours.outcome == 'failure')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: parcours-candidat
+          path: |
+            playwright-report-parcours/
+            test-results/parcours/
+          retention-days: 7
+      - run: echo "- **Parcours candidat** — inscription, achat scripté, dépôt et lecture, coupure, revue B-05, rédaction, double onglet, quota épuisé, dépôt déclaré et clôture, six profils navigateur" >> "$GITHUB_STEP_SUMMARY"
+
       # pg-boss 11 ne migre pas une base de pg-boss 10 (S.166) : la base de
       # départ est écrite par le vrai 10.4.2, puis la bascule reprend ce qui
       # attendait, sans doublon, et un retour arrière retrouve son schéma.

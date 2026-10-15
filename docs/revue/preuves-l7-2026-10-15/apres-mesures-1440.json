@@ -1,0 +1,71 @@
+{
+  "navigateur": "chromium 156 (Playwright 1.64.1)",
+  "banc": "immipro_recette_l7, --parcours, compte admin de démonstration",
+  "largeur": 1440,
+  "erreursJS": [],
+  "ecrans": [
+    {
+      "route": "/couts-ia",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/veille",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/revue",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/journal",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/contenus",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/utilisateurs",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/textes-juridiques",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/paiements",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    },
+    {
+      "route": "/habilitations",
+      "statut": 200,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "elementsAuDela": 0
+    }
+  ]
+}
