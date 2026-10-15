@@ -20,16 +20,25 @@ export function trierErreurs(
 ) {
   const annulee = (e: ErreurNavigateur) => {
     if (moteur !== "webkit") return false;
-    const url = /(https?:\/\/\S+) due to access control checks\.$/u.exec(e.message)?.[1];
-    if (!url || !new URL(url).searchParams.has("_rsc")) return false;
-    return echecs.some(
-      (r) =>
-        r.url === url &&
-        r.prechargement &&
-        r.navigation &&
-        /cancel(?:led|ed)|abort|interrupted/iu.test(r.cause) &&
-        Math.abs(r.instant - e.instant) <= 2_000,
-    );
+    const suffixe = " due to access control checks.";
+    return echecs.some((r) => {
+      if (
+        !r.prechargement ||
+        !r.navigation ||
+        !/cancel(?:led|ed)|abort|interrupted/iu.test(r.cause) ||
+        Math.abs(r.instant - e.instant) > 2_000
+      )
+        return false;
+      const cible = new URL(r.url);
+      if (!cible.searchParams.has("_rsc")) return false;
+      // WebKit/Playwright peut retirer « https:/ » du message d'erreur.
+      // Comparer au seul URL de la requête réellement observée, sans
+      // inventer de destination à partir du texte tronqué.
+      return (
+        e.message.endsWith(`${r.url}${suffixe}`) ||
+        e.message === `/${cible.host}${cible.pathname}${cible.search}${suffixe}`
+      );
+    });
   };
   return {
     erreursJS: erreurs.filter((e) => !annulee(e)).map((e) => e.message),
@@ -64,7 +73,8 @@ export function suivreErreurs(page: Page, moteur: string) {
   });
   return () => {
     const requetes = echecs.map((r) => ({
-      ...r, navigation: navigations.some((n) => Math.abs(r.instant - n) <= 2_000),
+      ...r,
+      navigation: navigations.some((n) => Math.abs(r.instant - n) <= 2_000),
     }));
     return {
       ...trierErreurs(moteur, erreurs, requetes),

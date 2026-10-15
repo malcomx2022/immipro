@@ -15,10 +15,13 @@ const annulation: RequeteAnnulee = {
 };
 
 describe("Recette : aucune erreur d'accès masquée sans preuve d'annulation", () => {
-  it("isole le préchargement WebKit effectivement annulé par une navigation", () => {
-    expect(trierErreurs("webkit", [erreur], [annulation])).toEqual({
+  it.each([
+    erreur.message,
+    "/localhost:3163/dossiers?_rsc=synthetique due to access control checks.",
+  ])("corrèle le préchargement annulé, message complet ou tronqué : %s", (message) => {
+    expect(trierErreurs("webkit", [{ ...erreur, message }], [annulation])).toEqual({
       erreursJS: [],
-      prechargementsAnnules: [erreur.message],
+      prechargementsAnnules: [message],
     });
   });
   it.each([
@@ -33,6 +36,13 @@ describe("Recette : aucune erreur d'accès masquée sans preuve d'annulation", (
     expect(trierErreurs("webkit", [erreur], [{ ...annulation, ...difference }]).erreursJS).toEqual([
       erreur.message,
     ]);
+    const tronquee = {
+      ...erreur,
+      message: "/localhost:3163/dossiers?_rsc=synthetique due to access control checks.",
+    };
+    expect(
+      trierErreurs("webkit", [tronquee], [{ ...annulation, ...difference }]).erreursJS,
+    ).toEqual([tronquee.message]);
   });
   it("ne dispense aucun autre moteur ni une requête active", () => {
     expect(trierErreurs("firefox", [erreur], [annulation]).erreursJS).toEqual([erreur.message]);

@@ -13766,7 +13766,7 @@ Le double onglet attend le nouveau rang avant sa relecture.
 B-04 : débordement 397/390 reproduit, métriques et tableau adaptés ; mesure
 réelle B-04/B-07 ajoutée aux six profils. Calculs WF-15/WF-16 inchangés.
 Le filtre WebKit exige une vraie requête de préchargement annulée lors d'une
-navigation ; CORS/TLS et erreurs non corrélées restent bloquants, dix tests.
+navigation ; CORS/TLS et erreurs non corrélées restent bloquants, onze tests.
 
 Tarif officiel Google référencé, promotion distincte du majorant de dépense
 brute. Aucun modèle, région, budget ou secret changé ; aucun appel réel.

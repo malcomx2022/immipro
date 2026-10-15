@@ -1090,5 +1090,7 @@ test("bilan du profil : aucun défilement horizontal, aucune erreur JavaScript",
   );
   await info.attach("preuves", { path: releve, contentType: "application/json" });
   expect(debordements).toEqual([]);
-  expect(erreursReelles).toEqual([]);
+  expect(erreursReelles, JSON.stringify({
+    observationsPrechargements: bilans.flatMap((b) => b.observationsPrechargements),
+  })).toEqual([]);
 });
