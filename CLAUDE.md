@@ -102,8 +102,11 @@ Le lot n'a rien fusionné ni déployé. Le 15/10 au soir, sur instruction du
 responsable, Claude Code a fusionné #293 (`a4ccc39`) puis #291, #292 et #290
 (`29e9f20`), chacune après sa porte complète rejouée sur la nouvelle base ;
 le pipeline de déploiement de `main` a suivi de lui-même, comme à chaque
-poussée. Lire le relevé des fusions à la fin du suivi du lot, où le résultat du
-déploiement est consigné.
+poussée : `29e9f20` en service sur le VPS à 21 h 26 UTC, `clamav` prêt en
+35 s avec sa nouvelle empreinte ; puis une relance manuelle, hors Claude
+Code, a redéployé l'état intermédiaire `07c29cb` à 21 h 56 UTC, en retrait
+de #290 tant que `main` n'est pas redéployée. Lire le relevé des fusions à
+la fin du suivi du lot.
 Ces fusions ne lèvent aucun préalable.
 
 ### Photographies publiques — validation du 15/10/2026, S.179
