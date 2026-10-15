@@ -13676,3 +13676,28 @@ Le banc sans option conserve l'absence d'IA/paiement et ses gardes S.170.
 Pas de fournisseur commercial éprouvé, pas de levée L5/Q.A/M.C, pas de fusion
 ou déploiement par cette proposition. L6 demeure ouverte tant que ses critères
 navigateur, accessibilité et tous les gestes de la matrice ne sont pas couverts.
+
+
+## S.179 — Photographies publiques validées : huit familles, cinq scènes
+
+**Décision du responsable, 15/10/2026.** Trois premiers placements validés,
+puis extension accueil/catalogues/guides/articles, inventaire de 62 gabarits,
+cinq scènes et variantes mobile/bureau ; instruction explicite d'implémenter
+et d'exécuter les tests. Base `de85961`, #288/L6 fusionnée, aucune correction
+Claude antérieure retirée. Numéro libre à la relecture du main.
+
+Accueil : photo à droite sur bureau, après les champs et le bouton sur mobile ;
+le simulateur et S.164 sont conservés. Une grande photo maximum par page publique,
+vignettes sur les listes, SVG dans le dossier/paiement et administration.
+Logo SVG inchangé. Les images générées ne deviennent pas des portraits réels.
+
+Catalogue local, associations explicites pays/slug, dimensions réservées et
+points focaux en jetons. Aucune URL extérieure, migration, nouveau type de
+bloc ou upload B-08 ; P.C reste fermé sur ces points. Une association ne publie
+aucune règle/guide/article, les gardes INV-4/8 et dates restent celles de Claude.
+Aucun appel IA d'exécution ni débit L5. Repli sans média pour sujet inconnu.
+
+[Spécification](../photographies.md), [validation et limites](../revue/implementation-photos-2026-10-15.md).
+La porte commune ajoute la recette réelle Chromium/Firefox/WebKit × mobile/bureau.
+Cette livraison ne certifie pas les critères L5/L6 encore ouverts et ne fusionne
+ou déploie rien automatiquement.

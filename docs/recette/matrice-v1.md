@@ -399,3 +399,17 @@ suites existantes et diagnostics IA conservent leurs attentes métier.
 [Rapport](../revue/lot-l4-2026-10-11.md) · [Fournisseur, reprise et migration](../exploitation/relecture-concurrente.md).
 Qualification fournisseur réelle L5, mobile B-07 L7 ; autres parcours, supports,
 préalables Q.A/M.C et reports V2 restent à qualifier dans leurs lots.
+
+## Photographies publiques — S.179, 15/10/2026
+
+Les huit familles publiques approuvées sont couvertes par 16 nouveaux tests
+unitaires/interface et une recette navigateur sur le banc PostgreSQL isolé.
+Les 28 scénarios Chromium locaux passent ; la porte commune exige également
+Firefox et WebKit, soit 84 scénarios sur les deux dimensions 390 et 1440 px.
+Les variantes réellement chargées, dimensions, poids, absence de débordement,
+sources/dates, réponse du simulateur et refus des contenus non publiés sont
+contrôlés. Les mesures initiales de performance restent des diagnostics locaux.
+
+[Rapport et limites](../revue/implementation-photos-2026-10-15.md) ·
+[Catalogue, commandes et preuves CI](../photographies.md).
+Cette recette ne clôt ni les préalables L5/Q.A/M.C ni les contrôles humains L6.

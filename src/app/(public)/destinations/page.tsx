@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { photoDuPays } from "@/lib/photographies";
 import { SourceNote } from "@/components/ui/SourceNote";
 import { fichesPubliees } from "@/server/lecture/destinations";
 
@@ -53,8 +55,8 @@ export default async function PageDestinations() {
           Destinations couvertes
         </h1>
         <p className="text-pretty text-16 text-ink-700">
-          Les procédures dont nous suivons les règles. Chacune dit ce qu&apos;il
-          faut prouver, et d&apos;où vient l&apos;information.
+          Les procédures dont nous suivons les règles. Chacune dit ce qu&apos;il faut prouver, et
+          d&apos;où vient l&apos;information.
         </p>
       </div>
 
@@ -68,24 +70,27 @@ export default async function PageDestinations() {
             <li key={fiche.slug}>
               <Link
                 href={`/destinations/${fiche.slug}`}
-                className="flex flex-col gap-2 rounded-lg border border-ink-300 p-5 hover:bg-ink-100"
+                className="flex items-start gap-4 rounded-lg border border-ink-300 p-5 hover:bg-ink-100"
               >
-                <span className="flex flex-wrap items-center gap-2.5">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-9 w-9 flex-none items-center justify-center rounded-sm bg-ink-100 font-mono text-13 text-ink-700"
-                  >
-                    {fiche.code}
-                  </span>
-                  {/* Le pays et l'intitulé, jamais le pays seul : deux
+                <PhotoPublique photo={photoDuPays(fiche.code)} format="vignette" decorative />
+                <span className="flex min-w-0 flex-1 flex-col gap-2">
+                  <span className="flex flex-wrap items-center gap-2.5">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-9 w-9 flex-none items-center justify-center rounded-sm bg-ink-100 font-mono text-13 text-ink-700"
+                    >
+                      {fiche.code}
+                    </span>
+                    {/* Le pays et l'intitulé, jamais le pays seul : deux
                       procédures du même pays donneraient deux cartes
                       indistinguables (défaut déjà corrigé sur l'accueil). */}
-                  <span className="text-19 font-semibold text-accent-600">{fiche.pays}</span>
-                  <span className="text-pretty text-14 text-ink-700">{fiche.intitule}</span>
-                </span>
-                <span className="text-pretty text-14 text-ink-700">{fiche.resume}</span>
-                <span className="text-13 text-ink-500">
-                  {fiche.piecesAReunir} pièces à réunir
+                    <span className="text-19 font-semibold text-accent-600">{fiche.pays}</span>
+                    <span className="text-pretty text-14 text-ink-700">{fiche.intitule}</span>
+                  </span>
+                  <span className="text-pretty text-14 text-ink-700">{fiche.resume}</span>
+                  <span className="text-13 text-ink-500">
+                    {fiche.piecesAReunir} pièces à réunir
+                  </span>
                 </span>
               </Link>
             </li>
@@ -95,8 +100,8 @@ export default async function PageDestinations() {
 
       {mention ? (
         <SourceNote {...mention}>
-          ImmiPro compare des exigences publiées. La décision appartient à
-          l&apos;administration du pays de destination.
+          ImmiPro compare des exigences publiées. La décision appartient à l&apos;administration du
+          pays de destination.
         </SourceNote>
       ) : null}
     </div>

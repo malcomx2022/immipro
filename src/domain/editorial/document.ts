@@ -70,6 +70,10 @@ export const estPublic = (etat: EtatDocument): boolean => etat === "PUBLIE";
  * pour lui, avec ses règles ; ajouter un sixième type ici en attendant
  * ferait entrer l'image par la porte de service.
  *
+ * S.179 (15/10/2026) : photographies de tête et vignettes autorisées par
+ * catalogue local validé, en dehors du corps. Aucun nouveau type de bloc,
+ * téléversement ou URL libre n'est introduit par cette extension.
+ *
  * L'union est fermée, et trois choses la tiennent : elle refuse un type
  * inconnu, aucun texte n'est rendu en HTML — React échappe tout — et
  * l'appel à l'action n'accepte qu'une adresse interne. Des tests les

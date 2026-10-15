@@ -1,3 +1,5 @@
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { photoEditoriale } from "@/lib/photographies";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlocsEditoriaux } from "@/components/ui/BlocsEditoriaux";
@@ -29,11 +31,7 @@ export async function generateMetadata({
   return { title: article.titre, description: article.chapeau };
 }
 
-export default async function PageArticle({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function PageArticle({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const article = await documentPublie("ARTICLE", slug);
   if (!article) notFound();
@@ -67,6 +65,8 @@ export default async function PageArticle({
 
       <p className="text-pretty text-19 text-ink-900">{article.chapeau}</p>
 
+      <PhotoPublique photo={photoEditoriale("ARTICLE", article.slug)} />
+
       <BlocsEditoriaux blocs={article.corps.blocs} />
 
       <section className="flex flex-col items-start gap-3 rounded-lg bg-ink-100 p-5">
@@ -75,9 +75,7 @@ export default async function PageArticle({
         <LienBouton href={article.corps.appel.href}>{article.corps.appel.action}</LienBouton>
       </section>
 
-      <SourceNote {...article.mention}>
-        {article.mentionSuite}
-      </SourceNote>
+      <SourceNote {...article.mention}>{article.mentionSuite}</SourceNote>
     </article>
   );
 }

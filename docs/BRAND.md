@@ -126,3 +126,22 @@ Tous les SVG sont autonomes : aucune police à installer, aucun lien externe, au
 1. **Dépôt de marque.** Avant l'immatriculation de la SAS, vérifier la disponibilité de « ImmiPro » à l'INPI et à l'EUIPO en classes 42 et 45, ainsi que la disponibilité du nom de domaine.
 2. **Licence Inter.** Inter est sous licence SIL Open Font, libre d'usage commercial, y compris pour un logo. Les lettres étant converties en tracés, aucune redistribution de la police n'a lieu.
 3. **Déclinaison d'usage sombre.** À produire quand le mode sombre de l'application sera arbitré.
+
+
+## Photographie publique — validation du 15 octobre 2026 (S.179)
+
+Bibliothèque générée par IA, sélectionnée puis validée par le responsable :
+préparation, accompagnement, accueil, Pays-Bas et Suisse. Lumière naturelle,
+blanc dominant et touches bleues du système ; adultes représentatifs de la
+cible d'Afrique de l'Ouest. Aucune scène ne vaut portrait d'équipe, témoignage
+client, identité professionnelle ou preuve d'un établissement réel.
+
+Accueil : photo latérale sur bureau, après le simulateur sur mobile.
+Fiches destination : après la source et sa date ; guides et articles : après
+le chapeau ; listes : vignettes décoratives associées au sujet. Une grande
+photo au maximum par page publique. Pas de photographie décorative dans le
+paiement, les formulaires, le dossier ou l'administration.
+
+Le logo demeure dans son SVG original, distinct des photos. L'association
+pays/article est explicite et les sources/publications restent prioritaires.
+[Règles, fichiers et recette](photographies.md).
