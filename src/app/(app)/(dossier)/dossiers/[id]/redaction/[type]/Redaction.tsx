@@ -174,6 +174,21 @@ export function Redaction({
 
   /** Le texte en cours de réécriture. Il part de la version courante. */
   const [brouillon, setBrouillon] = useState(courante ? texteDeLaVersion(courante) : "");
+  /*
+    Et il la suit (REV11-L6, 15/10/2026). Après « Proposer un premier
+    texte », la version produite arrivait par `router.refresh()` dans la
+    colonne des versions, débitée, mais le champ restait vide : le texte
+    partait de la version courante au premier rendu seulement, et rien ne le
+    rattrapait tant que la page n'était pas rechargée. Ajusté au rendu, sur
+    le rang de la version courante, comme C-08 le fait pour son analyse :
+    une version nouvelle — proposée, enregistrée ou restaurée — devient le
+    texte à reprendre.
+  */
+  const [rangSuivi, setRangSuivi] = useState(courante?.rang ?? 0);
+  if ((courante?.rang ?? 0) !== rangSuivi) {
+    setRangSuivi(courante?.rang ?? 0);
+    setBrouillon(courante ? texteDeLaVersion(courante) : "");
+  }
   const [envoi, setEnvoi] = useState("");
   const manque = obstacleALEnregistrement(brouillon, courante);
 

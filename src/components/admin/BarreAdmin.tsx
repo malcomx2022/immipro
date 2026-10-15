@@ -13,9 +13,15 @@ import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
  * de données.
  *
  * Registre outil interne : densité élevée, mêmes jetons que l'espace
- * candidat, accent réservé à l'action principale et à la sélection. Desktop
- * seul — ces écrans ne sont pas prototypés en 390 px, et une file de veille
- * au pouce n'aurait pas de sens.
+ * candidat, accent réservé à l'action principale et à la sélection. Pensé
+ * pour le bureau — ces écrans ne sont pas prototypés en 390 px, et une file
+ * de veille au pouce n'aurait pas de sens.
+ *
+ * Sous `md`, la colonne de navigation ne reste pourtant pas une colonne
+ * (REV11-L7) : à 390 px, ses 232 px laissaient 158 px au contenu, et B-07
+ * débordait de 146 px avant même d'afficher une métrique. La navigation
+ * passe au-dessus du contenu, ses entrées se replient en ligne ; au bureau,
+ * rien ne change.
  */
 export interface BarreAdminProps {
   /** Nom de l'opérateur connecté. Jamais un nom écrit en dur. */
@@ -27,12 +33,12 @@ export interface BarreAdminProps {
 
 export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdminProps) {
   return (
-    <div className="flex min-h-screen bg-ink-100">
+    <div className="flex min-h-screen flex-col bg-ink-100 md:flex-row">
       <SkipLink cible="contenu" />
 
       <nav
         aria-label="Navigation du back-office"
-        className="flex w-nav-admin flex-none flex-col gap-6 border-r border-ink-300 bg-white p-4"
+        className="flex flex-col gap-4 border-b border-ink-300 bg-white p-4 md:w-nav-admin md:flex-none md:gap-6 md:border-b-0 md:border-r"
       >
         <Link href="/veille" className="inline-flex items-center px-2">
           <Image
@@ -44,7 +50,7 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
             unoptimized
           />
         </Link>
-        <ul className="flex flex-col gap-0.5">
+        <ul className="flex flex-wrap gap-1 md:flex-col md:gap-0.5">
           {NAVIGATION_ADMIN.map((entree) => (
             <li key={entree.href}>
               <LienDeNavigation
@@ -57,7 +63,7 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
             </li>
           ))}
         </ul>
-        <div className="mt-auto flex items-center gap-2.5 rounded-md bg-ink-100 p-3">
+        <div className="flex items-center gap-2.5 rounded-md bg-ink-100 p-3 md:mt-auto">
           <span
             aria-hidden="true"
             className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white text-13 font-semibold text-ink-700"

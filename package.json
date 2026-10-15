@@ -66,7 +66,8 @@
     "db:studio": "prisma studio",
     "seed:demo": "tsx --env-file-if-exists=.env prisma/seed/demonstration.ts",
     "seed:editorial": "tsx --env-file-if-exists=.env prisma/seed/editorial.ts",
-    "test:photos": "playwright test"
+    "test:photos": "playwright test",
+    "test:parcours": "playwright test --config playwright.parcours.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

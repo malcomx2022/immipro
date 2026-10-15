@@ -17,6 +17,12 @@
  * préchargeur interdisant les autres destinations HTTP. Aucune qualification
  * commerciale ; les identifiants du parent restent écartés.
  *
+ * Option `--stockage-public https://localhost:<port>` (L6) : l'adresse que
+ * le serveur signe et que le navigateur joint pour déposer, quand un relais
+ * HTTPS local la sert devant le faux stockage — WebKit relève sinon le PUT
+ * présigné vers https. Boucle locale seulement ; le worker garde l'adresse
+ * interne.
+ *
  * Par défaut, ce que le banc **ne simule pas** : la lecture par le modèle (aucune clé :
  * la pièce part en revue humaine, comme en production sans fournisseur),
  * le paiement (aucun rail : l'achat le dit), nginx et ses certificats. Les
@@ -45,6 +51,13 @@ const arg = (nom: string, defaut: string) => {
 };
 const PORT = Number(arg("port", "3100"));
 const BASE = arg("base", "immipro_recette");
+const STOCKAGE_PUBLIC = arg("stockage-public", "");
+if (STOCKAGE_PUBLIC && !/^https:\/\/(localhost|127\.0\.0\.1):\d+$/u.test(STOCKAGE_PUBLIC)) {
+  console.error(
+    "✗ --stockage-public doit être une adresse https de la boucle locale, avec son port.",
+  );
+  process.exit(2);
+}
 if (!/^immipro_recette\w*$/u.test(BASE)) {
   console.error(
     "✗ --base doit commencer par immipro_recette : le banc supprime cette base à chaque lancement.",
@@ -136,7 +149,9 @@ async function demarrer(): Promise<void> {
   etape("Services simulés");
   const stockage = await demarrerUnFauxStockage();
   fermetures.push(stockage.arreter);
-  console.log(`  ✓ stockage S3 : http://localhost:${stockage.port}`);
+  console.log(
+    `  ✓ stockage S3 : http://localhost:${stockage.port}${STOCKAGE_PUBLIC ? ` — présigné pour ${STOCKAGE_PUBLIC}` : ""}`,
+  );
 
   const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
   const antivirus = createServer((requete, reponse) => {
@@ -209,7 +224,7 @@ async function demarrer(): Promise<void> {
     MINIO_ROOT_PASSWORD: "essai-mot-de-passe",
     MINIO_BUCKET_DOCUMENTS: "immipro-documents",
     MINIO_BUCKET_QUARANTAINE: "immipro-quarantaine",
-    MINIO_PUBLIC_URL: `http://localhost:${stockage.port}`,
+    MINIO_PUBLIC_URL: STOCKAGE_PUBLIC || `http://localhost:${stockage.port}`,
     ANTIVIRUS_URL: `http://127.0.0.1:${portAntivirus}/scan`,
     SMTP_URL: `smtp://127.0.0.1:${portSmtp}`,
     SMTP_FROM: "recette@immipro.test",
