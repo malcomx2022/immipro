@@ -24,7 +24,9 @@ export default defineConfig({
   outputDir: "test-results/photographies",
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   use: {
-    baseURL: "http://localhost:3172",
+    baseURL: "https://localhost:3173",
+    // Certificat éphémère du seul proxy local de recette, jamais en production.
+    ignoreHTTPSErrors: true,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -40,12 +42,22 @@ export default defineConfig({
       },
     })),
   ),
-  webServer: {
-    command:
-      "mkdir -p .recette && npm run recette:banc -- --port 3172 --base immipro_recette_photos > .recette/photos-banc.log 2>&1",
-    url: "http://localhost:3172",
-    timeout: 120_000,
-    reuseExistingServer: false,
-    gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
-  },
+  webServer: [
+    {
+      command:
+        "mkdir -p .recette && npm run recette:banc -- --port 3172 --base immipro_recette_photos > .recette/photos-banc.log 2>&1",
+      url: "http://localhost:3172",
+      timeout: 120_000,
+      reuseExistingServer: false,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
+    },
+    {
+      command: "node tests/photographies/https-local.mjs",
+      url: "https://localhost:3173",
+      ignoreHTTPSErrors: true,
+      timeout: 15_000,
+      reuseExistingServer: false,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
+    },
+  ],
 });

@@ -97,6 +97,7 @@ npx prisma generate
 npm run check
 npm run check:audit
 npm run build
+# OpenSSL est requis pour le certificat local éphémère.
 npx playwright install --with-deps chromium firefox webkit
 # DATABASE_URL doit désigner un serveur PostgreSQL local de recette.
 npm run test:photos
@@ -107,6 +108,13 @@ lancement. Le banc crée/recrée `immipro_recette_photos` sur ce serveur,
 lance le vrai standalone et son worker, puis ferme ses processus/services.
 S3, antivirus et SMTP sont locaux ; aucun fournisseur IA/paiement n'est branché.
 Ne pas utiliser une base de travail à conserver sous ce nom.
+
+Le navigateur accède au banc via `https://localhost:3173`, un proxy de recette
+vers le standalone local sur 3172. OpenSSL crée un certificat éphémère supprimé
+à l'arrêt ; Playwright accepte ce seul certificat local non signé. La CSP de
+production, notamment `upgrade-insecure-requests`, reste intacte et vérifiée.
+WebKit la respecte aussi sur localhost : une recette HTTP seule bloquerait ses
+scripts, styles et images. Aucun réglage de sécurité de production n'est changé.
 
 Pour Chromium système installé localement :
 

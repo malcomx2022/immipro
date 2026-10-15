@@ -31,6 +31,11 @@ SVG/pictogrammes. Les tests éditoriaux historiques restent inchangés.
   conservée, contenu retiré/brouillon refusé, image absente sans cadre vide.
 - La porte commune exécute les 84 scénarios sur les trois navigateurs et les
   deux dimensions. Son verdict et son artefact sont attachés à la PR.
+- La première CI a révélé que WebKit applique la CSP HTTPS aussi sur localhost :
+  le banc navigateur utilise désormais un proxy HTTPS local à certificat
+  éphémère, sans assouplir la CSP de production. L'attente du décodage des images
+  différées est explicite ; les deux rendus d'accueil passent aussi en HTTPS
+  local sous Chromium. La CI doit confirmer tous les profils sur ce montage.
 - Mesures initiales de LCP/CLS et transfert, puis relevé après défilement
   conservés avec les captures ; ce sont des diagnostics de laboratoire.
 

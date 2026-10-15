@@ -49,6 +49,7 @@ for (const [route, principale] of pages) {
     });
     const reponse = await page.goto(route, { waitUntil: "networkidle" });
     expect(reponse?.status()).toBe(200);
+    expect(reponse?.headers()["content-security-policy"]).toContain("upgrade-insecure-requests");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const initial = await page.evaluate(() => ({
       navigateur: (window as Window & { mesurePhotos?: { lcp: number | null; cls: number | null } })
