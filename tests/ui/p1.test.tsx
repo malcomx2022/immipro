@@ -1312,6 +1312,55 @@ describe("T-06 — Services partenaires", () => {
  * Le champ n'apparaissait qu'après une première mise en forme par le
  * service : sans elle, aucune pièce ne s'écrivait dans l'application.
  */
+/**
+ * REV11-L6, 15/10/2026 — reproduit par la recette navigateur : après
+ * « Proposer un premier texte », la version produite arrivait dans la
+ * colonne des versions, débitée, et le champ « Ton texte » restait vide
+ * jusqu'à un rechargement complet. Le texte à reprendre suit la version
+ * courante quand elle change ; il ne bouge pas quand elle ne change pas.
+ */
+describe("R-03 — l'éditeur suit la version courante", () => {
+  const version = (rang: number, texte: string) => ({
+    rang,
+    enregistreeLe: "2026-10-15T09:00:00.000Z",
+    paragraphes: [{ section: "Projet", texte }],
+    motif: rang === 1 ? "Texte proposé à partir de tes réponses" : "Réécriture",
+  });
+  const rendre = (versions: ReturnType<typeof version>[]) => (
+    <Redaction
+      dossier={DOSSIER}
+      piece={MOTIVATION}
+      reponsesEnregistrees={{ 0: "Une.", 1: "Deux.", 2: "Trois.", 3: "Quatre." }}
+      versions={versions}
+      redactionDisponible
+      redactionAssistee
+      maintenant={MAINTENANT}
+    />
+  );
+
+  it("remplit le champ avec le texte proposé quand la première version arrive", () => {
+    const { rerender } = render(rendre([]));
+    fireEvent.click(screen.getByRole("button", { name: "Écrire directement dans l'éditeur" }));
+    expect((screen.getByLabelText("Ton texte") as HTMLTextAreaElement).value).toBe("");
+    rerender(rendre([version(1, "Madame, Monsieur, voici le texte proposé.")]));
+    expect((screen.getByLabelText("Ton texte") as HTMLTextAreaElement).value).toContain(
+      "Madame, Monsieur, voici le texte proposé.",
+    );
+  });
+
+  it("ne reprend pas une saisie en cours tant que la version courante ne change pas", () => {
+    const { rerender } = render(rendre([version(1, "Texte de la version 1.")]));
+    const champ = screen.getByLabelText("Ton texte") as HTMLTextAreaElement;
+    fireEvent.change(champ, { target: { value: "Une reprise en cours, pas encore enregistrée." } });
+    rerender(rendre([version(1, "Texte de la version 1.")]));
+    expect(champ.value).toBe("Une reprise en cours, pas encore enregistrée.");
+    rerender(rendre([version(1, "Texte de la version 1."), version(2, "Texte restauré ou enregistré.")]));
+    expect((screen.getByLabelText("Ton texte") as HTMLTextAreaElement).value).toContain(
+      "Texte restauré ou enregistré.",
+    );
+  });
+});
+
 describe("R-03 et R-04 — la rédaction assistée réservée à Dossier et Pro", () => {
   it("l'éditeur garde le champ, ne propose aucune mise en forme, et mène aux packs", () => {
     render(

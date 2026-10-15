@@ -58,6 +58,17 @@ import {
  * `COMMANDES_ATTENDUES`, parce qu'elle pose une question de fond : un
  * plafond réglable depuis un écran est un plafond qu'on relève le jour où
  * il gêne, c'est-à-dire le jour où il sert.
+ *
+ * ── Ce que l'écran faisait à 390 px (REV11-L2, repris en L7) ──────────
+ *
+ * Il débordait de 146 px dans Chromium : la colonne de navigation prenait
+ * 232 des 390 px, puis cinq métriques se partageaient le reste, le
+ * formulaire d'export posait deux champs de date côte à côte, et les seuils
+ * des garde-fous refusaient de passer à la ligne. Les cinq colonnes
+ * attendent désormais `lg`, les champs d'export prennent la largeur sous
+ * `sm`, et les lignes des garde-fous et des dépassements s'empilent sous
+ * `md`, comme celles des fournisseurs. La mesure réelle est celle du banc ;
+ * jsdom ne vérifie que les classes qui l'interdisaient.
  */
 export interface CoutsIaProps {
   metriques: readonly Metrique[];
@@ -111,7 +122,7 @@ export function CoutsIa({
         }
       />
 
-      <div className="flex flex-col gap-5 p-6">
+      <div className="flex flex-col gap-5 p-4 md:p-6">
         {aRapprocher > 0 ? (
           <section role="alert" className="flex flex-col gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
             <h2 className="text-16 font-semibold text-ink-900">Consommation à rapprocher</h2>
@@ -145,7 +156,7 @@ export function CoutsIa({
           <ExportDesAppels duParDefaut={periodeExport.du} auParDefaut={periodeExport.au} />
         ) : null}
 
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {metriques.map((m) => (
             <div
               key={m.cle}
@@ -202,9 +213,9 @@ export function CoutsIa({
                 {audela.map((d) => (
                   <li
                     key={`${d.dossierId}-${d.nature}`}
-                    className="flex items-baseline justify-between gap-6 border-t border-ink-300 py-2.5"
+                    className="flex flex-col gap-1 border-t border-ink-300 py-2.5 md:flex-row md:items-baseline md:justify-between md:gap-6"
                   >
-                    <span className="font-mono text-13 text-ink-700">{d.dossierId}</span>
+                    <span className="break-all font-mono text-13 text-ink-700">{d.dossierId}</span>
                     <span className="text-14 text-ink-900">{libelleDepassement(d)}</span>
                   </li>
                 ))}
@@ -226,7 +237,7 @@ export function CoutsIa({
             {GARDE_FOUS.map((g) => (
               <div
                 key={g.libelle}
-                className="flex items-baseline justify-between gap-6 border-t border-ink-300 py-2.5"
+                className="flex flex-col gap-1 border-t border-ink-300 py-2.5 md:flex-row md:items-baseline md:justify-between md:gap-6"
               >
                 <dt className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-14 text-ink-900">{g.libelle}</span>
@@ -246,7 +257,7 @@ export function CoutsIa({
                     </>
                   )}
                 </dt>
-                <dd className="whitespace-nowrap text-14 font-medium text-ink-900">
+                <dd className="text-14 font-medium text-ink-900 md:whitespace-nowrap">
                   {g.seuil}
                 </dd>
               </div>

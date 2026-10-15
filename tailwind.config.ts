@@ -93,7 +93,10 @@ export default {
       },
       minWidth: { touch: "44px", tableau: "640px", "tableau-large": "840px" },
       maxHeight: { feuille: "85vh" },
+      aspectRatio: { photo: "3 / 2", "photo-mobile": "4 / 3", "photo-accueil": "4 / 5" },
+      objectPosition: { "photo-accueil": "44% 50%", "photo-preparation": "60% 50%", "photo-pays": "37% 45%" },
       gridTemplateColumns: {
+        "accueil-photo": "minmax(0, 1.4fr) minmax(0, 1fr)",
         // Les tableaux du back-office, en largeur de bureau.
         // B-05, revue des pièces : pièce, dossier, attente, motif.
         revue: "1fr 1.4fr 6rem 1fr",

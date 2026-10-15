@@ -65,7 +65,9 @@
     "db:garde-fous": "node scripts/garde-fous.mjs",
     "db:studio": "prisma studio",
     "seed:demo": "tsx --env-file-if-exists=.env prisma/seed/demonstration.ts",
-    "seed:editorial": "tsx --env-file-if-exists=.env prisma/seed/editorial.ts"
+    "seed:editorial": "tsx --env-file-if-exists=.env prisma/seed/editorial.ts",
+    "test:photos": "playwright test",
+    "test:parcours": "playwright test --config playwright.parcours.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -82,6 +84,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",

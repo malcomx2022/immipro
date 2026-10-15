@@ -13676,3 +13676,76 @@ Le banc sans option conserve l'absence d'IA/paiement et ses gardes S.170.
 Pas de fournisseur commercial éprouvé, pas de levée L5/Q.A/M.C, pas de fusion
 ou déploiement par cette proposition. L6 demeure ouverte tant que ses critères
 navigateur, accessibilité et tous les gestes de la matrice ne sont pas couverts.
+
+
+## S.179 — Photographies publiques validées : huit familles, cinq scènes
+
+**Décision du responsable, 15/10/2026.** Trois premiers placements validés,
+puis extension accueil/catalogues/guides/articles, inventaire de 62 gabarits,
+cinq scènes et variantes mobile/bureau ; instruction explicite d'implémenter
+et d'exécuter les tests. Base `de85961`, #288/L6 fusionnée, aucune correction
+Claude antérieure retirée. Numéro libre à la relecture du main.
+
+Accueil : photo à droite sur bureau, après les champs et le bouton sur mobile ;
+le simulateur et S.164 sont conservés. Une grande photo maximum par page publique,
+vignettes sur les listes, SVG dans le dossier/paiement et administration.
+Logo SVG inchangé. Les images générées ne deviennent pas des portraits réels.
+
+Catalogue local, associations explicites pays/slug, dimensions réservées et
+points focaux en jetons. Aucune URL extérieure, migration, nouveau type de
+bloc ou upload B-08 ; P.C reste fermé sur ces points. Une association ne publie
+aucune règle/guide/article, les gardes INV-4/8 et dates restent celles de Claude.
+Aucun appel IA d'exécution ni débit L5. Repli sans média pour sujet inconnu.
+
+[Spécification](../photographies.md), [validation et limites](../revue/implementation-photos-2026-10-15.md).
+La porte commune ajoute la recette réelle Chromium/Firefox/WebKit × mobile/bureau.
+Cette livraison ne certifie pas les critères L5/L6 encore ouverts et ne fusionne
+ou déploie rien automatiquement.
+
+
+## S.180 — L6, L7, L9 et vérification documentaire L5 : finalisation sans préalable levé
+
+**Instruction du responsable, 15/10/2026.** Finaliser les cinq lots restants
+(L5 à L9), le développement se faisant en parallèle avec un autre outil,
+Claude Code gardant la main. Base `552312f` (#289/S.179 fusionnée) ; PR
+ouvertes #290, #291, #292 (Dependabot, porte verte), relues et non reprises.
+Consignes, DOC-11/12, registre S.176–S.179 et code Claude relus avant toute
+modification ; numéro libre à la relecture du main.
+
+**L6 — recette des parcours authentifiés dans la porte.** `npm run
+test:parcours` : quinze scénarios par profil sur Chromium, Firefox et WebKit
+× 390/1 440 px, vraie application, vrai worker, base jetable, fournisseurs
+scriptés seulement. Le relais HTTPS de S.179 sert aussi le stockage présigné
+(`--stockage-public`), sans quoi WebKit n'aboutit aucun dépôt ; CSP intacte.
+Préconditions explicites limitées au candidat synthétique : lettre facultative
+(S.178) et dossier prêt pour WF-10. Deux défauts reproduits et corrigés avec
+tests : l'éditeur ne suivait pas la version produite (RG-08.4) ; le
+dénominateur du compteur comptait les analyses rendues (« 1 sur 11 »,
+RG-06.5/INV-6). Back-office joué au bureau. Lecteur d'écran humain,
+préproduction, gestes non rejoués et signature restent au responsable.
+
+**L7 — B-07 à 390 px.** Reproduit à 536 px ; navigation du back-office
+empilée sous `md`, métriques sur deux colonnes sous `lg`, export pleine
+largeur sous `sm`, lignes des garde-fous et dépassements empilées. Mesuré
+390 px après, bureau inchangé, trois tests jsdom (motif S.162). `/paiements`
+mesure encore 396 px ; diagnostics, sauvegardes et contrôles de services sur
+le VPS non exécutés.
+
+**L5 — vérification documentaire, sans appel ni clé.** `gemini-3.8-flash`
+GA depuis le 02/09/2026, retrait pas avant 09/2027, PDF/images acceptés ;
+la page des déploiements inclut `europe-west1`, la fiche du modèle ne cite
+que `global`/`us`/`eu` ; tarif lu seulement par des tiers, non retenu.
+Région et tarif à confirmer par le responsable avant tout appel payant ;
+aucune substitution décidée ici. L5 reste ouvert.
+
+**L9.** Les trois PR Dependabot sont fusionnables au jugement du
+responsable (#290 à vérifier au démarrage à froid suivant). Audit :
+exception `deepmerge-ts` maintenue (Prisma 7.10 l'épingle) ; quatre
+modérées tenues par `minio` 8.0.7, dernière version, à suivre. CLAUDE.md,
+matrice, suivi L6 et DOC-11 harmonisés avec les preuves réelles.
+
+**Éprouvé.** `npm run check` (dont trois tests jsdom L7, deux tests
+éditeur, trois tests du compteur), `check:audit`, build app/worker, recette
+six profils et preuves dans [le suivi](../revue/lot-l6-l9-2026-10-15.md).
+Aucune fusion, déploiement, drapeau commercial, levée Q.A/M.C ni L8 par ce
+lot ; les reports V2 et A-1 à A-3 sont inchangés.

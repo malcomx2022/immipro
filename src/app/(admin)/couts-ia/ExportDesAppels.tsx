@@ -62,6 +62,8 @@ export function ExportDesAppels({ duParDefaut, auParDefaut }: { duParDefaut: str
         </p>
       </div>
 
+      {/* Sous `sm`, les deux dates et le bouton prennent la largeur (L7) :
+          posés côte à côte, les champs sortaient de l'écran à 390 px. */}
       <div className="flex flex-wrap items-start gap-3">
         <Input
           libelle="Du"
@@ -69,6 +71,7 @@ export function ExportDesAppels({ duParDefaut, auParDefaut }: { duParDefaut: str
           value={du}
           onChange={(e) => setDu(e.target.value)}
           disabled={envoi}
+          classNameChamp="w-full sm:w-auto"
         />
         <Input
           libelle="Au"
@@ -76,10 +79,13 @@ export function ExportDesAppels({ duParDefaut, auParDefaut }: { duParDefaut: str
           value={au}
           onChange={(e) => setAu(e.target.value)}
           disabled={envoi}
+          classNameChamp="w-full sm:w-auto"
         />
-        <div className="self-end">
+        <div className="w-full sm:w-auto sm:self-end">
           <Button
             variante="secondaire"
+            pleineLargeur
+            className="sm:w-auto"
             disabled={envoi || obstacle !== null}
             raisonDesactivation={envoi ? "Préparation du fichier en cours." : (obstacle ?? "")}
             onClick={exporter}

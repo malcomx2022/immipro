@@ -1,3 +1,5 @@
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { photoEditoriale } from "@/lib/photographies";
 import Link from "next/link";
 import {
   CHAPEAU_RUBRIQUE,
@@ -24,13 +26,7 @@ import { jourEnFrancais } from "@/domain/format/moment";
  * en pied de page du document ; la rubrique la remonte, pour qu'on choisisse
  * quoi lire sur le bon critère.
  */
-export function Rubrique({
-  genre,
-  entetes,
-}: {
-  genre: GenreDocument;
-  entetes: readonly EnTete[];
-}) {
+export function Rubrique({ genre, entetes }: { genre: GenreDocument; entetes: readonly EnTete[] }) {
   const base = genre === "GUIDE" ? "/guides" : "/articles";
 
   return (
@@ -58,23 +54,30 @@ export function Rubrique({
             <li key={entete.slug} className="border-b border-ink-300 last:border-0">
               <Link
                 href={`${base}/${entete.slug}`}
-                className="flex flex-col gap-1.5 py-5 hover:bg-ink-100"
+                className="flex items-start gap-4 py-5 hover:bg-ink-100"
               >
-                <span className="font-mono text-13 uppercase tracking-wider text-ink-500">
-                  {entete.surtitre} · {entete.dureeLecture}
-                </span>
-                <span className="text-pretty text-19 font-semibold text-accent-600">
-                  {entete.titre}
-                </span>
-                <span className="text-pretty text-14 text-ink-700">{entete.chapeau}</span>
-                {dateDeLaRubrique(entete) ? (
-                  <span className="text-13 text-ink-500">
-                    {DATE_AFFICHEE[genre].libelle}{" "}
-                    <time dateTime={dateDeLaRubrique(entete)}>
-                      {jourEnFrancais(dateDeLaRubrique(entete))}
-                    </time>
+                <PhotoPublique
+                  photo={photoEditoriale(genre, entete.slug)}
+                  format="vignette"
+                  decorative
+                />
+                <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="font-mono text-13 uppercase tracking-wider text-ink-500">
+                    {entete.surtitre} · {entete.dureeLecture}
                   </span>
-                ) : null}
+                  <span className="text-pretty text-19 font-semibold text-accent-600">
+                    {entete.titre}
+                  </span>
+                  <span className="text-pretty text-14 text-ink-700">{entete.chapeau}</span>
+                  {dateDeLaRubrique(entete) ? (
+                    <span className="text-13 text-ink-500">
+                      {DATE_AFFICHEE[genre].libelle}{" "}
+                      <time dateTime={dateDeLaRubrique(entete)}>
+                        {jourEnFrancais(dateDeLaRubrique(entete))}
+                      </time>
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             </li>
           ))}

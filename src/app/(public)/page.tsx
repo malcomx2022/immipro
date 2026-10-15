@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { PHOTOS, photoDuPays } from "@/lib/photographies";
 import type { Metadata } from "next";
 import { Card } from "@/components/ui/Card";
 import { SourceNote } from "@/components/ui/SourceNote";
@@ -44,8 +46,7 @@ const PROMESSES = [
   },
   {
     titre: "Ton dossier, pièce par pièce",
-    texte:
-      "Une checklist par destination, et ce qu'il faut corriger sur chaque document.",
+    texte: "Une checklist par destination, et ce qu'il faut corriger sur chaque document.",
   },
   {
     titre: "Paiement Mobile Money",
@@ -58,15 +59,18 @@ export default async function Accueil() {
 
   return (
     <div className="mx-auto flex w-full max-w-gabarit flex-col gap-12 px-4 py-8 md:px-12 md:py-12">
-      <section className="flex flex-col gap-6 md:max-w-decision">
-        <h1
-          id="contenu"
-          tabIndex={-1}
-          className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-44"
-        >
-          Où peux-tu étudier ou travailler&nbsp;?
-        </h1>
-        <AccueilSimulateur />
+      <section className="flex flex-col gap-6 md:grid md:grid-cols-accueil-photo md:items-start md:gap-12">
+        <div className="flex min-w-0 flex-col gap-6">
+          <h1
+            id="contenu"
+            tabIndex={-1}
+            className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-44"
+          >
+            Où peux-tu étudier ou travailler&nbsp;?
+          </h1>
+          <AccueilSimulateur />
+        </div>
+        <PhotoPublique photo={PHOTOS.accueil} format="accueil" />
       </section>
 
       {destinations.length > 0 ? (
@@ -76,12 +80,21 @@ export default async function Accueil() {
             {destinations.map(({ fiche, cout, fenetre }) => (
               <Card key={fiche.slug} variante="bordure">
                 <div className="flex items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-ink-100 font-mono text-13 text-ink-700"
-                  >
-                    {fiche.code}
-                  </span>
+                  {photoDuPays(fiche.code) ? (
+                    <PhotoPublique
+                      photo={photoDuPays(fiche.code)}
+                      format="vignette"
+                      decorative
+                      className="h-18 w-24 md:h-18 md:w-24"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-ink-100 font-mono text-13 text-ink-700"
+                    >
+                      {fiche.code}
+                    </span>
+                  )}
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <Link
                       href={`/destinations/${fiche.slug}`}
@@ -100,9 +113,7 @@ export default async function Accueil() {
               </Card>
             ))}
           </div>
-          {mention ? (
-            <SourceNote {...mention} />
-          ) : null}
+          {mention ? <SourceNote {...mention} /> : null}
         </section>
       ) : (
         /* Règle 6 de la doctrine d'erreur : dire pourquoi rien n'est affiché.
@@ -113,9 +124,9 @@ export default async function Accueil() {
             Aucune destination n&apos;est publiée en ce moment
           </h2>
           <p className="text-pretty text-14 text-ink-700">
-            Les fiches sont retirées de l&apos;affichage dès que leur date de
-            relecture est dépassée : mieux vaut rien qu&apos;une exigence peut-être
-            périmée. Le simulateur ci-dessus reste utilisable.
+            Les fiches sont retirées de l&apos;affichage dès que leur date de relecture est dépassée
+            : mieux vaut rien qu&apos;une exigence peut-être périmée. Le simulateur ci-dessus reste
+            utilisable.
           </p>
         </section>
       )}
@@ -130,8 +141,7 @@ export default async function Accueil() {
       </section>
 
       <p className="text-pretty text-14 text-ink-500">
-        ImmiPro prépare ton dossier. La décision appartient aux autorités du pays
-        de destination.
+        ImmiPro prépare ton dossier. La décision appartient aux autorités du pays de destination.
       </p>
     </div>
   );

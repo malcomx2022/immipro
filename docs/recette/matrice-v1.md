@@ -80,6 +80,19 @@ par appel et incidents éprouvés sur HTTP local Anthropic/compatible.
 Aucun fournisseur réel, DPA, région, coût facturé ou configuration déployée
 qualifié. Les lignes dépendantes d'un service réel restent non vérifiées.
 
+**S.180 / L6-L7-L9, proposition du 15/10.** Les parcours authentifiés
+entrent dans la porte commune : `npm run test:parcours`, quinze scénarios
+par profil sur Chromium, Firefox et WebKit × 390/1 440 px, vraie
+application, vrai worker, base jetable, fournisseurs scriptés seulement.
+Inscription, achat scripté, dépôt et lecture, coupure, réponse tardive,
+signalement et décision B-05, lecture sans mesure, consentement retiré,
+rédaction, double onglet, quota épuisé et reprise gratuite, dépôt déclaré,
+clôture. B-07 ne déborde plus à 390 px. Deux défauts reproduits et
+corrigés : éditeur qui ne suivait pas la version produite, dénominateur du
+compteur gonflé par un rendu. [Preuves et limites](../revue/lot-l6-l9-2026-10-15.md).
+Aucun fournisseur réel ni encaissement ; lecteur d'écran humain,
+préproduction et signature restent à faire.
+
 **S.178 / L6, proposition du 12/10.** Gestes candidat automatisés dans Chromium
 390/1280 px avec la vraie application, worker et PostgreSQL, fournisseurs
 scriptés locaux uniquement. Téléphone normalisé conservé, code email réel capturé,
@@ -93,14 +106,14 @@ Les lignes non couvertes restent non vérifiées.
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |
 |---|---|---|---|---|---|---|
 | R-C01 | Visiteur → simulateur → résultats → inscription → code → tableau de bord | Banc vierge, 390 px | Six questions, résultats sourcés, code reçu par courriel, compte vérifié, tableau de bord | Conforme. Aucune erreur dans la console. Observation O-1 | Code relevé dans `.recette/courriers/001.eml` ; compte vérifié en base | Vérifié (banc) |
-| R-C02 | Ouverture d'un dossier, achat d'essai | Compte vérifié | Dossier ouvert, pack acheté, quota crédité | Non déroulé : aucun rail de paiement sur le banc | — | Non vérifié |
+| R-C02 | Ouverture d'un dossier, achat d'essai | Compte vérifié | Dossier ouvert, pack acheté, quota crédité | Dossier ouvert en brouillon, règle figée ; checkout intercepté localement, notification signée reçue par la vraie route, 30 analyses attribuées, rejeu sans double attribution. Paiement **scripté**, pas un encaissement réel | `tests/parcours/candidat.spec.ts`, six profils, preuves CI `parcours-candidat` (S.180) | Vérifié (porte CI, paiement scripté) |
 | R-C03 | Dépôt d'une pièce saine | Dossier de démonstration, autorisation « pièces » donnée | Accusé « bien arrivé », contrôle, promotion, lecture annoncée | Avant S.155 : la préparation répondait **503** (défaut bloquant, corrigé en S.155). Après : accusé, balayage SAINE, analyse sans débit (aucun fournisseur), revue humaine ouverte | Version 1 SAINE, analyse `creditConsumed = false` | Vérifié (banc) |
 | R-C04 | Dépôt du fichier EICAR | Idem | Fichier écarté, non conservé, message qui dit quoi faire, aucune analyse débitée | « Fichier écarté au contrôle… Dépose une nouvelle version de la pièce. » Analyses restantes inchangées | Version INFECTEE, `objectKey` vide | Vérifié (banc) |
 | R-C05 | Résultat d'une revue humaine sur l'écran de la pièce (C-08) | R-C03, puis décision B-05 « Conforme » | La pièce se lit conforme, avec le message de l'opérateur | L'alerte dit « Ta pièce a été acceptée après relecture », la checklist compte la pièce conforme, mais C-08 affiche encore « Illisible — Un opérateur regarde ta pièce » et propose « Reprendre la photo » | Capture `r-cas-3-avant` ; `Document.status = CONFORME`. Rejoué après S.157 : « Conforme », titre de l'avis, message de l'opérateur, « Revenir à la checklist », plus de « Reprendre la photo » | Corrigé en S.157 (banc) |
 | R-C06 | Remplacement d'une pièce | Pièce déjà déposée | Nouvelle version courante ; l'ancienne reste à l'historique ; la pièce suit la version courante (RG-06.8) | Version 2 créée, version 1 gardée, l'état suit la version 2 | Deux versions en base | Vérifié (banc) |
 | R-C07 | Historique des versions et signalement d'une erreur de lecture | Écran C-08 | Les deux liens mènent à leur écran | Les deux liens répondent **404** | Réponses 404 sur `…/versions` et `…/signalement`. Rejoué après S.157 : le signalement ouvre la revue (motif « Signalé par le candidat »), B-05 montre la valeur désignée ; l'historique liste les versions, sans défilement à 390 px | Corrigé en S.157 (banc) |
-| R-C08 | Complétude, rédaction assistée, échéancier | Dossier avec pièces lues | Complétude recalculée, rédaction débitée puis soldée (S.153) | Non déroulé : la lecture et la rédaction demandent un fournisseur | — | Non vérifié |
-| R-C09 | Déclaration du dépôt, issue, purge et portabilité | Dossier prêt | RG-10.8, RG-10.9 | Non déroulé | — | Non vérifié |
+| R-C08 | Complétude, rédaction assistée, échéancier | Dossier avec pièces lues | Complétude recalculée, rédaction débitée puis soldée (S.153) | Entretien, premier texte scripté débité puis soldé, version manuelle, export DOCX, relecture débitée ; l'éditeur suit désormais la version produite (défaut corrigé en S.180). Échéancier non rejoué | Preuves CI `parcours-candidat` (S.180) | Vérifié (porte CI, IA scriptée), sauf échéancier |
+| R-C09 | Déclaration du dépôt, issue, purge et portabilité | Dossier prêt | RG-10.8, RG-10.9 | Précondition explicite « dossier prêt » ; date hors bornes refusée, déclaration datée, conservation douze mois annoncée, dépôt refusé sur dossier figé, clôture avec issue, purge annoncée, archive consultable. Purge effective (RG-10.9) et portabilité non rejouées | Preuves CI `parcours-candidat` (S.180) | Vérifié (porte CI), sauf purge effective et portabilité |
 
 ## Cas indispensables
 
@@ -110,8 +123,8 @@ Les lignes non couvertes restent non vérifiées.
 | R-K02 | Double clic sur l'envoi | Fichier choisi | Une seule version | Une seule version (1 → 2) | Décompte en base | Vérifié (banc) |
 | R-K03 | Session expirée | Cookies effacés | Page → connexion avec retour ; API → message actionnable | `/connexion?suite=…` ; 401 « Ta session a expiré. Il faut te reconnecter pour continuer. Ton dossier est conservé en l'état. » | Réponse de l'API relevée | Vérifié (banc) |
 | R-K04 | Fournisseur de lecture indisponible | Aucune clé | Revue humaine, analyse non débitée, message honnête | « La lecture automatique n'est pas active sur cette installation. Un opérateur regarde ta pièce » ; aucun débit | `engineLog`, `creditConsumed = false` | Vérifié (banc) |
-| R-K05 | Quota nul, reprise après « illisible » | Solde à zéro | Le dépôt reste ouvert ; la reprise après « illisible » est lue (FON-03) | Couvert par `smoke:balayage` (S.155), pas par le navigateur | Fumée | Non vérifié (navigateur) |
-| R-K06 | Réponse perdue, ancien onglet, changement de fuseau, pièce périmée | — | DOC-11 | Non déroulés | — | Non vérifié |
+| R-K05 | Quota nul, reprise après « illisible » | Solde à zéro | Le dépôt reste ouvert ; la reprise après « illisible » est lue (FON-03) | Pack Essentiel : neuf lectures débitées, lecture illisible débitée puis rendue, reprise non débitée, dernière lecture débitée, « Tes 10 analyses du pack Essentiel sont utilisées », dépôt conservé sans analyse. Le dénominateur ne compte plus les rendus (défaut « 1 sur 11 » corrigé en S.180) | Preuves CI `parcours-candidat` (S.180) ; `smoke:balayage` | Vérifié (porte CI) |
+| R-K06 | Réponse perdue, ancien onglet, changement de fuseau, pièce périmée | — | DOC-11 | Réponse tardive du fournisseur : version conservée, lecture publiée à l'arrivée, un seul débit ; deux onglets sur la relecture : une seule analyse, réservation retrouvée. Changement de fuseau et pièce périmée non rejoués | Preuves CI `parcours-candidat` (S.180) | Vérifié (porte CI) pour réponse tardive et ancien onglet ; fuseau et péremption non vérifiés |
 
 ## Opérateur
 
@@ -127,10 +140,10 @@ Les lignes non couvertes restent non vérifiées.
 
 | N° | Scénario | Attendu | Observé | Statut |
 |---|---|---|---|---|
-| R-I01 | Mobile 390 px, parcours candidat | Pas de défilement horizontal ; navigation basse | Tableau de bord, checklist et pièces sans défilement horizontal | Vérifié (banc) |
+| R-I01 | Mobile 390 px, parcours candidat | Pas de défilement horizontal ; navigation basse | Toutes les pages visitées par la recette des parcours mesurent la largeur de l'écran, sans erreur JavaScript, sur Chromium, Firefox et WebKit à 390 px (S.180) | Vérifié (porte CI) |
 | R-I02 | Clavier, TalkBack selon le protocole du dépôt | — | Non déroulé | Non vérifié |
-| R-I03 | États vide, chargement, erreur | — | État vide de B-05 vu (observation O-3) ; les autres non déroulés | Non vérifié |
-| R-I04 | Formulaires du back-office terminés | — | Non déroulé | Non vérifié |
+| R-I03 | États vide, chargement, erreur | — | Tableau de bord sans dossier, file B-05 vide, « Connexion perdue » avec fichier gardé, « Un opérateur regarde ta pièce », « Trop de demandes en peu de temps » avec saisie conservée, « Analyse en cours… » et « déjà en cours » (S.180) | Vérifié (porte CI) |
+| R-I04 | Formulaires du back-office terminés | — | B-05 : motif obligatoire, décision, message refusé puis accepté par le vocabulaire, enregistrement ; B-07 mobile corrigé (S.180). Les autres formulaires ne sont pas rejoués | Vérifié (porte CI) pour B-05 ; autres non vérifiés |
 
 ## Exploitation
 
@@ -399,3 +412,17 @@ suites existantes et diagnostics IA conservent leurs attentes métier.
 [Rapport](../revue/lot-l4-2026-10-11.md) · [Fournisseur, reprise et migration](../exploitation/relecture-concurrente.md).
 Qualification fournisseur réelle L5, mobile B-07 L7 ; autres parcours, supports,
 préalables Q.A/M.C et reports V2 restent à qualifier dans leurs lots.
+
+## Photographies publiques — S.179, 15/10/2026
+
+Les huit familles publiques approuvées sont couvertes par 16 nouveaux tests
+unitaires/interface et une recette navigateur sur le banc PostgreSQL isolé.
+Les 28 scénarios Chromium locaux passent ; la porte commune exige également
+Firefox et WebKit, soit 84 scénarios sur les deux dimensions 390 et 1440 px.
+Les variantes réellement chargées, dimensions, poids, absence de débordement,
+sources/dates, réponse du simulateur et refus des contenus non publiés sont
+contrôlés. Les mesures initiales de performance restent des diagnostics locaux.
+
+[Rapport et limites](../revue/implementation-photos-2026-10-15.md) ·
+[Catalogue, commandes et preuves CI](../photographies.md).
+Cette recette ne clôt ni les préalables L5/Q.A/M.C ni les contrôles humains L6.
