@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { photoDuPays } from "@/lib/photographies";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LienBouton } from "@/components/ui/LienBouton";
@@ -53,11 +55,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function PageDestination({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function PageDestination({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const fiche = await ficheParSlugPubliee(slug);
   if (!fiche) notFound();
@@ -97,8 +95,7 @@ export default async function PageDestination({
             Source officielle — {fiche.mention.autorite ?? fiche.mention.source}
           </p>
           <p className="text-13 text-accent-700">
-            Vérifiée le{" "}
-            {DATE_A_COTONOU.format(new Date(fiche.mention.verifieeLe))}
+            Vérifiée le {DATE_A_COTONOU.format(new Date(fiche.mention.verifieeLe))}
             {fiche.mention.relectureLe ? (
               <>
                 {" · prochaine relecture le "}
@@ -107,6 +104,8 @@ export default async function PageDestination({
             ) : null}
           </p>
         </div>
+
+        <PhotoPublique photo={photoDuPays(fiche.code)} />
 
         <section className="flex flex-col gap-3">
           <h2 className="text-19 font-semibold text-ink-900">Conditions principales</h2>
@@ -144,10 +143,7 @@ export default async function PageDestination({
             <p className="text-pretty text-16 text-ink-700">{LISTE_VIDE.reserves}</p>
           ) : null}
           {fiche.reserves.map((r) => (
-            <div
-              key={r.texte}
-              className="flex items-start gap-3 rounded-md bg-ink-100 p-3.5"
-            >
+            <div key={r.texte} className="flex items-start gap-3 rounded-md bg-ink-100 p-3.5">
               <span
                 aria-hidden="true"
                 className={`mt-2 h-2 w-2 flex-none rounded-full ${
@@ -160,8 +156,8 @@ export default async function PageDestination({
         </section>
 
         <SourceNote {...fiche.mention}>
-          ImmiPro reproduit les exigences publiées par l&apos;administration et
-          n&apos;intervient pas dans la décision.
+          ImmiPro reproduit les exigences publiées par l&apos;administration et n&apos;intervient
+          pas dans la décision.
         </SourceNote>
       </div>
 

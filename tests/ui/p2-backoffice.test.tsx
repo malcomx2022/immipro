@@ -160,6 +160,33 @@ describe("gabarit back-office", () => {
     expect(container.textContent).toContain("Koffi Houngbo");
     expect(container.textContent).not.toContain("M. Agossou");
   });
+
+  /**
+   * REV11-L7 : à 390 px, la colonne de 232 px laissait 158 px au contenu,
+   * et B-07 débordait avant d'afficher une métrique. Sous `md`, la
+   * navigation se pose au-dessus du contenu et ses entrées se replient en
+   * ligne. jsdom ne mesure aucune largeur : il vérifie que rien ne fige la
+   * colonne sans point de rupture ; la mesure réelle est celle du banc.
+   */
+  it("ne fige la colonne de navigation qu'à partir du bureau", () => {
+    render(
+      <BarreAdmin nom="Mireille Agossou" role="Administration" initialesAffichees="MA">
+        <p>Écran</p>
+      </BarreAdmin>,
+    );
+    const nav = screen.getByRole("navigation", { name: "Navigation du back-office" });
+    const classes = nav.className.split(/\s+/u);
+    for (const interdit of ["w-nav-admin", "flex-none", "border-r"]) {
+      expect(classes).not.toContain(interdit);
+    }
+    expect(classes).toEqual(expect.arrayContaining(["md:w-nav-admin", "md:flex-none", "md:border-r"]));
+    expect(nav.parentElement!.className.split(/\s+/u)).toEqual(
+      expect.arrayContaining(["flex-col", "md:flex-row"]),
+    );
+    expect(within(nav).getByRole("list").className.split(/\s+/u)).toEqual(
+      expect.arrayContaining(["flex-wrap", "md:flex-col"]),
+    );
+  });
 });
 
 describe("B-01 — File de veille", () => {
@@ -1304,6 +1331,31 @@ describe("B-07 — Coûts IA", () => {
   it("ne montre aucune donnée de candidat", () => {
     const { container } = coutsIa();
     expect(container.textContent).toContain("Aucune donnée de candidat");
+  });
+
+  /**
+   * REV11-L7 : B-07 débordait de 146 px à 390 px dans Chromium (relevé L2).
+   * Dans l'écran même, trois causes — cinq colonnes de métriques, un seuil
+   * de garde-fou qui refusait la ligne, un identifiant de dossier insécable.
+   * jsdom ne mesure aucune largeur : il vérifie les classes qui forçaient
+   * une largeur sans point de rupture ; la mesure réelle est celle du banc.
+   */
+  it("ne force ni cinq colonnes ni une ligne unique sous la largeur du bureau", () => {
+    const { container } = coutsIa({ tarife: true, candidats: CANDIDATS });
+    const grille = container.querySelector(".grid")!;
+    const classes = grille.className.split(/\s+/u);
+    expect(classes).not.toContain("grid-cols-5");
+    expect(classes).toEqual(expect.arrayContaining(["grid-cols-2", "lg:grid-cols-5"]));
+    expect(grille.children).toHaveLength(METRIQUES.length);
+
+    for (const dd of container.querySelectorAll("dd")) {
+      expect(dd.className.split(/\s+/u)).not.toContain("whitespace-nowrap");
+    }
+    const identifiants = container.querySelectorAll("li .font-mono");
+    expect(identifiants.length).toBeGreaterThan(0);
+    for (const id of identifiants) {
+      expect(id.className.split(/\s+/u)).toContain("break-all");
+    }
   });
 
   // ── Le défaut de S.6 : des appels enregistrés, aucun tarif ────────────

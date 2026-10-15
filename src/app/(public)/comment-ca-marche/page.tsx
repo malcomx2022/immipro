@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { PHOTOS } from "@/lib/photographies";
 import type { Metadata } from "next";
 import { PACKS } from "@/domain/payments/pricing";
 import { ANALYSES_AJOUTEES } from "@/domain/payments/montee";
@@ -80,11 +82,12 @@ export default function CommentCaMarche() {
           Comment ça marche
         </h1>
         <p className="text-pretty text-16 text-ink-700">
-          ImmiPro t&apos;aide à préparer ton dossier, pièce par pièce. Tu déposes ta
-          demande toi-même, et la décision appartient aux autorités du pays de
-          destination.
+          ImmiPro t&apos;aide à préparer ton dossier, pièce par pièce. Tu déposes ta demande
+          toi-même, et la décision appartient aux autorités du pays de destination.
         </p>
       </header>
+
+      <PhotoPublique photo={PHOTOS.preparation} />
 
       <ol className="flex flex-col gap-6">
         {ETAPES.map((etape, rang) => (

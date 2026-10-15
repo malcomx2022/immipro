@@ -153,6 +153,12 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 ---
 
+**Présentation photographique WF-01 / S.179, 15/10/2026.** Accueil avec
+simulateur prioritaire sur mobile, médias de pays et éditoriaux issus d'un
+catalogue local validé. Aucun classement, condition, source, date ou filtre
+de publication modifié ; guide/article sans association d'image reste lisible.
+Les corps éditoriaux et leur validation P.C demeurent textuels.
+
 ### WF-02 — Inscription et profil
 
 | | |
@@ -294,7 +300,7 @@ drapeau compatible seul n'identifie pas une société ou une région validée.
 - RG-06.2 : une pièce re-téléversée à l'identique (même empreinte) réutilise le verdict en cache, sans nouvel appel IA ni nouveau débit d’analyse (INV-6).
 - RG-06.3 : un message d'échec est toujours **actionnable** — « votre passeport expire 4 mois après la date de retour prévue, il en faut 6 », jamais « document non conforme ».
 - RG-06.4 : les URLs MinIO présignées ont une durée de vie de 5 minutes et sont générées à la demande.
-- RG-06.5 : quota épuisé → dégradation gracieuse, proposition du pack supérieur, jamais de dépassement silencieux (INV-6).
+- RG-06.5 : quota épuisé → dégradation gracieuse, proposition du pack supérieur, jamais de dépassement silencieux (INV-6). Le compteur affiché, « Analyses restantes : n sur total », a pour dénominateur la somme des octrois — achat, recharge, geste commercial — jamais une analyse rendue, qui restitue un débit sans rien ouvrir (S.180).
 - RG-06.6 : les pièces à durée de validité limitée (relevés bancaires, extraits de casier) portent une date de péremption et basculent en `EXPIREE` automatiquement.
 - RG-06.7 : le fournisseur de la lecture automatique est choisi par l'exploitant (`AI_FOURNISSEUR_EXTRACTION`) : Anthropic par défaut, ou une API compatible OpenAI. Une pièce d'identité ne part chez un autre sous-traitant qu'Anthropic que si `AI_PIECES_SOUS_TRAITANT_AUTORISE` porte son code, posée une fois la sous-traitance validée ; pour une API compatible, l'autorisation désigne aussi la société par son origine (`AI_OPENAI_ORIGINE_AUTORISEE`), qui doit être celle de l'adresse appelée (S.171). Sans elles, la lecture n'est pas branchée et la pièce part en revue humaine, analyse recréditée. La pièce ne suit aucune redirection : un renvoi n'est jamais retransmis, la lecture finit en `non_configure` et la pièce en revue humaine. Un PDF n'est envoyé qu'à un fournisseur déclaré lecteur de PDF ; sinon, revue humaine. Chaque appel consigne son fournisseur et son modèle, et son coût se calcule au tarif de ce fournisseur. Le quota des packs se compte en analyses ; les jetons de chaque appel sont mesurés et comparés à la contrepartie du pack par l'alerte de B-07 (INV-6, D-1 du 09/10/2026).
 - RG-06.8 : seule la version courante d'une pièce commande son état. Le résultat d'une version remplacée depuis (analyse, balayage, revue humaine), ou celui d'un dossier déposé ou clos, reste à l'historique de cette version, sans changer la pièce, la complétude ni les avis. Une version déjà remplacée n'est ni débitée ni envoyée au fournisseur ; une lecture devenue obsolète pendant l'appel est rendue au candidat, ses jetons restant mesurés (S.147, RF-2, choix A-2).
@@ -367,7 +373,7 @@ drapeau compatible seul n'identifie pas une société ou une région validée.
 - RG-08.1 : le document généré porte une mention indiquant qu'il s'agit d'une aide à la rédaction relevant de la responsabilité du candidat.
 - RG-08.2 : aucun formulaire officiel n'est rempli ni soumis par la plateforme (INV-1).
 - RG-08.3 : cohérence croisée obligatoire — si la lettre mentionne un financement familial et que le relevé est au nom du candidat, l'incohérence est signalée.
-- RG-08.4 : chaque mise en forme ou relecture assistée débite une analyse, rendue si elle ne produit rien ; le compteur restant est visible en permanence.
+- RG-08.4 : chaque mise en forme ou relecture assistée débite une analyse, rendue si elle ne produit rien ; le compteur restant est visible en permanence. Le texte proposé devient aussitôt le texte à reprendre dans l'éditeur, comme une version enregistrée ou restaurée (S.180).
 - RG-08.5 : la rédaction assistée — proposition de texte à partir des réponses, reformulation, analyse critique, recoupements qui exigent la lecture automatique de pièces — est un droit des packs Dossier et Dossier Pro, dérivé de la couverture attribuée au dossier et jamais du dernier pack acheté par le compte. Une recharge d'analyses ne l'ouvre pas. Tous les packs gardent l'entretien guidé, l'écriture et la réécriture manuelles, les versions, les exports et les recoupements déterministes. Un refus ne perd jamais les réponses, le texte ni les versions (arbitrage S.80).
 - RG-08.6 : le fournisseur de la mise en forme et de la relecture est choisi par l'exploitant (`AI_FOURNISSEUR_REDACTION`) : Anthropic par défaut, ou une API compatible OpenAI. Les consignes, le schéma de la relecture et la lecture des réponses sont les mêmes quel que soit le fournisseur ; une réponse hors schéma, coupée ou refusée ne produit ni version ni avis. Aucune bascule automatique vers un autre fournisseur (arbitrage S.94).
 - RG-08.7 : le débit d'une mise en forme ou d'une relecture réserve l'analyse jusqu'à une échéance de trente minutes, posée avant l'appel. L'issue la solde dans la même écriture : le texte devenu version, l'avis daté, ou le rendu d'un échec. Une réservation restée sans issue à l'échéance — processus interrompu — est rendue par la reprise horaire, une seule fois ; le débit garde la trace de la rédaction, que lit le remboursement d'une montée. Les débits antérieurs ne sont pas repris (S.153, RF-4).

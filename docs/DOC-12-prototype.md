@@ -47,6 +47,17 @@ Décisions à acter avant de dessiner :
 
 ---
 
+### Extension validée le 15/10/2026 — S.179
+
+Le responsable valide une photo à droite du simulateur sur bureau, puis
+sous ses champs et son bouton sur mobile. Ce choix prolonge la priorité du
+simulateur, sans texte ni formulaire superposé à une photographie. Les sept
+autres familles publiques utilisent les placements validés : fiche après
+source, guide/article après chapeau, petites vignettes dans les listes.
+Les budgets §1.3 restent des objectifs d'écran à mesurer ; le seul poids des
+WebP ne les certifie pas. Aucune photo ajoutée à l'espace dossier/paiement.
+[Spécification des fichiers, points focaux et recette](photographies.md).
+
 ## 2. Le système de design
 
 À réconcilier avec DOC-02 : si la charte existe déjà, ce sont ses valeurs qui priment et cette section devient une traduction en tokens.

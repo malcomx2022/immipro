@@ -36,10 +36,20 @@ export interface Compteur {
   total: number;
 }
 
+/** Les lignes qui ouvrent des analyses : achats, recharges et gestes. */
+export const MOTIFS_D_OCTROI: readonly CreditReason[] = ["ACHAT_PACK", "RECHARGE", "GESTE_COMMERCIAL"];
+
 /**
  * Ce que l'écran affiche : « Analyses restantes : 12 sur 30 ». Le total est
  * la somme des octrois et non la valeur du pack : une recharge l'augmente,
  * et afficher le pack seul ferait mentir le dénominateur.
+ *
+ * Les octrois, et non toute ligne positive (REV11-L6, 15/10/2026). Une
+ * analyse rendue — lecture illisible, revue humaine — est une ligne
+ * positive qui rend ce qui avait été débité ; comptée comme un octroi, elle
+ * gonflait le dénominateur : un pack Essentiel de dix analyses affichait
+ * « 1 sur 11 » après une lecture rendue, et « Tes 11 analyses du pack »
+ * à l'épuisement. Reproduit par la recette navigateur des parcours.
  */
 export async function compteur(applicationId: string): Promise<Compteur> {
   const lignes = await db.analysisCredit.groupBy({
@@ -48,7 +58,7 @@ export async function compteur(applicationId: string): Promise<Compteur> {
     _sum: { delta: true },
   });
   const octrois = await db.analysisCredit.aggregate({
-    where: { applicationId, delta: { gt: 0 } },
+    where: { applicationId, reason: { in: [...MOTIFS_D_OCTROI] } },
     _sum: { delta: true },
   });
   return {

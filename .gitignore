@@ -25,3 +25,8 @@ next-env.d.ts
 
 # Campagne Vertex L5 : budget durable privé, ne jamais réinitialiser entre passages.
 .qualification-vertex/
+
+# Recettes navigateur : photographies publiques (S.179) et parcours candidat (L6)
+/test-results/
+/playwright-report/
+/playwright-report-parcours/
