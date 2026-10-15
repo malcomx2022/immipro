@@ -1,0 +1,92 @@
+[
+  {
+    "fichier": "assets/preparation-bureau.webp",
+    "octets": 107042,
+    "largeur": 1536,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/preparation-mobile.webp",
+    "octets": 42888,
+    "largeur": 780,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/pays-bas-bureau.webp",
+    "octets": 116270,
+    "largeur": 1536,
+    "qualite": 60
+  },
+  {
+    "fichier": "assets/pays-bas-mobile.webp",
+    "octets": 85600,
+    "largeur": 780,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/accompagnement-bureau.webp",
+    "octets": 109998,
+    "largeur": 1536,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/accompagnement-mobile.webp",
+    "octets": 44396,
+    "largeur": 780,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/accueil-bureau.webp",
+    "octets": 95952,
+    "largeur": 1536,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/accueil-mobile.webp",
+    "octets": 37698,
+    "largeur": 780,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/suisse-bureau.webp",
+    "octets": 117634,
+    "largeur": 1536,
+    "qualite": 72
+  },
+  {
+    "fichier": "assets/suisse-mobile.webp",
+    "octets": 73970,
+    "largeur": 780,
+    "qualite": 84
+  },
+  {
+    "fichier": "assets/accueil-vignette.webp",
+    "octets": 7284,
+    "largeur": 320,
+    "qualite": 72
+  },
+  {
+    "fichier": "assets/preparation-vignette.webp",
+    "octets": 8610,
+    "largeur": 320,
+    "qualite": 72
+  },
+  {
+    "fichier": "assets/pays-bas-vignette.webp",
+    "octets": 14878,
+    "largeur": 320,
+    "qualite": 72
+  },
+  {
+    "fichier": "assets/accompagnement-vignette.webp",
+    "octets": 8632,
+    "largeur": 320,
+    "qualite": 72
+  },
+  {
+    "fichier": "assets/suisse-vignette.webp",
+    "octets": 11550,
+    "largeur": 320,
+    "qualite": 72
+  }
+]
