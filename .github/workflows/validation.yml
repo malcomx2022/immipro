@@ -138,6 +138,23 @@ jobs:
         run: npm run smoke:recette
       - run: echo "- **Banc de recette** — isolation IA/paiement, collision de port, arrêt complet après perte du worker" >> "$GITHUB_STEP_SUMMARY"
 
+      # S.179 : vraie app/worker/base jetable, six profils navigateur.
+      - name: Navigateurs de recette photographique
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Photographies publiques — Chromium, Firefox et WebKit
+        id: photographies
+        run: npm run test:photos
+      - name: Preuves de recette photographique
+        if: always() && (steps.photographies.outcome == 'success' || steps.photographies.outcome == 'failure')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: photographies-publiques
+          path: |
+            playwright-report/
+            test-results/photographies/
+          retention-days: 7
+      - run: echo "- **Photographies** — huit gabarits publics, variantes mobiles, sources et publication préservées, six profils navigateur" >> "$GITHUB_STEP_SUMMARY"
+
       # pg-boss 11 ne migre pas une base de pg-boss 10 (S.166) : la base de
       # départ est écrite par le vrai 10.4.2, puis la bascule reprend ce qui
       # attendait, sans doublon, et un retour arrière retrouve son schéma.

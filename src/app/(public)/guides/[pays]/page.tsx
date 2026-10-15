@@ -1,3 +1,5 @@
+import { PhotoPublique } from "@/components/ui/PhotoPublique";
+import { photoEditoriale } from "@/lib/photographies";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ancre, BlocsEditoriaux } from "@/components/ui/BlocsEditoriaux";
@@ -35,11 +37,7 @@ export async function generateMetadata({
   return { title: guide.titre, description: guide.chapeau };
 }
 
-export default async function PageGuide({
-  params,
-}: {
-  params: Promise<{ pays: string }>;
-}) {
+export default async function PageGuide({ params }: { params: Promise<{ pays: string }> }) {
   const { pays } = await params;
   const guide = await documentPublie("GUIDE", pays);
   if (!guide) notFound();
@@ -53,9 +51,7 @@ export default async function PageGuide({
           aria-label="Sommaire"
           className="flex flex-col gap-2.5 rounded-lg bg-ink-100 p-4 md:w-60 md:flex-none md:self-start"
         >
-          <p className="text-13 font-semibold uppercase tracking-wider text-ink-900">
-            Au sommaire
-          </p>
+          <p className="text-13 font-semibold uppercase tracking-wider text-ink-900">Au sommaire</p>
           {guide.sommaire.map((entree) => (
             <a key={entree} href={`#${ancre(entree)}`} className="text-14 text-accent-600">
               {entree}
@@ -77,6 +73,8 @@ export default async function PageGuide({
         </h1>
         <p className="text-pretty text-16 text-ink-700">{guide.chapeau}</p>
 
+        <PhotoPublique photo={photoEditoriale("GUIDE", guide.slug)} />
+
         <BlocsEditoriaux blocs={guide.corps.blocs} />
 
         <section className="flex flex-col items-start gap-3 rounded-lg bg-ink-100 p-5">
@@ -85,9 +83,7 @@ export default async function PageGuide({
           <LienBouton href={guide.corps.appel.href}>{guide.corps.appel.action}</LienBouton>
         </section>
 
-        <SourceNote {...guide.mention}>
-          {guide.mentionSuite}
-        </SourceNote>
+        <SourceNote {...guide.mention}>{guide.mentionSuite}</SourceNote>
       </article>
     </div>
   );

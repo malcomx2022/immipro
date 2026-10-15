@@ -77,6 +77,25 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### Photographies publiques — validation du 15/10/2026, S.179
+
+Le responsable a validé les huit familles publiques, les cinq scènes et les
+placements mobile/bureau, puis demandé l'implémentation et tous les tests.
+Base `de85961` (#288 fusionnée), code et décisions Claude relus.
+Lire [le catalogue et les règles de photographie](docs/photographies.md).
+Accueil : simulateur à gauche, photo à droite sur bureau ; titre/champs/bouton
+avant la photo sur mobile. S.164 et les réponses de session restent inchangés.
+Bibliothèque locale `src/lib/photographies.ts` : associations explicites
+pays/slug, aucun tiers, upload éditorial ou appel IA. Slug sans image : texte
+seul ; guide retiré ou règle non publiée : gardes existantes avant tout rendu.
+Le corps éditorial P.C reste fermé aux images/URLs libres. Les photographies
+générées ne représentent ni clients, ni équipe, ni consultants réels.
+Paiement, dossier et administration gardent leurs SVG/pictogrammes.
+`npm run test:photos` lance la vraie app/worker/base jetable et six profils
+Chromium/Firefox/WebKit × 390/1440. Lire les résultats et limites dans
+[le suivi d'implémentation](docs/revue/implementation-photos-2026-10-15.md).
+Ce chantier ne ferme pas les critères restants de L5/L6 et ne vaut pas déploiement.
+
 ### Revue complète du 11/10/2026 — REV11
 
 **S.178 / L6 — téléphone conservé et parcours candidat locaux.**

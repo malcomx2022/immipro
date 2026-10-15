@@ -153,6 +153,12 @@ Règle : le passage `ACTIF → PRET` est **calculé**, jamais déclaré. Le pass
 
 ---
 
+**Présentation photographique WF-01 / S.179, 15/10/2026.** Accueil avec
+simulateur prioritaire sur mobile, médias de pays et éditoriaux issus d'un
+catalogue local validé. Aucun classement, condition, source, date ou filtre
+de publication modifié ; guide/article sans association d'image reste lisible.
+Les corps éditoriaux et leur validation P.C demeurent textuels.
+
 ### WF-02 — Inscription et profil
 
 | | |
