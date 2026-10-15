@@ -77,6 +77,25 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### Complément S.181 — saisie conservée et recette renforcée, 15/10/2026
+
+Base `29e9f20`, S.180/#293 et dépendances #290–292 fusionnés. Le complément
+Claude `2c5a3c0` et le relevé documentaire #294 sont relus et conservés.
+Le responsable autorise les corrections supplémentaires : une réponse lente
+d'enregistrement, génération ou restauration ne remplace plus une saisie
+faite depuis le geste. Une restauration explicite reste appliquée si rien
+n'a été saisi depuis ; un changement de version sans geste garde le brouillon
+non enregistré. Ne pas revenir au remplacement inconditionnel de S.180.
+La recette retarde une vraie réponse de sauvegarde, vérifie le texte gardé
+puis sa persistance et son export ; elle attend le nouveau rang avant la
+relecture à deux onglets. B-04 empile ses métriques et laisse le tableau
+défiler dans sa région au clavier. B-07/B-04 sont mesurés dans les six profils.
+Le filtre WebKit exige désormais un préchargement identifié, sa requête
+effectivement annulée et une navigation concomitante ; une erreur CORS seule
+reste bloquante. Lire [preuves et limites S.181](docs/revue/finition-s181-2026-10-15.md).
+Le tarif officiel Vertex est référencé ; ni campagne, ni clé, ni région
+autorisée, ni plafond global ne sont modifiés. Aucun préalable Q.A/M.C levé.
+
 ### Finalisation L6, L7, L9 et vérification L5 — 15/10/2026, S.180
 
 Instruction du responsable : finaliser les cinq lots restants, le

@@ -1317,7 +1317,8 @@ describe("T-06 — Services partenaires", () => {
  * « Proposer un premier texte », la version produite arrivait dans la
  * colonne des versions, débitée, et le champ « Ton texte » restait vide
  * jusqu'à un rechargement complet. Le texte à reprendre suit la version
- * courante quand elle change ; il ne bouge pas quand elle ne change pas.
+ * courante quand elle change, sans écraser une saisie non enregistrée
+ * (complément S.181).
  */
 describe("R-03 — l'éditeur suit la version courante", () => {
   const version = (rang: number, texte: string) => ({
@@ -1348,15 +1349,15 @@ describe("R-03 — l'éditeur suit la version courante", () => {
     );
   });
 
-  it("ne reprend pas une saisie en cours tant que la version courante ne change pas", () => {
+  it("conserve une saisie non enregistrée même si une nouvelle version arrive sans geste", () => {
     const { rerender } = render(rendre([version(1, "Texte de la version 1.")]));
     const champ = screen.getByLabelText("Ton texte") as HTMLTextAreaElement;
     fireEvent.change(champ, { target: { value: "Une reprise en cours, pas encore enregistrée." } });
     rerender(rendre([version(1, "Texte de la version 1.")]));
     expect(champ.value).toBe("Une reprise en cours, pas encore enregistrée.");
     rerender(rendre([version(1, "Texte de la version 1."), version(2, "Texte restauré ou enregistré.")]));
-    expect((screen.getByLabelText("Ton texte") as HTMLTextAreaElement).value).toContain(
-      "Texte restauré ou enregistré.",
+    expect((screen.getByLabelText("Ton texte") as HTMLTextAreaElement).value).toBe(
+      "Une reprise en cours, pas encore enregistrée.",
     );
   });
 });

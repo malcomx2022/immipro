@@ -13749,3 +13749,27 @@ matrice, suivi L6 et DOC-11 harmonisés avec les preuves réelles.
 six profils et preuves dans [le suivi](../revue/lot-l6-l9-2026-10-15.md).
 Aucune fusion, déploiement, drapeau commercial, levée Q.A/M.C ni L8 par ce
 lot ; les reports V2 et A-1 à A-3 sont inchangés.
+
+## S.181 — Compléments S.180 : saisie tardive, erreurs navigateur et B-04
+
+15/10/2026, autorisation de corrections supplémentaires du responsable.
+Base `29e9f20`, dernière logique Claude relue, complément `2c5a3c0` et
+dépendances #290–292 conservés ; relevé documentaire #294 laissé à sa branche.
+
+R-03 : la nouvelle version ne remplace plus une saisie faite après le geste.
+Une restauration explicite reste appliquée si rien n'a été saisi depuis ;
+un changement de version sans geste garde un brouillon non enregistré.
+Six contrôles d'interface et la réponse réellement retardée en navigateur,
+suivie de l'enregistrement et de la lecture SQL, éprouvent RG-08.4.
+Le double onglet attend le nouveau rang avant sa relecture.
+
+B-04 : débordement 397/390 reproduit, métriques et tableau adaptés ; mesure
+réelle B-04/B-07 ajoutée aux six profils. Calculs WF-15/WF-16 inchangés.
+Le filtre WebKit exige une vraie requête de préchargement annulée lors d'une
+navigation ; CORS/TLS et erreurs non corrélées restent bloquants, dix tests.
+
+Tarif officiel Google référencé, promotion distincte du majorant de dépense
+brute. Aucun modèle, région, budget ou secret changé ; aucun appel réel.
+Lire [le rapport et les limites](../revue/finition-s181-2026-10-15.md).
+L5 réel, critères humains L6, exploitation cible L7, L8 et Q.A/M.C restent
+ouverts. Proposition vérifiée par la porte complète, sans fusion/déploiement.

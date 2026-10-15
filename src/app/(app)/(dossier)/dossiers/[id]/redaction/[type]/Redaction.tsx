@@ -184,10 +184,19 @@ export function Redaction({
     une version nouvelle — proposée, enregistrée ou restaurée — devient le
     texte à reprendre.
   */
-  const [rangSuivi, setRangSuivi] = useState(courante?.rang ?? 0);
-  if ((courante?.rang ?? 0) !== rangSuivi) {
-    setRangSuivi(courante?.rang ?? 0);
-    setBrouillon(courante ? texteDeLaVersion(courante) : "");
+  const [versionSuivie, setVersionSuivie] = useState({
+    rang: courante?.rang ?? 0,
+    texte: courante ? texteDeLaVersion(courante) : "",
+  });
+  // S.181 : une réponse lente ne remplace pas ce qui a été saisi depuis
+  // le geste. Une restauration explicite peut remplacer le brouillon qui
+  // existait au clic ; une nouvelle saisie reste toujours au candidat.
+  const [texteAuGeste, setTexteAuGeste] = useState<string | null>(null);
+  if ((courante?.rang ?? 0) !== versionSuivie.rang) {
+    const texte = courante ? texteDeLaVersion(courante) : "";
+    if (brouillon === (texteAuGeste ?? versionSuivie.texte)) setBrouillon(texte);
+    setVersionSuivie({ rang: courante?.rang ?? 0, texte });
+    setTexteAuGeste(null);
   }
   const [envoi, setEnvoi] = useState("");
   const manque = obstacleALEnregistrement(brouillon, courante);
@@ -197,18 +206,18 @@ export function Redaction({
    * discriminés sur le geste : aucun ne modifie une version existante, un
    * état passé n'ayant pas à être réécrit.
    */
-  async function ecrire(
-    cle: string,
-    corps: Record<string, unknown>,
-  ): Promise<void> {
+  async function ecrire(cle: string, corps: Record<string, unknown>): Promise<void> {
+    setTexteAuGeste(brouillon);
     setEnvoi(cle);
     setEchec(null);
-    const resultat = await appeler<{ produite: boolean; disponible: boolean; motif?: string | null }>(
-      `/api/dossiers/${dossier.id}/redaction/${piece.type}/version`,
-      { methode: "POST", corps },
-    );
+    const resultat = await appeler<{
+      produite: boolean;
+      disponible: boolean;
+      motif?: string | null;
+    }>(`/api/dossiers/${dossier.id}/redaction/${piece.type}/version`, { methode: "POST", corps });
     setEnvoi("");
     if (!resultat.ok) {
+      setTexteAuGeste(null);
       setEchec(resultat.echec);
       return;
     }
@@ -221,6 +230,7 @@ export function Redaction({
      * Il l'ignorait, et le candidat ne savait pas si son geste avait compté.
      */
     if (!resultat.donnees.produite) {
+      setTexteAuGeste(null);
       const issue = issueDeLaMiseEnForme(resultat.donnees);
       if (issue) {
         setEchec(issue);
@@ -425,9 +435,7 @@ export function Redaction({
         >
           {piece.libelle}
         </h1>
-        {courante ? (
-          <p className="text-14 text-ink-700">{libelleVersion(courante, date)}</p>
-        ) : null}
+        {courante ? <p className="text-14 text-ink-700">{libelleVersion(courante, date)}</p> : null}
       </div>
 
       {/* Deux onglets en 390 px, deux colonnes au-delà : la commutation
@@ -625,8 +633,7 @@ export function Redaction({
                   )}
                 </div>
                 <span className="text-13 text-ink-500">
-                  {motsDeLaVersion(version)} mots ·{" "}
-                  {libelleAnciennete(version.enregistreeLe, date)}
+                  {motsDeLaVersion(version)} mots · {libelleAnciennete(version.enregistreeLe, date)}
                 </span>
                 <span className="text-pretty text-14 text-ink-700">{version.motif}</span>
               </li>
