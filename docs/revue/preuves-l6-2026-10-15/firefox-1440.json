@@ -1,0 +1,28 @@
+{
+  "simulation": true,
+  "navigateur": "firefox-1440",
+  "largeur": 1440,
+  "scenarios": 14,
+  "pagesMesurees": 54,
+  "debordements": [],
+  "erreursJS": [],
+  "prechargementsInterrompusWebKit": 0,
+  "controles": [
+    "Six réponses au clavier et recommandations calculées",
+    "Inscription, téléphone normalisé en base, courrier capturé, vérification par Entrée, état vide du tableau de bord",
+    "Ouverture réelle, règle figée et checklist persistée sans date inventée",
+    "Checkout intercepté localement, webhook signé réel et attribution de 30 analyses",
+    "Consentement accordé, téléversement réel, antivirus, worker et lecture IA scriptée mesurée",
+    "Coupure du stockage pendant l'envoi : bandeau, fichier gardé, relance automatique, deux versions et historique",
+    "Réponse tardive : version conservée, lecture publiée à l'arrivée, un seul débit",
+    "Signalement sans débit, décision B-05 avec motif, vocabulaire interdit refusé, pièce conforme et message relu par le candidat",
+    "Réponse sans mesure (L2) : aucune publication, revue humaine, analyse non débitée",
+    "Retrait du consentement, nouveau dépôt fermé et quota inchangé",
+    "Entretien, premier texte scripté débité et soldé, version manuelle, export DOCX, relecture débitée",
+    "Deux onglets : deux gestes, un seul appel fournisseur, réservation retrouvée après actualisation",
+    "Dix analyses Essentiel : neuf débitées, l'illisible débitée puis rendue, reprise gratuite, dernière débitée, dépôt conservé sans analyse à quota nul",
+    "Déclaration du dépôt datée, conservation douze mois annoncée, dépôt refusé sur dossier figé, clôture avec issue et purge annoncée"
+  ],
+  "lectureSynthetiqueMs": 1971,
+  "limitesDAppelsRencontrees": 3
+}

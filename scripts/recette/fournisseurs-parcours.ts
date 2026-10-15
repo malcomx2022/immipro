@@ -10,7 +10,10 @@ export async function fournisseursDuParcours(app: string) {
   )
     throw Error("Application locale requise.");
   const secret = `whsec_recette_${randomBytes(12).toString("hex")}`;
+  // `lente` : mêmes réponses que `lue`, après un délai — réponse tardive et
+  // double onglet de la recette L6. Jamais un fournisseur réel.
   let mode = "lue";
+  let delai = 3_000;
   const stats = { lectures: 0, redactions: 0, critiques: 0, paiements: 0, notifications: 0 };
   const sessions = new Map<
     string,
@@ -40,16 +43,18 @@ export async function fournisseursDuParcours(app: string) {
       }
       if (u.pathname === "/controle" && req.method === "POST") {
         const c = JSON.parse(texte);
-        if (!["lue", "illisible", "sans_usage", "indisponible"].includes(c.mode)) {
+        if (!["lue", "illisible", "sans_usage", "indisponible", "lente"].includes(c.mode)) {
           json({ erreur: "mode inconnu" }, 400);
           return;
         }
         mode = c.mode;
-        json({ mode });
+        if (Number.isInteger(c.delai) && c.delai >= 0 && c.delai <= 30_000) delai = c.delai;
+        json({ mode, delai });
         return;
       }
       if (u.pathname === "/v1/chat/completions") {
         const c = JSON.parse(texte);
+        if (mode === "lente") await new Promise((ok) => setTimeout(ok, delai));
         const nom = c.response_format?.json_schema?.name;
         let contenu: string;
         if (nom === "lecture") {

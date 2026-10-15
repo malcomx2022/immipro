@@ -77,6 +77,29 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### Finalisation L6, L7, L9 et vérification L5 — 15/10/2026, S.180
+
+Instruction du responsable : finaliser les cinq lots restants, le
+développement se faisant en parallèle avec un autre outil, Claude Code
+gardant la main. Base `552312f` (#289 fusionnée) ; PR ouvertes #290 à #292,
+Dependabot seulement, porte verte, relues et non reprises : leur fusion
+reste au responsable. Lire [le suivi du lot](docs/revue/lot-l6-l9-2026-10-15.md).
+`npm run test:parcours` (six profils, banc `--parcours`, relais HTTPS pour
+l'application **et** le stockage présigné) rejoue les parcours authentifiés
+de la matrice ; il est dans la porte commune après `test:photos`. Préconditions
+explicites limitées au candidat synthétique : lettre facultative, dossier prêt.
+Deux défauts corrigés avec tests : l'éditeur suit la version produite ; le
+dénominateur du compteur d'analyses compte les octrois, jamais un rendu.
+B-07 ne déborde plus à 390 px (navigation empilée sous `md`, métriques sur
+deux colonnes sous `lg`, export pleine largeur sous `sm`) ; le back-office
+reste conçu pour le bureau. L5 : `gemini-3.8-flash` existe en GA, deux pages
+officielles divergent sur `europe-west1`, tarif non lu officiellement ; région
+et tarif à confirmer par le responsable avant tout appel, aucune substitution.
+Audit : exception `deepmerge-ts` maintenue, quatre modérées tenues par `minio`
+8.0.7, dernière version. Restent au responsable : L5 réel, lecteur d'écran et
+signature L6, diagnostics/sauvegardes L7 sur le VPS, L8 entier, Q.A et M.C.
+Aucune fusion ni déploiement par ce lot.
+
 ### Photographies publiques — validation du 15/10/2026, S.179
 
 Le responsable a validé les huit familles publiques, les cinq scènes et les
@@ -106,8 +129,9 @@ Facultatif, aucun indicatif deviné ; l'inscription répétée ne modifie aucun 
 `recette:banc -- --parcours` active seulement des réponses IA/Stripe scriptées
 locales : aucun fournisseur réel, pas une preuve de qualification L5.
 [Recette, preuves et reprise](docs/revue/lot-l6-2026-10-12.md).
-L6 reste ouverte : Firefox/WebKit refusés par la politique CDN, lecteur d'écran
-humain et couverture navigateur complète à terminer. Aucun déploiement implicite.
+L6 : Firefox/WebKit, refusés par la politique CDN le 12/10, sont installés par
+la porte depuis S.179 et couverts par S.180 ; le lecteur d'écran humain et la
+signature de la matrice restent à faire. Aucun déploiement implicite.
 
 **S.177 / complément L5 — campagne Vertex autorisée, 5 000 XOF au total.**
 Base `5ada263` / #286 fusionné ; dernière logique Claude et S.176 relus.

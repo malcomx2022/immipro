@@ -17,7 +17,7 @@ export function EnteteAdmin({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ink-300 bg-white px-6 py-4">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ink-300 bg-white px-4 py-4 md:px-6">
       <div className="flex flex-col gap-1">
         <h1
           id="contenu"

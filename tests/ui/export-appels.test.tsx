@@ -29,6 +29,26 @@ describe("B-07 — Exporter le détail des appels", () => {
   const rendre = (du = "2026-09-01", au = "2026-09-14") =>
     render(<ExportDesAppels duParDefaut={du} auParDefaut={au} />);
 
+  /**
+   * REV11-L7 : posés côte à côte, les deux champs de date sortaient de
+   * l'écran à 390 px (relevé L2). Sous `sm`, chacun prend la largeur, et le
+   * bouton aussi. jsdom ne mesure rien : la mesure réelle est celle du banc.
+   */
+  it("empile les dates et le bouton sous la largeur du bureau", () => {
+    rendre();
+    for (const libelle of ["Du", "Au"]) {
+      const enveloppe = screen.getByLabelText(libelle).closest("div")!;
+      expect(enveloppe.className.split(/\s+/u)).toEqual(
+        expect.arrayContaining(["w-full", "sm:w-auto"]),
+      );
+    }
+    const bouton = screen.getByRole("button", { name: "Exporter le détail des appels" });
+    expect(bouton.className.split(/\s+/u)).toEqual(expect.arrayContaining(["w-full", "sm:w-auto"]));
+    expect(bouton.parentElement!.className.split(/\s+/u)).toEqual(
+      expect.arrayContaining(["w-full", "sm:w-auto"]),
+    );
+  });
+
   it("demande le fichier de la période affichée", async () => {
     telechargements.length = 0;
     refuse = false;
