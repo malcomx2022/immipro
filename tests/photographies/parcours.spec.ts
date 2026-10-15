@@ -68,8 +68,12 @@ for (const [route, principale] of pages) {
     expect(await photos.count()).toBeGreaterThan(0);
     for (const img of await photos.locator("img").all()) {
       await img.scrollIntoViewIfNeeded();
+      // WebKit peut encore annoncer complete=true avant de démarrer une image
+      // différée. Attendre son décodage, sans accepter une image cassée.
+      await expect
+        .poll(() => img.evaluate((e) => (e as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
       await expect(img).toHaveJSProperty("complete", true);
-      expect(await img.evaluate((e) => (e as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
       const src = await img.evaluate((e) => (e as HTMLImageElement).currentSrc);
       expect(new URL(src).origin).toBe(new URL(page.url()).origin);
       expect(src).toMatch(/\/photos\/[a-z-]+-(mobile|bureau|vignette)\.webp$/u);
