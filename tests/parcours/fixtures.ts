@@ -58,11 +58,14 @@ export function origineDesFournisseurs(): string {
   return m[1]!;
 }
 
-/** Le code à six chiffres du courrier capturé pour cette adresse, s'il est parti. */
+/**
+ * Le dernier code à six chiffres parti pour cette adresse, s'il en est parti
+ * un : l'émission d'un nouveau code annule les précédents.
+ */
 export function codeDeVerification(email: string): string | null {
   const echappe = email.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  const m = new RegExp(`${echappe}[^\\n]*code (\\d{6})`, "u").exec(journal());
-  return m ? m[1]! : null;
+  const codes = [...journal().matchAll(new RegExp(`${echappe}[^\\n]*code (\\d{6})`, "gu"))];
+  return codes.length ? codes[codes.length - 1]![1]! : null;
 }
 
 export async function controlerLesFournisseurs(

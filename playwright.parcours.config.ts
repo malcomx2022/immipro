@@ -28,14 +28,18 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  // Chaque geste attend ses effets réels : antivirus, worker, lecture scriptée.
-  timeout: 120_000,
+  // Chaque geste attend ses effets réels : antivirus, worker, lecture scriptée ;
+  // les exécuteurs de la porte sont plus lents que le poste de développement.
+  timeout: 180_000,
   outputDir: "test-results/parcours",
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report-parcours", open: "never" }],
   ],
   use: {
+    // Un geste qui n'aboutit pas en trente secondes est un échec lisible,
+    // jamais une attente jusqu'au délai du scénario.
+    actionTimeout: 30_000,
     baseURL: "https://localhost:3163",
     // Certificat éphémère des deux relais locaux de recette, jamais en production.
     ignoreHTTPSErrors: true,

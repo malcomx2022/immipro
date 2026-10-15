@@ -23,6 +23,7 @@
     "Dix analyses Essentiel : neuf débitées, l'illisible débitée puis rendue, reprise gratuite, dernière débitée, dépôt conservé sans analyse à quota nul",
     "Déclaration du dépôt datée, conservation douze mois annoncée, dépôt refusé sur dossier figé, clôture avec issue et purge annoncée"
   ],
-  "lectureSynthetiqueMs": 4620,
-  "limitesDAppelsRencontrees": 4
+  "lectureSynthetiqueMs": 4360,
+  "limitesDAppelsRencontrees": 4,
+  "renvoisDuCode": 0
 }
