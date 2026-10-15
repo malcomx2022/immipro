@@ -81,9 +81,9 @@ Un message d'échec est toujours actionnable.
 
 Instruction du responsable : finaliser les cinq lots restants, le
 développement se faisant en parallèle avec un autre outil, Claude Code
-gardant la main. Base `552312f` (#289 fusionnée) ; PR ouvertes #290 à #292,
-Dependabot seulement, porte verte, relues et non reprises : leur fusion
-reste au responsable. Lire [le suivi du lot](docs/revue/lot-l6-l9-2026-10-15.md).
+gardant la main. Base `552312f` (#289 fusionnée) ; PR #290 à #292, Dependabot seulement,
+porte verte, relues et non reprises par le lot.
+Lire [le suivi du lot](docs/revue/lot-l6-l9-2026-10-15.md).
 `npm run test:parcours` (six profils, banc `--parcours`, relais HTTPS pour
 l'application **et** le stockage présigné) rejoue les parcours authentifiés
 de la matrice ; il est dans la porte commune après `test:photos`. Préconditions
@@ -98,7 +98,16 @@ et tarif à confirmer par le responsable avant tout appel, aucune substitution.
 Audit : exception `deepmerge-ts` maintenue, quatre modérées tenues par `minio`
 8.0.7, dernière version. Restent au responsable : L5 réel, lecteur d'écran et
 signature L6, diagnostics/sauvegardes L7 sur le VPS, L8 entier, Q.A et M.C.
-Aucune fusion ni déploiement par ce lot.
+Le lot n'a rien fusionné ni déployé. Le 15/10 au soir, sur instruction du
+responsable, Claude Code a fusionné #293 (`a4ccc39`) puis #291, #292 et #290
+(`29e9f20`), chacune après sa porte complète rejouée sur la nouvelle base ;
+le pipeline de déploiement de `main` a suivi de lui-même, comme à chaque
+poussée : `29e9f20` en service sur le VPS à 21 h 26 UTC, `clamav` prêt en
+35 s avec sa nouvelle empreinte ; puis une relance manuelle, hors Claude
+Code, a redéployé l'état intermédiaire `07c29cb` à 21 h 56 UTC, en retrait
+de #290 tant que `main` n'est pas redéployée. Lire le relevé des fusions à
+la fin du suivi du lot.
+Ces fusions ne lèvent aucun préalable.
 
 ### Photographies publiques — validation du 15/10/2026, S.179
 

@@ -13749,3 +13749,18 @@ matrice, suivi L6 et DOC-11 harmonisés avec les preuves réelles.
 six profils et preuves dans [le suivi](../revue/lot-l6-l9-2026-10-15.md).
 Aucune fusion, déploiement, drapeau commercial, levée Q.A/M.C ni L8 par ce
 lot ; les reports V2 et A-1 à A-3 sont inchangés.
+
+**Suite, 15/10/2026 au soir — fusions sur instruction du responsable.**
+#293 fusionnée (`a4ccc39`, commit de fusion, convention du dépôt), puis les
+trois PR Dependabot après mise à jour de leur branche sur `a4ccc39` et porte
+complète verte, parcours compris : #291 (`fa0cf13`), #292 (`07c29cb`), #290
+(`29e9f20`). Le pipeline de déploiement de `main` a suivi de lui-même ;
+CI de `main` verte sur les quatre commits ; `a4ccc39` puis `29e9f20` mis en
+service sur le VPS (20 h 55 et 21 h 26 UTC), démarrage à froid de `clamav`
+en 35 s avec la nouvelle empreinte, garde-fous tenus. Une relance manuelle,
+non déclenchée par Claude Code, a ensuite redéployé l'état intermédiaire
+`07c29cb` à 21 h 56 UTC : le VPS est en retrait de #290 tant que `main`
+n'est pas redéployée.
+Relevé dans [le suivi](../revue/lot-l6-l9-2026-10-15.md). Aucun préalable
+levé, aucun drapeau commercial touché ; L5 réel, signature L6, L7 sur le
+VPS, L8, Q.A et M.C restent au responsable.
