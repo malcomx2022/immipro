@@ -18,6 +18,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { suivreErreurs } from "./erreurs-navigateur";
 import {
   codeDeVerification,
   controlerLesFournisseurs,
@@ -46,7 +47,8 @@ let dossier = "";
 let passeport = "";
 let second = "";
 let origineApp = "";
-const erreurs: string[] = [];
+const suivis: ReturnType<typeof suivreErreurs>[] = [];
+let moteur = "";
 const mesures: { route: string; largeur: number; contenu: number }[] = [];
 const preuves: Record<string, unknown>[] = [];
 
@@ -137,16 +139,15 @@ async function attendreLHydratation(p: Page, selecteur = "body", limite = 45_000
   const debut = Date.now();
   while (Date.now() - debut < limite) {
     try {
-      const hydrate = await p.evaluate(
-        (sel) => {
-          const el = document.querySelector(sel);
-          return (
-            !!el &&
-            Object.keys(el).some((k) => k.startsWith("__reactFiber$") || k.startsWith("__reactProps$"))
-          );
-        },
-        selecteur,
-      );
+      const hydrate = await p.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        return (
+          !!el &&
+          Object.keys(el).some(
+            (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactProps$"),
+          )
+        );
+      }, selecteur);
       if (hydrate) return;
     } catch {
       /* navigation en cours : réessayer */
@@ -158,7 +159,10 @@ async function attendreLHydratation(p: Page, selecteur = "body", limite = 45_000
 
 /** L'interrupteur de consentement, basculé au clavier : focus puis Espace. */
 async function basculerLeConsentement(p: Page, attendu: "true" | "false") {
-  const interrupteur = p.getByRole("switch", { name: "Analyse de mes pièces d'identité", exact: true });
+  const interrupteur = p.getByRole("switch", {
+    name: "Analyse de mes pièces d'identité",
+    exact: true,
+  });
   for (let essai = 0; essai < 4; essai += 1) {
     try {
       await attendreLHydratation(p, "[role=switch]");
@@ -174,7 +178,9 @@ async function basculerLeConsentement(p: Page, attendu: "true" | "false") {
   }
   await expect(interrupteur).toHaveAttribute("aria-checked", attendu);
   const [reponse] = await Promise.all([
-    p.waitForResponse((r) => r.url().endsWith("/api/comptes/consentements") && r.request().method() === "PUT"),
+    p.waitForResponse(
+      (r) => r.url().endsWith("/api/comptes/consentements") && r.request().method() === "PUT",
+    ),
     p.getByRole("button", { name: "Enregistrer", exact: true }).click(),
   ]);
   expect(reponse.ok()).toBe(true);
@@ -249,12 +255,13 @@ async function administration(): Promise<Page> {
     baseURL: origineApp,
   });
   admin = await contexte.newPage();
-  admin.on("pageerror", (e) => erreurs.push(`admin: ${e.message}`));
+  suivis.push(suivreErreurs(admin, moteur, origineApp));
   await connecter(admin, "admin@immipro.test", motDePasseDuBanc());
   return admin;
 }
 
 test.beforeAll(async ({ browser }, info) => {
+  moteur = info.project.use.browserName!;
   largeur = info.project.use.viewport!.width;
   origineApp = info.project.use.baseURL!;
   context = await browser.newContext({
@@ -263,7 +270,7 @@ test.beforeAll(async ({ browser }, info) => {
     baseURL: origineApp,
   });
   page = await context.newPage();
-  page.on("pageerror", (e) => erreurs.push(e.message));
+  suivis.push(suivreErreurs(page, moteur, origineApp));
   email = `l6-${info.project.name}-${process.hrtime.bigint()}@immipro.test`;
 });
 
@@ -287,7 +294,9 @@ test("simulateur au clavier : six réponses et recommandations calculées", asyn
     const radio = page.getByRole("radio", { name: nom, exact: true });
     await radio.focus();
     await page.keyboard.press("Space");
-    await expect(page.locator("[role=radio][aria-checked=true]")).toHaveText(new RegExp(`^${nom}`, "u"));
+    await expect(page.locator("[role=radio][aria-checked=true]")).toHaveText(
+      new RegExp(`^${nom}`, "u"),
+    );
     await page
       .getByRole("button", { name: i === 5 ? "Voir mes destinations" : "Continuer", exact: true })
       .click();
@@ -295,7 +304,10 @@ test("simulateur au clavier : six réponses et recommandations calculées", asyn
   await page.waitForURL("**/resultats");
   await expect(page.locator("h1").filter({ hasText: "destination" })).toBeVisible();
   await relever();
-  preuves.push({ controle: "Six réponses au clavier et recommandations calculées", conforme: true });
+  preuves.push({
+    controle: "Six réponses au clavier et recommandations calculées",
+    conforme: true,
+  });
 });
 
 test("inscription : téléphone normalisé, code capturé, vérification par Entrée, tableau de bord vide", async () => {
@@ -353,9 +365,14 @@ test("inscription : téléphone normalisé, code capturé, vérification par Ent
       const deja = (journal().match(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "gu")) ?? []).length;
       await page.getByRole("button", { name: "Renvoyer le code", exact: true }).click();
       await expect
-        .poll(() => (journal().match(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "gu")) ?? []).length, {
-          timeout: 20_000,
-        })
+        .poll(
+          () =>
+            (journal().match(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "gu")) ?? [])
+              .length,
+          {
+            timeout: 20_000,
+          },
+        )
         .toBeGreaterThan(deja);
       renvois += 1;
     }
@@ -386,10 +403,14 @@ test("ouverture du dossier : brouillon, règle figée, checklist persistée sans
   await page.waitForLoadState("networkidle");
   await relever();
   dossier = page.url().split("/").at(-1)!;
-  const [ligne] = await lire<{ status: string; targetDate: string | null; visaRuleId: string | null }>(
-    'SELECT status, "targetDate", "visaRuleId" FROM "Application" WHERE id=$1 AND "userId"=$2',
-    [dossier, compte],
-  );
+  const [ligne] = await lire<{
+    status: string;
+    targetDate: string | null;
+    visaRuleId: string | null;
+  }>('SELECT status, "targetDate", "visaRuleId" FROM "Application" WHERE id=$1 AND "userId"=$2', [
+    dossier,
+    compte,
+  ]);
   expect(ligne!.status).toBe("BROUILLON");
   expect(ligne!.targetDate).toBeNull();
   expect(ligne!.visaRuleId).not.toBeNull();
@@ -455,11 +476,16 @@ test("achat scripté : checkout intercepté, webhook signé, 30 analyses, rejeu 
 
 test("consentement, téléversement réel, antivirus, lecture scriptée mesurée et débit", async () => {
   await aller("/consentements");
-  const interrupteur = page.getByRole("switch", { name: "Analyse de mes pièces d'identité", exact: true });
+  const interrupteur = page.getByRole("switch", {
+    name: "Analyse de mes pièces d'identité",
+    exact: true,
+  });
   await expect(interrupteur).toHaveAttribute("aria-checked", "false");
   await interrupteur.click();
   const [reponse] = await Promise.all([
-    page.waitForResponse((r) => r.url().endsWith("/api/comptes/consentements") && r.request().method() === "PUT"),
+    page.waitForResponse(
+      (r) => r.url().endsWith("/api/comptes/consentements") && r.request().method() === "PUT",
+    ),
     page.getByRole("button", { name: "Enregistrer", exact: true }).click(),
   ]);
   expect(reponse.ok()).toBe(true);
@@ -533,7 +559,10 @@ test("réponse tardive du fournisseur : la pièce attend, puis la lecture arrive
   expect(await credits()).toBe(27);
   await aller(`/dossiers/${dossier}/pieces/${passeport}`);
   await expect(page.getByText("Analyses restantes : 27 sur 30")).toBeVisible();
-  preuves.push({ controle: "Réponse tardive : version conservée, lecture publiée à l'arrivée, un seul débit", conforme: true });
+  preuves.push({
+    controle: "Réponse tardive : version conservée, lecture publiée à l'arrivée, un seul débit",
+    conforme: true,
+  });
 });
 
 test("signalement d'une erreur de lecture, puis décision B-05 au bureau : vocabulaire refusé, pièce acceptée", async () => {
@@ -566,15 +595,23 @@ test("signalement d'une erreur de lecture, puis décision B-05 au bureau : vocab
   // L'aide du champ devient une alerte ; l'annonceur de route de Next en est une autre.
   const refus = b.getByRole("alert").filter({ hasText: "ne peut pas s'afficher chez le candidat" });
   await expect(refus).toContainText("visa garanti");
-  await expect(b.getByRole("button", { name: "Enregistrer et passer à la suivante", exact: true })).toBeDisabled();
-  await message.fill("Ta pièce est lisible : le numéro et la date de validité correspondent à ce que tu as déclaré.");
+  await expect(
+    b.getByRole("button", { name: "Enregistrer et passer à la suivante", exact: true }),
+  ).toBeDisabled();
+  await message.fill(
+    "Ta pièce est lisible : le numéro et la date de validité correspondent à ce que tu as déclaré.",
+  );
   await expect(refus).toHaveCount(0);
   const [decision] = await Promise.all([
-    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/revue/")),
+    b.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes("/api/admin/revue/"),
+    ),
     b.getByRole("button", { name: "Enregistrer et passer à la suivante", exact: true }).click(),
   ]);
   expect(decision.ok()).toBe(true);
-  const [piece] = await lire<{ status: string }>('SELECT status FROM "Document" WHERE id=$1', [passeport]);
+  const [piece] = await lire<{ status: string }>('SELECT status FROM "Document" WHERE id=$1', [
+    passeport,
+  ]);
   expect(piece!.status).toBe("CONFORME");
   const [audit] = await lire<{ n: string }>(
     `SELECT count(*) AS n FROM "AuditLog" WHERE action IN ('piece.consultation','revue.decision') AND "createdAt" > now() - interval '2 minutes'`,
@@ -583,11 +620,44 @@ test("signalement d'une erreur de lecture, puis décision B-05 au bureau : vocab
 
   await aller(`/dossiers/${dossier}/pieces/${passeport}`);
   await expect(page.getByText("le numéro et la date de validité correspondent")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Revenir à la checklist", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Revenir à la checklist", exact: true }),
+  ).toBeVisible();
   preuves.push({
     controle: "Signalement sans débit, décision B-05 avec motif, vocabulaire interdit refusé, pièce conforme et message relu par le candidat",
     conforme: true,
   });
+});
+
+test("back-office : coûts IA et paiements sans débordement sur la largeur du profil", async ({}, info) => {
+  const b = await administration();
+  await b.setViewportSize({ width: largeur, height: 1000 });
+  try {
+    for (const route of ["/couts-ia", "/paiements"]) {
+      await aller(route, b);
+      const mesure = await b.evaluate(() => ({
+        largeur: innerWidth,
+        contenu: document.documentElement.scrollWidth,
+        elements: [...document.querySelectorAll("main *")]
+          .map((e) => ({
+            balise: e.tagName,
+            classes: e.className,
+            droite: e.getBoundingClientRect().right,
+          }))
+          .filter((e) => e.droite > innerWidth),
+      }));
+      const fichier = info.outputPath(`largeur-${route.slice(1)}.json`);
+      mkdirSync(info.outputDir, { recursive: true });
+      writeFileSync(fichier, JSON.stringify(mesure));
+      await info.attach(`largeur-${route.slice(1)}`, {
+        path: fichier,
+        contentType: "application/json",
+      });
+      expect(mesure.contenu, route).toBe(largeur);
+    }
+  } finally {
+    await b.setViewportSize({ width: 1280, height: 900 });
+  }
 });
 
 test("lecture sans mesure valide : aucune publication, revue humaine ouverte, quota rendu", async () => {
@@ -632,14 +702,20 @@ test("retrait du consentement : le dépôt se ferme, versions et quota inchangé
   )[0]!.id;
   await aller(`/dossiers/${dossier}/pieces/${fonds}`);
   await expect(
-    page.getByRole("heading", { name: "Ton autorisation est nécessaire pour déposer une pièce", exact: true }),
+    page.getByRole("heading", {
+      name: "Ton autorisation est nécessaire pour déposer une pièce",
+      exact: true,
+    }),
   ).toBeVisible();
   await choisirLeFichier(page, "L13.pdf");
   await expect(page.getByRole("button", { name: "Ajouter la pièce", exact: true })).toBeDisabled();
   expect((await versions(fonds)).length).toBe(0);
   expect((await versions(passeport)).length).toBe(3);
   expect(await credits()).toBe(27);
-  preuves.push({ controle: "Retrait du consentement, nouveau dépôt fermé et quota inchangé", conforme: true });
+  preuves.push({
+    controle: "Retrait du consentement, nouveau dépôt fermé et quota inchangé",
+    conforme: true,
+  });
 });
 
 test("rédaction assistée : entretien, premier texte scripté débité, version, export DOCX et relecture débitée", async () => {
@@ -651,7 +727,9 @@ test("rédaction assistée : entretien, premier texte scripté débité, version
   for (let i = 0; i < 12; i += 1) {
     await page
       .getByLabel("Ta réponse", { exact: true })
-      .fill("Réponse synthétique de recette : deux phrases qui décrivent mon parcours et mon projet d'études.");
+      .fill(
+        "Réponse synthétique de recette : deux phrases qui décrivent mon parcours et mon projet d'études.",
+      );
     const dernier = page.getByRole("button", { name: "Mettre en forme ma lettre", exact: true });
     if (await dernier.isVisible()) {
       await dernier.click();
@@ -674,12 +752,46 @@ test("rédaction assistée : entretien, premier texte scripté débité, version
   );
   expect(ligne!.reservedUntil).toBeNull();
 
-  await page
-    .getByLabel("Ton texte", { exact: true })
-    .fill(
-      "Madame, Monsieur, je prépare mon dossier à partir des informations que j'ai fournies. Ce texte synthétique décrit mon parcours et mon projet d'études. Il sert à vérifier l'enregistrement, la conservation des versions et l'export local du document, puis sa relecture. Salutations respectueuses.",
-    );
+  const texteManuel =
+    "Madame, Monsieur, je prépare mon dossier à partir des informations que j'ai fournies. Ce texte synthétique décrit mon parcours et mon projet d'études. Il sert à vérifier l'enregistrement, la conservation des versions et l'export local du document, puis sa relecture. Salutations respectueuses.";
+  const textePoursuivi = `${texteManuel}\nAjout personnel pendant une réponse lente : cette saisie doit rester.`;
+  const cheminVersion = new URL(page.url()).pathname;
+  const routeVersion = `**/api${cheminVersion}/version`;
+  let reponsePrete!: () => void;
+  let liberer!: () => void;
+  const recue = new Promise<void>((ok) => {
+    reponsePrete = ok;
+  });
+  const attente = new Promise<void>((ok) => {
+    liberer = ok;
+  });
+  await page.route(routeVersion, async (route) => {
+    const reponse = await route.fetch();
+    reponsePrete();
+    await attente;
+    await route.fulfill({ response: reponse });
+  });
+  await page.getByLabel("Ton texte", { exact: true }).fill(texteManuel);
+  try {
+    await page.getByRole("button", { name: "Enregistrer une version", exact: true }).click();
+    await recue;
+    // Le vrai serveur a enregistré, mais sa réponse n'est pas encore livrée.
+    await page.getByLabel("Ton texte", { exact: true }).fill(textePoursuivi);
+    liberer();
+    await expect(page.getByText(/Version 2 en cours/u)).toBeVisible();
+    await expect(page.getByLabel("Ton texte", { exact: true })).toHaveValue(textePoursuivi);
+  } finally {
+    liberer();
+    await page.unroute(routeVersion);
+  }
+  // Les derniers ajouts peuvent à leur tour être enregistrés et exportés.
   await page.getByRole("button", { name: "Enregistrer une version", exact: true }).click();
+  await expect(page.getByText(/Version 3 en cours/u)).toBeVisible();
+  const [conservee] = await lire<{ body: string }>(
+    'SELECT v.body FROM "DocumentVersion" v JOIN "Document" d ON d.id=v."documentId" WHERE d."applicationId"=$1 AND d.code=$2 ORDER BY v.rank DESC LIMIT 1',
+    [dossier, "lettre_motivation"],
+  );
+  expect(conservee!.body).toBe(textePoursuivi);
   // Le lien d'export est une vraie route ; elle est appelée avec la session
   // du navigateur. Le clic lui-même passe par le repli de navigation de Next
   // vers une route d'API, dont l'événement de téléchargement n'est pas
@@ -713,9 +825,11 @@ test("deux onglets : une seule relecture par version, consultation sans second a
   await aller(`/dossiers/${dossier}/redaction/lettre-motivation`);
   await page
     .getByLabel("Ton texte", { exact: true })
-    .fill("Madame, Monsieur, voici une nouvelle version de ma lettre, écrite pour la recette du double onglet. Elle reprend mon parcours et mon projet d'études. Salutations respectueuses.");
+    .fill(
+      "Madame, Monsieur, voici une nouvelle version de ma lettre, écrite pour la recette du double onglet. Elle reprend mon parcours et mon projet d'études. Salutations respectueuses.",
+    );
   await page.getByRole("button", { name: "Enregistrer une version", exact: true }).click();
-  await expect(page.getByText(/Version 2 en cours/u)).toBeVisible();
+  await expect(page.getByText(/Version 4 en cours/u)).toBeVisible();
   const route = `/dossiers/${dossier}/redaction/lettre-motivation/relecture`;
   const avantStats = await statsDesFournisseurs();
   await controlerLesFournisseurs("lente", 5_000);
@@ -744,7 +858,9 @@ test("deux onglets : une seule relecture par version, consultation sans second a
   await expect(b.getByRole("button", { name: "Consulter le résultat", exact: true })).toBeVisible();
   // Le fournisseur répond après son délai : le premier onglet publie le
   // résultat, le second le consulte sans rien relancer.
-  await expect(page.getByRole("button", { name: "Analyse en cours…" })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Analyse en cours…" })).toHaveCount(0, {
+    timeout: 30_000,
+  });
   const resultat = /Rien à reprendre sur cette version|Préciser le retour/u;
   await expect(page.getByText(resultat).first()).toBeVisible();
   await b.getByRole("button", { name: "Consulter le résultat", exact: true }).click();
@@ -781,7 +897,18 @@ test("quota épuisé et reprise gratuite : dix analyses Essentiel, reprise aprè
       "passeport",
     ])
   )[0]!.id;
-  const fichiers = ["L03.pdf", "L05.pdf", "L06.pdf", "L16.pdf", "L17.pdf", "L19.pdf", "L20.pdf", "L22.pdf", "L23.pdf", "L24.pdf"];
+  const fichiers = [
+    "L03.pdf",
+    "L05.pdf",
+    "L06.pdf",
+    "L16.pdf",
+    "L17.pdf",
+    "L19.pdf",
+    "L20.pdf",
+    "L22.pdf",
+    "L23.pdf",
+    "L24.pdf",
+  ];
   let limitesRencontrees = 0;
   await aller(`/dossiers/${second}/pieces/${piece}`);
   for (const [i, fichier] of fichiers.entries()) {
@@ -827,11 +954,17 @@ test("quota épuisé et reprise gratuite : dix analyses Essentiel, reprise aprè
   // Quota épuisé après une lecture réussie : téléverser et conserver, sans analyse.
   await aller(`/dossiers/${second}/pieces/${piece}`);
   await nouvelleVersion(page);
-  await expect(page.getByRole("heading", { name: "Tes 10 analyses du pack Essentiel sont utilisées" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Tes 10 analyses du pack Essentiel sont utilisées" }),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: "Ajouter des analyses", exact: true })).toBeVisible();
   limitesRencontrees += await deposerEnCadence(page, "L28.pdf", "Téléverser sans analyse");
   await expect.poll(async () => (await versions(piece)).length, { timeout: 30_000 }).toBe(13);
-  await expect.poll(async () => (await versions(piece)).find((v) => v.rank === 13)?.scanState ?? null, { timeout: 60_000 }).toBe("SAINE");
+  await expect
+    .poll(async () => (await versions(piece)).find((v) => v.rank === 13)?.scanState ?? null, {
+      timeout: 60_000,
+    })
+    .toBe("SAINE");
   expect((await analyses(piece)).filter((a) => a.rank === 13)).toHaveLength(0);
   expect(await credits(second)).toBe(0);
   await relever();
@@ -845,7 +978,9 @@ test("quota épuisé et reprise gratuite : dix analyses Essentiel, reprise aprè
 test("déclaration du dépôt, conservation annoncée, dossier figé, clôture et purge annoncée", async () => {
   await preparerDossierPret(dossier, email);
   await aller(`/dossiers/${dossier}`);
-  await expect(page.getByRole("heading", { name: "Ton dossier est prêt", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Ton dossier est prêt", exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Déclarer mon dépôt", exact: true }).click();
   await page.waitForURL(`**/dossiers/${dossier}/depot`);
   await relever();
@@ -861,7 +996,12 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
   await bouton.click();
   await page.waitForURL(`**/dossiers/${dossier}`);
   await page.waitForLoadState("networkidle");
-  const [soumis] = await lire<{ status: string; depositedOn: string; retentionUntil: string | null; submittedAt: string | null }>(
+  const [soumis] = await lire<{
+    status: string;
+    depositedOn: string;
+    retentionUntil: string | null;
+    submittedAt: string | null;
+  }>(
     'SELECT status, to_char("depositedOn", \'YYYY-MM-DD\') AS "depositedOn", "retentionUntil", "submittedAt" FROM "Application" WHERE id=$1',
     [dossier],
   );
@@ -869,7 +1009,9 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
   expect(soumis!.depositedOn).toBe(aujourdhui);
   expect(soumis!.submittedAt).not.toBeNull();
   expect(soumis!.retentionUntil).not.toBeNull();
-  await expect(page.getByRole("heading", { name: "Conservation de tes pièces", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Conservation de tes pièces", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText(/douze mois après ton dépôt/u)).toBeVisible();
   // Figé : la route de dépôt refuse, et l'écran de déclaration le dit.
   const refus = await page.evaluate(
@@ -878,7 +1020,12 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
         await fetch(`/api/dossiers/${d}/pieces/${p}/depot`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nom: "x.pdf", octets: 10, typeMime: "application/pdf", empreinte: "a".repeat(64) }),
+          body: JSON.stringify({
+            nom: "x.pdf",
+            octets: 10,
+            typeMime: "application/pdf",
+            empreinte: "a".repeat(64),
+          }),
         })
       ).status,
     [dossier, passeport] as const,
@@ -890,7 +1037,9 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ton dépôt est déjà déclaré");
 
   await aller(`/dossiers/${dossier}/cloture`);
-  await expect(page.getByRole("button", { name: "Clôturer mon dossier", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Clôturer mon dossier", exact: true }),
+  ).toBeDisabled();
   await page.getByRole("radio", { name: "J'ai obtenu mon visa", exact: true }).click();
   await page.getByRole("button", { name: "Clôturer mon dossier", exact: true }).click();
   await page.waitForURL("**/tableau-de-bord");
@@ -916,12 +1065,9 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
 
 test("bilan du profil : aucun défilement horizontal, aucune erreur JavaScript", async ({}, info) => {
   const debordements = mesures.filter((m) => m.contenu > m.largeur);
-  // WebKit remonte comme erreur de page un préchargement Next (`_rsc`)
-  // interrompu par la navigation suivante ; Chromium et Firefox le voient
-  // comme une requête annulée. Relevé à part, jamais compté comme erreur.
-  const prechargementInterrompu = /[?&]_rsc=.* due to access control checks\.$/u;
-  const prechargementsInterrompus = erreurs.filter((e) => prechargementInterrompu.test(e));
-  const erreursReelles = erreurs.filter((e) => !prechargementInterrompu.test(e));
+  const bilans = suivis.map((lire) => lire());
+  const prechargementsInterrompus = bilans.flatMap((b) => b.prechargementsAnnules);
+  const erreursReelles = bilans.flatMap((b) => b.erreursJS);
   mkdirSync(info.outputDir, { recursive: true });
   const releve = info.outputPath("preuves.json");
   writeFileSync(
@@ -936,6 +1082,7 @@ test("bilan du profil : aucun défilement horizontal, aucune erreur JavaScript",
         debordements,
         erreursJS: erreursReelles,
         prechargementsInterrompusWebKit: prechargementsInterrompus,
+        observationsPrechargements: bilans.flatMap((b) => b.observationsPrechargements),
       },
       null,
       2,
@@ -943,5 +1090,7 @@ test("bilan du profil : aucun défilement horizontal, aucune erreur JavaScript",
   );
   await info.attach("preuves", { path: releve, contentType: "application/json" });
   expect(debordements).toEqual([]);
-  expect(erreursReelles).toEqual([]);
+  expect(erreursReelles, JSON.stringify({
+    observationsPrechargements: bilans.flatMap((b) => b.observationsPrechargements),
+  })).toEqual([]);
 });

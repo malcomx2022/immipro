@@ -103,6 +103,18 @@ Les lignes non couvertes restent non vérifiées.
 
 ## Candidat
 
+**S.182, complément du 15/10 sur `29e9f20`, numéroté S.181 à l'ouverture.** La recette conserve les
+correctifs de stabilité de Claude `2c5a3c0` : la CI de base est verte
+([run](https://github.com/malcomx2022/immipro/actions/runs/38805109198)).
+La protection de saisie R-03 est complétée par une réponse retardée, la
+conservation du brouillon et son enregistrement relu en SQL. B-04/B-07 sont
+mesurés sur chaque largeur ; les exceptions WebKit se limitent aux
+préchargements Next de l'application interrompus par une navigation, sans
+ignorer une erreur d'accès vers une autre origine. La suite passe à
+96 parcours en plus des 84 scénarios publics. Résultats du complément et
+limites : [rapport S.182](../revue/finition-s182-2026-10-15.md).
+Ces ajouts ne constituent pas une signature humaine ou une qualification réelle.
+
 | N° | Scénario | Préconditions | Attendu | Observé | Preuve | Statut |
 |---|---|---|---|---|---|---|
 | R-C01 | Visiteur → simulateur → résultats → inscription → code → tableau de bord | Banc vierge, 390 px | Six questions, résultats sourcés, code reçu par courriel, compte vérifié, tableau de bord | Conforme. Aucune erreur dans la console. Observation O-1 | Code relevé dans `.recette/courriers/001.eml` ; compte vérifié en base | Vérifié (banc) |

@@ -28,11 +28,11 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | 3 | L2 — Mesure des usages IA | P1 | S.173 fusionné #280 ; arbitrage Claude #282 ; [preuves et limites](lot-l2-2026-10-11.md) |
 | 4 | L3 — Validité des avis IA | P1 | S.174 fusionné #283 ; [preuves](lot-l3-2026-10-11.md) |
 | 5 | L4 — Relecture unique par version | P1 | S.175 fusionné #284, déployé `0d82d23` (run 547) ; [preuves et limites](lot-l4-2026-10-11.md) |
-| 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | S.176 fusionné #286 ; S.177 proposé : Vertex seul, 5 000 XOF ; [preuves réelles à compléter](lot-l5-vertex-2026-10-12.md) |
-| 7 | L6 — Recette front et parcours candidat | P2 | En cours : S.178, recette locale et téléphone ; critères restants ouverts |
-| 8 | L7 — Exploitation et données antérieures | P2 | À réaliser |
+| 6 | L5 — Qualification réelle des fournisseurs | Préalable IA | S.176/#286 et S.177/#287 fusionnés ; tarif et région relevés officiellement en S.181 (point `eu`, raisonnement `low`), campagne bornée sans appel ; qualification réelle toujours ouverte |
+| 7 | L6 — Recette front et parcours candidat | P2 | S.178/#288 et S.180/#293 fusionnés ; complément S.182 sur les réponses lentes ; contrôles humains et signature ouverts |
+| 8 | L7 — Exploitation et données antérieures | P2 | B-07 corrigé en S.180 ; complément B-04 et recette en S.182 ; diagnostics/restauration sur cible ouverts |
 | 9 | L8 — Paiement, conformité et lancement | Préalables Q.A/M.C | À réaliser avec les preuves externes |
-| 10 | L9 — Maintenances restantes | P2 | À réaliser après relecture du travail de Claude |
+| 10 | L9 — Maintenances restantes | P2 | #290, #291 et #292 fusionnées ; avis résiduels et étapes majeures restantes à suivre |
 
 Chaque lot conserve une PR et un numéro S.xxx attribué au démarrage. Les
 preuves de qualification/lancement restent distinctes des corrections de code.

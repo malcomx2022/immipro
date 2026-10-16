@@ -13821,3 +13821,35 @@ complet ; journal `.qualification-vertex` à archiver sans secret entre
 sessions ; rapprochement facture, deux grilles humaines, DPA, résidence,
 conservation, incidents réels et configuration déployée. **L5 non
 clôturé**, Q.A/M.C non levés ; proposition sans fusion ni déploiement.
+
+## S.182 — Compléments S.180 : saisie tardive, erreurs navigateur et B-04
+
+15/10/2026, autorisation de corrections supplémentaires du responsable,
+lot mené en parallèle avec un autre outil. Base `29e9f20`, dernière logique
+Claude relue, complément `2c5a3c0` et dépendances #290–292 conservés ;
+relevé documentaire #294 laissé à sa branche. Ouvert sous le numéro S.181
+(PR #295), renuméroté S.182 le 16/10 à la fusion sur `ee43301` : S.181 est
+pris par le lot Vertex ci-dessus, fusionné le premier.
+
+R-03 : la nouvelle version ne remplace plus une saisie faite après le geste.
+Une restauration explicite reste appliquée si rien n'a été saisi depuis ;
+un changement de version sans geste garde un brouillon non enregistré.
+Six contrôles d'interface et la réponse réellement retardée en navigateur,
+suivie de l'enregistrement et de la lecture SQL, éprouvent RG-08.4.
+Le double onglet attend le nouveau rang avant sa relecture.
+
+B-04 : débordement 397/390 reproduit, métriques et tableau adaptés ; mesure
+réelle B-04/B-07 ajoutée aux six profils. Calculs WF-15/WF-16 inchangés.
+Le filtre WebKit retire un préchargement Next de l'origine de l'application
+interrompu par une navigation principale dans les deux secondes, sans exiger
+un `requestfailed` que WebKit n'émet pas pour eux : le réseau les voit
+terminés en 200 ou sans trace (porte du 15/10 : un sur deux puis aucun sur
+treize tracés ; rejeu local du 16/10 : quatre sur cinq terminés) ; autre
+origine, sans `_rsc`, hors navigation ou autre moteur restent bloquants,
+quatorze tests dont le cas exact de la porte.
+
+Tarif officiel Google référencé, promotion distincte du majorant de dépense
+brute. Aucun modèle, région, budget ou secret changé ; aucun appel réel.
+Lire [le rapport et les limites](../revue/finition-s182-2026-10-15.md).
+L5 réel, critères humains L6, exploitation cible L7, L8 et Q.A/M.C restent
+ouverts. Proposition vérifiée par la porte complète, sans fusion/déploiement.
