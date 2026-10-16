@@ -420,7 +420,7 @@ export function Paiements({
         }
       />
 
-      <div className="flex flex-col gap-4 p-6">
+      <div className="flex flex-col gap-4 p-4 md:p-6">
         {echecExport ? <BlocEchec echec={echecExport} annonce /> : null}
         {echecRapprochement ? <BlocEchec echec={echecRapprochement} annonce /> : null}
         {/*
@@ -455,7 +455,7 @@ export function Paiements({
           </section>
         ) : null}
 
-        <div className="grid grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Carte
             intitule="Encaissé aujourd'hui"
             valeur={publiable ? sommes(agregats.encaisse) : "—"}
@@ -524,7 +524,7 @@ export function Paiements({
             </p>
           </div>
         ) : (
-        <div className="overflow-hidden rounded-lg border border-ink-300 bg-white">
+        <div role="region" aria-label="Paiements de la journée" tabIndex={0} className="overflow-x-auto rounded-lg border border-ink-300 bg-white">
           <table className="w-full text-14">
             <caption className="sr-only">Paiements de la journée</caption>
             <thead>

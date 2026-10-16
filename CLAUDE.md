@@ -77,6 +77,30 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### Complément S.182 — saisie conservée et recette renforcée, 15–16/10/2026
+
+Lot parallèle du responsable, ouvert le 15/10 sur `29e9f20` sous le numéro
+S.181 ; renuméroté S.182 à la fusion du 16/10 sur `ee43301`, S.181 étant
+pris par le lot Vertex ci-dessous. Le complément Claude `2c5a3c0` et le
+relevé documentaire #294 sont relus et conservés.
+Le responsable autorise les corrections supplémentaires : une réponse lente
+d'enregistrement, génération ou restauration ne remplace plus une saisie
+faite depuis le geste. Une restauration explicite reste appliquée si rien
+n'a été saisi depuis ; un changement de version sans geste garde le brouillon
+non enregistré. Ne pas revenir au remplacement inconditionnel de S.180.
+La recette retarde une vraie réponse de sauvegarde, vérifie le texte gardé
+puis sa persistance et son export ; elle attend le nouveau rang avant la
+relecture à deux onglets. B-04 empile ses métriques et laisse le tableau
+défiler dans sa région au clavier. B-07/B-04 sont mesurés dans les six profils.
+Le filtre WebKit ne retire qu'un préchargement Next (`_rsc`) de l'origine
+même de l'application, interrompu par une navigation principale dans les
+deux secondes : le réseau voit ces préchargements terminés en 200 ou sans
+trace, jamais tous annulés (porte du 15/10, rejeu local du 16/10) ; les
+requêtes observées sont jointes aux preuves. Une erreur vers une autre origine (CORS), sans `_rsc`, hors
+navigation ou d'un autre moteur reste bloquante. Lire [preuves et limites S.182](docs/revue/finition-s182-2026-10-15.md).
+Le tarif officiel Vertex est référencé ; ni campagne, ni clé, ni région
+autorisée, ni plafond global ne sont modifiés. Aucun préalable Q.A/M.C levé.
+
 ### L5 — campagne Vertex sur le point multi-région `eu` — 16/10/2026, S.181
 
 Relevé officiel du 16/10 (pages Google du 15/10, cellules lues dans le DOM) :
