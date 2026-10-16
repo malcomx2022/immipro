@@ -1,0 +1,18 @@
+{
+  "id": "projetanatt-eu-gemini-3.8-flash",
+  "projet": "projetanatt",
+  "region": "eu",
+  "modele": "google/gemini-3.8-flash",
+  "plafondXof": 5000,
+  "borneVerifiee": true,
+  "referenceBorne": "Relevé officiel du 16/10/2026 (pages Google datées 2026-10-15, releve-officiel.json) : tarif hors global 0,825 USD par million en entrée et 4,125 USD par million en sortie, réponse et raisonnement, jusqu'au 31/12/2026 ; entrée bornée à 10 240 jetons (consignes et schéma, plus un média : image 1 120, page PDF 560) ; sortie bornée à 5 120 jetons (max_tokens 4 096 de l'adaptateur + 1 024 de raisonnement, reasoning_effort low de la page de compatibilité OpenAI) ; change BCE du 15/10/2026 1 EUR = 1,1208 USD, soit 585,26 XOF par USD à parité fixe, majoré à 620 ; frais et taxes majorés à 20 %. Toute mesure au-delà arrête la campagne (BORNE_FACTUREE_DEPASSEE).",
+  "sourceLimites": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+  "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+  "jetonsEntreeMax": 10240,
+  "jetonsSortieFacturesMax": 5120,
+  "tarifEntreeMicrosDeviseParMillion": 825000,
+  "tarifSortieMicrosDeviseParMillion": 4125000,
+  "deviseTarif": "USD",
+  "conversionMajoreeMicrosXofParUnite": 620000000,
+  "fraisMajoresMilliemes": 1200
+}

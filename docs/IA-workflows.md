@@ -49,6 +49,7 @@ de sélecteur de modèle.
 | `AI_OPENAI_API_KEY` | Clé pour le mode `cle` ; aucune clé fixe requise pour le mode Google. |
 | `AI_OPENAI_COMPTE_DE_SERVICE` | Compte de service Google en JSON ou base64. Matériel secret à fournir hors dépôt. |
 | `AI_OPENAI_PDF` | `oui` / `file`, `document_url` ou `image_url`, selon le protocole PDF du fournisseur. Vide / `non` : le PDF n'est pas envoyé à cet adaptateur. |
+| `AI_OPENAI_RAISONNEMENT` | `low`, `medium` ou `high`, envoyé tel quel en `reasoning_effort` ; vide : le fournisseur garde son défaut. Gemini 3 facture le raisonnement en sortie ; la campagne L5 impose `low` (S.181). |
 | `AI_PIECES_SOUS_TRAITANT_AUTORISE` | Doit valoir exactement `openai_compatible` pour autoriser l'extraction par cet adaptateur. Une clé seule ne suffit pas. |
 | `AI_OPENAI_ORIGINE_AUTORISEE` | Depuis S.171 (REV11-L1) : origine de la société validée, sans chemin (`https://api.mistral.ai`). Elle doit être celle de `AI_OPENAI_URL`, sinon aucune pièce ne part et B-07 dit pourquoi. |
 
@@ -273,6 +274,14 @@ et avis L3 inchangés ; arrêt avant réseau si plafond insuffisant, reprise
 bloquée sur mesure inconnue. WF-16 distingue réserve prudente, consommation
 mesurée et facture à rapprocher. Aucun quota candidat ni configuration de
 production changé. Modèle/prix/limites réels et qualification toujours à prouver.
+
+**S.181, décision du responsable (16/10/2026) :** `gemini-3.8-flash` n'est
+servi sur aucune région simple ; point multi-région `eu`
+(`aiplatform.eu.rep.googleapis.com`) et raisonnement `low`. Tarif officiel
+relevé le 16/10 : 0,825 $ en entrée et 4,125 $ en sortie par million, hors
+global, jusqu'au 31/12/2026. Campagne bornée et manifeste dans
+`docs/revue/preuves-l5-vertex-2026-10-16/` ; aucun appel tant que la clé
+manque. [Suivi](revue/lot-l5-vertex-2026-10-16.md).
 
 
 ## Recette fonctionnelle locale — S.178 / L6

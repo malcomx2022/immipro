@@ -77,6 +77,28 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### L5 — campagne Vertex sur le point multi-région `eu` — 16/10/2026, S.181
+
+Relevé officiel du 16/10 (pages Google du 15/10, cellules lues dans le DOM) :
+`gemini-3.8-flash` n'est servi sur aucune région simple, `europe-west1`
+comprise, seulement sur `global`, `us` et `eu` ; tarif hors global 0,825 $
+en entrée et 4,125 $ en sortie par million, raisonnement facturé en sortie,
+jusqu'au 31/12/2026. Décision du responsable : point multi-région `eu`
+(`aiplatform.eu.rep.googleapis.com`, traitement garanti dans l'Union) et
+raisonnement `low`. `AI_OPENAI_RAISONNEMENT` envoie `reasoning_effort` au
+fournisseur compatible quand elle est définie, rien sinon ; la destination
+Vertex autorisée exige `eu` et `low`. Campagne bornée (10 240 / 5 120
+jetons, 620 XOF par USD, frais 20 %, 44 XOF réservés par invocation, 113
+possibles pour 60 prévues) et manifeste, sans secret, dans
+`docs/revue/preuves-l5-vertex-2026-10-16/`. Lire
+[le suivi](docs/revue/lot-l5-vertex-2026-10-16.md). La clé du compte se
+fournit en secret d'environnement, jamais dans le dépôt ni le chat ; aucun
+appel payant tant qu'elle manque. Premier passage `--pieces L01,R03`, usage
+à confirmer sous les bornes ; dans une session éphémère, archiver le journal
+`.qualification-vertex` sans secret et le remettre avant toute reprise.
+Devise de facturation et taxes du compte à confirmer par le responsable.
+L5, Q.A et M.C restent ouverts ; aucune fusion ni déploiement par ce lot.
+
 ### Finalisation L6, L7, L9 et vérification L5 — 15/10/2026, S.180
 
 Instruction du responsable : finaliser les cinq lots restants, le

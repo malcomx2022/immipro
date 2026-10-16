@@ -378,7 +378,8 @@ async function main() {
   const vertexDeclare =
     fournisseur === "openai_compatible" &&
     (process.env.AI_OPENAI_AUTH === "compte_de_service_google" ||
-      baseDeclaree?.hostname.endsWith("aiplatform.googleapis.com"));
+      baseDeclaree?.hostname.endsWith("aiplatform.googleapis.com") ||
+      /^aiplatform\.(?:us|eu)\.rep\.googleapis\.com$/u.test(baseDeclaree?.hostname ?? ""));
   if (vertexDeclare && !options["campagne-vertex"]) {
     arreter(
       "Essai Vertex refusé : --campagne-vertex obligatoire pour le plafond global de 5 000 XOF.",
@@ -402,6 +403,7 @@ async function main() {
       pdf: config.pdf,
       auth: config.authentification.mode,
       email: config.authentification.compte.email,
+      raisonnement: config.raisonnement ?? null,
     });
     if (
       manifeste?.regionDeclaree !== campagneVertex.region ||

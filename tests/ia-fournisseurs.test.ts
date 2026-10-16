@@ -20,6 +20,7 @@ import {
   formeDuPdf,
   litLesPdf,
   manqueDuFournisseur,
+  niveauDeRaisonnement,
   variablesExigees,
   type FormeDuPdf,
   modeleDu,
@@ -126,6 +127,20 @@ describe("le domaine choisit, et ne devine rien", () => {
     expect(litLesPdf({}, "anthropic")).toBe(true);
     expect(litLesPdf({}, "openai_compatible")).toBe(false);
     expect(litLesPdf({ AI_OPENAI_PDF: "oui" }, "openai_compatible")).toBe(true);
+  });
+
+  it("S.181 — le niveau de raisonnement est envoyé tel que déclaré, jamais deviné", () => {
+    expect(niveauDeRaisonnement({})).toEqual({ connu: true, niveau: null });
+    expect(niveauDeRaisonnement({ AI_OPENAI_RAISONNEMENT: " Low " })).toEqual({ connu: true, niveau: "low" });
+    expect(niveauDeRaisonnement({ AI_OPENAI_RAISONNEMENT: "high" })).toEqual({ connu: true, niveau: "high" });
+    expect(niveauDeRaisonnement({ AI_OPENAI_RAISONNEMENT: "minimal" })).toEqual({ connu: false, valeur: "minimal" });
+    // Une faute ne vaut pas « défaut du fournisseur » : l'exploitant croit raisonner bas et paie MEDIUM.
+    expect(manqueDuFournisseur({ ...COMPATIBLE, AI_OPENAI_RAISONNEMENT: "minimal" }, "openai_compatible")).toMatch(
+      /AI_OPENAI_RAISONNEMENT vaut « minimal » : écrire low, medium, high/u,
+    );
+    expect(configurationCompatible({ ...COMPATIBLE, AI_OPENAI_RAISONNEMENT: "minimal" })).toBeNull();
+    expect(configurationCompatible({ ...COMPATIBLE, AI_OPENAI_RAISONNEMENT: "low" })).toMatchObject({ raisonnement: "low" });
+    expect(configurationCompatible(COMPATIBLE)).toMatchObject({ raisonnement: null });
   });
 
   it("S.99 — la forme du PDF se déclare par fournisseur, et une valeur inconnue est dite", () => {

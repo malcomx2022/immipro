@@ -67,6 +67,7 @@ import {
   manqueDuFournisseur,
   modeDAuthentification,
   modeleDu,
+  niveauDeRaisonnement,
   piecesAutoriseesChez,
 } from "@/domain/ia/fournisseurs";
 import { VARIABLE_COMPTE_DE_SERVICE, lireCompteDeService } from "@/domain/ia/compte-de-service";
@@ -374,7 +375,8 @@ export function configurationCompatible(
   const modele = modeleDu(environnement, "openai_compatible");
   const pdf = formeDuPdf(environnement);
   const auth = modeDAuthentification(environnement);
-  if (!base || !modele || !pdf.connue || !auth.connu) return null;
+  const raisonnement = niveauDeRaisonnement(environnement);
+  if (!base || !modele || !pdf.connue || !auth.connu || !raisonnement.connu) return null;
 
   let authentification: Authentification;
   if (auth.mode === "compte_de_service_google") {
@@ -384,7 +386,7 @@ export function configurationCompatible(
   } else {
     authentification = { mode: "cle", cle: (environnement.AI_OPENAI_API_KEY ?? "").trim() };
   }
-  return { base, authentification, modele, pdf: pdf.forme };
+  return { base, authentification, modele, pdf: pdf.forme, raisonnement: raisonnement.niveau };
 }
 
 export const extractionConfiguree = (
