@@ -122,6 +122,17 @@ export const VARIABLE_ORIGINE_AUTORISEE = "AI_OPENAI_ORIGINE_AUTORISEE";
 /** Le fournisseur compatible OpenAI lit les PDF seulement si l'exploitant le déclare. */
 export const VARIABLE_PDF_COMPATIBLE = "AI_OPENAI_PDF";
 
+/**
+ * Le niveau de raisonnement demandé au fournisseur compatible — S.181.
+ *
+ * Envoyé tel quel comme `reasoning_effort`. Vide : rien n'est envoyé et le
+ * fournisseur garde son défaut. Gemini 3 sur Vertex raisonne en MEDIUM par
+ * défaut et facture ces jetons en sortie ; la campagne L5 impose `low`.
+ */
+export const VARIABLE_RAISONNEMENT_COMPATIBLE = "AI_OPENAI_RAISONNEMENT";
+export const NIVEAUX_DE_RAISONNEMENT = ["low", "medium", "high"] as const;
+export type NiveauDeRaisonnement = (typeof NIVEAUX_DE_RAISONNEMENT)[number];
+
 type Environnement = Readonly<Record<string, string | undefined>>;
 const lire = (env: Environnement, nom: string): string => (env[nom] ?? "").trim();
 
@@ -158,6 +169,17 @@ export function formeDuPdf(
 ): { connue: true; forme: FormeDuPdf | null } | { connue: false; valeur: string } {
   const valeur = lire(env, VARIABLE_PDF_COMPATIBLE).toLowerCase();
   return valeur in VALEURS_PDF ? { connue: true, forme: VALEURS_PDF[valeur]! } : { connue: false, valeur };
+}
+
+/** Le niveau de raisonnement déclaré, `null` si rien n'est à envoyer ; une valeur inconnue est dite. */
+export function niveauDeRaisonnement(
+  env: Environnement,
+): { connu: true; niveau: NiveauDeRaisonnement | null } | { connu: false; valeur: string } {
+  const valeur = lire(env, VARIABLE_RAISONNEMENT_COMPATIBLE).toLowerCase();
+  if (valeur === "") return { connu: true, niveau: null };
+  return (NIVEAUX_DE_RAISONNEMENT as readonly string[]).includes(valeur)
+    ? { connu: true, niveau: valeur as NiveauDeRaisonnement }
+    : { connu: false, valeur };
 }
 
 /**
@@ -252,6 +274,10 @@ export function manqueDuFournisseur(env: Environnement, code: CodeFournisseur): 
   const pdf = formeDuPdf(env);
   if (!pdf.connue) {
     return `${VARIABLE_PDF_COMPATIBLE} vaut « ${pdf.valeur} » : écrire oui (OpenAI), document_url (Mistral), image_url (Vertex AI) ou non`;
+  }
+  const raisonnement = niveauDeRaisonnement(env);
+  if (!raisonnement.connu) {
+    return `${VARIABLE_RAISONNEMENT_COMPATIBLE} vaut « ${raisonnement.valeur} » : écrire ${NIVEAUX_DE_RAISONNEMENT.join(", ")}, ou vider la variable pour laisser le défaut du fournisseur`;
   }
   const auth = modeDAuthentification(env);
   if (auth.connu && auth.mode === "compte_de_service_google") {

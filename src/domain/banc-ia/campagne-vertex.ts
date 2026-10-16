@@ -1,6 +1,11 @@
-/** Autorisation L5 du 12/10 : une seule destination, plafond global en XOF. */
+/**
+ * Autorisation L5 du 12/10 : une seule destination, plafond global en XOF.
+ * Décision du 16/10/2026 : le modèle demandé n'est servi sur aucune région
+ * simple ; le responsable retient le point multi-région `eu` (traitement
+ * garanti dans l'Union, tarif « hors global ») et le raisonnement `low`.
+ */
 import { z } from "zod";
-export const CAMPAGNE_VERTEX = "projetanatt-europe-west1-gemini-3.8-flash";
+export const CAMPAGNE_VERTEX = "projetanatt-eu-gemini-3.8-flash";
 export const PLAFOND_VERTEX_MICROS_XOF = 5_000_000_000;
 export const MODELE_VERTEX_DEMANDE = "google/gemini-3.8-flash";
 const entier = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -12,7 +17,7 @@ const schema = z
   .object({
     id: z.literal(CAMPAGNE_VERTEX),
     projet: z.literal("projetanatt"),
-    region: z.literal("europe-west1"),
+    region: z.literal("eu"),
     modele: z.literal(MODELE_VERTEX_DEMANDE),
     plafondXof: z.literal(5000),
     borneVerifiee: z.boolean(),
@@ -69,26 +74,28 @@ export function verifierDestinationVertex(config: {
   auth: string;
   email: string;
   pdf: string | null;
+  raisonnement: string | null;
 }) {
   if (
     config.fournisseur !== "openai_compatible" ||
     config.auth !== "compte_de_service_google" ||
     config.modele !== MODELE_VERTEX_DEMANDE ||
     config.pdf !== "image_url" ||
+    config.raisonnement !== "low" ||
     config.email !== "immipro-vertex-ai@projetanatt.iam.gserviceaccount.com" ||
     config.base.protocol !== "https:" ||
-    config.base.hostname !== "europe-west1-aiplatform.googleapis.com" ||
+    config.base.hostname !== "aiplatform.eu.rep.googleapis.com" ||
     config.base.port ||
     config.base.username ||
     config.base.password ||
     config.base.search ||
     config.base.hash ||
-    !/^\/v1(?:beta1)?\/projects\/projetanatt\/locations\/europe-west1\/endpoints\/openapi\/?$/u.test(
+    !/^\/v1(?:beta1)?\/projects\/projetanatt\/locations\/eu\/endpoints\/openapi\/?$/u.test(
       config.base.pathname,
     )
   ) {
     throw new Error(
-      "Destination refusée : uniquement Vertex projetanatt/europe-west1, modèle demandé et compte immipro-vertex-ai.",
+      "Destination refusée : uniquement Vertex projetanatt sur le point multi-région eu (aiplatform.eu.rep.googleapis.com), modèle demandé, compte immipro-vertex-ai et raisonnement low.",
     );
   }
 }

@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-16",
+  "methode": "Pages publiques de Google Cloud rendues par Chromium headless (Playwright) à travers le proxy de la session, sans compte ni OAuth ni appel au modèle ; lecture du texte rendu et, pour le tableau régional, des attributs DOM (aria-label « Supported », classe compare-yes).",
+  "pages": {
+    "tarifs": { "url": "https://cloud.google.com/vertex-ai/generative-ai/pricing", "resolue": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing" },
+    "regions": { "url": "https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations", "resolue": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/locations", "miseAJour": "2026-10-15 UTC" },
+    "modele": { "url": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash", "resolue": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash", "miseAJour": "2026-10-15 UTC" },
+    "raisonnement": { "url": "https://cloud.google.com/vertex-ai/generative-ai/docs/thinking", "miseAJour": "2026-10-15 UTC" },
+    "compatibiliteOpenAI": { "url": "https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/call-gemini-using-openai-library", "resolue": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/migrate/openai/overview", "miseAJour": "2026-10-15 UTC" },
+    "documents": { "url": "https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/document-understanding", "miseAJour": "2026-10-15 UTC" },
+    "images": { "url": "https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/image-understanding", "miseAJour": "2026-10-15 UTC" },
+    "geminiApiRaisonnement": { "url": "https://ai.google.dev/gemini-api/docs/thinking", "note": "API Gemini (hors offre Google Cloud), citée pour la sémantique de max_output_tokens seulement" },
+    "bce": { "url": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml", "date": "2026-10-15", "eurUsd": 1.1208 }
+  },
+  "constats": {
+    "tarifGemini38Flash": {
+      "periodeIntroductive": "jusqu'au 31/12/2026",
+      "entreeUsdParMillion": { "global": 0.75, "nonGlobal": 0.825 },
+      "sortieTexteReponseEtRaisonnementUsdParMillion": { "global": 3.75, "nonGlobal": 4.125 },
+      "aPartirDu20270101": { "entree": { "global": 1.50, "nonGlobal": 1.65 }, "sortie": { "global": 7.50, "nonGlobal": 8.25 } },
+      "colonneLue": "Standard (Priority identique ; Batch -50 %)",
+      "devise": "USD ; « If you pay in a currency other than USD, the prices listed in your currency on Cloud Platform SKUs apply »",
+      "facturation": "seules les réponses 200 sont facturées"
+    },
+    "regions": {
+      "gemini-3.8-flash": { "global": "Supported", "us": "Supported", "eu": "Supported", "europe-west1": "non", "autresRegionsSimplesEurope": "non", "regionsSimplesUS": "non" },
+      "gemini-3.7-flash": { "regionsSimples": "non" },
+      "gemini-2.5-flash": { "europe-west1": "Supported" },
+      "hoteMultiRegionEu": "https://aiplatform.eu.rep.googleapis.com (location eu)",
+      "avertissement": "Endpoints don't guarantee data residency or in-region ML processing ; les points multi-région garantissent le traitement ML dans la juridiction (US ou UE)."
+    },
+    "ficheModele": { "stade": "GA", "regionsCitees": "global ; multi-région us, eu", "fenetre": 1048576, "sortieMax": 65536, "retrait": "2027-09-02 ou plus tard", "pdf": "jusqu'à 3 000 pages, 50 Mo", "images": "png/jpeg/webp/heic/heif" },
+    "jetonsMedias": { "pdfParPageDefaut": 560, "pdfParPageHaute": 1120, "imageDefaut": 1120, "imageBasse": 280, "imageMoyenne": 560 },
+    "raisonnement": {
+      "niveaux38Flash": "LOW, MEDIUM (défaut), HIGH ; MINIMAL refusé",
+      "facture": "les jetons de réflexion sont facturés en sortie (« Text output (response and reasoning) »)",
+      "compatibiliteOpenAI": "reasoning_effort low=1024, medium=8192, high=24576 jetons de réflexion ; max_tokens pris en charge ; un seul de reasoning_effort ou extra_body.google.thinking_config",
+      "plafondCombine": "API Gemini : max_output_tokens inclut les jetons de réflexion ; la référence GenerationConfig Vertex dit seulement « maximum number of tokens to generate in the response » — à confirmer par la mesure usage du prédiagnostic avant toute baisse de borne"
+    },
+    "change": { "eurUsdBce20261015": 1.1208, "xofParEurFixe": 655.957, "xofParUsdDerive": 585.26 }
+  }
+}

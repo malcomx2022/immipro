@@ -13764,3 +13764,60 @@ n'est pas redéployée.
 Relevé dans [le suivi](../revue/lot-l6-l9-2026-10-15.md). Aucun préalable
 levé, aucun drapeau commercial touché ; L5 réel, signature L6, L7 sur le
 VPS, L8, Q.A et M.C restent au responsable.
+
+
+## S.181 — L5 : région tranchée (`eu`), raisonnement `low`, campagne bornée sans appel
+
+**Instruction du responsable, 16/10/2026.** « On reprend avec L5 », puis,
+sur le relevé officiel, « on part sur eu multi-région, valide le réglage
+low ». Base `841be33` (#294/S.180 fusionnée) ; CLAUDE.md, protocole Vertex
+S.177, banc S.176 et code Claude relus avant modification. Aucune PR
+concurrente ; S.181 libre.
+
+**Constat.** Pages Google rendues le 16/10 par Chromium à travers le proxy,
+sans compte ni appel (datées du 15/10) : la fiche du modèle ne cite que
+`global`, `us` et `eu` ; le tableau des points de terminaison, lu dans le
+DOM, ne marque `gemini-3.8-flash` « Supported » que sur ces trois points et
+laisse vides les dix régions d'Europe, `europe-west1` comprise, pour toute
+la famille Gemini 3. La lecture du 15/10 qui y voyait `europe-west1` était
+fausse. Tarif officiel, colonne Standard : 0,75 $ global et 0,825 $ hors
+global en entrée, 3,75 $ et 4,125 $ en sortie « réponse et raisonnement »,
+par million, jusqu'au 31/12/2026, le double ensuite ; prix en USD, seules
+les réponses 200 facturées. PDF 560 jetons par page par défaut, image
+1 120 ; `reasoning_effort` low = 1 024, medium = 8 192, high = 24 576 par
+l'API compatible, niveau MEDIUM par défaut pour 3.8 Flash. BCE 15/10 :
+1 EUR = 1,1208 USD, soit 585 XOF par USD à parité fixe.
+
+**Décision et correction.** Point multi-région `eu`
+(`aiplatform.eu.rep.googleapis.com`, location `eu`, traitement garanti dans
+l'Union, tarif hors global) ; raisonnement `low`. Nouvelle variable
+`AI_OPENAI_RAISONNEMENT` (`low|medium|high`, vide = défaut du fournisseur,
+autre valeur refusée et dite), envoyée telle quelle en `reasoning_effort`
+par l'adaptateur compatible ; `configurationCompatible` la lit. La campagne
+devient `projetanatt-eu-gemini-3.8-flash`, région `eu` ; la destination
+autorisée exige l'hôte multi-région UE, le chemin `locations/eu`, le modèle,
+le compte et `low`, et refuse `global`, `us`, toute région simple et tout
+autre niveau. Campagne bornée et manifeste, sans secret, dans
+`docs/revue/preuves-l5-vertex-2026-10-16/` : entrée 10 240, sortie 5 120
+(4 096 + 1 024), tarifs 825 000 / 4 125 000 micro-USD, change majoré
+620 000 000 micro-XOF par USD, frais 1 200 ‰ ; réserve 44,00 XOF par
+invocation, 113 possibles pour 60 prévues. `.env.example`, protocole,
+DOC IA et CLAUDE.md alignés. INV-6 et D1 inchangés : réserve prudente avant
+réseau, aucun zéro inventé.
+
+**Éprouvé.** Tests : niveau lu, refusé ou absent ; `reasoning_effort`
+présent dans le corps envoyé au serveur local quand il est déclaré, absent
+sinon ; destination `eu` acceptée en v1/v1beta1, `europe-west1`, `us`,
+`global`, niveau absent ou `medium` refusés ; CLI Vertex synthétique sur
+l'hôte `eu` avec `reasoning_effort: low` tracé et budget tenu. Campagne et
+manifeste acceptés par les lecteurs du projet. Résultats de `npm run check`
+dans [le suivi](../revue/lot-l5-vertex-2026-10-16.md).
+
+**Reste à faire.** Clé du compte `immipro-vertex-ai` en secret
+d'environnement par le responsable (jamais lue du coffre, jamais dans le
+dépôt) ; devise de facturation et taxes du compte à confirmer ; premier
+passage `--pieces L01,R03`, usage à confirmer sous les bornes avant le jeu
+complet ; journal `.qualification-vertex` à archiver sans secret entre
+sessions ; rapprochement facture, deux grilles humaines, DPA, résidence,
+conservation, incidents réels et configuration déployée. **L5 non
+clôturé**, Q.A/M.C non levés ; proposition sans fusion ni déploiement.

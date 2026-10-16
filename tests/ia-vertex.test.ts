@@ -266,6 +266,15 @@ describe("la lecture d'une pièce chez Vertex", () => {
     expect(JSON.stringify(lue)).not.toContain("jeton-1");
   });
 
+  it("S.181 — le niveau de raisonnement déclaré part en reasoning_effort, sinon rien", async () => {
+    await lireDesOctetsCompatible({ ...config(), raisonnement: "low" }, "image/png", Buffer.from("x"), DEMANDE);
+    await lireDesOctetsCompatible(config(), "image/png", Buffer.from("x"), DEMANDE);
+    const corps = recus.filter((r) => r.chemin.endsWith("/chat/completions")).map((r) => JSON.parse(r.corps));
+    expect(corps).toHaveLength(2);
+    expect(corps[0]).toMatchObject({ model: "google/gemini-3.8-flash", reasoning_effort: "low", max_tokens: 4096 });
+    expect(corps[1]).not.toHaveProperty("reasoning_effort");
+  });
+
   it("un jeton refusé en cours de route se redemande une fois", async () => {
     await jetonGoogle(compte());
     refusDuProchainAppel = true;

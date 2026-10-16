@@ -20,7 +20,7 @@ import type { MesureDuBanc } from "../scripts/banc-ia/resultats";
 const charge = {
   id: CAMPAGNE_VERTEX,
   projet: "projetanatt",
-  region: "europe-west1",
+  region: "eu",
   modele: MODELE_VERTEX_DEMANDE,
   plafondXof: 5000,
   borneVerifiee: true,
@@ -39,12 +39,13 @@ const campagne = () => lireCampagneVertex(charge);
 const config = {
   fournisseur: "openai_compatible",
   base: new URL(
-    "https://europe-west1-aiplatform.googleapis.com/v1/projects/projetanatt/locations/europe-west1/endpoints/openapi",
+    "https://aiplatform.eu.rep.googleapis.com/v1/projects/projetanatt/locations/eu/endpoints/openapi",
   ),
   modele: MODELE_VERTEX_DEMANDE,
   auth: "compte_de_service_google",
   email: "immipro-vertex-ai@projetanatt.iam.gserviceaccount.com",
   pdf: "image_url",
+  raisonnement: "low",
 };
 const connue: MesureDuBanc = {
   etat: "CONNUE",
@@ -77,7 +78,16 @@ describe("S.177 — destination et borne de coût Vertex", () => {
     { auth: "cle" },
     { email: "autre@projetanatt.iam.gserviceaccount.com" },
     { pdf: "file" },
-    { base: new URL(config.base.href.replaceAll("europe-west1", "europe-west4")) },
+    { raisonnement: null },
+    { raisonnement: "medium" },
+    // Région simple : le modèle n'y est pas servi, et la décision du 16/10 est le point multi-région.
+    {
+      base: new URL(
+        "https://europe-west1-aiplatform.googleapis.com/v1/projects/projetanatt/locations/europe-west1/endpoints/openapi",
+      ),
+    },
+    { base: new URL("https://aiplatform.us.rep.googleapis.com/v1/projects/projetanatt/locations/us/endpoints/openapi") },
+    { base: new URL("https://aiplatform.googleapis.com/v1/projects/projetanatt/locations/global/endpoints/openapi") },
     { base: new URL(config.base.href.replace("projects/projetanatt", "projects/autre")) },
     { base: new URL("https://generativelanguage.googleapis.com/v1") },
     { base: new URL(config.base.href + "?cle=secret") },
@@ -264,7 +274,7 @@ async function cliVertex(d: string, mode: "connue" | "inconnue") {
   };
   const shim = path.join(d, "transport-synthetique.mjs");
   const trace = path.join(d, "transport.json");
-  await writeFile(trace, JSON.stringify({ oauth: 0, modele: 0 }));
+  await writeFile(trace, JSON.stringify({ oauth: 0, modele: 0, raisonnement: null }));
   await writeFile(
     shim,
     `import cp from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; import { readFileSync, writeFileSync } from 'node:fs';
@@ -276,8 +286,8 @@ globalThis.fetch = async (input, init) => {
   const u = new URL(String(input)); const t = JSON.parse(readFileSync(${JSON.stringify(trace)}, 'utf8'));
   let charge;
   if(u.href === 'https://oauth2.googleapis.com/token') { t.oauth++; charge={access_token:'synthetique',expires_in:3600,token_type:'Bearer'}; }
-  else if(u.hostname === 'europe-west1-aiplatform.googleapis.com' && u.pathname.endsWith('/chat/completions')) {
-    t.modele++; charge={choices:[{message:{content:JSON.stringify({obstacle:null,pieceIdentifiee:'passeport',champs:{passeport_validite_min:'2031-01-01'}})},finish_reason:'stop'}],
+  else if(u.hostname === 'aiplatform.eu.rep.googleapis.com' && u.pathname.endsWith('/chat/completions')) {
+    t.modele++; t.raisonnement = JSON.parse(String(init.body)).reasoning_effort ?? null; charge={choices:[{message:{content:JSON.stringify({obstacle:null,pieceIdentifiee:'passeport',champs:{passeport_validite_min:'2031-01-01'}})},finish_reason:'stop'}],
       ...(${JSON.stringify(mode)} === 'connue' ? {usage:{prompt_tokens:1,completion_tokens:1}} : {})};
   } else throw new Error('Aucune destination réseau réelle dans ce test');
   writeFileSync(${JSON.stringify(trace)},JSON.stringify(t)); return new Response(JSON.stringify(charge), {headers:{'Content-Type':'application/json'}});
@@ -288,7 +298,7 @@ globalThis.fetch = async (input, init) => {
     path.join(d, "manifeste.json"),
     JSON.stringify({
       societe: "Google Vertex — test synthétique",
-      regionDeclaree: "europe-west1",
+      regionDeclaree: "eu",
       modele: config.modele,
       dateVerification: "2026-10-12",
       sourceModele: "https://exemple.test/modeles",
@@ -323,6 +333,7 @@ globalThis.fetch = async (input, init) => {
     AI_OPENAI_URL: config.base.href,
     AI_OPENAI_MODEL: config.modele,
     AI_OPENAI_PDF: "image_url",
+    AI_OPENAI_RAISONNEMENT: "low",
     AI_OPENAI_AUTH: "compte_de_service_google",
     AI_OPENAI_COMPTE_DE_SERVICE: JSON.stringify(compte),
     AI_TARIF_OPENAI_COMPATIBLE_ENTREE_PAR_MILLION: "500",
@@ -354,12 +365,12 @@ describe("CLI Vertex budgété avec SDK/OAuth synthétiques", () => {
         for (let i = 0; i < 5; i++) {
           const r = await cliVertex(d, "connue");
           expect(r.code).toBe(0);
-          expect(r.trace).toEqual({ oauth: 1, modele: 1 });
+          expect(r.trace).toEqual({ oauth: 1, modele: 1, raisonnement: "low" });
           expect(r.budget.reserveMicrosXof).toBe((i + 1) * 1_000_000_000);
         }
         const r = await cliVertex(d, "connue");
         expect(r.code).toBe(1);
-        expect(r.trace).toEqual({ oauth: 0, modele: 0 });
+        expect(r.trace).toEqual({ oauth: 0, modele: 0, raisonnement: null });
         expect(r.budget).toMatchObject({
           reserveMicrosXof: 5_000_000_000,
           blocage: "PLAFOND_AVANT_APPEL",
@@ -380,7 +391,7 @@ describe("CLI Vertex budgété avec SDK/OAuth synthétiques", () => {
         });
         const reprise = await cliVertex(d, "connue");
         expect(reprise.code).toBe(1);
-        expect(reprise.trace).toEqual({ oauth: 0, modele: 0 });
+        expect(reprise.trace).toEqual({ oauth: 0, modele: 0, raisonnement: null });
       }),
     20000,
   );

@@ -22,7 +22,7 @@ import {
   type MatiereDeLaPiece,
 } from "@/domain/redaction/commande";
 import type { CompteDeService } from "@/domain/ia/compte-de-service";
-import type { FormeDuPdf } from "@/domain/ia/fournisseurs";
+import type { FormeDuPdf, NiveauDeRaisonnement } from "@/domain/ia/fournisseurs";
 import type { Lecture } from "@/server/dossiers/extracteur";
 import type { Critique, Redacteur, Redaction, Relecture } from "@/server/redaction/adaptateur";
 import type { AppelMesure } from "./appel";
@@ -81,6 +81,12 @@ export interface ConfigurationCompatible {
   modele: string;
   /** La forme du bloc PDF que ce fournisseur lit, ou `null` s'il ne lit pas les PDF. */
   pdf: FormeDuPdf | null;
+  /**
+   * Le niveau envoyé comme `reasoning_effort`, ou rien pour laisser le
+   * défaut du fournisseur — S.181. Gemini 3 facture le raisonnement en
+   * sortie : la campagne L5 l'impose à `low`.
+   */
+  raisonnement?: NiveauDeRaisonnement | null;
 }
 
 /** Ce que rend un appel : la réponse lue, ou la cause de son absence. */
@@ -206,7 +212,11 @@ async function envoyer(
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ model: config.modele, ...corps }),
+      body: JSON.stringify({
+        model: config.modele,
+        ...(config.raisonnement ? { reasoning_effort: config.raisonnement } : {}),
+        ...corps,
+      }),
       signal: AbortSignal.timeout(delaiMs),
       // Jamais suivie : le corps porte la pièce (REV11-L1, S.171).
       redirect: "manual",
