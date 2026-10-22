@@ -77,6 +77,37 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### Revue des tests et état des modules — 22/10/2026, S.183
+
+Demande du responsable : revue des tests unitaires, d'intégration et
+fonctionnels, point du restant, modules et statuts. Base `a857390` (#297) ;
+#298–#300 (Dependabot) ouvertes, non reprises. Lire
+[la revue et la table des modules](docs/revue/revue-tests-2026-10-22.md).
+Trois niveaux, à ne pas confondre : **unitaire** (Vitest, 199 fichiers,
+3 940 tests, domaine pur, routes à Prisma simulé, écrans), **intégration**
+(30 fumées de la porte sur PostgreSQL jetable, deux diagnostics IA),
+**fonctionnel** (Playwright, 16 parcours et 14 scénarios photographiques
+× six profils, IA et checkout scriptés). Aucun ne qualifie un fournisseur.
+Rejoué le 22/10 : porte unitaire, audit, build, 30 fumées et diagnostics
+verts ; parcours (32) et photographies (28) verts sur Chromium 390/1440,
+Firefox/WebKit laissés à la CI ; bac à sable non éprouvé faute de clé.
+Lint désormais sans avertissement.
+Statuts : WF-01/02/04 éprouvés ; WF-05 bloqué par M.C ; WF-06/08 bloqués
+par L5 ; WF-03/07/09/10/11/13/14/15/16 partiels ; WF-12 en phase 3.
+Constat C-1 traité le même jour : `tests/routes-ecritures.test.ts`
+(66 tests) couvre les quatorze écritures sans test de route — rôle, limite
+sensible, corps refusé avant effet, motif journalisé avant l'écriture,
+propriété, rejeu ; huit mutations détectées. C-6 : le banc relevait
+parfois un faux code de vérification (en-têtes recollés jusqu'au
+`Message-ID`) ; `codeDuCourrier` ne lit plus que le corps. Suite :
+201 fichiers, 4 009 tests. Ne pas affaiblir ces attentes pour accepter un défaut. O-4
+tranchée par le responsable : la suspension B-03 exige désormais
+`MOTIF_MINIMUM_COMPTE` (dix caractères), comme l'écran et les autres
+actions de compte.
+Gestes absents : R-O03, R-O05, échéancier, fuseau, péremption, lecteur
+d'écran. Seules retouches : fixtures P-03 (`slug`) et une directive ESLint
+inutile. Aucun préalable levé, aucune fusion ni déploiement par ce lot.
+
 ### Complément S.182 — saisie conservée et recette renforcée, 15–16/10/2026
 
 Lot parallèle du responsable, ouvert le 15/10 sur `29e9f20` sous le numéro

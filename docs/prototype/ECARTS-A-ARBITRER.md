@@ -13853,3 +13853,31 @@ brute. Aucun modèle, région, budget ou secret changé ; aucun appel réel.
 Lire [le rapport et les limites](../revue/finition-s182-2026-10-15.md).
 L5 réel, critères humains L6, exploitation cible L7, L8 et Q.A/M.C restent
 ouverts. Proposition vérifiée par la porte complète, sans fusion/déploiement.
+
+## S.183 — Revue des tests unitaires, d'intégration et fonctionnels ; état des modules
+
+22/10/2026, demande du responsable : revue complète des trois niveaux de
+tests, point du restant, liste des modules et de leur statut. Base
+`a857390` (#297, S.182 fusionnée) ; #298–#300 Dependabot ouvertes, non
+reprises. Aucune règle, aucun schéma, aucun drapeau ni service changé.
+
+Porte rejouée sur un conteneur neuf (Node 24, PostgreSQL 16 local) :
+199 fichiers / 3 940 tests verts, types, vocabulaire, construction et
+fumées de la porte (résultats dans la revue). Deux retouches d'hygiène :
+fixtures P-03 complétées de leur `slug` (avertissement React de clé
+absente), directive ESLint inutile retirée de `purge-stockage.ts`.
+
+Constats : 41 routes API sur 73 testées directement. Complément du même
+jour, demandé par le responsable : `tests/routes-ecritures.test.ts`,
+66 tests sur les quatorze écritures restées sans test de route (B-04,
+B-03, partages, WF-09/11/12/13/14, dépôt, rappels, notification), huit
+mutations détectées. C-6 : faux code de vérification relevé par le banc
+quand l'UUID du `Message-ID` commençait par six chiffres (échec Firefox
+1 440 de la première porte de #301) ; lecture limitée au corps, test
+dédié. Suite à 201 fichiers / 4 009 tests. O-4 : motif de
+suspension B-03 à trois caractères contre dix ailleurs ; alignement
+demandé par le responsable et fait (`MOTIF_MINIMUM_COMPTE` dans la route). Gestes navigateur absents : R-O03, R-O05,
+échéancier, fuseau, péremption, lecteur d'écran. O-1 à O-3 ouvertes.
+Statuts par workflow et par module, et ordre du travail de code encore
+possible sans préalable : [la revue](../revue/revue-tests-2026-10-22.md).
+L5, L6 humain, L7 cible, L8, Q.A et M.C restent ouverts.

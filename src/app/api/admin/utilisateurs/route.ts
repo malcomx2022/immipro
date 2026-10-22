@@ -5,6 +5,7 @@ import { comptes } from "@/server/lecture/backoffice";
 import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { fermerToutesLesSessions } from "@/server/securite/session";
+import { MOTIF_MINIMUM_COMPTE } from "@/domain/backoffice/comptes";
 
 /**
  * Comptes — B-03, WF-15.
@@ -35,7 +36,8 @@ export const PUT = route({
   corps: z.object({
     userId: z.guid(),
     suspendre: z.boolean(),
-    motif: z.string().trim().min(3).max(500),
+    // Même seuil que l'écran et les autres actions de compte (O-4, S.183).
+    motif: z.string().trim().min(MOTIF_MINIMUM_COMPTE).max(500),
   }),
   async traiter({ corps, acteur }) {
     const cible = await db.user.findUnique({ where: { id: corps.userId } });
