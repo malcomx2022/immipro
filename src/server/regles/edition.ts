@@ -273,6 +273,18 @@ export async function enregistrerLesTextes(
     // dossier a pu figer, ni dans ce que le candidat lit.
     exigerUneVersionJamaisPubliee(versionDe(source));
     exigerUnEnregistrementAffichable(source, ecrit);
+    /*
+      Rien de changé, rien d'écrit — R-O03, S.183. B-02 enregistre avant de
+      publier : réécrire `verifiedBy` ici faisait de l'administrateur qui
+      relit le rédacteur de la version, et WF-14 §4 lui refusait alors la
+      publication. Un enregistrement sans changement n'est pas une rédaction.
+    */
+    if (
+      JSON.stringify(lu.data) === JSON.stringify(enBase.data) &&
+      Object.keys(metadonnees(ecrit)).length === 0
+    ) {
+      return { id: source.id, version: source.version, statut: source.status, versionOuverte: false };
+    }
     const maj = await db.visaRule.update({
       where: { id: destination.id },
       data: {

@@ -13876,7 +13876,15 @@ quand l'UUID du `Message-ID` commençait par six chiffres (échec Firefox
 1 440 de la première porte de #301) ; lecture limitée au corps, test
 dédié. Suite à 201 fichiers / 4 009 tests. O-4 : motif de
 suspension B-03 à trois caractères contre dix ailleurs ; alignement
-demandé par le responsable et fait (`MOTIF_MINIMUM_COMPTE` dans la route). Gestes navigateur absents : R-O03, R-O05,
+demandé par le responsable et fait (`MOTIF_MINIMUM_COMPTE` dans la route). Parcours R-O03 et R-O05 ajoutés (18 par profil).
+Six défauts relevés, quatre corrigés avec reproduction : C-8, purge d'une
+lettre relue refusée par la garde `document_version_relecture_sur_un_texte`
+(migration d'assouplissement, choix du responsable) ; C-9, reconnexion
+d'un compte en suppression demandée ; C-10, enregistrement sans changement
+qui faisait du publieur le rédacteur ; C-11, fausse annonce de pièces
+supprimées. Deux ouverts : C-7, `effectiveTo` prévu de la graine NL qui
+empêche le remplacement à la publication (lot dédié décidé) ; C-12, B-02
+sans les valeurs des conditions. Gestes navigateur encore absents :
 échéancier, fuseau, péremption, lecteur d'écran. O-1 à O-3 ouvertes.
 Statuts par workflow et par module, et ordre du travail de code encore
 possible sans préalable : [la revue](../revue/revue-tests-2026-10-22.md).

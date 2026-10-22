@@ -79,6 +79,15 @@ export async function controlerLesFournisseurs(
   if (!r.ok) throw Error(`Mode ${mode} refusé par le fournisseur scripté.`);
 }
 
+/** R-O05 : le faux stockage du banc refuse les suppressions, ou les accepte de nouveau. */
+export async function suppressionsDuStockage(etat: "refusees" | "acceptees"): Promise<void> {
+  const r = await fetch(`${origineDesFournisseurs()}/stockage`, {
+    method: "POST",
+    body: JSON.stringify({ suppressions: etat }),
+  });
+  if (!r.ok) throw Error(`État ${etat} refusé par le stockage du banc.`);
+}
+
 export async function statsDesFournisseurs(): Promise<Record<string, number>> {
   return (await fetch(`${origineDesFournisseurs()}/stats`)).json() as Promise<
     Record<string, number>

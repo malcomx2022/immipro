@@ -14,6 +14,11 @@
  * Le banc de recette (RF-5, S.156) le sert aussi au navigateur : le dépôt
  * présigné (préflight CORS, PUT), l'aperçu (GET), et au worker : la taille
  * (HEAD), la lecture et la promotion (copie par `x-amz-copy-source`).
+ *
+ * `refuserLesSuppressions` (S.183, R-O05) fait répondre 503 à chaque DELETE,
+ * comme un stockage indisponible : la suppression d'un compte reste alors
+ * « demandée », et la reprise B-03 s'éprouve. Désactivé par défaut ; seul
+ * le banc `--parcours` l'expose, par son serveur de contrôle.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -29,6 +34,7 @@ export async function demarrerUnFauxStockage(options: { port?: number; journal?:
     [SEAU_CONFIANCE, new Map()],
     [SEAU_QUARANTAINE, new Map()],
   ]);
+  let suppressionsRefusees = false;
   const seau = (nom: string) => {
     if (!seaux.has(nom)) seaux.set(nom, new Map());
     return seaux.get(nom)!;
@@ -115,6 +121,10 @@ export async function demarrerUnFauxStockage(options: { port?: number; journal?:
         return reponse.end();
       }
       if (requete.method === "DELETE") {
+        if (suppressionsRefusees) {
+          reponse.writeHead(503, { "Content-Type": "application/xml" });
+          return reponse.end("<Error><Code>ServiceUnavailable</Code></Error>");
+        }
         objets.delete(cle);
         reponse.writeHead(204);
         return reponse.end();
@@ -137,6 +147,9 @@ export async function demarrerUnFauxStockage(options: { port?: number; journal?:
   return {
     port,
     seau,
+    refuserLesSuppressions: (refus: boolean) => {
+      suppressionsRefusees = refus;
+    },
     arreter: () =>
       new Promise<void>((ok) => {
         serveur.closeAllConnections();

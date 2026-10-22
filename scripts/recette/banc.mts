@@ -236,7 +236,7 @@ async function demarrer(): Promise<void> {
   // valeurs ajoutées sont synthétiques et les destinations sur la boucle locale.
   const parcours = process.argv.includes("--parcours");
   if (parcours) {
-    const faux = await fournisseursDuParcours(env.APP_URL!);
+    const faux = await fournisseursDuParcours(env.APP_URL!, stockage);
     fermetures.push(faux.arreter);
     const origine = `http://127.0.0.1:${faux.port}`;
     Object.assign(env, {
