@@ -438,3 +438,11 @@ contrôlés. Les mesures initiales de performance restent des diagnostics locaux
 [Rapport et limites](../revue/implementation-photos-2026-10-15.md) ·
 [Catalogue, commandes et preuves CI](../photographies.md).
 Cette recette ne clôt ni les préalables L5/Q.A/M.C ni les contrôles humains L6.
+
+## Revue des tests — S.183, 22/10/2026
+
+Aucune ligne ne change de statut. La [revue des tests](../revue/revue-tests-2026-10-22.md)
+rapproche les lignes « non vérifié » (R-O03, R-O04, R-O05, R-C08
+échéancier, R-K06 fuseau et péremption, R-I02, R-I04) des routes API qui
+n'ont encore aucune preuve HTTP exécutée, et propose leur ordre de reprise.
+La signature reste à apposer.

@@ -34,6 +34,13 @@ ils ne valent ni date de livraison ni autorisation d'encaissement.
 | 9 | L8 — Paiement, conformité et lancement | Préalables Q.A/M.C | À réaliser avec les preuves externes |
 | 10 | L9 — Maintenances restantes | P2 | #290, #291 et #292 fusionnées ; avis résiduels et étapes majeures restantes à suivre |
 
+**Point du 22/10 (S.183).** États ci-dessus inchangés. La
+[revue des tests et des modules](revue-tests-2026-10-22.md) liste les
+statuts par workflow et par module, et le travail de code encore possible
+sans préalable : tests de route des écritures B-04, suppression,
+migration de version et correction de dépôt ; parcours R-O03/R-O05,
+échéancier et péremption ; observations O-1 à O-3.
+
 Chaque lot conserve une PR et un numéro S.xxx attribué au démarrage. Les
 preuves de qualification/lancement restent distinctes des corrections de code.
 

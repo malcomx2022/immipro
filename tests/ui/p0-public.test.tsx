@@ -158,6 +158,7 @@ describe("P-03 — Résultats", () => {
       ],
       ecartees: [
         {
+          slug: "suisse",
           code: "CH",
           pays: "Suisse",
           motif: "Le budget déclaré ne couvre pas la première année.",
@@ -190,6 +191,7 @@ describe("P-03 — Résultats", () => {
       retenues: [],
       ecartees: [
         {
+          slug: "pays-bas",
           code: "NL",
           pays: "Pays-Bas",
           motif: "Niveau de langue non atteint.",
@@ -265,6 +267,7 @@ describe("P-03 — Résultats", () => {
       retenues: [],
       ecartees: [
         {
+          slug: "pays-bas",
           code: "NL",
           pays: "Pays-Bas",
           motif: "Niveau de langue non atteint.",

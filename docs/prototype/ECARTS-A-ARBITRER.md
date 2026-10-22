@@ -13853,3 +13853,25 @@ brute. Aucun modèle, région, budget ou secret changé ; aucun appel réel.
 Lire [le rapport et les limites](../revue/finition-s182-2026-10-15.md).
 L5 réel, critères humains L6, exploitation cible L7, L8 et Q.A/M.C restent
 ouverts. Proposition vérifiée par la porte complète, sans fusion/déploiement.
+
+## S.183 — Revue des tests unitaires, d'intégration et fonctionnels ; état des modules
+
+22/10/2026, demande du responsable : revue complète des trois niveaux de
+tests, point du restant, liste des modules et de leur statut. Base
+`a857390` (#297, S.182 fusionnée) ; #298–#300 Dependabot ouvertes, non
+reprises. Aucune règle, aucun schéma, aucun drapeau ni service changé.
+
+Porte rejouée sur un conteneur neuf (Node 24, PostgreSQL 16 local) :
+199 fichiers / 3 940 tests verts, types, vocabulaire, construction et
+fumées de la porte (résultats dans la revue). Deux retouches d'hygiène :
+fixtures P-03 complétées de leur `slug` (avertissement React de clé
+absente), directive ESLint inutile retirée de `purge-stockage.ts`.
+
+Constats : 41 routes API sur 73 testées directement ; les écritures B-04
+(remboursement manuel/tranche), suppression et vérification d'utilisateur,
+migration de version (WF-11), correction de date de dépôt et partages n'ont
+aucune preuve HTTP exécutée. Gestes navigateur absents : R-O03, R-O05,
+échéancier, fuseau, péremption, lecteur d'écran. O-1 à O-3 ouvertes.
+Statuts par workflow et par module, et ordre du travail de code encore
+possible sans préalable : [la revue](../revue/revue-tests-2026-10-22.md).
+L5, L6 humain, L7 cible, L8, Q.A et M.C restent ouverts.
