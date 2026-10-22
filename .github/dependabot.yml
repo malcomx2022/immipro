@@ -18,8 +18,13 @@ updates:
       actions:
         update-types: [minor, patch]
 
+  # `docker/prisma-cli` porte la CLI Prisma de l'image, à version exacte :
+  # celle du verrou racine (M15, `tests/image-production.test.ts`). Surveillé
+  # seul `/`, Dependabot montait `prisma` à la racine et pas dans l'image, et
+  # la porte refusait la proposition (#303, 22/10/2026). Les deux répertoires
+  # partagent le groupe : une montée de Prisma arrive en une seule PR.
   - package-ecosystem: npm
-    directory: /
+    directories: [/, /docker/prisma-cli]
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     groups:
