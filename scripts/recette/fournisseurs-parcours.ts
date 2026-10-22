@@ -2,7 +2,10 @@
 import { createServer } from "node:http";
 import { createHmac, randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
-export async function fournisseursDuParcours(app: string) {
+export async function fournisseursDuParcours(
+  app: string,
+  stockage?: { refuserLesSuppressions: (refus: boolean) => void },
+) {
   const origine = new URL(app);
   if (
     origine.protocol !== "http:" ||
@@ -50,6 +53,17 @@ export async function fournisseursDuParcours(app: string) {
         mode = c.mode;
         if (Number.isInteger(c.delai) && c.delai >= 0 && c.delai <= 30_000) delai = c.delai;
         json({ mode, delai });
+        return;
+      }
+      // R-O05 : un stockage qui refuse les suppressions, puis qui répond.
+      if (u.pathname === "/stockage" && req.method === "POST" && stockage) {
+        const c = JSON.parse(texte);
+        if (!["refusees", "acceptees"].includes(c.suppressions)) {
+          json({ erreur: "état inconnu" }, 400);
+          return;
+        }
+        stockage.refuserLesSuppressions(c.suppressions === "refusees");
+        json({ suppressions: c.suppressions });
         return;
       }
       if (u.pathname === "/v1/chat/completions") {

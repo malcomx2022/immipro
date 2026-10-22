@@ -1578,6 +1578,89 @@ try {
     );
   }
   /*
+    ── B-02 : publier ne fait pas du publieur le rédacteur — R-O03, S.183 ──
+
+    « Publier enregistre d'abord » : l'écran renvoie les textes avant de
+    publier, pour ne jamais mettre en vigueur un texte que l'écran ne montre
+    pas. Cet enregistrement réécrivait `verifiedBy` même sans rien changer :
+    l'administrateur qui relisait la version d'un veilleur en devenait le
+    rédacteur, et WF-14 §4 refusait sa publication. Une modification de
+    condition bloquante ne pouvait donc jamais être publiée depuis B-02.
+    Relevé par la recette navigateur R-O03.
+  */
+  console.log("\nB-02 — un enregistrement sans changement ne fait pas du publieur le rédacteur");
+  {
+    const enVigueur = await db.visaRule.create({
+      data: {
+        countryCode: "NL",
+        visaType: "emploi_second_lecteur",
+        category: "EMPLOI",
+        version: 1,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: RULES as never,
+        sourceUrl: brute.sourceUrl,
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"),
+        verifiedBy: "graine",
+        nextReviewAt: new Date("2029-01-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const ecrit = await enregistrerLesTextes(
+      enVigueur.id,
+      { champ: "payload", payload: avecSeuil(ACTUEL - 1) as never },
+      { email: REDACTEUR.email },
+    );
+    const textesDuBrouillon = async () => {
+      const vue = (await editionDeLaRegle(enVigueur.id))!;
+      return {
+        champ: "textes" as const,
+        libelleCandidat: vue.brouillon.libelleCandidat,
+        reserveCandidat: vue.brouillon.reserveCandidat,
+      };
+    };
+    const redacteurDu = async () =>
+      (await db.visaRule.findUniqueOrThrow({ where: { id: ecrit.id } })).verifiedBy;
+    verifier((await redacteurDu()) === REDACTEUR.email, "le veilleur rédige le seuil abaissé");
+
+    /* Un texte réellement modifié par l'administrateur : il devient rédacteur, et ne publie pas seul. */
+    const modifies = await textesDuBrouillon();
+    await enregistrerLesTextes(
+      enVigueur.id,
+      { ...modifies, libelleCandidat: `${modifies.libelleCandidat} (relu)` },
+      AUTRE,
+    );
+    verifier((await redacteurDu()) === AUTRE.email, "un texte modifié fait de l'administrateur le rédacteur");
+    let refuse = false;
+    try {
+      await publierLaRegle(ecrit.id, AUTRE, "Publication de sa propre version");
+    } catch (erreur) {
+      refuse = codeDe(erreur) === "etat_incompatible";
+    }
+    verifier(refuse, "et WF-14 §4 refuse alors sa publication");
+
+    /* Le veilleur reprend la main ; l'administrateur publie par le chemin de l'écran. */
+    const repris = await textesDuBrouillon();
+    await enregistrerLesTextes(
+      enVigueur.id,
+      { ...repris, libelleCandidat: modifies.libelleCandidat },
+      { email: REDACTEUR.email },
+    );
+    verifier((await redacteurDu()) === REDACTEUR.email, "le veilleur redevient le rédacteur");
+    const avant = await db.visaRule.findUniqueOrThrow({ where: { id: ecrit.id } });
+    const inchange = await enregistrerLesTextes(enVigueur.id, await textesDuBrouillon(), AUTRE);
+    verifier(inchange.id === ecrit.id, "l'enregistrement de l'écran vise le brouillon");
+    const apres = await db.visaRule.findUniqueOrThrow({ where: { id: ecrit.id } });
+    verifier(apres.verifiedBy === REDACTEUR.email, `sans changement, le rédacteur reste le veilleur (${apres.verifiedBy})`);
+    verifier(
+      apres.verifiedAt?.getTime() === avant.verifiedAt?.getTime(),
+      "et rien n'est réécrit, pas même la date de vérification",
+    );
+    const publiee = await publierLaRegle(ecrit.id, AUTRE, "Relue par l'administrateur");
+    verifier(publiee.publiee === ecrit.id, "l'administrateur, second lecteur, publie depuis B-02");
+  }
+  /*
     ── Une version dépubliée par l'échéance reste figée — revue C1 ─────
 
     RG-14.1 repasse en `DRAFT` une version en vigueur dont la relecture

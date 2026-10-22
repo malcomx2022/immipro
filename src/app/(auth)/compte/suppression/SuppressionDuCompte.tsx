@@ -16,6 +16,8 @@ import {
   LIBELLE_CONFIRMATION,
   LIBELLE_LIEN_AVANT_SUPPRESSION,
   LIEN_AVANT_SUPPRESSION,
+  SUPPRESSION_EN_COURS,
+  TITRE_SUPPRESSION_EN_COURS,
 } from "@/domain/comptes/suppression";
 import { MENTION_DELAI_REMBOURSEMENT } from "@/domain/consultants/annulation";
 
@@ -65,7 +67,8 @@ export function SuppressionDuCompte({
 }: SuppressionDuCompteProps) {
   const [motDePasse, setMotDePasse] = useState("");
   const [envoi, setEnvoi] = useState(false);
-  const [fait, setFait] = useState(false);
+  // `en_cours` : la demande est prise, la purge n'a pas abouti (R-O05).
+  const [fait, setFait] = useState<null | "supprime" | "en_cours">(null);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   const idMotDePasse = useId();
 
@@ -78,13 +81,39 @@ export function SuppressionDuCompte({
     setEnvoi(false);
     if (resultat.ok) {
       setMotDePasse("");
-      setFait(true);
+      setFait(resultat.donnees.supprime ? "supprime" : "en_cours");
       return;
     }
     setEchec(resultat.echec);
   }
 
-  if (fait) {
+  if (fait === "en_cours") {
+    return (
+      <div className="mx-auto flex w-full max-w-reglages flex-col gap-4 px-4 py-6 md:px-8 md:py-10">
+        <h1
+          id="contenu"
+          tabIndex={-1}
+          aria-live="polite"
+          className="text-pretty text-24 font-semibold text-ink-900 outline-none md:text-32"
+        >
+          {TITRE_SUPPRESSION_EN_COURS}
+        </h1>
+        {SUPPRESSION_EN_COURS.map((phrase) => (
+          <p key={phrase} className="text-pretty text-16 text-ink-700">
+            {phrase}
+          </p>
+        ))}
+        <Link
+          href="/"
+          className="flex min-h-action items-center justify-center rounded-md bg-ink-900 px-4 text-16 font-medium text-white"
+        >
+          Revenir à l&apos;accueil
+        </Link>
+      </div>
+    );
+  }
+
+  if (fait === "supprime") {
     return (
       <div className="mx-auto flex w-full max-w-reglages flex-col gap-4 px-4 py-6 md:px-8 md:py-10">
         <h1

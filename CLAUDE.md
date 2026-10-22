@@ -104,8 +104,21 @@ parfois un faux code de vérification (en-têtes recollés jusqu'au
 tranchée par le responsable : la suspension B-03 exige désormais
 `MOTIF_MINIMUM_COMPTE` (dix caractères), comme l'écran et les autres
 actions de compte.
-Gestes absents : R-O03, R-O05, échéancier, fuseau, péremption, lecteur
-d'écran. Seules retouches : fixtures P-03 (`slug`) et une directive ESLint
+R-O03 et R-O05 joués en navigateur le même jour (18 parcours par
+profil) ; six défauts relevés. Corrigés : C-8, purge d'une lettre relue
+refusée par la base (migration `20261022180000_relecture_purgee`, choix
+du responsable) ; C-9, reconnexion d'un compte en suppression demandée ;
+C-10, « Publier » de B-02 faisait du publieur le rédacteur (WF-14 §4
+impossible depuis l'écran) ; C-11, écran « pièces supprimées » sur une
+purge inachevée. Ouverts : C-7, une règle à `effectiveTo` prévu (graine
+NL) n'est pas remplacée à la publication — lot dédié décidé, R-O03 tourne
+sur la règle CH ; C-12, B-02 ne montre ni n'édite les valeurs des
+conditions. Le faux stockage du banc `--parcours` sait refuser les
+suppressions (`POST /stockage`).
+Gestes absents : échéancier, fuseau, péremption, lecteur d'écran.
+Sécurité : `next` 16.4.2 reporté de #300 (GHSA-2464-fhr4-w9xw critique,
+GHSA-p3m5-59mp-jv5r élevée, publiés le 22/10) ; le VPS reste exposé
+jusqu'au redéploiement de `main`. Seules retouches : fixtures P-03 (`slug`) et une directive ESLint
 inutile. Aucun préalable levé, aucune fusion ni déploiement par ce lot.
 
 ### Complément S.182 — saisie conservée et recette renforcée, 15–16/10/2026

@@ -86,6 +86,23 @@ export const A_FAIRE_AVANT =
 export const LIEN_AVANT_SUPPRESSION = "/compte/mes-donnees";
 export const LIBELLE_LIEN_AVANT_SUPPRESSION = "Télécharger mes données";
 
+/**
+ * Quand la purge n'a pas abouti — R-O05, S.183.
+ *
+ * Le serveur rend `supprime: false` quand une pièce a résisté au stockage :
+ * le compte reste « suppression demandée », les sessions sont fermées, la
+ * reprise de nuit et B-03 achèveront. L'écran disait pourtant « tes pièces
+ * ont été supprimées » et « tu peux ouvrir un nouveau compte avec la même
+ * adresse » — deux affirmations fausses tant que l'anonymisation n'a pas eu
+ * lieu. Il dit ce qui est fait, ce qui ne l'est pas, et qu'il n'y a rien à
+ * refaire.
+ */
+export const TITRE_SUPPRESSION_EN_COURS = "Ta demande de suppression est enregistrée";
+export const SUPPRESSION_EN_COURS: readonly string[] = [
+  "Tu es déconnecté de tous tes appareils, et ce compte ne peut plus être ouvert.",
+  "Certaines de tes pièces n'ont pas encore pu être effacées de nos serveurs. La suppression reprend automatiquement, et ton nom sera effacé de nos bases dès qu'elle aura abouti. Tu n'as rien à refaire.",
+];
+
 /** Libellé du champ de confirmation. Le mot de passe, parce qu'il est déjà connu. */
 export const LIBELLE_CONFIRMATION = "Ton mot de passe, pour confirmer";
 

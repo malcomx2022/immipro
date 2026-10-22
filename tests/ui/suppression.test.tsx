@@ -61,6 +61,30 @@ describe("Suppression de compte", () => {
     expect(screen.getByText(/ouvrir un nouveau compte avec la même adresse/)).toBeDefined();
   });
 
+  it("ne dit pas les pièces supprimées quand la purge n'a pas abouti (R-O05, S.183)", async () => {
+    global.fetch = vi.fn(() => reponse({ supprime: false })) as unknown as typeof fetch;
+    const { container } = render(<SuppressionDuCompte email="aline.dossou@email.com" />);
+    fireEvent.change(screen.getByLabelText("Ton mot de passe, pour confirmer"), {
+      target: { value: "demonstration-2026" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Supprimer définitivement mon compte" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Ta demande de suppression est enregistrée" }),
+      ).toBeDefined(),
+    );
+    const texte = container.textContent ?? "";
+    // Ce qui est fait, et seulement cela : l'accès est fermé.
+    expect(texte).toContain("Tu es déconnecté de tous tes appareils");
+    // Ce qui ne l'est pas encore, sans geste demandé au candidat.
+    expect(texte).toMatch(/pas encore pu être effacées/u);
+    expect(texte).not.toMatch(/ont été supprimées/u);
+    // L'adresse n'est pas encore libérée : se réinscrire échouerait.
+    expect(texte).not.toMatch(/nouveau compte avec la même adresse/u);
+  });
+
   it("rend le mot de passe refusé actionnable, sans supprimer quoi que ce soit", async () => {
     global.fetch = vi.fn(() =>
       reponse(

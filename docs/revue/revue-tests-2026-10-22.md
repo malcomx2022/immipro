@@ -166,7 +166,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | Module | Statut | Preuves | Reste |
 |---|---|---|---|
 | WF-01 Simulateur | Éprouvé | Domaine `simulateur/` ; parcours clavier six réponses ; photographies | O-1 libellé du dispositif |
-| WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement | Suppression de compte (R-O05), portabilité en navigateur ; OAuth Google V2 |
+| WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement, suppression demandée et reprise (R-O05, § 8) | Portabilité en navigateur ; OAuth Google V2 |
 | WF-03 Recommandations | Partiel | Domaine, résultats sourcés, comparateur | Profils variés en navigateur |
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
 | WF-05 Achat de pack | Bloqué (M.C) | Tunnel, FedaPay, réconciliation, remboursement, montée sur PostgreSQL ; achat scripté en navigateur | Bac à sable réel FedaPay/Stripe, certification fiscale, essai réel |
@@ -175,11 +175,11 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-08 Rédaction assistée | Bloqué (L5) | Avis L3, relecture exclusive L4, rédaction ; parcours rédaction, DOCX, deux onglets, saisie tardive (S.182) | Modèle réel qualifié |
 | WF-09 Échéancier et rappels | Partiel | `smoke:rappels`, `smoke:depot` | Échéancier en navigateur, réception courriel réelle |
 | WF-10 Clôture, issue, purge | Partiel | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré et clôture | Purge effective et portabilité en navigateur |
-| WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` | R-O03 ; route de migration sans test direct |
+| WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle CH (§ 8) | C-7 : une règle à fin prévue (graine NL) n'est pas remplacée à la publication |
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès | Route d'un dossier sans test direct, conditions d'affiliation |
-| WF-14 Veille et publication | Partiel | Publication relue par un second opérateur, textes juridiques | Routine de veille réelle |
-| WF-15 Administration | Partiel | B-05 en navigateur, rôles, journal, facturation | B-04 remboursements, suppression, autres formulaires (R-I04) |
+| WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), textes juridiques | Routine de veille réelle ; B-02 ne montre ni n'édite les valeurs des conditions (C-12) |
+| WF-15 Administration | Partiel | B-05 et B-03 (relance de suppression) en navigateur, rôles, journal, facturation | B-04 remboursements, autres formulaires (R-I04) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
 
 ### 5.2 Modules techniques
@@ -261,8 +261,8 @@ Travail de code encore possible sans préalable externe, par priorité :
 
 1. ~~Tests de route pour les écritures listées en C-1~~ : fait le 22/10
    (66 tests, § 3). O-4 tranchée et corrigée le même jour.
-2. Parcours navigateur pour R-O03 (publication → divergence → arbitrage),
-   R-O05 (suppression), l'échéancier et la péremption d'une pièce.
+2. ~~Parcours navigateur pour R-O03 et R-O05~~ : faits le 22/10 (§ 8).
+   Restent l'échéancier et la péremption d'une pièce, et C-7 (lot dédié).
 3. Libellé du dispositif dans les résultats du simulateur (O-1) et
    textes d'aide B-05 (O-2, O-3).
 4. Relecture des trois PR Dependabot avec la porte complète.
@@ -279,3 +279,74 @@ npm run smoke:<nom>      # chaque fumée de validation.yml
 npx playwright install --with-deps chromium firefox webkit
 npm run test:photos && npm run test:parcours
 ```
+
+## 8. Parcours R-O03 et R-O05 — 22/10/2026
+
+Demande du responsable : ajouter les parcours navigateur de R-O03 et R-O05.
+Deux scénarios en fin de `tests/parcours/candidat.spec.ts` ; chaque profil
+passe donc de 16 à **18 parcours** (108 sur six profils). Ils ont relevé
+six défauts : quatre corrigés ici, avec reproduction préalable, et deux
+consignés.
+
+**R-O03 — second lecteur, divergence, arbitrage.**
+
+1. Le candidat ouvre un second dossier, sur la règle CH, et l'active par
+   l'achat scripté.
+2. L'administrateur abaisse de deux unités le seuil bloquant
+   `preuve_fonds_annuelle`, par `PUT /api/admin/regles/[id]` depuis sa
+   session : c'est la seule voie, B-02 n'éditant pas les valeurs (C-12).
+3. B-02 refuse sa publication et nomme la condition en cause.
+4. Le veilleur corrige à une unité. Son bouton « Publier » est désactivé,
+   avec sa raison (RG-14.2).
+5. L'administrateur publie depuis B-02 : la v1 est archivée, et le journal
+   donne le veilleur pour rédacteur.
+6. Le worker propage une divergence MAJEURE, sans mettre le dossier en
+   pause.
+7. Le candidat migre depuis ses alertes (T-02) ; son dossier porte la
+   nouvelle version.
+
+Chaque profil abaisse le seuil d'une unité, sans incidence sur les autres
+gestes.
+
+**R-O05 — suppression demandée, puis reprise.**
+
+- Le faux stockage du banc reçoit un mode « suppressions refusées »
+  (`refuserLesSuppressions`). Il est désactivé par défaut, et seul le banc
+  `--parcours` l'expose, par `POST /stockage` sur son serveur de contrôle.
+- Déroulé :
+  1. Demande de suppression du candidat pendant la panne ; sessions
+     fermées.
+  2. Même mot de passe refusé (401).
+  3. Relance B-03 « non achevée ».
+  4. Stockage rétabli ; relance achevée.
+  5. Compte anonymisé, dossiers purgés, deux relances au journal.
+
+| Constat | Défaut | Traitement |
+|---|---|---|
+| **C-7** | La graine livre les règles NL avec `effectiveTo = 2026-12-31`, une fin de validité prévue. La publication, la graine et le relevé du veilleur ne reconnaissent pour « en vigueur » qu'une version dont `effectiveTo` est nul. Publier la version 2027 n'archiverait pas la 2026 et ne préviendrait aucun dossier : deux versions PUBLISHED, aucune migration. C'est le cas que RG-14.3 annonce, « les montants IND changent au 1er janvier ». | **Ouvert**, lot dédié décidé par le responsable. Proposition : reconnaître une version remplacée par son statut `ARCHIVED` (posé seulement au remplacement) plutôt que par `effectiveTo` nul, dans `publierLaRegle`, la graine et `consignerLeReleve` ; garder `effectiveTo` comme fin prévue pour le filtre candidat et T-02. R-O03 tourne sur la règle CH en attendant. |
+| **C-8** | La purge efface le texte d'une version (`body`) mais garde sa date de relecture (`critiquedAt`). La garde `document_version_relecture_sur_un_texte` refusait la mise à jour : aucun dossier contenant une lettre relue ne se purgeait, pièces d'identité comprises (INV-5, clôture + 30 jours, suppression de compte en 500). | **Corrigé**, choix du responsable : la migration `20261022180000_relecture_purgee` admet une relecture datée sur une version purgée, et la refuse toujours ailleurs. Reproduit puis vérifié par `smoke:purge`. |
+| **C-9** | `connecter` refusait un compte suspendu, mais pas un compte en suppression demandée. Purge inachevée, le mot de passe rouvrait une session sur des dossiers en cours de purge. | **Corrigé** : même refus, et même message, qu'un compte suspendu ; `tests/connexion-suppression-demandee.test.ts`. |
+| **C-10** | Dans B-02, « Publier » enregistre d'abord les textes, et cet enregistrement réécrivait `verifiedBy` même sans changement. L'administrateur qui relisait la version d'un veilleur en devenait le rédacteur, et WF-14 §4 lui refusait la publication : une modification de condition bloquante ne pouvait jamais être publiée depuis l'écran. | **Corrigé** : un enregistrement sans changement de contenu ni de métadonnées n'écrit rien (`enregistrerLesTextes`). Reproduit puis vérifié par `smoke:publication`. Un texte réellement modifié fait toujours du publieur le rédacteur. |
+| **C-11** | L'écran de suppression affichait « Tes pièces ont été supprimées » et « tu peux ouvrir un nouveau compte avec la même adresse » même quand le serveur rendait `supprime: false`. | **Corrigé** : état « Ta demande de suppression est enregistrée », qui dit ce qui est fait, ce qui reste et qu'il n'y a rien à refaire ; test d'interface. |
+| **C-12** | B-02 ne montre pas les valeurs des conditions : le panneau des différences annonçait « 0 champ modifié » sur un seuil bloquant changé. Le second lecteur ne voit donc pas ce qu'il relit, et aucune valeur ne s'édite depuis l'écran. | **Ouvert** : un chantier d'écran, à arbitrer. |
+
+Résultats locaux, Chromium 390/1440 : **36 parcours sur 36** ;
+`npm run check`, `smoke:publication`, `smoke:purge` et `smoke:migrations`
+verts. Firefox et WebKit sont laissés à la porte CI.
+
+La migration est un assouplissement. Elle s'applique avant l'application
+et le worker, comme toute migration. Aucune ligne existante ne la viole.
+
+**Sécurité, 22/10 au soir.** Pendant la porte locale, l'audit a relevé deux
+avis publiés le jour même sur `next` ≥ 16.0.0 et ≤ 16.4.0 :
+GHSA-2464-fhr4-w9xw, une exécution de code à distance non authentifiée par
+l'API d'optimisation d'images avec des SVG (critique), et
+GHSA-p3m5-59mp-jv5r, un déni de service par les Server Actions (élevé).
+Ils rendaient la porte rouge pour toute proposition, `main` comprise. Le
+correctif existe dans la PR Dependabot #300 : il est reporté ici a minima,
+`next` et `eslint-config-next` en 16.4.2, sans les onze autres montées du
+groupe. Le verrou ne change que la famille `next`. L'audit repasse sans
+vulnérabilité élevée ou critique non motivée. Quand #300 sera fusionnée,
+ce report n'aura plus d'effet. La version en service sur le VPS reste
+exposée tant que `main` n'est pas redéployée avec ce correctif.
+

@@ -151,7 +151,13 @@ export async function connecter(
     return { ouverte: false, verdict: verdictAvant, message: libelleEchec(verdictAvant) };
   }
 
-  if (!user || !juste || user.suspendedAt) {
+  /*
+    Une suppression demandée ferme le compte comme une suspension (R-O05,
+    S.183). Quand le stockage a refusé la purge, le compte n'est pas encore
+    anonymisé et garde son empreinte : sans cette garde, le même mot de
+    passe rouvrait une session sur des dossiers en train d'être vidés.
+  */
+  if (!user || !juste || user.suspendedAt || user.deletionRequestedAt) {
     if (user) {
       /*
         L'incrément se fait en base, et le blocage se décide sur la valeur

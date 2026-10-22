@@ -1092,6 +1092,71 @@ try {
     );
   }
 
+  /*
+    Une lettre rédigée puis relue — C-8, revue S.183, relevé par la recette
+    R-O05. La purge efface le texte et gardait la date de relecture ; la
+    garde `document_version_relecture_sur_un_texte` refusait cette version,
+    et le dossier entier — pièces d'identité comprises — ne se purgeait
+    plus : rétention, clôture et suppression de compte en erreur.
+  */
+  console.log("\nUne lettre relue se purge, et sa relecture reste datée (C-8)");
+  {
+    const d = await dossierEchu(1);
+    const lettre = await db.document.create({
+      data: {
+        applicationId: d.application.id,
+        code: "lettre_motivation",
+        label: "Lettre de motivation",
+        required: false,
+        remedy: "REDIGER",
+      },
+    });
+    const relueLe = new Date("2026-10-01T10:00:00Z");
+    const texte = await db.documentVersion.create({
+      data: {
+        documentId: lettre.id,
+        rank: 1,
+        body: "Madame, Monsieur, je souhaite poursuivre mes études à Lausanne.",
+        wordCount: 10,
+        changeNote: "Premier jet",
+        critiquedAt: relueLe,
+      },
+    });
+    await db.critiqueFinding.create({
+      data: {
+        versionId: texte.id,
+        kind: "FORME",
+        title: "Phrase d'ouverture",
+        body: "La première phrase reprend mot pour mot l'intitulé du programme.",
+      },
+    });
+
+    const bilan = await purgerLesPiecesEchues();
+    verifier(bilan.dossiers >= 1, `le dossier se purge (${bilan.dossiers})`);
+    verifier(
+      (await db.application.findUniqueOrThrow({ where: { id: d.application.id } })).purgedAt !== null,
+      "pièce d'identité et lettre comprises",
+    );
+    const apres = await db.documentVersion.findUniqueOrThrow({ where: { id: texte.id } });
+    verifier(apres.body === null && apres.purgedAt !== null, "le texte de la lettre est effacé");
+    verifier(
+      apres.critiquedAt?.getTime() === relueLe.getTime(),
+      "la date de relecture reste, comme trace",
+    );
+    const remarque = await db.critiqueFinding.findFirstOrThrow({ where: { versionId: texte.id } });
+    verifier(remarque.body === ANALYSE_PURGEE_CORPS, "et la remarque qui citait le texte est vidée");
+
+    let refusee = false;
+    try {
+      await db.documentVersion.create({
+        data: { documentId: lettre.id, rank: 2, critiquedAt: new Date() },
+      });
+    } catch {
+      refusee = true;
+    }
+    verifier(refusee, "une relecture datée sans texte ni purge reste refusée par la base");
+  }
+
   console.log("\nLa purge de rétention se lance à la main après une restauration (RF-4, S.152)");
   {
     // Une restauration ressuscite un dossier échu et ses octets.

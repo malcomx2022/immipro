@@ -7,7 +7,9 @@
  * dépôt et lecture, coupure réseau, réponse tardive, lecture sans mesure et
  * revue humaine, signalement et décision B-05, retrait du consentement,
  * rédaction assistée, double onglet, quota épuisé et reprise gratuite,
- * déclaration du dépôt, clôture et purge annoncée.
+ * déclaration du dépôt, clôture et purge annoncée ; puis, au bureau et chez
+ * le candidat, publication par un second lecteur et arbitrage (R-O03), et
+ * suppression du compte pendant une panne du stockage, puis reprise (R-O05).
  *
  * Chaque geste est contrôlé par son effet en base, jamais par un seul
  * HTTP 200. IA et paiement sont les réponses scriptées locales du banc :
@@ -29,6 +31,7 @@ import {
   preparerDossierPret,
   preparerLettre,
   statsDesFournisseurs,
+  suppressionsDuStockage,
 } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -40,6 +43,7 @@ const APP_HTTP = "http://localhost:3162";
 let context: BrowserContext;
 let page: Page;
 let admin: Page | null = null;
+let veilleur: Page | null = null;
 let largeur = 0;
 let email = "";
 let compte = "";
@@ -246,6 +250,23 @@ async function connecter(p: Page, adresse: string, motDePasse: string) {
   await p.waitForURL("**/tableau-de-bord");
 }
 
+/** Un opérateur, au bureau, dans son propre contexte, arrivé sur `suite`. */
+async function operateur(adresse: string, suite: string): Promise<Page> {
+  const contexte = await context.browser()!.newContext({
+    viewport: { width: 1280, height: 900 },
+    ignoreHTTPSErrors: true,
+    baseURL: origineApp,
+  });
+  const p = await contexte.newPage();
+  suivis.push(suivreErreurs(p, moteur, origineApp));
+  await p.goto(`/connexion?suite=${encodeURIComponent(suite)}`);
+  await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
+  await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasseDuBanc());
+  await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
+  await p.waitForURL(`**${suite}`);
+  return p;
+}
+
 /** Le back-office, au bureau, dans son propre contexte de session. */
 async function administration(): Promise<Page> {
   if (admin) return admin;
@@ -276,7 +297,9 @@ test.beforeAll(async ({ browser }, info) => {
 
 test.afterAll(async () => {
   await controlerLesFournisseurs("lue");
+  await suppressionsDuStockage("acceptees");
   await admin?.context().close();
+  await veilleur?.context().close();
   await context.close();
 });
 
@@ -1060,6 +1083,292 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
     controle: "Déclaration du dépôt datée, conservation douze mois annoncée, dépôt refusé sur dossier figé, clôture avec issue et purge annoncée",
     conforme: true,
     fixture: true,
+  });
+});
+
+/**
+ * R-O03 — publication par un second lecteur, divergence, arbitrage (WF-14 §4,
+ * WF-11, T-02). Un second dossier, sur la règle CH « études », pour ne rien
+ * changer à celle des gestes précédents ni aux profils suivants : chaque
+ * profil abaisse d'une unité un seuil bloquant de la version en vigueur —
+ * un assouplissement, donc une alerte et une proposition de migration sans
+ * pause du dossier. Pas la règle NL : la graine lui donne une fin prévue
+ * (`effectiveTo`), et la publication ne la reconnaît alors pas comme la
+ * version à remplacer (constat C-7 de la revue S.183, décision attendue). B-02 n'édite que les textes destinés au candidat : la
+ * valeur passe par la seule route qui l'écrit, depuis la session du
+ * navigateur de l'administrateur, comme le ferait un outil d'exploitation.
+ */
+const SEUIL = "preuve_fonds_annuelle";
+let emploi = "";
+
+test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence et arbitrage du candidat", async () => {
+  await aller("/dossiers/nouveau?destination=suisse");
+  await page.getByRole("radio", { name: /Je ne sais pas encore/u }).click();
+  await page.getByRole("button", { name: "Créer mon dossier", exact: true }).click();
+  await page.waitForURL(/\/dossiers\/[a-f0-9-]+$/u);
+  emploi = page.url().split("/").at(-1)!;
+  await acheter(emploi, "essentiel", 10);
+  const [ouvert] = await lire<{ status: string; visaRuleId: string }>(
+    'SELECT status, "visaRuleId" FROM "Application" WHERE id=$1',
+    [emploi],
+  );
+  // WF-11 ne prévient que les dossiers actifs, prêts ou suspendus.
+  expect(ouvert!.status).toBe("ACTIF");
+  const [vigueur] = await lire<{
+    id: string;
+    version: number;
+    rules: { conditions: { code: string; valeur: unknown }[] };
+  }>('SELECT id, version, rules FROM "VisaRule" WHERE id=$1 AND status=\'PUBLISHED\'', [
+    ouvert!.visaRuleId,
+  ]);
+  expect(vigueur).toBeDefined();
+
+  /** Le seuil abaissé de `ecart`, écrit par la route depuis la session de `p`. */
+  const ecrireLeSeuil = async (p: Page, ecart: number) => {
+    const rules = {
+      ...vigueur!.rules,
+      conditions: vigueur!.rules.conditions.map((c) =>
+        c.code === SEUIL ? { ...c, valeur: (c.valeur as number) - ecart } : c,
+      ),
+    };
+    const statut = await p.evaluate(
+      async ([id, corps]) =>
+        (
+          await fetch(`/api/admin/regles/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ champ: "payload", rules: corps }),
+          })
+        ).status,
+      [vigueur!.id, rules] as const,
+    );
+    expect(statut).toBe(200);
+  };
+
+  // 1. L'administrateur rédige : seuil abaissé de deux unités.
+  const b02 = await administration();
+  await aller(`/regles/${vigueur!.id}`, b02);
+  await ecrireLeSeuil(b02, 2);
+  const brouillon = async () =>
+    (
+      await lire<{ id: string; version: number; status: string; verifiedBy: string }>(
+        `SELECT id, version, status, "verifiedBy" FROM "VisaRule"
+         WHERE "countryCode"='CH' AND "visaType"='etudes_permis_b' AND version=$1`,
+        [vigueur!.version + 1],
+      )
+    )[0]!;
+  expect((await brouillon()).verifiedBy).toBe("admin@immipro.test");
+  const suivante = vigueur!.version + 1;
+
+  // 2. Il tente de publier sa propre version : refus nommant la condition.
+  await aller(`/regles/${vigueur!.id}`, b02);
+  await expect(b02.getByText(`Brouillon version ${suivante}`, { exact: false })).toBeVisible();
+  await b02.getByLabel("Motif du changement", { exact: true }).fill("Montant SEM révisé au 1er janvier");
+  await b02.getByRole("button", { name: `Publier la version ${suivante}`, exact: true }).click();
+  const refus = b02.getByRole("alert").filter({ hasText: SEUIL });
+  await expect(refus).toBeVisible();
+  await expect(refus).toContainText("second opérateur");
+  expect((await brouillon()).status).toBe("DRAFT");
+
+  // 3. Le veilleur relit et corrige la valeur : il devient le rédacteur. Il ne publie pas.
+  veilleur = await operateur("veilleur@immipro.test", `/regles/${vigueur!.id}`);
+  await attendreLHydratation(veilleur, "main");
+  await ecrireLeSeuil(veilleur, 1);
+  expect((await brouillon()).verifiedBy).toBe("veilleur@immipro.test");
+  await veilleur.reload({ waitUntil: "load" });
+  await attendreLHydratation(veilleur, "main");
+  const publierVeilleur = veilleur.getByRole("button", {
+    name: `Publier la version ${suivante}`,
+    exact: true,
+  });
+  await expect(publierVeilleur).toBeDisabled();
+  await expect(publierVeilleur).toHaveAccessibleDescription(/compte administrateur/u);
+  await relever(veilleur);
+
+  // 4. L'administrateur, second lecteur, publie : « Publier » enregistre
+  //    d'abord, sans rien changer, et ne fait donc pas de lui le rédacteur.
+  await aller(`/regles/${vigueur!.id}`, b02);
+  await b02.getByLabel("Motif du changement", { exact: true }).fill("Relu par le veilleur, publié");
+  await b02.getByRole("button", { name: `Publier la version ${suivante}`, exact: true }).click();
+  await expect(b02.getByText(`Version ${suivante} publiée`, { exact: false })).toBeVisible();
+  const nouvelle = await brouillon();
+  expect(nouvelle.status).toBe("PUBLISHED");
+  const [archivee] = await lire<{ status: string }>('SELECT status FROM "VisaRule" WHERE id=$1', [
+    vigueur!.id,
+  ]);
+  expect(archivee!.status).toBe("ARCHIVED");
+  const [trace] = await lire<{ metadata: { redigeePar: string; bloquantesTouchees: string[] } }>(
+    `SELECT metadata FROM "AuditLog" WHERE action='regle.publication' AND target=$1`,
+    [`visaRule:${nouvelle.id}`],
+  );
+  expect(trace!.metadata.redigeePar).toBe("veilleur@immipro.test");
+  const [publiee] = await lire<{ rules: { conditions: { code: string; valeur: number }[] } }>(
+    'SELECT rules FROM "VisaRule" WHERE id=$1',
+    [nouvelle.id],
+  );
+  expect(publiee!.rules.conditions.find((c) => c.code === SEUIL)!.valeur).toBe(
+    (vigueur!.rules.conditions.find((c) => c.code === SEUIL)!.valeur as number) - 1,
+  );
+  expect(trace!.metadata.bloquantesTouchees).toContain(SEUIL);
+
+  // 5. Le worker propage : le dossier est prévenu, sans pause.
+  await expect
+    .poll(
+      async () =>
+        (
+          await lire<{ alertedAt: string | null }>(
+            'SELECT "alertedAt" FROM "RuleMigration" WHERE "applicationId"=$1 AND "toRuleId"=$2',
+            [emploi, nouvelle.id],
+          )
+        )[0]?.alertedAt ?? null,
+      { timeout: 60_000, intervals: [1_000] },
+    )
+    .not.toBeNull();
+  const [migration] = await lire<{ id: string; impact: string }>(
+    'SELECT id, impact FROM "RuleMigration" WHERE "applicationId"=$1 AND "toRuleId"=$2',
+    [emploi, nouvelle.id],
+  );
+  expect(migration!.impact).toBe("MAJEUR");
+  expect(
+    (await lire<{ status: string }>('SELECT status FROM "Application" WHERE id=$1', [emploi]))[0]!
+      .status,
+  ).toBe("ACTIF");
+
+  // 6. Le candidat arbitre depuis ses alertes (T-02) : il migre.
+  await aller("/notifications");
+  await page.getByRole("button", { name: "Choisir la version à appliquer", exact: true }).click();
+  await page.getByRole("radio", { name: new RegExp(`^Migrer vers la version ${suivante}`, "u") }).click();
+  const [arbitrage] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().includes(`/migrations/${migration!.id}`) && r.request().method() === "POST",
+    ),
+    page.getByRole("button", { name: `Migrer vers la version ${suivante}`, exact: true }).click(),
+  ]);
+  expect(arbitrage.ok()).toBe(true);
+  await expect(page.getByRole("button", { name: "Voir ma checklist", exact: true })).toBeVisible();
+  await relever();
+  const [apres] = await lire<{ visaRuleId: string; status: string }>(
+    'SELECT "visaRuleId", status FROM "Application" WHERE id=$1',
+    [emploi],
+  );
+  expect(apres!.visaRuleId).toBe(nouvelle.id);
+  const [decidee] = await lire<{ decision: string; decidedAt: string | null }>(
+    'SELECT decision, "decidedAt" FROM "RuleMigration" WHERE id=$1',
+    [migration!.id],
+  );
+  expect(decidee!.decision).toBe("MIGRER");
+  expect(decidee!.decidedAt).not.toBeNull();
+  preuves.push({
+    controle:
+      "R-O03 : refus du rédacteur nommant la condition, correction du veilleur, publication par l'administrateur depuis B-02, divergence MAJEURE propagée par le worker, migration choisie par le candidat",
+    version: suivante,
+    conforme: true,
+    valeurParLaRoute: true,
+  });
+});
+
+/**
+ * R-O05 — suppression demandée, puis reprise (RG-10.4, B-03). Le stockage
+ * du banc refuse d'abord les suppressions : la purge échoue, le compte reste
+ * « suppression demandée » et non anonymisé. L'écran ne doit pas dire les
+ * pièces supprimées, le mot de passe ne doit plus rien ouvrir, et B-03 doit
+ * dire qu'une relance pendant la panne n'achève rien. Le stockage rétabli,
+ * la relance anonymise. Dernier geste du profil : le compte n'existe plus.
+ */
+test("R-O05 : suppression demandée pendant une panne du stockage, connexion refusée, reprise B-03 jusqu'à l'anonymisation", async () => {
+  const etat = async () =>
+    (
+      await lire<{
+        email: string;
+        deletionRequestedAt: string | null;
+        deletedAt: string | null;
+        sessions: string;
+        restants: string;
+      }>(
+        `SELECT u.email, u."deletionRequestedAt", u."deletedAt",
+           (SELECT count(*) FROM "Session" s WHERE s."userId" = u.id) AS sessions,
+           (SELECT count(*) FROM "Application" a WHERE a."userId" = u.id AND a."purgedAt" IS NULL) AS restants
+         FROM "User" u WHERE u.id = $1`,
+        [compte],
+      )
+    )[0]!;
+  const relances = async () =>
+    Number(
+      (
+        await lire<{ n: string }>(
+          `SELECT count(*) AS n FROM "AuditLog" WHERE action='compte.relance' AND target=$1`,
+          [`user:${compte}`],
+        )
+      )[0]!.n,
+    );
+
+  await suppressionsDuStockage("refusees");
+  const b03 = await administration();
+  try {
+    await aller("/compte/suppression");
+    await page.getByLabel("Ton mot de passe, pour confirmer", { exact: true }).fill(MOT_DE_PASSE);
+    await page
+      .getByRole("button", { name: "Supprimer définitivement mon compte", exact: true })
+      .click();
+    // Chaque refus du stockage est réessayé par le client S3 : la réponse
+    // arrive après ces reprises, objet par objet.
+    await expect(
+      page.getByRole("heading", { name: "Ta demande de suppression est enregistrée", exact: true }),
+    ).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/ont été supprimées/u)).toHaveCount(0);
+    await relever();
+    const demande = await etat();
+    expect(demande.deletionRequestedAt).not.toBeNull();
+    expect(demande.deletedAt).toBeNull();
+    expect(Number(demande.sessions)).toBe(0);
+    expect(Number(demande.restants)).toBeGreaterThan(0);
+
+    // Le même mot de passe ne rouvre rien pendant que la purge attend.
+    await page.goto("/connexion");
+    await page.getByLabel("Adresse email", { exact: true }).fill(email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
+    const [connexion] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().endsWith("/api/comptes/session") && r.request().method() === "POST",
+      ),
+      page.getByLabel("Mot de passe", { exact: true }).press("Enter"),
+    ]);
+    expect(connexion.status()).toBe(401);
+    await expect(page.getByText("Email ou mot de passe incorrect")).toBeVisible();
+    expect(Number((await etat()).sessions)).toBe(0);
+
+    // B-03 pendant la panne : la relance dit qu'elle n'a rien achevé.
+    await aller("/utilisateurs", b03);
+    await b03.getByRole("button", { name: "Suppression demandée", exact: true }).click();
+    await b03.getByRole("option").filter({ hasText: email }).click();
+    await b03.getByLabel("Motif de la décision", { exact: true }).fill(
+      "Purge restée inachevée, stockage indisponible",
+    );
+    await b03.getByRole("button", { name: "Traiter la demande de suppression", exact: true }).click();
+    await expect(b03.getByText(/Suppression non achevée/u)).toBeVisible({ timeout: 60_000 });
+    expect((await etat()).deletedAt).toBeNull();
+    expect(await relances()).toBe(1);
+  } finally {
+    await suppressionsDuStockage("acceptees");
+  }
+
+  // Le stockage répond de nouveau : la reprise achève et anonymise.
+  await b03.getByLabel("Motif de la décision", { exact: true }).fill(
+    "Stockage rétabli, reprise de la purge",
+  );
+  await b03.getByRole("button", { name: "Traiter la demande de suppression", exact: true }).click();
+  await expect
+    .poll(async () => (await etat()).deletedAt, { timeout: 30_000 })
+    .not.toBeNull();
+  const fin = await etat();
+  expect(fin.email).toMatch(/@comptes\.invalid$/u);
+  expect(Number(fin.restants)).toBe(0);
+  expect(await relances()).toBe(2);
+  await relever(b03);
+  preuves.push({
+    controle:
+      "R-O05 : suppression demandée pendant une panne de stockage, écran sans fausse annonce, connexion refusée, relance B-03 non achevée puis achevée, compte anonymisé",
+    conforme: true,
   });
 });
 

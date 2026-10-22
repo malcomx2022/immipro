@@ -172,7 +172,7 @@ jobs:
             playwright-report-parcours/
             test-results/parcours/
           retention-days: 7
-      - run: echo "- **Parcours candidat** — inscription, achat scripté, dépôt et lecture, coupure, revue B-05, rédaction, double onglet, quota épuisé, dépôt déclaré et clôture, six profils navigateur" >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "- **Parcours candidat** — inscription, achat scripté, dépôt et lecture, coupure, revue B-05, rédaction, double onglet, quota épuisé, dépôt déclaré et clôture, second lecteur et arbitrage (R-O03), suppression et reprise (R-O05), six profils navigateur" >> "$GITHUB_STEP_SUMMARY"
 
       # pg-boss 11 ne migre pas une base de pg-boss 10 (S.166) : la base de
       # départ est écrite par le vrai 10.4.2, puis la bascule reprend ce qui
