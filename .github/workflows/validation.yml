@@ -146,7 +146,7 @@ jobs:
         run: npm run test:photos
       - name: Preuves de recette photographique
         if: always() && (steps.photographies.outcome == 'success' || steps.photographies.outcome == 'failure')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: photographies-publiques
           path: |
@@ -165,7 +165,7 @@ jobs:
         run: npm run test:parcours
       - name: Preuves de recette des parcours
         if: always() && (steps.parcours.outcome == 'success' || steps.parcours.outcome == 'failure')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: parcours-candidat
           path: |
