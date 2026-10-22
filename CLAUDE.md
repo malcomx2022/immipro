@@ -94,10 +94,13 @@ Firefox/WebKit laissés à la CI ; bac à sable non éprouvé faute de clé.
 Lint désormais sans avertissement.
 Statuts : WF-01/02/04 éprouvés ; WF-05 bloqué par M.C ; WF-06/08 bloqués
 par L5 ; WF-03/07/09/10/11/13/14/15/16 partiels ; WF-12 en phase 3.
-Constat à suivre : 32 routes API sur 73 sans test direct ; écritures
-B-04 (remboursements), suppression d'utilisateur, migration de version,
-correction de date de dépôt et partages sans preuve HTTP exécutée — un test
-de route par écriture (droits, motif, idempotence) avant la signature.
+Constat C-1 traité le même jour : `tests/routes-ecritures.test.ts`
+(66 tests) couvre les quatorze écritures sans test de route — rôle, limite
+sensible, corps refusé avant effet, motif journalisé avant l'écriture,
+propriété, rejeu ; huit mutations détectées. Suite : 200 fichiers,
+4 006 tests. Ne pas affaiblir ces attentes pour accepter un défaut. O-4
+ouverte : la suspension B-03 accepte un motif de trois caractères, les
+autres actions de compte dix — alignement à trancher par le responsable.
 Gestes absents : R-O03, R-O05, échéancier, fuseau, péremption, lecteur
 d'écran. Seules retouches : fixtures P-03 (`slug`) et une directive ESLint
 inutile. Aucun préalable levé, aucune fusion ni déploiement par ce lot.

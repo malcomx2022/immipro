@@ -13867,10 +13867,12 @@ fumées de la porte (résultats dans la revue). Deux retouches d'hygiène :
 fixtures P-03 complétées de leur `slug` (avertissement React de clé
 absente), directive ESLint inutile retirée de `purge-stockage.ts`.
 
-Constats : 41 routes API sur 73 testées directement ; les écritures B-04
-(remboursement manuel/tranche), suppression et vérification d'utilisateur,
-migration de version (WF-11), correction de date de dépôt et partages n'ont
-aucune preuve HTTP exécutée. Gestes navigateur absents : R-O03, R-O05,
+Constats : 41 routes API sur 73 testées directement. Complément du même
+jour, demandé par le responsable : `tests/routes-ecritures.test.ts`,
+66 tests sur les quatorze écritures restées sans test de route (B-04,
+B-03, partages, WF-09/11/12/13/14, dépôt, rappels, notification), huit
+mutations détectées ; suite à 200 fichiers / 4 006 tests. O-4 : motif de
+suspension B-03 à trois caractères contre dix ailleurs, à trancher. Gestes navigateur absents : R-O03, R-O05,
 échéancier, fuseau, péremption, lecteur d'écran. O-1 à O-3 ouvertes.
 Statuts par workflow et par module, et ordre du travail de code encore
 possible sans préalable : [la revue](../revue/revue-tests-2026-10-22.md).

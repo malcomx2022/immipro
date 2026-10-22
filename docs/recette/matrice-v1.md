@@ -445,4 +445,8 @@ Aucune ligne ne change de statut. La [revue des tests](../revue/revue-tests-2026
 rapproche les lignes « non vérifié » (R-O03, R-O04, R-O05, R-C08
 échéancier, R-K06 fuseau et péremption, R-I02, R-I04) des routes API qui
 n'ont encore aucune preuve HTTP exécutée, et propose leur ordre de reprise.
+Les quatorze écritures concernées ont reçu leur test de route le 22/10
+(`tests/routes-ecritures.test.ts`) ; la preuve navigateur de ces lignes
+reste à faire. **O-4.** La suspension B-03 accepte un motif de trois
+caractères, les autres actions de compte dix.
 La signature reste à apposer.

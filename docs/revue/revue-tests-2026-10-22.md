@@ -43,7 +43,7 @@ Conteneur éphémère, Node 24.22.1, PostgreSQL 16.15 local, `npm ci`.
 |---|---|
 | `npm run lint` | 0 erreur ; l'avertissement « préexistant » reporté depuis S.180 est **supprimé** (§ 4) |
 | `npm run typecheck` | Vert |
-| `npm run test` | **199 fichiers, 3 940 tests verts**, 99 s |
+| `npm run test` | **199 fichiers, 3 940 tests verts**, 99 s ; **200 / 4 006** après l'ajout des tests de route |
 | `npm run check:copy` | « Aucune formulation interdite » |
 | `npm run check:audit` | Aucune élevée ou critique sans motif ; `deepmerge-ts` acceptée ; 4 modérées (`stream-json`, `decode-uri-component`), toutes amenées par `minio` 8.0.7 |
 | `npm run build`, `prisma validate` | Verts (app `standalone` et `dist/worker.js`) |
@@ -71,6 +71,35 @@ de paiement, packs, destinations, partenaires d'un dossier, rendez-vous
 consultant. Ce sont précisément les lignes « non vérifié » de la matrice
 (R-O03, R-O04, R-O05, R-C08 échéancier). Proposition : un test de route
 par écriture (droits, motif obligatoire, idempotence) avant la signature.
+
+**Traité le 22/10, à la demande du responsable** :
+`tests/routes-ecritures.test.ts`, 66 tests sur les quatorze écritures de
+la liste — remboursement manuel et par tranche (B-04), suppression,
+vérification, suspension et rétablissement d'un compte (B-03), retrait
+d'un partage, arbitrage de divergence (WF-11), correction de la date de
+dépôt, replanification de l'échéancier (WF-09), préférences de rappel,
+relevé de veille (WF-14), notification lue, suite partenaire (WF-13),
+rendez-vous consultant (WF-12). Chaque route est vérifiée sur cinq
+points : rôle déclaré et limite sensible ; corps refusé avant tout
+effet ; motif au journal avant l'écriture, et jamais pour une décision
+refusée ; propriété lue avant d'écrire ; rejeu sans seconde ligne au
+journal. Le composeur est remplacé par une capture de la définition
+(idiome de `simulation-procedures`) : ces tests tiennent le contrat de la
+route, pas une contrainte SQL. Contrôle de mutation : huit défauts
+injectés dans les routes (journal d'un rejeu, suppression non demandée,
+dossier d'autrui, notification sans propriétaire, dossier figé, sessions
+non fermées, horaire hors offre, rappels d'un autre compte), chacun fait
+échouer un test ; sources restaurées. Les routes de lecture de la liste
+restent sans test direct, et la preuve navigateur de R-O03/R-O04/R-O05
+reste à faire.
+
+**O-4 — motif de suspension plus court que les autres actions B-03.**
+La suspension (`PUT /api/admin/utilisateurs`) accepte un motif de trois
+caractères, alors que la relance de suppression et le renvoi de code
+exigent `MOTIF_MINIMUM_COMPTE` (dix). RG-15.1 est tenue (motif
+obligatoire), mais un motif comme « abc » ne se relit pas au journal.
+Le test fixe le comportement actuel ; l'alignement est une décision du
+responsable, sans correction dans ce lot.
 
 **C-2 — Modules faiblement couverts.** `domain/echecs`,
 `domain/stockage`, `domain/navigation` : un seul fichier de test chacun,
@@ -213,9 +242,8 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 
 Travail de code encore possible sans préalable externe, par priorité :
 
-1. Tests de route pour les écritures listées en C-1 (B-04 remboursements,
-   suppression d'utilisateur, migration de version, correction de date de
-   dépôt, partages) : droits, motif, idempotence.
+1. ~~Tests de route pour les écritures listées en C-1~~ : fait le 22/10
+   (66 tests, § 3). Reste à trancher O-4.
 2. Parcours navigateur pour R-O03 (publication → divergence → arbitrage),
    R-O05 (suppression), l'échéancier et la péremption d'une pièce.
 3. Libellé du dispositif dans les résultats du simulateur (O-1) et
@@ -226,7 +254,7 @@ Travail de code encore possible sans préalable externe, par priorité :
 
 ```sh
 npm ci && npx prisma generate
-npm run check            # lint, types, 3 940 tests, vocabulaire
+npm run check            # lint, types, 4 006 tests, vocabulaire
 npm run check:audit && npm run build
 # PostgreSQL local jetable, DATABASE_URL sur la boucle locale :
 npm run smoke:migrations && npm run smoke:worker -- --base
