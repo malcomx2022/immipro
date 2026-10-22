@@ -97,8 +97,10 @@ par L5 ; WF-03/07/09/10/11/13/14/15/16 partiels ; WF-12 en phase 3.
 Constat C-1 traité le même jour : `tests/routes-ecritures.test.ts`
 (66 tests) couvre les quatorze écritures sans test de route — rôle, limite
 sensible, corps refusé avant effet, motif journalisé avant l'écriture,
-propriété, rejeu ; huit mutations détectées. Suite : 200 fichiers,
-4 006 tests. Ne pas affaiblir ces attentes pour accepter un défaut. O-4
+propriété, rejeu ; huit mutations détectées. C-6 : le banc relevait
+parfois un faux code de vérification (en-têtes recollés jusqu'au
+`Message-ID`) ; `codeDuCourrier` ne lit plus que le corps. Suite :
+201 fichiers, 4 009 tests. Ne pas affaiblir ces attentes pour accepter un défaut. O-4
 ouverte : la suspension B-03 accepte un motif de trois caractères, les
 autres actions de compte dix — alignement à trancher par le responsable.
 Gestes absents : R-O03, R-O05, échéancier, fuseau, péremption, lecteur

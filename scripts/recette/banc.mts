@@ -42,6 +42,7 @@ import { randomBytes } from "node:crypto";
 import { Client } from "pg";
 import { SMTPServer } from "smtp-server";
 import { demarrerUnFauxStockage } from "../faux-stockage";
+import { codeDuCourrier } from "./courrier";
 import { environnementDuBanc } from "./environnement";
 import { ProcessusDuBanc, verifierPortDisponible } from "./processus";
 
@@ -196,7 +197,7 @@ async function demarrer(): Promise<void> {
         const vers = session.envelope.rcptTo.map((r) => r.address).join(", ");
         const fichier = `.recette/courriers/${String(numero).padStart(3, "0")}.eml`;
         writeFileSync(fichier, contenu);
-        const code = /code[^\n]{0,60}?(\d{6})/iu.exec(contenu.replace(/=\r?\n/gu, ""))?.[1];
+        const code = codeDuCourrier(contenu);
         console.log(`  ✉ ${vers} — ${fichier}${code ? ` — code ${code}` : ""}`);
         fini();
       });

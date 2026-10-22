@@ -13871,7 +13871,10 @@ Constats : 41 routes API sur 73 testées directement. Complément du même
 jour, demandé par le responsable : `tests/routes-ecritures.test.ts`,
 66 tests sur les quatorze écritures restées sans test de route (B-04,
 B-03, partages, WF-09/11/12/13/14, dépôt, rappels, notification), huit
-mutations détectées ; suite à 200 fichiers / 4 006 tests. O-4 : motif de
+mutations détectées. C-6 : faux code de vérification relevé par le banc
+quand l'UUID du `Message-ID` commençait par six chiffres (échec Firefox
+1 440 de la première porte de #301) ; lecture limitée au corps, test
+dédié. Suite à 201 fichiers / 4 009 tests. O-4 : motif de
 suspension B-03 à trois caractères contre dix ailleurs, à trancher. Gestes navigateur absents : R-O03, R-O05,
 échéancier, fuseau, péremption, lecteur d'écran. O-1 à O-3 ouvertes.
 Statuts par workflow et par module, et ordre du travail de code encore

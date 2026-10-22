@@ -43,7 +43,7 @@ Conteneur éphémère, Node 24.22.1, PostgreSQL 16.15 local, `npm ci`.
 |---|---|
 | `npm run lint` | 0 erreur ; l'avertissement « préexistant » reporté depuis S.180 est **supprimé** (§ 4) |
 | `npm run typecheck` | Vert |
-| `npm run test` | **199 fichiers, 3 940 tests verts**, 99 s ; **200 / 4 006** après l'ajout des tests de route |
+| `npm run test` | **199 fichiers, 3 940 tests verts**, 99 s ; **201 / 4 009** après l'ajout des tests de route et du test du banc (C-6) |
 | `npm run check:copy` | « Aucune formulation interdite » |
 | `npm run check:audit` | Aucune élevée ou critique sans motif ; `deepmerge-ts` acceptée ; 4 modérées (`stream-json`, `decode-uri-component`), toutes amenées par `minio` 8.0.7 |
 | `npm run build`, `prisma validate` | Verts (app `standalone` et `dist/worker.js`) |
@@ -100,6 +100,20 @@ exigent `MOTIF_MINIMUM_COMPTE` (dix). RG-15.1 est tenue (motif
 obligatoire), mais un motif comme « abc » ne se relit pas au journal.
 Le test fixe le comportement actuel ; l'alignement est une décision du
 responsable, sans correction dans ce lot.
+
+**C-6 — Faux code de vérification relevé par le banc (corrigé).** La
+première porte CI de la PR #301 a échoué sur Firefox 1 440 px : quatre
+codes saisis, quatre refus (422), alors que chaque renvoi avait bien
+produit un courrier. Le banc relevait le code dans le courrier brut après
+avoir retiré les coupures quoted-printable (`=\r\n`) partout ; l'objet
+encodé se terminant par `?=`, ce retrait recollait aussi les en-têtes, et
+« code » se retrouvait à quelques caractères du `Message-ID`. Quand son UUID
+aléatoire commençait par six chiffres, le journal portait un faux code.
+Défaut probabiliste, latent sur `main`, sans effet sur l'application ni sur
+un vrai courrier. Reproduit avec le courrier réel de `nodemailer`
+(`872051` relevé au lieu de `964475`) ; `codeDuCourrier`
+(`scripts/recette/courrier.ts`) ne lit plus que le corps, et
+`tests/banc-courrier.test.ts` fixe le cas.
 
 **C-2 — Modules faiblement couverts.** `domain/echecs`,
 `domain/stockage`, `domain/navigation` : un seul fichier de test chacun,
@@ -254,7 +268,7 @@ Travail de code encore possible sans préalable externe, par priorité :
 
 ```sh
 npm ci && npx prisma generate
-npm run check            # lint, types, 4 006 tests, vocabulaire
+npm run check            # lint, types, 4 009 tests, vocabulaire
 npm run check:audit && npm run build
 # PostgreSQL local jetable, DATABASE_URL sur la boucle locale :
 npm run smoke:migrations && npm run smoke:worker -- --base
