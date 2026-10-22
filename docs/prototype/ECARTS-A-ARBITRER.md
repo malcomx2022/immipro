@@ -13875,7 +13875,8 @@ mutations détectées. C-6 : faux code de vérification relevé par le banc
 quand l'UUID du `Message-ID` commençait par six chiffres (échec Firefox
 1 440 de la première porte de #301) ; lecture limitée au corps, test
 dédié. Suite à 201 fichiers / 4 009 tests. O-4 : motif de
-suspension B-03 à trois caractères contre dix ailleurs, à trancher. Gestes navigateur absents : R-O03, R-O05,
+suspension B-03 à trois caractères contre dix ailleurs ; alignement
+demandé par le responsable et fait (`MOTIF_MINIMUM_COMPTE` dans la route). Gestes navigateur absents : R-O03, R-O05,
 échéancier, fuseau, péremption, lecteur d'écran. O-1 à O-3 ouvertes.
 Statuts par workflow et par module, et ordre du travail de code encore
 possible sans préalable : [la revue](../revue/revue-tests-2026-10-22.md).

@@ -98,8 +98,11 @@ La suspension (`PUT /api/admin/utilisateurs`) accepte un motif de trois
 caractères, alors que la relance de suppression et le renvoi de code
 exigent `MOTIF_MINIMUM_COMPTE` (dix). RG-15.1 est tenue (motif
 obligatoire), mais un motif comme « abc » ne se relit pas au journal.
-Le test fixe le comportement actuel ; l'alignement est une décision du
-responsable, sans correction dans ce lot.
+**Tranché et corrigé le 22/10** : le responsable a demandé l'alignement.
+La route lit désormais `MOTIF_MINIMUM_COMPTE`, la constante qu'utilisait
+déjà l'écran B-03 (`obstacleALActionCompte`) ; un appel direct à l'API ne
+contourne plus le seuil de l'écran. Le test a d'abord échoué sur le code
+d'origine (« abus » accepté), puis passé après correction.
 
 **C-6 — Faux code de vérification relevé par le banc (corrigé).** La
 première porte CI de la PR #301 a échoué sur Firefox 1 440 px : quatre
@@ -257,7 +260,7 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 Travail de code encore possible sans préalable externe, par priorité :
 
 1. ~~Tests de route pour les écritures listées en C-1~~ : fait le 22/10
-   (66 tests, § 3). Reste à trancher O-4.
+   (66 tests, § 3). O-4 tranchée et corrigée le même jour.
 2. Parcours navigateur pour R-O03 (publication → divergence → arbitrage),
    R-O05 (suppression), l'échéancier et la péremption d'une pièce.
 3. Libellé du dispositif dans les résultats du simulateur (O-1) et

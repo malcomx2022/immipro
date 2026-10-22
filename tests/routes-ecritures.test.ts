@@ -536,9 +536,12 @@ describe("B-03 — suspension et rétablissement d'un compte", () => {
       acteur: ADMIN,
     });
 
-  it("exige un motif", () => {
+  it("exige un motif de dix caractères, comme l'écran B-03 et les autres actions de compte (O-4)", () => {
     expect(corpsAccepte(NOM, { userId, suspendre: true, motif: "  " })).toBe(false);
     expect(corpsAccepte(NOM, { userId, suspendre: true })).toBe(false);
+    expect(corpsAccepte(NOM, { userId, suspendre: true, motif: "abus" })).toBe(false);
+    expect(corpsAccepte(NOM, { userId, suspendre: true, motif: "   abus    " })).toBe(false);
+    expect(corpsAccepte(NOM, { userId, suspendre: false, motif: "Erreur levée" })).toBe(true);
   });
 
   it("un compte inconnu n'est ni journalisé ni modifié", async () => {

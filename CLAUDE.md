@@ -101,8 +101,9 @@ propriété, rejeu ; huit mutations détectées. C-6 : le banc relevait
 parfois un faux code de vérification (en-têtes recollés jusqu'au
 `Message-ID`) ; `codeDuCourrier` ne lit plus que le corps. Suite :
 201 fichiers, 4 009 tests. Ne pas affaiblir ces attentes pour accepter un défaut. O-4
-ouverte : la suspension B-03 accepte un motif de trois caractères, les
-autres actions de compte dix — alignement à trancher par le responsable.
+tranchée par le responsable : la suspension B-03 exige désormais
+`MOTIF_MINIMUM_COMPTE` (dix caractères), comme l'écran et les autres
+actions de compte.
 Gestes absents : R-O03, R-O05, échéancier, fuseau, péremption, lecteur
 d'écran. Seules retouches : fixtures P-03 (`slug`) et une directive ESLint
 inutile. Aucun préalable levé, aucune fusion ni déploiement par ce lot.
