@@ -6,13 +6,5 @@
     "Une entrée dont l'avis n'est plus signalé fait échouer l'audit : on la retire avec la dépendance.",
     "Au-delà de cinq entrées, ce n'est plus une exception, c'est une dette : la porte refuse."
   ],
-  "exceptions": [
-    {
-      "avis": "GHSA-ggr8-5vv4-36mx",
-      "paquet": "deepmerge-ts",
-      "chemin": "prisma › @prisma/config › deepmerge-ts",
-      "motif": "D-34, risque accepté. Épuisement de pile sur un graphe d'objets récursif. deepmerge-ts n'est atteint que par le CLI Prisma, qui fusionne nos propres fichiers de configuration au lancement d'une commande (generate, migrate) : aucune donnée d'utilisateur ni d'attaquant ne l'atteint, et le client Prisma de l'application ne l'embarque pas. Revue à la montée de Prisma 7 (S.169) : @prisma/config 7.10.0 l'épingle toujours en 7.1.5 ; forcer la 8 imposerait au CLI une majeure qu'il n'a pas validée. À revoir à la prochaine version de Prisma.",
-      "date": "2026-10-11"
-    }
-  ]
+  "exceptions": []
 }
