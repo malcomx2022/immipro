@@ -77,6 +77,23 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### C-7 — une fin prévue n'est pas un remplacement — 22/10/2026, S.184
+
+Lot dédié demandé par le responsable. Base `78cdbeb` (#302 fusionnée).
+« En vigueur » = mis en vigueur un jour et non `ARCHIVED` : c'est la
+définition d'`estEnVigueur` (domaine, B-02). `publierLaRegle`,
+`consignerLeReleve` et la graine lisaient « `effectiveTo` nul ». Or
+`effectiveTo` porte aussi la fin prévue par l'autorité : graine NL au
+31/12/2026, et T-02 l'affiche. La version 2027 n'aurait rien archivé ni
+prévenu personne. Les trois sites sont alignés, et l'archivage garde la
+fin prévue. Ne pas réintroduire `effectiveTo: null` comme preuve de
+non-remplacement ; le filtre candidat la lit toujours comme fin prévue.
+Preuves : 15 vérifications dans `smoke:publication`, test du relevé,
+parcours R-O03 ramené sur la règle NL (36/36 Chromium). Sans migration ni
+donnée réécrite. C-13 : versions NL 2027 à publier avant le 31/12/2026,
+sinon plus aucune destination néerlandaise n'est affichée et les parcours
+« pays-bas » échouent. Lire [la revue, § 9](docs/revue/revue-tests-2026-10-22.md).
+
 ### Revue des tests et état des modules — 22/10/2026, S.183
 
 Demande du responsable : revue des tests unitaires, d'intégration et
@@ -110,10 +127,8 @@ refusée par la base (migration `20261022180000_relecture_purgee`, choix
 du responsable) ; C-9, reconnexion d'un compte en suppression demandée ;
 C-10, « Publier » de B-02 faisait du publieur le rédacteur (WF-14 §4
 impossible depuis l'écran) ; C-11, écran « pièces supprimées » sur une
-purge inachevée. Ouverts : C-7, une règle à `effectiveTo` prévu (graine
-NL) n'est pas remplacée à la publication — lot dédié décidé, R-O03 tourne
-sur la règle CH ; C-12, B-02 ne montre ni n'édite les valeurs des
-conditions. Le faux stockage du banc `--parcours` sait refuser les
+purge inachevée. C-7 (règle à fin prévue non remplacée) corrigé en S.184 ;
+reste ouvert C-12, B-02 ne montre ni n'édite les valeurs des conditions. Le faux stockage du banc `--parcours` sait refuser les
 suppressions (`POST /stockage`).
 Gestes absents : échéancier, fuseau, péremption, lecteur d'écran.
 Sécurité : `next` 16.4.2 reporté de #300 (GHSA-2464-fhr4-w9xw critique,

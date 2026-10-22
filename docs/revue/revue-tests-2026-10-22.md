@@ -175,7 +175,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-08 Rédaction assistée | Bloqué (L5) | Avis L3, relecture exclusive L4, rédaction ; parcours rédaction, DOCX, deux onglets, saisie tardive (S.182) | Modèle réel qualifié |
 | WF-09 Échéancier et rappels | Partiel | `smoke:rappels`, `smoke:depot` | Échéancier en navigateur, réception courriel réelle |
 | WF-10 Clôture, issue, purge | Partiel | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré et clôture | Purge effective et portabilité en navigateur |
-| WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle CH (§ 8) | C-7 : une règle à fin prévue (graine NL) n'est pas remplacée à la publication |
+| WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle NL à fin prévue (§ 8, § 9) | C-13 : versions 2027 des règles NL à publier avant le 31/12/2026 |
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès | Route d'un dossier sans test direct, conditions d'affiliation |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), textes juridiques | Routine de veille réelle ; B-02 ne montre ni n'édite les valeurs des conditions (C-12) |
@@ -262,7 +262,7 @@ Travail de code encore possible sans préalable externe, par priorité :
 1. ~~Tests de route pour les écritures listées en C-1~~ : fait le 22/10
    (66 tests, § 3). O-4 tranchée et corrigée le même jour.
 2. ~~Parcours navigateur pour R-O03 et R-O05~~ : faits le 22/10 (§ 8).
-   Restent l'échéancier et la péremption d'une pièce, et C-7 (lot dédié).
+   Restent l'échéancier et la péremption d'une pièce. C-7 est corrigé en S.184 (§ 9).
 3. Libellé du dispositif dans les résultats du simulateur (O-1) et
    textes d'aide B-05 (O-2, O-3).
 4. Relecture des trois PR Dependabot avec la porte complète.
@@ -323,7 +323,7 @@ gestes.
 
 | Constat | Défaut | Traitement |
 |---|---|---|
-| **C-7** | La graine livre les règles NL avec `effectiveTo = 2026-12-31`, une fin de validité prévue. La publication, la graine et le relevé du veilleur ne reconnaissent pour « en vigueur » qu'une version dont `effectiveTo` est nul. Publier la version 2027 n'archiverait pas la 2026 et ne préviendrait aucun dossier : deux versions PUBLISHED, aucune migration. C'est le cas que RG-14.3 annonce, « les montants IND changent au 1er janvier ». | **Ouvert**, lot dédié décidé par le responsable. Proposition : reconnaître une version remplacée par son statut `ARCHIVED` (posé seulement au remplacement) plutôt que par `effectiveTo` nul, dans `publierLaRegle`, la graine et `consignerLeReleve` ; garder `effectiveTo` comme fin prévue pour le filtre candidat et T-02. R-O03 tourne sur la règle CH en attendant. |
+| **C-7** | La graine livre les règles NL avec `effectiveTo = 2026-12-31`, une fin de validité prévue. La publication, la graine et le relevé du veilleur ne reconnaissent pour « en vigueur » qu'une version dont `effectiveTo` est nul. Publier la version 2027 n'archiverait pas la 2026 et ne préviendrait aucun dossier : deux versions PUBLISHED, aucune migration. C'est le cas que RG-14.3 annonce, « les montants IND changent au 1er janvier ». | **Corrigé en S.184** (lot dédié, § 9). |
 | **C-8** | La purge efface le texte d'une version (`body`) mais garde sa date de relecture (`critiquedAt`). La garde `document_version_relecture_sur_un_texte` refusait la mise à jour : aucun dossier contenant une lettre relue ne se purgeait, pièces d'identité comprises (INV-5, clôture + 30 jours, suppression de compte en 500). | **Corrigé**, choix du responsable : la migration `20261022180000_relecture_purgee` admet une relecture datée sur une version purgée, et la refuse toujours ailleurs. Reproduit puis vérifié par `smoke:purge`. |
 | **C-9** | `connecter` refusait un compte suspendu, mais pas un compte en suppression demandée. Purge inachevée, le mot de passe rouvrait une session sur des dossiers en cours de purge. | **Corrigé** : même refus, et même message, qu'un compte suspendu ; `tests/connexion-suppression-demandee.test.ts`. |
 | **C-10** | Dans B-02, « Publier » enregistre d'abord les textes, et cet enregistrement réécrivait `verifiedBy` même sans changement. L'administrateur qui relisait la version d'un veilleur en devenait le rédacteur, et WF-14 §4 lui refusait la publication : une modification de condition bloquante ne pouvait jamais être publiée depuis l'écran. | **Corrigé** : un enregistrement sans changement de contenu ni de métadonnées n'écrit rien (`enregistrerLesTextes`). Reproduit puis vérifié par `smoke:publication`. Un texte réellement modifié fait toujours du publieur le rédacteur. |
@@ -349,4 +349,55 @@ groupe. Le verrou ne change que la famille `next`. L'audit repasse sans
 vulnérabilité élevée ou critique non motivée. Quand #300 sera fusionnée,
 ce report n'aura plus d'effet. La version en service sur le VPS reste
 exposée tant que `main` n'est pas redéployée avec ce correctif.
+
+## 9. S.184 — C-7 corrigé, lot dédié — 22/10/2026
+
+Demande du responsable : corriger C-7 dans un lot dédié. Base : `78cdbeb`
+(#302 fusionnée).
+
+**Cause.** Le domaine définit déjà une version en vigueur : mise en
+vigueur un jour, et non archivée (`estEnVigueur`, `domain/backoffice/regle.ts`).
+B-02 applique cette définition. Trois requêtes serveur l'avaient remplacée
+par « `effectiveTo` nul », alors que `effectiveTo` porte aussi la fin de
+validité prévue par l'autorité, que T-02 affiche au candidat (« applicable
+jusqu'au »).
+
+**Correction.** Les trois sites sont alignés sur la définition du domaine :
+
+| Site | Avant | Après |
+|---|---|---|
+| `publierLaRegle` | prédécesseur à `effectiveTo` nul ; archivage qui écrase la fin prévue par la date du jour | prédécesseur publié une fois et non archivé ; l'archivage garde la fin prévue, ou pose la date du jour s'il n'y en a pas |
+| `consignerLeReleve` | une version à fin prévue, dépubliée par l'échéance, restait dépubliée après un relevé « à jour » | republiée : une version remplacée est archivée, et donc déjà refusée en amont |
+| graine `visa-rules.ts` | même critère que la publication | même définition ; la fin prévue est gardée |
+
+Le filtre candidat (`filtrePourCandidat`) et T-02 continuent de lire
+`effectiveTo` comme fin prévue. Aucun schéma ni aucune donnée ne change.
+
+**Preuves.**
+
+- `smoke:publication`, quinze vérifications nouvelles, rouges avant le
+  correctif et vertes après :
+  - fin prévue à venir, puis fin déjà passée (les montants de l'année
+    suivante publiés en janvier) : la version est archivée et garde sa fin
+    prévue ;
+  - une seule version reste publiée, et le dossier est prévenu avec un
+    arbitrage proposé ;
+  - une version dépubliée qui porte une fin prévue est republiée au relevé.
+- `tests/veille-relecture.test.ts` : la condition de remise en ligne ne lit
+  plus `effectiveTo` ; un brouillon jamais publié et une version archivée
+  restent refusés.
+- Parcours R-O03 ramené sur la règle NL `kennismigrant` : la v1 de la
+  graine est archivée avec sa fin au 31/12/2026, une seule version reste
+  publiée, et T-02 annonce « avant le 31 décembre 2026 ». 36/36 sur
+  Chromium 390/1440.
+- `npm run check`, construction, fumées graine, transitions, éditoriale et
+  migrations : vertes.
+
+**C-13 — échéance de données, pas de code.** Les deux règles NL de la
+graine portent une fin prévue au 31/12/2026. Dès le 01/01/2027, le filtre
+candidat les écarte. C'est voulu (INV-8), mais aucune destination
+néerlandaise ne s'afficherait alors, et les parcours qui ouvrent un dossier
+« pays-bas » échoueraient. Les versions 2027 sont à relever et à publier
+par la veille avant cette date. Depuis S.184, cette publication archive
+bien la version 2026 et prévient les dossiers.
 
