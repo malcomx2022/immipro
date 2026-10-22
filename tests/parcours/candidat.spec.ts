@@ -1008,13 +1008,18 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
   await page.waitForURL(`**/dossiers/${dossier}/depot`);
   await relever();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("As-tu déposé ta demande ?");
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  // « Aujourd'hui » est celui du candidat, dans son fuseau (S.89), que
+  // l'écran pose en `max` : la date UTC du banc le précède d'un jour entre
+  // minuit UTC et minuit local, et tombait avant l'ouverture du dossier.
+  const champDate = page.getByLabel("Quand as-tu déposé ta demande ?");
+  const aujourdhui = (await champDate.getAttribute("max")) ?? "";
+  expect(aujourdhui).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
   const bouton = page.getByRole("button", { name: "Déclarer mon dépôt", exact: true });
   await expect(bouton).toBeDisabled();
-  await page.getByLabel("Quand as-tu déposé ta demande ?").fill("2020-01-01");
+  await champDate.fill("2020-01-01");
   await page.getByRole("checkbox", { name: /J'ai déposé ma demande/u }).check();
   await expect(bouton).toBeDisabled();
-  await page.getByLabel("Quand as-tu déposé ta demande ?").fill(aujourdhui);
+  await champDate.fill(aujourdhui);
   await expect(bouton).toBeEnabled();
   await bouton.click();
   await page.waitForURL(`**/dossiers/${dossier}`);
