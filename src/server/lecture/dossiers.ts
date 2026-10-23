@@ -8,6 +8,7 @@ import type {
 import { db } from "@/lib/db";
 import { aidePourLaChecklist, type AideDeLEtape } from "@/domain/dossiers/aide-de-letape";
 import { echec } from "@/server/http/echecs";
+import { TITRE_ECHUE, corpsEchue } from "@/domain/dossiers/peremption";
 import { versFiche, payload, mentionDe } from "@/server/acces/regles";
 import { versDossier, versPiece } from "@/server/vue/dossier";
 import { compteur } from "@/server/acces/quota";
@@ -378,7 +379,16 @@ export async function analyseDeLaPiece(
       : revue.decidedAt
         ? null
         : { etat: "EN_COURS", signalee: revue.reason === "SIGNALE_PAR_LE_CANDIDAT" };
-  const affiche = analyse
+  const piece = versPiece(document);
+  /*
+    C-17 (S.188) — la checklist déclasse la pièce échue (C-16, `versPiece`) ;
+    l'écran de la pièce, lui, relisait la lecture d'origine : « Cette pièce
+    est conforme », un seul bouton vers la checklist, et rien pour la
+    remplacer. Le constat de péremption prime sur une lecture conforme,
+    avec le geste qui y répond.
+  */
+  const echue = piece.etat === "EXPIREE" && piece.perimeLe ? piece.perimeLe : null;
+  const lue = analyse
     ? resultatAffiche(
         { verdict: verdictAffichable(analyse.verdict), titre: analyse.title, corps: analyse.body },
         tranchee
@@ -392,9 +402,17 @@ export async function analyseDeLaPiece(
           : null,
       )
     : null;
+  const affiche =
+    lue && echue && lue.verdict === "CONFORME"
+      ? {
+          verdict: "A_CORRIGER" as const,
+          titre: TITRE_ECHUE(document.label),
+          corps: corpsEchue(document.label, echue, false),
+        }
+      : lue;
 
   return {
-    piece: versPiece(document),
+    piece,
     versions: document.versions,
     controle: controleDuDepot(
       derniere

@@ -92,3 +92,33 @@ export function corpsEchue(libelle: string, perimeLe: string, etaitPret: boolean
 /** Mention portée par la ligne de checklist d'une pièce échue. */
 export const mentionEchue = (perimeLe: string): string =>
   `Validité dépassée depuis le ${jourEnFrancais(perimeLe)}`;
+
+/** Ce qu'il faut d'une pièce pour savoir si elle bloque le dépôt. */
+export interface PieceExigee {
+  libelle: string;
+  obligatoire: boolean;
+  conforme: boolean;
+  /** Date de péremption, ISO `AAAA-MM-JJ` ; `null` pour une pièce sans durée. */
+  perimeLe: string | null;
+}
+
+/**
+ * C-16 (S.188) — la première pièce obligatoire, conforme en base, mais échue
+ * aujourd'hui. Entre son échéance et la passe de nuit, la base garde le
+ * dossier « prêt » ; l'écran et la déclaration de dépôt la lisent ici pour
+ * ne plus le croire. `null` si aucune.
+ */
+export function premiereObligatoireEchue(
+  pieces: readonly PieceExigee[],
+  aujourdhui: string,
+): PieceExigee | null {
+  return (
+    pieces.find(
+      (p) => p.obligatoire && p.conforme && p.perimeLe !== null && estEchue(p.perimeLe, aujourdhui),
+    ) ?? null
+  );
+}
+
+/** Le refus de déclarer un dépôt sur une pièce échue : la pièce, sa date, le geste. */
+export const refusDuDepotEchu = (piece: PieceExigee): string =>
+  `${piece.libelle} n'est plus valable depuis le ${jourEnFrancais(piece.perimeLe!)} : téléverse une version à jour, puis déclare ton dépôt.`;

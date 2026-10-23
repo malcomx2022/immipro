@@ -6,7 +6,7 @@ import { codesConformes } from "@/domain/completeness/conditions";
 import type { ConservationDuDepot, Dossier, StatutDossier } from "@/domain/dossiers/dossier";
 import { MENTION_CLOTURE, MENTION_DEPOSE, MENTION_EN_PAUSE } from "@/domain/dossiers/dossier";
 import { dateDeDepot } from "@/domain/dossiers/faisabilite";
-import { estEchue } from "@/domain/dossiers/peremption";
+import { estEchue, premiereObligatoireEchue, type PieceExigee } from "@/domain/dossiers/peremption";
 
 /** Un jour ISO, en UTC — même convention que l'échéancier. */
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -67,6 +67,15 @@ export function versPiece(document: Document, aujourdhui = jourCivil(new Date())
     ...(document.hint ? { astuce: document.hint } : {}),
   };
 }
+
+/** Les pièces telles que la péremption les lit (C-16). */
+export const exigees = (documents: readonly Document[]): PieceExigee[] =>
+  documents.map((d) => ({
+    libelle: d.label,
+    obligatoire: d.required,
+    conforme: d.status === "CONFORME",
+    perimeLe: d.expiresAt ? iso(d.expiresAt) : null,
+  }));
 
 /**
  * Pastille monospace de la checklist : trois lettres tirées du code de la
@@ -154,10 +163,20 @@ export function versDossier(
     portées séparément, et chaque appelant choisit la sienne.
   */
   const cible = dossier.targetDate?.toISOString().slice(0, 10);
+  /*
+    C-16 (S.188) — la base garde « prêt » jusqu'à la passe de nuit ; la
+    pièce, elle, s'affiche déjà expirée. L'écran annonçait les deux à la
+    fois : « Ton dossier est prêt », et « Remplacer ton justificatif ». Une
+    pièce obligatoire échue suffit à ce qu'il ne le soit plus (RG-07.4).
+  */
+  const statut =
+    dossier.status === "PRET" && premiereObligatoireEchue(exigees(documents), aujourdhui)
+      ? "ACTIF"
+      : versStatut(dossier.status);
   return {
     id: dossier.id,
     destination,
-    statut: versStatut(dossier.status),
+    statut,
     ...(cible
       ? {
           departVise: cible,
@@ -165,7 +184,7 @@ export function versDossier(
         }
       : {}),
     completude,
-    prochaineAction: prochaineAction(pieces, versStatut(dossier.status), completude),
+    prochaineAction: prochaineAction(pieces, statut, completude),
     ...(dossier.status === "SOUMIS" ? { conservation: conservationDuDepot(dossier) } : {}),
   };
 }

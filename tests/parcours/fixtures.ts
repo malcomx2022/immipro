@@ -173,7 +173,7 @@ export async function echoirLaPurge(dossier: string, email: string): Promise<voi
     const r = await db.query(
       `UPDATE "Application" SET "purgeDueAt" = now() - interval '1 minute'
        WHERE id = $1 AND "purgeDueAt" IS NOT NULL AND "purgedAt" IS NULL
-         AND status IN ('ISSUE_DECLAREE', 'CLOTURE', 'ABANDONNE')`,
+         AND status IN ('ISSUE_DECLAREE', 'ABANDONNE')`,
       [dossier],
     );
     if (r.rowCount !== 1) throw Error("Aucune purge annoncée à faire échoir sur ce dossier.");

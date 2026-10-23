@@ -190,6 +190,38 @@ try {
     verifier(brut, "la base refuse elle aussi une date de dépôt future");
   }
 
+  console.log("\nC-16 — une pièce obligatoire échue empêche la déclaration, même « prête » en base");
+  {
+    const { application } = await dossierPret(aMidi("2026-06-01"));
+    const maintenant = aMidi("2026-09-20");
+    await db.document.create({
+      data: {
+        applicationId: application.id,
+        code: "preuve_fonds",
+        label: "Justificatif de ressources",
+        status: "CONFORME",
+        required: true,
+        validityMonths: 3,
+        expiresAt: new Date("2026-09-19T00:00:00.000Z"),
+      },
+    });
+    const refus = await declarerLeDepot(application, { deposeLe: "2026-09-15", maintenant }).catch((e) => e);
+    verifier(codeDe(refus) === "etat_incompatible", `déclaration refusée (${codeDe(refus)})`);
+    verifier(
+      /Justificatif de ressources n'est plus valable depuis le 19 septembre 2026 : téléverse une version à jour/u.test(JSON.stringify(refus)),
+      "le refus nomme la pièce, sa date et le geste",
+    );
+    const relu = await db.application.findUniqueOrThrow({ where: { id: application.id } });
+    verifier(relu.status === "PRET" && relu.depositedOn === null, "un refus n'écrit rien");
+    // Valable jusqu'au 20 : elle l'est encore le 20.
+    await db.document.updateMany({
+      where: { applicationId: application.id, code: "preuve_fonds" },
+      data: { expiresAt: new Date("2026-09-20T00:00:00.000Z") },
+    });
+    const accepte = await declarerLeDepot(application, { deposeLe: "2026-09-15", maintenant });
+    verifier(accepte.status === "SOUMIS", "le jour même de sa limite, la pièce vaut encore");
+  }
+
   console.log("\nUne déclaration tardive ne purge jamais sur-le-champ");
   {
     const { application } = await dossierPret(aMidi("2025-01-10"));

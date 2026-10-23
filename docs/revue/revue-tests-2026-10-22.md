@@ -167,19 +167,19 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 |---|---|---|---|
 | WF-01 Simulateur | Éprouvé | Domaine `simulateur/` ; parcours clavier six réponses ; photographies ; procédure nommée partout où un pays en publie plusieurs (O-1, § 12) | — |
 | WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement, suppression demandée et reprise (R-O05, § 8) | Portabilité en navigateur ; OAuth Google V2 |
-| WF-03 Recommandations | Partiel | Domaine, résultats sourcés, comparateur | Profils variés en navigateur |
+| WF-03 Recommandations | Partiel | Domaine, résultats sourcés, comparateur ; trois profils contrastés en navigateur (§ 13) | Comparateur en navigateur |
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
 | WF-05 Achat de pack | Bloqué (M.C) | Tunnel, FedaPay, réconciliation, remboursement, montée sur PostgreSQL ; achat scripté en navigateur | Bac à sable réel FedaPay/Stripe, certification fiscale, essai réel |
 | WF-06 Pièces et analyse | Bloqué (L5) | Balayage, extraction, destination L1, mesure L2 ; dépôt, coupure, réponse tardive, revue B-05 en navigateur | Qualification réelle Vertex `eu` |
-| WF-07 Complétude | Partiel | Domaine `completeness/`, relecture humaine, transitions | Péremption et fuseau en navigateur |
+| WF-07 Complétude | Partiel | Domaine `completeness/`, relecture humaine, transitions ; péremption en navigateur, C-16/C-17 corrigés (§ 13) | Relecture de complétude en navigateur |
 | WF-08 Rédaction assistée | Bloqué (L5) | Avis L3, relecture exclusive L4, rédaction ; parcours rédaction, DOCX, deux onglets, saisie tardive (S.182) | Modèle réel qualifié |
-| WF-09 Échéancier et rappels | Partiel | `smoke:rappels`, `smoke:depot` | Échéancier en navigateur, réception courriel réelle |
-| WF-10 Clôture, issue, purge | Partiel | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré et clôture | Purge effective et portabilité en navigateur |
+| WF-09 Échéancier et rappels | Partiel | `smoke:rappels`, `smoke:depot` ; échéancier et fuseau en navigateur, C-15 corrigé (§ 13) | Réception courriel réelle |
+| WF-10 Clôture, issue, purge | Éprouvé | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré, clôture, purge effective et portabilité (§ 13) | — |
 | WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle NL à fin prévue (§ 8, § 9) | C-13 : versions 2027 des règles NL à publier avant le 31/12/2026 |
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès | Route d'un dossier sans test direct, conditions d'affiliation |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
-| WF-15 Administration | Partiel | B-05 et B-03 (relance de suppression) en navigateur, rôles, journal, facturation | B-04 remboursements, autres formulaires (R-I04) |
+| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression), B-04 (rapprochement, grand livre) et B-08 en navigateur, rôles, journal, facturation (§ 13) | B-04 remboursements (M.C), autres formulaires (R-I04) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
 
 ### 5.2 Modules techniques
@@ -262,7 +262,7 @@ Travail de code encore possible sans préalable externe, par priorité :
 1. ~~Tests de route pour les écritures listées en C-1~~ : fait le 22/10
    (66 tests, § 3). O-4 tranchée et corrigée le même jour.
 2. ~~Parcours navigateur pour R-O03 et R-O05~~ : faits le 22/10 (§ 8).
-   Restent l'échéancier et la péremption d'une pièce. C-7 est corrigé en S.184 (§ 9).
+   L'échéancier et la péremption sont faits en S.188 (§ 13). C-7 est corrigé en S.184 (§ 9).
 3. ~~Libellé du dispositif (O-1)~~ : fait en S.187 (§ 12). O-2 et O-3
    (textes d'aide B-05) étaient déjà corrigés en S.167 (RC-04, RC-05).
 4. Relecture des trois PR Dependabot avec la porte complète.
@@ -503,3 +503,70 @@ nomme « kennismigrant ».
 **Reste mineur, consigné.** Les titres d'onglet des pages d'un dossier
 (« Checklist — Pays-Bas ») ne nomment que le pays ; l'en-tête de la page,
 lui, porte la procédure.
+
+## 13. S.188 — parcours navigateur manquants, lot dédié — 23/10/2026
+
+Demande du responsable : ajouter les parcours navigateur manquants dans un
+lot dédié. Base : `ddd22cf` (#308 fusionnée). Gestes visés : ceux de C-3
+et des lignes « non vérifié » de la matrice, hors R-O04 (rail réel, M.C)
+et lecteur d'écran humain (R-I02).
+
+**Huit parcours ajoutés** à `tests/parcours/candidat.spec.ts`, chacun
+contrôlé par son effet en base :
+
+| Parcours | Matrice | Ce qui est vérifié |
+|---|---|---|
+| WF-03 profils contrastés | WF-03 | Trois jeux de réponses dans un contexte vierge : trois classements distincts, écartées motivées, écart chiffré pour le profil sans budget ni langue, source datée (INV-8), aucun mot interdit à l'écran candidat |
+| Échéancier | R-C08 | Date fixée depuis l'écran, échéances posées depuis la règle figée, date trop proche signalée intenable, date proposée reprise au retour sur l'écran |
+| Fuseau | R-K06 | Toronto et quatorze jours enregistrés, phrase des rappels recalculée ; un navigateur à UTC+14 lit le même échéancier, sans erreur d'hydratation ; l'« aujourd'hui » du dépôt est celui de Toronto |
+| Pièce périmée | R-K06 | Justificatif déposé et lu, puis échu (précondition) : déclassé à l'affichage, « prêt » retiré, dépôt refusé en nommant la pièce, version neuve qui repose la péremption |
+| Purge effective | R-C09 | Échéance annoncée atteinte (précondition), purge de rétention lancée à la main sous le nom de l'opérateur, versions vidées, journal, archive sans fichier, autre dossier intact |
+| Portabilité | R-C09 | Export « Mes données » téléchargé : deux dossiers dont le purgé, une seule adresse (celle du titulaire), aucune clé de stockage, export journalisé |
+| B-04 | R-I04 | Rapprochement lancé à la main, grand livre exporté avec la transaction du candidat |
+| B-08 | R-I04 | Article neuf : brouillon qui promet enregistré, publication refusée par l'écran et par la route, négation publiée avec sa source, page publique, retrait (404) |
+
+Trois préconditions nouvelles, bornées au candidat synthétique
+(`tests/parcours/fixtures.ts`) : `perimerLaPiece` (le temps passe sur une
+pièce périssable conforme), `echoirLaPurge` (l'échéance annoncée est
+atteinte), et `purgerALaMain`, qui lance la commande d'exploitation
+`scripts/purge-retention.mts` sur la base et le stockage du banc.
+
+**Trois défauts relevés par ces parcours, corrigés dans le lot.**
+
+- **C-15 — l'échéancier sans date ne la fixait pas.** Un dossier ouvert
+  sur « Je ne sais pas encore » arrivait sur « L'échéancier attend ta date
+  de départ », dont le bouton menait à la checklist, où rien ne la fixe.
+  La route acceptait pourtant une première date. Le champ est désormais
+  sur l'écran (`DateDeDepart`, partagé avec la replanification), libellé
+  « Date de départ visée », bouton « Fixer la date ». Test d'écran rouge
+  avant ; parcours rouge sur l'ancienne compilation.
+- **C-16 — « prêt » sur une pièce obligatoire échue.** Entre l'échéance
+  d'une pièce et la passe de nuit, la base garde le dossier `PRET` : la
+  checklist annonçait « Ton dossier est prêt » sous « Remplacer ton
+  justificatif », et la déclaration de dépôt passait. La vue et
+  `declarerLeDepot` lisent la même péremption
+  (`premiereObligatoireEchue`) ; le refus nomme la pièce, sa date et le
+  geste. Quatre tests unitaires et trois vérifications de `smoke:depot`
+  rouges avant.
+- **C-17 — l'écran de la pièce disait « conforme » à une pièce échue.**
+  La checklist la déclassait, C-08 relisait la lecture d'origine, sans
+  bouton pour la remplacer. Le constat de péremption prime sur une
+  lecture conforme, avec « Téléverser une autre version » ; la lecture
+  d'origine reste connue pour le prix de la version suivante. Vérification
+  de `smoke:extraction` rouge avant.
+
+La passe de nuit (`declasserLesPiecesEchues`) reste nécessaire : c'est
+elle qui écrit l'état stocké et prévient le candidat. Ces corrections
+alignent seulement l'écran et la déclaration sur ce qu'elle écrira.
+
+**Preuves.** Parcours 52/52 sur Chromium 390 et 1 440, sur le même banc
+(26 par profil) ; Firefox et WebKit laissés à la porte CI.
+Porte unitaire : 203 fichiers, 4 051 tests ; lint, types, vocabulaire,
+`smoke:depot` et `smoke:extraction` verts.
+
+**Ce qui reste non vérifié.** R-O04 (remboursement et avoir, M.C), le
+lecteur d'écran humain (R-I02), la réception d'un rappel par courriel à
+l'heure du fuseau (la passe horaire est éprouvée par `smoke:rappels`, pas
+en navigateur), B-04 remboursement et tranche (dépendent d'un rail réel),
+les autres formulaires d'administration (B-03 hors relance, B-06,
+textes juridiques, veille).
