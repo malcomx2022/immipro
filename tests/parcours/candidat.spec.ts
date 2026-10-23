@@ -364,8 +364,16 @@ test("WF-03 : trois profils contrastés, trois classements sourcés, écarts chi
   suivis.push(suivreErreurs(p, moteur, origineApp));
   const lus: { titre: string; retenues: string[]; ecartees: string[] }[] = [];
   try {
-    for (const reponses of profils) {
-      await aller("/simulateur", p);
+    await aller("/simulateur", p);
+    for (const [rang, reponses] of profils.entries()) {
+      // Le profil suivant part des résultats, comme le candidat : par
+      // « Modifier mes réponses », sans doubler une navigation de Next
+      // que Firefox n'a pas encore achevée.
+      if (rang > 0) {
+        await p.getByRole("link", { name: "Modifier mes réponses", exact: true }).click();
+        await p.waitForURL("**/simulateur");
+      }
+      await expect(p.getByRole("heading", { name: "Quel est ton objectif ?" })).toBeVisible();
       for (const [i, nom] of reponses.entries()) {
         await p.getByRole("radio", { name: nom, exact: true }).click();
         await p
