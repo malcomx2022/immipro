@@ -187,10 +187,18 @@ describe("B-02 — versionnement et INV-3", () => {
       MENTION_SANS_MONTANT,
       jourEnFrancais,
     );
-    expect(differences).toHaveLength(4);
-    expect(compterChangements(differences)).toBe(3);
+    // C-12 : les conditions entrent au panneau, une ligne chacune. Il
+    // annonçait « 0 champ modifié » sur un seuil bloquant changé.
+    expect(differences).toHaveLength(6);
+    expect(compterChangements(differences)).toBe(4);
     const delai = differences.find((d) => d.champ === "Délai d'instruction")!;
     expect(aChange(delai)).toBe(false);
+    const seuil = differences.find((d) => d.champ === "Condition « compte_bloque_min », bloquante")!;
+    expect(aChange(seuil)).toBe(true);
+    expect(seuil.avant).toMatch(/au moins 11\s208 EUR/u);
+    expect(seuil.apres).toMatch(/au moins 11\s904 EUR/u);
+    const presence = differences.find((d) => d.champ.includes("admission_universite"))!;
+    expect(aChange(presence)).toBe(false);
   });
 
   it("tient INV-4 : une source secondaire n'est jamais visible du candidat", () => {

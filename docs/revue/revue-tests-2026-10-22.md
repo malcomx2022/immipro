@@ -178,7 +178,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle NL à fin prévue (§ 8, § 9) | C-13 : versions 2027 des règles NL à publier avant le 31/12/2026 |
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès | Route d'un dossier sans test direct, conditions d'affiliation |
-| WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), textes juridiques | Routine de veille réelle ; B-02 ne montre ni n'édite les valeurs des conditions (C-12) |
+| WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
 | WF-15 Administration | Partiel | B-05 et B-03 (relance de suppression) en navigateur, rôles, journal, facturation | B-04 remboursements, autres formulaires (R-I04) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
 
@@ -328,7 +328,7 @@ gestes.
 | **C-9** | `connecter` refusait un compte suspendu, mais pas un compte en suppression demandée. Purge inachevée, le mot de passe rouvrait une session sur des dossiers en cours de purge. | **Corrigé** : même refus, et même message, qu'un compte suspendu ; `tests/connexion-suppression-demandee.test.ts`. |
 | **C-10** | Dans B-02, « Publier » enregistre d'abord les textes, et cet enregistrement réécrivait `verifiedBy` même sans changement. L'administrateur qui relisait la version d'un veilleur en devenait le rédacteur, et WF-14 §4 lui refusait la publication : une modification de condition bloquante ne pouvait jamais être publiée depuis l'écran. | **Corrigé** : un enregistrement sans changement de contenu ni de métadonnées n'écrit rien (`enregistrerLesTextes`). Reproduit puis vérifié par `smoke:publication`. Un texte réellement modifié fait toujours du publieur le rédacteur. |
 | **C-11** | L'écran de suppression affichait « Tes pièces ont été supprimées » et « tu peux ouvrir un nouveau compte avec la même adresse » même quand le serveur rendait `supprime: false`. | **Corrigé** : état « Ta demande de suppression est enregistrée », qui dit ce qui est fait, ce qui reste et qu'il n'y a rien à refaire ; test d'interface. |
-| **C-12** | B-02 ne montre pas les valeurs des conditions : le panneau des différences annonçait « 0 champ modifié » sur un seuil bloquant changé. Le second lecteur ne voit donc pas ce qu'il relit, et aucune valeur ne s'édite depuis l'écran. | **Ouvert** : un chantier d'écran, à arbitrer. |
+| **C-12** | B-02 ne montre pas les valeurs des conditions : le panneau des différences annonçait « 0 champ modifié » sur un seuil bloquant changé. Le second lecteur ne voit donc pas ce qu'il relit, et aucune valeur ne s'édite depuis l'écran. | **Corrigé en S.186** (lot dédié, affichage et modification, § 11). |
 
 Résultats locaux, Chromium 390/1440 : **36 parcours sur 36** ;
 `npm run check`, `smoke:publication`, `smoke:purge` et `smoke:migrations`
@@ -436,3 +436,43 @@ Aucun appel, aucun schéma, aucune donnée ne change.
 - `npm run check` (202 fichiers, 4 018 tests), construction, et parcours
   36/36 sur Chromium 390/1440. Firefox et WebKit sont laissés à la porte
   CI, où le défaut s'était montré.
+
+## 11. S.186 — C-12 corrigé, lot dédié — 23/10/2026
+
+Demande du responsable : corriger C-12 dans un lot dédié, affichage et
+modification. Base : `3d05ccf` (#306 fusionnée).
+
+**Constat.** B-02 ne montrait aucune condition. Son panneau des
+différences comparait le montant, la date, le délai et le libellé, et
+annonçait « 0 champ modifié » sur un seuil bloquant changé : le second
+opérateur que WF-14 §4 exige relisait sans voir ce qu'il relisait. Aucune
+valeur ne se modifiait depuis l'écran ; R-O03 écrivait le seuil par un
+`fetch` de la branche `payload`, que l'écran n'emploie pas.
+
+**Correction.**
+
+| Couche | Ce qui change |
+|---|---|
+| Domaine (`domain/backoffice/regle.ts`) | `Regle.conditions` ; `conditionsAffichees`, `valeurLisible`, `lireSeuil` (saisie française), `avecLesSeuils` (recollage sur le payload en base, refus nommé d'un code absent ou d'une référence), `seuilsModifies` ; une ligne par condition dans `comparer` |
+| Serveur | La branche `textes` du `PUT` porte `seuils`, par code. `enregistrerLesTextes` recolle textes puis seuils sur la ligne qu'il écrit, jamais sur la copie du client ; INV-3, C-10 et le vocabulaire inchangés |
+| Écran B-02 | Section « Conditions » : seuil chiffré en saisie, référence (`exists`) en lecture, qualités, valeur en vigueur et message au candidat ; refus d'un seuil illisible à l'endroit du champ, enregistrement et publication désactivés tant qu'il l'est ; notes « Modifié / Inchangé » calculées au lieu d'être écrites en dur |
+
+Seul un seuil chiffré se modifie : les autres valeurs du référentiel sont
+des références de pièce, que le schéma rattache. La relecture et la
+divergence restent décidées par `comparerLesVersions`, qui voyait déjà les
+seuils ; le lot lui donne enfin une entrée depuis l'écran.
+
+**Preuves.**
+
+- `tests/conditions-b02.test.ts` (22 tests) : lecture, saisie française,
+  recollage, refus nommés, relecture exigée sur un seuil bloquant.
+- `tests/ui/p2-backoffice.test.tsx`, cinq tests C-12 rouges avant le
+  correctif : conditions montrées, panneau à « 4 champs modifiés sur 6 »,
+  seul le seuil modifié part, seuil illisible signalé et rien n'est envoyé.
+- `smoke:publication`, onze vérifications rouges avant le correctif (la
+  vue de B-02 ne portait pas de conditions) : seuil saisi → version
+  ouverte, autres conditions intactes, version en vigueur non touchée,
+  code absent refusé, rédacteur refusé, second opérateur publie, dossier
+  figé prévenu (`CRITIQUE`).
+- Parcours R-O03 : le seuil est saisi dans B-02 par l'administrateur puis
+  par le veilleur, et le panneau des différences montre la condition.

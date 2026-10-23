@@ -1128,26 +1128,22 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
   ]);
   expect(vigueur).toBeDefined();
 
-  /** Le seuil abaissé de `ecart`, écrit par la route depuis la session de `p`. */
+  /**
+   * Le seuil abaissé de `ecart`, saisi dans B-02 depuis la session de `p`
+   * (C-12). Il s'écrivait par un `fetch` de la branche `payload` : l'écran
+   * ne montrait ni n'éditait la valeur d'une condition.
+   */
   const ecrireLeSeuil = async (p: Page, ecart: number) => {
-    const rules = {
-      ...vigueur!.rules,
-      conditions: vigueur!.rules.conditions.map((c) =>
-        c.code === SEUIL ? { ...c, valeur: (c.valeur as number) - ecart } : c,
+    const actuel = vigueur!.rules.conditions.find((c) => c.code === SEUIL)!.valeur as number;
+    await p.getByLabel(`Seuil de « ${SEUIL} »`, { exact: true }).fill(String(actuel - ecart));
+    const [reponse] = await Promise.all([
+      p.waitForResponse(
+        (r) => r.url().includes("/api/admin/regles/") && r.request().method() === "PUT",
       ),
-    };
-    const statut = await p.evaluate(
-      async ([id, corps]) =>
-        (
-          await fetch(`/api/admin/regles/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ champ: "payload", rules: corps }),
-          })
-        ).status,
-      [vigueur!.id, rules] as const,
-    );
-    expect(statut).toBe(200);
+      p.getByRole("button", { name: /^(Enregistrer le brouillon|Ouvrir la version \d+)$/u }).click(),
+    ]);
+    expect(reponse.status()).toBe(200);
+    await expect(p.getByText("Brouillon enregistré", { exact: false })).toBeVisible();
   };
 
   // 1. L'administrateur rédige : seuil abaissé de deux unités.
@@ -1168,6 +1164,8 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
   // 2. Il tente de publier sa propre version : refus nommant la condition.
   await aller(`/regles/${vigueur!.id}`, b02);
   await expect(b02.getByText(`Brouillon version ${suivante}`, { exact: false })).toBeVisible();
+  // C-12 : le panneau des différences montre le seuil que le second lecteur relira.
+  await expect(b02.getByText(`Condition « ${SEUIL} », bloquante`, { exact: true })).toBeVisible();
   await b02.getByLabel("Motif du changement", { exact: true }).fill("Seuil IND révisé au 1er janvier");
   await b02.getByRole("button", { name: `Publier la version ${suivante}`, exact: true }).click();
   const refus = b02.getByRole("alert").filter({ hasText: SEUIL });

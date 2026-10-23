@@ -8,6 +8,7 @@ import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
 import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import {
+  AIDE_CONDITIONS,
   AIDE_LIBELLE_CANDIDAT,
   AIDE_MOTIF,
   MENTION_DIVERGENCE_DIFFEREE,
@@ -18,13 +19,18 @@ import {
   comparer,
   compterChangements,
   effetDeLaPublication,
+  lireSeuil,
   MENTION_SANS_MONTANT,
   messageDeRefus,
   montantLisible,
   publiable,
+  seuilsModifies,
+  SYMBOLE_OPERATEUR,
+  valeurLisible,
   verifierTextesCandidat,
   visiblePourLeCandidat,
   type ChampCandidat,
+  type ConditionAffichee,
   type Regle,
 } from "@/domain/backoffice/regle";
 import { MENTION_AUDIT } from "@/domain/backoffice/navigation";
@@ -57,6 +63,12 @@ import { CHAMP_CONTROLE } from "@/components/ui/champ";
  * Les fautes restent signalées champ par champ dans les deux cas : les
  * montrer sans interdire d'enregistrer est précisément ce que la règle
  * demande.
+ *
+ * **Les conditions se lisent et leurs seuils se modifient (C-12).** L'écran
+ * ne les montrait pas : le panneau des différences annonçait « 0 champ
+ * modifié » sur un seuil bloquant changé, et le second opérateur de WF-14
+ * §4 relisait sans voir ce qu'il relisait. Seuls les seuils modifiés
+ * partent au serveur, qui les recolle sur la ligne en base.
  *
  * INV-3 reste tenu : publier n'migre aucun dossier. L'effet est montré avant,
  * avec le nombre de dossiers alertés, le nombre mis en arbitrage, et zéro
@@ -121,6 +133,14 @@ export function EditionRegle({
     libelleCandidat: brouillon.libelleCandidat,
     reserveCandidat: brouillon.reserveCandidat,
   });
+  /** Les seuils tels que saisis, par code : la lecture se fait à l'envoi. */
+  const [saisies, setSaisies] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      brouillon.conditions
+        .filter((c) => c.modifiable)
+        .map((c) => [c.code, String(c.valeur).replace(".", ",")]),
+    ),
+  );
   const [motif, setMotif] = useState("");
   const [envoi, setEnvoi] = useState<"" | "brouillon" | "publication">("");
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -131,13 +151,23 @@ export function EditionRegle({
 
   const fautes = verifierTextesCandidat(textes);
   const textesRecevables = publiable(textes);
-  const peutPublier = textesRecevables && motif.trim().length > 0 && habiliteAPublier;
+  const erreursDeSeuil = Object.fromEntries(
+    Object.entries(saisies).flatMap(([code, saisie]) => {
+      const lu = lireSeuil(saisie);
+      return lu.ok ? [] : [[code, lu.message] as const];
+    }),
+  );
+  const seuilsLisibles = Object.keys(erreursDeSeuil).length === 0;
+  const seuils = seuilsModifies(brouillon.conditions, saisies);
+  const peutPublier =
+    textesRecevables && seuilsLisibles && motif.trim().length > 0 && habiliteAPublier;
 
   /** Le corps de la branche `textes` : ce que l'écran édite, et rien de plus. */
   const corpsDesTextes = {
     champ: "textes" as const,
     libelleCandidat: textes.libelleCandidat,
     reserveCandidat: textes.reserveCandidat,
+    ...(Object.keys(seuils).length > 0 ? { seuils } : {}),
   };
 
   /**
@@ -197,9 +227,13 @@ export function EditionRegle({
     router.refresh();
   }
 
+  /** Les conditions telles que l'écran les montre, seuils saisis compris. */
+  const conditionsSaisies: ConditionAffichee[] = brouillon.conditions.map((c) =>
+    Object.hasOwn(seuils, c.code) ? { ...c, valeur: seuils[c.code]! } : c,
+  );
   const differences = comparer(
     enVigueur,
-    { ...brouillon, ...textes },
+    { ...brouillon, ...textes, conditions: conditionsSaisies },
     formatMontant,
     MENTION_SANS_MONTANT,
     jourEnFrancais,
@@ -207,6 +241,11 @@ export function EditionRegle({
   const effet = effetDeLaPublication(dossiersConcernes, dossiersSousLaNouvelleRegle);
 
   const fautePour = (champ: ChampCandidat) => fautes.find((f) => f.champ === champ);
+  /** La note d'une valeur : ce qui a changé depuis la version en vigueur, ou rien. */
+  const noteDe = (champ: string) => {
+    const d = differences.find((x) => x.champ === champ);
+    return d && aChange(d) ? `Modifié · version ${enVigueur.version} : ${d.avant}` : "Inchangé";
+  };
 
   return (
     <div className="flex flex-col">
@@ -221,8 +260,12 @@ export function EditionRegle({
           <>
             <Button
               variante="secondaire"
-              disabled={envoi !== ""}
-              raisonDesactivation="Enregistrement en cours."
+              disabled={envoi !== "" || !seuilsLisibles}
+              raisonDesactivation={
+                !seuilsLisibles
+                  ? "Un seuil n'est pas lisible : corrige-le dans la section Conditions."
+                  : "Enregistrement en cours."
+              }
               onClick={enregistrerLeBrouillon}
             >
               {envoi === "brouillon"
@@ -236,6 +279,8 @@ export function EditionRegle({
               raisonDesactivation={
                 !habiliteAPublier
                   ? "Publier demande un compte administrateur : qui rédige n'est pas qui publie (RG-14.2)."
+                  : !seuilsLisibles
+                    ? "Un seuil n'est pas lisible : corrige-le dans la section Conditions."
                   : fautes.length > 0
                     ? "Un texte destiné au candidat est refusé : corrige-le avant de publier."
                     : motif.trim().length === 0
@@ -260,17 +305,17 @@ export function EditionRegle({
             <Champ
               libelle={brouillon.intituleMontant}
               valeur={montantLisible(brouillon.montant, formatMontant, MENTION_SANS_MONTANT)}
-              note={`Modifié · version ${enVigueur.version} : ${montantLisible(enVigueur.montant, formatMontant, MENTION_SANS_MONTANT)}`}
+              note={noteDe(brouillon.intituleMontant)}
             />
             <Champ
               libelle="Applicable aux dépôts à partir du"
               valeur={jourEnFrancais(brouillon.applicableDepuis)}
-              note={`Modifié · version ${enVigueur.version} : ${jourEnFrancais(enVigueur.applicableDepuis)}`}
+              note={noteDe("Applicable aux dépôts à partir du")}
             />
             <Champ
               libelle="Délai d'instruction"
               valeur={brouillon.delaiInstruction}
-              note="Inchangé"
+              note={noteDe("Délai d'instruction")}
             />
             <Champ
               libelle="Source"
@@ -285,6 +330,33 @@ export function EditionRegle({
               libelle="Prochaine relecture"
               valeur={jourEnFrancais(brouillon.prochaineRelecture)}
             />
+          </section>
+
+          <section className="flex flex-col gap-4 rounded-lg border border-ink-300 bg-white p-5">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-16 font-semibold text-ink-900">Conditions</h2>
+              <p className="text-pretty text-13 text-ink-500">{AIDE_CONDITIONS}</p>
+            </div>
+            {brouillon.conditions.length === 0 ? (
+              <p className="text-pretty text-14 text-ink-700">
+                Cette version ne porte aucune condition : la complétude ne vérifie que la
+                présence des pièces requises.
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {brouillon.conditions.map((c) => (
+                  <LigneCondition
+                    key={c.code}
+                    condition={c}
+                    enVigueur={enVigueur.conditions.find((v) => v.code === c.code)}
+                    versionEnVigueur={enVigueur.version}
+                    saisie={saisies[c.code]}
+                    erreur={erreursDeSeuil[c.code]}
+                    onSaisie={(texte) => setSaisies((p) => ({ ...p, [c.code]: texte }))}
+                  />
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="flex flex-col gap-4 rounded-lg border border-ink-300 bg-white p-5">
@@ -458,6 +530,85 @@ function Champ({
       <span className="text-16 text-ink-900">{valeur}</span>
       {note ? <span className="text-pretty text-13 text-ink-500">{note}</span> : null}
     </div>
+  );
+}
+
+/**
+ * Une condition : sa valeur, ce qui la qualifie, et le texte que le
+ * candidat lit quand elle échoue. Le seuil chiffré se saisit ; une
+ * référence du référentiel se lit seulement (voir `ConditionAffichee`).
+ */
+function LigneCondition({
+  condition,
+  enVigueur,
+  versionEnVigueur,
+  saisie,
+  erreur,
+  onSaisie,
+}: {
+  condition: ConditionAffichee;
+  enVigueur: ConditionAffichee | undefined;
+  versionEnVigueur: number;
+  saisie: string | undefined;
+  erreur: string | undefined;
+  onSaisie: (texte: string) => void;
+}) {
+  const id = `seuil-${condition.code}`;
+  const qualites = [
+    condition.bloquant ? "Bloquante" : "Pondérée",
+    condition.piece ? `établie par la pièce « ${condition.piece} »` : "établie sans pièce",
+    condition.alternative ? `alternative du groupe « ${condition.alternative} »` : null,
+  ].filter(Boolean);
+  const avant = enVigueur ? valeurLisible(enVigueur) : null;
+  const maintenant = valeurLisible(condition);
+  return (
+    <li className="flex flex-col gap-1.5 border-t border-ink-300 py-3">
+      {condition.modifiable && saisie !== undefined ? (
+        <>
+          <label htmlFor={id} className="text-14 font-medium text-ink-900">
+            Seuil de « {condition.code} »
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-14 text-ink-700">{SYMBOLE_OPERATEUR[condition.operateur]}</span>
+            <div className="w-filtre">
+              <input
+                id={id}
+                type="text"
+                inputMode="decimal"
+                value={saisie}
+                onChange={(e) => onSaisie(e.target.value)}
+                aria-invalid={erreur ? true : undefined}
+                aria-describedby={`${id}-aide`}
+                className={cn(CHAMP_CONTROLE, erreur && "border-danger")}
+              />
+            </div>
+            {condition.unite ? (
+              <span className="text-14 text-ink-700">{condition.unite}</span>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
+          <span className="text-14 font-medium text-ink-900">Condition « {condition.code} »</span>
+          <span className="text-16 text-ink-900">{maintenant}</span>
+        </>
+      )}
+      <span
+        id={`${id}-aide`}
+        role={erreur ? "alert" : undefined}
+        className={cn("text-pretty text-13", erreur ? "text-danger" : "text-ink-500")}
+      >
+        {erreur ??
+          `${qualites.join(" · ")}. ${
+            avant === null
+              ? `Absente de la version ${versionEnVigueur}.`
+              : `Version ${versionEnVigueur} : ${avant}.`
+          }`}
+      </span>
+      <span className="text-pretty text-13 text-ink-700">
+        Message au candidat : {condition.message}
+      </span>
+    </li>
   );
 }
 

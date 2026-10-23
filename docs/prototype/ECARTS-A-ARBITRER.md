@@ -13935,3 +13935,24 @@ donnée modifié.
 Reproduction puis preuve : deux tests d'écran dans `tests/ui/p1.test.tsx`,
 rouges avant, verts après. WF-11, RG-14.1, écrans T-01/T-02. C-12 reste
 ouvert. Aucun préalable levé.
+
+## S.186 — C-12 : B-02 montre les conditions et en modifie les seuils
+
+23/10/2026, lot dédié demandé par le responsable (affichage et
+modification). Base `3d05ccf` (#306 fusionnée), sans PR ouverte.
+
+B-02 ne montrait aucune condition, et son panneau des différences
+annonçait « 0 champ modifié » sur un seuil bloquant changé : WF-14 §4
+demandait une relecture que l'écran ne permettait pas de faire. Aucune
+valeur ne s'éditait depuis l'écran.
+
+Les conditions s'affichent, chacune avec sa valeur en vigueur et le
+message au candidat ; les seuils chiffrés se saisissent, les références de
+pièce restent en lecture. La branche `textes` du `PUT` porte les seuils
+modifiés, recollés sur la ligne en base. INV-3, C-10, le vocabulaire et la
+relecture par un second opérateur sont inchangés.
+
+Reproduction puis preuve : 22 tests du domaine, cinq tests d'écran et onze
+vérifications de `smoke:publication` rouges avant, verts après ; R-O03
+saisit le seuil dans B-02. WF-14, WF-11, RG-14.1, RG-14.3, INV-3, INV-8,
+écran B-02. Aucun préalable levé.

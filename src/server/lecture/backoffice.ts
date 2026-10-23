@@ -14,7 +14,7 @@ import {
 import { echec } from "@/server/http/echecs";
 import { payload } from "@/server/acces/regles";
 import { versionDe } from "@/server/regles/edition";
-import { estEnVigueur, estUnBrouillon } from "@/domain/backoffice/regle";
+import { conditionsAffichees, estEnVigueur, estUnBrouillon } from "@/domain/backoffice/regle";
 import { editorialDe, EDITORIAL } from "@/lib/contenu/destinations";
 import {
   HORIZON_VEILLE_JOURS,
@@ -1339,6 +1339,7 @@ function versRegle(regle: {
     prochaineRelecture: iso(regle.nextReviewAt),
     libelleCandidat: p.libelle,
     reserveCandidat: p.reserves[0] ?? "",
+    conditions: conditionsAffichees(p),
   };
 }
 

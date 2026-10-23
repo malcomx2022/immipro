@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### C-12 — B-02 montre et modifie les seuils — 23/10/2026, S.186
+
+Lot dédié demandé par le responsable, affichage et modification. Base
+`3d05ccf` (#306 fusionnée). B-02 ne montrait aucune condition : « 0 champ
+modifié » sur un seuil bloquant changé, et WF-14 §4 relisait à l'aveugle.
+Section « Conditions » : seuils chiffrés en saisie (lecture française),
+références `exists` en lecture seule. La branche `textes` du `PUT` porte
+les seuils modifiés, recollés sur la ligne en base, jamais la copie du
+client ; INV-3, C-10 et vocabulaire inchangés. Preuves : 22 tests du
+domaine, cinq d'écran, onze vérifications `smoke:publication` rouges
+avant ; R-O03 saisit le seuil dans B-02. Lire
+[la revue, § 11](docs/revue/revue-tests-2026-10-22.md).
+
 ### C-14 — la confirmation d'arbitrage reste — 23/10/2026, S.185
 
 Lot dédié demandé par le responsable. Base `f8f0419` (#305 fusionnée,
@@ -141,7 +154,7 @@ du responsable) ; C-9, reconnexion d'un compte en suppression demandée ;
 C-10, « Publier » de B-02 faisait du publieur le rédacteur (WF-14 §4
 impossible depuis l'écran) ; C-11, écran « pièces supprimées » sur une
 purge inachevée. C-7 (règle à fin prévue non remplacée) corrigé en S.184 ;
-reste ouvert C-12, B-02 ne montre ni n'édite les valeurs des conditions. Le faux stockage du banc `--parcours` sait refuser les
+C-12 (B-02 sans valeurs de conditions) corrigé en S.186. Le faux stockage du banc `--parcours` sait refuser les
 suppressions (`POST /stockage`).
 Gestes absents : échéancier, fuseau, péremption, lecteur d'écran.
 Sécurité : `next` 16.4.2 reporté de #300 (GHSA-2464-fhr4-w9xw critique,
