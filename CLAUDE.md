@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.190 — O-5, une suite déjà donnée ne rouvre rien — 23/10/2026
+
+Lot dédié demandé par le responsable. Base `6ee07be` (#311 fusionnée).
+« Continuer seul » clôt la proposition pour ce dossier : la lecture ne
+repropose plus `SANS_SUITE` ni `DECLINEE`, une redirigée reste listée.
+T-06 n'ouvre le site que sur `etat: REDIRIGEE`, à l'adresse rendue par la
+route ; sinon `SUITE_DEJA_DONNEE`, sans ouvrir. Ne jamais ouvrir le
+partenaire sur une réponse acceptée sans redirection enregistrée. Trois
+tests d'écran et `smoke:partenaires` rouges avant. Lire
+[la revue, § 15](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.189 — WF-13, une seule suite par proposition — 23/10/2026
 
 Demandé par le responsable après le point du restant. Base `ce8de25`
@@ -86,8 +97,7 @@ Demandé par le responsable après le point du restant. Base `ce8de25`
 suite devancée qui rend l'état retenu, dossier de l'adresse vérifié dans
 la requête, aboutissement unique. Ne pas revenir à une lecture suivie
 d'une écriture inconditionnelle. `smoke:partenaires` dans la porte.
-O-5 à trancher : après « Continuer seul », T-03 ouvre encore le
-partenaire sans trace. Lire [la revue, § 14](docs/revue/revue-tests-2026-10-22.md).
+O-5, relevé ici, corrigé en S.190. Lire [la revue, § 14](docs/revue/revue-tests-2026-10-22.md).
 
 ### S.188 — parcours navigateur manquants — 23/10/2026
 

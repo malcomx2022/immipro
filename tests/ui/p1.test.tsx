@@ -33,6 +33,7 @@ import {
   AUCUN_PARTENAIRE_ACTIVE,
   FENETRE_BLOQUEE,
   SITE_NON_OUVERT,
+  SUITE_DEJA_DONNEE,
 } from "@/domain/partenaires/affiliation";
 
 /**
@@ -1257,8 +1258,10 @@ describe("T-06 — Services partenaires", () => {
     const avecFenetre = async (
       ok: boolean,
       ouverture: unknown,
+      // La route rend l'état retenu (S.189) ; une redirection prise est la règle.
+      donnees: unknown = { etat: "REDIRIGEE", url: "https://partenaire.exemple.test" },
     ): Promise<{ ouvertures: number; texte: string }> => {
-      reponse = { ok };
+      reponse = { ok, donnees };
       const ouvre = vi.fn(() => ouverture);
       const origine = window.open;
       Object.defineProperty(window, "open", { value: ouvre, writable: true });
@@ -1310,6 +1313,45 @@ describe("T-06 — Services partenaires", () => {
       // La trace existe : le message ne doit pas envoyer recommencer.
       expect(texte).not.toContain(SITE_NON_OUVERT);
       expect(texte).toContain("La redirection est enregistrée");
+    });
+
+    /**
+     * O-5 (S.190) — une suite déjà donnée. La route rend l'état retenu
+     * (`SANS_SUITE`, `DECLINEE`) sans rien enregistrer ; l'écran ouvrait
+     * quand même le partenaire, sur une réponse « acceptée » qui ne traçait
+     * aucune redirection. La première décision tient (S.189), et l'écran
+     * le dit au lieu de partir.
+     */
+    it.each(["SANS_SUITE", "DECLINEE"])(
+      "une proposition close (%s) n'ouvre rien et dit la suite déjà donnée",
+      async (etat) => {
+        const { ouvertures, texte } = await avecFenetre(true, {}, { etat });
+        expect(ouvertures).toBe(0);
+        expect(texte).toContain(SUITE_DEJA_DONNEE.titre);
+        expect(texte).toContain(SUITE_DEJA_DONNEE.corps);
+        expect(texte).not.toContain(FENETRE_BLOQUEE.titre);
+      },
+    );
+
+    it("ouvre l'adresse que la route a enregistrée", async () => {
+      const ouvre = vi.fn(() => ({}));
+      const origine = window.open;
+      Object.defineProperty(window, "open", { value: ouvre, writable: true });
+      reponse = { ok: true, donnees: { etat: "REDIRIGEE", url: "https://enregistree.exemple.test" } };
+      try {
+        rendre();
+        await act(async () => {
+          screen.getByRole("link", { name: "Ouvrir le site du partenaire (s'ouvre dans un nouvel onglet)" }).click();
+        });
+        expect(ouvre).toHaveBeenCalledWith(
+          "https://enregistree.exemple.test",
+          "_blank",
+          "noopener,noreferrer",
+        );
+      } finally {
+        Object.defineProperty(window, "open", { value: origine, writable: true });
+        reponse = { ok: true };
+      }
     });
 
     it("un départ réussi ne laisse aucun message d'échec", async () => {

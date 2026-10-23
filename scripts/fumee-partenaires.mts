@@ -170,6 +170,30 @@ try {
   const tardive = await enregistrerLaSuite(assurance!.id, a.user.id, "CONTINUER_SEUL", a.application.id);
   verifier(tardive.etat === "REDIRIGEE", "une suite différente arrive trop tard : la première tient");
 
+  console.log("\nO-5 — une proposition close ne se propose plus");
+  {
+    const d = await candidat();
+    const [premiere, seconde] = (await offresDuDossier(d.application.id, d.user.id)).offres;
+    await enregistrerLaSuite(premiere!.id, d.user.id, "CONTINUER_SEUL", d.application.id);
+    const restantes = await offresDuDossier(d.application.id, d.user.id);
+    verifier(
+      restantes.offres.map((o) => o.id).join() === seconde!.id,
+      `« continuer seul » clôt la proposition pour ce dossier (${restantes.offres.length} offre restante)`,
+    );
+    const rouverte = await enregistrerLaSuite(premiere!.id, d.user.id, "CRENEAUX", d.application.id);
+    const close = await db.partnerReferral.findUniqueOrThrow({ where: { id: premiere!.id } });
+    verifier(
+      rouverte.etat === "SANS_SUITE" && rouverte.url === undefined && close.redirectedAt === null,
+      "un clic tardif rend « sans suite », sans adresse ni redirection",
+    );
+    await enregistrerLaSuite(seconde!.id, d.user.id, "CRENEAUX", d.application.id);
+    const redirigee = await offresDuDossier(d.application.id, d.user.id);
+    verifier(
+      redirigee.offres.some((o) => o.id === seconde!.id),
+      "une proposition redirigée reste listée : le candidat peut y retourner",
+    );
+  }
+
   console.log("\nDeux suites simultanées : une seule est prise, et les deux réponses la disent");
   let divergences = 0;
   for (let essai = 0; essai < 10; essai += 1) {
