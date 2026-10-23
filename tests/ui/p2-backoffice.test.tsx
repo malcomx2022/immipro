@@ -480,6 +480,91 @@ describe("B-02 — les commandes partent vraiment au serveur", () => {
   });
 });
 
+/**
+ * C-12 — B-02 montre les conditions et en modifie les seuils.
+ *
+ * L'écran ne montrait aucune condition. Exécuté avant correction sur une
+ * version qui relève le seuil du compte bloqué de 11 208 à 11 904 € :
+ *
+ *     « compte_bloque_min » à l'écran : absent
+ *     panneau des différences         : 3 champs modifiés sur 4
+ *     champ de saisie d'un seuil      : aucun
+ */
+describe("B-02 — C-12, les conditions se lisent et leurs seuils se modifient", () => {
+  const ouvrir = () => {
+    appels.length = 0;
+    rafraichir.mockClear();
+    reponse = { ok: true };
+    editerRegle();
+  };
+  const enregistrer = async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Enregistrer le brouillon/u }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+  };
+
+  it("montre chaque condition, sa valeur et le message que lit le candidat", () => {
+    ouvrir();
+    const seuil = screen.getByLabelText("Seuil de « compte_bloque_min »") as HTMLInputElement;
+    expect(seuil.value).toBe("11904");
+    expect(seuil).toHaveAccessibleDescription(/Bloquante.*Version 4 : au moins 11\s208 EUR/u);
+    // Une référence se lit, elle ne se saisit pas.
+    expect(screen.queryByLabelText("Seuil de « admission_universite »")).toBeNull();
+    const reference = screen.getByText("Condition « admission_universite »").closest("li")!;
+    expect(within(reference).getByText("présence de lettre_admission")).toBeDefined();
+    expect(screen.getByText(/Message au candidat : Le compte bloqué doit porter/u)).toBeDefined();
+  });
+
+  it("le panneau des différences compte le seuil changé", () => {
+    ouvrir();
+    expect(screen.getByText(/4 champs modifiés sur 6/u)).toBeDefined();
+    const ligne = screen.getByText("Condition « compte_bloque_min », bloquante").parentElement!;
+    expect(espaces(ligne.textContent ?? "")).toMatch(/au moins 11 208 EUR.*au moins 11 904 EUR/u);
+  });
+
+  it("un seuil modifié part seul, lu en nombre, avec les deux textes", async () => {
+    ouvrir();
+    fireEvent.change(screen.getByLabelText("Seuil de « compte_bloque_min »"), {
+      target: { value: "12 000,50" },
+    });
+    expect(
+      espaces(screen.getByText("Condition « compte_bloque_min », bloquante").parentElement!.textContent ?? ""),
+    ).toMatch(/au moins 12 000,5 EUR/u);
+    await enregistrer();
+    expect(appels).toHaveLength(1);
+    expect(appels[0]!.corps).toEqual({
+      champ: "textes",
+      libelleCandidat: REGLE_BROUILLON.libelleCandidat,
+      reserveCandidat: REGLE_BROUILLON.reserveCandidat,
+      seuils: { compte_bloque_min: 12000.5 },
+    });
+  });
+
+  it("un seuil illisible est signalé là où il se corrige, et rien ne part", async () => {
+    ouvrir();
+    fireEvent.change(screen.getByLabelText("Motif du changement"), {
+      target: { value: "Barème 2027" },
+    });
+    fireEvent.change(screen.getByLabelText("Seuil de « compte_bloque_min »"), {
+      target: { value: "douze mille" },
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/« douze mille » n'est pas un seuil lisible/u);
+    const enregistrerLeBrouillon = screen.getByRole("button", { name: /Enregistrer le brouillon/u });
+    const publier = screen.getByRole("button", { name: /Publier la version/u });
+    expect(enregistrerLeBrouillon).toBeDisabled();
+    expect(enregistrerLeBrouillon).toHaveAccessibleDescription(/section Conditions/u);
+    expect(publier).toBeDisabled();
+    await enregistrer();
+    expect(appels).toHaveLength(0);
+  });
+
+  it("annonce avant le clic la relecture qu'exige une condition bloquante", () => {
+    ouvrir();
+    expect(screen.getByText(/relecture d'un second opérateur/u)).toBeDefined();
+  });
+});
+
 describe("B-02 — un administrateur ne peut pas publier une promesse", () => {
   it("signale la faute champ par champ et bloque la publication", () => {
     editerRegle();

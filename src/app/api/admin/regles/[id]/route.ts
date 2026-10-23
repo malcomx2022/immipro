@@ -22,8 +22,9 @@ import { publierLaRegle } from "@/server/regles/publication";
  *    pas — `publierLaRegle` le refuse, et le dit au lieu de rendre une
  *    erreur de contrainte.
  *
- * Deux façons d'écrire, et l'écran n'en emploie qu'une. B-02 n'édite que
- * les deux textes destinés au candidat ; la branche `payload` reste la
+ * Deux façons d'écrire, et l'écran n'en emploie qu'une. B-02 édite les
+ * deux textes destinés au candidat et les seuils chiffrés des conditions
+ * (C-12) ; la branche `payload` reste la
  * porte de WF-14 étape 3 pour un éditeur complet. Aucune des deux ne porte
  * le payload chargé à l'ouverture de la page : le serveur part de la ligne
  * qu'il écrit, et recolle. Un autre veilleur a pu passer entre-temps.
@@ -44,6 +45,10 @@ export const PUT = route({
       champ: z.literal("textes"),
       libelleCandidat: z.string().trim().min(1).max(300),
       reserveCandidat: z.string().trim().max(1000),
+      // C-12 : les seuils modifiés dans B-02, par code de condition.
+      seuils: z
+        .record(z.string().min(1).max(120), z.number().finite().nonnegative())
+        .optional(),
     }),
   ]),
   traiter: ({ corps, params, acteur }) =>
@@ -54,6 +59,7 @@ export const PUT = route({
             champ: "textes",
             libelleCandidat: corps.libelleCandidat,
             reserveCandidat: corps.reserveCandidat,
+            ...(corps.seuils ? { seuils: corps.seuils } : {}),
           }
         : {
             champ: "payload",

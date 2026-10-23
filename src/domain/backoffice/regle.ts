@@ -74,6 +74,170 @@ export interface Regle {
   libelleCandidat: string;
   /** Réserve affichée en contexte sous la règle. */
   reserveCandidat: string;
+  /**
+   * Les conditions de la version, dans l'ordre du référentiel — C-12.
+   *
+   * B-02 ne les montrait pas. Le panneau des différences comparait le
+   * montant, la date, le délai et le libellé, et annonçait « 0 champ
+   * modifié » sur un seuil bloquant passé de 4 357 € à 4 355 € : le second
+   * opérateur que WF-14 §4 exige relisait une version dont il ne voyait pas
+   * ce qui avait changé.
+   */
+  conditions: readonly ConditionAffichee[];
+}
+
+/* ── Les conditions, lues et saisies dans B-02 — C-12 ────────────────── */
+
+type ConditionDuReferentiel = VisaRulesPayload["conditions"][number];
+
+export interface ConditionAffichee {
+  code: string;
+  operateur: ConditionDuReferentiel["operateur"];
+  valeur: ConditionDuReferentiel["valeur"];
+  unite?: string;
+  bloquant: boolean;
+  /** La pièce qui établit la condition, par son code. */
+  piece?: string;
+  /** Le groupe d'alternatives, quand le seuil dépend d'un fait hors du dossier. */
+  alternative?: string;
+  /** Le texte que le candidat lit quand la condition échoue. */
+  message: string;
+  /**
+   * Seul un seuil chiffré se modifie ici.
+   *
+   * Les autres valeurs du référentiel sont des **références** : « présence »
+   * d'une pièce désignée par son code (`erkend_referent`, `permis_mohre`).
+   * Les réécrire depuis un champ libre romprait le rattachement que le
+   * schéma vérifie, sans qu'aucun seuil réglementaire ait changé.
+   */
+  modifiable: boolean;
+}
+
+export function conditionsAffichees(payload: VisaRulesPayload): ConditionAffichee[] {
+  return payload.conditions.map((c) => ({
+    code: c.code,
+    operateur: c.operateur,
+    valeur: c.valeur,
+    ...(c.unite !== undefined ? { unite: c.unite } : {}),
+    bloquant: c.bloquant,
+    ...(c.piece !== undefined ? { piece: c.piece } : {}),
+    ...(c.alternative !== undefined ? { alternative: c.alternative } : {}),
+    message: c.message_echec,
+    modifiable: typeof c.valeur === "number" && c.operateur !== "exists",
+  }));
+}
+
+export const SYMBOLE_OPERATEUR: Record<ConditionDuReferentiel["operateur"], string> = {
+  gte: "au moins",
+  lte: "au plus",
+  eq: "égal à",
+  in: "parmi",
+  exists: "présence de",
+};
+
+/** La valeur d'une condition, telle qu'une ligne de B-02 la montre. */
+export function valeurLisible(
+  condition: Pick<ConditionAffichee, "operateur" | "valeur" | "unite">,
+): string {
+  const valeur = Array.isArray(condition.valeur)
+    ? condition.valeur.join(", ")
+    : typeof condition.valeur === "number"
+      ? new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(condition.valeur)
+      : condition.valeur;
+  const unite = condition.unite ? ` ${condition.unite}` : "";
+  return `${SYMBOLE_OPERATEUR[condition.operateur]} ${valeur}${unite}`;
+}
+
+/**
+ * Un seuil saisi, lu comme un opérateur l'écrit en français.
+ *
+ * « 4 357 », « 4357 », « 13 569,24 » : les espaces de milliers — y compris
+ * insécables, que la copie d'un montant formaté apporte — et la virgule
+ * décimale sont admis. Le refus dit ce qui est attendu, pas seulement que
+ * la saisie est fausse.
+ */
+export function lireSeuil(
+  saisie: string,
+): { ok: true; valeur: number } | { ok: false; message: string } {
+  const nettoyee = saisie.replace(/[\s  ]/gu, "").replace(",", ".");
+  if (nettoyee === "") {
+    return { ok: false, message: "Indique le seuil en chiffres, par exemple 4 357." };
+  }
+  if (!/^\d+(\.\d{1,2})?$/u.test(nettoyee)) {
+    return {
+      ok: false,
+      message: `« ${saisie.trim()} » n'est pas un seuil lisible : écris un nombre positif, avec au plus deux décimales, par exemple 4 357 ou 13 569,24.`,
+    };
+  }
+  return { ok: true, valeur: Number(nettoyee) };
+}
+
+/**
+ * Les seuils saisis, réécrits dans le payload de la version qu'on écrit.
+ *
+ * Même principe que `avecLesTextesCandidat` : seules les valeurs soumises
+ * changent, tout le reste vient de la ligne en base. Un seuil soumis pour
+ * une condition que la version ne porte plus, ou pour une valeur qui n'est
+ * pas un seuil, est refusé — l'écrire en silence déplacerait une exigence
+ * que l'opérateur n'a pas vue.
+ */
+export function avecLesSeuils(
+  payload: VisaRulesPayload,
+  seuils: Readonly<Record<string, number>>,
+): { ok: true; payload: VisaRulesPayload } | { ok: false; code: string; message: string } {
+  const parCode = new Map(payload.conditions.map((c) => [c.code, c]));
+  for (const [code, valeur] of Object.entries(seuils)) {
+    const condition = parCode.get(code);
+    if (!condition) {
+      return {
+        ok: false,
+        code,
+        message: `La condition « ${code} » ne figure plus dans cette version : recharge la page avant de modifier son seuil.`,
+      };
+    }
+    if (typeof condition.valeur !== "number" || condition.operateur === "exists") {
+      return {
+        ok: false,
+        code,
+        message: `La condition « ${code} » ne porte pas de seuil chiffré : sa valeur est une référence du référentiel et ne se modifie pas depuis B-02.`,
+      };
+    }
+    if (!Number.isFinite(valeur) || valeur < 0) {
+      return {
+        ok: false,
+        code,
+        message: `Le seuil de « ${code} » doit être un nombre positif.`,
+      };
+    }
+  }
+  return {
+    ok: true,
+    payload: {
+      ...payload,
+      conditions: payload.conditions.map((c) =>
+        Object.hasOwn(seuils, c.code) ? { ...c, valeur: seuils[c.code]! } : c,
+      ),
+    },
+  };
+}
+
+/**
+ * Les seuils que l'écran a changés par rapport à la version affichée.
+ *
+ * L'écran n'envoie que ceux-là : renvoyer chaque seuil chargé à l'ouverture
+ * écraserait celui qu'un autre veilleur aurait corrigé entre-temps.
+ */
+export function seuilsModifies(
+  conditions: readonly ConditionAffichee[],
+  saisies: Readonly<Record<string, string>>,
+): Record<string, number> {
+  const modifies: Record<string, number> = {};
+  for (const c of conditions) {
+    if (!c.modifiable || !Object.hasOwn(saisies, c.code)) continue;
+    const lu = lireSeuil(saisies[c.code]!);
+    if (lu.ok && lu.valeur !== c.valeur) modifies[c.code] = lu.valeur;
+  }
+  return modifies;
 }
 
 /** Champs d'une règle dont le texte s'affiche au candidat. */
@@ -326,8 +490,44 @@ export function comparer(
       avant: enVigueur.libelleCandidat,
       apres: brouillon.libelleCandidat,
     },
+    ...comparerLesConditions(enVigueur.conditions, brouillon.conditions),
   ];
 }
+
+/** Ce qu'une ligne affiche pour une condition qu'une des deux versions ne porte pas. */
+export const MENTION_CONDITION_ABSENTE = "Absente de cette version";
+
+/**
+ * Une ligne par condition, présente dans l'une ou l'autre version — C-12.
+ *
+ * Les inchangées restent listées, comme les autres champs : c'est sur
+ * cette liste que le second lecteur constate qu'il a tout vu.
+ */
+function comparerLesConditions(
+  enVigueur: readonly ConditionAffichee[],
+  brouillon: readonly ConditionAffichee[],
+): Difference[] {
+  const avant = new Map(enVigueur.map((c) => [c.code, c]));
+  const apres = new Map(brouillon.map((c) => [c.code, c]));
+  const codes = [...new Set([...apres.keys(), ...avant.keys()])];
+  return codes.map((code) => {
+    const a = avant.get(code);
+    const b = apres.get(code);
+    const bloquante = (b ?? a)!.bloquant ? ", bloquante" : "";
+    return {
+      champ: `Condition « ${code} »${bloquante}`,
+      avant: a ? valeurLisible(a) : MENTION_CONDITION_ABSENTE,
+      apres: b ? valeurLisible(b) : MENTION_CONDITION_ABSENTE,
+    };
+  });
+}
+
+/**
+ * WF-14 §4 dit avant le clic ce que la publication opposera après : une
+ * condition bloquante modifiée se relit par un second opérateur.
+ */
+export const AIDE_CONDITIONS =
+  "Modifier une condition bloquante demande la relecture d'un second opérateur : la personne qui publie ne peut pas être celle qui a enregistré la version (WF-14).";
 
 export const aChange = (difference: Difference): boolean =>
   difference.avant !== difference.apres;

@@ -1743,6 +1743,107 @@ try {
     verifier(publiee.publiee === ecrit.id, "l'administrateur, second lecteur, publie depuis B-02");
   }
   /*
+    ── B-02 : un seuil se modifie depuis l'écran — C-12, S.186 ──────────
+
+    B-02 ne montrait ni n'éditait les valeurs des conditions : le seuil
+    s'écrivait par la branche `payload`, que l'écran n'emploie pas. La
+    branche `textes` porte désormais les seuils modifiés, recollés sur la
+    ligne en base. Ce qu'on vérifie ici est la chaîne entière : seuil saisi,
+    version ouverte, autres champs intacts, relecture exigée, publication
+    par un second opérateur, divergence pour le dossier figé.
+  */
+  console.log("\nB-02 — un seuil saisi à l'écran ouvre la version, et sa publication se relit (C-12)");
+  {
+    const enVigueur = await db.visaRule.create({
+      data: {
+        countryCode: "NL",
+        visaType: "emploi_seuil_b02",
+        category: "EMPLOI",
+        version: 1,
+        effectiveFrom: new Date("2026-01-01"),
+        rules: RULES as never,
+        sourceUrl: brute.sourceUrl,
+        sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"),
+        verifiedBy: "graine",
+        nextReviewAt: new Date("2029-01-01"),
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const p = await dossierPret(enVigueur.id);
+    const vue = (await editionDeLaRegle(enVigueur.id))!;
+    const lue = vue.brouillon.conditions.find((c) => c.code === SEUIL);
+    verifier(lue?.valeur === ACTUEL && lue.modifiable, `B-02 lit le seuil de ${SEUIL} (${String(lue?.valeur)})`);
+    verifier(
+      vue.brouillon.conditions.length === RULES.conditions.length,
+      `et chaque condition de la version (${vue.brouillon.conditions.length})`,
+    );
+
+    const ecrit = await enregistrerLesTextes(
+      enVigueur.id,
+      {
+        champ: "textes",
+        libelleCandidat: vue.brouillon.libelleCandidat,
+        reserveCandidat: vue.brouillon.reserveCandidat,
+        seuils: { [SEUIL]: ACTUEL + 200 },
+      },
+      { email: REDACTEUR.email },
+    );
+    verifier(ecrit.versionOuverte && ecrit.version === 2, "le seuil saisi ouvre la version 2");
+    const ouverte = await db.visaRule.findUniqueOrThrow({ where: { id: ecrit.id } });
+    const lu = payload(ouverte);
+    verifier(
+      lu.conditions.find((c) => c.code === SEUIL)?.valeur === ACTUEL + 200,
+      "le brouillon porte le seuil relevé",
+    );
+    verifier(
+      JSON.stringify(lu.conditions.filter((c) => c.code !== SEUIL)) ===
+        JSON.stringify(payload(enVigueur).conditions.filter((c) => c.code !== SEUIL)),
+      "et les autres conditions sont celles de la base",
+    );
+    const vigueurIntacte = await db.visaRule.findUniqueOrThrow({ where: { id: enVigueur.id } });
+    verifier(
+      payload(vigueurIntacte).conditions.find((c) => c.code === SEUIL)?.valeur === ACTUEL,
+      "la version en vigueur n'est pas touchée (INV-3)",
+    );
+
+    const apresVue = (await editionDeLaRegle(enVigueur.id))!;
+    const ligne = apresVue.brouillon.conditions.find((c) => c.code === SEUIL);
+    verifier(ligne?.valeur === ACTUEL + 200, "B-02 relit le seuil du brouillon");
+
+    let refusInconnue = "";
+    try {
+      await enregistrerLesTextes(
+        enVigueur.id,
+        { champ: "textes", libelleCandidat: vue.brouillon.libelleCandidat, reserveCandidat: vue.brouillon.reserveCandidat, seuils: { disparue: 3 } },
+        { email: REDACTEUR.email },
+      );
+    } catch (erreur) {
+      refusInconnue = `${codeDe(erreur)} ${corpsDe(erreur)}`;
+    }
+    verifier(
+      refusInconnue.startsWith("champs_invalides") && refusInconnue.includes("disparue"),
+      "un seuil pour une condition absente est refusé, nommé",
+    );
+
+    let refuse = "";
+    try {
+      await publierLaRegle(ecrit.id, REDACTEUR, "Seuil relevé par le veilleur seul");
+    } catch (erreur) {
+      refuse = corpsDe(erreur);
+    }
+    verifier(refuse.includes(SEUIL), "le rédacteur du seuil ne publie pas seul (WF-14 §4)");
+
+    const publiee = await publierLaRegle(ecrit.id, AUTRE, "Relu par un second opérateur");
+    verifier(publiee.publiee === ecrit.id && publiee.divergenceMiseEnFile, "un second opérateur publie, la divergence part");
+    await propagerLaPublication(ecrit.id);
+    const migration = await db.ruleMigration.findFirst({
+      where: { applicationId: p.application.id, toRuleId: ecrit.id },
+    });
+    verifier(migration !== null, `le dossier figé sur la version 1 est prévenu (${migration?.impact ?? "aucune"})`);
+  }
+  /*
     ── Une version dépubliée par l'échéance reste figée — revue C1 ─────
 
     RG-14.1 repasse en `DRAFT` une version en vigueur dont la relecture

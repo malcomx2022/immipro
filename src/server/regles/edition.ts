@@ -10,6 +10,7 @@ import {
 } from "@/domain/rules/schema";
 import {
   SUITE_DU_REFUS_EN_VIGUEUR,
+  avecLesSeuils,
   destinationDeLEnregistrement,
   estUnBrouillon,
   messageDeRefus,
@@ -79,7 +80,14 @@ import {
 
 /** Ce que l'enregistrement soumet, selon la branche employée par l'écran. */
 export type Ecrit =
-  | ({ champ: "textes" } & Pick<Regle, ChampCandidat>)
+  | ({
+      champ: "textes";
+      /**
+       * Les seuils que l'écran a modifiés, par code de condition — C-12.
+       * Seuls ceux-là : chaque autre valeur vient de la ligne en base.
+       */
+      seuils?: Readonly<Record<string, number>>;
+    } & Pick<Regle, ChampCandidat>)
   | {
       champ: "payload";
       payload: VisaRulesPayload;
@@ -184,6 +192,27 @@ function metadonnees(ecrit: Ecrit) {
   };
 }
 
+/**
+ * Les deux textes, puis les seuils modifiés, recollés sur le payload en
+ * base. Un seuil qui ne désigne plus une condition chiffrée de cette
+ * version est refusé, nommé par son code — C-12.
+ */
+function avecLesSaisiesDeB02(
+  enBase: VisaRulesPayload,
+  ecrit: Extract<Ecrit, { champ: "textes" }>,
+): VisaRulesPayload {
+  const textes = avecLesTextesCandidat(enBase, ecrit);
+  if (!ecrit.seuils || Object.keys(ecrit.seuils).length === 0) return textes;
+  const recolle = avecLesSeuils(textes, ecrit.seuils);
+  if (!recolle.ok) {
+    throw echec("champs_invalides", {
+      corps: recolle.message,
+      champs: { [`conditions.${recolle.code}`]: recolle.message },
+    });
+  }
+  return recolle.payload;
+}
+
 export interface Enregistrement {
   /** La ligne écrite — pas nécessairement celle que l'adresse désignait. */
   id: string;
@@ -257,7 +286,7 @@ export async function enregistrerLesTextes(
   }
 
   const propose =
-    ecrit.champ === "textes" ? avecLesTextesCandidat(enBase.data, ecrit) : ecrit.payload;
+    ecrit.champ === "textes" ? avecLesSaisiesDeB02(enBase.data, ecrit) : ecrit.payload;
 
   const lu = visaRulesSchema.safeParse(propose);
   if (!lu.success) {

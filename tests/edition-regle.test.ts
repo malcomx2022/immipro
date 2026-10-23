@@ -144,7 +144,10 @@ describe("la route n'accepte que ce que l'écran édite", () => {
   it("la branche des textes relit la base plutôt que de croire le client", () => {
     expect(route).toContain('champ: z.literal("textes")');
     expect(edition).toMatch(/visaRulesSchema\.safeParse\(source\.rules\)/u);
-    expect(edition).toContain("avecLesTextesCandidat(enBase.data, ecrit)");
+    expect(edition).toContain("avecLesSaisiesDeB02(enBase.data, ecrit)");
+    // Les textes puis les seuils (C-12) se recollent sur la ligne en base.
+    expect(edition).toContain("avecLesTextesCandidat(enBase, ecrit)");
+    expect(edition).toContain("avecLesSeuils(textes, ecrit.seuils)");
   });
 
   /**

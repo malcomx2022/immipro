@@ -164,6 +164,28 @@ export const REGLE_EN_VIGUEUR: Regle = {
     "Il te faut 11 208 € sur un compte bloqué allemand pour l'année, si tu déposes avant le 31 décembre 2026.",
   reserveCandidat:
     "Le montant est réévalué chaque année. Une demande déposée après publication d'un nouveau barème est instruite sur le montant à jour.",
+  conditions: [
+    {
+      code: "compte_bloque_min",
+      operateur: "gte",
+      valeur: 11208,
+      unite: "EUR",
+      bloquant: true,
+      piece: "attestation_compte_bloque",
+      message:
+        "Le compte bloqué doit porter au moins 11 208 € pour l'année. Complète le versement avant de déposer.",
+      modifiable: true,
+    },
+    {
+      code: "admission_universite",
+      operateur: "exists",
+      valeur: "lettre_admission",
+      bloquant: true,
+      piece: "lettre_admission",
+      message: "La lettre d'admission de l'établissement est demandée avant le dépôt.",
+      modifiable: false,
+    },
+  ],
 };
 
 export const REGLE_BROUILLON: Regle = {
@@ -174,6 +196,9 @@ export const REGLE_BROUILLON: Regle = {
   prochaineRelecture: "2026-12-09",
   libelleCandidat:
     "Il te faut 11 904 € sur un compte bloqué allemand pour l'année, si tu déposes à partir du 1er janvier 2027.",
+  conditions: REGLE_EN_VIGUEUR.conditions.map((c) =>
+    c.code === "compte_bloque_min" ? { ...c, valeur: 11904 } : c,
+  ),
 };
 
 /** Dossiers figés sur la version 4, et ceux dont le dépôt tombe en 2027. */
