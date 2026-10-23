@@ -139,7 +139,11 @@ jobs:
       - run: echo "- **Banc de recette** — isolation IA/paiement, collision de port, arrêt complet après perte du worker" >> "$GITHUB_STEP_SUMMARY"
 
       # S.179 : vraie app/worker/base jetable, six profils navigateur.
+      # L'installation prend moins d'une minute ; le 22/10, un miroir apt
+      # Azure à quelques Ko/s l'a figée deux fois plus de trente minutes
+      # (#304). Sans plafond, GitHub attend six heures : on échoue vite.
       - name: Navigateurs de recette photographique
+        timeout-minutes: 15
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Photographies publiques — Chromium, Firefox et WebKit
         id: photographies
