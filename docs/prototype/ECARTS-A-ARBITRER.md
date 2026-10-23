@@ -13997,3 +13997,19 @@ WF-03, WF-07, WF-09, WF-10, WF-15 ; RG-06.6, RG-07.4, RG-09.4, RG-10.9 ;
 écrans C-01, C-08, C-10, C-12 (mes données), B-04, B-08. Restent non
 vérifiés : R-O04 (M.C), R-I02, réception réelle d'un rappel, autres
 formulaires d'administration. Aucun préalable levé.
+
+## S.189 — WF-13 : une seule suite par proposition de partenaire
+
+23/10/2026, demandé par le responsable après le point du restant. Base
+`ce8de25` (#310 fusionnée et déployée).
+
+`enregistrerLaSuite` lisait puis écrivait sans condition : deux suites
+simultanées se contredisaient (dix-huit réponses sur dix courses,
+reproduit sur base jetable). L'écriture est conditionnelle, la suite
+devancée rend l'état retenu, la proposition doit appartenir au dossier de
+l'adresse, et l'aboutissement n'écrit qu'une commission. Nouvelle fumée
+`smoke:partenaires` dans la porte. WF-13, RG-13.3, écran T-03.
+
+À arbitrer — **O-5** : après « Continuer seul », « Voir les créneaux »
+ouvre encore le partenaire sans trace. Faut-il reproposer, ou constater la
+suite déjà donnée ? Aucun préalable levé.

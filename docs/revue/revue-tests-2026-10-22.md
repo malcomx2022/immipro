@@ -177,7 +177,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-10 Clôture, issue, purge | Éprouvé | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré, clôture, purge effective et portabilité (§ 13) | — |
 | WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle NL à fin prévue (§ 8, § 9) | C-13 : versions 2027 des règles NL à publier avant le 31/12/2026 |
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
-| WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès | Route d'un dossier sans test direct, conditions d'affiliation |
+| WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès ; route (`routes-ecritures`) et écriture sur base jetable (`smoke:partenaires`, § 14) | Conditions d'affiliation, O-5 |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
 | WF-15 Administration | Partiel | B-05, B-03 (relance de suppression), B-04 (rapprochement, grand livre) et B-08 en navigateur, rôles, journal, facturation (§ 13) | B-04 remboursements (M.C), autres formulaires (R-I04) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
@@ -570,3 +570,44 @@ l'heure du fuseau (la passe horaire est éprouvée par `smoke:rappels`, pas
 en navigateur), B-04 remboursement et tranche (dépendent d'un rail réel),
 les autres formulaires d'administration (B-03 hors relance, B-06,
 textes juridiques, veille).
+
+## 14. S.189 — WF-13, l'écriture d'une suite de partenaire — 23/10/2026
+
+Demande du responsable, après le point du restant : prendre le premier
+travail de code sans préalable, le test de la route « partenaires d'un
+dossier ». Base : `ce8de25` (#310 fusionnée, déployée à 17 h 25 UTC).
+
+**Constat.** La route était déjà tenue par `routes-ecritures` (C-1), avec
+le service simulé. L'écriture elle-même, `enregistrerLaSuite`, n'avait
+aucune preuve exécutée sur PostgreSQL. Elle lisait la proposition
+`PROPOSEE`, puis écrivait sans condition : deux suites simultanées
+passaient toutes deux la lecture, la dernière écrasait la première, et
+chaque réponse annonçait sa propre issue. Reproduit sur base jetable :
+dix-huit réponses contredisaient l'état retenu, sur dix courses. La route
+ignorait aussi le dossier de son adresse : la proposition d'un dossier se
+tranchait sous l'adresse d'un autre dossier du même candidat.
+
+**Correction.** L'écriture est conditionnelle (`status = PROPOSEE`) ; une
+suite devancée ou rejouée relit l'état retenu et le rend, avec l'adresse
+du partenaire si c'est une redirection. Le retrait de l'autorisation
+(« ne plus me proposer ») n'a lieu que si cette suite est prise. La
+proposition doit appartenir au dossier de l'adresse, dans la requête.
+L'aboutissement est conditionnel lui aussi : une seconde déclaration est
+refusée, la commission ne se réécrit pas.
+
+**Preuves.** `smoke:partenaires`, nouvelle fumée de la porte, quinze
+vérifications sur base jetable : proposition née de la lecture et non
+doublée, propriété et dossier dans la requête, refus sans écriture,
+redirection datée une fois, rejeu et suite tardive sans effet, dix courses
+sans contradiction (rouge avant), refus qui retire l'autorisation et les
+offres, commission au taux recopié sur la proposition, aboutissement
+unique. `routes-ecritures` vérifie que la route transmet son dossier.
+Porte unitaire : 203 fichiers, 4 051 tests.
+
+**Observation O-5, non corrigée.** L'écran T-03 ouvre la fenêtre du
+partenaire sur toute réponse acceptée. Après « Continuer seul », un clic
+sur « Voir les créneaux » rend l'état retenu (`SANS_SUITE`), et l'écran
+ouvre pourtant le partenaire : une redirection sans trace, donc une
+commission qu'on ne saurait rattacher. Ce que l'écran doit dire alors
+(proposer de nouveau, ou constater la suite déjà donnée) est un choix de
+formulation à trancher par le responsable.

@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.189 — WF-13, une seule suite par proposition — 23/10/2026
+
+Demandé par le responsable après le point du restant. Base `ce8de25`
+(#310 fusionnée, déployée). `enregistrerLaSuite` lisait `PROPOSEE` puis
+écrivait sans condition : deux suites simultanées se contredisaient
+(18 réponses sur 10 courses, base jetable). Écriture conditionnelle,
+suite devancée qui rend l'état retenu, dossier de l'adresse vérifié dans
+la requête, aboutissement unique. Ne pas revenir à une lecture suivie
+d'une écriture inconditionnelle. `smoke:partenaires` dans la porte.
+O-5 à trancher : après « Continuer seul », T-03 ouvre encore le
+partenaire sans trace. Lire [la revue, § 14](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.188 — parcours navigateur manquants — 23/10/2026
 
 Lot dédié demandé par le responsable. Base `ddd22cf` (#308 fusionnée).
