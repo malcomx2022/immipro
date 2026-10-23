@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### C-14 — la confirmation d'arbitrage reste — 23/10/2026, S.185
+
+Lot dédié demandé par le responsable. Base `f8f0419` (#305 fusionnée,
+plafond de 15 minutes sur l'installation des navigateurs).
+T-02 lance `router.refresh()` après l'arbitrage ; la page ne passe plus la
+divergence tranchée, et la feuille rendue sur la prop disparaissait avec
+la confirmation que le candidat doit fermer. Une divergence suivante
+héritait de l'état « arbitré ». `Alertes` fige la divergence à
+l'ouverture, la feuille est clée par migration. Ne pas revenir à une
+feuille rendue sur la prop. Deux tests d'écran (`tests/ui/p1.test.tsx`),
+rouges avant ; relevé par R-O03 en webkit-1440. Lire
+[la revue, § 10](docs/revue/revue-tests-2026-10-22.md).
+
 ### C-7 — une fin prévue n'est pas un remplacement — 22/10/2026, S.184
 
 Lot dédié demandé par le responsable. Base `78cdbeb` (#302 fusionnée).

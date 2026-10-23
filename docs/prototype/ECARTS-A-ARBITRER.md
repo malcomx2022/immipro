@@ -13916,3 +13916,22 @@ ramené sur la règle NL. WF-11, WF-14, RG-14.1, RG-14.3, INV-3, INV-8.
 Écart C-13, de données : les versions NL 2027 sont à publier avant le
 31/12/2026. C-12 reste ouvert. Aucun préalable levé.
 
+
+## S.185 — C-14 : la confirmation d'arbitrage reste jusqu'au geste du candidat
+
+23/10/2026, lot dédié demandé par le responsable. Base `f8f0419` (#305
+fusionnée), sans PR ouverte concurrente.
+
+T-02 lance `router.refresh()` après l'arbitrage, et la page ne passe plus
+la divergence tranchée : la feuille, rendue sur cette prop, disparaissait
+avec la confirmation que le candidat devait fermer lui-même. Une
+divergence suivante héritait en outre de l'état « arbitré ». Relevé par
+la porte de #305 (R-O03, webkit-1440, une fois sur deux passages).
+
+`Alertes` fige la divergence à l'ouverture et la garde jusqu'à la
+fermeture ; la feuille est clée par migration. Aucun appel, schéma ni
+donnée modifié.
+
+Reproduction puis preuve : deux tests d'écran dans `tests/ui/p1.test.tsx`,
+rouges avant, verts après. WF-11, RG-14.1, écrans T-01/T-02. C-12 reste
+ouvert. Aucun préalable levé.
