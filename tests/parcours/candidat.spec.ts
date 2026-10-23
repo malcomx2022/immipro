@@ -1108,6 +1108,8 @@ let emploi = "";
 
 test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence et arbitrage du candidat", async () => {
   await aller("/dossiers/nouveau?destination=pays-bas-emploi");
+  // O-1 : la procédure ouverte est nommée, pas seulement le pays.
+  await expect(page.getByRole("form", { name: /Pays-Bas.*kennismigrant/u })).toBeVisible();
   await page.getByRole("radio", { name: /Je ne sais pas encore/u }).click();
   await page.getByRole("button", { name: "Créer mon dossier", exact: true }).click();
   await page.waitForURL(/\/dossiers\/[a-f0-9-]+$/u);

@@ -136,7 +136,7 @@ export function OuvertureDossier({
   return (
     <form
       noValidate
-      aria-labelledby="contenu"
+      aria-labelledby="contenu procedure-ouverte"
       onSubmit={(e) => {
         e.preventDefault();
         void ouvrir();
@@ -151,6 +151,12 @@ export function OuvertureDossier({
         >
           Ouvre ton dossier {fiche.pays}
         </h1>
+        {/* O-1 : un pays peut publier plusieurs procédures — études et emploi
+            aux Pays-Bas. Le pays seul ne dit pas laquelle s'ouvre, au moment
+            même où le dossier fige la règle qu'il suivra (INV-3). */}
+        <p id="procedure-ouverte" className="text-pretty text-16 font-medium text-ink-900">
+          {fiche.intitule}
+        </p>
         <p className="text-pretty text-16 text-ink-700">
           Ta destination est choisie : une date suffit pour générer ta checklist
           et ton échéancier.
