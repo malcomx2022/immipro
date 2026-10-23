@@ -107,6 +107,14 @@ export async function publierLaRegle(
     publication se croyait première, n'archivait rien, et ne mettait
     aucune divergence en file. Le candidat dont le seuil montait de
     1 500 € n'apprenait rien.
+
+    « Jamais remplacée » veut dire « pas archivée » — la définition
+    d'`estEnVigueur`, que B-02 applique déjà. Elle se lisait `effectiveTo`
+    nul : or `effectiveTo` porte aussi la fin de validité prévue par
+    l'autorité, que la graine pose sur les montants de l'année et que T-02
+    affiche. Une version à fin prévue n'était donc jamais reconnue, et
+    publier les montants de l'année suivante n'archivait rien et ne
+    prévenait personne (C-7, revue S.183).
   */
   const veille = await db.visaRule.findFirst({
     where: {
@@ -114,7 +122,7 @@ export async function publierLaRegle(
       visaType: regle.visaType,
       id: { not: regle.id },
       publishedAt: { not: null },
-      effectiveTo: null,
+      status: { not: "ARCHIVED" },
     },
     orderBy: { publishedAt: "desc" },
   });
@@ -148,7 +156,10 @@ export async function publierLaRegle(
       ? [
           db.visaRule.update({
             where: { id: veille.id },
-            data: { status: "ARCHIVED" as const, effectiveTo: aujourdhui },
+            // La fin prévue par l'autorité, quand elle existe, reste la
+            // sienne : c'est elle que T-02 annonce au dossier qui conserve
+            // cette version. Sans fin prévue, elle s'arrête aujourd'hui.
+            data: { status: "ARCHIVED" as const, effectiveTo: veille.effectiveTo ?? aujourdhui },
           }),
         ]
       : []),

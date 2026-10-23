@@ -49,15 +49,26 @@ async function main() {
     // statut : une version dont la relecture était dépassée est repassée en
     // DRAFT par la veille, et resterait sinon éternellement à côté de la
     // nouvelle, ni publiée ni archivée.
+    //
+    // Mise en vigueur et pas encore archivée — la définition d'`estEnVigueur`.
+    // `effectiveTo` nul n'en était pas la preuve : il porte aussi la fin
+    // prévue des montants de l'année (C-7, revue S.183). Une fin prévue
+    // reste la sienne ; sans elle, la version s'arrête à l'entrée en
+    // vigueur de la suivante.
+    const enVigueur = {
+      countryCode: r.countryCode,
+      visaType: r.visaType,
+      publishedAt: { not: null },
+      status: { not: "ARCHIVED" as const },
+      version: { not: r.version },
+    };
     await prisma.visaRule.updateMany({
-      where: {
-        countryCode: r.countryCode,
-        visaType: r.visaType,
-        publishedAt: { not: null },
-        effectiveTo: null,
-        version: { not: r.version },
-      },
+      where: { ...enVigueur, effectiveTo: null },
       data: { status: "ARCHIVED", effectiveTo: new Date(r.effectiveFrom) },
+    });
+    await prisma.visaRule.updateMany({
+      where: enVigueur,
+      data: { status: "ARCHIVED" },
     });
 
     await prisma.visaRule.upsert({

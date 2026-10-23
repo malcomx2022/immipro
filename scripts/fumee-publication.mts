@@ -559,6 +559,88 @@ try {
     });
     verifier(dossier.status === "PRET", `et il reste prêt à déposer (${dossier.status})`);
   }
+  /*
+    ── C-7, revue S.183 : une fin prévue n'est pas un remplacement ─────
+
+    La graine livre les règles NL avec `effectiveTo` au 31/12/2026 : la fin
+    de validité des montants de l'année, que T-02 affiche (« applicable
+    jusqu'au »). La publication cherchait son prédécesseur parmi les
+    versions à `effectiveTo` nul : elle ne trouvait rien, n'archivait rien
+    et ne prévenait aucun dossier — sur le changement que RG-14.3 annonce,
+    « les montants IND changent au 1er janvier ». Remplacée veut dire
+    archivée, comme le dit déjà `estEnVigueur` côté B-02.
+  */
+  for (const [cas, finPrevue] of [
+    ["à venir", new Date("2099-12-31")],
+    ["déjà passée — les montants de l'année suivante publiés en janvier", new Date("2026-01-31")],
+  ] as const) {
+    console.log(`\nC-7 — une version à fin prévue (${cas}) est bien remplacée`);
+    rang += 10;
+    const socle = {
+      countryCode: "NL" as const,
+      visaType: `emploi_fin_prevue_${rang}`,
+      category: "EMPLOI" as const,
+      effectiveFrom: new Date("2025-01-01"),
+      sourceUrl: brute.sourceUrl,
+      sourceTier: "OFFICIEL" as const,
+      verifiedAt: new Date(),
+      nextReviewAt: new Date("2099-01-01"),
+    };
+    const v1 = await db.visaRule.create({
+      data: {
+        ...socle, version: 1, rules: brute.rules as never, verifiedBy: "graine",
+        status: "PUBLISHED", publishedAt: new Date("2025-01-01"), effectiveTo: finPrevue,
+      },
+    });
+    const p = await dossierPret(v1.id);
+    const v2 = await db.visaRule.create({
+      data: {
+        ...socle, version: 2, rules: avecSeuil(ACTUEL - 1) as never,
+        verifiedBy: REDACTEUR.email, status: "DRAFT",
+      },
+    });
+
+    const publiee = await publierLaRegle(v2.id, AUTRE, "Montants de l'année suivante");
+    verifier(publiee.archivee === v1.id, `la version à fin prévue est reconnue et archivée (${publiee.archivee})`);
+    verifier(publiee.divergenceAPropager, "et la divergence est due");
+    const ancienne = await db.visaRule.findUniqueOrThrow({ where: { id: v1.id } });
+    verifier(ancienne.status === "ARCHIVED", `l'ancienne quitte la vigueur (${ancienne.status})`);
+    verifier(
+      ancienne.effectiveTo?.getTime() === finPrevue.getTime(),
+      "sa fin prévue reste celle que T-02 annonce, pas la date de publication",
+    );
+    const enVigueur = await db.visaRule.count({
+      where: { countryCode: "NL", visaType: socle.visaType, status: "PUBLISHED" },
+    });
+    verifier(enVigueur === 1, `une seule version publiée pour la procédure (${enVigueur})`);
+    const bilan = await propagerLaPublication(v2.id);
+    verifier(bilan.alertes === 1, `le dossier figé sur l'ancienne est prévenu (${JSON.stringify(bilan)})`);
+    const migration = await db.ruleMigration.findFirst({
+      where: { applicationId: p.application.id, toRuleId: v2.id },
+    });
+    verifier(migration !== null, "et un arbitrage lui est proposé");
+  }
+
+  console.log("\nC-7 — une version à fin prévue, dépubliée par l'échéance, revient en ligne au relevé");
+  {
+    rang += 10;
+    const fiche = await db.visaRule.create({
+      data: {
+        countryCode: "NL", visaType: `emploi_releve_fin_prevue_${rang}`, category: "EMPLOI",
+        version: 1, effectiveFrom: new Date("2026-01-01"), effectiveTo: new Date("2099-12-31"),
+        rules: brute.rules as never, sourceUrl: brute.sourceUrl, sourceTier: "OFFICIEL",
+        verifiedAt: new Date("2026-01-01"), verifiedBy: "graine",
+        nextReviewAt: new Date("2026-02-01"), status: "DRAFT", publishedAt: new Date("2026-01-01"),
+      },
+    });
+    const releve = await consignerLeReleve(
+      fiche.id, "A_JOUR", undefined, { id: REDACTEUR.id, email: REDACTEUR.email },
+      new Date("2026-03-01T08:00:00Z"),
+    );
+    const relue = await db.visaRule.findUniqueOrThrow({ where: { id: fiche.id } });
+    verifier(releve.republiee && relue.status === "PUBLISHED", `relue « à jour », elle est republiée (${relue.status})`);
+  }
+
   console.log("\nRG-09.3 — un délai modifié prévient, et le recalcul suit l'arbitrage");
   {
     /*

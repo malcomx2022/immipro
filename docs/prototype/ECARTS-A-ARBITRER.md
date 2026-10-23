@@ -13889,3 +13889,30 @@ sans les valeurs des conditions. Gestes navigateur encore absents :
 Statuts par workflow et par module, et ordre du travail de code encore
 possible sans préalable : [la revue](../revue/revue-tests-2026-10-22.md).
 L5, L6 humain, L7 cible, L8, Q.A et M.C restent ouverts.
+
+## S.184 — C-7 : une fin prévue n'est pas un remplacement
+
+22/10/2026, lot dédié demandé par le responsable après S.183. Base
+`78cdbeb` (#302 fusionnée), sans PR concurrente autre que Dependabot.
+
+La version en vigueur d'une procédure est celle qui a été mise en vigueur
+et n'a pas été archivée : c'est la définition d'`estEnVigueur`, qu'applique
+B-02. `publierLaRegle`, `consignerLeReleve` et la graine retenaient
+« `effectiveTo` nul ». Or ce champ porte aussi la fin prévue par
+l'autorité, celle de la graine NL au 31/12/2026, que T-02 annonce.
+Conséquence : publier la version suivante d'une telle règle n'archivait
+rien, ne prévenait aucun dossier et laissait deux versions publiées, et un
+relevé « à jour » ne remettait pas en ligne une version dépubliée par
+l'échéance.
+
+Les trois sites sont alignés sur la définition du domaine. L'archivage
+garde la fin prévue quand elle existe, et pose la date du jour sinon.
+Aucun schéma ni aucune donnée n'est modifié.
+
+Reproduction puis preuve : quinze vérifications dans `smoke:publication`
+(fin à venir, fin passée, relevé), le test du relevé, et le parcours R-O03
+ramené sur la règle NL. WF-11, WF-14, RG-14.1, RG-14.3, INV-3, INV-8.
+
+Écart C-13, de données : les versions NL 2027 sont à publier avant le
+31/12/2026. C-12 reste ouvert. Aucun préalable levé.
+

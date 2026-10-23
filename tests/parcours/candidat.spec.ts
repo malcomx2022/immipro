@@ -1008,13 +1008,18 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
   await page.waitForURL(`**/dossiers/${dossier}/depot`);
   await relever();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("As-tu déposé ta demande ?");
-  const aujourdhui = new Date().toISOString().slice(0, 10);
+  // « Aujourd'hui » est celui du candidat, dans son fuseau (S.89), que
+  // l'écran pose en `max` : la date UTC du banc le précède d'un jour entre
+  // minuit UTC et minuit local, et tombait avant l'ouverture du dossier.
+  const champDate = page.getByLabel("Quand as-tu déposé ta demande ?");
+  const aujourdhui = (await champDate.getAttribute("max")) ?? "";
+  expect(aujourdhui).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
   const bouton = page.getByRole("button", { name: "Déclarer mon dépôt", exact: true });
   await expect(bouton).toBeDisabled();
-  await page.getByLabel("Quand as-tu déposé ta demande ?").fill("2020-01-01");
+  await champDate.fill("2020-01-01");
   await page.getByRole("checkbox", { name: /J'ai déposé ma demande/u }).check();
   await expect(bouton).toBeDisabled();
-  await page.getByLabel("Quand as-tu déposé ta demande ?").fill(aujourdhui);
+  await champDate.fill(aujourdhui);
   await expect(bouton).toBeEnabled();
   await bouton.click();
   await page.waitForURL(`**/dossiers/${dossier}`);
@@ -1088,21 +1093,21 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
 
 /**
  * R-O03 — publication par un second lecteur, divergence, arbitrage (WF-14 §4,
- * WF-11, T-02). Un second dossier, sur la règle CH « études », pour ne rien
+ * WF-11, T-02). Un second dossier, sur la règle NL « emploi », pour ne rien
  * changer à celle des gestes précédents ni aux profils suivants : chaque
  * profil abaisse d'une unité un seuil bloquant de la version en vigueur —
  * un assouplissement, donc une alerte et une proposition de migration sans
- * pause du dossier. Pas la règle NL : la graine lui donne une fin prévue
- * (`effectiveTo`), et la publication ne la reconnaît alors pas comme la
- * version à remplacer (constat C-7 de la revue S.183, décision attendue). B-02 n'édite que les textes destinés au candidat : la
+ * pause du dossier. La graine donne à cette règle une fin prévue
+ * (`effectiveTo` au 31/12/2026) : c'est le cas que C-7 empêchait de
+ * remplacer (S.184), et T-02 doit l'annoncer au candidat. B-02 n'édite que les textes destinés au candidat : la
  * valeur passe par la seule route qui l'écrit, depuis la session du
  * navigateur de l'administrateur, comme le ferait un outil d'exploitation.
  */
-const SEUIL = "preuve_fonds_annuelle";
+const SEUIL = "salaire_min_moins_30_ans";
 let emploi = "";
 
 test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence et arbitrage du candidat", async () => {
-  await aller("/dossiers/nouveau?destination=suisse");
+  await aller("/dossiers/nouveau?destination=pays-bas-emploi");
   await page.getByRole("radio", { name: /Je ne sais pas encore/u }).click();
   await page.getByRole("button", { name: "Créer mon dossier", exact: true }).click();
   await page.waitForURL(/\/dossiers\/[a-f0-9-]+$/u);
@@ -1153,7 +1158,7 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
     (
       await lire<{ id: string; version: number; status: string; verifiedBy: string }>(
         `SELECT id, version, status, "verifiedBy" FROM "VisaRule"
-         WHERE "countryCode"='CH' AND "visaType"='etudes_permis_b' AND version=$1`,
+         WHERE "countryCode"='NL' AND "visaType"='emploi_kennismigrant' AND version=$1`,
         [vigueur!.version + 1],
       )
     )[0]!;
@@ -1163,7 +1168,7 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
   // 2. Il tente de publier sa propre version : refus nommant la condition.
   await aller(`/regles/${vigueur!.id}`, b02);
   await expect(b02.getByText(`Brouillon version ${suivante}`, { exact: false })).toBeVisible();
-  await b02.getByLabel("Motif du changement", { exact: true }).fill("Montant SEM révisé au 1er janvier");
+  await b02.getByLabel("Motif du changement", { exact: true }).fill("Seuil IND révisé au 1er janvier");
   await b02.getByRole("button", { name: `Publier la version ${suivante}`, exact: true }).click();
   const refus = b02.getByRole("alert").filter({ hasText: SEUIL });
   await expect(refus).toBeVisible();
@@ -1193,10 +1198,25 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
   await expect(b02.getByText(`Version ${suivante} publiée`, { exact: false })).toBeVisible();
   const nouvelle = await brouillon();
   expect(nouvelle.status).toBe("PUBLISHED");
-  const [archivee] = await lire<{ status: string }>('SELECT status FROM "VisaRule" WHERE id=$1', [
-    vigueur!.id,
-  ]);
+  const [archivee] = await lire<{ status: string; effectiveTo: string | null }>(
+    'SELECT status, to_char("effectiveTo", \'YYYY-MM-DD\') AS "effectiveTo" FROM "VisaRule" WHERE id=$1',
+    [vigueur!.id],
+  );
   expect(archivee!.status).toBe("ARCHIVED");
+  // C-7 : la v1 de la graine porte une fin prévue ; l'archivage la garde.
+  // Les profils suivants partent d'une version publiée ici, sans fin prévue.
+  const finPrevue = (
+    await lire<{ fin: string | null }>(
+      `SELECT to_char("effectiveTo", 'YYYY-MM-DD') AS fin FROM "VisaRule"
+       WHERE "countryCode"='NL' AND "visaType"='emploi_kennismigrant' AND version=1`,
+    )
+  )[0]!.fin;
+  expect(finPrevue).toBe("2026-12-31");
+  const [unique] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "VisaRule"
+     WHERE "countryCode"='NL' AND "visaType"='emploi_kennismigrant' AND status='PUBLISHED'`,
+  );
+  expect(Number(unique!.n)).toBe(1);
   const [trace] = await lire<{ metadata: { redigeePar: string; bloquantesTouchees: string[] } }>(
     `SELECT metadata FROM "AuditLog" WHERE action='regle.publication' AND target=$1`,
     [`visaRule:${nouvelle.id}`],
@@ -1237,6 +1257,10 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
   // 6. Le candidat arbitre depuis ses alertes (T-02) : il migre.
   await aller("/notifications");
   await page.getByRole("button", { name: "Choisir la version à appliquer", exact: true }).click();
+  if (vigueur!.version === 1) {
+    // T-02 annonce la fin prévue de la version que le dossier conserverait.
+    await expect(page.getByText(/avant le 31 décembre 2026/u).first()).toBeVisible();
+  }
   await page.getByRole("radio", { name: new RegExp(`^Migrer vers la version ${suivante}`, "u") }).click();
   const [arbitrage] = await Promise.all([
     page.waitForResponse(
@@ -1260,7 +1284,7 @@ test("R-O03 : rédacteur refusé, relecture du veilleur, publication, divergence
   expect(decidee!.decidedAt).not.toBeNull();
   preuves.push({
     controle:
-      "R-O03 : refus du rédacteur nommant la condition, correction du veilleur, publication par l'administrateur depuis B-02, divergence MAJEURE propagée par le worker, migration choisie par le candidat",
+      "R-O03 : refus du rédacteur nommant la condition, correction du veilleur, publication par l'administrateur depuis B-02, version à fin prévue archivée (C-7), divergence MAJEURE propagée par le worker, migration choisie par le candidat",
     version: suivante,
     conforme: true,
     valeurParLaRoute: true,

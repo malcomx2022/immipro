@@ -175,7 +175,7 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
   it("seule une fiche dépubliée par l'échéance est republiée", () => {
     const put = route.slice(route.indexOf("export async function consignerLeReleve"));
     expect(put).toMatch(
-      /const republier =\s*fiche\.status === "DRAFT" &&\s*fiche\.publishedAt !== null &&\s*fiche\.effectiveTo === null &&\s*fiche\.nextReviewAt < jour/u,
+      /const republier =\s*fiche\.status === "DRAFT" &&\s*fiche\.publishedAt !== null &&\s*fiche\.nextReviewAt < jour/u,
     );
     expect(put).toMatch(/\.\.\.\(republier \? \{ status: "PUBLISHED" as const \} : \{\}\)/u);
   });
@@ -192,7 +192,19 @@ describe("la route de relecture écrit ce que WF-14 demande", () => {
     const put = route.slice(route.indexOf("export async function consignerLeReleve"));
     const condition = put.slice(put.indexOf("const republier ="), put.indexOf("const maj ="));
     expect(condition).toContain("fiche.publishedAt !== null");
-    expect(condition).toContain("fiche.effectiveTo === null");
+  });
+
+  /**
+   * C-7, revue S.183. Une version remplacée est archivée, et refusée avant
+   * cette condition. `effectiveTo` porte la fin prévue par l'autorité
+   * (graine NL au 31/12/2026) : la lire comme un remplacement laissait
+   * dépubliée une version relue « à jour ».
+   */
+  it("une fin prévue n'empêche pas la remise en ligne après relecture", () => {
+    const put = route.slice(route.indexOf("export async function consignerLeReleve"));
+    const condition = put.slice(put.indexOf("const republier ="), put.indexOf("const maj ="));
+    expect(condition).not.toContain("effectiveTo");
+    expect(put.indexOf('fiche.status === "ARCHIVED"')).toBeLessThan(put.indexOf("const republier ="));
   });
 
   it("une version archivée ne se relit pas", () => {

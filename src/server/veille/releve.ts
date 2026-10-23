@@ -173,12 +173,13 @@ export async function consignerLeReleve(
     aux dossiers, ni second opérateur ni contrôle du vocabulaire (revue du
     07/10/2026, C1). Seule une version déjà mise en vigueur, et pas encore
     remplacée, revient en ligne ici. Un brouillon se publie par B-02.
+
+    Remplacée veut dire archivée, refusée plus haut. `effectiveTo` nul n'en
+    était pas la preuve : une version à fin prévue (graine NL) relue « à
+    jour » restait dépubliée (C-7, revue S.183).
   */
   const republier =
-    fiche.status === "DRAFT" &&
-    fiche.publishedAt !== null &&
-    fiche.effectiveTo === null &&
-    fiche.nextReviewAt < jour;
+    fiche.status === "DRAFT" && fiche.publishedAt !== null && fiche.nextReviewAt < jour;
 
   const maj = await db.visaRule.update({
     where: { id: fiche.id },
