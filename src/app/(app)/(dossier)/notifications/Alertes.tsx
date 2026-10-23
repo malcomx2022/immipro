@@ -73,7 +73,16 @@ export interface AlertesProps {
 export function Alertes({ alertes, nonLues: nonLuesServeur, total, maintenant, divergence }: AlertesProps) {
   const [liste, setListe] = useState<readonly Alerte[]>(alertes);
   const [filtre, setFiltre] = useState<FiltreAlerte>("TOUTES");
-  const [arbitrageOuvert, setArbitrageOuvert] = useState(false);
+  /*
+    La divergence que la feuille arbitre, figée à son ouverture (C-14).
+
+    Arbitrer lance `router.refresh()` pour que la liste perde l'alerte
+    tranchée, et la page ne passe plus alors de divergence — ou passe la
+    suivante. La feuille rendue sur la prop disparaissait avec sa
+    confirmation, avant que le candidat l'ait lue ; c'est lui qui ferme.
+  */
+  const [arbitrage, setArbitrage] = useState<AlertesProps["divergence"] | null>(null);
+  const feuille = arbitrage ?? divergence;
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
 
@@ -194,7 +203,7 @@ export function Alertes({ alertes, nonLues: nonLuesServeur, total, maintenant, d
                 <Button
                   variante="secondaire"
                   className="mt-1 self-start"
-                  onClick={() => setArbitrageOuvert(true)}
+                  onClick={() => setArbitrage(divergence)}
                 >
                   Choisir la version à appliquer
                 </Button>
@@ -219,11 +228,14 @@ export function Alertes({ alertes, nonLues: nonLuesServeur, total, maintenant, d
         <p className="text-pretty text-13 text-ink-500">{MENTION_PORTEE}</p>
       </div>
 
-      {divergence ? (
+      {/* La clé repart d'un état vierge quand une autre divergence prend la
+          place : la confirmation d'un arbitrage ne vaut que pour lui. */}
+      {feuille ? (
         <DivergenceReglementaire
-          ouverte={arbitrageOuvert}
-          onFermer={() => setArbitrageOuvert(false)}
-          {...divergence}
+          key={feuille.migrationId}
+          ouverte={arbitrage !== null}
+          onFermer={() => setArbitrage(null)}
+          {...feuille}
         />
       ) : null}
     </div>

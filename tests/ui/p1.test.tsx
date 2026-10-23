@@ -941,6 +941,58 @@ describe("T-02 — Divergence réglementaire", () => {
   });
 
   /**
+   * C-14 — arbitrer lance `router.refresh()`, et la page ne passe plus la
+   * divergence tranchée. La feuille était rendue sur la prop : elle
+   * disparaissait avec sa confirmation. Exécuté avant correction :
+   *
+   *     après le rafraîchissement : « Voir ma checklist » → null
+   *
+   * Le parcours R-O03 le voyait selon la vitesse du rafraîchissement
+   * (webkit-1440, #305).
+   */
+  const page = (d?: typeof divergence) => (
+    <Alertes
+      alertes={ALERTES}
+      nonLues={compterNonLues(ALERTES)}
+      total={ALERTES.length}
+      maintenant="2026-09-18T13:05:00Z"
+      divergence={d}
+    />
+  );
+  const arbitrer = async () => {
+    appels.length = 0;
+    reponse = { ok: true };
+    rafraichit.mockClear();
+    const rendu = render(page(divergence));
+    fireEvent.click(screen.getByRole("button", { name: "Choisir la version à appliquer" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Migrer vers la version 5/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Migrer vers la version 5" }));
+    await attendre();
+    expect(rafraichit).toHaveBeenCalled();
+    return rendu;
+  };
+
+  it("la confirmation survit au rafraîchissement qui retire la divergence", async () => {
+    const { rerender } = await arbitrer();
+    rerender(page(undefined));
+
+    expect(screen.getByRole("dialog").textContent).toContain("suit la nouvelle version");
+    fireEvent.click(screen.getByRole("button", { name: "Voir ma checklist" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("une divergence suivante s'ouvre vierge, sans la confirmation de la précédente", async () => {
+    const { rerender } = await arbitrer();
+    rerender(page({ ...divergence, migrationId: "migration-2" }));
+    expect(screen.getByRole("dialog").textContent).toContain("suit la nouvelle version");
+    fireEvent.click(screen.getByRole("button", { name: "Voir ma checklist" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Choisir la version à appliquer" }));
+    expect(screen.getByRole("radio", { name: /Migrer vers la version 5/ })).not.toBeNull();
+    expect(screen.getByRole("dialog").textContent).not.toContain("suit la nouvelle version");
+  });
+
+  /**
    * L'échec se lit là où le geste a été fait. Fermer d'abord ferait
    * disparaître le seul endroit où il peut s'afficher, sur une décision
    * qui déplace un échéancier entier.

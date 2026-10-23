@@ -401,3 +401,38 @@ néerlandaise ne s'afficherait alors, et les parcours qui ouvrent un dossier
 par la veille avant cette date. Depuis S.184, cette publication archive
 bien la version 2026 et prévient les dossiers.
 
+
+## 10. S.185 — C-14 corrigé, lot dédié — 23/10/2026
+
+Demande du responsable : corriger C-14 dans un lot dédié. Base : `f8f0419`
+(#305 fusionnée).
+
+**Constat.** La porte de #305 a échoué une fois sur R-O03, en webkit-1440
+seulement : après l'arbitrage, « Voir ma checklist » n'apparaissait pas
+(`tests/parcours/candidat.spec.ts`). La relance est passée. Le parcours
+ne se trompait pas : il voyait un défaut d'écran selon la vitesse du
+rafraîchissement.
+
+**Cause.** T-02 garde sa confirmation ouverte jusqu'à ce que le candidat
+la ferme, puis lance `router.refresh()` pour que la liste perde l'alerte
+tranchée. La page ne passe une divergence que tant qu'elle n'est pas
+arbitrée : le rafraîchissement rendait T-01 sans divergence, et la
+feuille, rendue sur cette prop, disparaissait avec la confirmation. Si
+une autre divergence attendait, la feuille la recevait en gardant l'état
+« arbitré » de la précédente : le candidat ne pouvait plus la trancher
+depuis cette page.
+
+**Correction.** `Alertes` fige la divergence à l'ouverture de la feuille
+et la garde jusqu'à sa fermeture ; la feuille porte la clé de sa
+migration, et repart vierge quand une autre divergence prend la place.
+Aucun appel, aucun schéma, aucune donnée ne change.
+
+**Preuves.**
+
+- `tests/ui/p1.test.tsx`, deux tests nouveaux, rouges avant le correctif
+  et verts après : la confirmation survit au rafraîchissement qui retire la
+  divergence, et se ferme au geste du candidat ; une divergence suivante
+  s'ouvre avec ses options, sans la confirmation de la précédente.
+- `npm run check` (202 fichiers, 4 018 tests), construction, et parcours
+  36/36 sur Chromium 390/1440. Firefox et WebKit sont laissés à la porte
+  CI, où le défaut s'était montré.
