@@ -13972,3 +13972,28 @@ Reproduction puis preuve : test d'écran rouge avant, vert après ; R-O03
 vérifie « kennismigrant » à l'ouverture. WF-04, INV-3, écran C-05. Les
 titres d'onglet des pages d'un dossier restent au seul pays. Aucun
 préalable levé.
+
+## S.188 — parcours navigateur manquants, et trois défauts relevés
+
+23/10/2026, lot dédié demandé par le responsable. Base `ddd22cf` (#308
+fusionnée), sans PR ouverte.
+
+Huit parcours ajoutés à la recette navigateur : profils contrastés du
+simulateur (WF-03), échéancier (R-C08), fuseau et pièce périmée (R-K06),
+purge effective et portabilité (R-C09), B-04 et B-08 (R-I04). Trois
+préconditions bornées au candidat synthétique : pièce périssable échue,
+échéance de purge atteinte, purge lancée à la main par la commande
+d'exploitation.
+
+Trois défauts relevés et corrigés : C-15, l'échéancier sans date
+renvoyait à la checklist, où rien ne la fixe (le champ est désormais sur
+l'écran) ; C-16, « Ton dossier est prêt » et la déclaration de dépôt sur
+une pièce obligatoire échue avant la passe de nuit ; C-17, l'écran de la
+pièce disait « conforme » à une pièce échue, sans moyen de la remplacer.
+Chacun rouge avant (test d'écran, tests unitaires, `smoke:depot`,
+`smoke:extraction`, parcours sur l'ancienne compilation).
+
+WF-03, WF-07, WF-09, WF-10, WF-15 ; RG-06.6, RG-07.4, RG-09.4, RG-10.9 ;
+écrans C-01, C-08, C-10, C-12 (mes données), B-04, B-08. Restent non
+vérifiés : R-O04 (M.C), R-I02, réception réelle d'un rappel, autres
+formulaires d'administration. Aucun préalable levé.

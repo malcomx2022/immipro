@@ -27,6 +27,8 @@ import { lirePreferences } from "@/domain/dossiers/preferences-rappels";
 import { journaliser } from "@/server/acces/journal";
 import { FUSEAU_AFFICHAGE, jourCivil, momentDans } from "@/domain/format/fuseau";
 import { jourEnFrancais } from "@/domain/format/moment";
+import { premiereObligatoireEchue, refusDuDepotEchu } from "@/domain/dossiers/peremption";
+import { exigees } from "@/server/vue/dossier";
 
 /**
  * Les deux passages déclarés d'un dossier — WF-10.
@@ -81,6 +83,18 @@ export async function declarerLeDepot(
   { deposeLe, fuseau = FUSEAU_AFFICHAGE, maintenant = new Date() }: DeclarationDeDepot,
 ): Promise<Application> {
   refuserUnDepotHorsPret(dossier.status);
+
+  /*
+    C-16 (S.188) — `PRET` est écrit en base ; la péremption, elle, se lit
+    chaque jour. Entre l'échéance d'une pièce et la passe de nuit, le
+    dossier restait déclarable sur une pièce que l'autorité refuserait.
+    Même lecture que la checklist : le jour civil d'affichage.
+  */
+  const echue = premiereObligatoireEchue(
+    exigees(await db.document.findMany({ where: { applicationId: dossier.id } })),
+    jourCivil(maintenant),
+  );
+  if (echue) throw echec("etat_incompatible", { corps: refusDuDepotEchu(echue) });
 
   /*
     Arbitrage S.89 — la date réelle du dépôt, lue dans le fuseau du

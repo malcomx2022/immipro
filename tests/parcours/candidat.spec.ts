@@ -3,13 +3,15 @@
  *
  * Un candidat synthétique par profil navigateur, créé par l'inscription
  * réelle, puis les gestes de la matrice dans l'ordre où il les ferait :
- * simulateur, inscription et code, ouverture, achat scripté, consentement,
- * dépôt et lecture, coupure réseau, réponse tardive, lecture sans mesure et
- * revue humaine, signalement et décision B-05, retrait du consentement,
- * rédaction assistée, double onglet, quota épuisé et reprise gratuite,
- * déclaration du dépôt, clôture et purge annoncée ; puis, au bureau et chez
- * le candidat, publication par un second lecteur et arbitrage (R-O03), et
- * suppression du compte pendant une panne du stockage, puis reprise (R-O05).
+ * simulateur, profils contrastés (WF-03), inscription et code, ouverture,
+ * achat scripté, consentement, dépôt et lecture, coupure réseau, réponse
+ * tardive, lecture sans mesure et revue humaine, signalement et décision
+ * B-05, retrait du consentement, rédaction assistée, double onglet, quota
+ * épuisé et reprise gratuite, échéancier, fuseau, pièce périmée,
+ * déclaration du dépôt, clôture, purge effective et portabilité ; puis, au
+ * bureau, B-04 et B-08, publication par un second lecteur et arbitrage
+ * (R-O03), et suppression du compte pendant une panne du stockage, puis
+ * reprise (R-O05).
  *
  * Chaque geste est contrôlé par son effet en base, jamais par un seul
  * HTTP 200. IA et paiement sont les réponses scriptées locales du banc :
@@ -362,8 +364,16 @@ test("WF-03 : trois profils contrastés, trois classements sourcés, écarts chi
   suivis.push(suivreErreurs(p, moteur, origineApp));
   const lus: { titre: string; retenues: string[]; ecartees: string[] }[] = [];
   try {
-    for (const reponses of profils) {
-      await aller("/simulateur", p);
+    await aller("/simulateur", p);
+    for (const [rang, reponses] of profils.entries()) {
+      // Le profil suivant part des résultats, comme le candidat : par
+      // « Modifier mes réponses », sans doubler une navigation de Next
+      // que Firefox n'a pas encore achevée.
+      if (rang > 0) {
+        await p.getByRole("link", { name: "Modifier mes réponses", exact: true }).click();
+        await p.waitForURL("**/simulateur");
+      }
+      await expect(p.getByRole("heading", { name: "Quel est ton objectif ?" })).toBeVisible();
       for (const [i, nom] of reponses.entries()) {
         await p.getByRole("radio", { name: nom, exact: true }).click();
         await p
@@ -1091,8 +1101,8 @@ const VERDICT_INTENABLE = /^(La date de dépôt est passée|Une pièce obligatoi
  */
 test("échéancier : date fixée depuis l'écran, calendrier intenable, date proposée reprise", async () => {
   const echeances = () =>
-    lire<{ code: string; dueDate: string }>(
-      `SELECT code, to_char("dueDate", 'YYYY-MM-DD') AS "dueDate" FROM "Deadline" WHERE "applicationId"=$1 ORDER BY code`,
+    lire<{ code: string; dueAt: string }>(
+      `SELECT code, to_char("dueAt", 'YYYY-MM-DD') AS "dueAt" FROM "Deadline" WHERE "applicationId"=$1 ORDER BY code`,
       [dossier],
     );
   const cible = async () =>
@@ -1109,7 +1119,7 @@ test("échéancier : date fixée depuis l'écran, calendrier intenable, date pro
   await page.getByRole("link", { name: "Échéancier", exact: true }).click();
   await page.waitForURL(`**/dossiers/${dossier}/echeancier`);
   await relever();
-  const champ = page.getByLabel(/date de départ visée/u);
+  const champ = page.getByLabel(/^(Nouvelle d|D)ate de départ visée$/u);
   await expect(champ).toBeVisible();
   const aujourdhui = (await champ.getAttribute("min")) ?? "";
   expect(aujourdhui).toBe(jourDans("Africa/Porto-Novo"));
@@ -1138,7 +1148,11 @@ test("échéancier : date fixée depuis l'écran, calendrier intenable, date pro
   expect(rapprochees.map((e) => e.code)).toEqual(posees.map((e) => e.code));
   expect(rapprochees).not.toEqual(posees);
 
-  // Le champ part de la date proposée : la reprendre suffit.
+  // La saisie reste après la réponse (S.182) ; au retour sur l'écran, le
+  // champ part de la date proposée : la reprendre suffit.
+  await expect(nouvelle).toHaveValue(proche);
+  await aller(`/dossiers/${dossier}/echeancier`);
+  await expect(verdict).toBeVisible();
   await expect(nouvelle).not.toHaveValue(proche);
   const proposee = await nouvelle.inputValue();
   expect(proposee > proche).toBe(true);
@@ -1224,53 +1238,64 @@ test("fuseau : rappels réglés sur Toronto, échéancier identique depuis un na
  * qui repose sa péremption.
  */
 test("pièce périmée : déclassée à l'affichage, dépôt refusé, version neuve qui repose la péremption", async () => {
-  await preparerDossierPret(dossier, email);
-  await aller(`/dossiers/${dossier}`);
-  await expect(page.getByRole("heading", { name: "Ton dossier est prêt", exact: true })).toBeVisible();
-  await perimerLaPiece(dossier, email, "preuve_fonds");
   const [fonds] = await lire<{ id: string; label: string }>(
     'SELECT id, label FROM "Document" WHERE "applicationId"=$1 AND code=$2',
     [dossier, "preuve_fonds"],
   );
+  const peremption = async () =>
+    (
+      await lire<{ jusquau: string | null }>(
+        `SELECT to_char("expiresAt", 'YYYY-MM-DD') AS jusquau FROM "Document" WHERE id=$1`,
+        [fonds!.id],
+      )
+    )[0]!.jusquau;
+  // Le justificatif est déposé et lu : sa péremption se pose au dépôt.
+  await aller(`/dossiers/${dossier}/pieces/${fonds!.id}`);
+  const rang = (await versions(fonds!.id)).length + 1;
+  await deposer(page, "L13.pdf");
+  await attendreLAnalyse(fonds!.id, rang);
+  expect((await peremption())! > jourDans("UTC")).toBe(true);
+
+  await preparerDossierPret(dossier, email);
+  await aller(`/dossiers/${dossier}`);
+  await expect(page.getByRole("heading", { name: "Ton dossier est prêt", exact: true })).toBeVisible();
+  await perimerLaPiece(dossier, email, "preuve_fonds");
   await aller(`/dossiers/${dossier}`);
   await relever();
   await expect(page.getByText(/Prochaine action : Remplacer ton justificatif/u)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ton dossier est prêt", exact: true })).toHaveCount(0);
   const veille = decaler(jourDans("UTC"), -1);
   const refus = await page.evaluate(
-    async ([d, jour]) =>
-      (
-        await fetch(`/api/dossiers/${d}/depot`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deposeLe: jour }),
-        })
-      ).status,
+    async ([d, jour]) => {
+      const r = await fetch(`/api/dossiers/${d}/depot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deposeLe: jour }),
+      });
+      return { statut: r.status, corps: await r.text() };
+    },
     [dossier, veille] as const,
   );
-  expect(refus).toBeGreaterThanOrEqual(400);
-  expect(refus).toBeLessThan(500);
+  expect(refus.statut).toBeGreaterThanOrEqual(400);
+  expect(refus.statut).toBeLessThan(500);
+  expect(refus.corps).toContain("n'est plus valable depuis le");
   const [toujours] = await lire<{ status: string }>('SELECT status FROM "Application" WHERE id=$1', [
     dossier,
   ]);
   expect(toujours!.status).not.toBe("SOUMIS");
 
+  // Le remède : une version neuve, qui repose la péremption.
   await aller(`/dossiers/${dossier}/pieces/${fonds!.id}`);
   await relever();
-  await expect(page.getByText(/Validité dépassée depuis le/u).first()).toBeVisible();
-  const avant = (await versions(fonds!.id)).length;
-  await page.getByRole("button", { name: /^(Remplacer la pièce|Téléverser une autre version|Ajouter la pièce)$/u }).first().click();
-  await deposer(page, "L01.pdf", "Ajouter la pièce");
-  await expect.poll(async () => (await versions(fonds!.id)).length, { timeout: 30_000 }).toBe(avant + 1);
+  await expect(page.getByRole("heading", { level: 2, name: /la validité est dépassée$/u })).toBeVisible();
+  await expect(page.getByText(/Cette pièce est conforme/u)).toHaveCount(0);
+  await nouvelleVersion(page);
+  await deposer(page, "L29.pdf");
   // La lecture arrive avant la suite : elle récrit l'état de la pièce.
-  await attendreLAnalyse(fonds!.id, avant + 1);
-  const [reposee] = await lire<{ jusquau: string }>(
-    `SELECT to_char("expiresAt", 'YYYY-MM-DD') AS jusquau FROM "Document" WHERE id=$1`,
-    [fonds!.id],
-  );
-  expect(reposee!.jusquau > jourDans("UTC")).toBe(true);
+  await attendreLAnalyse(fonds!.id, rang + 1);
+  expect((await peremption())! > jourDans("UTC")).toBe(true);
   preuves.push({
-    controle: "R-K06 péremption : pièce périmée déclassée à l'affichage, dépôt refusé, version neuve et péremption reposée",
+    controle: "R-K06 péremption : pièce périmée déclassée à l'affichage, prêt retiré, dépôt refusé avec la pièce nommée, version neuve et péremption reposée",
     conforme: true,
     fixture: true,
   });
@@ -1445,8 +1470,18 @@ test("portabilité : export de mes données, deux dossiers, aucun autre compte, 
   const fichier = info.outputPath("mes-donnees.json");
   await telechargement.saveAs(fichier);
   const brut = readFileSync(fichier, "utf8");
-  const donnees = JSON.parse(brut) as { dossiers: { id: string }[] };
-  expect(donnees.dossiers.map((d) => d.id).sort()).toEqual([dossier, second].sort());
+  const donnees = JSON.parse(brut) as {
+    dossiers: { statut: string; issue: string | null; departVise: string | null }[];
+  };
+  // Les deux dossiers du compte, le purgé compris, tels qu'ils sont en base.
+  expect(donnees.dossiers).toHaveLength(2);
+  const [clos] = await lire<{ t: string }>(
+    `SELECT to_char("targetDate", 'YYYY-MM-DD') AS t FROM "Application" WHERE id=$1`,
+    [dossier],
+  );
+  expect(donnees.dossiers).toContainEqual(
+    expect.objectContaining({ statut: "ARCHIVE", issue: "ACCEPTE", departVise: clos!.t }),
+  );
   // Une seule adresse dans le fichier : celle du titulaire.
   expect([...new Set(brut.match(/[\w.+-]+@[\w.-]+\.\w+/gu) ?? [])]).toEqual([email]);
   expect(brut).not.toContain("objectKey");

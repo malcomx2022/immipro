@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { Document } from "@prisma/client";
+import type { Application, Document } from "@prisma/client";
 import {
   corpsEchue,
   estEchue,
   mentionEchue,
   piecesEchues,
+  premiereObligatoireEchue,
+  refusDuDepotEchu,
   TITRE_ECHUE,
 } from "@/domain/dossiers/peremption";
 import { mentionDeLaPiece, completudeDesPieces, type Piece } from "@/domain/dossiers/piece";
-import { versPiece } from "@/server/vue/dossier";
+import { versDossier, versPiece } from "@/server/vue/dossier";
+import { PAYS_BAS } from "@/lib/contenu/destinations";
 import { sansCommentaires } from "@/domain/copy/source";
 import {
   INTERDITS_ECRAN_CANDIDAT,
@@ -207,5 +210,65 @@ describe("l'état EXPIREE a enfin un écrivain", () => {
       `EXPIREE` que personne n'écrivait, et c'est lui qu'on tient.
     */
     expect([...ecrits], "EXPIREE n'est écrit sur aucun document").toContain("EXPIREE");
+  });
+});
+
+/**
+ * C-16 (S.188) — entre l'échéance d'une pièce et la passe de nuit, la base
+ * garde le dossier « prêt ». La checklist affichait à la fois « Ton dossier
+ * est prêt » et « Remplacer ton justificatif », et la déclaration de dépôt
+ * passait. Relevé par le parcours navigateur de la péremption.
+ */
+describe("C-16 — une pièce obligatoire échue défait le « prêt » stocké", () => {
+  const fonds = (perimeLe: string, required = true) =>
+    ({
+      id: "doc-fonds",
+      code: "preuve_fonds",
+      label: "Justificatif de ressources",
+      family: "OBLIGATOIRE",
+      required,
+      remedy: "AJOUTER",
+      status: "CONFORME",
+      expiresAt: new Date(`${perimeLe}T00:00:00Z`),
+      feedback: null,
+      finding: null,
+      hint: null,
+    }) as unknown as Document;
+  const pret = { id: "d1", status: "PRET", targetDate: null } as unknown as Application;
+
+  it("trouve la première obligatoire échue, strictement avant aujourd'hui", () => {
+    const pieces = [
+      { libelle: "Passeport", obligatoire: true, conforme: true, perimeLe: null },
+      { libelle: "Relevé", obligatoire: false, conforme: true, perimeLe: "2026-09-01" },
+      { libelle: "Justificatif", obligatoire: true, conforme: true, perimeLe: "2026-09-20" },
+    ];
+    expect(premiereObligatoireEchue(pieces, "2026-09-20")).toBeNull();
+    expect(premiereObligatoireEchue(pieces, "2026-09-21")?.libelle).toBe("Justificatif");
+    // Une pièce déjà déclassée n'est plus « conforme » : la base dit déjà vrai.
+    expect(premiereObligatoireEchue([{ ...pieces[2]!, conforme: false }], "2026-09-21")).toBeNull();
+  });
+
+  it("refuse en nommant la pièce, sa date et le geste", () => {
+    const texte = refusDuDepotEchu({
+      libelle: "Justificatif de ressources",
+      obligatoire: true,
+      conforme: true,
+      perimeLe: "2026-09-19",
+    });
+    expect(texte).toBe(
+      "Justificatif de ressources n'est plus valable depuis le 19 septembre 2026 : téléverse une version à jour, puis déclare ton dépôt.",
+    );
+    expect(verifierTexte(texte, INTERDITS_ECRAN_CANDIDAT)).toEqual([]);
+  });
+
+  it("la checklist ne dit plus « prêt » sur une obligatoire échue", () => {
+    const vue = versDossier(pret, [fonds("2026-09-19")], PAYS_BAS, null, "2026-09-20");
+    expect(vue.statut).toBe("ACTIF");
+    expect(vue.prochaineAction).toMatch(/^Remplacer ton justificatif de ressources/u);
+  });
+
+  it("une facultative échue, ou une obligatoire valable ce jour, laisse le dossier prêt", () => {
+    expect(versDossier(pret, [fonds("2026-09-19", false)], PAYS_BAS, null, "2026-09-20").statut).toBe("PRET");
+    expect(versDossier(pret, [fonds("2026-09-20")], PAYS_BAS, null, "2026-09-20").statut).toBe("PRET");
   });
 });

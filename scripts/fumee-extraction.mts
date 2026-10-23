@@ -1737,6 +1737,24 @@ try {
       "la lecture automatique reste connue : c'est elle qui décide du prix d'une reprise (FON-03)",
     );
 
+    /* C-17 (S.188) — la même pièce, conforme, dont la validité est dépassée. */
+    await db.document.update({
+      where: { id: p.document.id },
+      data: { expiresAt: new Date(Date.now() - 2 * 86_400_000) },
+    });
+    const echue = await analyseDeLaPiece(p.document.id, p.application.id, p.user.id);
+    verifier(
+      echue.piece.etat === "EXPIREE" &&
+        echue.analyse?.verdict === "A_CORRIGER" &&
+        /la validité est dépassée$/u.test(echue.analyse.titre) &&
+        /Téléverse une version à jour/u.test(echue.analyse.corps),
+      `C-17 : une pièce conforme échue s'affiche à remplacer, pas « conforme » (${echue.analyse?.verdict})`,
+    );
+    verifier(
+      echue.analyse?.verdictLu === "ILLISIBLE",
+      "C-17 : la lecture d'origine reste connue pour le prix de la version suivante",
+    );
+
     /* Tranchée après le dépôt du dossier, la décision n'a rien écrit : l'écran ne la porte pas. */
     const r = await piece({ dateCible: "2027-09-01" });
     await analyserUnePiece(r.tache, lExtracteur());

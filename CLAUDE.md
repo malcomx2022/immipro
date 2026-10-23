@@ -77,6 +77,21 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.188 — parcours navigateur manquants — 23/10/2026
+
+Lot dédié demandé par le responsable. Base `ddd22cf` (#308 fusionnée).
+Huit parcours, effets lus en base : profils WF-03, échéancier (R-C08),
+fuseau et péremption (R-K06), purge effective et portabilité (R-C09),
+B-04 et B-08 (R-I04). Préconditions bornées au candidat synthétique ;
+`purgerALaMain` lance la commande d'exploitation sur le banc. Trois
+défauts corrigés, rouges avant : C-15, l'échéancier sans date porte le
+champ qui la fixe ; C-16, une pièce obligatoire échue retire « prêt » et
+refuse le dépôt avant la passe de nuit ; C-17, l'écran de la pièce dit la
+péremption plutôt que « conforme ». Ne pas réintroduire de lecture du
+`PRET` stocké sans la péremption du jour. Restent R-O04 (M.C), R-I02,
+rappel réellement reçu, autres formulaires. Lire
+[la revue, § 13](docs/revue/revue-tests-2026-10-22.md).
+
 ### O-1 — la procédure ouverte est nommée — 23/10/2026, S.187
 
 Lot dédié demandé par le responsable. Base `d0ed9a1` (#307 fusionnée).
