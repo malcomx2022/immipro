@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### O-1 — la procédure ouverte est nommée — 23/10/2026, S.187
+
+Lot dédié demandé par le responsable. Base `d0ed9a1` (#307 fusionnée).
+S.167 nommait déjà la procédure aux résultats ; le doublon du 22/10
+venait des fixtures P-03. Restait C-05 : « Ouvre ton dossier Pays-Bas »
+pour études comme pour emploi, au moment où le dossier fige sa règle.
+L'intitulé s'affiche sous le titre et nomme le formulaire. Un pays peut
+publier plusieurs procédures : ne jamais afficher le pays seul là où l'on
+choisit. Test d'écran rouge avant ; R-O03 vérifie « kennismigrant ». Lire
+[la revue, § 12](docs/revue/revue-tests-2026-10-22.md).
+
 ### C-12 — B-02 montre et modifie les seuils — 23/10/2026, S.186
 
 Lot dédié demandé par le responsable, affichage et modification. Base

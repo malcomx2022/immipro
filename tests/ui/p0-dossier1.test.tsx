@@ -410,6 +410,36 @@ describe("C-05 — Ouverture de dossier", () => {
   });
 
   /**
+   * O-1 — un pays, deux procédures : l'écran nomme celle qu'on ouvre.
+   *
+   * Les Pays-Bas publient deux procédures, études et emploi. L'écran
+   * disait « Ouvre ton dossier Pays-Bas » pour l'une comme pour l'autre,
+   * au moment précis où le dossier fige la règle qu'il suivra (INV-3).
+   * Exécuté avant correction, sur les deux fiches :
+   *
+   *     études : « Ouvre ton dossier Pays-Bas »
+   *     emploi : « Ouvre ton dossier Pays-Bas »
+   *     intitulé de la procédure à l'écran : absent
+   */
+  it("nomme la procédure ouverte, pas seulement le pays", () => {
+    const EMPLOI = {
+      ...PAYS_BAS,
+      slug: "pays-bas-emploi",
+      intitule: "Travailleur hautement qualifié (kennismigrant) et carte bleue européenne",
+    };
+    const { unmount } = render(<OuvertureDossier fiche={PAYS_BAS} apercu={[]} />);
+    const etudes = screen.getByRole("form").getAttribute("aria-labelledby");
+    expect(screen.getByText(PAYS_BAS.intitule)).toBeDefined();
+    expect(screen.getByRole("form", { name: new RegExp(PAYS_BAS.intitule.split(" — ")[0]!, "u") })).toBeDefined();
+    unmount();
+
+    render(<OuvertureDossier fiche={EMPLOI} apercu={[]} />);
+    expect(screen.getByText(EMPLOI.intitule)).toBeDefined();
+    expect(screen.getByRole("form", { name: /kennismigrant/u })).toBeDefined();
+    expect(screen.getByRole("form").getAttribute("aria-labelledby")).toBe(etudes);
+  });
+
+  /**
    * La question demandait le dépôt, le champ stockait la rentrée : un
    * candidat qui répondait « je dépose le 15 janvier » se voyait fixer un
    * dépôt au 17 octobre, tout son échéancier avançant de quatre-vingt-dix

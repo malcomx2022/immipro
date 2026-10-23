@@ -13956,3 +13956,19 @@ Reproduction puis preuve : 22 tests du domaine, cinq tests d'écran et onze
 vérifications de `smoke:publication` rouges avant, verts après ; R-O03
 saisit le seuil dans B-02. WF-14, WF-11, RG-14.1, RG-14.3, INV-3, INV-8,
 écran B-02. Aucun préalable levé.
+
+## S.187 — O-1 : l'ouverture d'un dossier nomme la procédure
+
+23/10/2026, lot dédié demandé par le responsable. Base `d0ed9a1` (#307
+fusionnée), sans PR ouverte.
+
+S.167 avait nommé la procédure aux résultats du simulateur ; le doublon
+relevé le 22/10 (C-4) tenait aux fixtures du test P-03. Restait C-05,
+l'ouverture d'un dossier : « Ouvre ton dossier Pays-Bas » pour la
+procédure études comme pour l'emploi, au moment où le dossier fige sa
+règle (INV-3). L'intitulé s'affiche sous le titre et nomme le formulaire.
+
+Reproduction puis preuve : test d'écran rouge avant, vert après ; R-O03
+vérifie « kennismigrant » à l'ouverture. WF-04, INV-3, écran C-05. Les
+titres d'onglet des pages d'un dossier restent au seul pays. Aucun
+préalable levé.

@@ -137,7 +137,7 @@ type `Ecartee` : React avertissait d'une clé absente. Ce n'était pas un
 défaut du produit (le serveur fournit le `slug`), mais l'avertissement
 masquait un éventuel vrai doublon de clé. Corrigé (§ 4). L'observation
 O-1 (« Pays-Bas » deux fois, une par dispositif, sans nommer le
-dispositif) reste ouverte : clés distinctes, libellé ambigu.
+dispositif) était restée ouverte : corrigée en S.187 (§ 12).
 
 **C-5 — Bruit de console attendu.** Les autres sorties `stderr` de la
 suite sont voulues (variables dépréciées `*_SECRET_KEY` jusqu'au
@@ -165,7 +165,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 
 | Module | Statut | Preuves | Reste |
 |---|---|---|---|
-| WF-01 Simulateur | Éprouvé | Domaine `simulateur/` ; parcours clavier six réponses ; photographies | O-1 libellé du dispositif |
+| WF-01 Simulateur | Éprouvé | Domaine `simulateur/` ; parcours clavier six réponses ; photographies ; procédure nommée partout où un pays en publie plusieurs (O-1, § 12) | — |
 | WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement, suppression demandée et reprise (R-O05, § 8) | Portabilité en navigateur ; OAuth Google V2 |
 | WF-03 Recommandations | Partiel | Domaine, résultats sourcés, comparateur | Profils variés en navigateur |
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
@@ -263,8 +263,8 @@ Travail de code encore possible sans préalable externe, par priorité :
    (66 tests, § 3). O-4 tranchée et corrigée le même jour.
 2. ~~Parcours navigateur pour R-O03 et R-O05~~ : faits le 22/10 (§ 8).
    Restent l'échéancier et la péremption d'une pièce. C-7 est corrigé en S.184 (§ 9).
-3. Libellé du dispositif dans les résultats du simulateur (O-1) et
-   textes d'aide B-05 (O-2, O-3).
+3. ~~Libellé du dispositif (O-1)~~ : fait en S.187 (§ 12). O-2 et O-3
+   (textes d'aide B-05) étaient déjà corrigés en S.167 (RC-04, RC-05).
 4. Relecture des trois PR Dependabot avec la porte complète.
 
 ## 7. Reproduction
@@ -476,3 +476,30 @@ seuils ; le lot lui donne enfin une entrée depuis l'écran.
   figé prévenu (`CRITIQUE`).
 - Parcours R-O03 : le seuil est saisi dans B-02 par l'administrateur puis
   par le veilleur, et le panneau des différences montre la condition.
+
+## 12. S.187 — O-1 corrigé, lot dédié — 23/10/2026
+
+Demande du responsable : corriger O-1 dans un lot dédié. Base : `d0ed9a1`
+(#307 fusionnée).
+
+**Ce qui restait.** S.167 (RC-01) avait fait nommer la procédure aux
+résultats du simulateur, et l'accueil, les destinations, le comparateur,
+le tableau de bord, la fiche détaillée et la portabilité montraient déjà
+l'intitulé sous le pays. Le doublon observé le 22/10 (C-4) venait des
+fixtures du test P-03, sans `procedure` ; la route en fournit toujours une.
+Un écran restait : l'ouverture d'un dossier (C-05), qui disait
+« Ouvre ton dossier Pays-Bas » pour la procédure études comme pour la
+procédure emploi, au moment même où le dossier fige la règle (INV-3).
+
+**Correction.** L'intitulé de la procédure s'affiche sous le titre, et le
+formulaire est nommé par les deux (`aria-labelledby`). Aucun appel ni
+aucune donnée ne change.
+
+**Preuves.** `tests/ui/p0-dossier1.test.tsx` : la procédure ouverte est
+nommée, et le nom du formulaire diffère entre études et emploi — rouge
+avant le correctif. Parcours R-O03 : l'ouverture de `pays-bas-emploi`
+nomme « kennismigrant ».
+
+**Reste mineur, consigné.** Les titres d'onglet des pages d'un dossier
+(« Checklist — Pays-Bas ») ne nomment que le pays ; l'en-tête de la page,
+lui, porte la procédure.
