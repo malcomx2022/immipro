@@ -12,7 +12,7 @@ import {
 } from "@/domain/dossiers/echeancier";
 import type { DateProposee, Verdict } from "@/domain/dossiers/faisabilite";
 import { jourEnFrancais } from "@/domain/format/moment";
-import { Faisabilite } from "./Faisabilite";
+import { DateDeDepart, Faisabilite } from "./Faisabilite";
 import { EnteteDossier } from "../EnteteDossier";
 
 /**
@@ -61,7 +61,13 @@ export function Echeancier({
   const mention = dossier.destination.mention;
 
   if (!dossier.departVise || echeances.length === 0) {
-    return <SansEcheancier dossierId={id} />;
+    return (
+      <SansEcheancier
+        dossierId={id}
+        dateCible={dossier.departVise ?? null}
+        aujourdhui={aujourdhui}
+      />
+    );
   }
 
   return (
@@ -214,8 +220,23 @@ function LigneEcheance({
   );
 }
 
-/** Un brouillon n'a pas d'échéancier : il lui manque la date de départ visée. */
-function SansEcheancier({ dossierId }: { dossierId: string }) {
+/**
+ * Sans date de départ visée, aucune échéance ne peut être posée.
+ *
+ * C-15 (S.188) : le bouton « Fixer la date de départ » menait à la
+ * checklist, où rien ne la fixe — un dossier ouvert sur « Je ne sais pas
+ * encore » n'avait aucun moyen d'obtenir un échéancier. Le champ est ici,
+ * et il écrit, comme celui qui la change ensuite.
+ */
+function SansEcheancier({
+  dossierId,
+  dateCible,
+  aujourdhui,
+}: {
+  dossierId: string;
+  dateCible: string | null;
+  aujourdhui: string;
+}) {
   return (
     <div className="mx-auto flex w-full max-w-decision flex-col gap-4 px-4 py-8">
       <h1
@@ -230,9 +251,18 @@ function SansEcheancier({ dossierId }: { dossierId: string }) {
         prise de poste : sans elle, aucune échéance ne peut être posée. Fixe-la,
         la date de dépôt et les délais des pièces périssables suivront.
       </p>
-      <LienBouton href={`/dossiers/${dossierId}`} pleineLargeur className="md:w-auto md:self-start">
-        Fixer la date de départ
-      </LienBouton>
+      <DateDeDepart
+        dossierId={dossierId}
+        dateCible={dateCible}
+        initiale={dateCible ?? ""}
+        aujourdhui={aujourdhui}
+      />
+      <Link
+        href={`/dossiers/${dossierId}`}
+        className="flex min-h-touch items-center self-start text-14 font-medium text-accent-600"
+      >
+        Revenir à la checklist
+      </Link>
     </div>
   );
 }

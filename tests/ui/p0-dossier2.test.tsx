@@ -612,6 +612,42 @@ describe("C-10 — Échéancier", () => {
     );
     expect(container.textContent).toContain("L'échéancier attend ta date de départ");
   });
+
+  /**
+   * C-15 (S.188) — « Fixer la date de départ » menait à la checklist, où
+   * rien ne la fixe : un dossier ouvert sans date n'avait aucun moyen
+   * d'obtenir un échéancier. Le champ est sur l'écran, et il écrit.
+   */
+  it("fixe la première date sur l'écran même, sans renvoyer à la checklist", async () => {
+    const brouillon = dossierParId("de-8820")!;
+    const appels: { url: string; corps: unknown }[] = [];
+    const fetchAvant = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      appels.push({ url: String(url), corps: JSON.parse(String(init?.body ?? "null")) });
+      return new Response(JSON.stringify({ echeances: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      render(
+        <Echeancier dossier={brouillon} echeances={[]} aujourdhui={AUJOURDHUI} verdict={VERDICT} proposition={null} rappels={RAPPELS} />,
+      );
+      expect(screen.queryByRole("link", { name: "Fixer la date de départ" })).toBeNull();
+      const champ = screen.getByLabelText("Date de départ visée") as HTMLInputElement;
+      expect(champ.min).toBe(AUJOURDHUI);
+      const bouton = () => screen.getByRole("button", { name: "Fixer la date" });
+      expect(bouton()).toHaveProperty("disabled", true);
+      fireEvent.change(champ, { target: { value: "2028-09-01" } });
+      expect(bouton()).toHaveProperty("disabled", false);
+      fireEvent.click(bouton());
+      await waitFor(() => expect(appels).toHaveLength(1));
+      expect(appels[0]!.url).toBe(`/api/dossiers/${brouillon.id}/echeancier`);
+      expect(appels[0]!.corps).toEqual({ dateCible: "2028-09-01" });
+    } finally {
+      globalThis.fetch = fetchAvant;
+    }
+  });
 });
 
 describe("C-11 — Clôture", () => {

@@ -65,32 +65,7 @@ export function Faisabilite({
   dateCible,
   aujourdhui,
 }: FaisabiliteProps) {
-  const router = useRouter();
   const ton = TON_DU_VERDICT[verdict.etat];
-  /*
-    Le champ part de la date proposée quand il y en a une : le candidat
-    dont le calendrier ne tient plus n'a pas à recopier une date qu'on
-    vient de calculer pour lui.
-  */
-  const [date, setDate] = useState(proposition?.date ?? dateCible ?? "");
-  const [envoi, setEnvoi] = useState(false);
-  const [echec, setEchec] = useState<EchecCandidat | null>(null);
-
-  async function replanifier() {
-    if (date === "" || date === dateCible || envoi) return;
-    setEnvoi(true);
-    setEchec(null);
-    const resultat = await appeler(`/api/dossiers/${dossierId}/echeancier`, {
-      methode: "PUT",
-      corps: { dateCible: date },
-    });
-    setEnvoi(false);
-    if (resultat.ok) {
-      router.refresh();
-      return;
-    }
-    setEchec(resultat.echec);
-  }
 
   return (
     <section
@@ -110,24 +85,95 @@ export function Faisabilite({
         ) : null}
       </div>
 
+      {/*
+        Le champ part de la date proposée quand il y en a une : le candidat
+        dont le calendrier ne tient plus n'a pas à recopier une date qu'on
+        vient de calculer pour lui.
+      */}
+      <DateDeDepart
+        dossierId={dossierId}
+        dateCible={dateCible}
+        initiale={proposition?.date ?? dateCible ?? ""}
+        aujourdhui={aujourdhui}
+        className="border-t border-ink-300 pt-3"
+      />
+    </section>
+  );
+}
+
+export interface DateDeDepartProps {
+  dossierId: string;
+  /** Date visée enregistrée, ISO ; `null` tant qu'aucune n'est fixée. */
+  dateCible: string | null;
+  /** Valeur de départ du champ. */
+  initiale: string;
+  /** Date du serveur au rendu, ISO — le minimum du champ. */
+  aujourdhui: string;
+  className?: string;
+}
+
+/**
+ * Le champ qui écrit la date de départ visée — WF-09 étapes 1 et 4.
+ *
+ * C-15 (S.188) : un dossier ouvert sur « Je ne sais pas encore » arrivait
+ * sur « L'échéancier attend ta date de départ », dont le bouton menait à
+ * la checklist — où rien ne la fixe. La route acceptait pourtant une
+ * première date. Le même champ sert donc à la fixer et à la changer ; seuls
+ * son libellé et son bouton disent lequel des deux gestes il fait.
+ */
+export function DateDeDepart({
+  dossierId,
+  dateCible,
+  initiale,
+  aujourdhui,
+  className = "",
+}: DateDeDepartProps) {
+  const router = useRouter();
+  const [date, setDate] = useState(initiale);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const premiere = dateCible === null;
+
+  async function replanifier() {
+    if (date === "" || date === dateCible || envoi) return;
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler(`/api/dossiers/${dossierId}/echeancier`, {
+      methode: "PUT",
+      corps: { dateCible: date },
+    });
+    setEnvoi(false);
+    if (resultat.ok) {
+      router.refresh();
+      return;
+    }
+    setEchec(resultat.echec);
+  }
+
+  return (
+    <div className={`flex flex-col gap-3 ${className}`}>
       {/* Un formulaire (revue du 07/10/2026, M11) : Entrée dans la date
           replanifie. `noValidate` : la borne `min` ne doit pas ouvrir la
           bulle anglaise du navigateur, l'écran et le serveur disent déjà
           pourquoi une date est refusée. */}
       <form
         noValidate
-        aria-label="Replanifier le départ"
+        aria-label={premiere ? "Fixer la date de départ" : "Replanifier le départ"}
         onSubmit={(e) => {
           e.preventDefault();
           void replanifier();
         }}
-        className="flex flex-col gap-2 border-t border-ink-300 pt-3 md:flex-row md:items-end"
+        className="flex flex-col gap-2 md:flex-row md:items-end"
       >
         <Input
           type="date"
           name="dateCible"
-          libelle="Nouvelle date de départ visée"
-          aide="Tout l'échéancier est recalculé depuis les délais de ta procédure."
+          libelle={premiere ? "Date de départ visée" : "Nouvelle date de départ visée"}
+          aide={
+            premiere
+              ? "Rentrée ou prise de poste : tout l'échéancier se calcule à rebours depuis les délais de ta procédure."
+              : "Tout l'échéancier est recalculé depuis les délais de ta procédure."
+          }
           min={aujourdhui}
           value={date}
           onChange={(e) => setDate(e.target.value)}
@@ -135,16 +181,17 @@ export function Faisabilite({
         />
         <Button
           type="submit"
-          variante="secondaire"
+          variante={premiere ? "primaire" : "secondaire"}
           className="min-h-action md:w-auto"
           chargement={envoi}
           disabled={date === "" || date === dateCible}
+          raisonDesactivation={premiere ? "Choisis d'abord une date." : undefined}
         >
-          Replanifier
+          {premiere ? "Fixer la date" : "Replanifier"}
         </Button>
       </form>
 
       {echec ? <BlocEchec echec={echec} /> : null}
-    </section>
+    </div>
   );
 }
