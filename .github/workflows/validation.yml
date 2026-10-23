@@ -362,6 +362,13 @@ jobs:
         run: npm run smoke:depot
       - run: 'echo "- **Date réelle du dépôt** — relances sans rafale, préavis tenu, correction auditée" >> "$GITHUB_STEP_SUMMARY"'
 
+      # Suites d'une proposition de partenaire (WF-13, S.189) : propriété et
+      # dossier lus dans la requête, première suite retenue sous course,
+      # autorisation retirée au refus, commission au taux de la proposition.
+      - name: Suites d'une proposition de partenaire
+        run: npm run smoke:partenaires
+      - run: 'echo "- **Partenaires** — une seule suite sous course, refus qui retire le consentement, commission au taux annoncé" >> "$GITHUB_STEP_SUMMARY"'
+
       # Sans clé, il s'abstient et le dit — il ne rend pas vert ce qu'il
       # n'a pas éprouvé. Avec des clés de bac à sable, il ouvre pour de bon.
       - name: Bac à sable des fournisseurs

@@ -36,6 +36,7 @@
     "smoke:rappels": "tsx scripts/fumee-rappels.mts",
     "smoke:montee": "tsx scripts/fumee-montee.mts",
     "smoke:depot": "tsx scripts/fumee-depot.mts",
+    "smoke:partenaires": "tsx scripts/fumee-partenaires.mts",
     "smoke:files": "tsx scripts/fumee-files.mts",
     "smoke:transitions": "tsx scripts/fumee-transitions.mts",
     "smoke:publication": "tsx scripts/fumee-publication.mts",

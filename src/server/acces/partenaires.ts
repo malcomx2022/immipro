@@ -24,31 +24,50 @@ export async function enregistrerLaSuite(
   referralId: string,
   userId: string,
   suite: Suite,
+  /** Le dossier de l'adresse appelée : la proposition doit lui appartenir. */
+  applicationId: string,
   maintenant = new Date(),
 ): Promise<{ etat: string; url?: string }> {
   // La propriété se vérifie dans la requête, pas après lecture : un
-  // identifiant deviné ne doit pas rendre la ligne de quelqu'un d'autre.
+  // identifiant deviné ne doit pas rendre la ligne de quelqu'un d'autre,
+  // ni celle d'un autre dossier sous l'adresse de celui-ci.
   const ligne = await db.partnerReferral.findFirst({
-    where: { id: referralId, application: { userId } },
+    where: { id: referralId, applicationId, application: { userId } },
     include: { partner: { select: { url: true } } },
   });
   if (!ligne) throw echec("introuvable");
 
-  if (ligne.status !== "PROPOSEE") {
-    // Rejouée — double clic, reprise réseau — la même suite ne change rien
-    // et rend le même état. Une suite différente arrive trop tard : la
-    // première décision est celle qui a été prise.
-    return { etat: ligne.status };
-  }
-
   const etat = ETAT_APRES[suite];
-  await db.partnerReferral.update({
-    where: { id: referralId },
-    data: {
-      status: etat,
-      ...(etat === "REDIRIGEE" ? { redirectedAt: maintenant } : {}),
-    },
-  });
+  /*
+    S.189 — l'écriture est conditionnelle. Elle lisait `PROPOSEE` puis
+    écrivait sans condition : deux suites simultanées passaient toutes deux
+    la lecture, la dernière écrasait la première, et chaque réponse
+    annonçait sa propre issue — « redirigée » à l'un, « sans suite » en
+    base. Reproduit sur base jetable : dix-huit réponses contredites sur dix
+    courses. Seule la base sait qui est arrivé le premier.
+  */
+  const prise =
+    ligne.status === "PROPOSEE"
+      ? await db.partnerReferral.updateMany({
+          where: { id: referralId, status: "PROPOSEE" },
+          data: {
+            status: etat,
+            ...(etat === "REDIRIGEE" ? { redirectedAt: maintenant } : {}),
+          },
+        })
+      : { count: 0 };
+
+  if (prise.count === 0) {
+    // Rejouée — double clic, reprise réseau — ou devancée : la première
+    // décision est celle qui a été prise, et la réponse la dit.
+    const retenue = await db.partnerReferral.findUniqueOrThrow({
+      where: { id: referralId },
+      select: { status: true },
+    });
+    return retenue.status === "REDIRIGEE"
+      ? { etat: retenue.status, url: ligne.partner.url }
+      : { etat: retenue.status };
+  }
 
   if (suite === "NE_PLUS_PROPOSER") {
     await enregistrerLAutorisation(userId, "partenaires", false);
@@ -83,8 +102,10 @@ export async function enregistrerLAboutissement(
   if (ligne.status !== "REDIRIGEE") throw echec("etat_incompatible");
 
   const commission = commissionDue(montant, ligne.commissionBps);
-  await db.partnerReferral.update({
-    where: { id: referralId },
+  // Conditionnelle, comme la suite : deux déclarations simultanées
+  // n'écrivent qu'une commission, la seconde est refusée.
+  const prise = await db.partnerReferral.updateMany({
+    where: { id: referralId, status: "REDIRIGEE" },
     data: {
       status: "ABOUTIE",
       settledAt: maintenant,
@@ -92,5 +113,6 @@ export async function enregistrerLAboutissement(
       commissionCurrency: devise,
     },
   });
+  if (prise.count === 0) throw echec("etat_incompatible");
   return { commission };
 }

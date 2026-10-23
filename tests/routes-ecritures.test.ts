@@ -696,13 +696,18 @@ describe("WF-13 — suite donnée à une proposition partenaire", () => {
     expect(corpsAccepte(NOM, { suite: "ACCEPTER_TOUT" })).toBe(false);
   });
 
-  it("enregistre la suite pour le seul candidat connecté", async () => {
+  it("enregistre la suite pour le seul candidat connecté, sous le dossier de l'adresse", async () => {
     await definition(NOM).traiter({
       corps: { suite: "CONTINUER_SEUL" },
       params: { id: "dossier-1", referralId: "proposition-1" },
       acteur: CANDIDAT,
     });
-    expect(m.enregistrerSuite).toHaveBeenCalledWith("proposition-1", CANDIDAT.id, "CONTINUER_SEUL");
+    expect(m.enregistrerSuite).toHaveBeenCalledWith(
+      "proposition-1",
+      CANDIDAT.id,
+      "CONTINUER_SEUL",
+      "dossier-1",
+    );
   });
 });
 

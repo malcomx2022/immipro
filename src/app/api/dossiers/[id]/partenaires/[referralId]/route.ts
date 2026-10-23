@@ -23,6 +23,6 @@ export const POST = route({
     suite: z.enum(["CRENEAUX", "CONTINUER_SEUL", "NE_PLUS_PROPOSER"]),
   }),
   async traiter({ corps, params, acteur }) {
-    return enregistrerLaSuite(params.referralId!, acteur!.id, corps.suite);
+    return enregistrerLaSuite(params.referralId!, acteur!.id, corps.suite, params.id!);
   },
 });
