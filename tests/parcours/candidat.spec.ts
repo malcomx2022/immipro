@@ -18,18 +18,25 @@
  * un contexte de 1 280 px quel que soit le profil.
  */
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { suivreErreurs } from "./erreurs-navigateur";
 import {
+  INTERDITS_ECRAN_CANDIDAT,
+  verifierTexte,
+} from "../../src/domain/copy/vocabulaire-interdit";
+import {
   codeDeVerification,
   controlerLesFournisseurs,
+  echoirLaPurge,
   journal,
   lire,
   motDePasseDuBanc,
   origineDesFournisseurs,
+  perimerLaPiece,
   preparerDossierPret,
   preparerLettre,
+  purgerALaMain,
   statsDesFournisseurs,
   suppressionsDuStockage,
 } from "./fixtures";
@@ -331,6 +338,69 @@ test("simulateur au clavier : six réponses et recommandations calculées", asyn
     controle: "Six réponses au clavier et recommandations calculées",
     conforme: true,
   });
+});
+
+/**
+ * WF-03 — profils contrastés (S.188). Le premier geste ne jouait qu'un jeu
+ * de réponses : rien ne montrait que le classement suit le profil. Trois
+ * profils, dans un contexte vierge pour ne pas toucher à la simulation du
+ * candidat : chacun son classement, ses écarts chiffrés, sa source datée
+ * (INV-8), et aucun mot de la note de dossier ni promesse (INV-1, INV-2).
+ */
+test("WF-03 : trois profils contrastés, trois classements sourcés, écarts chiffrés", async () => {
+  const profils = [
+    ["Étudier", "Licence", "Plus de 12 millions F", "C1 et plus", "Rentrée de septembre 2027", "Seul"],
+    ["Travailler", "Master", "4 à 8 millions F", "B2 — avancé", "En 2028", "Avec mon conjoint"],
+    ["Étudier", "Baccalauréat", "Moins de 4 millions F", "Débutant", "Je ne sais pas encore", "Avec mes enfants"],
+  ];
+  const vierge = await context.browser()!.newContext({
+    viewport: { width: largeur, height: largeur === 390 ? 844 : 1000 },
+    ignoreHTTPSErrors: true,
+    baseURL: origineApp,
+  });
+  const p = await vierge.newPage();
+  suivis.push(suivreErreurs(p, moteur, origineApp));
+  const lus: { titre: string; retenues: string[]; ecartees: string[] }[] = [];
+  try {
+    for (const reponses of profils) {
+      await aller("/simulateur", p);
+      for (const [i, nom] of reponses.entries()) {
+        await p.getByRole("radio", { name: nom, exact: true }).click();
+        await p
+          .getByRole("button", { name: i === 5 ? "Voir mes destinations" : "Continuer", exact: true })
+          .click();
+      }
+      await p.waitForURL("**/resultats");
+      const titre = p.getByRole("heading", { level: 1 });
+      await expect(titre).not.toHaveText("Tes destinations");
+      await expect(p.getByText(/Information vérifiée le/u).first()).toBeVisible();
+      const lu = {
+        titre: (await titre.innerText()).trim(),
+        retenues: await p.locator("main .grid h2").allInnerTexts(),
+        ecartees: await p
+          .locator("main section")
+          .filter({ has: p.getByRole("heading", { name: /^(Destinations écartées|Ce qu'il manque)/u }) })
+          .locator("li")
+          .allInnerTexts(),
+      };
+      // Une destination écartée dit pourquoi, puis ce qui manque (RG-01.3).
+      for (const ecartee of lu.ecartees) expect(ecartee.trim().split("\n").length).toBeGreaterThanOrEqual(4);
+      expect(lu.retenues.length + lu.ecartees.length).toBeGreaterThan(0);
+      const texte = await p.locator("main").innerText();
+      expect(verifierTexte(texte, INTERDITS_ECRAN_CANDIDAT), texte).toEqual([]);
+      lus.push(lu);
+      await relever(p);
+    }
+  } finally {
+    await vierge.close();
+  }
+  const signatures = lus.map((l) => JSON.stringify(l));
+  expect(new Set(signatures).size).toBe(profils.length);
+  // Le profil sans budget ni langue n'a pas le classement du profil le mieux doté.
+  expect(lus[2]!.retenues).not.toEqual(lus[0]!.retenues);
+  // L'écart franchissable est chiffré : budget ou niveau de langue manquant.
+  expect(lus[2]!.ecartees.some((e) => /\d/u.test(e.trim().split("\n").at(-1)!))).toBe(true);
+  preuves.push({ controle: "WF-03 : trois profils, trois classements sourcés", classements: lus, conforme: true });
 });
 
 test("inscription : téléphone normalisé, code capturé, vérification par Entrée, tableau de bord vide", async () => {
@@ -998,6 +1068,214 @@ test("quota épuisé et reprise gratuite : dix analyses Essentiel, reprise aprè
   });
 });
 
+/** Le jour civil d'un fuseau, `AAAA-MM-JJ`, comme l'écrit le serveur. */
+const jourDans = (fuseau: string, instant = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: fuseau,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+
+const decaler = (jour: string, jours: number) =>
+  new Date(Date.parse(`${jour}T00:00:00Z`) + jours * 86_400_000).toISOString().slice(0, 10);
+
+const VERDICT_INTENABLE = /^(La date de dépôt est passée|Une pièce obligatoire ne peut plus arriver à temps|\d+ pièces obligatoires ne peuvent plus arriver à temps)$/u;
+
+/**
+ * R-C08, WF-09 — l'échéancier en navigateur (S.188). Le dossier a été ouvert
+ * « Je ne sais pas encore » : le candidat fixe sa date depuis l'échéancier,
+ * puis la rapproche jusqu'à rendre le calendrier intenable, et reprend la
+ * date proposée. Chaque geste est lu en base : la date cible et les
+ * échéances recalculées depuis la règle figée (INV-3).
+ */
+test("échéancier : date fixée depuis l'écran, calendrier intenable, date proposée reprise", async () => {
+  const echeances = () =>
+    lire<{ code: string; dueDate: string }>(
+      `SELECT code, to_char("dueDate", 'YYYY-MM-DD') AS "dueDate" FROM "Deadline" WHERE "applicationId"=$1 ORDER BY code`,
+      [dossier],
+    );
+  const cible = async () =>
+    (
+      await lire<{ t: string | null }>(
+        `SELECT to_char("targetDate", 'YYYY-MM-DD') AS t FROM "Application" WHERE id=$1`,
+        [dossier],
+      )
+    )[0]!.t;
+  expect(await cible()).toBeNull();
+  expect(await echeances()).toHaveLength(0);
+
+  await aller(`/dossiers/${dossier}`);
+  await page.getByRole("link", { name: "Échéancier", exact: true }).click();
+  await page.waitForURL(`**/dossiers/${dossier}/echeancier`);
+  await relever();
+  const champ = page.getByLabel(/date de départ visée/u);
+  await expect(champ).toBeVisible();
+  const aujourdhui = (await champ.getAttribute("min")) ?? "";
+  expect(aujourdhui).toBe(jourDans("Africa/Porto-Novo"));
+
+  // Une date lointaine : le calendrier se pose et tient.
+  const lointaine = decaler(aujourdhui, 400);
+  await champ.fill(lointaine);
+  await champ.press("Enter");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Échéancier");
+  await expect.poll(cible).toBe(lointaine);
+  const posees = await echeances();
+  expect(posees.length).toBeGreaterThan(0);
+  await expect(page.getByRole("heading", { level: 2, name: VERDICT_INTENABLE })).toHaveCount(0);
+  await relever();
+
+  // Une date trop proche : le dépôt tomberait derrière nous.
+  const proche = decaler(aujourdhui, 10);
+  const nouvelle = page.getByLabel("Nouvelle date de départ visée");
+  await nouvelle.fill(proche);
+  await page.getByRole("button", { name: "Replanifier", exact: true }).click();
+  await expect.poll(cible).toBe(proche);
+  const verdict = page.getByRole("heading", { level: 2, name: VERDICT_INTENABLE });
+  await expect(verdict).toBeVisible();
+  await expect(page.getByText(/la première date de départ compatible avec les délais connus est le/u)).toBeVisible();
+  const rapprochees = await echeances();
+  expect(rapprochees.map((e) => e.code)).toEqual(posees.map((e) => e.code));
+  expect(rapprochees).not.toEqual(posees);
+
+  // Le champ part de la date proposée : la reprendre suffit.
+  await expect(nouvelle).not.toHaveValue(proche);
+  const proposee = await nouvelle.inputValue();
+  expect(proposee > proche).toBe(true);
+  await page.getByRole("button", { name: "Replanifier", exact: true }).click();
+  await expect.poll(cible).toBe(proposee);
+  await expect(verdict).toHaveCount(0);
+  await relever();
+  preuves.push({
+    controle: "R-C08 échéancier : date fixée depuis l'écran, échéances posées puis recalculées, intenable signalé, date proposée reprise",
+    dates: { lointaine, proche, proposee },
+    conforme: true,
+  });
+});
+
+/**
+ * R-K06, RG-09.4 — le changement de fuseau (S.188). Les rappels suivent la
+ * ville choisie par le candidat, et la phrase qui les annonce la nomme ;
+ * l'aujourd'hui du dépôt se lit dans ce fuseau (S.89). Le reste de l'écran
+ * date à l'heure de Cotonou, quel que soit le fuseau du navigateur : un
+ * second navigateur réglé sur Kiritimati (UTC+14) lit le même échéancier.
+ */
+test("fuseau : rappels réglés sur Toronto, échéancier identique depuis un navigateur à UTC+14", async () => {
+  await aller(`/dossiers/${dossier}/echeancier`);
+  await page.getByRole("link", { name: "Modifier mes rappels", exact: true }).click();
+  await page.waitForURL("**/compte/rappels**");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mes rappels d'échéance");
+  await relever();
+  const phrase = page.getByRole("heading", { name: "Ce qui partira" }).locator("..");
+  await expect(phrase).toContainText("heure de Cotonou, Porto-Novo");
+  await page.getByLabel("Mon fuseau horaire").selectOption("America/Toronto");
+  await page.getByRole("radio", { name: /^Quatorze jours avant/u }).click();
+  await expect(phrase).toContainText("heure de Montréal, Toronto");
+  await expect(phrase).toContainText("moins de quatorze jours");
+  await page.getByRole("button", { name: "Enregistrer mes réglages", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText(/Tes réglages sont enregistrés/u);
+  const [reglages] = await lire<{ fuseau: string; jours: number }>(
+    'SELECT "reminderTimeZone" AS fuseau, "reminderLeadDays" AS jours FROM "User" WHERE id=$1',
+    [compte],
+  );
+  expect(reglages).toEqual({ fuseau: "America/Toronto", jours: 14 });
+
+  await page.getByRole("link", { name: "Revenir à l'échéancier", exact: true }).click();
+  await page.waitForURL(`**/dossiers/${dossier}/echeancier`);
+  await expect(page.getByText(/heure de Montréal, Toronto/u)).toBeVisible();
+
+  // Le fuseau du navigateur ne déplace aucune date affichée.
+  const ailleurs = await context.browser()!.newContext({
+    viewport: { width: largeur, height: largeur === 390 ? 844 : 1000 },
+    ignoreHTTPSErrors: true,
+    baseURL: origineApp,
+    timezoneId: "Pacific/Kiritimati",
+    storageState: await context.storageState(),
+  });
+  try {
+    const loin = await ailleurs.newPage();
+    suivis.push(suivreErreurs(loin, moteur, origineApp));
+    await aller(`/dossiers/${dossier}/echeancier`, loin);
+    await aller(`/dossiers/${dossier}/echeancier`);
+    await attendreLHydratation(loin, "main");
+    await attendreLHydratation(page, "main");
+    expect(await loin.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe(
+      "Pacific/Kiritimati",
+    );
+    expect(await loin.locator("main").innerText()).toBe(await page.locator("main").innerText());
+    expect(await loin.getByLabel("Nouvelle date de départ visée").getAttribute("min")).toBe(
+      jourDans("Africa/Porto-Novo"),
+    );
+  } finally {
+    await ailleurs.close();
+  }
+  preuves.push({
+    controle: "R-K06 fuseau : Toronto et quatorze jours enregistrés, phrase recalculée, échéancier identique depuis un navigateur à UTC+14",
+    conforme: true,
+  });
+});
+
+/**
+ * R-K06, RG-06.6/RG-07.4 — la pièce périmée (S.188). Le dossier est prêt ;
+ * trois mois passent sur le justificatif de ressources (précondition
+ * explicite). L'écran le déclasse sans attendre la passe de nuit : la pièce
+ * se lit expirée, la prochaine action dit de la remplacer, le dépôt ne se
+ * déclare plus. Le remède est le geste du candidat : une version neuve,
+ * qui repose sa péremption.
+ */
+test("pièce périmée : déclassée à l'affichage, dépôt refusé, version neuve qui repose la péremption", async () => {
+  await preparerDossierPret(dossier, email);
+  await aller(`/dossiers/${dossier}`);
+  await expect(page.getByRole("heading", { name: "Ton dossier est prêt", exact: true })).toBeVisible();
+  await perimerLaPiece(dossier, email, "preuve_fonds");
+  const [fonds] = await lire<{ id: string; label: string }>(
+    'SELECT id, label FROM "Document" WHERE "applicationId"=$1 AND code=$2',
+    [dossier, "preuve_fonds"],
+  );
+  await aller(`/dossiers/${dossier}`);
+  await relever();
+  await expect(page.getByText(/Prochaine action : Remplacer ton justificatif/u)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ton dossier est prêt", exact: true })).toHaveCount(0);
+  const veille = decaler(jourDans("UTC"), -1);
+  const refus = await page.evaluate(
+    async ([d, jour]) =>
+      (
+        await fetch(`/api/dossiers/${d}/depot`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deposeLe: jour }),
+        })
+      ).status,
+    [dossier, veille] as const,
+  );
+  expect(refus).toBeGreaterThanOrEqual(400);
+  expect(refus).toBeLessThan(500);
+  const [toujours] = await lire<{ status: string }>('SELECT status FROM "Application" WHERE id=$1', [
+    dossier,
+  ]);
+  expect(toujours!.status).not.toBe("SOUMIS");
+
+  await aller(`/dossiers/${dossier}/pieces/${fonds!.id}`);
+  await relever();
+  await expect(page.getByText(/Validité dépassée depuis le/u).first()).toBeVisible();
+  const avant = (await versions(fonds!.id)).length;
+  await page.getByRole("button", { name: /^(Remplacer la pièce|Téléverser une autre version|Ajouter la pièce)$/u }).first().click();
+  await deposer(page, "L01.pdf", "Ajouter la pièce");
+  await expect.poll(async () => (await versions(fonds!.id)).length, { timeout: 30_000 }).toBe(avant + 1);
+  // La lecture arrive avant la suite : elle récrit l'état de la pièce.
+  await attendreLAnalyse(fonds!.id, avant + 1);
+  const [reposee] = await lire<{ jusquau: string }>(
+    `SELECT to_char("expiresAt", 'YYYY-MM-DD') AS jusquau FROM "Document" WHERE id=$1`,
+    [fonds!.id],
+  );
+  expect(reposee!.jusquau > jourDans("UTC")).toBe(true);
+  preuves.push({
+    controle: "R-K06 péremption : pièce périmée déclassée à l'affichage, dépôt refusé, version neuve et péremption reposée",
+    conforme: true,
+    fixture: true,
+  });
+});
+
 test("déclaration du dépôt, conservation annoncée, dossier figé, clôture et purge annoncée", async () => {
   await preparerDossierPret(dossier, email);
   await aller(`/dossiers/${dossier}`);
@@ -1014,6 +1292,8 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
   const champDate = page.getByLabel("Quand as-tu déposé ta demande ?");
   const aujourdhui = (await champDate.getAttribute("max")) ?? "";
   expect(aujourdhui).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
+  // Depuis le geste du fuseau, ce jour est celui de Toronto (RG-09.4, S.89).
+  expect([jourDans("America/Toronto"), jourDans("America/Toronto", new Date(Date.now() - 60_000))]).toContain(aujourdhui);
   const bouton = page.getByRole("button", { name: "Déclarer mon dépôt", exact: true });
   await expect(bouton).toBeDisabled();
   await champDate.fill("2020-01-01");
@@ -1089,6 +1369,200 @@ test("déclaration du dépôt, conservation annoncée, dossier figé, clôture e
     conforme: true,
     fixture: true,
   });
+});
+
+/**
+ * R-C09, RG-10.9 — la purge effective (S.188). La clôture l'annonçait ;
+ * l'échéance est ramenée à la minute passée (précondition explicite), puis
+ * la purge de rétention est lancée à la main par un opérateur nommé, avec
+ * la commande d'exploitation (S.152). L'archive que le candidat consulte
+ * le dit, pièce par pièce, et plus rien ne s'y télécharge.
+ */
+test("purge effective : échéance atteinte, purge lancée à la main, archive sans fichier", async () => {
+  await aller(`/dossiers/${dossier}/archive`);
+  const telechargements = page.getByRole("button", { name: "Télécharger le fichier", exact: true });
+  await expect(telechargements.first()).toBeVisible();
+  const [avant] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "DocumentVersion" v JOIN "Document" d ON d.id = v."documentId"
+     WHERE d."applicationId"=$1 AND v."objectKey" IS NOT NULL AND v."purgedAt" IS NULL`,
+    [dossier],
+  );
+  expect(Number(avant!.n)).toBeGreaterThan(0);
+
+  await echoirLaPurge(dossier, email);
+  const par = `Recette S.188 ${moteur}-${largeur}`;
+  const passe = purgerALaMain(par);
+  expect(passe.code, passe.sortie).toBe(0);
+  expect(passe.sortie).toMatch(/Dossiers purgés : [1-9]/u);
+
+  const [purge] = await lire<{ purgedAt: string | null; restantes: string }>(
+    `SELECT a."purgedAt",
+       (SELECT count(*) FROM "DocumentVersion" v JOIN "Document" d ON d.id = v."documentId"
+        WHERE d."applicationId" = a.id AND v."purgedAt" IS NULL AND v."objectKey" IS NOT NULL) AS restantes
+     FROM "Application" a WHERE a.id=$1`,
+    [dossier],
+  );
+  expect(purge!.purgedAt).not.toBeNull();
+  expect(purge!.restantes).toBe("0");
+  const [journalise] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE "actorId"=$1 AND target LIKE $2`,
+    [`console:${par}`, `%${dossier}%`],
+  );
+  expect(Number(journalise!.n)).toBeGreaterThan(0);
+
+  await aller(`/dossiers/${dossier}/archive`);
+  await relever();
+  await expect(telechargements).toHaveCount(0);
+  await expect(page.getByText(/Supprimée le/u).first()).toBeVisible();
+  // L'autre dossier du compte n'est pas touché.
+  const [autre] = await lire<{ purgedAt: string | null }>(
+    'SELECT "purgedAt" FROM "Application" WHERE id=$1',
+    [second],
+  );
+  expect(autre!.purgedAt).toBeNull();
+  preuves.push({
+    controle: "R-C09 purge effective : échéance atteinte, purge à la main sous le nom de l'opérateur, versions vidées, archive sans fichier",
+    conforme: true,
+    fixture: true,
+  });
+});
+
+/**
+ * R-C09, WF-02 — la portabilité (S.188). Le fichier que le candidat
+ * télécharge depuis « Mes données » : ses deux dossiers, le purgé compris,
+ * et rien d'un autre compte. L'export est journalisé à son nom.
+ */
+test("portabilité : export de mes données, deux dossiers, aucun autre compte, export journalisé", async ({}, info) => {
+  await aller("/compte/mes-donnees");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mes données");
+  await relever();
+  const [telechargement] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Télécharger mes données", exact: true }).click(),
+  ]);
+  await expect(page.getByText("Le fichier est dans tes téléchargements.")).toBeVisible();
+  expect(telechargement.suggestedFilename()).toMatch(/\.json$/u);
+  const fichier = info.outputPath("mes-donnees.json");
+  await telechargement.saveAs(fichier);
+  const brut = readFileSync(fichier, "utf8");
+  const donnees = JSON.parse(brut) as { dossiers: { id: string }[] };
+  expect(donnees.dossiers.map((d) => d.id).sort()).toEqual([dossier, second].sort());
+  // Une seule adresse dans le fichier : celle du titulaire.
+  expect([...new Set(brut.match(/[\w.+-]+@[\w.-]+\.\w+/gu) ?? [])]).toEqual([email]);
+  expect(brut).not.toContain("objectKey");
+  const [exporte] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE action = 'compte.export' AND target = $1`,
+    [`user:${compte}`],
+  );
+  expect(exporte!.n).toBe("1");
+  preuves.push({ controle: "R-C09 portabilité : export JSON de deux dossiers, sans autre compte, journalisé", conforme: true });
+});
+
+/**
+ * R-I04, WF-15 — B-04 au-delà du tableau (S.188) : le rapprochement lancé
+ * à la main rend son compte rendu, et le grand livre exporté porte le
+ * paiement scripté du candidat. Ni remboursement ni avoir : R-O04 attend
+ * un rail réel (M.C).
+ */
+test("B-04 : rapprochement lancé à la main, grand livre exporté avec le paiement du candidat", async ({}, info) => {
+  const b = await administration();
+  await aller("/paiements", b);
+  await b.getByRole("button", { name: "Lancer le rapprochement", exact: true }).click();
+  await expect(b.getByRole("button", { name: "Lancer le rapprochement", exact: true })).toBeEnabled({
+    timeout: 60_000,
+  });
+  await expect(b.getByRole("status").or(b.getByRole("alert")).first()).toBeVisible();
+  const [telechargement] = await Promise.all([
+    b.waitForEvent("download"),
+    b.getByRole("button", { name: "Exporter le grand livre", exact: true }).click(),
+  ]);
+  const fichier = info.outputPath("grand-livre.csv");
+  await telechargement.saveAs(fichier);
+  const livre = readFileSync(fichier, "utf8");
+  const [tx] = await lire<{ reference: string }>(
+    'SELECT reference FROM "Transaction" WHERE "applicationId"=$1',
+    [dossier],
+  );
+  expect(livre).toContain(tx!.reference);
+  preuves.push({ controle: "R-I04 B-04 : rapprochement à la main et grand livre exporté", conforme: true });
+});
+
+/**
+ * R-I04, B-08 — un article, du brouillon à la publication (S.188). Un
+ * brouillon qui promet s'enregistre ; sa publication est refusée par
+ * l'écran et par la route. La négation passe, la source et la date de
+ * vérification sont exigées (INV-8), la page publique les porte, et le
+ * retrait la ferme. Un article neuf par profil : le référentiel éditorial
+ * de la graine n'est pas touché.
+ */
+test("B-08 : brouillon qui promet enregistré, publication refusée, négation publiée, retrait", async () => {
+  const b = await administration();
+  const titre = `Recette S.188 ${moteur} ${largeur} ${process.hrtime.bigint()}`;
+  await aller("/contenus", b);
+  await b.getByRole("button", { name: "Nouveau document", exact: true }).click();
+  await b.getByRole("radio", { name: "Article", exact: true }).click();
+  await b.getByLabel("Titre", { exact: true }).fill(titre);
+  await b.getByLabel("Rubrique", { exact: true }).fill("Recette");
+  await b.getByLabel("Auteur", { exact: true }).fill("Équipe ImmiPro");
+  await b.getByRole("button", { name: "Créer le brouillon", exact: true }).click();
+  await b.waitForURL(/\/contenus\/[a-f0-9-]+$/u);
+  const id = b.url().split("/").at(-1)!;
+  const etat = async () =>
+    (
+      await lire<{ status: string; standfirst: string; slug: string }>(
+        'SELECT status, standfirst, slug FROM "EditorialDoc" WHERE id=$1',
+        [id],
+      )
+    )[0]!;
+
+  // Le brouillon s'enregistre, même s'il promet ; la publication, non.
+  await b.getByLabel("Chapeau", { exact: true }).fill("Visa garanti en trois semaines pour tous les profils.");
+  await b.getByLabel("Texte", { exact: true }).first().fill("Les étapes de la demande, dans l'ordre.");
+  await b.getByLabel("Source", { exact: true }).fill("ind.nl");
+  await b.getByLabel("Vérifiée le", { exact: true }).fill(jourDans("Africa/Porto-Novo"));
+  await b.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await expect(b.getByText("Enregistré.")).toBeVisible();
+  expect((await etat()).standfirst).toContain("Visa garanti");
+  await b.getByLabel("Motif", { exact: true }).fill("Recette S.188 — publication");
+  await expect(b.getByRole("button", { name: "Publier", exact: true })).toBeDisabled();
+  const refus = await b.evaluate(
+    async (d) =>
+      (
+        await fetch(`/api/admin/contenus/${d}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "publier", motif: "Recette S.188 — contournement" }),
+        })
+      ).status,
+    id,
+  );
+  expect(refus).toBeGreaterThanOrEqual(400);
+  expect(refus).toBeLessThan(500);
+  expect((await etat()).status).toBe("BROUILLON");
+
+  // La négation n'est pas une promesse : elle se publie, avec sa source.
+  await b
+    .getByLabel("Chapeau", { exact: true })
+    .fill("ImmiPro ne garantit pas l'obtention du visa. Cet article décrit les étapes de la demande.");
+  await b.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await expect(b.getByText("Enregistré.")).toBeVisible();
+  await b.getByLabel("Motif", { exact: true }).fill("Recette S.188 — publication");
+  await b.getByRole("button", { name: "Publier", exact: true }).click();
+  await expect(b.getByText(/^Publié — \/articles\//u)).toBeVisible();
+  const publie = await etat();
+  expect(publie.status).toBe("PUBLIE");
+  await aller(`/articles/${publie.slug}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(titre);
+  await expect(page.getByText(/Information vérifiée le/u).first()).toBeVisible();
+  await relever();
+
+  await b.getByLabel("Motif", { exact: true }).fill("Recette S.188 — retrait");
+  await b.getByRole("button", { name: "Retirer de la publication", exact: true }).click();
+  await expect(b.getByText("Retiré de la publication.")).toBeVisible();
+  expect((await etat()).status).not.toBe("PUBLIE");
+  const ferme = await page.request.get(`/articles/${publie.slug}`);
+  expect(ferme.status()).toBe(404);
+  preuves.push({ controle: "R-I04 B-08 : brouillon qui promet enregistré, publication refusée (écran et route), négation publiée sourcée, retrait", conforme: true });
 });
 
 /**

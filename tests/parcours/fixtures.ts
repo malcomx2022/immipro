@@ -1,11 +1,13 @@
 /**
  * Préconditions et lectures de la recette L6, dans la seule base jetable du
- * banc `--parcours`. Les lectures sont en transaction `READ ONLY` ; les deux
+ * banc `--parcours`. Les lectures sont en transaction `READ ONLY` ; les
  * préconditions n'écrivent que sur le candidat synthétique de l'exécution
- * (`l6-…@immipro.test`), jamais sur un référentiel.
+ * (`l6-…@immipro.test`), jamais sur un référentiel. La purge à la main est
+ * la commande d'exploitation elle-même, lancée sur le banc.
  */
 import { Client } from "pg";
 import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 export const BASE = "immipro_recette_parcours";
@@ -139,4 +141,69 @@ export async function preparerDossierPret(dossier: string, email: string): Promi
       [dossier],
     );
   });
+}
+
+/**
+ * Précondition explicite RG-06.6 (S.188) : le temps a passé sur une pièce
+ * périssable. Sa date de péremption, posée au dépôt depuis la durée de
+ * validité, est ramenée à la veille ; seulement pour une pièce conforme du
+ * candidat synthétique. Le déclassement à l'affichage, l'écran et le
+ * remède restent ceux de l'application.
+ */
+export async function perimerLaPiece(dossier: string, email: string, code: string): Promise<void> {
+  await avec(async (db) => {
+    await dossierDuCandidat(db, dossier, email);
+    const r = await db.query(
+      `UPDATE "Document" SET "expiresAt" = current_date - 1
+       WHERE "applicationId" = $1 AND code = $2 AND status = 'CONFORME' AND "validityMonths" IS NOT NULL`,
+      [dossier, code],
+    );
+    if (r.rowCount !== 1) throw Error(`Aucune pièce périssable conforme « ${code} » à vieillir.`);
+  });
+}
+
+/**
+ * Précondition explicite RG-10.9 (S.188) : l'échéance de purge annoncée à
+ * la clôture est atteinte. Seulement sur un dossier clôturé du candidat
+ * synthétique, dont la purge est annoncée et pas encore faite.
+ */
+export async function echoirLaPurge(dossier: string, email: string): Promise<void> {
+  await avec(async (db) => {
+    await dossierDuCandidat(db, dossier, email);
+    const r = await db.query(
+      `UPDATE "Application" SET "purgeDueAt" = now() - interval '1 minute'
+       WHERE id = $1 AND "purgeDueAt" IS NOT NULL AND "purgedAt" IS NULL
+         AND status IN ('ISSUE_DECLAREE', 'CLOTURE', 'ABANDONNE')`,
+      [dossier],
+    );
+    if (r.rowCount !== 1) throw Error("Aucune purge annoncée à faire échoir sur ce dossier.");
+  });
+}
+
+/**
+ * La purge de rétention lancée à la main par un opérateur nommé (S.152) :
+ * la commande d'exploitation elle-même, sur la base et le stockage du banc.
+ */
+export function purgerALaMain(par: string): { code: number | null; sortie: string } {
+  const port = /stockage S3 : http:\/\/localhost:(\d+)/u.exec(journal())?.[1];
+  if (!port) throw Error("Port du stockage du banc absent du journal.");
+  const r = spawnSync("npx", ["tsx", "scripts/purge-retention.mts", "--par", par], {
+    encoding: "utf8",
+    timeout: 120_000,
+    env: {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      NODE_ENV: "production",
+      DATABASE_URL: cible(),
+      MINIO_ENDPOINT: "127.0.0.1",
+      MINIO_PORT: port,
+      MINIO_USE_SSL: "false",
+      MINIO_ROOT_USER: "essai",
+      MINIO_ROOT_PASSWORD: "essai-mot-de-passe",
+      MINIO_BUCKET_DOCUMENTS: "immipro-documents",
+      MINIO_BUCKET_QUARANTAINE: "immipro-quarantaine",
+      MINIO_PUBLIC_URL: `http://localhost:${port}`,
+    },
+  });
+  return { code: r.status, sortie: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
