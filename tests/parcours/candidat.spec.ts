@@ -9,7 +9,8 @@
  * B-05, retrait du consentement, rédaction assistée, double onglet, quota
  * épuisé et reprise gratuite, échéancier, fuseau, pièce périmée,
  * déclaration du dépôt, clôture, purge effective et portabilité ; puis, au
- * bureau, B-04 et B-08, publication par un second lecteur et arbitrage
+ * bureau, B-04, B-08, B-03, B-06, veille et textes juridiques,
+ * publication par un second lecteur et arbitrage
  * (R-O03), et suppression du compte pendant une panne du stockage, puis
  * reprise (R-O05).
  *
@@ -1598,6 +1599,180 @@ test("B-08 : brouillon qui promet enregistré, publication refusée, négation p
   const ferme = await page.request.get(`/articles/${publie.slug}`);
   expect(ferme.status()).toBe(404);
   preuves.push({ controle: "R-I04 B-08 : brouillon qui promet enregistré, publication refusée (écran et route), négation publiée sourcée, retrait", conforme: true });
+});
+
+/**
+ * R-I04, B-03 — suspendre puis rétablir un compte (S.191). Le motif court
+ * est refusé à l'écran (O-4, dix caractères) ; la suspension ferme les
+ * sessions ouvertes et la connexion est refusée ; le rétablissement rend
+ * l'accès, et les deux gestes sont au journal avec leur motif. Le compte
+ * est celui du candidat synthétique, reconnecté à la fin pour R-O05.
+ */
+test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablissement", async () => {
+  const b = await administration();
+  const etat = async () =>
+    (
+      await lire<{ suspendu: boolean; sessions: string }>(
+        `SELECT "suspendedAt" IS NOT NULL AS suspendu,
+           (SELECT count(*) FROM "Session" s WHERE s."userId" = u.id) AS sessions
+         FROM "User" u WHERE u.id = $1`,
+        [compte],
+      )
+    )[0]!;
+  expect((await etat()).suspendu).toBe(false);
+  expect(Number((await etat()).sessions)).toBeGreaterThan(0);
+
+  await aller("/utilisateurs", b);
+  await b.getByRole("searchbox", { name: "Rechercher" }).fill(email);
+  await b.getByRole("option").filter({ hasText: email }).click();
+  const suspendre = b.getByRole("button", { name: "Suspendre le compte", exact: true });
+  await b.getByLabel("Motif de la décision", { exact: true }).fill("abus");
+  await expect(suspendre).toBeDisabled();
+  await expect(b.getByText(/en 10 caractères au moins/u).first()).toBeVisible();
+  await b.getByLabel("Motif de la décision", { exact: true }).fill(`Recette S.191 ${moteur}-${largeur} : suspension éprouvée`);
+  await suspendre.click();
+  await expect(b.getByRole("status")).toHaveText(/Compte suspendu/u);
+  await expect.poll(async () => (await etat()).suspendu).toBe(true);
+  expect((await etat()).sessions).toBe("0");
+
+  // La session du candidat est fermée, et la connexion est refusée.
+  await page.goto(`/dossiers/${dossier}`);
+  await page.waitForURL(/\/connexion/u);
+  await page.getByLabel("Adresse email", { exact: true }).fill(email);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
+  await page.getByLabel("Mot de passe", { exact: true }).press("Enter");
+  await expect(page.getByRole("alert").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/connexion/u);
+
+  await b.getByLabel("Motif de la décision", { exact: true }).fill(`Recette S.191 ${moteur}-${largeur} : rétablissement`);
+  await b.getByRole("button", { name: "Rétablir le compte", exact: true }).click();
+  await expect(b.getByRole("status")).toHaveText(/Compte rétabli/u);
+  await expect.poll(async () => (await etat()).suspendu).toBe(false);
+  await connecter(page, email, MOT_DE_PASSE);
+
+  const [journalise] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE target = $1 AND reason LIKE $2`,
+    [`user:${compte}`, `Recette S.191 ${moteur}-${largeur}%`],
+  );
+  expect(journalise!.n).toBe("2");
+  preuves.push({ controle: "R-I04 B-03 : motif court refusé, suspension qui ferme les sessions, connexion refusée, rétablissement journalisé", conforme: true });
+});
+
+/**
+ * R-I04, B-06 — habiliter un consultant sur une destination, puis retirer
+ * l'habilitation (S.191, RG-12.1). Titre et motif sont exigés avant le
+ * clic ; la ligne retirée reste, datée. Suisse, pour ne pas toucher à
+ * l'habilitation néerlandaise de la graine.
+ */
+test("B-06 : titre et motif exigés, habilitation vérifiée puis retirée, journal", async () => {
+  const b = await administration();
+  const habilitation = async () =>
+    (
+      await lire<{ titre: string; retiree: boolean }>(
+        `SELECT a.title AS titre, a."revokedAt" IS NOT NULL AS retiree FROM "Accreditation" a
+         JOIN "Consultant" c ON c.id = a."consultantId"
+         WHERE c.name = 'Marieke Visser' AND a."countryCode" = 'CH'`,
+      )
+    )[0] ?? null;
+  const motif = `Registre vaudois consulté — recette S.191 ${moteur}-${largeur}`;
+  await aller("/habilitations", b);
+  const fiche = b.locator("article").filter({ hasText: "Marieke Visser" });
+  const habiliter = fiche.getByRole("button", { name: "Habiliter", exact: true });
+  await expect(habiliter).toBeDisabled();
+  await expect(fiche.getByText("Indique le titre vérifié.").first()).toBeVisible();
+  await fiche.getByLabel("Juridiction").selectOption("CH");
+  await fiche.getByLabel("Titre vérifié").fill("Avocate au barreau de Lausanne");
+  await expect(habiliter).toBeDisabled();
+  await fiche.getByLabel("Motif").fill(motif);
+  await habiliter.click();
+  await expect.poll(habilitation).toEqual({ titre: "Avocate au barreau de Lausanne", retiree: false });
+
+  const ligne = fiche.locator("li").filter({ hasText: "Avocate au barreau de Lausanne" });
+  await expect(ligne.getByRole("button", { name: "Retirer", exact: true })).toBeVisible();
+  await fiche.getByLabel("Motif").fill(motif);
+  await ligne.getByRole("button", { name: "Retirer", exact: true }).click();
+  await expect.poll(async () => (await habilitation())?.retiree).toBe(true);
+  await expect(ligne.getByText(/retiré le/u)).toBeVisible();
+  const [journalise] = await lire<{ actions: string }>(
+    `SELECT string_agg(action, ',' ORDER BY "createdAt") AS actions FROM "AuditLog" WHERE reason = $1`,
+    [motif],
+  );
+  expect(journalise!.actions).toBe("consultant.habiliter,consultant.retirer");
+  preuves.push({ controle: "R-I04 B-06 : titre et motif exigés, habilitation puis retrait datés et journalisés", conforme: true });
+});
+
+/**
+ * R-I04, WF-14 étape 2 — un relevé de veille (S.191). Un écart sans note
+ * ne se consigne pas ; avec sa note, il s'écrit au relevé et s'affiche sur
+ * la fiche, sans déplacer les dates de vérification. « À jour » n'est pas
+ * joué : il sortirait la fiche suisse de la file pour les profils suivants.
+ */
+test("veille : écart sans note refusé, écart noté consigné sans toucher aux dates", async () => {
+  const b = await administration();
+  const fiche = async () =>
+    (
+      await lire<{ verifie: string; source: string }>(
+        `SELECT to_char("verifiedAt", 'YYYY-MM-DD') AS verifie, "sourceUrl" AS source
+         FROM "VisaRule" WHERE "countryCode" = 'CH' AND status = 'PUBLISHED' ORDER BY version DESC LIMIT 1`,
+      )
+    )[0]!;
+  const avant = await fiche();
+  const note = `Montant mensuel modifié sur la source — recette S.191 ${moteur}-${largeur}`;
+  const releve = async () =>
+    (
+      await lire<{ n: string }>(
+        `SELECT count(*) AS n FROM "SourceCheck" WHERE "sourceUrl" = $1 AND difference = $2`,
+        [avant.source, note],
+      )
+    )[0]!.n;
+  await aller("/veille", b);
+  await b.getByRole("button", { name: "Toutes", exact: true }).click();
+  await b.getByRole("option").filter({ hasText: "CH" }).first().click();
+  await b.getByRole("radio", { name: /^À arbitrer/u }).click();
+  const consigner = b.getByRole("button", { name: "Consigner ce relevé", exact: true });
+  await expect(consigner).toBeDisabled();
+  await expect(b.getByText(/le relevé se relit dans six mois/u).first()).toBeVisible();
+  await b.getByLabel("Ce qui a changé sur la source").fill(note);
+  await consigner.click();
+  await expect.poll(releve).toBe("1");
+  await expect(b.getByText(note).first()).toBeVisible();
+  expect((await fiche()).verifie).toBe(avant.verifie);
+  preuves.push({ controle: "R-I04 veille : écart sans note refusé, écart noté consigné et affiché, dates inchangées", conforme: true });
+});
+
+/**
+ * R-I04, textes juridiques (S.191). Une variable mal formée est refusée à
+ * l'écran et par la route, sans rien écrire ; la validation d'un texte
+ * exige l'attestation de relecture. Rien n'est publié : la relecture d'un
+ * juriste ne se simule pas (Q.A).
+ */
+test("textes juridiques : variable refusée à l'écran et par la route, validation sans attestation impossible", async () => {
+  const b = await administration();
+  const valeur = async () =>
+    (
+      await lire<{ value: string }>(`SELECT value FROM "LegalVariable" WHERE key = 'email_contact'`)
+    )[0]?.value ?? null;
+  const avant = await valeur();
+  await aller("/textes-juridiques", b);
+  const champ = b.getByLabel("Adresse électronique de contact", { exact: true });
+  await champ.fill("pas-une-adresse");
+  await expect(b.getByText("n'est pas une adresse électronique", { exact: false }).first()).toBeVisible();
+  await expect(b.getByRole("button", { name: /^Enregistrer/u })).toBeDisabled();
+  const refus = await b.evaluate(async () => {
+    const r = await fetch("/api/admin/textes-juridiques/variables", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ valeurs: { email_contact: "pas-une-adresse" } }),
+    });
+    return r.status;
+  });
+  expect(refus).toBeGreaterThanOrEqual(400);
+  expect(refus).toBeLessThan(500);
+  expect(await valeur()).toBe(avant);
+  await champ.fill(avant ?? "");
+  const valider = b.getByRole("button", { name: "Valider et publier", exact: true }).first();
+  await expect(valider).toBeDisabled();
+  preuves.push({ controle: "R-I04 textes juridiques : variable refusée (écran et route), rien d'écrit, validation fermée sans attestation", conforme: true });
 });
 
 /**

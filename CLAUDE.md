@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.191 — formulaires du back-office en navigateur — 23/10/2026
+
+Lot dédié demandé par le responsable. Base `8a4eaba` (#312 fusionnée). Quatre
+parcours au bureau, lus en base : B-03 suspension et rétablissement
+(motif court refusé, sessions fermées, reconnexion), B-06 habilitation
+puis retrait, veille (écart noté, jamais « à jour » : il viderait la
+file des profils suivants), variables juridiques refusées sans rien
+écrire. Rejouables sur les six profils d'un banc ; aucun texte juridique
+publié (Q.A). Aucun défaut relevé. Lire
+[la revue, § 16](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.190 — O-5, une suite déjà donnée ne rouvre rien — 23/10/2026
 
 Lot dédié demandé par le responsable. Base `6ee07be` (#311 fusionnée).
