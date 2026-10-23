@@ -123,3 +123,18 @@ describe("la porte et la construction ne tirent rien de Docker Hub", () => {
     expect(deploy).toMatch(/\[registry\."docker\.io"\]\n\s+mirrors = \["mirror\.gcr\.io"\]/u);
   });
 });
+
+describe("un miroir lent ne fige pas la porte", () => {
+  it("l'installation des navigateurs est plafonnée", () => {
+    // 22/10/2026, #304 : un miroir apt Azure à quelques Ko/s a figé
+    // l'étape plus de trente minutes, deux fois ; sans plafond, six heures.
+    const porte = lire(".github/workflows/validation.yml");
+    const etape = porte.match(
+      /- name: Navigateurs de recette photographique\n((?:\s{8}\S.*\n)+)/u,
+    )?.[1];
+    expect(etape).toMatch(/run: npx playwright install --with-deps/u);
+    const plafond = Number(etape?.match(/timeout-minutes: (\d+)/u)?.[1]);
+    expect(plafond).toBeGreaterThan(0);
+    expect(plafond).toBeLessThanOrEqual(20);
+  });
+});
