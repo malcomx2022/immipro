@@ -5,6 +5,11 @@ import { Services } from "@/app/(app)/(dossier)/services/Services";
 import { dossierParId } from "@/lib/contenu/dossiers";
 import { CE_QUI_RESTE } from "@/domain/comptes/suppression";
 
+// T-06 rafraîchit la page sur une suite déjà donnée (O-5, S.190).
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 const reponse = (corps: unknown, statut = 200) =>
   Promise.resolve({
     ok: statut < 400,

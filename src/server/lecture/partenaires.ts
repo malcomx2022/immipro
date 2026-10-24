@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { MotifProposition, Partenaire } from "@/domain/consultants/proposition";
 import {
+  ETATS_OUVERTS,
   LIBELLE_GENRE,
   tauxConformeALAnnonce,
   type GenrePartenaire,
@@ -153,6 +154,14 @@ export async function offresDuDossier(
       },
       update: {},
     });
+    /*
+      O-5 (S.190) — « continuer seul » clôt la proposition pour ce dossier,
+      « ne plus me proposer » la décline. La lecture la reproposait quand
+      même : l'offre restait listée, et son bouton menait chez le
+      partenaire sans redirection enregistrée. Une proposition redirigée,
+      elle, reste : le candidat peut y retourner.
+    */
+    if (!ETATS_OUVERTS.includes(ligne.status)) continue;
 
     offres.push({
       id: ligne.id,

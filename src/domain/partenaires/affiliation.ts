@@ -259,6 +259,26 @@ export const FENETRE_BLOQUEE = {
   ton: "limite",
 } as const;
 
+/**
+ * Une suite déjà donnée — O-5, S.190.
+ *
+ * La première décision est celle qui a été prise (S.189) : une proposition
+ * close pour ce dossier ne se rouvre pas par un clic tardif — un onglet
+ * resté ouvert, une page d'avant le choix. L'écran ouvrait pourtant le
+ * partenaire sur cette réponse, sans redirection enregistrée. Il le dit
+ * désormais, et le site n'est pas ouvert.
+ */
+export const SUITE_DEJA_DONNEE = {
+  titre: "Tu as déjà donné une suite à cette proposition",
+  corps:
+    "Tu avais choisi de ne pas y donner suite pour ce dossier : le site du partenaire n'a pas été ouvert, et rien n'a été enregistré.",
+  action: "Afficher les offres à jour",
+  ton: "limite",
+} as const;
+
+/** États d'une proposition que le candidat peut encore suivre. */
+export const ETATS_OUVERTS: readonly EtatProposition[] = ["PROPOSEE", "REDIRIGEE"];
+
 export const FORMULATION: Record<GenrePartenaire, Formulation> = {
   CONSULTANT: {
     titre: "Ce point dépasse ce que nous savons faire",
