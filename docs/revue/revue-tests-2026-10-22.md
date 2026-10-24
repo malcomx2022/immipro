@@ -179,7 +179,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès ; route (`routes-ecritures`) et écriture sur base jetable (`smoke:partenaires`, § 14) | Conditions d'affiliation |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
-| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression), B-04 (rapprochement, grand livre) et B-08 en navigateur, rôles, journal, facturation (§ 13) | B-04 remboursements (M.C), autres formulaires (R-I04) |
+| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression, suspension et rétablissement), B-04 (rapprochement, grand livre), B-06 (habilitations), B-08, veille et textes juridiques en navigateur, rôles, journal, facturation (§ 13, § 16) | B-04 remboursements (M.C) ; validation d'un texte juridique (Q.A) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
 
 ### 5.2 Modules techniques
@@ -641,3 +641,37 @@ est celle enregistrée. `smoke:partenaires` passe à dix-huit vérifications :
 la proposition close disparaît des offres (rouge avant), un clic tardif
 rend « sans suite » sans adresse ni redirection, la proposition redirigée
 reste listée. Porte unitaire : 203 fichiers, 4 054 tests.
+
+## 16. S.191 — formulaires du back-office en navigateur, lot dédié — 23/10/2026
+
+Demande du responsable : ajouter les formulaires du back-office en
+navigateur dans un lot dédié. Base : `e7295e4` (#312, S.190, en attente
+de fusion au démarrage), replacée sur `8a4eaba` après la fusion de #312
+le 24/10.
+
+**Quatre parcours ajoutés** à `tests/parcours/candidat.spec.ts`, au
+bureau, chacun lu en base et rejouable sur les six profils d'un même
+banc :
+
+| Parcours | Écran | Ce qui est vérifié |
+|---|---|---|
+| Suspension | B-03 | Motif de quatre caractères refusé avant le clic (O-4, dix caractères) ; suspension qui ferme les sessions du candidat, connexion refusée ; rétablissement, reconnexion ; deux lignes au journal avec leur motif |
+| Habilitation | B-06 | Titre puis motif exigés avant le clic ; habilitation suisse vérifiée et datée ; retrait qui garde la ligne, datée ; `consultant.habiliter` puis `consultant.retirer` au journal |
+| Veille | WF-14 étape 2 | Écart « à arbitrer » sans note refusé avant le clic ; écart noté consigné au relevé et affiché sur la fiche ; dates de vérification inchangées |
+| Textes juridiques | Variables | Adresse mal formée refusée à l'écran et par la route, rien d'écrit ; validation d'un texte fermée sans attestation de relecture |
+
+**Choix de rejeu.** Le banc est partagé par les six profils. Le compte
+suspendu est celui du candidat synthétique, rétabli puis reconnecté avant
+R-O05. L'habilitation suisse est posée puis retirée : la ligne se relève
+d'un profil à l'autre. La veille joue l'écart noté, pas « à jour », qui
+sortirait la fiche suisse de la file pour les profils suivants. Aucun
+texte juridique n'est publié : la relecture d'un juriste ne se simule pas
+(Q.A).
+
+**Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc
+(30 par profil) ; Firefox et WebKit laissés à la porte CI. Aucun
+défaut relevé par ces gestes ; aucun code applicatif modifié.
+
+**Ce qui reste non vérifié en navigateur.** Les remboursements B-04
+(rail réel, M.C) ; la publication d'un texte juridique (Q.A) ; la
+création d'un consultant, qui n'a pas d'écran (route seule).

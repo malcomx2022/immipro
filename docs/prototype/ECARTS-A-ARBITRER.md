@@ -14028,3 +14028,14 @@ de l'interface : propositions closes avant K.A, ou appel direct.
 
 Trois tests d'écran et une vérification de `smoke:partenaires` rouges
 avant. WF-13 étape 2, RG-13.3, écran T-06. Aucun préalable levé.
+
+## S.191 — formulaires du back-office en navigateur
+
+23/10/2026, lot dédié demandé par le responsable. Base `e7295e4` (#312), replacée sur `8a4eaba` (#312 fusionnée le 24/10).
+
+Quatre parcours au bureau : B-03 suspension et rétablissement, B-06
+habilitation puis retrait, relevé de veille avec écart noté, variables
+des textes juridiques. Chacun est lu en base et rejouable sur les six
+profils d'un même banc. Aucun défaut relevé, aucun code applicatif
+modifié. Restent hors navigateur : remboursements B-04 (M.C), publication
+d'un texte juridique (Q.A). R-I04, WF-14, WF-15, RG-12.1, RG-15.1.
