@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { MENTION_NOUVEL_ONGLET } from "@/components/ui/LienNouvelOnglet";
@@ -14,6 +15,7 @@ import {
   FORMULATION,
   SILENCE,
   SITE_NON_OUVERT,
+  SUITE_DEJA_DONNEE,
 } from "@/domain/partenaires/affiliation";
 import { Button } from "@/components/ui/Button";
 import { BlocEchec } from "@/components/ui/BlocEchec";
@@ -153,7 +155,8 @@ function SansAutorisation({ autorisation }: { autorisation: "retiree" | "jamais_
  */
 type Empechement =
   | { quoi: "refus"; echec: EchecCandidat }
-  | { quoi: "fenetre_bloquee" };
+  | { quoi: "fenetre_bloquee" }
+  | { quoi: "suite_donnee" };
 
 /**
  * Une offre. La redirection est tracée avant le départ (WF-13, étape 2), et
@@ -167,6 +170,7 @@ type Empechement =
  * résultat — l'attente était payée, la garantie non.
  */
 function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string }) {
+  const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const [empechement, setEmpechement] = useState<Empechement | null>(null);
   const mots = FORMULATION[offre.genre];
@@ -174,9 +178,12 @@ function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string
   async function partir() {
     setEnCours(true);
     setEmpechement(null);
-    const resultat = await appeler(`/api/dossiers/${dossierId}/partenaires/${offre.id}`, {
-      corps: { suite: "CRENEAUX" },
-    });
+    const resultat = await appeler<{ etat: string; url?: string }>(
+      `/api/dossiers/${dossierId}/partenaires/${offre.id}`,
+      {
+        corps: { suite: "CRENEAUX" },
+      },
+    );
     setEnCours(false);
 
     // La fenêtre s'ouvre après l'enregistrement, et seulement s'il a eu
@@ -188,10 +195,23 @@ function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string
       return;
     }
 
+    // O-5 (S.190) — une réponse acceptée n'est pas une redirection. Sur une
+    // proposition déjà close, la route rend l'état retenu sans rien
+    // enregistrer : ouvrir le site serait le départ sans trace que cet
+    // écran existe pour empêcher.
+    if (resultat.donnees.etat !== "REDIRIGEE") {
+      setEmpechement({ quoi: "suite_donnee" });
+      return;
+    }
+
     // `null` quand le navigateur a bloqué l'ouverture : l'attente réseau a
     // consommé le geste de la personne. La trace est écrite, il ne reste
-    // qu'à le dire.
-    const fenetre = window.open(offre.url, "_blank", "noopener,noreferrer");
+    // qu'à le dire. L'adresse est celle que la route a enregistrée.
+    const fenetre = window.open(
+      resultat.donnees.url ?? offre.url,
+      "_blank",
+      "noopener,noreferrer",
+    );
     if (!fenetre) setEmpechement({ quoi: "fenetre_bloquee" });
   }
 
@@ -254,6 +274,14 @@ function OffrePartenaire({ offre, dossierId }: { offre: Offre; dossierId: string
 
       {empechement?.quoi === "fenetre_bloquee" ? (
         <BlocEchec echec={FENETRE_BLOQUEE} />
+      ) : null}
+
+      {empechement?.quoi === "suite_donnee" ? (
+        <BlocEchec echec={SUITE_DEJA_DONNEE}>
+          <Button variante="secondaire" onClick={() => router.refresh()}>
+            {SUITE_DEJA_DONNEE.action}
+          </Button>
+        </BlocEchec>
       ) : null}
     </Card>
   );

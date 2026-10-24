@@ -177,7 +177,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-10 Clôture, issue, purge | Éprouvé | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré, clôture, purge effective et portabilité (§ 13) | — |
 | WF-11 Divergence de version | Partiel | `smoke:publication`, `smoke:transitions` ; R-O03 en navigateur sur la règle NL à fin prévue (§ 8, § 9) | C-13 : versions 2027 des règles NL à publier avant le 31/12/2026 |
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
-| WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès ; route (`routes-ecritures`) et écriture sur base jetable (`smoke:partenaires`, § 14) | Conditions d'affiliation, O-5 |
+| WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès ; route (`routes-ecritures`) et écriture sur base jetable (`smoke:partenaires`, § 14) | Conditions d'affiliation |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
 | WF-15 Administration | Partiel | B-05, B-03 (relance de suppression), B-04 (rapprochement, grand livre) et B-08 en navigateur, rôles, journal, facturation (§ 13) | B-04 remboursements (M.C), autres formulaires (R-I04) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
@@ -604,10 +604,40 @@ offres, commission au taux recopié sur la proposition, aboutissement
 unique. `routes-ecritures` vérifie que la route transmet son dossier.
 Porte unitaire : 203 fichiers, 4 051 tests.
 
-**Observation O-5, non corrigée.** L'écran T-03 ouvre la fenêtre du
+**Observation O-5, corrigée en S.190 (§ 15).** L'écran T-06 ouvre la fenêtre du
 partenaire sur toute réponse acceptée. Après « Continuer seul », un clic
 sur « Voir les créneaux » rend l'état retenu (`SANS_SUITE`), et l'écran
 ouvre pourtant le partenaire : une redirection sans trace, donc une
 commission qu'on ne saurait rattacher. Ce que l'écran doit dire alors
 (proposer de nouveau, ou constater la suite déjà donnée) est un choix de
 formulation à trancher par le responsable.
+
+## 15. S.190 — O-5 corrigé, lot dédié — 23/10/2026
+
+Demande du responsable : corriger O-5 dans un lot dédié. Base : `6ee07be`
+(#311 fusionnée).
+
+**Ce qui se produisait.** Depuis l'arbitrage K.A, l'écran des services
+partenaires (T-06) n'offre plus que « Voir les créneaux » ; plus rien dans
+l'interface ne produit `SANS_SUITE` ni `DECLINEE`, mais ces états
+existent : propositions closes avant K.A, ou par un appel direct à la
+route. La lecture des offres les reproposait, et l'écran ouvrait le site
+du partenaire sur toute réponse acceptée — y compris quand la route
+rendait l'état retenu sans rien enregistrer. Un départ sans trace,
+c'est-à-dire une commission impossible à rattacher (WF-13, étape 2).
+
+**Décision appliquée.** La règle déjà écrite : « continuer seul » clôt la
+proposition pour ce dossier, et la première décision est celle qui a été
+prise (S.189). Une proposition close ne se propose plus ; une proposition
+redirigée reste, le candidat peut y retourner. L'écran n'ouvre le site
+que sur une redirection enregistrée, à l'adresse que la route rend ; sur
+une proposition close (onglet resté ouvert), il dit « Tu as déjà donné
+une suite à cette proposition », sans ouvrir, et propose d'afficher les
+offres à jour.
+
+**Preuves.** Trois tests d'écran (`tests/ui/p1.test.tsx`), rouges avant :
+`SANS_SUITE` et `DECLINEE` n'ouvrent rien et le disent, l'adresse ouverte
+est celle enregistrée. `smoke:partenaires` passe à dix-huit vérifications :
+la proposition close disparaît des offres (rouge avant), un clic tardif
+rend « sans suite » sans adresse ni redirection, la proposition redirigée
+reste listée. Porte unitaire : 203 fichiers, 4 054 tests.

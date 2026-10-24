@@ -14008,8 +14008,23 @@ simultanées se contredisaient (dix-huit réponses sur dix courses,
 reproduit sur base jetable). L'écriture est conditionnelle, la suite
 devancée rend l'état retenu, la proposition doit appartenir au dossier de
 l'adresse, et l'aboutissement n'écrit qu'une commission. Nouvelle fumée
-`smoke:partenaires` dans la porte. WF-13, RG-13.3, écran T-03.
+`smoke:partenaires` dans la porte. WF-13, RG-13.3, écran T-06.
 
-À arbitrer — **O-5** : après « Continuer seul », « Voir les créneaux »
-ouvre encore le partenaire sans trace. Faut-il reproposer, ou constater la
-suite déjà donnée ? Aucun préalable levé.
+O-5 relevé : après « Continuer seul », « Voir les créneaux » ouvrait
+encore le partenaire sans trace. Corrigé en S.190. Aucun préalable levé.
+
+## S.190 — O-5 : une suite déjà donnée ne rouvre pas le partenaire
+
+23/10/2026, lot dédié demandé par le responsable. Base `6ee07be` (#311
+fusionnée).
+
+Choix appliqué, celui que la règle écrivait déjà : « continuer seul »
+clôt la proposition pour ce dossier, la première décision tient (S.189).
+La lecture ne repropose plus une proposition `SANS_SUITE` ou `DECLINEE` ;
+une proposition redirigée reste listée. T-06 n'ouvre le site que sur une
+redirection enregistrée, à l'adresse rendue par la route ; sinon il dit
+la suite déjà donnée sans ouvrir. Depuis K.A, ces états ne viennent plus
+de l'interface : propositions closes avant K.A, ou appel direct.
+
+Trois tests d'écran et une vérification de `smoke:partenaires` rouges
+avant. WF-13 étape 2, RG-13.3, écran T-06. Aucun préalable levé.
