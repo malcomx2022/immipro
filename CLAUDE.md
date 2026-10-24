@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.192 — navigateurs de la porte, reprise sur le miroir officiel — 24/10/2026
+
+Lot dédié demandé par le responsable. Base `6ee07be` (#311 fusionnée).
+Le 23/10, `azure.archive.ubuntu.com` à 30 Ko/s a épuisé deux fois les
+quinze minutes de « Navigateurs de recette photographique » sur #312
+(157 paquets reçus, aucun test lancé) ; `main` passait une heure avant.
+Relever seul le plafond ne suffit pas : le 22/10, le miroir est resté
+figé plus de trente minutes. Première tentative bornée à huit minutes,
+puis miroir réécrit vers `archive.ubuntu.com`, `dpkg` remis d'aplomb,
+seconde tentative de quinze minutes ; plafond de l'étape à 25 minutes.
+Aucun test ni navigateur changé. Ne pas retirer le plafond : sans lui,
+GitHub attend six heures.
+
 ### S.189 — WF-13, une seule suite par proposition — 23/10/2026
 
 Demandé par le responsable après le point du restant. Base `ce8de25`
