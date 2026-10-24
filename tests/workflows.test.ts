@@ -125,16 +125,35 @@ describe("la porte et la construction ne tirent rien de Docker Hub", () => {
 });
 
 describe("un miroir lent ne fige pas la porte", () => {
+  // 22/10/2026, #304 : un miroir apt Azure à quelques Ko/s a figé
+  // l'étape plus de trente minutes, deux fois ; sans plafond, six heures.
+  // 23/10, #312 : le même miroir à 30 Ko/s a épuisé quinze minutes, deux
+  // fois. S.192 : tentative bornée, puis reprise sur le miroir officiel.
+  const etape = () =>
+    lire(".github/workflows/validation.yml").match(
+      /- name: Navigateurs de recette photographique\n((?:\s{8,}\S.*\n)+)/u,
+    )?.[1] ?? "";
+
   it("l'installation des navigateurs est plafonnée", () => {
-    // 22/10/2026, #304 : un miroir apt Azure à quelques Ko/s a figé
-    // l'étape plus de trente minutes, deux fois ; sans plafond, six heures.
-    const porte = lire(".github/workflows/validation.yml");
-    const etape = porte.match(
-      /- name: Navigateurs de recette photographique\n((?:\s{8}\S.*\n)+)/u,
-    )?.[1];
-    expect(etape).toMatch(/run: npx playwright install --with-deps/u);
-    const plafond = Number(etape?.match(/timeout-minutes: (\d+)/u)?.[1]);
+    expect(etape()).toMatch(/npx playwright install --with-deps/u);
+    const plafond = Number(etape().match(/timeout-minutes: (\d+)/u)?.[1]);
     expect(plafond).toBeGreaterThan(0);
     expect(plafond).toBeLessThanOrEqual(20);
+  });
+
+  it("chaque tentative est bornée et les deux tiennent sous le plafond", () => {
+    expect(etape()).toMatch(/timeout --kill-after=30s "\$1" npx playwright install/u);
+    const tentatives = [...etape().matchAll(/installer (\d+)m/gu)].map(([, m]) => Number(m));
+    expect(tentatives).toHaveLength(2);
+    const plafond = Number(etape().match(/timeout-minutes: (\d+)/u)?.[1]);
+    // Une demi-minute d'arrêt forcé par tentative, une pour dpkg.
+    expect(tentatives.reduce((a, b) => a + b, 0) + 2).toBeLessThanOrEqual(plafond);
+  });
+
+  it("la reprise quitte le miroir Azure pour le miroir officiel et répare dpkg", () => {
+    const reprise = etape().slice(etape().indexOf("if ! installer"));
+    expect(reprise).toMatch(/s\|azure\\\.archive\\\.ubuntu\\\.com\|archive\.ubuntu\.com\|g/u);
+    expect(reprise.indexOf("dpkg --configure -a")).toBeGreaterThan(reprise.indexOf("sed -i"));
+    expect(reprise.lastIndexOf("installer ")).toBeGreaterThan(reprise.indexOf("dpkg --configure -a"));
   });
 });

@@ -142,9 +142,21 @@ jobs:
       # L'installation prend moins d'une minute ; le 22/10, un miroir apt
       # Azure à quelques Ko/s l'a figée deux fois plus de trente minutes
       # (#304). Sans plafond, GitHub attend six heures : on échoue vite.
+      # S.192 : le 23/10, le même miroir à 30 Ko/s a épuisé deux fois les
+      # quinze minutes (#312). Attendre plus longtemps le même miroir ne
+      # sert à rien : après six minutes, on reprend sur le miroir officiel
+      # d'Ubuntu. `timeout` arrête aussi apt-get, et dpkg est remis d'aplomb
+      # avant la reprise ; une reprise lente échoue au plafond de l'étape.
       - name: Navigateurs de recette photographique
-        timeout-minutes: 15
-        run: npx playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 20
+        run: |
+          installer() { timeout --kill-after=30s "$1" npx playwright install --with-deps chromium firefox webkit; }
+          if ! installer 6m; then
+            echo "::warning::Installation des navigateurs interrompue sur le miroir Azure, reprise sur archive.ubuntu.com"
+            sudo grep -rl 'azure\.archive\.ubuntu\.com' /etc/apt | xargs -r sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g'
+            sudo dpkg --configure -a
+            installer 12m
+          fi
       - name: Photographies publiques — Chromium, Firefox et WebKit
         id: photographies
         run: npm run test:photos
