@@ -84,11 +84,13 @@ Le 23/10, `azure.archive.ubuntu.com` à 30 Ko/s a épuisé deux fois les
 quinze minutes de « Navigateurs de recette photographique » sur #312
 (157 paquets reçus, aucun test lancé) ; `main` passait une heure avant.
 Relever seul le plafond ne suffit pas : le 22/10, le miroir est resté
-figé plus de trente minutes. Première tentative bornée à huit minutes,
+figé plus de trente minutes. Première tentative bornée à six minutes,
 puis miroir réécrit vers `archive.ubuntu.com`, `dpkg` remis d'aplomb,
-seconde tentative de quinze minutes ; plafond de l'étape à 25 minutes.
-Aucun test ni navigateur changé. Ne pas retirer le plafond : sans lui,
-GitHub attend six heures.
+seconde tentative de douze minutes ; plafond de l'étape à 20 minutes,
+la borne que `tests/workflows.test.ts` tenait déjà. Ce test vérifie
+aussi les deux tentatives bornées sous le plafond, la réécriture du
+miroir et la réparation de `dpkg` avant la reprise. Aucun navigateur
+changé. Ne pas retirer le plafond : sans lui, GitHub attend six heures.
 
 ### S.190 — O-5, une suite déjà donnée ne rouvre rien — 23/10/2026
 
