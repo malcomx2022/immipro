@@ -254,7 +254,7 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 | L6 Recette front | 96 parcours + 84 scénarios verts ; lecteur d'écran humain, gestes C-3, signature de la matrice | Responsable + tests à compléter |
 | L7 Exploitation | B-04/B-07 corrigés ; diagnostics, inventaire, sauvegarde/restauration sur clone, services cibles | Responsable (VPS) |
 | L8 Paiement et lancement | Textes juridiques, coordonnées, TVA, certification fiscale, essais réels | Responsable, juriste, comptable |
-| L9 Maintenance | #298–#300 Dependabot ouvertes ; exception `deepmerge-ts`, avis modérés `minio` | Code |
+| L9 Maintenance | #298 et #299 fusionnées, #300 fermée au profit de #303 fusionnée ; exception `deepmerge-ts`, avis modérés `minio` | Code |
 | Q.A / M.C | Ouverts | Responsable |
 
 Travail de code encore possible sans préalable externe, par priorité :
@@ -265,7 +265,9 @@ Travail de code encore possible sans préalable externe, par priorité :
    L'échéancier et la péremption sont faits en S.188 (§ 13). C-7 est corrigé en S.184 (§ 9).
 3. ~~Libellé du dispositif (O-1)~~ : fait en S.187 (§ 12). O-2 et O-3
    (textes d'aide B-05) étaient déjà corrigés en S.167 (RC-04, RC-05).
-4. Relecture des trois PR Dependabot avec la porte complète.
+4. ~~Relecture des trois PR Dependabot avec la porte complète~~ : #298 et
+   #299 fusionnées, #300 fermée au profit de #303 ; aucune PR ouverte au 25/10.
+5. ~~R-O05 sous Firefox~~ : fiabilisé en S.193 (§ 17).
 
 ## 7. Reproduction
 
@@ -675,3 +677,37 @@ défaut relevé par ces gestes ; aucun code applicatif modifié.
 **Ce qui reste non vérifié en navigateur.** Les remboursements B-04
 (rail réel, M.C) ; la publication d'un texte juridique (Q.A) ; la
 création d'un consultant, qui n'a pas d'écran (route seule).
+
+## 17. S.193 — R-O05 fiabilisé sous Firefox, lot dédié — 25/10/2026
+
+Demande du responsable après le point du restant. Base : `5221dcc`
+(#314 fusionnée, déployée).
+
+**Constat.** Le 24/10, la porte de #314 a vu R-O05 échouer une fois en
+firefox-390, sur 180 parcours, puis passer à la relance sur la même
+tête ; les cinq autres profils étaient verts. La trace Playwright
+montre le geste en cause : après la confirmation de la demande de
+suppression, `page.goto("/connexion")` aboutit (document 200, `load`),
+puis Firefox lance aussitôt une seconde navigation de document vers la
+même adresse (304) qui ne s'achève jamais. La saisie de l'adresse
+attend cette navigation trente secondes, puis échoue. Aucun code de
+l'application n'y prend part : l'écran de confirmation ne redirige
+pas, l'écran de connexion ne recharge rien.
+
+**Correction.** Le parcours ne force plus de navigation de document à
+cet endroit : il suit les liens du candidat, « Revenir à l'accueil »
+sur l'écran de confirmation puis « Connexion » dans l'en-tête, deux
+navigations de Next sans rechargement. C'est le choix déjà fait en
+S.188 pour WF-03 (« Modifier mes réponses »). Ce que R-O05 vérifie est
+inchangé : connexion refusée en 401 avec le message attendu, aucune
+session recréée, puis la reprise B-03 jusqu'à l'anonymisation. Il
+éprouve en plus la sortie annoncée par l'écran de confirmation.
+
+**Limite.** Le défaut ne s'est montré qu'une fois et seulement sous
+Firefox, absent du poste local : la correction s'appuie sur la trace,
+elle ne se reproduit pas à la demande. `connecter()` garde son
+`goto("/connexion")` : il n'a jamais échoué ainsi, et le changer
+toucherait tous les parcours sans preuve.
+
+**Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc,
+R-O05 compris ; Firefox et WebKit à la porte CI.

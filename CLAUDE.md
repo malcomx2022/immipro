@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.193 — R-O05 fiabilisé sous Firefox — 25/10/2026
+
+Lot dédié demandé par le responsable. Base `5221dcc` (#314 fusionnée,
+déployée). Le 24/10, R-O05 a échoué une fois en firefox-390 sur #314 :
+après la confirmation de suppression, `goto("/connexion")` aboutissait
+puis Firefox doublait la navigation de document (304) sans jamais
+l'achever, et la saisie l'attendait trente secondes (trace). Le
+parcours suit désormais les liens du candidat, « Revenir à l'accueil »
+puis « Connexion » de l'en-tête, comme WF-03 en S.188 ; ses attentes
+sont inchangées. Ne pas revenir à un `goto` à cet endroit. Correction
+fondée sur la trace, défaut non reproductible à la demande. Lire
+[la revue, § 17](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.192 — navigateurs de la porte, reprise sur le miroir officiel — 24/10/2026
 
 Lot dédié demandé par le responsable. Base `6ee07be` (#311 fusionnée).

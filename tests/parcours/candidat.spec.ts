@@ -2032,7 +2032,18 @@ test("R-O05 : suppression demandée pendant une panne du stockage, connexion ref
     expect(Number(demande.restants)).toBeGreaterThan(0);
 
     // Le même mot de passe ne rouvre rien pendant que la purge attend.
-    await page.goto("/connexion");
+    // Par les liens du candidat, sans `goto` : sous Firefox, la navigation
+    // de document vers /connexion était aussitôt doublée d'une seconde
+    // (304) qui ne s'achevait jamais, et la saisie l'attendait sans fin
+    // (S.193, trace de #314). Le parcours éprouve au passage la sortie
+    // annoncée par l'écran de confirmation.
+    await page.getByRole("link", { name: "Revenir à l'accueil", exact: true }).click();
+    await page.waitForURL((url) => url.pathname === "/");
+    await page
+      .getByRole("banner")
+      .getByRole("link", { name: "Connexion", exact: true })
+      .click();
+    await page.waitForURL("**/connexion");
     await page.getByLabel("Adresse email", { exact: true }).fill(email);
     await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
     const [connexion] = await Promise.all([
