@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.194 — comparateur en navigateur (WF-03) — 26/10/2026
+
+Premier des quatre lots demandés par le responsable le 26/10, une branche
+par lot. Base `73e1e30` (#315 fusionnée, déployée). Parcours C-03 depuis
+l'état vide du tableau de bord : colonnes comparées aux règles relues en
+base sous les conditions de la requête candidate (INV-4, RG-14.1, en
+vigueur), cinq critères recalculés depuis le JSON des règles, encadré
+RG-03.3, mention INV-8/INV-1, fiche et ouverture sans rien créer. Deux
+mutations de `comparaison` détectées. Aucun défaut relevé. WF-03 passe
+« éprouvé ». Lire [la revue, § 18](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.193 — R-O05 fiabilisé sous Firefox — 25/10/2026
 
 Lot dédié demandé par le responsable. Base `5221dcc` (#314 fusionnée,

@@ -167,7 +167,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 |---|---|---|---|
 | WF-01 Simulateur | Éprouvé | Domaine `simulateur/` ; parcours clavier six réponses ; photographies ; procédure nommée partout où un pays en publie plusieurs (O-1, § 12) | — |
 | WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement, suppression demandée et reprise (R-O05, § 8) | Portabilité en navigateur ; OAuth Google V2 |
-| WF-03 Recommandations | Partiel | Domaine, résultats sourcés, comparateur ; trois profils contrastés en navigateur (§ 13) | Comparateur en navigateur |
+| WF-03 Recommandations | Éprouvé | Domaine, résultats sourcés ; trois profils contrastés en navigateur (§ 13) ; comparateur en navigateur, colonnes et valeurs lues en base (§ 18) | — |
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
 | WF-05 Achat de pack | Bloqué (M.C) | Tunnel, FedaPay, réconciliation, remboursement, montée sur PostgreSQL ; achat scripté en navigateur | Bac à sable réel FedaPay/Stripe, certification fiscale, essai réel |
 | WF-06 Pièces et analyse | Bloqué (L5) | Balayage, extraction, destination L1, mesure L2 ; dépôt, coupure, réponse tardive, revue B-05 en navigateur | Qualification réelle Vertex `eu` |
@@ -711,3 +711,34 @@ toucherait tous les parcours sans preuve.
 
 **Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc,
 R-O05 compris ; Firefox et WebKit à la porte CI.
+
+## 18. S.194 — comparateur en navigateur (WF-03), lot dédié — 26/10/2026
+
+Demande du responsable après le point du restant, premier des quatre
+lots demandés. Base : `73e1e30` (#315 fusionnée, déployée).
+
+**Parcours ajouté** à `tests/parcours/candidat.spec.ts`, entre
+l'inscription et l'ouverture du dossier : le candidat arrive sur C-03 par
+« Parcourir les destinations » de l'état vide de son tableau de bord.
+
+| Contrôle | Comment il est lu |
+|---|---|
+| Colonnes | Les liens d'en-tête sont comparés aux règles relues en base, en lecture seule, sous les conditions de la requête candidate : publiée, hors `SECONDAIRE` (INV-4), relecture non échue (RG-14.1), en vigueur. Une colonne de trop ou de moins échoue |
+| Titre | « Comparer N destinations », N lu en base |
+| Valeurs | Ressources à prouver, après diplôme, délai, langue et frais de demande, recalculés depuis le JSON de chaque règle ; coût et travail étudiant non vides |
+| Encadré RG-03.3 | Présent si et seulement si une règle exige le permis employeur |
+| Mention (INV-8, INV-1) | Plus ancienne date de vérification, toutes les sources, « il ne prédit aucune décision » ; vocabulaire interdit absent |
+| Navigation | Une colonne mène à sa fiche, le retour garde le tableau ; « Ouvrir un dossier » mène à l'ouverture sans rien créer |
+| 390 px | Indication de défilement visible, aucun défilement horizontal de la page |
+
+**Preuves.** Parcours 62/62 sur Chromium 390 et 1 440 (31 par profil) ;
+Firefox et WebKit à la porte CI. Deux mutations de la lecture
+(`comparaison`) détectées : une destination retirée (« Comparer 2 » au
+lieu de 3) et un délai mal formé. Aucun défaut relevé ; aucun code
+applicatif modifié.
+
+**Limite.** INV-4 n'est éprouvé qu'en creux : le banc ne contient aucune
+règle `SECONDAIRE` publiable, la graine les force en brouillon et les
+garde-fous SQL refusent leur publication. Les préconditions n'écrivent
+jamais sur un référentiel : RG-14.1 (fiche à relecture échue) n'est pas
+rejoué en navigateur.
