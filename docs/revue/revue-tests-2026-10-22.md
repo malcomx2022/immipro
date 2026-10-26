@@ -707,7 +707,47 @@ session recréée, puis la reprise B-03 jusqu'à l'anonymisation. Il
 Firefox, absent du poste local : la correction s'appuie sur la trace,
 elle ne se reproduit pas à la demande. `connecter()` garde son
 `goto("/connexion")` : il n'a jamais échoué ainsi, et le changer
-toucherait tous les parcours sans preuve.
+toucherait tous les parcours sans preuve. Repris à titre préventif en S.197
+(§ 21), à la demande du responsable.
 
 **Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc,
 R-O05 compris ; Firefox et WebKit à la porte CI.
+
+## 21. S.197 — `connecter()` sans navigation de document de trop, lot dédié — 26/10/2026
+
+Quatrième des quatre lots demandés par le responsable le 26/10. Base :
+`73e1e30` (#315 fusionnée). Correction **préventive** : `connecter()` n'a
+jamais échoué, mais il gardait le geste qui a fait échouer R-O05 sous
+Firefox (§ 17).
+
+**Les appels relus.**
+
+| Appelant | Page de départ | Risque |
+|---|---|---|
+| `administration()` | Page neuve, rien en cours | Aucun |
+| `operateur()` | Page neuve, rien en cours | Aucun |
+| B-03, reconnexion après rétablissement | Déjà sur `/connexion`, juste après une connexion refusée | Celui de R-O05 : une navigation de document vers l'adresse où l'on est déjà |
+
+**Ce qui change.** Une seule fonction, `ouvrirLaConnexion(p, suite?)`,
+sert `connecter()` et `operateur()`. Déjà sur `/connexion` sans suite, elle
+ne recharge pas l'écran ; sinon elle y va par `aller`, qui reprend une
+navigation interrompue (`NS_BINDING_ABORTED`) et attend l'hydratation.
+Dans les deux cas, elle attend que le formulaire soit hydraté avant de le
+remplir. Plus aucun `goto` vers `/connexion` dans les parcours.
+
+**Constat en chemin.** La reconnexion de B-03 se fait depuis
+`/connexion?suite=/dossiers/…`, où la page protégée a renvoyé le compte
+suspendu. L'ancien `goto("/connexion")` effaçait cette suite, et
+`connecter()` attendait le tableau de bord. En restant sur l'écran, la
+reconnexion mène au dossier demandé : `connecter()` attend désormais la
+destination exacte, la suite de l'adresse quand il y en a une, sinon le
+tableau de bord. L'attente n'est pas affaiblie : elle vérifie en plus que
+la suite est respectée.
+
+**Preuves.** Parcours 60/60 sur Chromium 390 et 1 440 ; Firefox et WebKit à la
+porte CI. Première exécution rouge sur B-03 (la suite, ci-dessus), puis
+verte ; aucune attente affaiblie.
+
+**Limite.** Le défaut n'a jamais été observé sur `connecter()` : la
+correction ne se prouve pas par un rouge, seulement par l'absence du geste
+en cause.
