@@ -28,6 +28,7 @@ import {
   INTERDITS_ECRAN_CANDIDAT,
   verifierTexte,
 } from "../../src/domain/copy/vocabulaire-interdit";
+import { CONSEQUENCE_ETAT, LIBELLE_ETAT } from "../../src/domain/backoffice/consultants";
 import {
   codeDeVerification,
   controlerLesFournisseurs,
@@ -1664,6 +1665,84 @@ test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablisse
  * clic ; la ligne retirée reste, datée. Suisse, pour ne pas toucher à
  * l'habilitation néerlandaise de la graine.
  */
+/**
+ * B-09, WF-15 et RG-12.1 (S.196) : un consultant se crée à l'écran. La
+ * fiche n'a aucune habilitation, donc aucun annuaire ne la sert, et
+ * l'écran le dit. Une fiche nouvelle par profil : le banc les garde toutes.
+ */
+test("B-09 : consultant créé à l'écran, refus dits avant l'envoi, sans habilitation, journal", async () => {
+  const b = await administration();
+  const nom = `Consultant ${email.split("@")[0]}`;
+  const motif = `Tableau de l'ordre consulté — recette S.196 ${moteur}-${largeur}`;
+  await aller("/habilitations", b);
+  const formulaire = b.getByRole("region", { name: "Ajouter un consultant" });
+  const creer = () => formulaire.getByRole("button", { name: "Créer le consultant", exact: true });
+  await expect(creer()).toBeDisabled();
+
+  await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
+  await formulaire.getByLabel("Cabinet", { exact: true }).fill("Cabinet de recette");
+  await formulaire.getByLabel("Ville", { exact: true }).fill("Cotonou");
+  await formulaire.getByLabel("Qualification", { exact: true }).fill("Avocat, 7 ans");
+  await formulaire.getByLabel("Langues de travail", { exact: true }).fill("Français, fon ; français");
+  // Un délai qui n'est pas un nombre d'heures se dit sous son champ.
+  const delai = formulaire.getByLabel("Délai de réponse, en heures", { exact: true });
+  await delai.fill("48h");
+  await expect(formulaire.getByText(/en heures, un nombre entier entre 1 et 336/u).first()).toBeVisible();
+  await expect(creer()).toBeDisabled();
+  await delai.fill("48");
+  // Le motif manque encore : le bouton reste fermé et le dit.
+  await expect(creer()).toBeDisabled();
+  await expect(formulaire.getByText("Indique ce que tu as consulté avant de créer la fiche.")).toBeVisible();
+  await formulaire.getByLabel("Motif de la création", { exact: true }).fill(motif);
+  const [creation] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/admin/consultants")),
+    creer().click(),
+  ]);
+  expect(creation.ok()).toBe(true);
+  await expect(formulaire.getByRole("status")).toContainText("Il reste invisible dans l'annuaire");
+  await expect(formulaire.getByLabel("Nom", { exact: true })).toHaveValue("");
+
+  const [cree] = await lire<{
+    id: string;
+    firm: string;
+    city: string;
+    qualification: string;
+    languages: string[];
+    responseHours: number;
+    active: boolean;
+    habilitations: string;
+  }>(
+    `SELECT c.id, c.firm, c.city, c.qualification, c.languages, c."responseHours", c.active,
+            (SELECT count(*) FROM "Accreditation" a WHERE a."consultantId" = c.id) AS habilitations
+       FROM "Consultant" c WHERE c.name = $1`,
+    [nom],
+  );
+  expect(cree).toMatchObject({
+    firm: "Cabinet de recette",
+    city: "Cotonou",
+    qualification: "Avocat, 7 ans",
+    languages: ["Français", "fon"],
+    responseHours: 48,
+    active: true,
+    habilitations: "0",
+  });
+  const [trace] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE action = 'consultant.creation' AND target = $1 AND reason = $2`,
+    [`consultant:${cree!.id}`, motif],
+  );
+  expect(Number(trace!.n)).toBe(1);
+
+  // La fiche paraît, sans habilitation, et l'écran dit qu'aucun annuaire ne la sert.
+  const fiche = b.locator("article").filter({ hasText: nom });
+  await expect(fiche).toHaveCount(1);
+  await expect(fiche.getByText(LIBELLE_ETAT.SANS_HABILITATION)).toBeVisible();
+  await expect(fiche.getByText(CONSEQUENCE_ETAT.SANS_HABILITATION)).toBeVisible();
+  preuves.push({
+    controle: "B-09 : consultant créé à l'écran, refus avant l'envoi, fiche sans habilitation et journalisée",
+    conforme: true,
+  });
+});
+
 test("B-06 : titre et motif exigés, habilitation vérifiée puis retirée, journal", async () => {
   const b = await administration();
   const habilitation = async () =>

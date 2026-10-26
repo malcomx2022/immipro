@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
+  BORNES_CONSULTANT,
   CONSEQUENCE_ETAT,
+  SAISIE_CONSULTANT_VIDE,
+  corpsDeCreation,
+  languesSaisies,
+  refusDeLaCreation,
   LIBELLE_ETAT,
   RAPPEL_VERIFICATION,
   destinationsCouvertes,
@@ -283,5 +288,77 @@ describe("le registre s'est vidé d'une entrée", () => {
   it("le rappel de vérification ne prétend pas définir la preuve", () => {
     expect(RAPPEL_VERIFICATION).toContain("registre professionnel");
     expect(RAPPEL_VERIFICATION).toContain("Ton nom et la date");
+  });
+});
+
+describe("la création d'un consultant a son écran (S.196)", () => {
+  const saisie = {
+    nom: "Maître F. Sow",
+    cabinet: "Sow & Associés",
+    ville: "Dakar",
+    qualification: "Avocate, 12 ans",
+    langues: "Français, wolof",
+    delai: "48",
+    motif: "Inscription vérifiée au barreau de Dakar.",
+  };
+
+  it("une saisie vide est refusée champ par champ, et chaque refus dit quoi écrire", () => {
+    const refus = refusDeLaCreation(SAISIE_CONSULTANT_VIDE);
+    expect(Object.keys(refus).sort()).toEqual(
+      ["cabinet", "delai", "langues", "motif", "nom", "qualification", "ville"].sort(),
+    );
+    for (const message of Object.values(refus)) expect(message).toMatch(/^Indique /u);
+  });
+
+  it("une saisie complète part", () => {
+    expect(refusDeLaCreation(saisie)).toEqual({});
+  });
+
+  it("le délai est un nombre entier d'heures, entre une heure et deux semaines", () => {
+    for (const delai of ["0", "337", "12h", "4.5", "-3", ""]) {
+      expect(refusDeLaCreation({ ...saisie, delai }).delai, delai).toContain("entre 1 et 336");
+    }
+    for (const delai of ["1", " 48 ", "336"]) expect(refusDeLaCreation({ ...saisie, delai }).delai).toBeUndefined();
+  });
+
+  it("une langue s'écrit en toutes lettres", () => {
+    expect(refusDeLaCreation({ ...saisie, langues: "Français, a" }).langues).toContain("« a »");
+    expect(refusDeLaCreation({ ...saisie, langues: " , ; " }).langues).toContain("au moins une langue");
+  });
+
+  it("les bornes hautes sont celles de la route", () => {
+    expect(refusDeLaCreation({ ...saisie, nom: "x".repeat(121) }).nom).toContain("120");
+    expect(refusDeLaCreation({ ...saisie, motif: "x".repeat(501) }).motif).toContain("500");
+  });
+
+  it("les langues se lisent sans vide ni doublon", () => {
+    expect(languesSaisies(" Français ; anglais,français ,, Wolof ")).toEqual([
+      "Français",
+      "anglais",
+      "Wolof",
+    ]);
+  });
+
+  it("le corps envoyé est celui que la route attend", () => {
+    expect(corpsDeCreation({ ...saisie, nom: "  Maître F. Sow ", delai: " 48 " })).toEqual({
+      nom: "Maître F. Sow",
+      cabinet: "Sow & Associés",
+      ville: "Dakar",
+      qualification: "Avocate, 12 ans",
+      langues: ["Français", "wolof"],
+      delaiReponseHeures: 48,
+      motif: "Inscription vérifiée au barreau de Dakar.",
+    });
+  });
+
+  it("la route lit les mêmes bornes que l'écran, aucune en dur", () => {
+    const route = sansCommentaires(readFileSync("src/app/api/admin/consultants/route.ts", "utf8"));
+    const creation = route.slice(route.indexOf("POST = route"), route.indexOf("PUT = route"));
+    for (const champ of ["nom", "cabinet", "ville", "qualification", "motif"] as const) {
+      expect(creation).toContain(`min(B.${champ}.min).max(B.${champ}.max)`);
+    }
+    expect(creation).toContain("min(B.delaiHeures.min).max(B.delaiHeures.max)");
+    expect(route).toContain("min(B.langue.min)");
+    expect(BORNES_CONSULTANT.delaiHeures.max).toBe(24 * 14);
   });
 });

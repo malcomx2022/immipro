@@ -179,7 +179,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès ; route (`routes-ecritures`) et écriture sur base jetable (`smoke:partenaires`, § 14) | Conditions d'affiliation |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
-| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression, suspension et rétablissement), B-04 (rapprochement, grand livre), B-06 (habilitations), B-08, veille et textes juridiques en navigateur, rôles, journal, facturation (§ 13, § 16) | B-04 remboursements (M.C) ; validation d'un texte juridique (Q.A) |
+| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression, suspension et rétablissement), B-04 (rapprochement, grand livre), B-06 (habilitations), B-09 (création d'un consultant, § 20), B-08, veille et textes juridiques en navigateur, rôles, journal, facturation (§ 13, § 16) | B-04 remboursements (M.C) ; validation d'un texte juridique (Q.A) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
 
 ### 5.2 Modules techniques
@@ -676,7 +676,8 @@ défaut relevé par ces gestes ; aucun code applicatif modifié.
 
 **Ce qui reste non vérifié en navigateur.** Les remboursements B-04
 (rail réel, M.C) ; la publication d'un texte juridique (Q.A) ; la
-création d'un consultant, qui n'a pas d'écran (route seule).
+création d'un consultant, qui n'avait pas d'écran (route seule) : écran
+ajouté en S.196 (§ 20).
 
 ## 17. S.193 — R-O05 fiabilisé sous Firefox, lot dédié — 25/10/2026
 
@@ -711,3 +712,40 @@ toucherait tous les parcours sans preuve.
 
 **Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc,
 R-O05 compris ; Firefox et WebKit à la porte CI.
+
+## 20. S.196 — création d'un consultant à l'écran (B-09), lot dédié — 26/10/2026
+
+Troisième des quatre lots demandés par le responsable le 26/10, qui a
+retenu l'écran. Base : `73e1e30` (#315 fusionnée) ; S.194 et S.195 sont
+proposés à part.
+
+**Constat.** `POST /api/admin/consultants` existait et journalisait
+`consultant.creation`, mais aucun écran ne l'appelait : un consultant ne
+s'ajoutait que par l'API, et B-09 n'administrait que les fiches déjà
+présentes.
+
+**Ce qui change.**
+
+- B-09 porte un formulaire « Ajouter un consultant » (nom, cabinet,
+  ville, qualification, langues, délai de réponse en heures, motif), un
+  vrai `<form>` où Entrée envoie (D-16), ajouté à `formulaires.test.ts`.
+- Les refus sont ceux de la route, dits avant l'envoi : le domaine
+  (`refusDeLaCreation`, `BORNES_CONSULTANT`) porte les bornes, et la route
+  les lit au lieu de les écrire en dur. Un champ vide est dit par le
+  bouton ; un champ saisi et refusé, sous lui-même.
+- Après la création, l'écran dit que la fiche reste invisible dans
+  l'annuaire tant qu'aucune habilitation n'est vérifiée (RG-12.1) ; la
+  saisie est vidée et la liste rafraîchie. Un refus de la route garde la
+  saisie.
+
+**Preuves.** Huit essais du domaine et de la route
+(`consultants-admin.test.ts`), deux de `formulaires.test.ts`, quatre essais d'écran
+(`tests/ui/consultants-creation.test.tsx`), un parcours navigateur au
+bureau : délai « 48h » refusé sous son champ, motif manquant dit par le
+bouton, création, fiche en base avec langues dédoublonnées et délai,
+aucune habilitation, `consultant.creation` au journal avec le motif,
+fiche affichée « Aucune habilitation en cours ». Parcours 62/62 sur
+Chromium 390 et 1 440 ; porte unitaire 204 fichiers, 4 070 tests.
+
+**Limite.** Le parcours crée une fiche par profil : le banc les garde,
+sans habilitation, donc hors de tout annuaire.

@@ -8,13 +8,18 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { MENTION_AUDIT } from "@/domain/backoffice/navigation";
 import {
+  APRES_CREATION,
   CONSEQUENCE_ETAT,
   LIBELLE_ETAT,
   RAPPEL_VERIFICATION,
+  SAISIE_CONSULTANT_VIDE,
+  corpsDeCreation,
   destinationsCouvertes,
   etatDuConsultant,
+  refusDeLaCreation,
   resumeCouverture,
   type ConsultantAdministre,
+  type SaisieConsultant,
 } from "@/domain/backoffice/consultants";
 import { jourEnFrancais } from "@/domain/format/moment";
 import { appeler } from "@/lib/api";
@@ -83,6 +88,8 @@ export function Consultants({ consultants, destinations }: ConsultantsProps) {
         {RAPPEL_VERIFICATION}
       </p>
 
+      <NouveauConsultant />
+
       {consultants.length === 0 ? (
         <p className="rounded-lg bg-white p-4 text-14 text-ink-700">
           Aucun consultant enregistré. L&apos;annuaire candidat reste vide tant
@@ -104,6 +111,116 @@ export function Consultants({ consultants, destinations }: ConsultantsProps) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * S.196 — créer la fiche d'un consultant. La route existait sans écran :
+ * on ne l'ajoutait qu'à la main, par l'API. Les refus sont ceux de la
+ * route, dits avant l'envoi ; la fiche créée n'a aucune habilitation, et
+ * l'écran le rappelle aussitôt (RG-12.1).
+ */
+function NouveauConsultant() {
+  const router = useRouter();
+  const [saisie, setSaisie] = useState<SaisieConsultant>(SAISIE_CONSULTANT_VIDE);
+  const [envoi, setEnvoi] = useState(false);
+  const [echec, setEchec] = useState<EchecCandidat | null>(null);
+  const [cree, setCree] = useState(false);
+
+  const refus = refusDeLaCreation(saisie);
+  const premierRefus = Object.values(refus)[0];
+  // Un champ vide ne crie pas : il est dit par le bouton. Un champ saisi
+  // et refusé dit pourquoi, sous lui-même.
+  const erreur = (champ: keyof SaisieConsultant) =>
+    saisie[champ].trim() ? refus[champ] : undefined;
+  const changer = (champ: keyof SaisieConsultant) => (e: { target: { value: string } }) => {
+    const valeur = e.target.value;
+    setCree(false);
+    setSaisie((s) => ({ ...s, [champ]: valeur }));
+  };
+
+  async function creer(e: React.FormEvent) {
+    e.preventDefault();
+    if (premierRefus || envoi) return;
+    setEnvoi(true);
+    setEchec(null);
+    const resultat = await appeler("/api/admin/consultants", { corps: corpsDeCreation(saisie) });
+    setEnvoi(false);
+    if (!resultat.ok) {
+      // Rien n'est perdu : la saisie reste.
+      setEchec(resultat.echec);
+      return;
+    }
+    setSaisie(SAISIE_CONSULTANT_VIDE);
+    setCree(true);
+    router.refresh();
+  }
+
+  return (
+    <section
+      aria-labelledby="nouveau-consultant"
+      className="flex flex-col gap-3 rounded-lg bg-white p-4 shadow-e2"
+    >
+      <h2 id="nouveau-consultant" className="text-16 font-semibold text-ink-900">
+        Ajouter un consultant
+      </h2>
+      {cree ? (
+        <p role="status" className="text-pretty text-13 text-ink-700">
+          {APRES_CREATION}
+        </p>
+      ) : null}
+      {echec ? <BlocEchec echec={echec} annonce /> : null}
+      <form noValidate onSubmit={(e) => void creer(e)} className="flex flex-col gap-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Input libelle="Nom" value={saisie.nom} onChange={changer("nom")} erreur={erreur("nom")} />
+          <Input
+            libelle="Cabinet"
+            value={saisie.cabinet}
+            onChange={changer("cabinet")}
+            erreur={erreur("cabinet")}
+          />
+          <Input libelle="Ville" value={saisie.ville} onChange={changer("ville")} erreur={erreur("ville")} />
+          <Input
+            libelle="Qualification"
+            placeholder="Avocate, 12 ans"
+            value={saisie.qualification}
+            onChange={changer("qualification")}
+            erreur={erreur("qualification")}
+          />
+          <Input
+            libelle="Langues de travail"
+            aide="Séparées par des virgules."
+            value={saisie.langues}
+            onChange={changer("langues")}
+            erreur={erreur("langues")}
+          />
+          <Input
+            libelle="Délai de réponse, en heures"
+            inputMode="numeric"
+            value={saisie.delai}
+            onChange={changer("delai")}
+            erreur={erreur("delai")}
+          />
+        </div>
+        <Input
+          libelle="Motif de la création"
+          aide="Ce que tu as consulté avant de créer la fiche."
+          value={saisie.motif}
+          onChange={changer("motif")}
+          erreur={erreur("motif")}
+        />
+        <Button
+          type="submit"
+          variante="secondaire"
+          className="md:w-auto md:self-start"
+          chargement={envoi}
+          disabled={Boolean(premierRefus)}
+          raisonDesactivation={premierRefus}
+        >
+          Créer le consultant
+        </Button>
+      </form>
+    </section>
   );
 }
 
