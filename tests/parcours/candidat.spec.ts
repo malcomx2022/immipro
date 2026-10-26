@@ -1100,6 +1100,120 @@ const VERDICT_INTENABLE = /^(La date de dépôt est passée|Une pièce obligatoi
  * date proposée. Chaque geste est lu en base : la date cible et les
  * échéances recalculées depuis la règle figée (INV-3).
  */
+/**
+ * WF-07, C-09 et B-05 (S.195) : la relecture humaine de la complétude
+ * (avis L.A du 03/10/2026). Le candidat demande, avec ce qui lui semble
+ * inexact ; une seule demande en attente par dossier ; le relecteur répond
+ * sous le vocabulaire de l'écran candidat ; la réponse part dans les
+ * alertes, au journal, et sur l'écran de la complétude.
+ */
+test("WF-07 relecture de la complétude : demande unique, réponse refusée puis relue, alerte et journal", async () => {
+  const demandes = () =>
+    lire<{ id: string; status: string; explanation: string; answer: string | null; resolvedBy: string | null }>(
+      `SELECT id, status, explanation, answer, "resolvedBy" FROM "CompletenessReviewRequest"
+        WHERE "applicationId"=$1 ORDER BY "createdAt"`,
+      [dossier],
+    );
+  expect(await demandes()).toHaveLength(0);
+
+  // Par la vue « Complétude » de la checklist.
+  await aller(`/dossiers/${dossier}`);
+  await page
+    .getByRole("navigation", { name: "Vues du dossier" })
+    .getByRole("link", { name: "Complétude", exact: true })
+    .click();
+  await page.waitForURL(`**/dossiers/${dossier}/completude`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Complétude de ton dossier");
+  await attendreLHydratation(page, "section[aria-labelledby=relecture-completude] button");
+  const ecran = await page.locator("main").innerText();
+  expect(verifierTexte(ecran, INTERDITS_ECRAN_CANDIDAT), ecran).toEqual([]);
+
+  await page.getByRole("button", { name: "Demander une relecture", exact: true }).click();
+  const champ = page.getByLabel("Qu'est-ce qui te semble inexact ?", { exact: true });
+  const envoyer = page.getByRole("button", { name: "Envoyer la demande", exact: true });
+  // Moins de vingt caractères : l'envoi reste fermé et l'aide dit quoi écrire.
+  await champ.fill("Le passeport");
+  await expect(envoyer).toBeDisabled();
+  // L'aide du champ, et la raison que le bouton fermé annonce.
+  await expect(page.getByText(/une pièce comptée comme manquante/u)).toHaveCount(2);
+  const explication = "Recette S.195 : mon passeport est déposé et conforme, il me semble compté à part.";
+  await champ.fill(explication);
+  const [demande] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().endsWith(`/completude/relecture`),
+    ),
+    envoyer.click(),
+  ]);
+  expect(demande.ok()).toBe(true);
+  await expect(page.getByRole("status").filter({ hasText: "Ta demande de relecture est enregistrée" })).toBeVisible();
+  const [enAttente] = await demandes();
+  expect(enAttente).toMatchObject({ status: "EN_ATTENTE", explanation: explication, answer: null });
+
+  // Une seule demande en attente par dossier : l'écran ne la repropose plus,
+  // et la route la refuse sans rien écrire.
+  await aller(`/dossiers/${dossier}/completude`);
+  await expect(page.getByRole("button", { name: "Demander une relecture", exact: true })).toHaveCount(0);
+  const doublon = await page.request.post(`/api/dossiers/${dossier}/completude/relecture`, {
+    data: { explication: "Recette S.195 : seconde demande pendant que la première attend." },
+  });
+  expect(doublon.status()).toBeGreaterThanOrEqual(400);
+  expect(await demandes()).toHaveLength(1);
+
+  // B-05 : le relecteur répond. Une note ou une promesse est refusée par la
+  // route, rien n'est écrit ; une réponse relue part au candidat.
+  const b = await administration();
+  await aller("/revue", b);
+  const carte = b.locator("article").filter({ hasText: email }).filter({ hasText: explication });
+  await expect(carte).toHaveCount(1);
+  const reponse = carte.getByLabel("Réponse au candidat", { exact: true });
+  const repondre = carte.getByRole("button", { name: "Répondre", exact: true });
+  await reponse.fill("Relu : tes chances d'obtention sont bonnes, ton score est complet.");
+  const [refusee] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/completude/relectures/")),
+    repondre.click(),
+  ]);
+  expect(refusee.ok()).toBe(false);
+  await expect(carte.getByText(/cette réponse est lue par le candidat/u)).toBeVisible();
+  expect((await demandes())[0]!.status).toBe("EN_ATTENTE");
+  const texteRelu =
+    "Relu : ton passeport est bien compté parmi les pièces conformes. Il reste la preuve de ressources à déposer.";
+  await reponse.fill(texteRelu);
+  const [acceptee] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/completude/relectures/")),
+    repondre.click(),
+  ]);
+  expect(acceptee.ok()).toBe(true);
+  await expect(carte).toHaveCount(0);
+
+  const [traitee] = await demandes();
+  expect(traitee).toMatchObject({ status: "TRAITEE", answer: texteRelu });
+  expect(traitee!.resolvedBy).not.toBeNull();
+  const [alerte] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "Notification" WHERE "applicationId"=$1 AND title=$2 AND body=$3`,
+    [dossier, "Relecture de ta complétude", texteRelu],
+  );
+  expect(Number(alerte!.n)).toBe(1);
+  const [trace] = await lire<{ reason: string }>(
+    `SELECT reason FROM "AuditLog" WHERE action='dossier.completude.relecture' AND target=$1
+      ORDER BY "createdAt" DESC LIMIT 1`,
+    [`application:${dossier}`],
+  );
+  expect(trace!.reason).toBe(texteRelu);
+
+  // Le candidat lit la réponse sur l'écran, et peut redemander.
+  await aller(`/dossiers/${dossier}/completude`);
+  await expect(page.getByText("Réponse à ta dernière demande")).toBeVisible();
+  await expect(page.getByText(texteRelu)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Demander une relecture", exact: true })).toBeVisible();
+  await aller("/notifications");
+  await expect(page.getByText("Relecture de ta complétude").first()).toBeVisible();
+  preuves.push({
+    controle:
+      "Relecture de complétude : demande refusée sous vingt caractères, une seule en attente, réponse promettant refusée par la route, réponse relue en alerte, au journal et à l'écran",
+    conforme: true,
+  });
+});
+
 test("échéancier : date fixée depuis l'écran, calendrier intenable, date proposée reprise", async () => {
   const echeances = () =>
     lire<{ code: string; dueAt: string }>(

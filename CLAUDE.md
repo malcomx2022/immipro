@@ -77,6 +77,16 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.195 — relecture de la complétude en navigateur (WF-07) — 26/10/2026
+
+Deuxième des quatre lots du 26/10, sur sa branche. Base `73e1e30`
+(#315 fusionnée). Parcours de l'avis L.A : demande depuis C-09 (moins de
+vingt caractères refusée), une seule en attente (écran et route), réponse
+B-05 promettante refusée par la route, réponse relue en alerte, au
+journal comme motif et sur C-09. Deux mutations de `repondreALaRelecture`
+détectées. Aucun défaut relevé. WF-07 passe « éprouvé ». Lire
+[la revue, § 19](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.193 — R-O05 fiabilisé sous Firefox — 25/10/2026
 
 Lot dédié demandé par le responsable. Base `5221dcc` (#314 fusionnée,

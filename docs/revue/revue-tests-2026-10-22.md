@@ -171,7 +171,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
 | WF-05 Achat de pack | Bloqué (M.C) | Tunnel, FedaPay, réconciliation, remboursement, montée sur PostgreSQL ; achat scripté en navigateur | Bac à sable réel FedaPay/Stripe, certification fiscale, essai réel |
 | WF-06 Pièces et analyse | Bloqué (L5) | Balayage, extraction, destination L1, mesure L2 ; dépôt, coupure, réponse tardive, revue B-05 en navigateur | Qualification réelle Vertex `eu` |
-| WF-07 Complétude | Partiel | Domaine `completeness/`, relecture humaine, transitions ; péremption en navigateur, C-16/C-17 corrigés (§ 13) | Relecture de complétude en navigateur |
+| WF-07 Complétude | Éprouvé | Domaine `completeness/`, transitions ; péremption en navigateur, C-16/C-17 corrigés (§ 13) ; relecture humaine de la complétude en navigateur, de la demande à la réponse (§ 19) | — |
 | WF-08 Rédaction assistée | Bloqué (L5) | Avis L3, relecture exclusive L4, rédaction ; parcours rédaction, DOCX, deux onglets, saisie tardive (S.182) | Modèle réel qualifié |
 | WF-09 Échéancier et rappels | Partiel | `smoke:rappels`, `smoke:depot` ; échéancier et fuseau en navigateur, C-15 corrigé (§ 13) | Réception courriel réelle |
 | WF-10 Clôture, issue, purge | Éprouvé | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré, clôture, purge effective et portabilité (§ 13) | — |
@@ -711,3 +711,29 @@ toucherait tous les parcours sans preuve.
 
 **Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc,
 R-O05 compris ; Firefox et WebKit à la porte CI.
+
+## 19. S.195 — relecture de la complétude en navigateur (WF-07), lot dédié — 26/10/2026
+
+Deuxième des quatre lots demandés par le responsable le 26/10. Base :
+`73e1e30` (#315 fusionnée) ; S.194 (§ 18) est proposé à part, sur sa
+propre branche.
+
+**Parcours ajouté** à `tests/parcours/candidat.spec.ts`, avant
+l'échéancier : la relecture humaine de la complétude (avis L.A du
+03/10/2026), demandée depuis C-09 et traitée dans B-05.
+
+| Étape | Ce qui est vérifié, à l'écran et en base |
+|---|---|
+| Accès | Par la vue « Complétude » de la checklist ; vocabulaire interdit absent de C-09 |
+| Demande trop courte | Moins de vingt caractères : envoi fermé, l'aide dit quoi écrire (champ et raison du bouton) |
+| Demande | `CompletenessReviewRequest` en attente avec l'explication ; mention « Ta demande de relecture est enregistrée » |
+| Unicité | L'écran ne propose plus de demande ; la route refuse une seconde demande, une seule ligne en base |
+| Réponse refusée | « chances d'obtention », « score » : la route refuse, l'aide le dit, la demande reste en attente |
+| Réponse relue | Demande traitée avec la réponse et son auteur ; une alerte « Relecture de ta complétude » ; la réponse comme motif au journal |
+| Retour au candidat | La réponse sur C-09, une nouvelle demande possible, l'alerte dans les notifications |
+
+**Preuves.** Parcours 62/62 sur Chromium 390 et 1 440 (31 par profil) ;
+Firefox et WebKit à la porte CI. Deux mutations de
+`repondreALaRelecture` détectées : vocabulaire non vérifié (réponse
+promettante acceptée) et alerte non créée. Aucun défaut relevé ; aucun
+code applicatif modifié.
