@@ -28,6 +28,7 @@ import {
   INTERDITS_ECRAN_CANDIDAT,
   verifierTexte,
 } from "../../src/domain/copy/vocabulaire-interdit";
+import { EDITORIAL } from "../../src/lib/contenu/destinations";
 import {
   codeDeVerification,
   controlerLesFournisseurs,
@@ -495,6 +496,140 @@ test("inscription : téléphone normalisé, code capturé, vérification par Ent
     controle:
       "Inscription, téléphone normalisé en base, courrier capturé, vérification par Entrée, état vide du tableau de bord",
     renvoisDuCode: renvois,
+    conforme: true,
+  });
+});
+
+/**
+ * WF-03, C-03 (S.194) : le comparateur montre exactement les règles qu'un
+ * candidat peut lire, et les valeurs du référentiel. Les règles attendues
+ * sont relues en base, en lecture seule, sous les conditions de la
+ * requête candidate (publiée, hors `SECONDAIRE` — INV-4 —, relecture non
+ * échue, en vigueur) : une colonne de trop ou de moins se voit.
+ */
+test("WF-03 comparateur : colonnes des règles visibles, valeurs du référentiel, source datée, fiche et ouverture", async () => {
+  type Regle = {
+    cle: string;
+    rules: {
+      preuve_fonds: { valeur: number; devise: string; periodicite: string } | null;
+      apres_etudes: { duree_mois: number | null } | null;
+      delai_traitement_jours: { min: number; max: number } | null;
+      langues_acceptees: string[];
+      niveau_langue_min: string | null;
+      frais_dossier: { valeur: number; devise: string } | null;
+      travail_autorise: { permis_employeur_requis: boolean };
+    };
+    hote: string;
+    verifie: string;
+  };
+  const visibles = (
+    await lire<Regle>(
+      `SELECT "countryCode" || '/' || "visaType" AS cle, rules,
+              regexp_replace(substring("sourceUrl" from '^https?://([^/]+)'), '^www\\.', '') AS hote,
+              to_char("verifiedAt", 'YYYY-MM-DD') AS verifie
+         FROM "VisaRule"
+        WHERE status = 'PUBLISHED' AND "sourceTier" <> 'SECONDAIRE'
+          AND "nextReviewAt" >= (now() AT TIME ZONE 'UTC')::date
+          AND "effectiveFrom" <= (now() AT TIME ZONE 'UTC')::date
+          AND ("effectiveTo" IS NULL OR "effectiveTo" >= (now() AT TIME ZONE 'UTC')::date)`,
+    )
+  ).filter((r) => EDITORIAL[r.cle]);
+  expect(visibles.length).toBeGreaterThan(1);
+  const parSlug = new Map(visibles.map((r) => [`/fiches/${EDITORIAL[r.cle]!.slug}`, r]));
+
+  // Le candidat y arrive par l'état vide de son tableau de bord.
+  await page.getByRole("link", { name: "Parcourir les destinations", exact: true }).click();
+  await page.waitForURL("**/comparateur");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    `Comparer ${visibles.length} destinations`,
+  );
+  await attendreLHydratation(page, "table a");
+  await relever();
+  if (largeur < 768) {
+    await expect(page.getByText("Fais défiler le tableau vers la droite.")).toBeVisible();
+  }
+
+  const tableau = page.getByRole("table", {
+    name: "Exigences publiées de trois destinations, critère par critère",
+  });
+  const colonnes = await tableau
+    .locator("thead th a")
+    .evaluateAll((liens) => liens.map((a) => new URL((a as HTMLAnchorElement).href).pathname));
+  expect([...colonnes].sort()).toEqual([...parSlug.keys()].sort());
+
+  const lignes = await tableau.locator("tbody tr").evaluateAll((trs) =>
+    Object.fromEntries(
+      trs.map((tr) => [
+        tr.querySelector("th")!.textContent!.trim(),
+        [...tr.querySelectorAll("td")].map((td) => td.textContent!.trim()),
+      ]),
+    ),
+  );
+  const nombre = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
+  const attendu: Record<string, (r: Regle["rules"]) => string> = {
+    "Ressources à prouver": (r) =>
+      r.preuve_fonds
+        ? `${nombre(r.preuve_fonds.valeur)} ${r.preuve_fonds.devise}${
+            r.preuve_fonds.periodicite === "mensuel" ? " / mois" : " / an"
+          }`
+        : "Non exigé",
+    "Après diplôme": (r) =>
+      r.apres_etudes?.duree_mois ? `${r.apres_etudes.duree_mois} mois` : "Aucun dispositif",
+    "Délai d'instruction": (r) =>
+      r.delai_traitement_jours
+        ? `${r.delai_traitement_jours.min} à ${r.delai_traitement_jours.max} jours`
+        : "Non communiqué",
+    "Langue du cursus": (r) =>
+      r.niveau_langue_min
+        ? `${r.langues_acceptees.join(", ")} — ${r.niveau_langue_min}`
+        : r.langues_acceptees.join(", "),
+    "Frais de demande": (r) =>
+      r.frais_dossier ? `${nombre(r.frais_dossier.valeur)} ${r.frais_dossier.devise}` : "Aucun",
+  };
+  for (const [critere, valeur] of Object.entries(attendu)) {
+    expect(lignes[critere], critere).toEqual(colonnes.map((c) => valeur(parSlug.get(c)!.rules)));
+  }
+  // Les deux lignes calculées ailleurs (conversion, travail) sont remplies.
+  for (const critere of ["Coût 1re année", "Travail étudiant"]) {
+    expect(lignes[critere]).toHaveLength(colonnes.length);
+    for (const cellule of lignes[critere]!) expect(cellule).not.toBe("");
+  }
+
+  // RG-03.3 : l'encadré n'apparaît que si le contraste existe.
+  const permis = visibles.some((r) => r.rules.travail_autorise.permis_employeur_requis);
+  await expect(page.getByRole("heading", { name: "Le travail étudiant se lit de près" })).toHaveCount(
+    permis ? 1 : 0,
+  );
+  // INV-8 : la vérification la plus ancienne et toutes les sources. INV-1.
+  const [a, m, j] = visibles.map((r) => r.verifie).sort()[0]!.split("-");
+  const mention = page.getByText(/^Information vérifiée le /u);
+  await expect(mention).toContainText(`${j}/${m}/${a}`);
+  for (const hote of new Set(visibles.map((r) => r.hote))) await expect(mention).toContainText(hote);
+  await expect(mention).toContainText("il ne prédit aucune décision");
+  const texte = await page.locator("main").innerText();
+  expect(verifierTexte(texte, INTERDITS_ECRAN_CANDIDAT), texte).toEqual([]);
+
+  // Une colonne mène à sa fiche ; le retour garde le tableau.
+  const premiere = parSlug.get(colonnes[0]!)!;
+  await tableau.locator("thead th a").first().click();
+  await page.waitForURL(`**${colonnes[0]}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(EDITORIAL[premiere.cle]!.pays);
+  await page.goBack();
+  await page.waitForURL("**/comparateur");
+  await expect(tableau.locator("thead th a")).toHaveCount(visibles.length);
+
+  // L'action du pied de page ouvre le parcours suivant, sans rien créer.
+  await page.getByRole("link", { name: "Ouvrir un dossier", exact: true }).click();
+  await page.waitForURL("**/dossiers/nouveau");
+  const [dossiers] = await lire<{ n: string }>(
+    'SELECT count(*) AS n FROM "Application" WHERE "userId"=$1',
+    [compte],
+  );
+  expect(Number(dossiers!.n)).toBe(0);
+  preuves.push({
+    controle:
+      "Comparateur : colonnes égales aux règles lisibles en base, cinq critères égaux au référentiel, source datée, fiche, ouverture",
+    colonnes: colonnes.length,
     conforme: true,
   });
 });
