@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.198 — B-04 au jour civil du paiement — 27/10/2026
+
+Lot dédié demandé par le responsable. Base `72963b4` (#316 fusionnée).
+B-04 attendait le paiement de l'achat scripté dans le livre de la journée
+affichée ; une exécution franchissant minuit à Cotonou (porte de #317,
+27/10) le trouvait vide, à raison. Le test lit le jour civil du paiement :
+même jour, présent ; sinon absent du livre du jour et présent dans celui
+de son jour, demandé à la route du bouton. Ne pas supposer que l'achat
+et l'export tombent le même jour. Rouge reproduit en reculant le
+paiement d'un jour. Lire [la revue, § 22](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.194 — comparateur en navigateur (WF-03) — 26/10/2026
 
 Premier des quatre lots demandés par le responsable le 26/10, une branche
