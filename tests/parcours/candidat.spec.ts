@@ -29,6 +29,7 @@ import {
   verifierTexte,
 } from "../../src/domain/copy/vocabulaire-interdit";
 import { CONSEQUENCE_ETAT, LIBELLE_ETAT } from "../../src/domain/backoffice/consultants";
+import { EDITORIAL } from "../../src/lib/contenu/destinations";
 import {
   codeDeVerification,
   controlerLesFournisseurs,
@@ -496,6 +497,140 @@ test("inscription : téléphone normalisé, code capturé, vérification par Ent
     controle:
       "Inscription, téléphone normalisé en base, courrier capturé, vérification par Entrée, état vide du tableau de bord",
     renvoisDuCode: renvois,
+    conforme: true,
+  });
+});
+
+/**
+ * WF-03, C-03 (S.194) : le comparateur montre exactement les règles qu'un
+ * candidat peut lire, et les valeurs du référentiel. Les règles attendues
+ * sont relues en base, en lecture seule, sous les conditions de la
+ * requête candidate (publiée, hors `SECONDAIRE` — INV-4 —, relecture non
+ * échue, en vigueur) : une colonne de trop ou de moins se voit.
+ */
+test("WF-03 comparateur : colonnes des règles visibles, valeurs du référentiel, source datée, fiche et ouverture", async () => {
+  type Regle = {
+    cle: string;
+    rules: {
+      preuve_fonds: { valeur: number; devise: string; periodicite: string } | null;
+      apres_etudes: { duree_mois: number | null } | null;
+      delai_traitement_jours: { min: number; max: number } | null;
+      langues_acceptees: string[];
+      niveau_langue_min: string | null;
+      frais_dossier: { valeur: number; devise: string } | null;
+      travail_autorise: { permis_employeur_requis: boolean };
+    };
+    hote: string;
+    verifie: string;
+  };
+  const visibles = (
+    await lire<Regle>(
+      `SELECT "countryCode" || '/' || "visaType" AS cle, rules,
+              regexp_replace(substring("sourceUrl" from '^https?://([^/]+)'), '^www\\.', '') AS hote,
+              to_char("verifiedAt", 'YYYY-MM-DD') AS verifie
+         FROM "VisaRule"
+        WHERE status = 'PUBLISHED' AND "sourceTier" <> 'SECONDAIRE'
+          AND "nextReviewAt" >= (now() AT TIME ZONE 'UTC')::date
+          AND "effectiveFrom" <= (now() AT TIME ZONE 'UTC')::date
+          AND ("effectiveTo" IS NULL OR "effectiveTo" >= (now() AT TIME ZONE 'UTC')::date)`,
+    )
+  ).filter((r) => EDITORIAL[r.cle]);
+  expect(visibles.length).toBeGreaterThan(1);
+  const parSlug = new Map(visibles.map((r) => [`/fiches/${EDITORIAL[r.cle]!.slug}`, r]));
+
+  // Le candidat y arrive par l'état vide de son tableau de bord.
+  await page.getByRole("link", { name: "Parcourir les destinations", exact: true }).click();
+  await page.waitForURL("**/comparateur");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    `Comparer ${visibles.length} destinations`,
+  );
+  await attendreLHydratation(page, "table a");
+  await relever();
+  if (largeur < 768) {
+    await expect(page.getByText("Fais défiler le tableau vers la droite.")).toBeVisible();
+  }
+
+  const tableau = page.getByRole("table", {
+    name: "Exigences publiées de trois destinations, critère par critère",
+  });
+  const colonnes = await tableau
+    .locator("thead th a")
+    .evaluateAll((liens) => liens.map((a) => new URL((a as HTMLAnchorElement).href).pathname));
+  expect([...colonnes].sort()).toEqual([...parSlug.keys()].sort());
+
+  const lignes = await tableau.locator("tbody tr").evaluateAll((trs) =>
+    Object.fromEntries(
+      trs.map((tr) => [
+        tr.querySelector("th")!.textContent!.trim(),
+        [...tr.querySelectorAll("td")].map((td) => td.textContent!.trim()),
+      ]),
+    ),
+  );
+  const nombre = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
+  const attendu: Record<string, (r: Regle["rules"]) => string> = {
+    "Ressources à prouver": (r) =>
+      r.preuve_fonds
+        ? `${nombre(r.preuve_fonds.valeur)} ${r.preuve_fonds.devise}${
+            r.preuve_fonds.periodicite === "mensuel" ? " / mois" : " / an"
+          }`
+        : "Non exigé",
+    "Après diplôme": (r) =>
+      r.apres_etudes?.duree_mois ? `${r.apres_etudes.duree_mois} mois` : "Aucun dispositif",
+    "Délai d'instruction": (r) =>
+      r.delai_traitement_jours
+        ? `${r.delai_traitement_jours.min} à ${r.delai_traitement_jours.max} jours`
+        : "Non communiqué",
+    "Langue du cursus": (r) =>
+      r.niveau_langue_min
+        ? `${r.langues_acceptees.join(", ")} — ${r.niveau_langue_min}`
+        : r.langues_acceptees.join(", "),
+    "Frais de demande": (r) =>
+      r.frais_dossier ? `${nombre(r.frais_dossier.valeur)} ${r.frais_dossier.devise}` : "Aucun",
+  };
+  for (const [critere, valeur] of Object.entries(attendu)) {
+    expect(lignes[critere], critere).toEqual(colonnes.map((c) => valeur(parSlug.get(c)!.rules)));
+  }
+  // Les deux lignes calculées ailleurs (conversion, travail) sont remplies.
+  for (const critere of ["Coût 1re année", "Travail étudiant"]) {
+    expect(lignes[critere]).toHaveLength(colonnes.length);
+    for (const cellule of lignes[critere]!) expect(cellule).not.toBe("");
+  }
+
+  // RG-03.3 : l'encadré n'apparaît que si le contraste existe.
+  const permis = visibles.some((r) => r.rules.travail_autorise.permis_employeur_requis);
+  await expect(page.getByRole("heading", { name: "Le travail étudiant se lit de près" })).toHaveCount(
+    permis ? 1 : 0,
+  );
+  // INV-8 : la vérification la plus ancienne et toutes les sources. INV-1.
+  const [a, m, j] = visibles.map((r) => r.verifie).sort()[0]!.split("-");
+  const mention = page.getByText(/^Information vérifiée le /u);
+  await expect(mention).toContainText(`${j}/${m}/${a}`);
+  for (const hote of new Set(visibles.map((r) => r.hote))) await expect(mention).toContainText(hote);
+  await expect(mention).toContainText("il ne prédit aucune décision");
+  const texte = await page.locator("main").innerText();
+  expect(verifierTexte(texte, INTERDITS_ECRAN_CANDIDAT), texte).toEqual([]);
+
+  // Une colonne mène à sa fiche ; le retour garde le tableau.
+  const premiere = parSlug.get(colonnes[0]!)!;
+  await tableau.locator("thead th a").first().click();
+  await page.waitForURL(`**${colonnes[0]}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(EDITORIAL[premiere.cle]!.pays);
+  await page.goBack();
+  await page.waitForURL("**/comparateur");
+  await expect(tableau.locator("thead th a")).toHaveCount(visibles.length);
+
+  // L'action du pied de page ouvre le parcours suivant, sans rien créer.
+  await page.getByRole("link", { name: "Ouvrir un dossier", exact: true }).click();
+  await page.waitForURL("**/dossiers/nouveau");
+  const [dossiers] = await lire<{ n: string }>(
+    'SELECT count(*) AS n FROM "Application" WHERE "userId"=$1',
+    [compte],
+  );
+  expect(Number(dossiers!.n)).toBe(0);
+  preuves.push({
+    controle:
+      "Comparateur : colonnes égales aux règles lisibles en base, cinq critères égaux au référentiel, source datée, fiche, ouverture",
+    colonnes: colonnes.length,
     conforme: true,
   });
 });
@@ -1101,6 +1236,120 @@ const VERDICT_INTENABLE = /^(La date de dépôt est passée|Une pièce obligatoi
  * date proposée. Chaque geste est lu en base : la date cible et les
  * échéances recalculées depuis la règle figée (INV-3).
  */
+/**
+ * WF-07, C-09 et B-05 (S.195) : la relecture humaine de la complétude
+ * (avis L.A du 03/10/2026). Le candidat demande, avec ce qui lui semble
+ * inexact ; une seule demande en attente par dossier ; le relecteur répond
+ * sous le vocabulaire de l'écran candidat ; la réponse part dans les
+ * alertes, au journal, et sur l'écran de la complétude.
+ */
+test("WF-07 relecture de la complétude : demande unique, réponse refusée puis relue, alerte et journal", async () => {
+  const demandes = () =>
+    lire<{ id: string; status: string; explanation: string; answer: string | null; resolvedBy: string | null }>(
+      `SELECT id, status, explanation, answer, "resolvedBy" FROM "CompletenessReviewRequest"
+        WHERE "applicationId"=$1 ORDER BY "createdAt"`,
+      [dossier],
+    );
+  expect(await demandes()).toHaveLength(0);
+
+  // Par la vue « Complétude » de la checklist.
+  await aller(`/dossiers/${dossier}`);
+  await page
+    .getByRole("navigation", { name: "Vues du dossier" })
+    .getByRole("link", { name: "Complétude", exact: true })
+    .click();
+  await page.waitForURL(`**/dossiers/${dossier}/completude`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Complétude de ton dossier");
+  await attendreLHydratation(page, "section[aria-labelledby=relecture-completude] button");
+  const ecran = await page.locator("main").innerText();
+  expect(verifierTexte(ecran, INTERDITS_ECRAN_CANDIDAT), ecran).toEqual([]);
+
+  await page.getByRole("button", { name: "Demander une relecture", exact: true }).click();
+  const champ = page.getByLabel("Qu'est-ce qui te semble inexact ?", { exact: true });
+  const envoyer = page.getByRole("button", { name: "Envoyer la demande", exact: true });
+  // Moins de vingt caractères : l'envoi reste fermé et l'aide dit quoi écrire.
+  await champ.fill("Le passeport");
+  await expect(envoyer).toBeDisabled();
+  // L'aide du champ, et la raison que le bouton fermé annonce.
+  await expect(page.getByText(/une pièce comptée comme manquante/u)).toHaveCount(2);
+  const explication = "Recette S.195 : mon passeport est déposé et conforme, il me semble compté à part.";
+  await champ.fill(explication);
+  const [demande] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().endsWith(`/completude/relecture`),
+    ),
+    envoyer.click(),
+  ]);
+  expect(demande.ok()).toBe(true);
+  await expect(page.getByRole("status").filter({ hasText: "Ta demande de relecture est enregistrée" })).toBeVisible();
+  const [enAttente] = await demandes();
+  expect(enAttente).toMatchObject({ status: "EN_ATTENTE", explanation: explication, answer: null });
+
+  // Une seule demande en attente par dossier : l'écran ne la repropose plus,
+  // et la route la refuse sans rien écrire.
+  await aller(`/dossiers/${dossier}/completude`);
+  await expect(page.getByRole("button", { name: "Demander une relecture", exact: true })).toHaveCount(0);
+  const doublon = await page.request.post(`/api/dossiers/${dossier}/completude/relecture`, {
+    data: { explication: "Recette S.195 : seconde demande pendant que la première attend." },
+  });
+  expect(doublon.status()).toBeGreaterThanOrEqual(400);
+  expect(await demandes()).toHaveLength(1);
+
+  // B-05 : le relecteur répond. Une note ou une promesse est refusée par la
+  // route, rien n'est écrit ; une réponse relue part au candidat.
+  const b = await administration();
+  await aller("/revue", b);
+  const carte = b.locator("article").filter({ hasText: email }).filter({ hasText: explication });
+  await expect(carte).toHaveCount(1);
+  const reponse = carte.getByLabel("Réponse au candidat", { exact: true });
+  const repondre = carte.getByRole("button", { name: "Répondre", exact: true });
+  await reponse.fill("Relu : tes chances d'obtention sont bonnes, ton score est complet.");
+  const [refusee] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/completude/relectures/")),
+    repondre.click(),
+  ]);
+  expect(refusee.ok()).toBe(false);
+  await expect(carte.getByText(/cette réponse est lue par le candidat/u)).toBeVisible();
+  expect((await demandes())[0]!.status).toBe("EN_ATTENTE");
+  const texteRelu =
+    "Relu : ton passeport est bien compté parmi les pièces conformes. Il reste la preuve de ressources à déposer.";
+  await reponse.fill(texteRelu);
+  const [acceptee] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/completude/relectures/")),
+    repondre.click(),
+  ]);
+  expect(acceptee.ok()).toBe(true);
+  await expect(carte).toHaveCount(0);
+
+  const [traitee] = await demandes();
+  expect(traitee).toMatchObject({ status: "TRAITEE", answer: texteRelu });
+  expect(traitee!.resolvedBy).not.toBeNull();
+  const [alerte] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "Notification" WHERE "applicationId"=$1 AND title=$2 AND body=$3`,
+    [dossier, "Relecture de ta complétude", texteRelu],
+  );
+  expect(Number(alerte!.n)).toBe(1);
+  const [trace] = await lire<{ reason: string }>(
+    `SELECT reason FROM "AuditLog" WHERE action='dossier.completude.relecture' AND target=$1
+      ORDER BY "createdAt" DESC LIMIT 1`,
+    [`application:${dossier}`],
+  );
+  expect(trace!.reason).toBe(texteRelu);
+
+  // Le candidat lit la réponse sur l'écran, et peut redemander.
+  await aller(`/dossiers/${dossier}/completude`);
+  await expect(page.getByText("Réponse à ta dernière demande")).toBeVisible();
+  await expect(page.getByText(texteRelu)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Demander une relecture", exact: true })).toBeVisible();
+  await aller("/notifications");
+  await expect(page.getByText("Relecture de ta complétude").first()).toBeVisible();
+  preuves.push({
+    controle:
+      "Relecture de complétude : demande refusée sous vingt caractères, une seule en attente, réponse promettant refusée par la route, réponse relue en alerte, au journal et à l'écran",
+    conforme: true,
+  });
+});
+
 test("échéancier : date fixée depuis l'écran, calendrier intenable, date proposée reprise", async () => {
   const echeances = () =>
     lire<{ code: string; dueAt: string }>(
