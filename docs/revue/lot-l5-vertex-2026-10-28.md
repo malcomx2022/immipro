@@ -1,4 +1,4 @@
-# S.201 — L5 : premier passage Vertex `--pieces L01,R03`
+# S.201 — L5 : passages Vertex du 28/10, `L01,R03` puis le restant
 
 **28/10/2026**, base `de63b49` (#322 fusionnée), branche
 `claude/dreamy-heisenberg-49uym4`. Instruction du responsable : « lance le
@@ -41,7 +41,7 @@ incident, aucun arrêt de campagne.
   4 824,01 XOF, soit 109 invocations. Le jeu complet en demande 56 (29
   pièces, 9 rédactions et 9 relectures, 9 avis), soit 2 464 XOF : couvert.
 
-## Points à lever avant le jeu complet
+## Points relevés après le premier passage
 
 1. **Raisonnement compté ?** L'extraction L01 rend 36 jetons de sortie
    avec un raisonnement `low` demandé. L'adaptateur ne lit que
@@ -52,25 +52,62 @@ incident, aucun arrêt de campagne.
    projet `projetanatt` (SKU de sortie du 28/10 contre 1 270 jetons) avant
    la suite ; le relevé de la réserve n'en dépend pas.
 2. **PDF non éprouvé** : L01 est une image ; le chemin `image_url` des
-   pièces PDF n'a pas encore été appelé. Le jeu complet le couvre, sans
-   rejouer L01 ni R03.
+   pièces PDF n'avait pas encore été appelé (levé au second passage).
 3. Devise de facturation et taxes du compte, toujours à confirmer.
+
+## Second passage : le restant, arrêté sur L06
+
+Lancé le même jour à la demande du responsable, sur les 56 invocations
+restantes (L02 à L30, R01, R02, R04 à R10), commande du protocole avec
+`--pieces` limité au restant, même journal, arbre propre.
+
+| Cas | Format | Entrée / sortie | ms | Constat |
+|---|---|---|---|---|
+| L02 | JPEG | 1 668 / 36 | 6 326 | `A_CORRIGER`, comme attendu |
+| L03 | PDF | 1 108 / 56 | 11 400 | `A_CORRIGER`, comme attendu |
+| L04 | PNG | 1 668 / 36 | 9 868 | `CONFORME`, comme attendu |
+| L05 | PDF | 1 136 / 35 | 21 440 | `CONFORME`, comme attendu |
+| L06 | PDF | inconnue | 120 002 | `delai_depasse`, mesure `INCONNUE` |
+
+- Le chemin PDF `image_url` passe (L03, L05) : le point 2 ci-dessus est levé.
+- L06 a épuisé le délai client de 120 s. La réponse n'a pas été reçue : on
+  ne sait pas si Vertex a traité, ni facturé, la demande. La latence
+  montait déjà (L05 à 21 s).
+- La campagne s'est arrêtée d'elle-même, comme prévu : `blocage:
+  MESURE_A_RAPPROCHER`, réserve gardée, aucun appel suivant. Le banc
+  n'a fabriqué aucun rapport, et aucune rédaction n'a été lancée.
+- Réserve prudente : 9 invocations, 395,97 XOF ; restant 4 604,03 XOF.
+  Coût mesuré des quatre appels connus : 0,0053 USD ; L06 est borné par
+  sa réserve de 44 XOF, jamais compté zéro.
+
+**Reprise interdite** tant que L06 n'est pas rapproché : le banc refuse
+tout nouveau réseau sur ce journal, et il ne faut ni retirer le blocage
+à la main ni ouvrir un second journal. Pour lever le blocage, il faut
+d'abord relever dans la console du projet `projetanatt` les requêtes du
+28/10 entre 17 h 27 et 17 h 30 UTC (journal de requêtes, SKU d'entrée et de sortie).
+Puis le responsable décide de la reprise et du délai : faut-il
+l'allonger pour les PDF, ou la latence vient-elle de Vertex ?
 
 ## Preuves
 
-[`passage-2026-10-28-L01-R03/`](preuves-l5-vertex-2026-10-16/passage-2026-10-28-L01-R03/) :
-`passage.json`, `appels.json`, `resultats.json`, `rapport.md`, la lettre
-R03 (pour les grilles humaines) et `journal/budget.json`, copie à
-l'identique du journal privé (SHA-256 `03f9cc34…bd351`). Aucun secret.
+Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
 
-**Reprise dans une nouvelle session** : copier
-`journal/budget.json` vers
+- `passage-2026-10-28-L01-R03/` : `passage.json`, `appels.json`,
+  `resultats.json`, `rapport.md` et la lettre R03 (pour les grilles
+  humaines) ;
+- `passage-2026-10-28-restant/` : `passage.json`, `appels.json` (le banc
+  arrêté ne produit ni rapport ni résultats) ;
+- `journal/budget.json` : copie à l'identique du journal privé **après le
+  second passage** (SHA-256 `9ddea761…2bf07e`), bloqué. C'est la seule
+  copie : elle remplace celle du premier passage. Aucun secret.
+
+**Reprise dans une nouvelle session** : copier `journal/budget.json` vers
 `.qualification-vertex/projetanatt-eu-gemini-3.8-flash/budget.json` avant
-tout passage, vérifier l'empreinte, puis lancer le restant. Ne jamais
-relancer sans ce journal : ce serait ouvrir un second budget.
+tout passage, puis vérifier l'empreinte. Ne jamais relancer sans ce
+journal : ce serait ouvrir un second budget et effacer le blocage.
 
 ## Reste à faire et non prouvé
 
-Jeu complet, rapprochement avec la facture, deux grilles humaines, DPA,
-résidence, conservation, incidents réels, configuration déployée.
+Rapprochement de L06, fin du jeu (51 invocations), rapprochement avec
+la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.

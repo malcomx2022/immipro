@@ -77,18 +77,20 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
-### S.201 — L5, premier passage Vertex `--pieces L01,R03` — 28/10/2026
+### S.201 — L5, passages Vertex du 28/10 — 28/10/2026
 
-Demandé par le responsable. Base `de63b49` (#322 fusionnée). Commande du
-protocole, campagne du 16/10 inchangée : quatre appels `CONNUE`, aucun
-incident ; L01 conforme, R03 écrite sans mot interdit, incohérence relevée
-par la relecture et l'avis. Entrée 1 668 / 10 240, sortie 656 / 5 120 ;
-réserve 175,99 XOF, restant 4 824,01 pour 56 invocations prévues. Avant
-le jeu complet : vérifier en console que la sortie facturée correspond à
-`completion_tokens` (36 en extraction malgré `low`), le PDF reste à
-éprouver. Le journal est archivé dans les preuves : le remettre en place
-avant toute reprise, jamais relancer sans lui. L5, Q.A et M.C restent
-ouverts. Lire [le suivi](docs/revue/lot-l5-vertex-2026-10-28.md).
+Demandé par le responsable. Base `de63b49` (#322 fusionnée). Premier
+passage `--pieces L01,R03` : quatre appels `CONNUE` ; entrée 1 668 / 10 240,
+sortie 656 / 5 120. Restant lancé ensuite : L02 à L05 justes, PDF compris ;
+L06 (PDF) dépasse le délai de 120 s, mesure `INCONNUE`, campagne arrêtée
+en `MESURE_A_RAPPROCHER`. Réserve 395,97 XOF pour 9 invocations, restant
+4 604,03. Reprise interdite avant le rapprochement de L06 dans la console
+`projetanatt` : ne pas retirer le blocage à la main, ne pas ouvrir de
+second journal. Seule copie du journal :
+`docs/revue/preuves-l5-vertex-2026-10-16/journal/budget.json`, à remettre
+en place avant toute reprise. À vérifier aussi : la sortie facturée
+compte-t-elle le raisonnement `low` ? L5, Q.A et M.C restent ouverts.
+Lire [le suivi](docs/revue/lot-l5-vertex-2026-10-28.md).
 
 ### S.200 — C-13, la fin prévue sans relais annoncée en B-01 — 28/10/2026
 
