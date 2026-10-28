@@ -112,6 +112,39 @@ Ce changement **ne lève pas** le blocage `MESURE_A_RAPPROCHER` : L06
 reste à rapprocher dans la console avant toute reprise. Le banc exige
 un arbre propre : reprendre depuis un commit qui porte ce délai.
 
+## Rapprochement de L06, puis troisième passage arrêté sur L06
+
+**Rapprochement.** Le responsable a relevé dans la console `projetanatt`
+que la requête L06 du second passage n'avait pas été facturée. Pour le
+consigner sans éditer le journal à la main, le banc a reçu une commande
+dédiée, `npm run banc:ia:rapprocher` (`BudgetVertex.rapprocher`). Elle
+n'appelle pas le réseau et prend le verrou de campagne. Elle ne lève que
+`MESURE_A_RAPPROCHER` : une mesure facturée au-delà d'une borne passe en
+`BORNE_FACTUREE_DEPASSEE`, et tout refus laisse le journal intact. Le
+journal garde l'appel (`L06/extraction`), le constat `NON_FACTUREE`, la
+source et la date. La réserve prudente n'est pas rendue. Huit tests, rouges
+avant le changement.
+
+**Troisième passage** (commit `c1a0ed1`, arbre propre), sur 52
+invocations : L06 à L30, R01, R02, R04 à R10.
+
+| Cas | Format | Entrée / sortie | ms | Constat |
+|---|---|---|---|---|
+| L06 | PDF | inconnue | 180 174 | `delai_depasse` avec le délai de 180 s, mesure `INCONNUE` |
+
+- Avec 180 s, L06 dépasse encore, alors que L03 et L05 (PDF de 60 Ko et
+  50 Ko) répondent en 11 et 21 s ; L06 pèse 48 Ko. Ce n'est donc pas une
+  lenteur générale de Vertex mais un comportement propre à cette pièce
+  (« attestation de bourse annuelle sous le seuil »). Allonger encore le
+  délai n'est pas une réponse : la marge du jeton Google plafonne à 300 s.
+- La campagne s'est de nouveau arrêtée d'elle-même en
+  `MESURE_A_RAPPROCHER`. Réserve prudente : 10 invocations, 439,97 XOF ;
+  restant 4 560,03 XOF.
+- Il faut un second rapprochement de L06 (requête du 28/10 entre 17 h 49
+  et 17 h 53 UTC). Le responsable décide ensuite de la suite : poursuivre
+  sans L06, en le comptant comme échec technique du fournisseur, ou
+  diagnostiquer la pièce d'abord.
+
 ## Preuves
 
 Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
@@ -121,9 +154,12 @@ Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
   humaines) ;
 - `passage-2026-10-28-restant/` : `passage.json`, `appels.json` (le banc
   arrêté ne produit ni rapport ni résultats) ;
+- `passage-2026-10-28-reprise-L06/` : `passage.json`, `appels.json` du
+  troisième passage ;
 - `journal/budget.json` : copie à l'identique du journal privé **après le
-  second passage** (SHA-256 `9ddea761…2bf07e`), bloqué. C'est la seule
-  copie : elle remplace celle du premier passage. Aucun secret.
+  troisième passage** (SHA-256 `0269ce24…`), bloqué, avec le rapprochement
+  du second passage. C'est la seule copie : elle remplace les précédentes.
+  Aucun secret.
 
 **Reprise dans une nouvelle session** : copier `journal/budget.json` vers
 `.qualification-vertex/projetanatt-eu-gemini-3.8-flash/budget.json` avant
@@ -132,6 +168,7 @@ journal : ce serait ouvrir un second budget et effacer le blocage.
 
 ## Reste à faire et non prouvé
 
-Rapprochement de L06, fin du jeu (51 invocations), rapprochement avec
+Second rapprochement de L06, décision sur L06, fin du jeu (51
+invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.

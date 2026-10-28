@@ -92,7 +92,12 @@ en place avant toute reprise. À vérifier aussi : la sortie facturée
 compte-t-elle le raisonnement `low` ? Le délai client d'un PDF passe à
 180 s (`delaiDeLecture`), l'image garde 120 s, dans les deux adaptateurs
 et donc en production ; ne pas dépasser la marge de 300 s du jeton
-Google. Ce délai ne lève pas le blocage. L5, Q.A et M.C restent ouverts.
+Google. Ce délai ne lève pas le blocage. L06 rapproché « non
+facturée » par `npm run banc:ia:rapprocher` (journal tracé, réserve
+gardée ; ne jamais éditer le blocage à la main). Le troisième passage
+s'arrête de nouveau sur L06 à 180 s : comportement propre à la pièce, pas
+un délai à allonger. Réserve 439,97 XOF pour 10 invocations. Second
+rapprochement et décision sur L06 au responsable. L5, Q.A et M.C restent ouverts.
 Lire [le suivi](docs/revue/lot-l5-vertex-2026-10-28.md).
 
 ### S.200 — C-13, la fin prévue sans relais annoncée en B-01 — 28/10/2026

@@ -2,8 +2,8 @@
   "campagne": "projetanatt-eu-gemini-3.8-flash",
   "empreinte": "beca65756cc69591832e2a095af86e363415a6e22e3322f41697ab6edbd0852c",
   "plafondMicrosXof": 5000000000,
-  "reserveMicrosXof": 395974656,
-  "appelsReserves": 9,
+  "reserveMicrosXof": 439971840,
+  "appelsReserves": 10,
   "enCours": null,
   "blocage": "MESURE_A_RAPPROCHER",
   "derniereMesure": {
@@ -12,5 +12,16 @@
     "jetonsSortie": null,
     "fournisseur": "openai_compatible",
     "modele": "google/gemini-3.8-flash"
-  }
+  },
+  "rapprochements": [
+    {
+      "appel": "L06/extraction",
+      "blocage": "MESURE_A_RAPPROCHER",
+      "constat": "NON_FACTUREE",
+      "jetonsEntree": null,
+      "jetonsSortie": null,
+      "source": "Console Google Cloud du projet projetanatt, relevé par le responsable le 28/10/2026 : requête L06 du 28/10 entre 17 h 27 et 17 h 30 UTC non facturée",
+      "consigneLe": "2026-10-28T17:49:29.468Z"
+    }
+  ]
 }

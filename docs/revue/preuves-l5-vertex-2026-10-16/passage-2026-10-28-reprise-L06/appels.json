@@ -1,0 +1,15 @@
+[
+  {
+    "cas": "L06",
+    "fonction": "extraction",
+    "mesure": {
+      "etat": "INCONNUE",
+      "jetonsEntree": null,
+      "jetonsSortie": null,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "millisecondes": 180174,
+    "incident": "delai_depasse"
+  }
+]
