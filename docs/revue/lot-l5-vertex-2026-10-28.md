@@ -5,7 +5,8 @@
 premier passage L5 `--pieces L01,R03` ». Le protocole
 [campagne Vertex](../exploitation/qualification-vertex-l5.md) et le
 [suivi S.181](lot-l5-vertex-2026-10-16.md) ont été relus avant l'appel.
-Aucun code, schéma ni service touché ; aucune fusion ni déploiement.
+Aucun schéma ni service touché ; seul code modifié : le délai des PDF
+(voir plus bas). Aucune fusion ni déploiement.
 
 ## Conditions
 
@@ -87,6 +88,29 @@ d'abord relever dans la console du projet `projetanatt` les requêtes du
 28/10 entre 17 h 27 et 17 h 30 UTC (journal de requêtes, SKU d'entrée et de sortie).
 Puis le responsable décide de la reprise et du délai : faut-il
 l'allonger pour les PDF, ou la latence vient-elle de Vertex ?
+
+## Délai client des PDF allongé
+
+Demandé par le responsable après l'arrêt sur L06. La lecture d'un PDF
+attend désormais **180 s** (`DELAI_EXTRACTION_PDF_MS`, choisi par
+`delaiDeLecture`, domaine). Les images gardent leurs 120 s
+(`DELAI_EXTRACTION_MS`). Le changement vaut pour les deux adaptateurs, compatible et
+Anthropic, donc pour la production comme pour le banc : un PDF qui
+dépasse part toujours en revue humaine, simplement plus tard. Trois
+minutes est déjà le délai d'une rédaction, et le plafond reste sous la
+marge de renouvellement du jeton Google (300 s) : aucun jeton n'expire
+pendant l'appel. Les messages d'échec disent le délai réellement appliqué.
+
+Preuves : `tests/delai-de-lecture.test.ts`, rouge avant la correction
+(six tests) : le domaine, la borne sous la marge du jeton, le délai
+transmis à `AbortSignal.timeout` par le chemin compatible pour un PDF et
+pour une PNG, l'option `timeout` du SDK Anthropic pour un PDF et un JPEG,
+avec le message `delai_depasse`. `npm run check` : lint, types,
+207 fichiers et 4 094 tests, vocabulaire.
+
+Ce changement **ne lève pas** le blocage `MESURE_A_RAPPROCHER` : L06
+reste à rapprocher dans la console avant toute reprise. Le banc exige
+un arbre propre : reprendre depuis un commit qui porte ce délai.
 
 ## Preuves
 

@@ -61,7 +61,7 @@ export const DUREE_DU_JETON_SECONDES = 3600;
 
 /**
  * Un jeton se renouvelle avant d'expirer, pas après : un appel de lecture
- * dure jusqu'à deux minutes, et un jeton qui expire pendant l'appel le
+ * dure jusqu'à trois minutes pour un PDF, et un jeton qui expire pendant l'appel le
  * ferait échouer en `non_configure`, comme une clé refusée.
  */
 export const MARGE_DE_RENOUVELLEMENT_SECONDES = 300;

@@ -2,7 +2,7 @@ import { mesurerLesJetons, DETAIL_MESURE_INCOMPLETE, type MesureDeJetons } from 
 import { fetchSansRedirection } from "@/lib/ia-transport";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import {
-  DELAI_EXTRACTION_MS,
+  delaiDeLecture,
   TYPES_LISIBLES,
   instructions,
   lireLaReponse,
@@ -322,7 +322,7 @@ export async function lireDesOctetsCompatible(
         { role: "user", content: [piece, { type: "text", text: instructions(demande) }] },
       ],
     },
-    DELAI_EXTRACTION_MS,
+    delaiDeLecture(type),
   );
   if (!reponse.ok) return {
     ...sansJetons(reponse.cause, reponse.detail), ...usageDUnEchec(reponse, appel),
