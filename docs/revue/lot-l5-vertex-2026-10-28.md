@@ -219,7 +219,7 @@ ont été rendues en image et comparées.
 
 **Vérification proposée, sans appel** : comparer la sortie facturée du
 28/10 (SKU de sortie Gemini 3.8 Flash, projet `projetanatt`) au total
-mesuré des appels connus, soit 18 033 jetons d'entrée et 1 631 de sortie
+mesuré des appels connus, soit 18 034 jetons d'entrée et 1 631 de sortie
 sur les quatre passages. Une sortie facturée nettement supérieure prouve
 que la réflexion n'est pas comptée : il faudrait alors arrêter la
 campagne et faire lire à l'adaptateur le détail d'usage avant de
