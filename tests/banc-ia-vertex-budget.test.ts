@@ -396,3 +396,120 @@ describe("CLI Vertex budgété avec SDK/OAuth synthétiques", () => {
     20000,
   );
 });
+
+describe("S.201 — rapprochement tracé d'une mesure inconnue", () => {
+  const source = "Console projetanatt, journal des requêtes du 28/10, aucune réponse 200";
+  async function bloque(d: string) {
+    const b = await BudgetVertex.ouvrir(d, campagne());
+    await b.reserver("L06", "extraction");
+    await b.terminer({ ...connue, etat: "INCONNUE", jetonsEntree: null, jetonsSortie: null });
+    await b.fermer();
+  }
+  const lire = async (d: string) => JSON.parse(await readFile(path.join(d, "budget.json"), "utf8"));
+
+  it("non facturée : le blocage tombe, la réserve reste, la trace demeure", async () =>
+    jetable(async (d) => {
+      await bloque(d);
+      const avant = await lire(d);
+      const apres = await BudgetVertex.rapprocher(d, campagne(), {
+        appel: "L06/extraction",
+        constat: "NON_FACTUREE",
+        jetonsEntree: null,
+        jetonsSortie: null,
+        source,
+      });
+      expect(apres).toMatchObject({
+        blocage: null,
+        reserveMicrosXof: avant.reserveMicrosXof,
+        appelsReserves: avant.appelsReserves,
+        rapprochements: [
+          {
+            appel: "L06/extraction",
+            blocage: "MESURE_A_RAPPROCHER",
+            constat: "NON_FACTUREE",
+            source,
+          },
+        ],
+      });
+      expect(await lire(d)).toEqual(apres);
+      const b = await BudgetVertex.ouvrir(d, campagne());
+      expect(() => b.exigerSuite()).not.toThrow();
+      await b.fermer();
+    }));
+
+  it("facturée sous les bornes : mesure consignée, suite permise", async () =>
+    jetable(async (d) => {
+      await bloque(d);
+      const apres = await BudgetVertex.rapprocher(d, campagne(), {
+        appel: "L06/extraction",
+        constat: "FACTUREE",
+        jetonsEntree: 900,
+        jetonsSortie: 40,
+        source,
+      });
+      expect(apres).toMatchObject({
+        blocage: null,
+        rapprochements: [{ constat: "FACTUREE", jetonsEntree: 900, jetonsSortie: 40 }],
+      });
+    }));
+
+  it("facturée au-delà d'une borne : la campagne reste arrêtée", async () =>
+    jetable(async (d) => {
+      await bloque(d);
+      const apres = await BudgetVertex.rapprocher(d, campagne(), {
+        appel: "L06/extraction",
+        constat: "FACTUREE",
+        jetonsEntree: 1001,
+        jetonsSortie: 40,
+        source,
+      });
+      expect(apres.blocage).toBe("BORNE_FACTUREE_DEPASSEE");
+      await expect(BudgetVertex.ouvrir(d, campagne())).rejects.toThrow(/rapprochement/u);
+    }));
+
+  it.each([
+    ["source trop courte", { source: "console" }, /source/iu],
+    ["jetons sur une requête non facturée", { jetonsEntree: 10 }, /non facturée/u],
+    ["facturée sans mesure", { constat: "FACTUREE" as const }, /mesure/u],
+    ["appel mal nommé", { appel: "L06" }, /appel/iu],
+  ])("refuse sans rien écrire : %s", async (_nom, ecart, motif) =>
+    jetable(async (d) => {
+      await bloque(d);
+      const avant = await readFile(path.join(d, "budget.json"), "utf8");
+      await expect(
+        BudgetVertex.rapprocher(d, campagne(), {
+          appel: "L06/extraction",
+          constat: "NON_FACTUREE",
+          jetonsEntree: null,
+          jetonsSortie: null,
+          source,
+          ...ecart,
+        }),
+      ).rejects.toThrow(motif);
+      expect(await readFile(path.join(d, "budget.json"), "utf8")).toBe(avant);
+      await expect(BudgetVertex.ouvrir(d, campagne())).rejects.toThrow(/rapprochement/u);
+    }),
+  );
+
+  it("rien à rapprocher sans blocage de mesure, ni sans journal, ni sous verrou", async () =>
+    jetable(async (d) => {
+      const demande = {
+        appel: "L06/extraction",
+        constat: "NON_FACTUREE" as const,
+        jetonsEntree: null,
+        jetonsSortie: null,
+        source,
+      };
+      await expect(BudgetVertex.rapprocher(d, campagne(), demande)).rejects.toThrow(
+        /aucun journal/u,
+      );
+      const b = await BudgetVertex.ouvrir(d, campagne());
+      await b.reserver("L01", "extraction");
+      await b.terminer({ ...connue, jetonsEntree: 1001 });
+      await expect(BudgetVertex.rapprocher(d, campagne(), demande)).rejects.toThrow(/verrouillée/u);
+      await b.fermer();
+      await expect(BudgetVertex.rapprocher(d, campagne(), demande)).rejects.toThrow(
+        /BORNE_FACTUREE_DEPASSEE/u,
+      );
+    }));
+});
