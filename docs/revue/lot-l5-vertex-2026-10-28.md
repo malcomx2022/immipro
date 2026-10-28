@@ -183,6 +183,48 @@ technique du fournisseur. Passage du commit `522ff41`, arbre propre, sur
   18 h 13 UTC côté client. Google a horodaté le 499 de L06 deux minutes
   après l'abandon : regarder jusqu'à 18 h 17.
 
+## Examen local de L06 et L14, sans appel
+
+Demandé par le responsable avant toute reprise. Aucun appel, aucune
+réserve : la demande a été reconstruite comme `lancer.mts` la construit
+(`champsDemandes`, `instructions`, `schemaDeLaLecture`), puis les pièces
+ont été rendues en image et comparées.
+
+- **La demande n'y est pour rien.** L05 et L06 reçoivent exactement la
+  même consigne, le même schéma et la même exigence IND
+  (`preuve_fonds_annuelle`, 13 569,24 €) ; de même L13 et L14 (21 000
+  CHF). Seuls les octets de la pièce diffèrent.
+- **Le montant sous le seuil n'y est pour rien.** L08, un relevé dont le
+  solde est juste sous le seuil, a répondu en 4,4 s. L'hypothèse du
+  quatrième passage est donc écartée dans sa forme générale.
+- **Le format et le rendu n'y sont pour rien.** L06 est un PDF Skia A4
+  d'une page, comme L05, L09, L12 et L13 (46 à 51 Ko). L14 est un JPEG de
+  1191 × 1685, comme L02, L08 et L11. Les deux pièces se lisent nettement,
+  avec le même gabarit et le même filigrane « spécimen » que les autres.
+- **Ce qui reste propre à L06 et L14** : ce sont les deux seules
+  attestations de fonds émises par un tiers (une fondation, un garant)
+  plutôt qu'un relevé bancaire, avec un montant annuel énoncé et, pour
+  L14, un engagement de couverture. C'est une piste, pas une cause
+  établie : rien localement ne permet de la départager d'un blocage
+  intermittent côté Vertex. L06 a toutefois bloqué deux fois sur deux.
+- **Un indice sur la durée de réflexion.** L07 a mis 52 s pour 29 jetons
+  de sortie déclarés, et Google a horodaté le 499 de L06 plus de cinq
+  minutes après l'envoi. Avec `reasoning_effort: low` (1 024 jetons de
+  réflexion au plus selon la documentation), de telles durées laissent
+  penser que la réflexion n'est pas bornée comme prévu, ou qu'elle n'est
+  pas comptée dans `completion_tokens`. Cela rejoint le point 1 ouvert
+  après le premier passage : si la réflexion est facturée hors de
+  `completion_tokens`, le contrôle des bornes de sortie se fait sur une
+  valeur trop basse.
+
+**Vérification proposée, sans appel** : comparer la sortie facturée du
+28/10 (SKU de sortie Gemini 3.8 Flash, projet `projetanatt`) au total
+mesuré des appels connus, soit 18 033 jetons d'entrée et 1 631 de sortie
+sur les quatre passages. Une sortie facturée nettement supérieure prouve
+que la réflexion n'est pas comptée : il faudrait alors arrêter la
+campagne et faire lire à l'adaptateur le détail d'usage avant de
+continuer.
+
 ## Preuves
 
 Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :

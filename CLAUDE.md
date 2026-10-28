@@ -98,8 +98,11 @@ gardée ; ne jamais éditer le blocage à la main). Le troisième passage
 s'arrête de nouveau sur L06 à 180 s : comportement propre à la pièce, pas
 un délai à allonger. Réserve 439,97 XOF pour 10 invocations. Second
 rapprochement consigné (499, non facturée). Quatrième passage sans L06 :
-L07 à L13 justes, puis L14 (JPEG) dépasse 120 s. Hypothèse non prouvée :
-les attestations de fonds sous le seuil (L06, L14). Réserve 791,95 XOF
+L07 à L13 justes, puis L14 (JPEG) dépasse 120 s. Examen local sans
+appel : demandes identiques à L05/L13, L08 (sous le seuil) passe, format
+et rendu sains ; seule piste propre à L06/L14, des attestations de fonds
+d'un tiers. Durées (L07 : 52 s pour 29 jetons) : vérifier en facturation
+que la réflexion `low` est comptée, avant toute reprise. Réserve 791,95 XOF
 pour 18 invocations. Rapprochement de L14 et suite au responsable. L5, Q.A et M.C restent ouverts.
 Lire [le suivi](docs/revue/lot-l5-vertex-2026-10-28.md).
 
