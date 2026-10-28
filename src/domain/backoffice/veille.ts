@@ -376,3 +376,109 @@ export function prochaineRelecture(
   anticipee.setUTCDate(anticipee.getUTCDate() - PERIODICITE_AVANT_REVISION_JOURS);
   return anticipee > relueLe ? anticipee : ordinaire;
 }
+
+/**
+ * Fin prévue sans relais — C-13, WF-11, WF-14.
+ *
+ * `effectiveTo` porte la fin de validité annoncée par l'autorité (S.184) :
+ * les montants néerlandais de 2026 valent jusqu'au 31/12/2026. Le filtre
+ * candidat la lit (`effectiveTo >= jour`) et retire la procédure le
+ * lendemain. Si personne n'a publié la version suivante, la destination
+ * disparaît du simulateur, du comparateur et des résultats, sans que
+ * rien ne l'ait annoncé : la file de veille ne regarde que l'échéance de
+ * relecture, et une fiche relue la veille n'y est pas.
+ *
+ * Ce module ne choisit rien et ne publie rien : il dit au veilleur, assez
+ * tôt pour qu'il aille chercher la source officielle, quelle version en
+ * vigueur arrive à sa fin sans successeur publié — et si un brouillon
+ * attend déjà.
+ *
+ * « En vigueur », c'est la définition du domaine (`estEnVigueur`) : mise en
+ * vigueur un jour et non archivée. Une version que RG-14.1 a repassée en
+ * brouillon reste en vigueur pour les dossiers qui l'ont figée (INV-3) ;
+ * sa fin prévue compte donc aussi. Une version remplacée est archivée par
+ * la publication de la suivante : elle ne sonne plus.
+ */
+export const HORIZON_FIN_PREVUE_JOURS = 90;
+
+export interface VersionPourRelais {
+  id: string;
+  code: string;
+  /** Clé de la procédure : `countryCode` et `visaType`, une seule chaîne. */
+  procedure: string;
+  pays: string;
+  libelle: string;
+  version: number;
+  statut: "PUBLISHED" | "DRAFT" | "ARCHIVED";
+  /** Mise en vigueur, ISO ; nulle tant que la version n'a jamais été publiée. */
+  publieeLe: string | null;
+  /** Fin de validité annoncée, ISO court ; nulle quand l'autorité n'en fixe pas. */
+  finPrevue: string | null;
+}
+
+export interface FinSansRelais {
+  id: string;
+  code: string;
+  pays: string;
+  libelle: string;
+  version: number;
+  finPrevue: string;
+  /** Négatif quand la fin est passée : la procédure n'est plus affichée. */
+  joursRestants: number;
+  /** Numéro du brouillon suivant qui attend sa publication, s'il existe. */
+  brouillonSuivant: number | null;
+}
+
+const enVigueur = (v: VersionPourRelais): boolean =>
+  v.publieeLe !== null && v.statut !== "ARCHIVED";
+
+export function finsSansRelais(
+  versions: readonly VersionPourRelais[],
+  aujourdhui: string,
+  horizon = HORIZON_FIN_PREVUE_JOURS,
+): FinSansRelais[] {
+  const resultat: FinSansRelais[] = [];
+  for (const v of versions) {
+    if (!enVigueur(v) || v.finPrevue === null) continue;
+    const joursRestants = Math.round((jour(v.finPrevue) - jour(aujourdhui)) / MS_PAR_JOUR);
+    if (joursRestants > horizon) continue;
+    const suivantes = versions.filter((s) => s.procedure === v.procedure && s.version > v.version);
+    // Un successeur déjà en vigueur prend le relais, même si la publication
+    // n'a pas encore archivé celle-ci.
+    if (suivantes.some(enVigueur)) continue;
+    const brouillon = suivantes
+      .filter((s) => s.publieeLe === null && s.statut === "DRAFT")
+      .sort((a, b) => b.version - a.version)[0];
+    resultat.push({
+      id: v.id,
+      code: v.code,
+      pays: v.pays,
+      libelle: v.libelle,
+      version: v.version,
+      finPrevue: v.finPrevue.slice(0, 10),
+      joursRestants,
+      brouillonSuivant: brouillon?.version ?? null,
+    });
+  }
+  return resultat.sort((a, b) => a.joursRestants - b.joursRestants);
+}
+
+/** « Fin prévue dans 64 j » ; « Fin prévue dépassée de 3 j » ; « … aujourd'hui ». */
+export function libelleFinPrevue(fin: FinSansRelais): string {
+  if (fin.joursRestants > 0) return `Fin prévue dans ${fin.joursRestants} j`;
+  if (fin.joursRestants === 0) return "Fin prévue aujourd'hui";
+  return `Fin prévue dépassée de ${-fin.joursRestants} j`;
+}
+
+/** Ce qui manque, et le geste qui le comble — jamais « attention » seul. */
+export function suiteFinPrevue(fin: FinSansRelais): string {
+  const apres =
+    fin.joursRestants >= 0
+      ? "Le lendemain de cette date, la procédure ne s'affiche plus chez le candidat."
+      : "La procédure ne s'affiche plus chez le candidat depuis cette date.";
+  const geste =
+    fin.brouillonSuivant !== null
+      ? `Le brouillon de la version ${fin.brouillonSuivant} attend : relis-le sur la source officielle, puis publie-le.`
+      : `Aucune version suivante n'existe : ouvre la version ${fin.version + 1} depuis la fiche, à partir de la source officielle, puis publie-la.`;
+  return `${apres} ${geste}`;
+}

@@ -77,6 +77,20 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.200 — C-13, la fin prévue sans relais annoncée en B-01 — 28/10/2026
+
+Lot dédié demandé par le responsable après le point du 28/10. Base
+`feb4334` (#320 fusionnée). La file de veille ne suit que la relecture :
+rien n'annonçait qu'une version en vigueur (`estEnVigueur`) arrive à sa
+fin prévue (`effectiveTo`) sans successeur, alors que le filtre candidat
+la retire le lendemain (graine NL au 31/12/2026). `finsSansRelais`
+(domaine) les relève à quatre-vingt-dix jours ; B-01 les annonce en
+tête, avec l'écart en jours, l'effet chez le candidat, le brouillon
+suivant s'il attend, et le lien vers la fiche. Rien n'est publié ni
+prolongé : le contenu 2027 reste au responsable, depuis la source
+officielle. Ne pas prolonger `effectiveTo` pour faire taire l'alerte.
+Lire [la revue, § 24](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.198 — B-04 au jour civil du paiement — 27/10/2026
 
 Lot dédié demandé par le responsable. Base `72963b4` (#316 fusionnée).

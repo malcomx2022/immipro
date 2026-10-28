@@ -18,6 +18,8 @@ import { conditionsAffichees, estEnVigueur, estUnBrouillon } from "@/domain/back
 import { editorialDe, EDITORIAL } from "@/lib/contenu/destinations";
 import {
   HORIZON_VEILLE_JOURS,
+  finsSansRelais,
+  type FinSansRelais,
   type FicheSuivie,
   type Collecte,
   type StatutFiche,
@@ -102,6 +104,40 @@ export async function fichesSuivies(aujourdhui = new Date()): Promise<FicheSuivi
       ...(ecart ? { ecart } : {}),
     };
   });
+}
+
+/**
+ * Fins prévues sans relais — B-01, C-13.
+ *
+ * Toutes les versions des procédures qui en portent une en vigueur avec
+ * une fin prévue : le domaine a besoin des suivantes pour savoir si un
+ * successeur est déjà en vigueur ou si un brouillon attend. Le référentiel
+ * compte quelques dizaines de lignes ; la requête ne lit que ce qu'il faut.
+ */
+export async function finsPrevuesSansRelais(maintenant = new Date()): Promise<FinSansRelais[]> {
+  const concernees = await db.visaRule.findMany({
+    where: { effectiveTo: { not: null }, publishedAt: { not: null }, status: { not: "ARCHIVED" } },
+    select: { countryCode: true, visaType: true },
+  });
+  if (concernees.length === 0) return [];
+  const versions = await db.visaRule.findMany({
+    where: { OR: concernees.map((c) => ({ countryCode: c.countryCode, visaType: c.visaType })) },
+    orderBy: [{ countryCode: "asc" }, { visaType: "asc" }, { version: "asc" }],
+  });
+  return finsSansRelais(
+    versions.map((r) => ({
+      id: r.id,
+      code: r.countryCode,
+      procedure: `${r.countryCode}:${r.visaType}`,
+      pays: editorialDe(r.countryCode, r.visaType)?.pays ?? r.countryCode,
+      libelle: libelleProcedure(r),
+      version: r.version,
+      statut: r.status,
+      publieeLe: r.publishedAt ? r.publishedAt.toISOString() : null,
+      finPrevue: r.effectiveTo ? iso(r.effectiveTo) : null,
+    })),
+    jourCivil(maintenant),
+  );
 }
 
 /**
