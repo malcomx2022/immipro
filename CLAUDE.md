@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.197 — `connecter()` sans navigation de document de trop — 26/10/2026
+
+Quatrième des quatre lots du 26/10, sur sa branche ; préventif, à la
+demande du responsable. Base `73e1e30` (#315 fusionnée). `connecter()` et
+`operateur()` passent par `ouvrirLaConnexion` : pas de rechargement quand
+l'écran est déjà `/connexion` (reconnexion B-03 après un refus, le geste
+de R-O05), sinon `aller` et formulaire hydraté avant la saisie ;
+`connecter()` attend la suite de l'adresse quand elle en porte une. Ne
+pas réintroduire de `goto("/connexion")` dans les parcours. Un refus de
+connexion s'attend au réseau (401), jamais sur « une alerte » : l'annonceur
+de route de Next en est une. Lire
+[la revue, § 21](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.196 — création d'un consultant à l'écran (B-09) — 26/10/2026
 
 Troisième des quatre lots du 26/10, sur sa branche ; le responsable a

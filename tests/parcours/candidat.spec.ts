@@ -254,12 +254,38 @@ async function deposerEnCadence(p: Page, fichier: string, bouton = "Ajouter la p
   throw new Error("La limite d'appels ne s'est pas rouverte.");
 }
 
+/**
+ * L'écran de connexion, sans navigation de document de trop (S.197).
+ *
+ * Sous Firefox, un `goto` vers /connexion a été aussitôt doublé d'une
+ * seconde navigation de document (304) qui ne s'achevait jamais, et la
+ * saisie l'attendait sans fin (S.193, trace de #314). Déjà sur l'écran —
+ * après une connexion refusée —, on ne le recharge donc pas. Sinon on y va
+ * par `aller`, qui reprend une navigation interrompue et attend que le
+ * formulaire soit hydraté avant de le remplir.
+ */
+async function ouvrirLaConnexion(p: Page, suite?: string) {
+  const ici = /^https?:/u.test(p.url()) ? new URL(p.url()) : null;
+  if (!suite && ici?.pathname === "/connexion") {
+    await attendreLHydratation(p, "form");
+    return;
+  }
+  await aller(suite ? `/connexion?suite=${encodeURIComponent(suite)}` : "/connexion", p);
+  await attendreLHydratation(p, "form");
+}
+
+/**
+ * Se connecter, et arriver où l'écran l'a promis : la suite portée par
+ * l'adresse quand l'écran en a une — une page protégée y a renvoyé —,
+ * sinon le tableau de bord.
+ */
 async function connecter(p: Page, adresse: string, motDePasse: string) {
-  await p.goto("/connexion");
+  await ouvrirLaConnexion(p);
+  const suite = new URL(p.url()).searchParams.get("suite") ?? "/tableau-de-bord";
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasse);
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
-  await p.waitForURL("**/tableau-de-bord");
+  await p.waitForURL((u) => u.pathname === suite);
 }
 
 /** Un opérateur, au bureau, dans son propre contexte, arrivé sur `suite`. */
@@ -271,7 +297,7 @@ async function operateur(adresse: string, suite: string): Promise<Page> {
   });
   const p = await contexte.newPage();
   suivis.push(suivreErreurs(p, moteur, origineApp));
-  await p.goto(`/connexion?suite=${encodeURIComponent(suite)}`);
+  await ouvrirLaConnexion(p, suite);
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasseDuBanc());
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
@@ -1890,8 +1916,17 @@ test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablisse
   await page.waitForURL(/\/connexion/u);
   await page.getByLabel("Adresse email", { exact: true }).fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
-  await page.getByLabel("Mot de passe", { exact: true }).press("Enter");
-  await expect(page.getByRole("alert").first()).toBeVisible();
+  // Le refus est attendu au réseau, pas sur « une alerte » : l'annonceur de
+  // route de Next en est une dès l'arrivée, et le second envoi, parti avant
+  // la réponse, serait ignoré par l'écran encore en cours d'envoi (S.197).
+  const [refus] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith("/api/comptes/session") && r.request().method() === "POST",
+    ),
+    page.getByLabel("Mot de passe", { exact: true }).press("Enter"),
+  ]);
+  expect(refus.status()).toBe(401);
+  await expect(page.getByText("Email ou mot de passe incorrect")).toBeVisible();
   await expect(page).toHaveURL(/\/connexion/u);
 
   await b.getByLabel("Motif de la décision", { exact: true }).fill(`Recette S.191 ${moteur}-${largeur} : rétablissement`);
