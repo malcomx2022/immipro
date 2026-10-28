@@ -846,3 +846,17 @@ verte ; aucune attente affaiblie.
 **Limite.** Le défaut n'a jamais été observé sur `connecter()` : la
 correction ne se prouve pas par un rouge, seulement par l'absence du geste
 en cause.
+
+**Course révélée à l'intégration de `main` (28/10).** Après la fusion de
+#316 à #318, B-03 a échoué une fois en chromium-390 : la reconnexion
+attendait trois minutes une navigation qui ne venait pas. La trace montre
+un seul POST de connexion, le 401 attendu, et la saisie suivante sans
+envoi. Le refus était vérifié par `getByRole("alert").first()`, déjà
+satisfait 30 ms après Entrée par l'annonceur de route de Next, que le
+parcours B-05 écartait déjà. La reconnexion partait donc avant la réponse du refus, pendant
+que l'écran était encore en cours d'envoi, et l'écran l'ignorait :
+c'est le comportement voulu, qui empêche d'envoyer deux fois. L'ancien
+rechargement de `/connexion` masquait cette course. B-03 attend
+désormais la réponse au réseau (401) puis le message « Email ou mot de
+passe incorrect », comme R-O05. L'attente est plus précise, pas plus
+faible.

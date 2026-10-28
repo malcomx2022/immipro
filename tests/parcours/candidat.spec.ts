@@ -1916,8 +1916,17 @@ test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablisse
   await page.waitForURL(/\/connexion/u);
   await page.getByLabel("Adresse email", { exact: true }).fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
-  await page.getByLabel("Mot de passe", { exact: true }).press("Enter");
-  await expect(page.getByRole("alert").first()).toBeVisible();
+  // Le refus est attendu au réseau, pas sur « une alerte » : l'annonceur de
+  // route de Next en est une dès l'arrivée, et le second envoi, parti avant
+  // la réponse, serait ignoré par l'écran encore en cours d'envoi (S.197).
+  const [refus] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith("/api/comptes/session") && r.request().method() === "POST",
+    ),
+    page.getByLabel("Mot de passe", { exact: true }).press("Enter"),
+  ]);
+  expect(refus.status()).toBe(401);
+  await expect(page.getByText("Email ou mot de passe incorrect")).toBeVisible();
   await expect(page).toHaveURL(/\/connexion/u);
 
   await b.getByLabel("Motif de la décision", { exact: true }).fill(`Recette S.191 ${moteur}-${largeur} : rétablissement`);
