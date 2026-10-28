@@ -30,6 +30,7 @@ import {
 } from "../../src/domain/copy/vocabulaire-interdit";
 import { CONSEQUENCE_ETAT, LIBELLE_ETAT } from "../../src/domain/backoffice/consultants";
 import { EDITORIAL } from "../../src/lib/contenu/destinations";
+import { jourCivil } from "../../src/domain/format/fuseau";
 import {
   codeDeVerification,
   controlerLesFournisseurs,
@@ -1791,12 +1792,37 @@ test("B-04 : rapprochement lancé à la main, grand livre exporté avec le paiem
   const fichier = info.outputPath("grand-livre.csv");
   await telechargement.saveAs(fichier);
   const livre = readFileSync(fichier, "utf8");
-  const [tx] = await lire<{ reference: string }>(
-    'SELECT reference FROM "Transaction" WHERE "applicationId"=$1',
+  const [tx] = await lire<{ reference: string; recu: Date }>(
+    'SELECT reference, "createdAt" AS recu FROM "Transaction" WHERE "applicationId"=$1',
     [dossier],
   );
-  expect(livre).toContain(tx!.reference);
-  preuves.push({ controle: "R-I04 B-04 : rapprochement à la main et grand livre exporté", conforme: true });
+  /*
+    Le livre exporté est celui de la journée affichée, au jour civil de
+    Cotonou (S.198). Une exécution qui passe minuit entre l'achat et
+    l'export ne trouve pas le paiement dans le livre du jour, et c'est
+    juste : il appartient à la veille. Le test lit donc le jour du
+    paiement au lieu de le supposer.
+  */
+  const journee = /^\uFEFF?Grand livre ImmiPro\r?\nJournée;(\d{4}-\d{2}-\d{2})/u.exec(livre)?.[1];
+  expect(journee, "première ligne « Journée » du grand livre").toBeDefined();
+  const jourDuPaiement = jourCivil(new Date(tx!.recu));
+  if (jourDuPaiement === journee) {
+    expect(livre).toContain(tx!.reference);
+  } else {
+    // Hors du livre du jour, et présent dans celui de son propre jour.
+    expect(livre).not.toContain(tx!.reference);
+    const veille = await b.request.get(`/api/admin/paiements/export?jour=${jourDuPaiement}`);
+    expect(veille.ok()).toBe(true);
+    const livreDuPaiement = await veille.text();
+    expect(livreDuPaiement).toContain(`Journée;${jourDuPaiement}`);
+    expect(livreDuPaiement).toContain(tx!.reference);
+  }
+  preuves.push({
+    controle: "R-I04 B-04 : rapprochement à la main et grand livre exporté au jour civil du paiement",
+    journee,
+    jourDuPaiement,
+    conforme: true,
+  });
 });
 
 /**

@@ -860,3 +860,30 @@ rechargement de `/connexion` masquait cette course. B-03 attend
 désormais la réponse au réseau (401) puis le message « Email ou mot de
 passe incorrect », comme R-O05. L'attente est plus précise, pas plus
 faible.
+
+## 22. S.198 — B-04 au jour civil du paiement, lot dédié — 27/10/2026
+
+Demande du responsable après l'échec de la porte de #317 le 27/10. Base :
+`72963b4` (#316 fusionnée).
+
+**Constat.** B-04 (S.188, § 13) exportait le grand livre de la journée
+affichée — le jour civil de Cotonou — et attendait d'y trouver le
+paiement de l'achat scripté. Le 27/10, l'achat a eu lieu vers 22 h 5x
+UTC (23 h 5x à Cotonou) et l'export à 23 h 00 UTC, déjà le 28/10 à
+Cotonou : livre vide, attente rouge, en firefox-390 seulement parce que
+ce profil a franchi minuit. L'application avait raison ; le test
+supposait que l'achat et l'export tombent le même jour.
+
+**Correction.** Le test lit la journée du fichier exporté et le jour
+civil du paiement (`jourCivil`, le même fuseau que l'application). Même
+jour : la référence est dans le livre. Jour différent : elle est absente
+du livre du jour, et présente dans celui de son jour, demandé à la route
+que le bouton appelle (`/api/admin/paiements/export?jour=…`). L'attente
+est donc renforcée, pas affaiblie : le passage de minuit vérifie en plus
+que la journée borne bien ce qu'elle exporte.
+
+**Preuves.** Le paiement reculé d'un jour en local avant B-04 :
+l'ancienne attente échoue (`Expected substring: "IMP-…"`, le défaut du
+27/10 reproduit), la nouvelle passe par la branche « veille ». Parcours
+31/31 sur Chromium 1 440 dans le cas courant ; Firefox et WebKit à la
+porte CI.
