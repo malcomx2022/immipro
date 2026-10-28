@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.196 — création d'un consultant à l'écran (B-09) — 26/10/2026
+
+Troisième des quatre lots du 26/10, sur sa branche ; le responsable a
+retenu l'écran. Base `73e1e30` (#315 fusionnée). `POST
+/api/admin/consultants` n'avait aucun appelant : B-09 porte désormais
+« Ajouter un consultant », un `<form>` dont les refus sont ceux de la
+route, dits avant l'envoi. Les bornes vivent dans le domaine
+(`BORNES_CONSULTANT`) et la route les lit : ne pas les réécrire en dur.
+La fiche créée n'a aucune habilitation et l'écran le dit (RG-12.1).
+Lire [la revue, § 20](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.195 — relecture de la complétude en navigateur (WF-07) — 26/10/2026
 
 Deuxième des quatre lots du 26/10, sur sa branche. Base `73e1e30`

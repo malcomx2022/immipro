@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { consultantsAdministres, destinationsOuvertes } from "@/server/lecture/backoffice";
-import { motifDeRefusDuTitre, TITRE_MINIMUM } from "@/domain/backoffice/consultants";
+import { BORNES_CONSULTANT as B, motifDeRefusDuTitre, TITRE_MINIMUM } from "@/domain/backoffice/consultants";
 
 /**
  * Consultants — B-09, WF-15 et RG-12.1.
@@ -41,7 +41,7 @@ export const GET = route({
   },
 });
 
-const langues = z.array(z.string().trim().min(2)).min(1);
+const langues = z.array(z.string().trim().min(B.langue.min)).min(1);
 
 /**
  * Le nom de l'action est écrit en toutes lettres, pas composé.
@@ -64,13 +64,14 @@ export const POST = route({
   acces: "admin",
   limite: "sensible",
   corps: z.object({
-    nom: z.string().trim().min(2).max(120),
-    cabinet: z.string().trim().min(2).max(160),
-    ville: z.string().trim().min(2).max(120),
-    qualification: z.string().trim().min(2).max(200),
+    // Les bornes de l'écran B-09 (S.196) : un refus s'y dit avant l'envoi.
+    nom: z.string().trim().min(B.nom.min).max(B.nom.max),
+    cabinet: z.string().trim().min(B.cabinet.min).max(B.cabinet.max),
+    ville: z.string().trim().min(B.ville.min).max(B.ville.max),
+    qualification: z.string().trim().min(B.qualification.min).max(B.qualification.max),
     langues,
-    delaiReponseHeures: z.number().int().positive().max(24 * 14),
-    motif: z.string().trim().min(3).max(500),
+    delaiReponseHeures: z.number().int().min(B.delaiHeures.min).max(B.delaiHeures.max),
+    motif: z.string().trim().min(B.motif.min).max(B.motif.max),
   }),
   async traiter({ corps, acteur }) {
     const cree = await db.consultant.create({
