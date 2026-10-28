@@ -28,6 +28,7 @@ import {
   INTERDITS_ECRAN_CANDIDAT,
   verifierTexte,
 } from "../../src/domain/copy/vocabulaire-interdit";
+import { CONSEQUENCE_ETAT, LIBELLE_ETAT } from "../../src/domain/backoffice/consultants";
 import { EDITORIAL } from "../../src/lib/contenu/destinations";
 import { jourCivil } from "../../src/domain/format/fuseau";
 import {
@@ -254,12 +255,38 @@ async function deposerEnCadence(p: Page, fichier: string, bouton = "Ajouter la p
   throw new Error("La limite d'appels ne s'est pas rouverte.");
 }
 
+/**
+ * L'écran de connexion, sans navigation de document de trop (S.197).
+ *
+ * Sous Firefox, un `goto` vers /connexion a été aussitôt doublé d'une
+ * seconde navigation de document (304) qui ne s'achevait jamais, et la
+ * saisie l'attendait sans fin (S.193, trace de #314). Déjà sur l'écran —
+ * après une connexion refusée —, on ne le recharge donc pas. Sinon on y va
+ * par `aller`, qui reprend une navigation interrompue et attend que le
+ * formulaire soit hydraté avant de le remplir.
+ */
+async function ouvrirLaConnexion(p: Page, suite?: string) {
+  const ici = /^https?:/u.test(p.url()) ? new URL(p.url()) : null;
+  if (!suite && ici?.pathname === "/connexion") {
+    await attendreLHydratation(p, "form");
+    return;
+  }
+  await aller(suite ? `/connexion?suite=${encodeURIComponent(suite)}` : "/connexion", p);
+  await attendreLHydratation(p, "form");
+}
+
+/**
+ * Se connecter, et arriver où l'écran l'a promis : la suite portée par
+ * l'adresse quand l'écran en a une — une page protégée y a renvoyé —,
+ * sinon le tableau de bord.
+ */
 async function connecter(p: Page, adresse: string, motDePasse: string) {
-  await p.goto("/connexion");
+  await ouvrirLaConnexion(p);
+  const suite = new URL(p.url()).searchParams.get("suite") ?? "/tableau-de-bord";
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasse);
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
-  await p.waitForURL("**/tableau-de-bord");
+  await p.waitForURL((u) => u.pathname === suite);
 }
 
 /** Un opérateur, au bureau, dans son propre contexte, arrivé sur `suite`. */
@@ -271,7 +298,7 @@ async function operateur(adresse: string, suite: string): Promise<Page> {
   });
   const p = await contexte.newPage();
   suivis.push(suivreErreurs(p, moteur, origineApp));
-  await p.goto(`/connexion?suite=${encodeURIComponent(suite)}`);
+  await ouvrirLaConnexion(p, suite);
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasseDuBanc());
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
@@ -1236,6 +1263,120 @@ const VERDICT_INTENABLE = /^(La date de dépôt est passée|Une pièce obligatoi
  * date proposée. Chaque geste est lu en base : la date cible et les
  * échéances recalculées depuis la règle figée (INV-3).
  */
+/**
+ * WF-07, C-09 et B-05 (S.195) : la relecture humaine de la complétude
+ * (avis L.A du 03/10/2026). Le candidat demande, avec ce qui lui semble
+ * inexact ; une seule demande en attente par dossier ; le relecteur répond
+ * sous le vocabulaire de l'écran candidat ; la réponse part dans les
+ * alertes, au journal, et sur l'écran de la complétude.
+ */
+test("WF-07 relecture de la complétude : demande unique, réponse refusée puis relue, alerte et journal", async () => {
+  const demandes = () =>
+    lire<{ id: string; status: string; explanation: string; answer: string | null; resolvedBy: string | null }>(
+      `SELECT id, status, explanation, answer, "resolvedBy" FROM "CompletenessReviewRequest"
+        WHERE "applicationId"=$1 ORDER BY "createdAt"`,
+      [dossier],
+    );
+  expect(await demandes()).toHaveLength(0);
+
+  // Par la vue « Complétude » de la checklist.
+  await aller(`/dossiers/${dossier}`);
+  await page
+    .getByRole("navigation", { name: "Vues du dossier" })
+    .getByRole("link", { name: "Complétude", exact: true })
+    .click();
+  await page.waitForURL(`**/dossiers/${dossier}/completude`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Complétude de ton dossier");
+  await attendreLHydratation(page, "section[aria-labelledby=relecture-completude] button");
+  const ecran = await page.locator("main").innerText();
+  expect(verifierTexte(ecran, INTERDITS_ECRAN_CANDIDAT), ecran).toEqual([]);
+
+  await page.getByRole("button", { name: "Demander une relecture", exact: true }).click();
+  const champ = page.getByLabel("Qu'est-ce qui te semble inexact ?", { exact: true });
+  const envoyer = page.getByRole("button", { name: "Envoyer la demande", exact: true });
+  // Moins de vingt caractères : l'envoi reste fermé et l'aide dit quoi écrire.
+  await champ.fill("Le passeport");
+  await expect(envoyer).toBeDisabled();
+  // L'aide du champ, et la raison que le bouton fermé annonce.
+  await expect(page.getByText(/une pièce comptée comme manquante/u)).toHaveCount(2);
+  const explication = "Recette S.195 : mon passeport est déposé et conforme, il me semble compté à part.";
+  await champ.fill(explication);
+  const [demande] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().endsWith(`/completude/relecture`),
+    ),
+    envoyer.click(),
+  ]);
+  expect(demande.ok()).toBe(true);
+  await expect(page.getByRole("status").filter({ hasText: "Ta demande de relecture est enregistrée" })).toBeVisible();
+  const [enAttente] = await demandes();
+  expect(enAttente).toMatchObject({ status: "EN_ATTENTE", explanation: explication, answer: null });
+
+  // Une seule demande en attente par dossier : l'écran ne la repropose plus,
+  // et la route la refuse sans rien écrire.
+  await aller(`/dossiers/${dossier}/completude`);
+  await expect(page.getByRole("button", { name: "Demander une relecture", exact: true })).toHaveCount(0);
+  const doublon = await page.request.post(`/api/dossiers/${dossier}/completude/relecture`, {
+    data: { explication: "Recette S.195 : seconde demande pendant que la première attend." },
+  });
+  expect(doublon.status()).toBeGreaterThanOrEqual(400);
+  expect(await demandes()).toHaveLength(1);
+
+  // B-05 : le relecteur répond. Une note ou une promesse est refusée par la
+  // route, rien n'est écrit ; une réponse relue part au candidat.
+  const b = await administration();
+  await aller("/revue", b);
+  const carte = b.locator("article").filter({ hasText: email }).filter({ hasText: explication });
+  await expect(carte).toHaveCount(1);
+  const reponse = carte.getByLabel("Réponse au candidat", { exact: true });
+  const repondre = carte.getByRole("button", { name: "Répondre", exact: true });
+  await reponse.fill("Relu : tes chances d'obtention sont bonnes, ton score est complet.");
+  const [refusee] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/completude/relectures/")),
+    repondre.click(),
+  ]);
+  expect(refusee.ok()).toBe(false);
+  await expect(carte.getByText(/cette réponse est lue par le candidat/u)).toBeVisible();
+  expect((await demandes())[0]!.status).toBe("EN_ATTENTE");
+  const texteRelu =
+    "Relu : ton passeport est bien compté parmi les pièces conformes. Il reste la preuve de ressources à déposer.";
+  await reponse.fill(texteRelu);
+  const [acceptee] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/api/admin/completude/relectures/")),
+    repondre.click(),
+  ]);
+  expect(acceptee.ok()).toBe(true);
+  await expect(carte).toHaveCount(0);
+
+  const [traitee] = await demandes();
+  expect(traitee).toMatchObject({ status: "TRAITEE", answer: texteRelu });
+  expect(traitee!.resolvedBy).not.toBeNull();
+  const [alerte] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "Notification" WHERE "applicationId"=$1 AND title=$2 AND body=$3`,
+    [dossier, "Relecture de ta complétude", texteRelu],
+  );
+  expect(Number(alerte!.n)).toBe(1);
+  const [trace] = await lire<{ reason: string }>(
+    `SELECT reason FROM "AuditLog" WHERE action='dossier.completude.relecture' AND target=$1
+      ORDER BY "createdAt" DESC LIMIT 1`,
+    [`application:${dossier}`],
+  );
+  expect(trace!.reason).toBe(texteRelu);
+
+  // Le candidat lit la réponse sur l'écran, et peut redemander.
+  await aller(`/dossiers/${dossier}/completude`);
+  await expect(page.getByText("Réponse à ta dernière demande")).toBeVisible();
+  await expect(page.getByText(texteRelu)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Demander une relecture", exact: true })).toBeVisible();
+  await aller("/notifications");
+  await expect(page.getByText("Relecture de ta complétude").first()).toBeVisible();
+  preuves.push({
+    controle:
+      "Relecture de complétude : demande refusée sous vingt caractères, une seule en attente, réponse promettant refusée par la route, réponse relue en alerte, au journal et à l'écran",
+    conforme: true,
+  });
+});
+
 test("échéancier : date fixée depuis l'écran, calendrier intenable, date proposée reprise", async () => {
   const echeances = () =>
     lire<{ code: string; dueAt: string }>(
@@ -1801,8 +1942,17 @@ test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablisse
   await page.waitForURL(/\/connexion/u);
   await page.getByLabel("Adresse email", { exact: true }).fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
-  await page.getByLabel("Mot de passe", { exact: true }).press("Enter");
-  await expect(page.getByRole("alert").first()).toBeVisible();
+  // Le refus est attendu au réseau, pas sur « une alerte » : l'annonceur de
+  // route de Next en est une dès l'arrivée, et le second envoi, parti avant
+  // la réponse, serait ignoré par l'écran encore en cours d'envoi (S.197).
+  const [refus] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith("/api/comptes/session") && r.request().method() === "POST",
+    ),
+    page.getByLabel("Mot de passe", { exact: true }).press("Enter"),
+  ]);
+  expect(refus.status()).toBe(401);
+  await expect(page.getByText("Email ou mot de passe incorrect")).toBeVisible();
   await expect(page).toHaveURL(/\/connexion/u);
 
   await b.getByLabel("Motif de la décision", { exact: true }).fill(`Recette S.191 ${moteur}-${largeur} : rétablissement`);
@@ -1825,6 +1975,84 @@ test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablisse
  * clic ; la ligne retirée reste, datée. Suisse, pour ne pas toucher à
  * l'habilitation néerlandaise de la graine.
  */
+/**
+ * B-09, WF-15 et RG-12.1 (S.196) : un consultant se crée à l'écran. La
+ * fiche n'a aucune habilitation, donc aucun annuaire ne la sert, et
+ * l'écran le dit. Une fiche nouvelle par profil : le banc les garde toutes.
+ */
+test("B-09 : consultant créé à l'écran, refus dits avant l'envoi, sans habilitation, journal", async () => {
+  const b = await administration();
+  const nom = `Consultant ${email.split("@")[0]}`;
+  const motif = `Tableau de l'ordre consulté — recette S.196 ${moteur}-${largeur}`;
+  await aller("/habilitations", b);
+  const formulaire = b.getByRole("region", { name: "Ajouter un consultant" });
+  const creer = () => formulaire.getByRole("button", { name: "Créer le consultant", exact: true });
+  await expect(creer()).toBeDisabled();
+
+  await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
+  await formulaire.getByLabel("Cabinet", { exact: true }).fill("Cabinet de recette");
+  await formulaire.getByLabel("Ville", { exact: true }).fill("Cotonou");
+  await formulaire.getByLabel("Qualification", { exact: true }).fill("Avocat, 7 ans");
+  await formulaire.getByLabel("Langues de travail", { exact: true }).fill("Français, fon ; français");
+  // Un délai qui n'est pas un nombre d'heures se dit sous son champ.
+  const delai = formulaire.getByLabel("Délai de réponse, en heures", { exact: true });
+  await delai.fill("48h");
+  await expect(formulaire.getByText(/en heures, un nombre entier entre 1 et 336/u).first()).toBeVisible();
+  await expect(creer()).toBeDisabled();
+  await delai.fill("48");
+  // Le motif manque encore : le bouton reste fermé et le dit.
+  await expect(creer()).toBeDisabled();
+  await expect(formulaire.getByText("Indique ce que tu as consulté avant de créer la fiche.")).toBeVisible();
+  await formulaire.getByLabel("Motif de la création", { exact: true }).fill(motif);
+  const [creation] = await Promise.all([
+    b.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/admin/consultants")),
+    creer().click(),
+  ]);
+  expect(creation.ok()).toBe(true);
+  await expect(formulaire.getByRole("status")).toContainText("Il reste invisible dans l'annuaire");
+  await expect(formulaire.getByLabel("Nom", { exact: true })).toHaveValue("");
+
+  const [cree] = await lire<{
+    id: string;
+    firm: string;
+    city: string;
+    qualification: string;
+    languages: string[];
+    responseHours: number;
+    active: boolean;
+    habilitations: string;
+  }>(
+    `SELECT c.id, c.firm, c.city, c.qualification, c.languages, c."responseHours", c.active,
+            (SELECT count(*) FROM "Accreditation" a WHERE a."consultantId" = c.id) AS habilitations
+       FROM "Consultant" c WHERE c.name = $1`,
+    [nom],
+  );
+  expect(cree).toMatchObject({
+    firm: "Cabinet de recette",
+    city: "Cotonou",
+    qualification: "Avocat, 7 ans",
+    languages: ["Français", "fon"],
+    responseHours: 48,
+    active: true,
+    habilitations: "0",
+  });
+  const [trace] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE action = 'consultant.creation' AND target = $1 AND reason = $2`,
+    [`consultant:${cree!.id}`, motif],
+  );
+  expect(Number(trace!.n)).toBe(1);
+
+  // La fiche paraît, sans habilitation, et l'écran dit qu'aucun annuaire ne la sert.
+  const fiche = b.locator("article").filter({ hasText: nom });
+  await expect(fiche).toHaveCount(1);
+  await expect(fiche.getByText(LIBELLE_ETAT.SANS_HABILITATION)).toBeVisible();
+  await expect(fiche.getByText(CONSEQUENCE_ETAT.SANS_HABILITATION)).toBeVisible();
+  preuves.push({
+    controle: "B-09 : consultant créé à l'écran, refus avant l'envoi, fiche sans habilitation et journalisée",
+    conforme: true,
+  });
+});
+
 test("B-06 : titre et motif exigés, habilitation vérifiée puis retirée, journal", async () => {
   const b = await administration();
   const habilitation = async () =>

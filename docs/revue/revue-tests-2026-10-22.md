@@ -171,7 +171,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
 | WF-05 Achat de pack | Bloqué (M.C) | Tunnel, FedaPay, réconciliation, remboursement, montée sur PostgreSQL ; achat scripté en navigateur | Bac à sable réel FedaPay/Stripe, certification fiscale, essai réel |
 | WF-06 Pièces et analyse | Bloqué (L5) | Balayage, extraction, destination L1, mesure L2 ; dépôt, coupure, réponse tardive, revue B-05 en navigateur | Qualification réelle Vertex `eu` |
-| WF-07 Complétude | Partiel | Domaine `completeness/`, relecture humaine, transitions ; péremption en navigateur, C-16/C-17 corrigés (§ 13) | Relecture de complétude en navigateur |
+| WF-07 Complétude | Éprouvé | Domaine `completeness/`, transitions ; péremption en navigateur, C-16/C-17 corrigés (§ 13) ; relecture humaine de la complétude en navigateur, de la demande à la réponse (§ 19) | — |
 | WF-08 Rédaction assistée | Bloqué (L5) | Avis L3, relecture exclusive L4, rédaction ; parcours rédaction, DOCX, deux onglets, saisie tardive (S.182) | Modèle réel qualifié |
 | WF-09 Échéancier et rappels | Partiel | `smoke:rappels`, `smoke:depot` ; échéancier et fuseau en navigateur, C-15 corrigé (§ 13) | Réception courriel réelle |
 | WF-10 Clôture, issue, purge | Éprouvé | Transitions, conservation, purge (INV-5) ; parcours dépôt déclaré, clôture, purge effective et portabilité (§ 13) | — |
@@ -179,7 +179,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | WF-12 Consultants | Phase 3 | `smoke:consultation` (concurrence sur créneau) | Restrictions de lancement maintenues |
 | WF-13 Partenaires | Partiel | Domaine `partenaires/`, accès ; route (`routes-ecritures`) et écriture sur base jetable (`smoke:partenaires`, § 14) | Conditions d'affiliation |
 | WF-14 Veille et publication | Partiel | Second lecteur éprouvé en navigateur depuis B-02 (§ 8), seuils des conditions lus et saisis dans B-02 (C-12, § 11), textes juridiques | Routine de veille réelle |
-| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression, suspension et rétablissement), B-04 (rapprochement, grand livre), B-06 (habilitations), B-08, veille et textes juridiques en navigateur, rôles, journal, facturation (§ 13, § 16) | B-04 remboursements (M.C) ; validation d'un texte juridique (Q.A) |
+| WF-15 Administration | Partiel | B-05, B-03 (relance de suppression, suspension et rétablissement), B-04 (rapprochement, grand livre), B-06 (habilitations), B-09 (création d'un consultant, § 20), B-08, veille et textes juridiques en navigateur, rôles, journal, facturation (§ 13, § 16) | B-04 remboursements (M.C) ; validation d'un texte juridique (Q.A) |
 | WF-16 Coûts IA | Partiel | Mesures L2, B-07 mobile/bureau, export | Rapprochement avec la facture réelle (L5) |
 
 ### 5.2 Modules techniques
@@ -676,7 +676,8 @@ défaut relevé par ces gestes ; aucun code applicatif modifié.
 
 **Ce qui reste non vérifié en navigateur.** Les remboursements B-04
 (rail réel, M.C) ; la publication d'un texte juridique (Q.A) ; la
-création d'un consultant, qui n'a pas d'écran (route seule).
+création d'un consultant, qui n'avait pas d'écran (route seule) : écran
+ajouté en S.196 (§ 20).
 
 ## 17. S.193 — R-O05 fiabilisé sous Firefox, lot dédié — 25/10/2026
 
@@ -707,7 +708,8 @@ session recréée, puis la reprise B-03 jusqu'à l'anonymisation. Il
 Firefox, absent du poste local : la correction s'appuie sur la trace,
 elle ne se reproduit pas à la demande. `connecter()` garde son
 `goto("/connexion")` : il n'a jamais échoué ainsi, et le changer
-toucherait tous les parcours sans preuve.
+toucherait tous les parcours sans preuve. Repris à titre préventif en S.197
+(§ 21), à la demande du responsable.
 
 **Preuves.** Parcours 60/60 sur Chromium 390 et 1 440, sur le même banc,
 R-O05 compris ; Firefox et WebKit à la porte CI.
@@ -742,6 +744,122 @@ règle `SECONDAIRE` publiable, la graine les force en brouillon et les
 garde-fous SQL refusent leur publication. Les préconditions n'écrivent
 jamais sur un référentiel : RG-14.1 (fiche à relecture échue) n'est pas
 rejoué en navigateur.
+
+## 19. S.195 — relecture de la complétude en navigateur (WF-07), lot dédié — 26/10/2026
+
+Deuxième des quatre lots demandés par le responsable le 26/10. Base :
+`73e1e30` (#315 fusionnée) ; S.194 (§ 18) est proposé à part, sur sa
+propre branche.
+
+**Parcours ajouté** à `tests/parcours/candidat.spec.ts`, avant
+l'échéancier : la relecture humaine de la complétude (avis L.A du
+03/10/2026), demandée depuis C-09 et traitée dans B-05.
+
+| Étape | Ce qui est vérifié, à l'écran et en base |
+|---|---|
+| Accès | Par la vue « Complétude » de la checklist ; vocabulaire interdit absent de C-09 |
+| Demande trop courte | Moins de vingt caractères : envoi fermé, l'aide dit quoi écrire (champ et raison du bouton) |
+| Demande | `CompletenessReviewRequest` en attente avec l'explication ; mention « Ta demande de relecture est enregistrée » |
+| Unicité | L'écran ne propose plus de demande ; la route refuse une seconde demande, une seule ligne en base |
+| Réponse refusée | « chances d'obtention », « score » : la route refuse, l'aide le dit, la demande reste en attente |
+| Réponse relue | Demande traitée avec la réponse et son auteur ; une alerte « Relecture de ta complétude » ; la réponse comme motif au journal |
+| Retour au candidat | La réponse sur C-09, une nouvelle demande possible, l'alerte dans les notifications |
+
+**Preuves.** Parcours 62/62 sur Chromium 390 et 1 440 (31 par profil) ;
+Firefox et WebKit à la porte CI. Deux mutations de
+`repondreALaRelecture` détectées : vocabulaire non vérifié (réponse
+promettante acceptée) et alerte non créée. Aucun défaut relevé ; aucun
+code applicatif modifié.
+
+## 20. S.196 — création d'un consultant à l'écran (B-09), lot dédié — 26/10/2026
+
+Troisième des quatre lots demandés par le responsable le 26/10, qui a
+retenu l'écran. Base : `73e1e30` (#315 fusionnée) ; S.194 et S.195 sont
+proposés à part.
+
+**Constat.** `POST /api/admin/consultants` existait et journalisait
+`consultant.creation`, mais aucun écran ne l'appelait : un consultant ne
+s'ajoutait que par l'API, et B-09 n'administrait que les fiches déjà
+présentes.
+
+**Ce qui change.**
+
+- B-09 porte un formulaire « Ajouter un consultant » (nom, cabinet,
+  ville, qualification, langues, délai de réponse en heures, motif), un
+  vrai `<form>` où Entrée envoie (D-16), ajouté à `formulaires.test.ts`.
+- Les refus sont ceux de la route, dits avant l'envoi : le domaine
+  (`refusDeLaCreation`, `BORNES_CONSULTANT`) porte les bornes, et la route
+  les lit au lieu de les écrire en dur. Un champ vide est dit par le
+  bouton ; un champ saisi et refusé, sous lui-même.
+- Après la création, l'écran dit que la fiche reste invisible dans
+  l'annuaire tant qu'aucune habilitation n'est vérifiée (RG-12.1) ; la
+  saisie est vidée et la liste rafraîchie. Un refus de la route garde la
+  saisie.
+
+**Preuves.** Huit essais du domaine et de la route
+(`consultants-admin.test.ts`), deux de `formulaires.test.ts`, quatre essais d'écran
+(`tests/ui/consultants-creation.test.tsx`), un parcours navigateur au
+bureau : délai « 48h » refusé sous son champ, motif manquant dit par le
+bouton, création, fiche en base avec langues dédoublonnées et délai,
+aucune habilitation, `consultant.creation` au journal avec le motif,
+fiche affichée « Aucune habilitation en cours ». Parcours 62/62 sur
+Chromium 390 et 1 440 ; porte unitaire 204 fichiers, 4 070 tests.
+
+**Limite.** Le parcours crée une fiche par profil : le banc les garde,
+sans habilitation, donc hors de tout annuaire.
+
+## 21. S.197 — `connecter()` sans navigation de document de trop, lot dédié — 26/10/2026
+
+Quatrième des quatre lots demandés par le responsable le 26/10. Base :
+`73e1e30` (#315 fusionnée). Correction **préventive** : `connecter()` n'a
+jamais échoué, mais il gardait le geste qui a fait échouer R-O05 sous
+Firefox (§ 17).
+
+**Les appels relus.**
+
+| Appelant | Page de départ | Risque |
+|---|---|---|
+| `administration()` | Page neuve, rien en cours | Aucun |
+| `operateur()` | Page neuve, rien en cours | Aucun |
+| B-03, reconnexion après rétablissement | Déjà sur `/connexion`, juste après une connexion refusée | Celui de R-O05 : une navigation de document vers l'adresse où l'on est déjà |
+
+**Ce qui change.** Une seule fonction, `ouvrirLaConnexion(p, suite?)`,
+sert `connecter()` et `operateur()`. Déjà sur `/connexion` sans suite, elle
+ne recharge pas l'écran ; sinon elle y va par `aller`, qui reprend une
+navigation interrompue (`NS_BINDING_ABORTED`) et attend l'hydratation.
+Dans les deux cas, elle attend que le formulaire soit hydraté avant de le
+remplir. Plus aucun `goto` vers `/connexion` dans les parcours.
+
+**Constat en chemin.** La reconnexion de B-03 se fait depuis
+`/connexion?suite=/dossiers/…`, où la page protégée a renvoyé le compte
+suspendu. L'ancien `goto("/connexion")` effaçait cette suite, et
+`connecter()` attendait le tableau de bord. En restant sur l'écran, la
+reconnexion mène au dossier demandé : `connecter()` attend désormais la
+destination exacte, la suite de l'adresse quand il y en a une, sinon le
+tableau de bord. L'attente n'est pas affaiblie : elle vérifie en plus que
+la suite est respectée.
+
+**Preuves.** Parcours 60/60 sur Chromium 390 et 1 440 ; Firefox et WebKit à la
+porte CI. Première exécution rouge sur B-03 (la suite, ci-dessus), puis
+verte ; aucune attente affaiblie.
+
+**Limite.** Le défaut n'a jamais été observé sur `connecter()` : la
+correction ne se prouve pas par un rouge, seulement par l'absence du geste
+en cause.
+
+**Course révélée à l'intégration de `main` (28/10).** Après la fusion de
+#316 à #318, B-03 a échoué une fois en chromium-390 : la reconnexion
+attendait trois minutes une navigation qui ne venait pas. La trace montre
+un seul POST de connexion, le 401 attendu, et la saisie suivante sans
+envoi. Le refus était vérifié par `getByRole("alert").first()`, déjà
+satisfait 30 ms après Entrée par l'annonceur de route de Next, que le
+parcours B-05 écartait déjà. La reconnexion partait donc avant la réponse du refus, pendant
+que l'écran était encore en cours d'envoi, et l'écran l'ignorait :
+c'est le comportement voulu, qui empêche d'envoyer deux fois. L'ancien
+rechargement de `/connexion` masquait cette course. B-03 attend
+désormais la réponse au réseau (401) puis le message « Email ou mot de
+passe incorrect », comme R-O05. L'attente est plus précise, pas plus
+faible.
 
 ## 22. S.198 — B-04 au jour civil du paiement, lot dédié — 27/10/2026
 
