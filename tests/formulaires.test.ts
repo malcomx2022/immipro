@@ -25,6 +25,8 @@ const ECRANS = [
   "src/app/(app)/(dossier)/dossiers/[id]/depot/Depot.tsx",
   "src/app/(app)/(dossier)/dossiers/[id]/DemandeDeCorrection.tsx",
   "src/app/(auth)/compte/rappels/PreferencesDeRappels.tsx",
+  // S.196 : la création d'un consultant (B-09).
+  "src/app/(admin)/habilitations/Consultants.tsx",
 ];
 
 /**

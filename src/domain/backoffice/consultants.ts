@@ -157,3 +157,160 @@ export const motifDeRefusDuTitre = (titre: string): string | null =>
   titre.trim().length >= TITRE_MINIMUM
     ? null
     : "Indique le titre vérifié — « RCIC », « avocat au barreau d'Amsterdam » — tel qu'il figure au registre consulté.";
+
+/**
+ * ── La création, à l'écran (S.196) ────────────────────────────────────
+ *
+ * La route `POST /api/admin/consultants` existait sans écran : un
+ * consultant ne s'ajoutait qu'à la main, par l'API. Le formulaire vit dans
+ * B-09 et ses refus sont ceux de la route, champ par champ, dits avant
+ * l'envoi : les bornes ci-dessous sont celles du schéma de la route, et un
+ * essai le vérifie.
+ *
+ * Un consultant créé n'a aucune habilitation : l'annuaire candidat ne le
+ * sert pas (RG-12.1) tant qu'une juridiction n'est pas vérifiée, et
+ * l'écran le dit au moment même où il est créé.
+ */
+export const BORNES_CONSULTANT = {
+  nom: { min: 2, max: 120 },
+  cabinet: { min: 2, max: 160 },
+  ville: { min: 2, max: 120 },
+  qualification: { min: 2, max: 200 },
+  langue: { min: 2 },
+  delaiHeures: { min: 1, max: 24 * 14 },
+  motif: { min: 3, max: 500 },
+} as const;
+
+export interface SaisieConsultant {
+  nom: string;
+  cabinet: string;
+  ville: string;
+  qualification: string;
+  /** Les langues de travail, séparées par des virgules. */
+  langues: string;
+  /** Le délai de réponse annoncé, en heures, tel que saisi. */
+  delai: string;
+  /** Ce que l'administrateur a consulté avant de créer la fiche. */
+  motif: string;
+}
+
+export const SAISIE_CONSULTANT_VIDE: SaisieConsultant = {
+  nom: "",
+  cabinet: "",
+  ville: "",
+  qualification: "",
+  langues: "",
+  delai: "",
+  motif: "",
+};
+
+/** « Français, anglais ; wolof » → trois langues, sans doublon ni vide. */
+export function languesSaisies(texte: string): string[] {
+  const vues = new Set<string>();
+  const langues: string[] = [];
+  for (const brute of texte.split(/[,;]/u)) {
+    const langue = brute.trim();
+    if (!langue || vues.has(langue.toLocaleLowerCase("fr"))) continue;
+    vues.add(langue.toLocaleLowerCase("fr"));
+    langues.push(langue);
+  }
+  return langues;
+}
+
+const longueur = (
+  valeur: string,
+  { min, max }: { min: number; max: number },
+  manque: string,
+  trop: string,
+): string | null => {
+  const n = valeur.trim().length;
+  if (n < min) return manque;
+  if (n > max) return trop;
+  return null;
+};
+
+/**
+ * Champ par champ, ce qui empêche la création. Vide : la fiche peut partir.
+ * Chaque message dit quoi écrire, pas seulement ce qui manque.
+ */
+export function refusDeLaCreation(
+  saisie: SaisieConsultant,
+): Partial<Record<keyof SaisieConsultant, string>> {
+  const b = BORNES_CONSULTANT;
+  const refus: Partial<Record<keyof SaisieConsultant, string>> = {};
+  const poser = (champ: keyof SaisieConsultant, message: string | null) => {
+    if (message) refus[champ] = message;
+  };
+
+  poser(
+    "nom",
+    longueur(saisie.nom, b.nom, "Indique le nom du consultant, tel qu'il exerce.", `Le nom dépasse ${b.nom.max} caractères.`),
+  );
+  poser(
+    "cabinet",
+    longueur(
+      saisie.cabinet,
+      b.cabinet,
+      "Indique le cabinet ou la structure d'exercice.",
+      `Le cabinet dépasse ${b.cabinet.max} caractères.`,
+    ),
+  );
+  poser(
+    "ville",
+    longueur(saisie.ville, b.ville, "Indique la ville d'exercice.", `La ville dépasse ${b.ville.max} caractères.`),
+  );
+  poser(
+    "qualification",
+    longueur(
+      saisie.qualification,
+      b.qualification,
+      "Indique la qualification et l'ancienneté : « Avocate, 12 ans ».",
+      `La qualification dépasse ${b.qualification.max} caractères : garde la mention et l'ancienneté.`,
+    ),
+  );
+
+  const langues = languesSaisies(saisie.langues);
+  if (langues.length === 0) {
+    poser("langues", "Indique au moins une langue de travail, séparées par des virgules.");
+  } else {
+    const courte = langues.find((l) => l.length < b.langue.min);
+    if (courte) poser("langues", `« ${courte} » n'est pas une langue : écris-la en toutes lettres.`);
+  }
+
+  const delai = saisie.delai.trim();
+  const heures = /^\d+$/u.test(delai) ? Number(delai) : Number.NaN;
+  if (!Number.isInteger(heures) || heures < b.delaiHeures.min || heures > b.delaiHeures.max) {
+    poser(
+      "delai",
+      `Indique le délai de réponse en heures, un nombre entier entre ${b.delaiHeures.min} et ${b.delaiHeures.max}.`,
+    );
+  }
+
+  poser(
+    "motif",
+    longueur(
+      saisie.motif,
+      b.motif,
+      "Indique ce que tu as consulté avant de créer la fiche.",
+      `Le motif dépasse ${b.motif.max} caractères : garde l'essentiel.`,
+    ),
+  );
+  return refus;
+}
+
+/** Le corps de `POST /api/admin/consultants`, à partir d'une saisie acceptée. */
+export function corpsDeCreation(saisie: SaisieConsultant) {
+  return {
+    nom: saisie.nom.trim(),
+    cabinet: saisie.cabinet.trim(),
+    ville: saisie.ville.trim(),
+    qualification: saisie.qualification.trim(),
+    langues: languesSaisies(saisie.langues),
+    delaiReponseHeures: Number(saisie.delai.trim()),
+    motif: saisie.motif.trim(),
+  };
+}
+
+/** Ce que l'écran dit juste après la création. */
+export const APRES_CREATION =
+  "Consultant créé. Il reste invisible dans l'annuaire tant qu'aucune habilitation n'est vérifiée : enregistre-la sur sa fiche, ci-dessous.";
