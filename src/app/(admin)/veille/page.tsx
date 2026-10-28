@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { FileDeVeille } from "./FileDeVeille";
-import { collecte, fichesSuivies } from "@/server/lecture/backoffice";
+import { collecte, fichesSuivies, finsPrevuesSansRelais } from "@/server/lecture/backoffice";
 import { exigerVeilleur } from "@/server/securite/page";
 import { jourCivil } from "@/domain/format/fuseau";
 
@@ -22,12 +22,17 @@ export const metadata: Metadata = {
 
 export default async function PageVeille() {
   await exigerVeilleur("/veille");
-  const [fiches, etatCollecte] = await Promise.all([fichesSuivies(), collecte()]);
+  const [fiches, etatCollecte, fins] = await Promise.all([
+    fichesSuivies(),
+    collecte(),
+    finsPrevuesSansRelais(),
+  ]);
 
   return (
     <FileDeVeille
       fiches={fiches}
       collecte={etatCollecte}
+      finsSansRelais={fins}
       aujourdhui={jourCivil(new Date())}
     />
   );

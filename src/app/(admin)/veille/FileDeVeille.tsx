@@ -26,7 +26,9 @@ import {
   enRetard,
   collecteComplete,
   filtrerVeille,
+  libelleFinPrevue,
   libelleRelecture,
+  suiteFinPrevue,
   messageSourceInjoignable,
   resumeCollecte,
   resumeFileVide,
@@ -35,6 +37,7 @@ import {
   type EtatSource,
   type FicheSuivie,
   type FiltreVeille,
+  type FinSansRelais,
 } from "@/domain/backoffice/veille";
 import {
   LIBELLE_NIVEAU,
@@ -80,11 +83,22 @@ export interface FileDeVeilleProps {
    * inventé, et c'est précisément le chiffre auquel un veilleur se fie.
    */
   collecte: Collecte | null;
+  /**
+   * Versions en vigueur dont la fin prévue approche sans successeur publié
+   * (C-13). Elles n'entrent pas dans la file, qui suit la relecture : une
+   * fiche relue hier peut cesser de s'afficher le mois prochain.
+   */
+  finsSansRelais?: readonly FinSansRelais[];
   /** Date de rendu, ISO court : les retards se comptent depuis aujourd'hui. */
   aujourdhui: string;
 }
 
-export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps) {
+export function FileDeVeille({
+  fiches,
+  collecte,
+  finsSansRelais = [],
+  aujourdhui,
+}: FileDeVeilleProps) {
   const router = useRouter();
   const [filtre, setFiltre] = useState<FiltreVeille>("EN_RETARD");
   const [recherche, setRecherche] = useState("");
@@ -143,6 +157,8 @@ export function FileDeVeille({ fiches, collecte, aujourdhui }: FileDeVeilleProps
             ? resumeCollecte(collecte, moment)
             : AUCUN_RELEVE}
         </p>
+
+        {finsSansRelais.length > 0 ? <FinsSansRelais fins={finsSansRelais} /> : null}
 
         {incident ? (
           <section className="flex flex-col items-start gap-2 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2">
@@ -381,5 +397,43 @@ function SansCollecte() {
         demandent pas la même chose.
       </p>
     </div>
+  );
+}
+
+/**
+ * C-13 — une procédure qui va cesser de s'afficher faute de version
+ * suivante. Chaque ligne mène à sa fiche, où la version suivante s'ouvre.
+ */
+function FinsSansRelais({ fins }: { fins: readonly FinSansRelais[] }) {
+  const idTitre = useId();
+  return (
+    <section
+      aria-labelledby={idTitre}
+      className="flex flex-col gap-3 rounded-lg border-l-6 border-warning bg-white p-4 shadow-e2"
+    >
+      <h2 id={idTitre} className="text-16 font-semibold text-ink-900">
+        {fins.length > 1
+          ? `${fins.length} procédures arrivent à leur fin prévue sans version suivante`
+          : "Une procédure arrive à sa fin prévue sans version suivante"}
+      </h2>
+      <ul className="flex flex-col gap-3">
+        {fins.map((fin) => (
+          <li key={fin.id} className="flex flex-col gap-1">
+            <p className="text-14 text-ink-900">
+              <span className="font-mono text-13 text-ink-700">{fin.code}</span>{" "}
+              {fin.pays} — {fin.libelle}, version {fin.version} :{" "}
+              <strong className="font-semibold">{libelleFinPrevue(fin)}</strong> (
+              {jourEnFrancais(fin.finPrevue)})
+            </p>
+            <p className="max-w-lecture-large text-pretty text-13 text-ink-700">
+              {suiteFinPrevue(fin)}
+            </p>
+            <LienBouton href={`/regles/${fin.id}`} variante="secondaire" className="self-start">
+              Ouvrir la fiche {fin.code}
+            </LienBouton>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

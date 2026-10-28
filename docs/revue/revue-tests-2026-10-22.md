@@ -282,7 +282,7 @@ Travail de code encore possible sans préalable externe, par priorité :
 8. ~~`connecter()` sans navigation de trop~~ : S.197 (§ 21), avec la
    course de B-03 révélée à l'intégration. ~~B-04 au passage de
    minuit~~ : S.198 (§ 22).
-9. Alerte avant l'échéance C-13 : proposée en lot dédié après S.199.
+9. ~~Alerte avant l'échéance C-13~~ : B-01 l'annonce en S.200 (§ 24).
    Le contenu des versions 2027 reste au responsable, depuis les sources
    officielles.
 
@@ -937,3 +937,58 @@ levée de préalable.
 (lignes encore « non vérifié » : R-O04, R-I02, R-P01, R-P11 à R-P20) et
 de `tests/parcours/candidat.spec.ts`. Porte locale verte : lint, types, 204 fichiers
 et 4 070 tests, vocabulaire.
+
+## 24. S.200 — C-13, la fin prévue sans relais annoncée en B-01, lot dédié — 28/10/2026
+
+Demande du responsable après le point du 28/10. Base : `feb4334` (#320
+fusionnée). Rattachement : WF-11 (divergence de version), WF-14 (veille),
+RG-14.1, INV-3, INV-8 ; écran B-01.
+
+**Constat.** C-13 (§ 9) est une échéance de données : les deux règles NL
+de la graine portent une fin prévue au 31/12/2026, et le filtre candidat
+(`effectiveTo >= jour`) les retire le lendemain. Sans version 2027
+publiée, plus aucune destination néerlandaise ne s'affiche le 1er janvier.
+Rien ne l'annonçait : la file B-01 ne retient que les fiches dont la
+**relecture** approche (trente jours), et une fiche NL relue récemment
+n'y entre pas. Le défaut se serait donc vu chez le candidat d'abord.
+
+**Correction.**
+
+- `finsSansRelais` (`domain/backoffice/veille.ts`, pur) relève chaque
+  version en vigueur, au sens d'`estEnVigueur` (mise en vigueur, non
+  archivée, y compris repassée en brouillon par RG-14.1), dont la fin
+  prévue tombe dans les quatre-vingt-dix jours ou est déjà passée, et
+  qu'aucune version suivante en vigueur ne relaie. Elle nomme le
+  brouillon suivant s'il attend.
+- `finsPrevuesSansRelais` (lecture B-01) lit les procédures concernées
+  puis toutes leurs versions, et compte les jours depuis le jour civil de
+  Cotonou.
+- B-01 affiche un encadré en tête : procédure, version, « Fin prévue dans
+  64 j » et la date, ce qui arrive au candidat le lendemain, le geste
+  (publier le brouillon qui attend, ou ouvrir la version suivante depuis
+  la fiche), et le lien vers la fiche.
+
+**Ce que le lot ne fait pas.** Il ne publie rien, ne prolonge aucune fin
+prévue et n'écrit aucune règle 2027 : ce contenu vient de la source
+officielle (INV-8) et passe par le second lecteur (WF-14 § 4). Prolonger
+`effectiveTo` pour faire taire l'alerte afficherait au candidat des
+montants que l'autorité a déclarés échus.
+
+**Preuves.**
+
+- Domaine et lecture : 15 tests (`tests/veille-fin-prevue.test.ts`).
+  Ils couvrent l'horizon (90 jours compris, 91 exclus), la version
+  repassée en brouillon, la version archivée, le brouillon jamais publié,
+  le successeur en vigueur, le brouillon suivant, deux procédures d'un
+  même pays, la fin passée en tête, les libellés, le vocabulaire et le
+  jour civil de Cotonou.
+- Écran : trois tests (`tests/ui/veille-fin-prevue.test.tsx`), encadré,
+  compte, lien, et absence quand tout est relayé.
+- Parcours : « veille : fins prévues sans version suivante… », attendu
+  relu en base par une requête écrite dans le test, indépendante du
+  domaine. Le nombre de lignes et les liens doivent correspondre ;
+  l'écart en jours n'est comparé que si le jour civil n'a pas changé
+  entre la requête et le rendu (S.198).
+
+**Reste.** Les versions NL 2027 elles-mêmes, au responsable, avant le
+31/12/2026.

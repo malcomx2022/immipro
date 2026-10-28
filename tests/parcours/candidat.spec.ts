@@ -2130,6 +2130,53 @@ test("veille : écart sans note refusé, écart noté consigné sans toucher aux
 });
 
 /**
+ * C-13, WF-11 — une fin prévue sans relais s'annonce en tête de B-01
+ * (S.200). L'attendu est relu en base par une requête écrite ici, pas par
+ * le domaine qu'elle vérifie : version mise en vigueur, non archivée, fin
+ * prévue dans les quatre-vingt-dix jours du jour civil, et aucune version
+ * suivante en vigueur. R-O03 publie une version NL : selon l'ordre des
+ * profils, le relais existe ou non, et l'attente suit la base.
+ */
+test("veille : fins prévues sans version suivante annoncées, comptées en base (C-13)", async () => {
+  const b = await administration();
+  const jour = jourCivil(new Date());
+  const attendues = await lire<{ id: string; code: string; jours: number }>(
+    `SELECT r.id, r."countryCode" AS code, (r."effectiveTo" - $1::date) AS jours
+     FROM "VisaRule" r
+     WHERE r."publishedAt" IS NOT NULL AND r.status <> 'ARCHIVED'
+       AND r."effectiveTo" IS NOT NULL AND r."effectiveTo" <= $1::date + 90
+       AND NOT EXISTS (
+         SELECT 1 FROM "VisaRule" s
+         WHERE s."countryCode" = r."countryCode" AND s."visaType" = r."visaType"
+           AND s.version > r.version AND s."publishedAt" IS NOT NULL AND s.status <> 'ARCHIVED')`,
+    [jour],
+  );
+  await aller("/veille", b);
+  const encadre = b.getByRole("region", { name: /fin prévue sans version suivante$/u });
+  if (attendues.length === 0) {
+    await expect(encadre).toHaveCount(0);
+  } else {
+    await expect(encadre).toBeVisible();
+    await expect(encadre.getByRole("listitem")).toHaveCount(attendues.length);
+    for (const { id, code, jours } of attendues) {
+      const ligne = encadre.getByRole("listitem").filter({
+        has: b.locator(`a[href="/regles/${id}"]`),
+      });
+      await expect(ligne.getByRole("link", { name: `Ouvrir la fiche ${code}` })).toBeVisible();
+      // Le jour a pu changer entre la requête et le rendu : l'écart ne se
+      // compare qu'au même jour civil (S.198).
+      if (jourCivil(new Date()) === jour && jours > 0) {
+        await expect(ligne).toContainText(`Fin prévue dans ${jours} j`);
+      }
+    }
+  }
+  preuves.push({
+    controle: `C-13 veille : ${attendues.length} fin(s) prévue(s) sans version suivante annoncée(s), comme en base`,
+    conforme: true,
+  });
+});
+
+/**
  * R-I04, textes juridiques (S.191). Une variable mal formée est refusée à
  * l'écran et par la route, sans rien écrire ; la validation d'un texte
  * exige l'attestation de relecture. Rien n'est publié : la relecture d'un
