@@ -42,6 +42,7 @@ import {
 } from "@/server/ia/appel";
 import {
   DELAI_EXTRACTION_MS,
+  delaiDeLecture,
   TAILLE_MAXI_EXTRACTION_OCTETS,
   TYPES_LISIBLES,
   instructions,
@@ -214,7 +215,7 @@ export async function lireDesOctets(
           },
         ],
       },
-      { timeout: DELAI_EXTRACTION_MS },
+      { timeout: delaiDeLecture(type) },
     );
   } catch (erreur) {
     /*
@@ -223,7 +224,7 @@ export async function lireDesOctets(
       mesure, alors que ce serait une estimation — et B-07 recalcule des
       coûts à partir de ces nombres.
     */
-    const { cause, detail } = classer(erreur, CHAINE);
+    const { cause, detail } = classer(erreur, { ...CHAINE, delaiMs: delaiDeLecture(type) });
     return { ...sansJetons(cause, detail), appel: { fournisseur: "anthropic", modele, mesure: mesurerLesJetons(undefined, undefined) } };
   }
 

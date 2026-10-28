@@ -77,6 +77,35 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.201 — L5, passages Vertex du 28/10 — 28/10/2026
+
+Demandé par le responsable. Base `de63b49` (#322 fusionnée). Premier
+passage `--pieces L01,R03` : quatre appels `CONNUE` ; entrée 1 668 / 10 240,
+sortie 656 / 5 120. Restant lancé ensuite : L02 à L05 justes, PDF compris ;
+L06 (PDF) dépasse le délai de 120 s, mesure `INCONNUE`, campagne arrêtée
+en `MESURE_A_RAPPROCHER`. Réserve 395,97 XOF pour 9 invocations, restant
+4 604,03. Reprise interdite avant le rapprochement de L06 dans la console
+`projetanatt` : ne pas retirer le blocage à la main, ne pas ouvrir de
+second journal. Seule copie du journal :
+`docs/revue/preuves-l5-vertex-2026-10-16/journal/budget.json`, à remettre
+en place avant toute reprise. À vérifier aussi : la sortie facturée
+compte-t-elle le raisonnement `low` ? Le délai client d'un PDF passe à
+180 s (`delaiDeLecture`), l'image garde 120 s, dans les deux adaptateurs
+et donc en production ; ne pas dépasser la marge de 300 s du jeton
+Google. Ce délai ne lève pas le blocage. L06 rapproché « non
+facturée » par `npm run banc:ia:rapprocher` (journal tracé, réserve
+gardée ; ne jamais éditer le blocage à la main). Le troisième passage
+s'arrête de nouveau sur L06 à 180 s : comportement propre à la pièce, pas
+un délai à allonger. Réserve 439,97 XOF pour 10 invocations. Second
+rapprochement consigné (499, non facturée). Quatrième passage sans L06 :
+L07 à L13 justes, puis L14 (JPEG) dépasse 120 s. Examen local sans
+appel : demandes identiques à L05/L13, L08 (sous le seuil) passe, format
+et rendu sains ; seule piste propre à L06/L14, des attestations de fonds
+d'un tiers. Durées (L07 : 52 s pour 29 jetons) : vérifier en facturation
+que la réflexion `low` est comptée, avant toute reprise. Réserve 791,95 XOF
+pour 18 invocations. Rapprochement de L14 et suite au responsable. L5, Q.A et M.C restent ouverts.
+Lire [le suivi](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.200 — C-13, la fin prévue sans relais annoncée en B-01 — 28/10/2026
 
 Lot dédié demandé par le responsable après le point du 28/10. Base

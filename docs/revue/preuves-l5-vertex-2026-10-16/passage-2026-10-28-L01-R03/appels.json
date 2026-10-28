@@ -1,0 +1,54 @@
+[
+  {
+    "cas": "L01",
+    "fonction": "extraction",
+    "mesure": {
+      "etat": "CONNUE",
+      "jetonsEntree": 1668,
+      "jetonsSortie": 36,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "millisecondes": 4518,
+    "incident": null
+  },
+  {
+    "cas": "R03",
+    "fonction": "redaction",
+    "mesure": {
+      "etat": "CONNUE",
+      "jetonsEntree": 522,
+      "jetonsSortie": 158,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "millisecondes": 2604,
+    "incident": null
+  },
+  {
+    "cas": "R03",
+    "fonction": "relecture",
+    "mesure": {
+      "etat": "CONNUE",
+      "jetonsEntree": 852,
+      "jetonsSortie": 420,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "millisecondes": 4735,
+    "incident": null
+  },
+  {
+    "cas": "R03",
+    "fonction": "avis_reference",
+    "mesure": {
+      "etat": "CONNUE",
+      "jetonsEntree": 818,
+      "jetonsSortie": 656,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "millisecondes": 6412,
+    "incident": null
+  }
+]

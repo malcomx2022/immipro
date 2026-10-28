@@ -68,7 +68,10 @@ import { INTERDITS_PARTOUT, verifierTexte } from "@/domain/copy/vocabulaire-inte
  */
 export const TAILLE_MAXI_EXTRACTION_OCTETS = 32 * 1024 * 1024;
 
-/** Au-delà, l'appel est abandonné et la pièce part en revue humaine. */
+/**
+ * Au-delà, l'appel est abandonné et la pièce part en revue humaine.
+ * Délai d'une image ; un PDF a le sien (`delaiDeLecture`).
+ */
 export const DELAI_EXTRACTION_MS = 120_000;
 
 /**
@@ -86,6 +89,19 @@ export type TypeLisible = keyof typeof TYPES_LISIBLES;
 
 export const typeLisible = (mime: string | null | undefined): mime is TypeLisible =>
   mime !== null && mime !== undefined && mime in TYPES_LISIBLES;
+
+/**
+ * Délai d'un PDF. Sur Vertex, une page PDF a épuisé les deux minutes quand
+ * les images rendaient en moins de douze secondes (S.201, L06) : le PDF
+ * attend trois minutes, comme une rédaction. Le plafond reste sous la
+ * marge de renouvellement du jeton Google (`MARGE_DE_RENOUVELLEMENT_SECONDES`),
+ * pour qu'aucun jeton n'expire pendant l'appel.
+ */
+export const DELAI_EXTRACTION_PDF_MS = 180_000;
+
+/** Le délai de l'appel de lecture, selon ce qui part au modèle. */
+export const delaiDeLecture = (type: TypeLisible): number =>
+  TYPES_LISIBLES[type] === "document" ? DELAI_EXTRACTION_PDF_MS : DELAI_EXTRACTION_MS;
 
 /* ------------------------------------------------------------------ *
  * Pourquoi une lecture n'a pas eu lieu.
