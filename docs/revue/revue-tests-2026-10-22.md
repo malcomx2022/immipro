@@ -130,6 +130,9 @@ en navigateur, changement de fuseau, pièce périmée, purge effective et
 portabilité, publication → divergence → arbitrage (R-O03), remboursement
 → avoir (R-O04, dépend de M.C), suppression de compte (R-O05), lecteur
 d'écran et TalkBack (R-I02), formulaires back-office hors B-05 (R-I04).
+*État au 28/10 (§ 23)* : tous déroulés en navigateur (§ 8, § 13, § 16,
+§ 20), sauf R-O04, qui attend un rail de paiement réel (M.C), et R-I02,
+qui demande un lecteur d'écran manié par une personne.
 
 **C-4 — Fixtures d'interface incomplètes.** Le test P-03 (`p0-public`)
 fournissait des destinations écartées sans `slug`, champ requis par le
@@ -166,7 +169,7 @@ dépend d'un préalable externe ; **V2** — reporté par DOC-11 § 0.
 | Module | Statut | Preuves | Reste |
 |---|---|---|---|
 | WF-01 Simulateur | Éprouvé | Domaine `simulateur/` ; parcours clavier six réponses ; photographies ; procédure nommée partout où un pays en publie plusieurs (O-1, § 12) | — |
-| WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement, suppression demandée et reprise (R-O05, § 8) | Portabilité en navigateur ; OAuth Google V2 |
+| WF-02 Inscription, profil, consentements | Éprouvé | `comptes/`, `acces/comptes` ; parcours inscription + téléphone (S.178), retrait du consentement, suppression demandée et reprise (R-O05, § 8, § 17) ; portabilité en navigateur (§ 13) | OAuth Google V2 |
 | WF-03 Recommandations | Éprouvé | Domaine, résultats sourcés ; trois profils contrastés en navigateur (§ 13) ; comparateur en navigateur, colonnes et valeurs lues en base (§ 18) | — |
 | WF-04 Ouverture de dossier | Éprouvé | Règle figée (INV-3), parcours ouverture | — |
 | WF-05 Achat de pack | Bloqué (M.C) | Tunnel, FedaPay, réconciliation, remboursement, montée sur PostgreSQL ; achat scripté en navigateur | Bac à sable réel FedaPay/Stripe, certification fiscale, essai réel |
@@ -247,14 +250,18 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 
 ## 6. Le restant
 
-| Lot | État au 22/10 | Qui |
+État relu le 28/10 (S.199, § 23) ; il remplace celui du 22/10.
+
+| Lot | État au 28/10 | Qui |
 |---|---|---|
 | L0–L4 | Fusionnés et déployés (S.170–S.175) | — |
 | L5 Qualification IA | Région `eu`, raisonnement `low`, campagne bornée ; aucun appel payant, clé à fournir en secret d'environnement | Responsable |
-| L6 Recette front | 96 parcours + 84 scénarios verts ; lecteur d'écran humain, gestes C-3, signature de la matrice | Responsable + tests à compléter |
-| L7 Exploitation | B-04/B-07 corrigés ; diagnostics, inventaire, sauvegarde/restauration sur clone, services cibles | Responsable (VPS) |
+| L6 Recette front | 33 parcours par profil (198 sur six profils) et 84 scénarios photographiques verts ; gestes C-3 déroulés sauf R-O04 (M.C) ; restent R-I02 au lecteur d'écran et la signature de la matrice | Responsable |
+| L7 Exploitation | B-04/B-07 corrigés ; restent diagnostics, inventaire, sauvegarde/restauration sur clone, services cibles et les lignes R-P01, R-P11 à R-P20 de la matrice (certificats, santé, parcours sur téléphone et opérateur, runbook) | Responsable (VPS) |
 | L8 Paiement et lancement | Textes juridiques, coordonnées, TVA, certification fiscale, essais réels | Responsable, juriste, comptable |
-| L9 Maintenance | #298 et #299 fusionnées, #300 fermée au profit de #303 fusionnée ; exception `deepmerge-ts`, avis modérés `minio` | Code |
+| L9 Maintenance | #298 et #299 fusionnées, #300 fermée au profit de #303 fusionnée ; exception `deepmerge-ts`, avis modérés `minio` ; aucune PR ouverte au 28/10 | Code |
+| C-13 Règles NL 2027 | Échéance de données au 31/12/2026 : sans versions 2027 publiées, plus aucune destination néerlandaise n'est affichée le 1er janvier (§ 9) | Responsable (contenu sourcé), code pour l'alerte |
+| WF-09, WF-13, WF-14 | Rappel réellement reçu (SMTP de production), conditions d'affiliation, routine de veille réelle | Responsable |
 | Q.A / M.C | Ouverts | Responsable |
 
 Travail de code encore possible sans préalable externe, par priorité :
@@ -268,6 +275,19 @@ Travail de code encore possible sans préalable externe, par priorité :
 4. ~~Relecture des trois PR Dependabot avec la porte complète~~ : #298 et
    #299 fusionnées, #300 fermée au profit de #303 ; aucune PR ouverte au 25/10.
 5. ~~R-O05 sous Firefox~~ : fiabilisé en S.193 (§ 17).
+6. ~~Comparateur WF-03 et relecture de la complétude WF-07 en
+   navigateur~~ : S.194 et S.195 (§ 18, § 19), les deux modules passent
+   « éprouvé ».
+7. ~~Création d'un consultant à l'écran B-09~~ : S.196 (§ 20).
+8. ~~`connecter()` sans navigation de trop~~ : S.197 (§ 21), avec la
+   course de B-03 révélée à l'intégration. ~~B-04 au passage de
+   minuit~~ : S.198 (§ 22).
+9. Alerte avant l'échéance C-13 : proposée en lot dédié après S.199.
+   Le contenu des versions 2027 reste au responsable, depuis les sources
+   officielles.
+
+Au-delà, plus aucun code applicatif n'est à écrire sans préalable : le
+reste attend L5, M.C, Q.A, la cible VPS ou un geste humain.
 
 ## 7. Reproduction
 
@@ -887,3 +907,33 @@ l'ancienne attente échoue (`Expected substring: "IMP-…"`, le défaut du
 27/10 reproduit), la nouvelle passe par la branche « veille ». Parcours
 31/31 sur Chromium 1 440 dans le cas courant ; Firefox et WebKit à la
 porte CI.
+
+## 23. S.199 — le restant relu après les lots du 26/10, lot dédié — 28/10/2026
+
+Demande du responsable après la fusion de #320. Base : `feb4334` (#320
+fusionnée). Lot **documentaire** : aucun code, schéma, drapeau ni
+service touché.
+
+**Ce qui était périmé.**
+
+- § 5.1, WF-02 : la portabilité figurait encore en reste alors que
+  S.188 la déroule en navigateur (`candidat.spec.ts`, « portabilité :
+  export de mes données… », § 13). Seul l'OAuth Google, reporté en V2,
+  reste.
+- § 3, C-3 : la liste des gestes absents datait du 22/10. Tous sont
+  déroulés depuis, sauf R-O04 (M.C) et R-I02 (humain).
+- § 6 : l'état des lots datait du 22/10. Il est relu au 28/10 :
+  - nombre de parcours mis à jour, 33 par profil ;
+  - lignes R-P de la matrice rattachées à L7 ;
+  - échéance C-13 et restes de WF-09/13/14 ajoutés ;
+  - priorités du 26/10 et du 27/10 barrées.
+
+**Constat.** Le déploiement de `main` suit chaque fusion (workflow
+« Déploiement ») : #316 à #319 ont été déployées avec succès le 28/10,
+#320 ne change que des tests. Une fusion ne vaut toujours ni recette ni
+levée de préalable.
+
+**Preuves.** Relecture des sections citées, de `docs/recette/matrice-v1.md`
+(lignes encore « non vérifié » : R-O04, R-I02, R-P01, R-P11 à R-P20) et
+de `tests/parcours/candidat.spec.ts`. Porte locale verte : lint, types, 204 fichiers
+et 4 070 tests, vocabulaire.
