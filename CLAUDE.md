@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.201 — L5, premier passage Vertex `--pieces L01,R03` — 28/10/2026
+
+Demandé par le responsable. Base `de63b49` (#322 fusionnée). Commande du
+protocole, campagne du 16/10 inchangée : quatre appels `CONNUE`, aucun
+incident ; L01 conforme, R03 écrite sans mot interdit, incohérence relevée
+par la relecture et l'avis. Entrée 1 668 / 10 240, sortie 656 / 5 120 ;
+réserve 175,99 XOF, restant 4 824,01 pour 56 invocations prévues. Avant
+le jeu complet : vérifier en console que la sortie facturée correspond à
+`completion_tokens` (36 en extraction malgré `low`), le PDF reste à
+éprouver. Le journal est archivé dans les preuves : le remettre en place
+avant toute reprise, jamais relancer sans lui. L5, Q.A et M.C restent
+ouverts. Lire [le suivi](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.200 — C-13, la fin prévue sans relais annoncée en B-01 — 28/10/2026
 
 Lot dédié demandé par le responsable après le point du 28/10. Base

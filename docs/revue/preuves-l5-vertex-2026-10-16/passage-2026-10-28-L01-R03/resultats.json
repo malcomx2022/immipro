@@ -1,0 +1,329 @@
+{
+  "format": "REV11-L5-1",
+  "qualification": {
+    "nature": "FOURNISSEUR_REEL",
+    "statut": "A_COMPLETER",
+    "fournisseurQualifie": false,
+    "couverture": {
+      "pieces": 1,
+      "piecesAttendues": 30,
+      "redactions": 1,
+      "redactionsAttendues": 10
+    },
+    "preuvesRestantes": [
+      "modèles et tarifs officiels revalidés",
+      "incidents du fournisseur réel",
+      "deux relectures humaines des lettres",
+      "rapprochement du relevé fournisseur",
+      "DPA, résidence et conservation validés",
+      "choix extraction/rédaction et configuration déployée"
+    ]
+  },
+  "manifeste": {
+    "societe": "Google Cloud — Vertex AI (Gemini Enterprise Agent Platform), projet projetanatt, compte de service immipro-vertex-ai",
+    "regionDeclaree": "eu",
+    "modele": "google/gemini-3.8-flash",
+    "dateVerification": "2026-10-16",
+    "sourceModele": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+    "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "maxAppels": 60,
+    "budgetCompte": "Plafond global de campagne 5 000 XOF (décision S.177), réservé avant réseau dans .qualification-vertex/projetanatt-eu-gemini-3.8-flash ; devise de facturation et taxes du compte projetanatt à confirmer dans la console",
+    "autorisationEssaiSynthetique": true,
+    "dpa": "NON_VERIFIE",
+    "residence": "NON_VERIFIE",
+    "conservation": "NON_VERIFIE"
+  },
+  "campagneVertex": {
+    "id": "projetanatt-eu-gemini-3.8-flash",
+    "projet": "projetanatt",
+    "region": "eu",
+    "modele": "google/gemini-3.8-flash",
+    "plafondXof": 5000,
+    "borneVerifiee": true,
+    "referenceBorne": "Relevé officiel du 16/10/2026 (pages Google datées 2026-10-15, releve-officiel.json) : tarif hors global 0,825 USD par million en entrée et 4,125 USD par million en sortie, réponse et raisonnement, jusqu'au 31/12/2026 ; entrée bornée à 10 240 jetons (consignes et schéma, plus un média : image 1 120, page PDF 560) ; sortie bornée à 5 120 jetons (max_tokens 4 096 de l'adaptateur + 1 024 de raisonnement, reasoning_effort low de la page de compatibilité OpenAI) ; change BCE du 15/10/2026 1 EUR = 1,1208 USD, soit 585,26 XOF par USD à parité fixe, majoré à 620 ; frais et taxes majorés à 20 %. Toute mesure au-delà arrête la campagne (BORNE_FACTUREE_DEPASSEE).",
+    "sourceLimites": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+    "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "jetonsEntreeMax": 10240,
+    "jetonsSortieFacturesMax": 5120,
+    "tarifEntreeMicrosDeviseParMillion": 825000,
+    "tarifSortieMicrosDeviseParMillion": 4125000,
+    "deviseTarif": "USD",
+    "conversionMajoreeMicrosXofParUnite": 620000000,
+    "fraisMajoresMilliemes": 1200
+  },
+  "budgetVertex": {
+    "campagne": "projetanatt-eu-gemini-3.8-flash",
+    "empreinte": "beca65756cc69591832e2a095af86e363415a6e22e3322f41697ab6edbd0852c",
+    "plafondMicrosXof": 5000000000,
+    "reserveMicrosXof": 175988736,
+    "appelsReserves": 4,
+    "enCours": null,
+    "blocage": null,
+    "derniereMesure": {
+      "etat": "CONNUE",
+      "jetonsEntree": 818,
+      "jetonsSortie": 656,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    }
+  },
+  "configuration": {
+    "adresse": "https://aiplatform.eu.rep.googleapis.com/v1/projects/projetanatt/locations/eu/endpoints/openapi",
+    "pdf": "image_url",
+    "authentification": "compte_de_service_google"
+  },
+  "provenance": {
+    "commit": "de63b49e8468519f630a2bf42f1e28d7cdd146d8",
+    "arbreModifie": false,
+    "pieces": [
+      {
+        "id": "L01",
+        "type": "image/jpeg",
+        "sha256": "c7e53c5d599258a0fd7f11484dff168d5047d6f710055ffbfbe691199488da9c"
+      }
+    ],
+    "lettresReferenceSha256": "3dc8c01e3840f2e6b6f765169e5d6eef8fdef16aaef12f34ef249a03482908c0"
+  },
+  "appelsPrevus": 4,
+  "appels": [
+    {
+      "cas": "L01",
+      "fonction": "extraction",
+      "mesure": {
+        "etat": "CONNUE",
+        "jetonsEntree": 1668,
+        "jetonsSortie": 36,
+        "fournisseur": "openai_compatible",
+        "modele": "google/gemini-3.8-flash"
+      },
+      "millisecondes": 4518,
+      "incident": null
+    },
+    {
+      "cas": "R03",
+      "fonction": "redaction",
+      "mesure": {
+        "etat": "CONNUE",
+        "jetonsEntree": 522,
+        "jetonsSortie": 158,
+        "fournisseur": "openai_compatible",
+        "modele": "google/gemini-3.8-flash"
+      },
+      "millisecondes": 2604,
+      "incident": null
+    },
+    {
+      "cas": "R03",
+      "fonction": "relecture",
+      "mesure": {
+        "etat": "CONNUE",
+        "jetonsEntree": 852,
+        "jetonsSortie": 420,
+        "fournisseur": "openai_compatible",
+        "modele": "google/gemini-3.8-flash"
+      },
+      "millisecondes": 4735,
+      "incident": null
+    },
+    {
+      "cas": "R03",
+      "fonction": "avis_reference",
+      "mesure": {
+        "etat": "CONNUE",
+        "jetonsEntree": 818,
+        "jetonsSortie": 656,
+        "fournisseur": "openai_compatible",
+        "modele": "google/gemini-3.8-flash"
+      },
+      "millisecondes": 6412,
+      "incident": null
+    }
+  ],
+  "references": [
+    {
+      "id": "R03",
+      "incoherenceAttendue": true,
+      "incoherenceRelevee": true,
+      "avisValide": true,
+      "remarques": [
+        {
+          "genre": "INCOHERENCE",
+          "titre": "Dates contradictoires pour l'obtention du diplôme",
+          "corps": "Le texte indique une obtention de licence en 2025, puis un travail commencé dès l'obtention du diplôme en 2024. Harmonise l'année d'obtention de ton diplôme et la chronologie de ton parcours professionnel.",
+          "ecarts": [
+            {
+              "source": "Licence en informatique de gestion, obtenue en 2025.",
+              "valeur": "2025"
+            },
+            {
+              "source": "Depuis mon diplôme en 2024, je travaille comme technicien support dans une banque.",
+              "valeur": "2024"
+            }
+          ]
+        },
+        {
+          "genre": "A_RENFORCER",
+          "titre": "Absence de détails sur le cursus visé et l'établissement d'accueil aux Pays-Bas",
+          "corps": "Tu mentionnes un 'master en science des données' sans préciser l'université visée, son intitulé exact, son programme ni pourquoi cette formation spécifique aux Pays-Bas s'impose pour ton projet. Renseigne le nom de l'établissement d'accueil, le contenu précis des cours et les compétences visées en lien avec ton expérience."
+        },
+        {
+          "genre": "A_RENFORCER",
+          "titre": "Manque d'explication sur la cohérence entre le parcours antérieur et la formation demandée",
+          "corps": "Le passage de technicien support et titulaire d'une licence en informatique de gestion vers les sciences des données appliquées aux risques bancaires n'est pas développé. Démontre comment tes acquis académiques et tes missions actuelles t'ont préparé aux exigences de ce master."
+        },
+        {
+          "genre": "A_RENFORCER",
+          "titre": "Détails absents sur l'origine de la bourse",
+          "corps": "Tu mentionnes une bourse de 9 600 euros sans nommer l'organisme attribuant ce financement. Précise le nom du bailleur ou de l'organisme d'attribution de cette bourse."
+        },
+        {
+          "genre": "FORME",
+          "titre": "Structure du texte fragmentée et présentation tardive",
+          "corps": "La lettre est composée d'une suite de phrases nominales sans liaisons logiques, et tu ne déclines ton identité qu'à la fin. Rédige des phrases complètes structurées en paragraphes cohérents et présente-toi dès l'introduction."
+        }
+      ],
+      "incident": null
+    }
+  ],
+  "mesureTotale": {
+    "entree": 3860,
+    "sortie": 1270,
+    "coutMicros": 8423,
+    "appelsARapprocher": 0,
+    "rapprochementFournisseur": "NON_EFFECTUE"
+  },
+  "fournisseur": "openai_compatible",
+  "modele": "google/gemini-3.8-flash",
+  "horodatage": "2026-10-28T17:23:31.304Z",
+  "synthese": {
+    "pieces": 1,
+    "champs": {
+      "total": 1,
+      "justes": 1,
+      "manquees": 0,
+      "inventees": 0,
+      "fausses": 0
+    },
+    "identifications": {
+      "attendues": 1,
+      "justes": 1
+    },
+    "obstacles": {
+      "attendus": 0,
+      "justes": 0,
+      "signalesATort": 0
+    },
+    "echecsTechniques": 0,
+    "verdicts": {
+      "justes": 1,
+      "revuesHumaines": 0
+    },
+    "fausseConformite": [],
+    "disqualifie": false,
+    "redactions": {
+      "total": 1,
+      "ecrites": 1,
+      "avecVocabulaireInterdit": 0,
+      "avecNombresAjoutes": 0,
+      "incoherences": {
+        "attendues": 1,
+        "relevees": 1
+      }
+    }
+  },
+  "jetons": {
+    "lecture": {
+      "entree": 1668,
+      "sortie": 36
+    },
+    "redaction": {
+      "entree": 1374,
+      "sortie": 578
+    }
+  },
+  "tarif": {
+    "entreeParMillion": 0.825,
+    "sortieParMillion": 4.125,
+    "devise": "USD"
+  },
+  "coutMicros": {
+    "lecture": 1525,
+    "redaction": 3518
+  },
+  "lectures": [
+    {
+      "note": {
+        "id": "L01",
+        "champs": [
+          {
+            "code": "passeport_validite_min",
+            "attendu": "2031-05-14",
+            "obtenu": "2031-05-14",
+            "issue": "juste"
+          }
+        ],
+        "identificationJuste": true,
+        "obstacle": "sans_objet",
+        "echecTechnique": false,
+        "verdictAttendu": "CONFORME",
+        "verdictObtenu": "CONFORME",
+        "fausseConformite": false
+      },
+      "mesure": {
+        "jetonsEntree": 1668,
+        "jetonsSortie": 36,
+        "millisecondes": 4518
+      },
+      "cause": null
+    }
+  ],
+  "redactions": [
+    {
+      "note": {
+        "id": "R03",
+        "ecrite": true,
+        "fautesDeVocabulaire": [],
+        "nombresAjoutes": [],
+        "formulesSignalees": [],
+        "tutoiement": false,
+        "incoherenceRelevee": true,
+        "incoherenceAttendue": true,
+        "aVerifier": []
+      },
+      "mesure": {
+        "jetonsEntree": 1374,
+        "jetonsSortie": 578,
+        "millisecondes": 7339
+      },
+      "texte": "Je suis Lionel Akpovi, technicien support, candidat au master en science des données.\n\nTitulaire d'une licence en informatique de gestion, obtenue en 2025, je travaille comme technicien support dans une banque depuis mon diplôme en 2024.\n\nJe vise le master en science des données aux Pays-Bas car je souhaite comprendre les modèles de risque, ce qui s'inscrit dans la continuité de mes activités professionnelles actuelles.\n\nMon projet d'études est financé par une bourse de 9 600 euros ainsi que par l'épargne de mes parents.\n\nAprès l'obtention de ce diplôme, mon projet est de rejoindre le service des risques de ma banque à Cotonou.",
+      "remarques": [
+        {
+          "genre": "INCOHERENCE",
+          "titre": "Dates contradictoires pour l'obtention de la licence",
+          "corps": "Le texte indique d'abord une obtention de diplôme en 2025, puis un travail débuté dès l'obtention du diplôme en 2024. Corrige l'une des deux dates pour rétablir la chronologie réelle.",
+          "ecarts": [
+            {
+              "source": "licence en informatique de gestion, obtenue en 2025",
+              "valeur": "2025"
+            },
+            {
+              "source": "depuis mon diplôme en 2024",
+              "valeur": "2024"
+            }
+          ]
+        },
+        {
+          "genre": "A_RENFORCER",
+          "titre": "Absence d'établissement d'accueil et de programme précis",
+          "corps": "Tu mentionnes un master en science des données aux Pays-Bas sans désigner l'université ciblée ni le contenu du programme d'études. Précise le nom de l'université néerlandaise, l'intitulé exact du cursus et les modules spécifiques en lien avec ton projet."
+        },
+        {
+          "genre": "A_RENFORCER",
+          "titre": "Lien non démontré entre le support technique et la modélisation des risques",
+          "corps": "Tu affirmes que comprendre les modèles de risque s'inscrit dans la continuité de tes activités de technicien support sans décrire tes missions actuelles. Explicite les tâches ou les données que tu manipules au support technique pour justifier cette continuité."
+        }
+      ],
+      "incident": null
+    }
+  ]
+}
