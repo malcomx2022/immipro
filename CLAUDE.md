@@ -91,6 +91,16 @@ prolongé : le contenu 2027 reste au responsable, depuis la source
 officielle. Ne pas prolonger `effectiveTo` pour faire taire l'alerte.
 Lire [la revue, § 24](docs/revue/revue-tests-2026-10-22.md).
 
+### S.199 — le restant relu après les lots du 26/10 — 28/10/2026
+
+Lot documentaire demandé par le responsable. Base `feb4334` (#320
+fusionnée). La revue du 22/10 est remise à jour : WF-02 n'a plus la
+portabilité en reste (déroulée en S.188), C-3 ne garde que R-O04 (M.C)
+et R-I02 (humain), § 6 relu au 28/10 avec C-13 et les lignes R-P de la
+matrice. Plus aucun code applicatif sans préalable, hors l'alerte C-13.
+Aucun code, schéma ni service touché. Lire
+[la revue, § 23](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.198 — B-04 au jour civil du paiement — 27/10/2026
 
 Lot dédié demandé par le responsable. Base `72963b4` (#316 fusionnée).
