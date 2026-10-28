@@ -140,10 +140,17 @@ invocations : L06 à L30, R01, R02, R04 à R10.
 - La campagne s'est de nouveau arrêtée d'elle-même en
   `MESURE_A_RAPPROCHER`. Réserve prudente : 10 invocations, 439,97 XOF ;
   restant 4 560,03 XOF.
-- Il faut un second rapprochement de L06 (requête du 28/10 entre 17 h 49
-  et 17 h 53 UTC). Le responsable décide ensuite de la suite : poursuivre
-  sans L06, en le comptant comme échec technique du fournisseur, ou
-  diagnostiquer la pièce d'abord.
+- **Second rapprochement, consigné.** D'après les métriques de la Vertex
+  AI API relevées par le responsable (28/10, 17 h 48 à 17 h 55 UTC), une
+  seule requête figure dans la fenêtre : `ChatCompletions`, code **499**
+  (requête annulée par le client), horodatée 17:54:44Z, et aucune réponse
+  200. Elle est donc non facturée. L'horodatage tombe environ deux minutes
+  après l'abandon client (vers 17:52:42) : la métrique date la fin du
+  traitement côté Google, ce qui laisse penser que Vertex a calculé plus de
+  cinq minutes sur L06. Inscrit par `banc:ia:rapprocher` ; le blocage est
+  levé et la réserve inchangée (439,97 XOF pour 10 invocations).
+- Reste à décider : poursuivre sans L06, en le comptant comme échec
+  technique du fournisseur, ou diagnostiquer la pièce d'abord.
 
 ## Preuves
 
@@ -157,8 +164,8 @@ Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
 - `passage-2026-10-28-reprise-L06/` : `passage.json`, `appels.json` du
   troisième passage ;
 - `journal/budget.json` : copie à l'identique du journal privé **après le
-  troisième passage** (SHA-256 `0269ce24…`), bloqué, avec le rapprochement
-  du second passage. C'est la seule copie : elle remplace les précédentes.
+  second rapprochement** (SHA-256 `aae76531…`), débloqué, avec les deux
+  rapprochements de L06. C'est la seule copie : elle remplace les précédentes.
   Aucun secret.
 
 **Reprise dans une nouvelle session** : copier `journal/budget.json` vers
@@ -168,7 +175,7 @@ journal : ce serait ouvrir un second budget et effacer le blocage.
 
 ## Reste à faire et non prouvé
 
-Second rapprochement de L06, décision sur L06, fin du jeu (51
+Décision sur L06, fin du jeu (51
 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.

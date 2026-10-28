@@ -5,7 +5,7 @@
   "reserveMicrosXof": 439971840,
   "appelsReserves": 10,
   "enCours": null,
-  "blocage": "MESURE_A_RAPPROCHER",
+  "blocage": null,
   "derniereMesure": {
     "etat": "INCONNUE",
     "jetonsEntree": null,
@@ -22,6 +22,15 @@
       "jetonsSortie": null,
       "source": "Console Google Cloud du projet projetanatt, relevé par le responsable le 28/10/2026 : requête L06 du 28/10 entre 17 h 27 et 17 h 30 UTC non facturée",
       "consigneLe": "2026-10-28T17:49:29.468Z"
+    },
+    {
+      "appel": "L06/extraction",
+      "constat": "NON_FACTUREE",
+      "jetonsEntree": null,
+      "jetonsSortie": null,
+      "source": "Console Google Cloud projetanatt, métriques Vertex AI API du 28/10/2026 17:48-17:55 UTC, relevées par le responsable : une seule requête ChatCompletions, code 499 (client), horodatée 17:54:44Z, aucune réponse 200",
+      "blocage": "MESURE_A_RAPPROCHER",
+      "consigneLe": "2026-10-28T18:09:09.331Z"
     }
   ]
 }
