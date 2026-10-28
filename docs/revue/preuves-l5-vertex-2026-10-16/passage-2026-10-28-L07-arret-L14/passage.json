@@ -1,0 +1,210 @@
+{
+  "nature": "FOURNISSEUR_REEL",
+  "manifeste": {
+    "societe": "Google Cloud — Vertex AI (Gemini Enterprise Agent Platform), projet projetanatt, compte de service immipro-vertex-ai",
+    "regionDeclaree": "eu",
+    "modele": "google/gemini-3.8-flash",
+    "dateVerification": "2026-10-16",
+    "sourceModele": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+    "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "maxAppels": 60,
+    "budgetCompte": "Plafond global de campagne 5 000 XOF (décision S.177), réservé avant réseau dans .qualification-vertex/projetanatt-eu-gemini-3.8-flash ; devise de facturation et taxes du compte projetanatt à confirmer dans la console",
+    "autorisationEssaiSynthetique": true,
+    "dpa": "NON_VERIFIE",
+    "residence": "NON_VERIFIE",
+    "conservation": "NON_VERIFIE"
+  },
+  "campagneVertex": {
+    "id": "projetanatt-eu-gemini-3.8-flash",
+    "projet": "projetanatt",
+    "region": "eu",
+    "modele": "google/gemini-3.8-flash",
+    "plafondXof": 5000,
+    "borneVerifiee": true,
+    "referenceBorne": "Relevé officiel du 16/10/2026 (pages Google datées 2026-10-15, releve-officiel.json) : tarif hors global 0,825 USD par million en entrée et 4,125 USD par million en sortie, réponse et raisonnement, jusqu'au 31/12/2026 ; entrée bornée à 10 240 jetons (consignes et schéma, plus un média : image 1 120, page PDF 560) ; sortie bornée à 5 120 jetons (max_tokens 4 096 de l'adaptateur + 1 024 de raisonnement, reasoning_effort low de la page de compatibilité OpenAI) ; change BCE du 15/10/2026 1 EUR = 1,1208 USD, soit 585,26 XOF par USD à parité fixe, majoré à 620 ; frais et taxes majorés à 20 %. Toute mesure au-delà arrête la campagne (BORNE_FACTUREE_DEPASSEE).",
+    "sourceLimites": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+    "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "jetonsEntreeMax": 10240,
+    "jetonsSortieFacturesMax": 5120,
+    "tarifEntreeMicrosDeviseParMillion": 825000,
+    "tarifSortieMicrosDeviseParMillion": 4125000,
+    "deviseTarif": "USD",
+    "conversionMajoreeMicrosXofParUnite": 620000000,
+    "fraisMajoresMilliemes": 1200
+  },
+  "budgetVertex": {
+    "campagne": "projetanatt-eu-gemini-3.8-flash",
+    "empreinte": "beca65756cc69591832e2a095af86e363415a6e22e3322f41697ab6edbd0852c",
+    "plafondMicrosXof": 5000000000,
+    "reserveMicrosXof": 439971840,
+    "appelsReserves": 10,
+    "enCours": null,
+    "blocage": null,
+    "derniereMesure": {
+      "etat": "INCONNUE",
+      "jetonsEntree": null,
+      "jetonsSortie": null,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "rapprochements": [
+      {
+        "appel": "L06/extraction",
+        "blocage": "MESURE_A_RAPPROCHER",
+        "constat": "NON_FACTUREE",
+        "jetonsEntree": null,
+        "jetonsSortie": null,
+        "source": "Console Google Cloud du projet projetanatt, relevé par le responsable le 28/10/2026 : requête L06 du 28/10 entre 17 h 27 et 17 h 30 UTC non facturée",
+        "consigneLe": "2026-10-28T17:49:29.468Z"
+      },
+      {
+        "appel": "L06/extraction",
+        "blocage": "MESURE_A_RAPPROCHER",
+        "constat": "NON_FACTUREE",
+        "jetonsEntree": null,
+        "jetonsSortie": null,
+        "source": "Console Google Cloud projetanatt, métriques Vertex AI API du 28/10/2026 17:48-17:55 UTC, relevées par le responsable : une seule requête ChatCompletions, code 499 (client), horodatée 17:54:44Z, aucune réponse 200",
+        "consigneLe": "2026-10-28T18:09:09.331Z"
+      }
+    ]
+  },
+  "adresse": "https://aiplatform.eu.rep.googleapis.com/v1/projects/projetanatt/locations/eu/endpoints/openapi",
+  "modele": "google/gemini-3.8-flash",
+  "commit": "522ff412c866074f72058b8baef0c6732af14015",
+  "arbreModifie": false,
+  "horodatage": "2026-10-28T18:09:52.392Z",
+  "appelsPrevus": 51,
+  "pieces": [
+    {
+      "id": "L07",
+      "type": "application/pdf",
+      "sha256": "04a6e54355aac7db57a9b6a03fb26e218bedd364d95bff4683fee41296cc609e"
+    },
+    {
+      "id": "L08",
+      "type": "image/jpeg",
+      "sha256": "7450cced1e656af471fab0b91b6f1cbc8d20228f6784181051dc966c98d32db7"
+    },
+    {
+      "id": "L09",
+      "type": "application/pdf",
+      "sha256": "246e7532580dc77074e3d6771f326ad40d08116962f023f3a648971037a7d5cb"
+    },
+    {
+      "id": "L10",
+      "type": "application/pdf",
+      "sha256": "b91e40b06c0ddb794a526a3aecfaa037054b8d19cd31322d5d26cb85e200b3ed"
+    },
+    {
+      "id": "L11",
+      "type": "image/jpeg",
+      "sha256": "e9c18992f9426cd1a95601e8e19b740adecd39c47d7684907d377e1678fe2a74"
+    },
+    {
+      "id": "L12",
+      "type": "application/pdf",
+      "sha256": "4c184334575a80070ac8c2c8f3bb6be1c85da48f0519f657e48c1d50c8b82474"
+    },
+    {
+      "id": "L13",
+      "type": "application/pdf",
+      "sha256": "eb416f4cda879bb67760dc33488a019ac5910cac3839d83fa93cb3aa8ffd8f0d"
+    },
+    {
+      "id": "L14",
+      "type": "image/jpeg",
+      "sha256": "692b8d7e0767a49b707a07ff30deb8fe18b59c2400e22a6656c832d6f7398596"
+    },
+    {
+      "id": "L15",
+      "type": "image/png",
+      "sha256": "e310c4cef4248317b8260cc6769b0321c831cf4bef4554540e2429e372ffb6e3"
+    },
+    {
+      "id": "L16",
+      "type": "application/pdf",
+      "sha256": "3bedcac0ebd25ef2d5f399130399e737ba1c3ce190b2aa682ca0c89ea1f4d072"
+    },
+    {
+      "id": "L17",
+      "type": "application/pdf",
+      "sha256": "8f147bf27fec075e8d849184faebaa8b0e9d754296b880c4428e68da76f4981d"
+    },
+    {
+      "id": "L18",
+      "type": "image/jpeg",
+      "sha256": "c1ed7b1ab1d13f8c364afe6830624237990557bef1cf002252c949aec616754f"
+    },
+    {
+      "id": "L19",
+      "type": "application/pdf",
+      "sha256": "482310286cc3cb8f307912ad4f803ca3a691553fa1a0c1fd1572cd969cb0c3f5"
+    },
+    {
+      "id": "L20",
+      "type": "application/pdf",
+      "sha256": "752a75963834b1efe1e7d8a3509f92f9fbe0b3121c522c1aa36190550ded3c13"
+    },
+    {
+      "id": "L21",
+      "type": "image/jpeg",
+      "sha256": "d3cd839702e554f432face7ce9b7a0057e484ac1d1f8323a1b0d0b5c50737ea6"
+    },
+    {
+      "id": "L22",
+      "type": "application/pdf",
+      "sha256": "a1a57d897b8221645b035a7b196b54904563d99ab123170ed29bc4c11ef6442f"
+    },
+    {
+      "id": "L23",
+      "type": "application/pdf",
+      "sha256": "8011cba589fbcc374afd8558a072b572c557c4c6397c5aa9d36c1145d9acb409"
+    },
+    {
+      "id": "L24",
+      "type": "application/pdf",
+      "sha256": "4e6ebfd2757fbd67b7ebd45794648d25f2fc8710862e721d86da58f284580c31"
+    },
+    {
+      "id": "L25",
+      "type": "image/jpeg",
+      "sha256": "2a86d87f83d8ab806791bb3ab2e9bfa5dbea2229c0b70dd84ef05a82405b0fa3"
+    },
+    {
+      "id": "L26",
+      "type": "application/pdf",
+      "sha256": "eda14a92a95f0e851185364260d9bba590d88b37bc3cd45d95c803bdae0d9317"
+    },
+    {
+      "id": "L27",
+      "type": "application/pdf",
+      "sha256": "1504601e397fe43f31ac9a962f4b33889172e1a69788ab0ef4c1f378c642a567"
+    },
+    {
+      "id": "L28",
+      "type": "application/pdf",
+      "sha256": "0238c615980c89af1cab1b5c8c458f93f03276f7502ce129839f78de23d18990"
+    },
+    {
+      "id": "L29",
+      "type": "application/pdf",
+      "sha256": "628cab28bc02fe925e759f92089dd5f7f28d709a9827119e4f2a05aff97be1f6"
+    },
+    {
+      "id": "L30",
+      "type": "image/jpeg",
+      "sha256": "469edfe61e382026d6681720d8417cc8b93fea7c092c89b60562eb87c8f95c96"
+    }
+  ],
+  "redactions": [
+    "R01",
+    "R02",
+    "R04",
+    "R05",
+    "R06",
+    "R07",
+    "R08",
+    "R09",
+    "R10"
+  ]
+}

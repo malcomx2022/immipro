@@ -2,10 +2,10 @@
   "campagne": "projetanatt-eu-gemini-3.8-flash",
   "empreinte": "beca65756cc69591832e2a095af86e363415a6e22e3322f41697ab6edbd0852c",
   "plafondMicrosXof": 5000000000,
-  "reserveMicrosXof": 439971840,
-  "appelsReserves": 10,
+  "reserveMicrosXof": 791949312,
+  "appelsReserves": 18,
   "enCours": null,
-  "blocage": null,
+  "blocage": "MESURE_A_RAPPROCHER",
   "derniereMesure": {
     "etat": "INCONNUE",
     "jetonsEntree": null,
@@ -25,11 +25,11 @@
     },
     {
       "appel": "L06/extraction",
+      "blocage": "MESURE_A_RAPPROCHER",
       "constat": "NON_FACTUREE",
       "jetonsEntree": null,
       "jetonsSortie": null,
       "source": "Console Google Cloud projetanatt, métriques Vertex AI API du 28/10/2026 17:48-17:55 UTC, relevées par le responsable : une seule requête ChatCompletions, code 499 (client), horodatée 17:54:44Z, aucune réponse 200",
-      "blocage": "MESURE_A_RAPPROCHER",
       "consigneLe": "2026-10-28T18:09:09.331Z"
     }
   ]

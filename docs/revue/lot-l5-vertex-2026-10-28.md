@@ -152,6 +152,37 @@ invocations : L06 à L30, R01, R02, R04 à R10.
 - Reste à décider : poursuivre sans L06, en le comptant comme échec
   technique du fournisseur, ou diagnostiquer la pièce d'abord.
 
+## Quatrième passage, sans L06 : arrêté sur L14
+
+Le responsable a choisi de poursuivre sans L06, compté comme échec
+technique du fournisseur. Passage du commit `522ff41`, arbre propre, sur
+51 invocations : L07 à L30, R01, R02, R04 à R10.
+
+| Cas | Format | Entrée / sortie | ms | Constat |
+|---|---|---|---|---|
+| L07 | PDF | 1 136 / 29 | 52 381 | `HORS_SUJET`, comme attendu |
+| L08 | JPEG | 1 696 / 35 | 4 431 | `A_CORRIGER`, comme attendu |
+| L09 | PDF | 990 / 35 | 3 786 | `CONFORME`, comme attendu |
+| L10 | PDF | 1 108 / 29 | 5 181 | `HORS_SUJET`, comme attendu |
+| L11 | JPEG | 1 551 / 19 | 2 916 | `CONFORME`, comme attendu |
+| L12 | PDF | 993 / 18 | 2 673 | `CONFORME`, comme attendu |
+| L13 | PDF | 1 120 / 33 | 4 442 | `CONFORME`, comme attendu |
+| L14 | JPEG | inconnue | 120 003 | `delai_depasse`, mesure `INCONNUE` |
+
+- Sept verdicts justes sur sept. Coût mesuré des appels connus :
+  8 594 / 198 jetons, 0,0079 USD.
+- L14 est une **image** : le format n'explique pas le blocage. L06 et L14
+  ont en commun d'être des **attestations de fonds** (bourse, garant)
+  portant un **montant annuel sous le seuil**, alors que L05 et L13,
+  relevés au-dessus du seuil, répondent en 4 à 21 s. Ce point commun est
+  une hypothèse, pas une preuve : rien n'a été appelé pour la vérifier.
+- Campagne arrêtée en `MESURE_A_RAPPROCHER`. Réserve prudente :
+  18 invocations, 791,95 XOF ; restant 4 208,05 XOF. Le restant (L15 à L30,
+  rédactions, relectures et avis) en demande 43, soit 1 892 XOF.
+- Rapprochement de L14 à faire : requête du 28/10, environ 18 h 11 à
+  18 h 13 UTC côté client. Google a horodaté le 499 de L06 deux minutes
+  après l'abandon : regarder jusqu'à 18 h 17.
+
 ## Preuves
 
 Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
@@ -163,8 +194,10 @@ Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
   arrêté ne produit ni rapport ni résultats) ;
 - `passage-2026-10-28-reprise-L06/` : `passage.json`, `appels.json` du
   troisième passage ;
+- `passage-2026-10-28-L07-arret-L14/` : `passage.json`, `appels.json` du
+  quatrième passage ;
 - `journal/budget.json` : copie à l'identique du journal privé **après le
-  second rapprochement** (SHA-256 `aae76531…`), débloqué, avec les deux
+  quatrième passage** (SHA-256 `59d9c696…`), bloqué sur L14, avec les deux
   rapprochements de L06. C'est la seule copie : elle remplace les précédentes.
   Aucun secret.
 
@@ -175,7 +208,7 @@ journal : ce serait ouvrir un second budget et effacer le blocage.
 
 ## Reste à faire et non prouvé
 
-Décision sur L06, fin du jeu (51
-invocations), rapprochement avec
+Rapprochement de L14, décision sur L14 et les
+attestations sous le seuil, fin du jeu (43 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.
