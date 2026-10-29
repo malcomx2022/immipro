@@ -248,9 +248,77 @@ Dans [`preuves-l5-vertex-2026-10-16/`](preuves-l5-vertex-2026-10-16/) :
 tout passage, puis vérifier l'empreinte. Ne jamais relancer sans ce
 journal : ce serait ouvrir un second budget et effacer le blocage.
 
+## Rapprochement de L14 et facture du 28/10 — S.203, 29/10/2026
+
+Relevé du responsable dans la console `projetanatt`, le 29/10, méthode
+`ChatCompletions` de l'Agent Platform API, 28/10 de 18:05 à 18:20 UTC.
+
+**L14 : non facturée, rapprochée.** Sept réponses 200, deux à 18:11 et cinq
+à 18:12 UTC : ce sont L07 à L13, les sept appels connus du quatrième
+passage. Une seule 499 (requête annulée par le client), à 18:16, seule dans
+sa minute : L14, abandonnée par le banc après 120 s vers 18:14, et
+horodatée par Google environ deux minutes après l'abandon, comme L06.
+Aucun jeton n'est relevé à 18:16. Inscrit par `banc:ia:rapprocher`
+(`L14/extraction`, `NON_FACTUREE`) ; le blocage `MESURE_A_RAPPROCHER` est
+levé, la réserve reste de 791,95 XOF pour 18 invocations, le journal compte
+trois rapprochements. Nouvelle copie : `journal/budget.json`, SHA-256
+`ff04b4ad…`, qui remplace la précédente (`59d9c696…`).
+
+**Facture du 28/10 comparée aux mesures du banc.**
+
+| | Mesuré par le banc (appels connus) | Facturé ou relevé | Écart |
+|---|---|---|---|
+| Entrée, journée | 18 034 | 21 986 (texte 10 646, image 11 340) | +3 952 |
+| Sortie, journée | 1 631 | 3 201 | × 1,96 |
+| Sortie, L07 à L13 (18:12–18:13) | 198 | 431 (365 + 66) | × 2,18 |
+| Entrée, L07 à L13 (18:12) | 8 594 | 8 164 | −430 |
+
+Montant filtré : 0,03 $, soit une vingtaine de XOF, très loin de la réserve
+prudente (791,95 XOF) : le plafond n'a jamais été menacé, et aucun appel ne
+dépasse ses bornes, même avec une sortie doublée (au plus quelques centaines
+de jetons pour 5 120).
+
+**Constat 1 — la sortie est sous-mesurée.** Sur les seules minutes de L07 à
+L13, où l'attribution ne fait pas de doute, Google compte 2,18 fois la
+sortie que le banc a mesurée. L'adaptateur compatible ne lit que
+`usage.completion_tokens` (`src/server/ia/openai-compatible.ts`) : les
+jetons de réflexion `low`, facturés en sortie, n'y figurent manifestement
+pas. C'est le cas que le suivi prévoyait : le contrôle des bornes de sortie
+se fait sur une valeur trop basse, et B-07 sous-estimerait aussi le coût
+d'un fournisseur compatible en production (INV-6). **Ne pas reprendre la
+campagne** avant que l'adaptateur lise la mesure complète.
+
+**Constat 2 — l'entrée facturée dépasse la mesure de 3 952 jetons.** Ce
+nombre est presque exactement l'entrée probable des trois requêtes annulées
+(L06 deux fois, PDF comme L05 : 1 136 ; L14, JPEG comme L08 : 1 696 ; total
+3 968). La page de tarifs dit pourtant que seules les réponses 200 sont
+facturées, et aucun jeton n'est relevé à la minute de la 499 de L14. Ce
+n'est donc qu'une coïncidence remarquable, pas une preuve : un autre trafic
+du projet le même jour l'expliquerait aussi. La facture journalière ne
+permet pas l'attribution par requête ; seul un export de facturation horaire
+ou le support Google trancheraient. Les rapprochements de L06 et L14 restent
+« non facturée » d'après les métriques par requête, et la réserve n'a rien
+rendu.
+
+**Suite proposée, sur décision du responsable.**
+
+1. Lot de code : l'adaptateur compatible ajoute à la sortie les jetons de
+   réflexion rendus par l'API (`usage.completion_tokens_details.reasoning_tokens`
+   dans la forme OpenAI, si Vertex les y place), et classe la mesure
+   `PARTIELLE` quand la réponse annonce une réflexion sans la chiffrer.
+   Le champ exact se vérifie sur une réponse réelle : une invocation de
+   diagnostic (une pièce déjà juste, par exemple L09), réservée au journal
+   comme les autres, qui enregistre le bloc `usage` brut, sans secret.
+2. Puis seulement, la reprise : L15 à L30, rédactions, relectures et avis
+   (43 invocations, environ 1 892 XOF sur les 4 208,05 restants).
+3. Constat 2 : relever, si possible, l'export de facturation horaire du
+   28/10, ou poser la question au support Google ; vérifier que la
+   production n'a pas appelé Vertex sur ce projet le même jour.
+
 ## Reste à faire et non prouvé
 
-Rapprochement de L14, décision sur L14 et les
-attestations sous le seuil, fin du jeu (43 invocations), rapprochement avec
+Lecture complète de la sortie par l'adaptateur (réflexion comprise),
+attribution de l'entrée facturée en trop, décision sur L06 et L14,
+fin du jeu (43 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.

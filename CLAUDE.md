@@ -77,6 +77,20 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.203 — L5 : L14 rapprochée, sortie sous-mesurée — 29/10/2026
+
+Demandé par le responsable. Base `5ad75a7`. Relevé console du 29/10 :
+sept 200 pour L07 à L13, une seule 499 à 18:16 pour L14 ; inscrite
+`NON_FACTUREE` par `banc:ia:rapprocher`, blocage levé, réserve 791,95 XOF
+pour 18 invocations, journal `ff04b4ad…`. Facture du 28/10 : sortie 3 201
+pour 1 631 mesurés (× 2,18 sur L07 à L13) ; l'adaptateur ne lit que
+`completion_tokens`, la réflexion `low` facturée n'est pas comptée.
+**Ne pas reprendre la campagne** avant que l'adaptateur lise la sortie
+complète (lot de code à décider). Entrée facturée +3 952, presque l'entrée
+des trois requêtes annulées : coïncidence non prouvée, attribution à
+obtenir. Montant 0,03 $. Lire
+[le suivi L5](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.202 — relevé serveur L7 du 28/10, consigné — 29/10/2026
 
 Lot documentaire demandé par le responsable. Base `471837b` (#323
