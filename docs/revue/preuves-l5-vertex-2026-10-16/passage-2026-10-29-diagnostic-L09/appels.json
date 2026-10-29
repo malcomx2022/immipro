@@ -1,0 +1,20 @@
+[
+  {
+    "cas": "L09",
+    "fonction": "extraction",
+    "mesure": {
+      "etat": "CONNUE",
+      "jetonsEntree": 990,
+      "jetonsSortie": 32,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "millisecondes": 3178,
+    "incident": null,
+    "usageBrut": {
+      "completion_tokens": 32,
+      "prompt_tokens": 990,
+      "total_tokens": 1022
+    }
+  }
+]
