@@ -88,7 +88,11 @@ v2, contact v1, toutes en 200. Backblaze hors service en production
 (déclaration du responsable) : D-27 sans objet. Activer B2 demande une
 nouvelle version relue. Q.A quitte `PREALABLES` et passe « tranché » ; ne
 pas l'y remettre pour une page servie. La validation se lit en base. M.C
-reste ouvert. Lire [la revue, § 26](docs/revue/revue-tests-2026-10-22.md).
+reste ouvert. Sauvegardes réelles : `restic` vers un Garage local, même
+VPS, aucune externalisation (L7, D-26 non appliqué) ; contenu, rétention
+et restauration à relever. Production IA sur Vertex, région
+`europe-west1` déclarée : à rapprocher du relevé du 16/10. Lire
+[la revue, § 26](docs/revue/revue-tests-2026-10-22.md).
 
 ### S.205 — L5 : relevé console de L09, facture attendue — 29/10/2026
 

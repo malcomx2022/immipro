@@ -1083,5 +1083,29 @@ routes ne changent pas : sans version validée en base, une page répond
 toujours « introuvable ». Les tables des modules du § 5 gardent leur état
 du 22/10.
 
+**Relevé du responsable, 29/10 au soir.**
+
+- *Sauvegardes (L7).* Elles ne partent pas sur Backblaze. Un dépôt
+  `restic` prend un instantané quotidien dans le seau `vps-backups` d'un
+  Garage local, conteneur en service sur le même VPS (`srv1`). Il n'y a
+  donc pas d'externalisation : même machine, même disque, et D-26 n'est
+  pas appliqué. Les scripts du dépôt (`backup-postgres.sh`,
+  `backup-pieces.sh` : `rclone` vers `b2:`, chiffrement GPG, trente
+  jours) ne sont pas ceux qui tournent. Restent à relever, en lecture
+  seule : ce que l'instantané contient (base, pièces), sa politique
+  `restic forget` (une pièce purgée ne doit pas survivre au-delà de la
+  durée annoncée, INV-5) et une restauration (R-P11, sur clone, avec
+  l'accord du responsable). La page publiée dit « Sauvegardes chiffrées
+  (GPG) quotidiennes » : `restic` chiffre par lui-même, sans GPG ; la
+  formulation est à confirmer par le responsable.
+- *Prestataire IA en production.* La configuration de production nomme
+  Google Cloud Vertex AI (projet `projetanatt`, compte de service,
+  `openai_compatible` en extraction et rédaction, `gemini-3.8-flash`) :
+  la page cite le bon sous-traitant. Elle porte la région
+  `europe-west1`, que le relevé officiel du 16/10 (S.181) ne donne pas
+  pour ce modèle, servi seulement sur `global`, `us` et `eu`. Le point
+  d'accès effectif et le sort des appels de production sont à relever.
+  Ces appels partagent la facturation du projet avec la campagne L5.
+
 Restent M.C (encaissement commercial), L5, R-I02 et la signature de la
 matrice (L6), la cible L7 et C-13.
