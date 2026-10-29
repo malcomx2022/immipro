@@ -2155,6 +2155,17 @@ mieux le constater que le supposer.
 pages obligatoires restant suspendu à une validation juridique avant
 l'ouverture au public.
 
+**Tranché le 29/10/2026 (S.206) : les quatre pages obligatoires sont
+publiées.** Mentions légales (version 3), conditions (version 1),
+données personnelles (version 2) et contact (version 1) sont servies
+depuis `/textes-juridiques`, en vigueur au 29/10/2026, chacune validée en
+nommant son juriste relecteur. La version 2 des données personnelles
+complète les sous-traitants avec Stripe (republiée le 29/10 à 18:20) ;
+sa relecture est confirmée par le juriste le 29/10. Le responsable
+déclare Backblaze hors service en production : le point D-27 ne
+s'applique pas tant que les sauvegardes ne partent pas sur B2. Q.A quitte
+le registre des préalables, sans réserve.
+
 Retirer les liens ne retire pas l'obligation. La question n'était pas
 « faut-il ces pages » mais **qui les écrit**, et c'est elle qui est
 tranchée : mentions légales et conditions à la direction avec un conseil
@@ -14039,3 +14050,24 @@ des textes juridiques. Chacun est lu en base et rejouable sur les six
 profils d'un même banc. Aucun défaut relevé, aucun code applicatif
 modifié. Restent hors navigateur : remboursements B-04 (M.C), publication
 d'un texte juridique (Q.A). R-I04, WF-14, WF-15, RG-12.1, RG-15.1.
+
+## S.206 — Q.A levé, les quatre pages publiées
+
+29/10/2026, lot documentaire demandé par le responsable. Base `7ad8ce2`
+(#331 fusionnée).
+
+Le responsable confirme la relecture de la version 2 des données
+personnelles par le juriste, le 29/10/2026 : liste des sous-traitants
+complétée avec Stripe, republiée à 18:20. C'était la dernière réserve.
+Relu sur `https://immipro.app` le 29/10 : les quatre pages répondent 200,
+mentions légales v3, conditions v1, données personnelles v2 (Stripe
+nommé), contact v1, toutes en vigueur depuis le 29/10/2026. Le nom du
+relecteur vit en base (`LegalPublication`), pas sur la page publique.
+Backblaze n'est pas en service en production (déclaration du
+responsable) : D-27 sans objet tant que B2 n'est pas activé ; l'activer
+demandera une nouvelle version relue.
+
+Q.A passe « tranché » : retiré de `PREALABLES`, méta-test des arbitrages
+aligné. Le jalon d'ouverture publique n'a plus de préalable au registre ;
+M.C reste sous réserve pour l'encaissement commercial. Aucune règle
+métier, aucun schéma ni service touché.

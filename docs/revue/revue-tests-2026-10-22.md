@@ -250,7 +250,8 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 
 ## 6. Le restant
 
-État relu le 28/10 (S.199, § 23) ; il remplace celui du 22/10.
+État relu le 28/10 (S.199, § 23) ; il remplace celui du 22/10. Q.A
+levé le 29/10 (S.206, § 26).
 
 | Lot | État au 28/10 | Qui |
 |---|---|---|
@@ -258,11 +259,12 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 | L5 Qualification IA | Région `eu`, raisonnement `low`, campagne bornée ; aucun appel payant, clé à fournir en secret d'environnement | Responsable |
 | L6 Recette front | 33 parcours par profil (198 sur six profils) et 84 scénarios photographiques verts ; gestes C-3 déroulés sauf R-O04 (M.C) ; restent R-I02 au lecteur d'écran et la signature de la matrice | Responsable |
 | L7 Exploitation | B-04/B-07 corrigés ; relevé serveur du 28/10 en lecture seule (§ 25) : certificats, six services, sondes, disque, nginx, base. Restent : sauvegarde/restauration sur clone (accord du responsable), détail de `/api/health` (R-P11), `certbot renew --dry-run`, limites, battement et réconciliation (R-P01, R-P12), parcours téléphone et opérateur (R-P13 à R-P19), trois répétitions du runbook (R-P20) ; mémoire à surveiller | Responsable (VPS) |
-| L8 Paiement et lancement | Textes juridiques, coordonnées, TVA, certification fiscale, essais réels | Responsable, juriste, comptable |
+| L8 Paiement et lancement | TVA, certification fiscale, essais réels ; textes juridiques et contact publiés le 29/10 (§ 26) | Responsable, comptable |
 | L9 Maintenance | #298 et #299 fusionnées, #300 fermée au profit de #303 fusionnée ; exception `deepmerge-ts`, avis modérés `minio` ; aucune PR ouverte au 28/10 | Code |
 | C-13 Règles NL 2027 | Échéance de données au 31/12/2026 : sans versions 2027 publiées, plus aucune destination néerlandaise n'est affichée le 1er janvier (§ 9) | Responsable (contenu sourcé), code pour l'alerte |
 | WF-09, WF-13, WF-14 | Rappel réellement reçu (SMTP de production), conditions d'affiliation, routine de veille réelle | Responsable |
-| Q.A / M.C | Ouverts | Responsable |
+| Q.A | Levé le 29/10 : quatre pages publiées, relecteurs nommés (§ 26) | — |
+| M.C | Ouvert | Responsable |
 
 Travail de code encore possible sans préalable externe, par priorité :
 
@@ -287,7 +289,7 @@ Travail de code encore possible sans préalable externe, par priorité :
    officielles.
 
 Au-delà, plus aucun code applicatif n'est à écrire sans préalable : le
-reste attend L5, M.C, Q.A, la cible VPS ou un geste humain.
+reste attend L5, M.C, la cible VPS ou un geste humain.
 
 ## 7. Reproduction
 
@@ -1049,3 +1051,37 @@ relevés). Parcours sur téléphone et côté opérateur (R-P13 à R-P19). Trois
 répétitions du runbook (R-P20), une par déploiement, chacune avec
 l'accord du responsable.
 
+## 26. S.206 — Q.A levé, lot documentaire — 29/10/2026
+
+Demande du responsable : lever la dernière réserve de Q.A et le consigner
+clos. Base : `7ad8ce2` (#331, S.205, fusionnée).
+
+**Preuve.** Le juriste a confirmé le 29/10/2026 la relecture de la
+version 2 des données personnelles : liste des sous-traitants complétée
+avec Stripe, republiée le 29/10 à 18:20. Le relecteur est nommé dans la
+publication (`LegalPublication`), en base. Relu sur `https://immipro.app`
+le 29/10, sans compte :
+
+| Page | Réponse | Version, en vigueur depuis |
+|---|---|---|
+| `/mentions-legales` | 200 | v3, 29/10/2026 |
+| `/conditions` | 200 | v1, 29/10/2026 |
+| `/donnees-personnelles` | 200 | v2, 29/10/2026 ; sous-traitants : Google Cloud (Vertex AI), Brevo, FedaPay, Stripe, IONOS |
+| `/contact` | 200 | v1, 29/10/2026 ; réponse sous 30 jours |
+
+**Backblaze.** Le dossier de levée demandait Backblaze dans les
+sous-traitants (D-27), puisque D-26 envoie les sauvegardes sur B2. Le
+responsable déclare Backblaze hors service en production : D-27 est sans
+objet tant que B2 n'est pas activé, et l'activer demandera une nouvelle
+version relue de la page. Pour L7, la destination réelle des sauvegardes
+reste à relever (R-P11 et le test sur clone, avec l'accord du
+responsable).
+
+**Code.** Q.A est retiré de `PREALABLES` et passe « tranché » dans le
+méta-test des arbitrages (`tests/arbitrages-ouverts.test.ts`). Les
+routes ne changent pas : sans version validée en base, une page répond
+toujours « introuvable ». Les tables des modules du § 5 gardent leur état
+du 22/10.
+
+Restent M.C (encaissement commercial), L5, R-I02 et la signature de la
+matrice (L6), la cible L7 et C-13.

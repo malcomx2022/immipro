@@ -440,9 +440,11 @@ describe("M.C (sous réserve) — le reçu reste un reçu, la facture est une pi
  * ------------------------------------------------------------------ */
 
 /**
- * Arbitrage d'attribution clos le 20/09/2026, **le contenu des quatre
- * pages obligatoires restant suspendu à une validation juridique avant
- * l'ouverture au public**.
+ * Arbitrage d'attribution clos le 20/09/2026, le contenu des quatre pages
+ * obligatoires restant suspendu à une validation juridique avant
+ * l'ouverture au public. **Tranché le 29/10/2026 (S.206)** : les quatre
+ * pages sont publiées depuis `/textes-juridiques`, chacune avec son
+ * juriste relecteur nommé, et Q.A quitte le registre des préalables.
  *
  * Ce qui est tranché : qui écrit quoi, et laquelle de ces pages commande
  * une porte de lancement. Ce qui ne l'est pas, et ne peut pas l'être ici :
@@ -456,7 +458,7 @@ describe("M.C (sous réserve) — le reçu reste un reçu, la facture est une pi
  * tient est vérifiable — une page déclarée absente l'est, et rien ne
  * pointe vers elle.
  */
-describe("Q.A (sous réserve) — les six pages publiques et leur responsable", () => {
+describe("Q.A (tranché) — les six pages publiques et leur responsable", () => {
   const ROUTES = fichiers("src/app", /^page\.tsx$/u).map((f) =>
     f
       .replace(/^src\/app/u, "")
@@ -565,14 +567,14 @@ describe("Q.A (sous réserve) — les six pages publiques et leur responsable", 
   });
 
   /**
-   * Les quatre bloquantes tiennent la même porte que les autres préalables
-   * d'ouverture, et s'y lisent avec eux : trois registres qui ne se
-   * répondent pas valent une prose qui ne se lit pas.
+   * Les quatre bloquantes tenaient la même porte que les autres préalables
+   * d'ouverture. Publiées le 29/10/2026, chacune avec son relecteur
+   * nommé, elles la quittent ; la règle reste, et c'est la route qui la
+   * tient : sans version validée en base, la page répond « introuvable ».
    */
-  it("la porte de lancement rejoint les préalables d'ouverture", () => {
-    const prealable = PREALABLES.find((p) => p.arbitrage === "Q.A");
-    expect(prealable?.jalon).toBe("OUVERTURE_PUBLIQUE");
-    expect(prealablesDe("OUVERTURE_PUBLIQUE").map((p) => p.arbitrage)).toContain("Q.A");
+  it("Q.A est levé : il ne figure plus parmi les préalables d'ouverture", () => {
+    expect(PREALABLES.map((p) => p.arbitrage)).not.toContain("Q.A");
+    expect(prealablesDe("OUVERTURE_PUBLIQUE").map((p) => p.arbitrage)).not.toContain("Q.A");
   });
 
   /**
@@ -608,14 +610,14 @@ describe("chaque garde-fou cite un arbitrage, et dit s'il est ouvert", () => {
    * qu'il faut ne pas perdre de vue. Un troisième état la garde visible,
    * et le test exige qu'elle soit nommée dans le relevé.
    */
-  const SOUS_RESERVE = ["M.C", "Q.A"];
+  const SOUS_RESERVE = ["M.C"];
   /**
    * Tranchés, et dont la règle décidée survit au garde-fou. Le test ne
    * disparaît pas avec l'arbitrage : une décision qui pose une condition —
    * « pas de taux sans source datée » — a plus besoin d'être tenue qu'une
    * lecture provisoire.
    */
-  const TRANCHES = ["I.B", "I.D", "K.A", "L.A", "N.A"];
+  const TRANCHES = ["I.B", "I.D", "K.A", "L.A", "N.A", "Q.A"];
 
   const TOUS = [...OUVERTS, ...SOUS_RESERVE, ...TRANCHES];
 

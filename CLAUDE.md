@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.206 — Q.A levé, les quatre pages publiées — 29/10/2026
+
+Lot documentaire demandé par le responsable. Base `7ad8ce2` (#331
+fusionnée). Relecture de la version 2 des données personnelles (Stripe
+ajouté aux sous-traitants, republiée le 29/10 à 18:20) confirmée par le
+juriste le 29/10 ; le relecteur est nommé en base. Relu sur
+`immipro.app` : mentions légales v3, conditions v1, données personnelles
+v2, contact v1, toutes en 200. Backblaze hors service en production
+(déclaration du responsable) : D-27 sans objet. Activer B2 demande une
+nouvelle version relue. Q.A quitte `PREALABLES` et passe « tranché » ; ne
+pas l'y remettre pour une page servie. La validation se lit en base. M.C
+reste ouvert. Lire [la revue, § 26](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.205 — L5 : relevé console de L09, facture attendue — 29/10/2026
 
 Lot documentaire demandé par le responsable. Base `5bb55ec` (#330
