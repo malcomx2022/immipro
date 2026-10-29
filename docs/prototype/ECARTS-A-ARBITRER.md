@@ -11769,7 +11769,7 @@ Après correction, tout passe. `tests/audit-dependances.test.ts` et `tests/seed-
 ## S.133 — Revue du 07/10/2026 : exploitation II (E10)
 
 **Contexte.** Neuvième lot du plan de traitement. Deux décisions, tranchées le 08/10/2026 :
-- **D-26** : les sauvegardes partent sur Backblaze B2, hors du VPS ; la clé privée GPG est dans un coffre hors ligne, jamais sur le VPS ; la surveillance passe par Healthchecks.io.
+- **D-26** : les sauvegardes partent sur Backblaze B2, hors du VPS ; la clé privée GPG est dans un coffre hors ligne, jamais sur le VPS ; la surveillance passe par Healthchecks.io. **Révisé le 29/10/2026 (S.207)** : Cloudflare R2, seau en juridiction UE, à la place de B2, jamais mis en service ; clé hors ligne et surveillance inchangées.
 - **D-27** : les pièces restent 30 jours dans les sauvegardes, comme la base.
 
 **Ce que fait le code.**
@@ -14071,3 +14071,31 @@ Q.A passe « tranché » : retiré de `PREALABLES`, méta-test des arbitrages
 aligné. Le jalon d'ouverture publique n'a plus de préalable au registre ;
 M.C reste sous réserve pour l'encaissement commercial. Aucune règle
 métier, aucun schéma ni service touché.
+
+## S.207 — D-26 révisé : sauvegardes sur Cloudflare R2
+
+29/10/2026, lot demandé par le responsable après le relevé du 29/10.
+Base : `claude/s206-qa-clos` (#332), replacée sur `main` à sa fusion.
+
+Relevé : les scripts de sauvegarde du dépôt ne tournaient pas sur le
+VPS. Un `restic` local écrivait dans le Garage du même serveur, sans
+aucune externalisation. Décision du responsable : un seau Cloudflare R2
+en juridiction UE remplace B2. La clé privée GPG reste hors ligne, la
+surveillance Healthchecks.io et la conservation de trente jours (D-27)
+sont inchangées.
+
+Code : `r2:immipro-backups` devient la destination par défaut des trois
+scripts. `sauvegarde.sh` refuse, avant tout envoi, une destination qui
+reste sur le VPS : le remote des pièces, un remote `local` ou `alias`, un
+point d'accès en `127.0.0.1`, `localhost` ou `[::1]`. Tests : cinq
+nouveaux dans `tests/sauvegarde.test.ts`, les trois refus rouges avant.
+Rien n'est éprouvé contre R2 réel ni contre un serveur S3 réel. La
+preuve viendra de la première nuit et de la restauration de contrôle.
+
+Reste au responsable, dans cet ordre :
+1. le seau et le jeton R2, puis le remote `r2` du VPS ;
+2. Cloudflare dans `sous_traitants` et la phrase des sauvegardes, relues
+   et validées nommément en B-08, avant la première nuit ;
+3. le cron, puis la première restauration de contrôle.
+
+Aucun préalable levé.

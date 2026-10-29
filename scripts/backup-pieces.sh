@@ -31,7 +31,7 @@ source .env.sauvegarde
 : "${BACKUP_GPG_RECIPIENT:?BACKUP_GPG_RECIPIENT manque dans .env.sauvegarde}"
 SEAU="${SEAU_PIECES:-immipro-documents}"
 SOURCE="${SAUVEGARDE_SOURCE_PIECES:-garage}"
-DESTINATION="${SAUVEGARDE_DESTINATION:-b2:immipro-backups}"
+DESTINATION="${SAUVEGARDE_DESTINATION:-r2:immipro-backups}"
 CONSERVATION="${SAUVEGARDE_CONSERVATION:-30d}"
 
 # Sur le disque du VPS, et non en mémoire (`/tmp` peut être un tmpfs) : la
@@ -56,6 +56,7 @@ tar -C "$TMP" -cf - inventaire.tsv pieces |
   gpg --batch --yes --encrypt --recipient "$BACKUP_GPG_RECIPIENT" >"$TMP/$FICHIER"
 
 rclone copy "$TMP/$FICHIER" "$DESTINATION/pieces/"
+# Même conservation que la base : voir `backup-postgres.sh`.
 rclone delete --min-age "$CONSERVATION" --b2-hard-delete "$DESTINATION/pieces/"
 
 echo "[sauvegarde] pièces : $FICHIER ($OBJETS objet(s))"

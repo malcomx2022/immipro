@@ -27,6 +27,19 @@ if [[ -z "${SAUVEGARDE_PING_URL:-}" ]]; then
   exit 1
 fi
 
+# D-26 : la sauvegarde quitte le VPS. Le 29/10/2026, elle partait dans un
+# seau du Garage local, sur le même disque que ce qu'elle protège. Refusé
+# avant tout envoi : le remote des pièces lui-même, un dossier local, ou
+# un point d'accès sur la machine.
+DESTINATION="${SAUVEGARDE_DESTINATION:-r2:immipro-backups}"
+REMOTE="${DESTINATION%%:*}"
+CONFIG=$(rclone config show "$REMOTE" 2>/dev/null || true)
+if [[ "$REMOTE" == "${SAUVEGARDE_SOURCE_PIECES:-garage}" ]] ||
+  grep -Eq '^type = (local|alias)$|^endpoint = (https?://)?(127\.|localhost|\[::1\])' <<<"$CONFIG"; then
+  echo "[sauvegarde] ÉCHEC — SAUVEGARDE_DESTINATION ($DESTINATION) reste sur le VPS : une sauvegarde sur le même disque ne survit pas à sa perte. Viser le seau R2 hors du VPS (D-26), par exemple r2:immipro-backups." >&2
+  exit 1
+fi
+
 pinger() {
   curl -fsS -m 10 --retry 3 -o /dev/null "$SAUVEGARDE_PING_URL$1" ||
     echo "[sauvegarde] le ping « ${1:-succès} » n'est pas parti" >&2
