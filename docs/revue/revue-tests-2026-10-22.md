@@ -257,7 +257,7 @@ restent volontairement introuvables tant que Q.A n'est pas levé.
 | L0–L4 | Fusionnés et déployés (S.170–S.175) | — |
 | L5 Qualification IA | Région `eu`, raisonnement `low`, campagne bornée ; aucun appel payant, clé à fournir en secret d'environnement | Responsable |
 | L6 Recette front | 33 parcours par profil (198 sur six profils) et 84 scénarios photographiques verts ; gestes C-3 déroulés sauf R-O04 (M.C) ; restent R-I02 au lecteur d'écran et la signature de la matrice | Responsable |
-| L7 Exploitation | B-04/B-07 corrigés ; restent diagnostics, inventaire, sauvegarde/restauration sur clone, services cibles et les lignes R-P01, R-P11 à R-P20 de la matrice (certificats, santé, parcours sur téléphone et opérateur, runbook) | Responsable (VPS) |
+| L7 Exploitation | B-04/B-07 corrigés ; relevé serveur du 28/10 en lecture seule (§ 25) : certificats, six services, sondes, disque, nginx, base. Restent : sauvegarde/restauration sur clone (accord du responsable), détail de `/api/health` (R-P11), `certbot renew --dry-run`, limites, battement et réconciliation (R-P01, R-P12), parcours téléphone et opérateur (R-P13 à R-P19), trois répétitions du runbook (R-P20) ; mémoire à surveiller | Responsable (VPS) |
 | L8 Paiement et lancement | Textes juridiques, coordonnées, TVA, certification fiscale, essais réels | Responsable, juriste, comptable |
 | L9 Maintenance | #298 et #299 fusionnées, #300 fermée au profit de #303 fusionnée ; exception `deepmerge-ts`, avis modérés `minio` ; aucune PR ouverte au 28/10 | Code |
 | C-13 Règles NL 2027 | Échéance de données au 31/12/2026 : sans versions 2027 publiées, plus aucune destination néerlandaise n'est affichée le 1er janvier (§ 9) | Responsable (contenu sourcé), code pour l'alerte |
@@ -992,3 +992,60 @@ montants que l'autorité a déclarés échus.
 
 **Reste.** Les versions NL 2027 elles-mêmes, au responsable, avant le
 31/12/2026.
+
+## 25. S.202 — relevé serveur L7 du 28/10, consigné, lot documentaire — 29/10/2026
+
+Demande du responsable : consigner le compte rendu des vérifications L7
+faites sur le VPS le 28/10 au soir, **en lecture seule** (rien n'a été
+écrit sur le serveur). Base : `471837b` (#323, S.201, fusionnée et
+déployée). Ce lot ne change aucun code ni aucun service.
+
+**Relevé.**
+
+| Contrôle | Constat | Ligne |
+|---|---|---|
+| Certificats | `immipro.app`, `www.immipro.app`, `stockage.immipro.app` : un même certificat, valide jusqu'au 06/01/2027 21:57 GMT (70 jours) ; `certbot certificates` : VALID | R-P01 |
+| Services | Six conteneurs sains ; app, worker et antivirus redémarrés au déploiement de `471837b`, clamav depuis 6 jours, minio et postgres depuis 2 semaines | R-P12 |
+| Sondes du worker | `messagerie` envoyée, `antivirus` reconnu | R-P12 |
+| État public | `/api/health` : `{"status":"pilote","db":"up"}` (vue anonyme) ; `/`, `/tarifs`, `/inscription` en 200 | R-P04, R-P05 |
+| Disque | 45 Go libres sur 116 Go (62 % utilisés) | — |
+| Mémoire | 1,3 Go disponibles sur 3,8 Go ; swap 1,6 Go sur 4 Go | — |
+| nginx | `nginx -t` sans erreur | R-P01 |
+| Base | Connectivité OK ; schéma `taches` en version 46 (45 au 10/10) | — |
+
+**Correction d'une explication.** Le compte rendu attribuait la version
+46 de `taches` à une migration des lots S.188 à S.201. Aucun de ces lots
+n'a créé de migration : la dernière migration Prisma reste
+`20261022180000_relecture_purgee` (S.183). `taches` est le schéma interne
+de pg-boss, que pg-boss migre lui-même au démarrage (deploiement.md :
+45 avec pg-boss 12 en S.168). Le passage à 46 suit, selon toute
+vraisemblance, la montée de pg-boss 12.37.1 à 12.38.0 par Dependabot le
+22/10 (`65ff16f`). Constat normal ; confirmation possible en lecture seule
+par `SELECT version FROM taches.version`.
+
+**Ce que le relevé ne couvre pas** (protocole pilote, §1 à §3) :
+
+- R-P01 : `certbot renew --dry-run` et `nginx -T` (fichiers du dépôt) ;
+  le renouvellement automatique est attendu vers le 07/12, à trente jours
+  de l'échéance.
+- R-P11 : le détail de `/api/health`, lu en administrateur ou avec le
+  jeton d'état ; tant que M.C est ouvert, `facturation.obstacles` doit
+  montrer la série réelle fermée, ce qui n'est pas une panne.
+- R-P12 : les limites de mémoire dans `docker stats`, le battement et une
+  réconciliation récente au journal du worker.
+
+R-P01 et R-P12 passent donc « partiel », R-P11 reste « non vérifié ».
+
+**À surveiller.** Le swap utilisé (1,6 Go) est la marge la plus faible du
+serveur : clamav occupe à lui seul environ 1 Go. Relever `free -h` et
+`docker stats --no-stream` sur quelques jours ; si le swap croît, il faudra
+plus de mémoire ou une limite plus basse pour clamav, par une décision du
+responsable.
+
+**Reste L7.** Sauvegarde et restauration sur une base clone : elles
+écrivent sur le serveur et ne se lancent qu'avec l'accord explicite du
+responsable (base nommée, supprimée après, durée et comptes de lignes
+relevés). Parcours sur téléphone et côté opérateur (R-P13 à R-P19). Trois
+répétitions du runbook (R-P20), une par déploiement, chacune avec
+l'accord du responsable.
+
