@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.204 — L5 : diagnostic de l'usage, aucun compteur de réflexion — 29/10/2026
+
+Décision du responsable : lot avec une invocation de diagnostic. Le banc
+écrit les seuls compteurs numériques du bloc `usage` (`usageBrut`,
+`usageNumerique`) ; la production n'inscrit aucun observateur. L09 le
+29/10 à 14:01 UTC : 990 / 32, `total_tokens` 1 022, aucun champ de
+réflexion. Réserve 835,95 XOF pour 19 invocations, journal `93175249…`.
+Lire `reasoning_tokens` n'aurait rien à lire : relever la sortie de cette
+minute dans la console pour départager réflexion cachée et écart venu
+d'ailleurs. Reprise toujours suspendue. Lire
+[le suivi L5](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.203 — L5 : L14 rapprochée, sortie sous-mesurée — 29/10/2026
 
 Demandé par le responsable. Base `5ad75a7`. Relevé console du 29/10 :

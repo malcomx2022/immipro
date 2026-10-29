@@ -315,9 +315,50 @@ rendu.
    28/10, ou poser la question au support Google ; vérifier que la
    production n'a pas appelé Vertex sur ce projet le même jour.
 
+## Diagnostic de l'usage, une invocation — S.204, 29/10/2026
+
+Décision du responsable : lancer le lot avec une invocation de
+diagnostic. Le banc a d'abord reçu un observateur du bloc `usage` : il
+n'en garde que les compteurs numériques (`usageNumerique`, domaine), les
+écrit dans `appels.json` sous `usageBrut`, et la production n'en inscrit
+aucun (cinq tests, dont un échange HTTP local). Puis une invocation,
+commit `852598e`, arbre propre, journal `ff04b4ad…` remis en place :
+
+| Cas | Format | Entrée / sortie | ms | `usageBrut` |
+|---|---|---|---|---|
+| L09 | PDF | 990 / 32 | 3 178 | `prompt_tokens` 990, `completion_tokens` 32, `total_tokens` 1 022 |
+
+Verdict juste (`CONFORME`). Réserve : 19 invocations, 835,95 XOF ; restant
+4 164,05 XOF. Copie du journal : `journal/budget.json`, SHA-256
+`93175249…`. Preuves : `passage-2026-10-29-diagnostic-L09/`.
+
+**Constat.** Le point compatible de Vertex ne rend **aucun compteur de
+réflexion** : ni `completion_tokens_details`, ni `reasoning_tokens`, et
+`total_tokens` est exactement la somme de l'entrée et de la sortie. Le
+correctif envisagé (lire `reasoning_tokens`) n'aurait rien à lire. Deux
+explications restent ouvertes :
+
+1. la réflexion est facturée en sortie sans paraître dans la réponse ;
+2. elle est déjà comptée dans `completion_tokens`, et l'écart du 28/10
+   vient d'ailleurs (requêtes annulées facturées, autre trafic du projet).
+
+**Ce qui tranche, sans nouvel appel.** Cette invocation est isolée : le
+29/10 à 14:01 UTC. Relever dans la console, sur cette minute, le nombre
+de requêtes `ChatCompletions` et les jetons de sortie de
+`gemini-3.8-flash`. Une sortie de 32 donne raison à l'explication 2 ; une
+sortie nettement supérieure, à l'explication 1. Puis, quand la facturation
+du 29/10 sera arrêtée, la quantité du SKU « Text Output » du jour.
+
+Selon le résultat : avec l'explication 1, le banc et B-07 doivent majorer
+la sortie mesurée, ou demander la réflexion explicitement par le paramètre
+propre à Google, à choisir sur preuve ; avec l'explication 2, la mesure est
+juste et seule l'attribution du 28/10 reste à éclaircir. **La reprise de
+la campagne reste suspendue** jusque-là.
+
 ## Reste à faire et non prouvé
 
-Lecture complète de la sortie par l'adaptateur (réflexion comprise),
+Relevé console de la minute 14:01 UTC du 29/10 (sortie de L09), puis
+décision sur la mesure de la réflexion,
 attribution de l'entrée facturée en trop, décision sur L06 et L14,
 fin du jeu (43 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.

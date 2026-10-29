@@ -30,3 +30,26 @@ export function usageARapprocher(etat: string | null | undefined, entree: number
   return etat === "CONNUE" ? !compteurValide(entree) || !compteurValide(sortie)
     : etat != null || !compteurValide(entree) || !compteurValide(sortie) || (entree === 0 && sortie === 0);
 }
+
+/**
+ * Les compteurs d'un bloc `usage`, et rien d'autre — S.204.
+ *
+ * Le diagnostic du banc relève la forme exacte de l'usage que rend un
+ * fournisseur, pour savoir où il range les jetons de réflexion. On n'en
+ * garde que les nombres, rangés sous leurs clés : jamais un texte, qui
+ * pourrait porter un extrait de la pièce ou de la réponse.
+ */
+export type UsageNumerique = { [cle: string]: number | UsageNumerique };
+
+export function usageNumerique(usage: unknown, profondeur = 0): UsageNumerique | null {
+  if (usage === null || typeof usage !== "object" || Array.isArray(usage) || profondeur > 3) return null;
+  const garde: UsageNumerique = {};
+  for (const [cle, valeur] of Object.entries(usage as Record<string, unknown>)) {
+    if (typeof valeur === "number" && Number.isFinite(valeur)) garde[cle] = valeur;
+    else {
+      const imbrique = usageNumerique(valeur, profondeur + 1);
+      if (imbrique && Object.keys(imbrique).length > 0) garde[cle] = imbrique;
+    }
+  }
+  return garde;
+}

@@ -2,14 +2,14 @@
   "campagne": "projetanatt-eu-gemini-3.8-flash",
   "empreinte": "beca65756cc69591832e2a095af86e363415a6e22e3322f41697ab6edbd0852c",
   "plafondMicrosXof": 5000000000,
-  "reserveMicrosXof": 791949312,
-  "appelsReserves": 18,
+  "reserveMicrosXof": 835946496,
+  "appelsReserves": 19,
   "enCours": null,
   "blocage": null,
   "derniereMesure": {
-    "etat": "INCONNUE",
-    "jetonsEntree": null,
-    "jetonsSortie": null,
+    "etat": "CONNUE",
+    "jetonsEntree": 990,
+    "jetonsSortie": 32,
     "fournisseur": "openai_compatible",
     "modele": "google/gemini-3.8-flash"
   },
@@ -34,11 +34,11 @@
     },
     {
       "appel": "L14/extraction",
+      "blocage": "MESURE_A_RAPPROCHER",
       "constat": "NON_FACTUREE",
       "jetonsEntree": null,
       "jetonsSortie": null,
       "source": "Console projetanatt, métriques Agent Platform API (ChatCompletions), 28/10/2026 18:05–18:20 UTC, relevées par le responsable le 29/10 : 7 réponses 200 à 18:11 (2) et 18:12 (5), soit L07 à L13 du quatrième passage ; une seule 499 à 18:16, seule dans sa minute, environ deux minutes après l'abandon client de L14 (120 s), comme pour L06 ; aucun jeton relevé à 18:16",
-      "blocage": "MESURE_A_RAPPROCHER",
       "consigneLe": "2026-10-29T13:48:25.574Z"
     }
   ]

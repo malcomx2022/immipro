@@ -1,0 +1,94 @@
+{
+  "nature": "FOURNISSEUR_REEL",
+  "manifeste": {
+    "societe": "Google Cloud — Vertex AI (Gemini Enterprise Agent Platform), projet projetanatt, compte de service immipro-vertex-ai",
+    "regionDeclaree": "eu",
+    "modele": "google/gemini-3.8-flash",
+    "dateVerification": "2026-10-16",
+    "sourceModele": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+    "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "maxAppels": 60,
+    "budgetCompte": "Plafond global de campagne 5 000 XOF (décision S.177), réservé avant réseau dans .qualification-vertex/projetanatt-eu-gemini-3.8-flash ; devise de facturation et taxes du compte projetanatt à confirmer dans la console",
+    "autorisationEssaiSynthetique": true,
+    "dpa": "NON_VERIFIE",
+    "residence": "NON_VERIFIE",
+    "conservation": "NON_VERIFIE"
+  },
+  "campagneVertex": {
+    "id": "projetanatt-eu-gemini-3.8-flash",
+    "projet": "projetanatt",
+    "region": "eu",
+    "modele": "google/gemini-3.8-flash",
+    "plafondXof": 5000,
+    "borneVerifiee": true,
+    "referenceBorne": "Relevé officiel du 16/10/2026 (pages Google datées 2026-10-15, releve-officiel.json) : tarif hors global 0,825 USD par million en entrée et 4,125 USD par million en sortie, réponse et raisonnement, jusqu'au 31/12/2026 ; entrée bornée à 10 240 jetons (consignes et schéma, plus un média : image 1 120, page PDF 560) ; sortie bornée à 5 120 jetons (max_tokens 4 096 de l'adaptateur + 1 024 de raisonnement, reasoning_effort low de la page de compatibilité OpenAI) ; change BCE du 15/10/2026 1 EUR = 1,1208 USD, soit 585,26 XOF par USD à parité fixe, majoré à 620 ; frais et taxes majorés à 20 %. Toute mesure au-delà arrête la campagne (BORNE_FACTUREE_DEPASSEE).",
+    "sourceLimites": "https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-8-flash",
+    "sourceTarif": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
+    "jetonsEntreeMax": 10240,
+    "jetonsSortieFacturesMax": 5120,
+    "tarifEntreeMicrosDeviseParMillion": 825000,
+    "tarifSortieMicrosDeviseParMillion": 4125000,
+    "deviseTarif": "USD",
+    "conversionMajoreeMicrosXofParUnite": 620000000,
+    "fraisMajoresMilliemes": 1200
+  },
+  "budgetVertex": {
+    "campagne": "projetanatt-eu-gemini-3.8-flash",
+    "empreinte": "beca65756cc69591832e2a095af86e363415a6e22e3322f41697ab6edbd0852c",
+    "plafondMicrosXof": 5000000000,
+    "reserveMicrosXof": 791949312,
+    "appelsReserves": 18,
+    "enCours": null,
+    "blocage": null,
+    "derniereMesure": {
+      "etat": "INCONNUE",
+      "jetonsEntree": null,
+      "jetonsSortie": null,
+      "fournisseur": "openai_compatible",
+      "modele": "google/gemini-3.8-flash"
+    },
+    "rapprochements": [
+      {
+        "appel": "L06/extraction",
+        "blocage": "MESURE_A_RAPPROCHER",
+        "constat": "NON_FACTUREE",
+        "jetonsEntree": null,
+        "jetonsSortie": null,
+        "source": "Console Google Cloud du projet projetanatt, relevé par le responsable le 28/10/2026 : requête L06 du 28/10 entre 17 h 27 et 17 h 30 UTC non facturée",
+        "consigneLe": "2026-10-28T17:49:29.468Z"
+      },
+      {
+        "appel": "L06/extraction",
+        "blocage": "MESURE_A_RAPPROCHER",
+        "constat": "NON_FACTUREE",
+        "jetonsEntree": null,
+        "jetonsSortie": null,
+        "source": "Console Google Cloud projetanatt, métriques Vertex AI API du 28/10/2026 17:48-17:55 UTC, relevées par le responsable : une seule requête ChatCompletions, code 499 (client), horodatée 17:54:44Z, aucune réponse 200",
+        "consigneLe": "2026-10-28T18:09:09.331Z"
+      },
+      {
+        "appel": "L14/extraction",
+        "blocage": "MESURE_A_RAPPROCHER",
+        "constat": "NON_FACTUREE",
+        "jetonsEntree": null,
+        "jetonsSortie": null,
+        "source": "Console projetanatt, métriques Agent Platform API (ChatCompletions), 28/10/2026 18:05–18:20 UTC, relevées par le responsable le 29/10 : 7 réponses 200 à 18:11 (2) et 18:12 (5), soit L07 à L13 du quatrième passage ; une seule 499 à 18:16, seule dans sa minute, environ deux minutes après l'abandon client de L14 (120 s), comme pour L06 ; aucun jeton relevé à 18:16",
+        "consigneLe": "2026-10-29T13:48:25.574Z"
+      }
+    ]
+  },
+  "adresse": "https://aiplatform.eu.rep.googleapis.com/v1/projects/projetanatt/locations/eu/endpoints/openapi",
+  "modele": "google/gemini-3.8-flash",
+  "commit": "852598e93470809213825d3dffddff36eb585d04",
+  "arbreModifie": false,
+  "horodatage": "2026-10-29T14:01:13.374Z",
+  "appelsPrevus": 1,
+  "pieces": [
+    {
+      "id": "L09",
+      "type": "application/pdf",
+      "sha256": "246e7532580dc77074e3d6771f326ad40d08116962f023f3a648971037a7d5cb"
+    }
+  ],
+  "redactions": []
+}

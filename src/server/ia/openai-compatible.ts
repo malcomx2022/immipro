@@ -1,4 +1,10 @@
-import { mesurerLesJetons, DETAIL_MESURE_INCOMPLETE, type MesureDeJetons } from "@/domain/ia/usage";
+import {
+  mesurerLesJetons,
+  usageNumerique,
+  DETAIL_MESURE_INCOMPLETE,
+  type MesureDeJetons,
+  type UsageNumerique,
+} from "@/domain/ia/usage";
 import { fetchSansRedirection } from "@/lib/ia-transport";
 import type { CauseDAppel } from "@/domain/ia/appel";
 import {
@@ -140,11 +146,22 @@ export function causeDuStatut(statut: number): { cause: CauseDAppel; detail: str
   };
 }
 
+/**
+ * Observateur du bloc `usage`, inscrit par le banc de qualification seul
+ * (S.204) : il relève où le fournisseur range les jetons de réflexion.
+ * La production n'en inscrit aucun. Seuls les compteurs passent.
+ */
+let observateurDeLUsage: ((usage: UsageNumerique | null) => void) | null = null;
+export function observerLUsage(observateur: ((usage: UsageNumerique | null) => void) | null): void {
+  observateurDeLUsage = observateur;
+}
+
 const lireReponse = (charge: unknown): Reponse => {
   const c = charge as {
     choices?: { finish_reason?: unknown; message?: { content?: unknown; refusal?: unknown } }[];
     usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
   } | null;
+  observateurDeLUsage?.(usageNumerique((charge as { usage?: unknown } | null)?.usage));
   // Mesurer avant de lire le contenu : une enveloppe refusée peut avoir coûté.
   const mesure = mesurerLesJetons(c?.usage?.prompt_tokens, c?.usage?.completion_tokens);
   if (mesure.etat !== "CONNUE") {
