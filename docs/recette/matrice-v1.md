@@ -218,7 +218,7 @@ Claude Code.
 
 | N° | Scénario | Attendu | Observé | Statut |
 |---|---|---|---|---|
-| R-P01 | Certificats des trois noms | Let's Encrypt, trois noms, échéance lointaine | Illisible d'ici : le proxy de sortie de la session présente son propre certificat | Non vérifié (protocole §2) |
+| R-P01 | Certificats des trois noms | Let's Encrypt, trois noms, échéance lointaine | 28/10, relevé de l'exploitant sur le VPS (S.202) : `immipro.app`, `www.immipro.app` et `stockage.immipro.app` servent un même certificat, valide jusqu'au 06/01/2027 21:57 GMT (70 jours) ; `certbot certificates` le dit VALID ; `nginx -t` sans erreur. Non relevés : `certbot renew --dry-run`, `nginx -T` (fichiers du dépôt) | **Partiel le 28/10/2026** : échéance et noms vérifiés ; renouvellement à blanc et source nginx restent à relever |
 | R-P02 | HTTP vers HTTPS, `www` vers le domaine nu | 301, chemin conservé | `http://`, `http://www.` et `https://www.` donnent 301 vers `https://immipro.app/…`, chemin conservé | Vérifié (pilote) |
 | R-P03 | En-têtes de sécurité | HSTS, CSP, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy | Tous présents ; CSP avec `'unsafe-inline'` (choix F1) ; `camera=()` ne gêne pas la photo, qui passe par `<input capture>` | Vérifié (pilote) |
 | R-P04 | `/api/health` public | `{status, db}` seulement, `no-store` | `{"status":"pilote","db":"up"}`, `cache-control: no-store` | Vérifié (pilote) |
@@ -228,8 +228,8 @@ Claude Code.
 | R-P08 | CORS du stockage, prévol `OPTIONS` | 200 pour `https://immipro.app`, 403 ailleurs | 09/10 : **403 pour toutes les origines, `immipro.app` comprise**. 10/10, après la pose : 200 pour `https://immipro.app` en `GET` et `PUT` sur les deux seaux ; 403 pour `https://exemple.test`, `https://www.immipro.app` et `DELETE` | **Conforme le 10/10/2026** (R-E01 levée) ; dépôt réel encore à faire (R-P15) |
 | R-P09 | Lecture anonyme d'un seau | Refusée | 403 | Vérifié (pilote) |
 | R-P10 | Pages publiques à 390 px, console | Pas de défilement horizontal, aucune erreur | Neuf pages sans défaut ; **`/tarifs` déborde (436 px)** | **Conforme le 10/10/2026** : R-E02 corrigée en S.162 ; sur `immipro.app` après déploiement (ad50d39), `/tarifs`, `/`, `/simulateur` et `/destinations` font 390 px, sans erreur de console |
-| R-P11 | Détail de `/api/health` | Bloquantes expliquées | Lecture laissée au responsable (choix du 09/10) | Non vérifié (protocole §1) |
-| R-P12 | Six services, worker, alertes | `healthy`, limites, battement, sondes | — | Non vérifié (protocole §3) |
+| R-P11 | Détail de `/api/health` | Bloquantes expliquées | 28/10 (S.202) : seule la vue anonyme a été lue, `{"status":"pilote","db":"up"}`. Le détail (administrateur ou jeton `ETAT_DE_SERVICE_JETON`) n'a pas été relevé | Non vérifié (protocole §1) ; attendu tant que M.C est ouvert : `facturation.obstacles` avec la série réelle fermée |
+| R-P12 | Six services, worker, alertes | `healthy`, limites, battement, sondes | 28/10, relevé de l'exploitant (S.202), version servie `471837b` : six conteneurs sains (app, worker, antivirus redémarrés au déploiement ; clamav 6 jours ; minio et postgres 2 semaines) ; sondes `messagerie` envoyée et `antivirus` reconnu ; `/`, `/tarifs`, `/inscription` en 200. Mémoire : 1,3 Go disponibles sur 3,8 Go, swap 1,6 Go sur 4 Go. Non relevés : limites de `docker stats`, battement, réconciliation récente | **Partiel le 28/10/2026** : services et sondes vérifiés ; limites, battement et réconciliation restent à relever |
 | R-P13 à R-P17 | Parcours candidat sur téléphone | Voir le protocole §4 | — | Non vérifié |
 | R-P18, R-P19 | Parcours opérateur B-05, B-04 | Voir le protocole §5 | — | Non vérifié |
 | R-P20 | Runbook de déploiement | Trois répétitions | — | Non vérifié (protocole §7) |

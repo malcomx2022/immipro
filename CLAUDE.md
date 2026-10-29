@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.202 — relevé serveur L7 du 28/10, consigné — 29/10/2026
+
+Lot documentaire demandé par le responsable. Base `471837b` (#323
+fusionnée, déployée). Relevé de l'exploitant sur le VPS, en lecture seule :
+certificats des trois noms jusqu'au 06/01/2027, six services sains,
+sondes messagerie et antivirus, disque 62 %, nginx et base OK. R-P01 et
+R-P12 passent « partiel » (`certbot renew --dry-run`, `nginx -T`, limites,
+battement, réconciliation non relevés), R-P11 reste « non vérifié ». La
+version 46 de `taches` vient de pg-boss (12.38.0, 22/10), pas d'une
+migration des lots. Swap à 1,6 Go à surveiller. Sauvegarde et
+restauration sur clone : accord du responsable avant tout lancement.
+Lire [la revue, § 25](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.201 — L5, passages Vertex du 28/10 — 28/10/2026
 
 Demandé par le responsable. Base `de63b49` (#322 fusionnée). Premier
