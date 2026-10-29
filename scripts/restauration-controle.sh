@@ -13,7 +13,7 @@
 #
 # Il se lance **hors du VPS**, là où vit la clé privée GPG (D-26 : coffre
 # hors ligne) ; il refuse de tourner sur le VPS. Il faut `rclone` (remote
-# vers B2), `gpg` avec la clé privée, `docker`, et l'accès en lecture à
+# vers le seau R2 des sauvegardes), `gpg` avec la clé privée, `docker`, et l'accès en lecture à
 # l'image sur GHCR.
 #
 #     scripts/restauration-controle.sh              la nuit la plus récente
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 JOUR="${1:-}"
-SOURCE="${SAUVEGARDE_DESTINATION:-b2:immipro-backups}"
+SOURCE="${SAUVEGARDE_DESTINATION:-r2:immipro-backups}"
 PROPRIETAIRE="${IMMIPRO_PROPRIETAIRE:-malcomx2022}"
 IMAGE_POSTGRES="${IMAGE_POSTGRES:-postgres:16-alpine}"
 ATTENTE_BASE="${ATTENTE_BASE:-60}"

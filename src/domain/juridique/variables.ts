@@ -215,7 +215,7 @@ export const VARIABLES_JURIDIQUES: readonly VariableJuridique[] = [
     cle: "sous_traitants",
     groupe: "donnees",
     libelle: "Sous-traitants",
-    aide: "Un sous-traitant par ligne : nom, rôle et pays de traitement. Hébergement, stockage des sauvegardes chiffrées (Backblaze B2, D-26), prestataire d'IA retenu, FedaPay, Stripe, messagerie.",
+    aide: "Un sous-traitant par ligne : nom, rôle et pays de traitement. Hébergement, stockage des sauvegardes chiffrées (Cloudflare R2, Union européenne, D-26), prestataire d'IA retenu, FedaPay, Stripe, messagerie.",
     nature: "liste",
   },
   {

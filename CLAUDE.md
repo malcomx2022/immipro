@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.207 — D-26 révisé : sauvegardes sur Cloudflare R2 — 29/10/2026
+
+Demandé par le responsable après le relevé du 29/10 : aucune sauvegarde
+ne quittait le VPS. Un `restic` local écrivait dans le Garage du même
+disque, et les scripts du dépôt ne tournaient pas. Un seau R2 en
+juridiction UE remplace B2. Clé GPG hors ligne, Healthchecks.io et
+conservation de trente jours inchangés. `r2:immipro-backups` devient la
+destination par défaut. `sauvegarde.sh` refuse toute destination restée
+sur le VPS : ne pas retirer ce refus. Rien n'est éprouvé contre R2.
+Avant la première nuit, Cloudflare doit être nommé dans `sous_traitants`
+et la page validée nommément en B-08, car la variable seule republie sous
+l'ancienne relecture. Lire [la revue, § 27](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.206 — Q.A levé, les quatre pages publiées — 29/10/2026
 
 Lot documentaire demandé par le responsable. Base `7ad8ce2` (#331

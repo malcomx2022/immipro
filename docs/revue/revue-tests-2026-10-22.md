@@ -258,7 +258,7 @@ levé le 29/10 (S.206, § 26).
 | L0–L4 | Fusionnés et déployés (S.170–S.175) | — |
 | L5 Qualification IA | Région `eu`, raisonnement `low`, campagne bornée ; aucun appel payant, clé à fournir en secret d'environnement | Responsable |
 | L6 Recette front | 33 parcours par profil (198 sur six profils) et 84 scénarios photographiques verts ; gestes C-3 déroulés sauf R-O04 (M.C) ; restent R-I02 au lecteur d'écran et la signature de la matrice | Responsable |
-| L7 Exploitation | B-04/B-07 corrigés ; relevé serveur du 28/10 en lecture seule (§ 25) : certificats, six services, sondes, disque, nginx, base. Restent : sauvegarde/restauration sur clone (accord du responsable), détail de `/api/health` (R-P11), `certbot renew --dry-run`, limites, battement et réconciliation (R-P01, R-P12), parcours téléphone et opérateur (R-P13 à R-P19), trois répétitions du runbook (R-P20) ; mémoire à surveiller | Responsable (VPS) |
+| L7 Exploitation | B-04/B-07 corrigés ; relevé serveur du 28/10 en lecture seule (§ 25) : certificats, six services, sondes, disque, nginx, base. Sauvegardes : aucune hors du VPS au 29/10, R2 décidé (§ 27). Restent : sauvegarde/restauration sur clone (accord du responsable), détail de `/api/health` (R-P11), `certbot renew --dry-run`, limites, battement et réconciliation (R-P01, R-P12), parcours téléphone et opérateur (R-P13 à R-P19), trois répétitions du runbook (R-P20) ; mémoire à surveiller | Responsable (VPS) |
 | L8 Paiement et lancement | TVA, certification fiscale, essais réels ; textes juridiques et contact publiés le 29/10 (§ 26) | Responsable, comptable |
 | L9 Maintenance | #298 et #299 fusionnées, #300 fermée au profit de #303 fusionnée ; exception `deepmerge-ts`, avis modérés `minio` ; aucune PR ouverte au 28/10 | Code |
 | C-13 Règles NL 2027 | Échéance de données au 31/12/2026 : sans versions 2027 publiées, plus aucune destination néerlandaise n'est affichée le 1er janvier (§ 9) | Responsable (contenu sourcé), code pour l'alerte |
@@ -1074,8 +1074,7 @@ sous-traitants (D-27), puisque D-26 envoie les sauvegardes sur B2. Le
 responsable déclare Backblaze hors service en production : D-27 est sans
 objet tant que B2 n'est pas activé, et l'activer demandera une nouvelle
 version relue de la page. Pour L7, la destination réelle des sauvegardes
-reste à relever (R-P11 et le test sur clone, avec l'accord du
-responsable).
+reste à relever, avec le test sur clone (accord du responsable).
 
 **Code.** Q.A est retiré de `PREALABLES` et passe « tranché » dans le
 méta-test des arbitrages (`tests/arbitrages-ouverts.test.ts`). Les
@@ -1094,8 +1093,8 @@ du 22/10.
   jours) ne sont pas ceux qui tournent. Restent à relever, en lecture
   seule : ce que l'instantané contient (base, pièces), sa politique
   `restic forget` (une pièce purgée ne doit pas survivre au-delà de la
-  durée annoncée, INV-5) et une restauration (R-P11, sur clone, avec
-  l'accord du responsable). La page publiée dit « Sauvegardes chiffrées
+  durée annoncée, INV-5) et une restauration sur clone, avec l'accord du
+  responsable. La page publiée dit « Sauvegardes chiffrées
   (GPG) quotidiennes » : `restic` chiffre par lui-même, sans GPG ; la
   formulation est à confirmer par le responsable.
 - *Prestataire IA en production.* La configuration de production nomme
@@ -1109,3 +1108,49 @@ du 22/10.
 
 Restent M.C (encaissement commercial), L5, R-I02 et la signature de la
 matrice (L6), la cible L7 et C-13.
+
+## 27. S.207 — D-26 révisé, sauvegardes sur Cloudflare R2 — 29/10/2026
+
+Demande du responsable, après le relevé du § 26 : les sauvegardes ne
+quittaient pas le VPS. Décision : un seau Cloudflare R2, juridiction UE,
+remplace Backblaze B2 dans D-26. Les scripts du dépôt (chiffrement GPG,
+clé privée hors ligne, trente jours) sont préférés au `restic` local :
+avec `restic`, le mot de passe du dépôt vit sur le VPS, et la
+conservation n'est pas connue.
+
+**Code.**
+- `r2:immipro-backups` par défaut dans `backup-postgres.sh`,
+  `backup-pieces.sh` et `restauration-controle.sh`.
+- `sauvegarde.sh` refuse avant tout envoi une destination qui reste sur
+  le VPS : le remote des pièces, un remote `local` ou `alias`, un point
+  d'accès local.
+- `--b2-hard-delete` reste, sans effet hors B2.
+
+**Tests.** Cinq nouveaux dans `tests/sauvegarde.test.ts`, joués avec de
+faux `rclone` et `gpg` :
+- sans destination déclarée, R2 ;
+- trois refus, rouges sur le script d'avant ;
+- un remote R2 configuré comme la documentation l'indique est accepté.
+
+Rien n'est éprouvé contre R2 ni contre un vrai serveur S3 : ni `rclone`
+ni Docker ne sont disponibles dans la session.
+
+**Documentation.** `sauvegardes.md` (seau, jeton, remote, vérification,
+texte juridique et ordre de mise en service), `.env.example`, l'aide de
+`sous_traitants` en B-08, D-26 au registre. Ce lot corrige aussi un
+renvoi du § 26 : R-P11 est le détail de `/api/health`, pas la
+restauration.
+
+**Mise en service, au responsable, dans cet ordre.**
+1. Créer le seau R2 `immipro-backups` en juridiction UE et un jeton
+   *Object Read & Write* limité à ce seau.
+2. Déclarer le remote `r2` sur le VPS, puis vérifier avec
+   `rclone config show r2` et `rclone lsf r2:immipro-backups`.
+3. Saisir Cloudflare dans `sous_traitants` et la phrase des sauvegardes
+   dans `securite_complements`. Les faire relire par le juriste, puis
+   valider la page en B-08 en le nommant. Enregistrer la variable
+   republie la page sous la relecture précédente : la validation nommée
+   doit suivre.
+4. Activer le cron de 2 h UTC, constater le ping, puis faire la première
+   restauration de contrôle hors du VPS, avec l'accord du responsable.
+5. Décider du sort de `restic` : le garder en copie locale, ou l'arrêter.

@@ -19,9 +19,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
  * bon — revue du 07/10/2026, E10 (D-26, D-27).
  *
  * De faux `rclone`, `docker`, `gpg` et `curl` en tête du PATH : `rclone`
- * copie entre des dossiers qui jouent Garage et B2, `gpg` laisse passer le
+ * copie entre des dossiers qui jouent Garage et R2, `gpg` laisse passer le
  * flux, `curl` note les pings. L'archive, l'inventaire et les empreintes
- * sont faits par les vrais `tar`, `find` et `sha256sum`. Le même dossier B2
+ * sont faits par les vrais `tar`, `find` et `sha256sum`. Le même dossier R2
  * sert ensuite à la restauration de contrôle, dont la base jetable est
  * jouée par le faux `docker`.
  */
@@ -35,6 +35,7 @@ case "$1" in
   copy) d=$(chemin "$3"); mkdir -p "$d"; cp "$2" "$d/" ;;
   copyto) cp "$(chemin "$2")" "$3" ;;
   delete) ;;
+  config) cat "$FAUX_ETAT/config-$3" 2>/dev/null || true ;;
   lsf) [[ "\${FAUX_LSF_ECHOUE:-}" == 1 ]] && exit 1
        d=$(chemin "$2"); motif="$4"; [[ -d "$d" ]] || exit 0
        (cd "$d" && for f in $motif; do [[ -e "$f" ]] && echo "$f"; done; true) ;;
@@ -136,7 +137,7 @@ const environnement = (env: Record<string, string>) =>
     HOME: racine,
     IMMIPRO_DOSSIER: srv,
     SAUVEGARDE_TRAVAIL: racine,
-    SAUVEGARDE_DESTINATION: "b2:immipro-backups",
+    SAUVEGARDE_DESTINATION: "r2:immipro-backups",
     ATTENTE_BASE: "2",
     FAUX_ETAT: etat,
     FAUX_DISTANT: distant,
@@ -152,7 +153,7 @@ const controler = (args: string[] = [], env: Record<string, string> = {}) =>
   lancer(join(SCRIPTS, "restauration-controle.sh"), args, env);
 
 const dans = (sous: string) => {
-  const d = join(distant, "b2", "immipro-backups", sous);
+  const d = join(distant, "r2", "immipro-backups", sous);
   return existsSync(d) ? readdirSync(d) : [];
 };
 const pings = () => (existsSync(join(etat, "pings")) ? readFileSync(join(etat, "pings"), "utf8").trim().split("\n") : []);
@@ -167,15 +168,15 @@ describe("la sauvegarde de nuit", () => {
     expect(base).toMatch(/^immipro-\d{4}-\d{2}-\d{2}T\d{4}Z-abc1234\.dump\.gpg$/u);
     expect(pieces).toBe(base!.replace(/^immipro-/u, "immipro-pieces-").replace(/\.dump\.gpg$/u, ".tar.gpg"));
     expect(pings()).toEqual(["https://hc-ping.test/uuid/start", "https://hc-ping.test/uuid"]);
-    // La conservation détruit pour de bon sur B2.
-    expect(appels()).toMatch(/rclone delete --min-age 30d --b2-hard-delete b2:immipro-backups\/postgres\//u);
-    expect(appels()).toMatch(/rclone delete --min-age 30d --b2-hard-delete b2:immipro-backups\/pieces\//u);
+    // La conservation détruit au-delà de 30 jours, dans les deux dossiers.
+    expect(appels()).toMatch(/rclone delete --min-age 30d --b2-hard-delete r2:immipro-backups\/postgres\//u);
+    expect(appels()).toMatch(/rclone delete --min-age 30d --b2-hard-delete r2:immipro-backups\/pieces\//u);
   });
 
   it("l'archive porte les pièces saines et leur inventaire, jamais la quarantaine", () => {
     sauvegarder();
     const [pieces] = dans("pieces");
-    const archive = join(distant, "b2", "immipro-backups", "pieces", pieces!);
+    const archive = join(distant, "r2", "immipro-backups", "pieces", pieces!);
     const liste = spawnSync("tar", ["-tf", archive], { encoding: "utf8" }).stdout;
     expect(liste).toMatch(/^inventaire\.tsv$/mu);
     expect(liste).toMatch(/pieces\/dossiers\/a1\/passeport\/v1\.pdf/u);
@@ -196,6 +197,46 @@ describe("la sauvegarde de nuit", () => {
     expect(r.code).toBe(1);
     expect(r.sortie).toMatch(/SAUVEGARDE_PING_URL manque/u);
     expect(dans("postgres")).toEqual([]);
+  });
+
+  it("sans destination déclarée, elle part sur le seau R2 (D-26, S.207)", () => {
+    const r = sauvegarder({ SAUVEGARDE_DESTINATION: "" });
+    expect(r.code, r.sortie).toBe(0);
+    expect(dans("postgres")).toHaveLength(1);
+    expect(dans("pieces")).toHaveLength(1);
+  });
+
+  /**
+   * S.207 — le 29/10/2026, les sauvegardes partaient dans un seau du Garage
+   * local : même machine, même disque. Une destination qui reste sur le VPS
+   * est refusée avant tout envoi, et le refus dit quoi viser.
+   */
+  it.each([
+    ["le remote des pièces lui-même", { SAUVEGARDE_DESTINATION: "garage:vps-backups" }, null],
+    ["un dossier local", { SAUVEGARDE_DESTINATION: "disque:sauvegardes" }, "[disque]\ntype = local\n"],
+    [
+      "un point d'accès sur la machine",
+      { SAUVEGARDE_DESTINATION: "s3local:vps-backups" },
+      "[s3local]\ntype = s3\nprovider = Other\nendpoint = http://127.0.0.1:3900\n",
+    ],
+  ] as const)("refuse une destination qui reste sur le VPS : %s", (_cas, env, config) => {
+    const remote = env.SAUVEGARDE_DESTINATION.split(":")[0]!;
+    if (config) writeFileSync(join(etat, `config-${remote}`), config);
+    const r = sauvegarder(env);
+    expect(r.code).toBe(1);
+    expect(r.sortie).toMatch(/reste sur le VPS .* Viser le seau R2 hors du VPS \(D-26\)/u);
+    expect(pings()).toEqual([]);
+    expect(readdirSync(distant)).toEqual(["garage"]);
+  });
+
+  it("accepte le seau R2 déclaré tel que la documentation le configure", () => {
+    writeFileSync(
+      join(etat, "config-r2"),
+      "[r2]\ntype = s3\nprovider = Cloudflare\nendpoint = https://compte.eu.r2.cloudflarestorage.com\nno_check_bucket = true\n",
+    );
+    const r = sauvegarder();
+    expect(r.code, r.sortie).toBe(0);
+    expect(dans("postgres")).toHaveLength(1);
   });
 
   it("sans .env.sauvegarde, elle dit quoi créer", () => {
@@ -258,7 +299,7 @@ describe("la restauration de contrôle", () => {
 
   it("une nuit sans archive des pièces est une sauvegarde incomplète", () => {
     sauvegarder();
-    for (const f of dans("pieces")) rmSync(join(distant, "b2", "immipro-backups", "pieces", f));
+    for (const f of dans("pieces")) rmSync(join(distant, "r2", "immipro-backups", "pieces", f));
     const r = controler();
     expect(r.code).toBe(1);
     expect(r.sortie).toMatch(/n'a pas son archive des pièces.*incomplète/u);
@@ -268,7 +309,7 @@ describe("la restauration de contrôle", () => {
     sauvegarder();
     const r = controler([], { FAUX_LSF_ECHOUE: "1" });
     expect(r.code).toBe(1);
-    expect(r.sortie).toMatch(/b2:immipro-backups ne se lit pas : vérifier le remote rclone/u);
+    expect(r.sortie).toMatch(/r2:immipro-backups ne se lit pas : vérifier le remote rclone/u);
   });
 
   it("une date sans sauvegarde le dit", () => {
