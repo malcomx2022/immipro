@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.205 — L5 : relevé console de L09, facture attendue — 29/10/2026
+
+Lot documentaire demandé par le responsable. Base `5bb55ec` (#330
+fusionnée). Minute du 29/10 à 14:01 UTC : une seule 200, entrée 941,
+sortie 23, pour 990 / 32 mesurés : pas de réflexion cachée sur L09, et
+la mesure du banc reste prudente. La métrique par minute compte environ
+5 % d'entrée de moins que `prompt_tokens` les deux jours : elle attribue
+les requêtes, la facturation par SKU fait foi pour les jetons. L09 (3 s)
+ne départage rien pour les appels lents ; suspect du 28/10 : L07 (52 s,
+29 jetons). Reprise suspendue ; décision du responsable : attendre la
+facture du 29/10 (L09 seule), sans appel. Lire
+[le suivi L5](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.204 — L5 : diagnostic de l'usage, aucun compteur de réflexion — 29/10/2026
 
 Décision du responsable : lot avec une invocation de diagnostic. Le banc

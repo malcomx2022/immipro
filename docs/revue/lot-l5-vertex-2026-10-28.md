@@ -355,10 +355,51 @@ propre à Google, à choisir sur preuve ; avec l'explication 2, la mesure est
 juste et seule l'attribution du 28/10 reste à éclaircir. **La reprise de
 la campagne reste suspendue** jusque-là.
 
+## Relevé console de L09 — S.205, 29/10/2026
+
+Relevé du responsable, lecture seule, minute du 29/10 à 14:01 UTC
+(15:01 à Cotonou), méthode `ChatCompletions` ; valeurs lues dans le
+tableau affiché, sans export CSV pour les recouper.
+
+| | Console | Banc (`usageBrut`) | Écart |
+|---|---|---|---|
+| Requêtes | une 200, aucune autre | une invocation | — |
+| Entrée | 941 | 990 | −49 (−4,9 %) |
+| Sortie | 23 | 32 | −9 |
+
+**Ce que le relevé établit.**
+
+- **Aucune réflexion cachée sur L09.** La console compte moins de sortie
+  que `completion_tokens` : pour cet appel, la mesure du banc est au-dessus
+  de ce que Google compte, donc prudente.
+- **La métrique par minute n'est pas le compteur de la réponse.** Son
+  entrée est plus basse que `prompt_tokens` du même ordre les deux jours
+  (−4,9 % pour L09, −5,0 % pour L07 à L13 le 28/10 à 18:12). Elle sert à
+  attribuer les requêtes (codes, minutes), pas à rapprocher les jetons à
+  l'unité : seule la facturation par SKU fait foi pour les jetons.
+- **Pas de débordement sur la minute voisine ici** : un appel de 3 s parti
+  à 14:01:13 s'achève dans sa minute. Le débordement explique en revanche
+  probablement les 66 jetons de sortie relevés à 18:13 le 28/10 sans entrée.
+
+**Ce qu'il n'établit pas.** L09 était un témoin faible : une lecture de
+3 s ne laisse presque pas de place à la réflexion. L'écart de sortie du
+28/10 (3 201 facturés pour 1 631 mesurés) reste inexpliqué ; le suspect
+est L07, 52 s pour 29 jetons de sortie, avec L06 et L14 abandonnées après
+plusieurs minutes de calcul. **La reprise reste suspendue.**
+
+**Décision du responsable (29/10) : attendre la facture du 29/10**, sans
+nouvel appel. Si aucun autre trafic n'a touché `projetanatt` ce jour-là,
+seule L09 y figure : relever les SKU *Text Output*, *Text Input* et
+*Image Input* du 29/10. Une sortie facturée d'environ 32 dirait que la
+facture suit `completion_tokens` pour un appel court ; nettement plus,
+qu'une réflexion est facturée même sur un appel court. Si la question
+reste ouverte, un second diagnostic sur L07, seul dans sa journée, sera
+proposé au responsable.
+
 ## Reste à faire et non prouvé
 
-Relevé console de la minute 14:01 UTC du 29/10 (sortie de L09), puis
-décision sur la mesure de la réflexion,
+Facture du 29/10 par SKU (L09 seule), puis, au besoin, diagnostic sur
+L07 et décision sur la mesure de la réflexion,
 attribution de l'entrée facturée en trop, décision sur L06 et L14,
 fin du jeu (43 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
