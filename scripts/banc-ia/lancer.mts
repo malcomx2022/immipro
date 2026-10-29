@@ -73,8 +73,10 @@ import { configurationCompatible, lireDesOctets } from "@/server/dossiers/extrac
 import {
   critiqueCompatible,
   lireDesOctetsCompatible,
+  observerLUsage,
   redacteurCompatible,
 } from "@/server/ia/openai-compatible";
+import type { UsageNumerique } from "@/domain/ia/usage";
 import { critiqueClaude, redacteurClaude } from "@/server/redaction/adaptateur";
 import { etatDuPassage, selectionnerLesCas } from "@/domain/banc-ia/qualification";
 import { avisDeReference, LETTRES_DE_REFERENCE } from "@/domain/banc-ia/lettres-reference";
@@ -502,7 +504,12 @@ async function main() {
     mesure: MesureDuBanc;
     millisecondes: number;
     incident: string | null;
+    /** Compteurs du bloc `usage` rendu par le fournisseur compatible (S.204). */
+    usageBrut?: UsageNumerique | null;
   }[] = [];
+  // Le dernier bloc `usage` reçu, rattaché à l'appel tracé ensuite.
+  let dernierUsage: UsageNumerique | null = null;
+  if (fournisseur === "openai_compatible") observerLUsage((u) => (dernierUsage = u));
   const tracer = async (
     cas: string,
     fonction: (typeof appels)[number]["fonction"],
@@ -510,7 +517,15 @@ async function main() {
     millisecondes: number,
     incident: string | null,
   ) => {
-    appels.push({ cas, fonction, mesure, millisecondes, incident });
+    appels.push({
+      cas,
+      fonction,
+      mesure,
+      millisecondes,
+      incident,
+      ...(fournisseur === "openai_compatible" ? { usageBrut: dernierUsage } : {}),
+    });
+    dernierUsage = null;
     await writeFile(path.join(dossier, "appels.json"), JSON.stringify(appels, null, 2));
     budgetActif?.exigerSuite();
   };
