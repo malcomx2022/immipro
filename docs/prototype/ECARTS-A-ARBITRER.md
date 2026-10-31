@@ -14099,3 +14099,25 @@ Reste au responsable, dans cet ordre :
 3. le cron, puis la première restauration de contrôle.
 
 Aucun préalable levé.
+
+## S.209 — D-35 : `decode-uri-component`, risque accepté
+
+31/10/2026, lot dédié demandé par le responsable. Base : `main`
+`46c8b76` (#333). Constat sur #334 : `npm run check:audit` échoue sur
+toute branche depuis l'avis GHSA-qr28-fpjm-wq7f (gravité élevée,
+publié avec `decode-uri-component` 0.5.1 le 23/10), porté par
+`minio` 8.0.7 › `query-string` 7.1.3 › `decode-uri-component` 0.2.2.
+
+**D-35, tranchée par le responsable le 31/10/2026** : risque accepté,
+motivé et daté dans `audit-exceptions.json`.
+
+- Mise à jour impossible : `minio` 8.0.7 est la dernière version ; la
+  0.5.1 n'existe qu'en module ESM à export par défaut, et `query-string`
+  7 la charge par `require()`. Une surcharge casserait `minio`.
+- Exposition : `minio` n'appelle que `querystring.stringify` (étiquettes
+  `X-Amz-Tagging`) ; la fonction de décodage vulnérable n'est pas
+  atteinte. Ni `src/` ni `scripts/` n'importent ces paquets.
+- Revue : retirer l'exception à la prochaine version de `minio`. L'audit
+  la refusera de lui-même dès que l'avis ne sera plus signalé.
+
+Aucun code applicatif, schéma ni service touché ; aucun préalable levé.
