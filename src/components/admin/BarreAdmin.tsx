@@ -63,7 +63,12 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
             </li>
           ))}
         </ul>
-        <div className="flex items-center gap-2.5 rounded-md bg-ink-100 p-3 md:mt-auto">
+        {/* La carte de l'opérateur mène à son compte interne (S.208). */}
+        <Link
+          href="/mon-compte"
+          aria-label={`Mon compte : ${nom}, ${role}`}
+          className="flex items-center gap-2.5 rounded-md bg-ink-100 p-3 hover:bg-ink-300 md:mt-auto"
+        >
           <span
             aria-hidden="true"
             className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white text-13 font-semibold text-ink-700"
@@ -74,7 +79,7 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
             <span className="text-14 font-medium text-ink-900">{nom}</span>
             <span className="text-13 text-ink-500">{role}</span>
           </span>
-        </div>
+        </Link>
       </nav>
 
       <main className="min-w-0 flex-1">{children}</main>

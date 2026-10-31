@@ -1,4 +1,4 @@
-import type { Role } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { journaliser } from "@/server/acces/journal";
 import {
@@ -7,24 +7,47 @@ import {
   type DemandeDeChangement,
   type RoleDeCompte,
 } from "@/domain/comptes/role";
+import { rolesAuMoins } from "@/domain/comptes/hierarchie";
 
 /**
- * Le changement de rôle et sa ligne de journal, ensemble — S.115.
+ * Le changement de rôle et sa ligne de journal, ensemble — S.115, S.208.
  *
  * Les deux s'écrivent dans **une** transaction : un rôle changé sans trace
  * est précisément ce que ce module remplace, et une trace sans changement
- * mentirait. Le nombre d'administrateurs est relu dans la même
- * transaction, pour que deux retraits simultanés ne laissent pas la
- * plateforme sans personne.
+ * mentirait. Le nombre d'administrateurs et de super-administrateurs
+ * actifs est relu dans la même transaction, sérialisable, pour que deux
+ * retraits simultanés ne laissent pas la plateforme sans personne.
  *
- * Le rôle prend effet à la requête suivante : la session ne le copie pas,
- * elle le relit en base (`server/securite/session`).
+ * Deux auteurs possibles :
+ *
+ * - la **console du serveur** (`changer-role`), qui garde son autorité :
+ *   c'est elle qui nomme le premier super-administrateur ;
+ * - un **compte super-administrateur**, depuis B-03 (S.208). Le domaine
+ *   refuse tout autre rôle et l'auto-promotion.
+ *
+ * **Les sessions du compte changé sont fermées dans la transaction.** La
+ * session relit déjà le rôle en base à chaque appel ; les fermer en plus
+ * oblige la personne à se reconnecter, et un écran resté ouvert sur
+ * l'ancien rôle ne continue pas à envoyer des gestes que le nouveau rôle
+ * n'autorise plus — ni, pour une promotion, à hériter d'une session
+ * ouverte avant que le rôle ne soit donné.
  */
 export type IssueDuChangement =
-  | { issue: "change"; de: RoleDeCompte; vers: RoleDeCompte }
+  | { issue: "change"; de: RoleDeCompte; vers: RoleDeCompte; sessionsFermees: number }
   | { issue: "inchange"; raison: string }
   | { issue: "refuse"; raison: string }
   | { issue: "introuvable" };
+
+export type AuteurDuChangement =
+  | { genre: "console"; par: string }
+  | { genre: "compte"; id: string; role: RoleDeCompte };
+
+export interface ChangementDeRole {
+  cible: { email: string } | { id: string };
+  vers: RoleDeCompte;
+  motif: string;
+  auteur: AuteurDuChangement;
+}
 
 class Refus extends Error {
   constructor(readonly issue: IssueDuChangement) {
@@ -32,22 +55,45 @@ class Refus extends Error {
   }
 }
 
-export async function changerLeRole(demande: DemandeDeChangement): Promise<IssueDuChangement> {
+/** Actif : ni suspendu, ni supprimé. C'est ce que la borne des deux compte. */
+const SUPER_ADMINS_ACTIFS: Prisma.UserWhereInput = {
+  role: "SUPER_ADMIN",
+  deletedAt: null,
+  suspendedAt: null,
+};
+
+export async function appliquerLeChangementDeRole(
+  changement: ChangementDeRole,
+): Promise<IssueDuChangement> {
+  const { auteur } = changement;
   try {
     return await db.$transaction(
       async (tx) => {
-        const cible = await tx.user.findUnique({ where: { email: demande.email } });
+        const cible = await tx.user.findUnique({
+          where: "email" in changement.cible ? { email: changement.cible.email } : { id: changement.cible.id },
+        });
         if (!cible) throw new Refus({ issue: "introuvable" });
-        const administrateurs = await tx.user.count({ where: { role: "ADMIN", deletedAt: null } });
+
+        const [administrateurs, superAdminsActifs] = await Promise.all([
+          tx.user.count({
+            where: { role: { in: rolesAuMoins("ADMIN") as Role[] }, deletedAt: null },
+          }),
+          tx.user.count({ where: SUPER_ADMINS_ACTIFS }),
+        ]);
         const verdict = verdictDuChangement(
           {
+            id: cible.id,
             role: cible.role as RoleDeCompte,
             emailVerifie: cible.emailVerified !== null,
             suspendu: cible.suspendedAt !== null,
             supprime: cible.deletedAt !== null,
           },
-          demande.role,
+          changement.vers,
           administrateurs,
+          {
+            superAdminsActifs,
+            ...(auteur.genre === "compte" ? { acteur: { id: auteur.id, role: auteur.role } } : {}),
+          },
         );
         if (!verdict.permis) {
           throw new Refus(
@@ -61,22 +107,33 @@ export async function changerLeRole(demande: DemandeDeChangement): Promise<Issue
         // une autre commande est passée et celle-ci raisonne sur le passé.
         const { count } = await tx.user.updateMany({
           where: { id: cible.id, role: cible.role },
-          data: { role: demande.role as Role },
+          data: { role: changement.vers as Role },
         });
         if (count !== 1) {
           throw new Refus({ issue: "refuse", raison: "Le rôle a changé pendant la commande : relancez-la pour lire l'état actuel." });
         }
+        const { count: sessionsFermees } = await tx.session.deleteMany({ where: { userId: cible.id } });
         await journaliser(
           {
-            acteurId: auteurConsole(demande.par),
+            acteurId: auteur.genre === "console" ? auteurConsole(auteur.par) : auteur.id,
             action: "compte.role",
             cible: `user:${cible.id}`,
-            motif: demande.motif,
-            details: { de: cible.role, vers: demande.role },
+            motif: changement.motif,
+            details: {
+              de: cible.role,
+              vers: changement.vers,
+              sessionsFermees,
+              origine: auteur.genre === "console" ? "console" : "back-office",
+            },
           },
           tx,
         );
-        return { issue: "change", de: cible.role as RoleDeCompte, vers: demande.role } as const;
+        return {
+          issue: "change",
+          de: cible.role as RoleDeCompte,
+          vers: changement.vers,
+          sessionsFermees,
+        } as const;
       },
       { isolationLevel: "Serializable" },
     );
@@ -90,3 +147,12 @@ export async function changerLeRole(demande: DemandeDeChangement): Promise<Issue
     throw erreur;
   }
 }
+
+/** La commande de la console (S.115) : l'adresse, le rôle, l'opérateur et le motif. */
+export const changerLeRole = (demande: DemandeDeChangement): Promise<IssueDuChangement> =>
+  appliquerLeChangementDeRole({
+    cible: { email: demande.email },
+    vers: demande.role,
+    motif: demande.motif,
+    auteur: { genre: "console", par: demande.par },
+  });

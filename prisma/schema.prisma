@@ -94,10 +94,14 @@ model VisaRule {
 ///
 /// RG-15.3 : moindre privilège. Un veilleur relit des sources et rédige des
 /// versions de règle ; il ne voit ni les paiements ni les pièces d'identité.
+/// SUPER_ADMIN ⊃ ADMIN ⊃ VEILLEUR (S.208) : la hiérarchie se lit dans
+/// `domain/comptes/hierarchie`. Seul le sommet change un rôle, crée un
+/// compte interne ou en suspend un depuis le back-office.
 enum Role {
   CANDIDAT
   VEILLEUR
   ADMIN
+  SUPER_ADMIN
 }
 
 model User {
@@ -108,6 +112,13 @@ model User {
   lastName      String?
   phone         String?
   countryCode   String?   @db.Char(2)
+  /// Nom affiché (« Mon compte », S.208), entre 2 et 80 caractères. Nul :
+  /// l'écran affiche le prénom et le nom. Il part avec le compte (RG-10.4).
+  displayName   String?
+  /// Date de naissance déclarée (S.208). Elle borne l'âge (13 à 110 ans)
+  /// et refuse les propositions commerciales à un mineur. Elle part avec
+  /// le compte (RG-10.4) ; aucune facture ne la porte.
+  birthDate     DateTime? @db.Date
   /// Identité de facturation — avis comptable M.C, 04/10/2026.
   ///
   /// Demandée avant le premier paiement réel, et figée sur chaque facture

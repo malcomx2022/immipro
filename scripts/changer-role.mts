@@ -9,6 +9,15 @@
  *       --motif "Responsable de la revue manuelle désigné par la direction le 03/10"
  *
  * En local : `npm run compte:role -- --email … --role … --par … --motif …`.
+ *
+ * Le premier super-administrateur (S.208) se nomme ici, et seulement ici :
+ * aucun écran ne donne ce rôle tant qu'aucun super-administrateur n'existe.
+ * La personne doit s'être inscrite et avoir vérifié son adresse :
+ *
+ *     npm run compte:role -- --email awa@exemple.com --role SUPER_ADMIN \
+ *       --par "Awa Koffi" --motif "Premier super-administrateur désigné par la direction"
+ *
+ * Ses sessions ouvertes sont fermées : elle se reconnecte avec son rôle.
  */
 import { lireLaDemande, USAGE } from "../src/domain/comptes/role";
 
@@ -27,7 +36,7 @@ try {
   const issue = await changerLeRole(lue.demande);
   if (issue.issue === "change") {
     console.log(
-      `✓ ${lue.demande.email} : ${issue.de} → ${issue.vers}. Effet à la prochaine requête. Inscrit au journal d'audit (compte.role, par « ${lue.demande.par} »).`,
+      `✓ ${lue.demande.email} : ${issue.de} → ${issue.vers}. ${issue.sessionsFermees} session(s) fermée(s) : la personne se reconnecte. Inscrit au journal d'audit (compte.role, par « ${lue.demande.par} »).`,
     );
   } else if (issue.issue === "inchange") {
     console.log(`= ${issue.raison}`);

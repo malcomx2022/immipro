@@ -7,6 +7,7 @@ import {
   enregistrerLAutorisation,
 } from "@/server/acces/consentements";
 import { CODES_CONSENTEMENT, CONSENTEMENTS } from "@/domain/comptes/consentements";
+import { exigerAutorisationPermise } from "@/server/acces/profil";
 
 /**
  * Consentements — A-05, RG-02.1.
@@ -61,6 +62,8 @@ export const PUT = route({
     version: z.string().min(1).max(20).optional(),
   }),
   async traiter({ corps, acteur }) {
+    // S.208 : un mineur n'accorde pas les propositions de partenaires.
+    await exigerAutorisationPermise(acteur!.id, corps.code, corps.accorde);
     await enregistrerLAutorisation(
       acteur!.id,
       corps.code,

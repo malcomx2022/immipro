@@ -154,6 +154,9 @@ export async function acheverLaSuppression(
         passwordHash: null,
         firstName: null,
         lastName: null,
+        // S.208 : le nom affiché et la date de naissance partent aussi.
+        displayName: null,
+        birthDate: null,
         phone: null,
         // L'identité de facturation part avec le compte. Les factures déjà
         // émises la gardent : elles en ont une copie figée, conservée dix

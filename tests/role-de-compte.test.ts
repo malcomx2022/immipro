@@ -26,7 +26,7 @@ describe("la ligne de commande", () => {
     expect(lu.ok).toBe(false);
     if (!lu.ok) {
       expect(lu.erreurs.join("\n")).toMatch(/--email/u);
-      expect(lu.erreurs.join("\n")).toMatch(/--role : CANDIDAT, VEILLEUR, ADMIN \(reçu : « SUPERADMIN »\)/u);
+      expect(lu.erreurs.join("\n")).toMatch(/--role : CANDIDAT, VEILLEUR, ADMIN, SUPER_ADMIN \(reçu : « SUPERADMIN »\)/u);
       expect(lu.erreurs.join("\n")).toMatch(/--par/u);
       expect(lu.erreurs.join("\n")).toMatch(/--motif/u);
     }

@@ -274,6 +274,7 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
       analysesUtilisees: octroyees - solde,
       analysesTotal: octroyees,
       statut: statutDuCompte(u),
+      role: u.role,
       depots: u.applications.flatMap((a) =>
         a.depositedOn && a.submittedAt
           ? [
@@ -650,6 +651,10 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "compte.verification": "COMPTE",
   "compte.relance": "COMPTE",
   "compte.export": "COMPTE",
+  // S.208 — les gestes du super-administrateur, et ses refus.
+  "compte.role": "COMPTE",
+  "compte.creation.interne": "COMPTE",
+  "acces.refuse": "COMPTE",
   "paiement.remboursement": "PAIEMENT",
   "paiement.remboursement.manuel": "PAIEMENT",
   "paiement.remboursement.tranche": "PAIEMENT",

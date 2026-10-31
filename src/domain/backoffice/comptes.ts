@@ -9,6 +9,8 @@
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
 
+import { estInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
+
 export type StatutCompte =
   | "ACTIF"
   | "EMAIL_NON_VERIFIE"
@@ -35,6 +37,11 @@ export interface Compte {
   analysesUtilisees: number;
   analysesTotal: number;
   statut: StatutCompte;
+  /**
+   * Le rôle du compte — S.208. Facultatif pour les lectures antérieures :
+   * absent, le compte se lit comme un candidat.
+   */
+  role?: RoleDeCompte;
   /**
    * Les dépôts déclarés de ce compte — S.89. La date réelle ne se modifie
    * pas depuis le dossier ; sa correction passe par le back-office, avec
@@ -236,8 +243,37 @@ export function messageDeRelance(bilan: BilanRelanceSuppression): {
   };
 }
 
-export const actionsPour = (compte: Compte): ActionCompte[] =>
-  ACTIONS_COMPTE.filter((a) => a.statuts.includes(compte.statut));
+/**
+ * Les actions offertes sur ce compte, à cet acteur — S.208.
+ *
+ * Sans acteur, la liste par statut (WF-15). Avec lui, la suspension et le
+ * rétablissement disparaissent là où le serveur les refuserait : sur son
+ * propre compte, et sur un compte interne quand l'acteur n'est pas
+ * super-administrateur. Un bouton que la route refuse est un bouton qui
+ * ment.
+ */
+export const actionsPour = (
+  compte: Compte,
+  acteur?: { id: string; role: RoleDeCompte },
+): ActionCompte[] =>
+  ACTIONS_COMPTE.filter((a) => {
+    if (!a.statuts.includes(compte.statut)) return false;
+    if (!acteur || (a.cle !== "suspendre" && a.cle !== "retablir")) return true;
+    if (compte.id === acteur.id) return false;
+    return !estInterne(compte.role ?? "CANDIDAT") || acteur.role === "SUPER_ADMIN";
+  });
+
+/** Pourquoi la suspension n'est pas offerte sur ce compte, ou `null`. */
+export function suspensionReservee(
+  compte: Compte,
+  acteur: { id: string; role: RoleDeCompte },
+): string | null {
+  if (compte.id === acteur.id) return "C'est ton propre compte : il ne se suspend pas depuis ici.";
+  if (estInterne(compte.role ?? "CANDIDAT") && acteur.role !== "SUPER_ADMIN") {
+    return "Compte interne : seul un super-administrateur le suspend, le rétablit ou change son rôle.";
+  }
+  return null;
+}
 
 /** Le motif part au journal d'audit, et une suspension sans motif ne se relit pas. */
 export const MOTIF_MINIMUM_COMPTE = 10;

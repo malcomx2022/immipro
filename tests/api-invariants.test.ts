@@ -68,7 +68,7 @@ describe("toutes les routes passent par le composeur", () => {
     (fichier) => {
       const source = lire(fichier);
       expect(source).toMatch(/route\(\{/u);
-      expect(source).toMatch(/acces:\s*"(public|candidat|candidat_verifie|veilleur|admin)"/u);
+      expect(source).toMatch(/acces:\s*"(public|candidat|candidat_verifie|veilleur|admin|super_admin)"/u);
       expect(source).toMatch(/limite:\s*"(lecture|sensible|attente|webhook)"/u);
       // Un gestionnaire écrit à la main contournerait tout le socle.
       expect(source).not.toMatch(/export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/u);

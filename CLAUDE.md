@@ -77,6 +77,24 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.208 — rôle SUPER_ADMIN et profils utilisateur — 31/10/2026
+
+Lot demandé par le responsable. Base `46c8b76` (#333 fusionnée).
+`SUPER_ADMIN ⊃ ADMIN ⊃ VEILLEUR` vit dans `domain/comptes/hierarchie` ; le
+composeur, les gardes de pages et le lecteur d'exploitation la lisent : ne
+plus écrire de liste de rôles à la main. Seul le sommet change un rôle,
+crée un compte interne ou suspend un compte interne ; un ADMIN suspend
+toujours un candidat (WF-15). Accès `super_admin` : 403 et `acces.refuse`
+au journal, sous débit. Tout changement de rôle ferme les sessions du compte
+dans la transaction de sa ligne `compte.role`. Au moins deux
+super-administrateurs actifs pour en retirer un, soi compris. Le premier se
+nomme par la console (`changer-role --role SUPER_ADMIN`). Profils :
+`/compte` (identité, `validerIdentite`), `/compte/securite`, `/mon-compte`
+(interne, sans suppression autonome, RG-10.4) ; `displayName` et `birthDate`
+additifs, purgés à l'anonymisation. Mineur : propositions de partenaires
+retirées et refusées. Verrouillage inchangé (blocage au 5e échec). Lire
+[le lot](docs/revue/lot-s208-super-admin-profils-2026-10-31.md).
+
 ### S.207 — D-26 révisé : sauvegardes sur Cloudflare R2 — 29/10/2026
 
 Demandé par le responsable après le relevé du 29/10 : aucune sauvegarde
