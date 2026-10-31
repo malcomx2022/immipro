@@ -92,7 +92,8 @@ nomme par la console (`changer-role --role SUPER_ADMIN`). Profils :
 `/compte` (identité, `validerIdentite`), `/compte/securite`, `/mon-compte`
 (interne, sans suppression autonome, RG-10.4) ; `displayName` et `birthDate`
 additifs, purgés à l'anonymisation. Mineur : propositions de partenaires
-retirées et refusées. Verrouillage inchangé (blocage au 5e échec). Lire
+retirées et refusées. Décisions du 31/10 : blocage au 5e échec conservé,
+liste `PAYS_DE_RESIDENCE` validée par le responsable. Lire
 [le lot](docs/revue/lot-s208-super-admin-profils-2026-10-31.md).
 
 ### S.207 — D-26 révisé : sauvegardes sur Cloudflare R2 — 29/10/2026

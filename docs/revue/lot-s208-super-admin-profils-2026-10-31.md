@@ -130,5 +130,13 @@ Nouveaux tests : `tests/super-admin.test.ts`, `tests/profil-identite.test.ts`,
   français.
 - Le verrouillage de compte n'est pas touché : il bloque **au cinquième**
   échec (4 échecs : un essai restant ; 5e : blocage ; 6e : refusé), figé par
-  un test. La demande parlait de « 4 échecs ⇒ blocage » : le code fait foi.
+  un test. Décision du responsable du 31/10 : le blocage au cinquième échec
+  est conservé.
+
+## Décisions du responsable — 31/10/2026
+
+- Verrouillage : blocage au cinquième échec conservé (`ESSAIS_AVANT_BLOCAGE`).
+- `PAYS_DE_RESIDENCE` validée telle quelle : Bénin, Burkina Faso, Côte
+  d'Ivoire, Guinée-Bissau, Mali, Niger, Sénégal, Togo, Cameroun, RD Congo,
+  France, Belgique, Pays-Bas, Canada, avec leurs indicatifs.
 - Firefox et WebKit non rejoués localement, laissés à la CI.
