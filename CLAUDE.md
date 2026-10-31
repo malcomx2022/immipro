@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.209 — D-35, exception d'audit `decode-uri-component` — 31/10/2026
+
+Lot dédié demandé par le responsable. Base `46c8b76` (#333 fusionnée).
+L'avis GHSA-qr28-fpjm-wq7f (élevée), porté par `minio` 8.0.7 ›
+`query-string` 7.1.3, faisait échouer `check:audit` sur toute branche.
+Mise à jour impossible : la 0.5.1 est ESM seule, `query-string` 7 la
+charge par `require()`. `minio` n'appelle que `stringify` : le décodage
+vulnérable n'est pas atteint. Exception motivée et datée ; à retirer à
+la prochaine version de `minio`. Ne pas forcer la 0.5.1 par `overrides`.
+Lire le registre, entrée S.209.
+
 ### S.208 — revue fonctionnelle, restant et chemin vers la fin — 31/10/2026
 
 Lot documentaire demandé par le responsable. Base `46c8b76` (#333
