@@ -73,7 +73,7 @@ export function Utilisateurs({
 }: {
   comptes: readonly Compte[];
   /**
-   * L'opérateur connecté — S.208. Il décide des gestes offerts : rôle et
+   * L'opérateur connecté — S.210. Il décide des gestes offerts : rôle et
    * création pour le super-administrateur, suspension d'un compte interne
    * réservée à lui. Absent, l'écran se lit comme celui d'un administrateur.
    */

@@ -22,7 +22,7 @@ import { suspendreOuRetablir } from "@/server/comptes/gestion";
  * pendant lesquels la personne suspendue continuerait d'utiliser la
  * plateforme.
  *
- * ── Comptes internes — S.208 ────────────────────────────────────────
+ * ── Comptes internes — S.210 ────────────────────────────────────────
  *
  * Un candidat se suspend depuis le rôle administrateur, comme avant. Un
  * compte interne (veilleur et au-dessus), depuis le rôle

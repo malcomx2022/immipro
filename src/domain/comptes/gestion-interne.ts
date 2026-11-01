@@ -1,5 +1,5 @@
 /**
- * Gestion des comptes internes depuis le back-office — S.208, B-03.
+ * Gestion des comptes internes depuis le back-office — S.210, B-03.
  *
  * Jusqu'ici, un rôle ne se changeait que depuis la console du serveur
  * (S.115) et aucun écran ne créait de compte interne. Le rôle

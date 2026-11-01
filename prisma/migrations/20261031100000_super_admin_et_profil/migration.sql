@@ -1,4 +1,4 @@
--- S.208 : rôle SUPER_ADMIN et identité du compte.
+-- S.210 : rôle SUPER_ADMIN et identité du compte.
 --
 -- Additive seule : une valeur ajoutée à l'énumération, deux colonnes
 -- nullables. Aucune ligne existante n'est réécrite, aucun rôle n'est donné :

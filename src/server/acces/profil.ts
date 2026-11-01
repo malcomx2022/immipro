@@ -158,7 +158,7 @@ export async function enregistrerLeProfil(userId: string, corps: CorpsDuProfil):
 }
 
 /* ------------------------------------------------------------------ *
- * L'identité du compte — « Mon compte » (/compte), S.208.
+ * L'identité du compte — « Mon compte » (/compte), S.210.
  * ------------------------------------------------------------------ */
 
 
@@ -294,7 +294,7 @@ export async function exigerAutorisationPermise(
 }
 
 /**
- * Ce que « Sécurité » (/compte/securite) affiche — S.208 : les sessions
+ * Ce que « Sécurité » (/compte/securite) affiche — S.210 : les sessions
  * ouvertes et la plus récente. Ni jeton, ni empreinte, ni agent complet :
  * la date d'ouverture, la dernière activité et le début de l'agent.
  */

@@ -8,7 +8,7 @@ import { ROLES, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 import { MOTIF_MAX, MOTIF_MIN } from "@/domain/comptes/role";
 
 /**
- * Changement de rôle depuis B-03 — S.208.
+ * Changement de rôle depuis B-03 — S.210.
  *
  * Réservé au super-administrateur (`acces: "super_admin"`) : un ADMIN, un
  * VEILLEUR ou un candidat reçoit 403, et l'essai part au journal. Contrôle

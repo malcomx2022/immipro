@@ -242,7 +242,7 @@ describe("l'écran ne dit plus rien que le serveur n'ait répondu", () => {
   it("un veilleur voit pourquoi il ne peut pas publier", () => {
     expect(ecran).toMatch(/!habiliteAPublier[\s\S]{0,140}RG-14\.2/u);
     expect(lire("src/app/(admin)/regles/[id]/page.tsx")).toContain(
-      // S.208 : la hiérarchie, pour qu'un super-administrateur publie aussi.
+      // S.210 : la hiérarchie, pour qu'un super-administrateur publie aussi.
       'peutPublier={couvre(acteur.role, "ADMIN")}',
     );
   });

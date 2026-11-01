@@ -31,7 +31,7 @@ export const POST = route({
     motDePasse: z.string().min(1, "Saisis ton mot de passe pour confirmer."),
   }),
   async traiter({ corps, acteur }) {
-    // S.208 : un compte interne ne se supprime pas lui-même (RG-10.4).
+    // S.210 : un compte interne ne se supprime pas lui-même (RG-10.4).
     if (estInterne(acteur!.role as RoleDeCompte)) {
       throw echec("etat_incompatible", { corps: SUPPRESSION_INTERNE_REFUSEE });
     }

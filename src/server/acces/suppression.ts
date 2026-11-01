@@ -154,7 +154,7 @@ export async function acheverLaSuppression(
         passwordHash: null,
         firstName: null,
         lastName: null,
-        // S.208 : le nom affiché et la date de naissance partent aussi.
+        // S.210 : le nom affiché et la date de naissance partent aussi.
         displayName: null,
         birthDate: null,
         phone: null,

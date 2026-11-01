@@ -20,7 +20,7 @@ import {
 } from "@/domain/comptes/connexion";
 
 /**
- * « Mon compte » — S.208. Bornes exactes de chaque champ, à un près de
+ * « Mon compte » — S.210. Bornes exactes de chaque champ, à un près de
  * chaque côté, telles que le domaine les décide pour l'écran et le serveur.
  */
 const AUJOURDHUI = "2026-10-31";
@@ -159,7 +159,7 @@ describe("pays, langue et fuseau : des listes bornées", () => {
 });
 
 /**
- * Le verrouillage de compte n'est pas touché par S.208 : ce test fige son
+ * Le verrouillage de compte n'est pas touché par S.210 : ce test fige son
  * comportement réel. Le compte se bloque **au cinquième** échec
  * (`ESSAIS_AVANT_BLOCAGE` = 5) : après quatre échecs il reste un essai, le
  * cinquième bloque, le sixième est refusé pendant le blocage.

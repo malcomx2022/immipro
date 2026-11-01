@@ -11,7 +11,7 @@ import { peutCreerUnCompteInterne, type RoleDeCompte } from "@/domain/comptes/hi
 import type { Acteur } from "@/server/securite/session";
 
 /**
- * Gestion des comptes depuis B-03 — S.208.
+ * Gestion des comptes depuis B-03 — S.210.
  *
  * La décision est au domaine (`gestion-interne`), l'écriture ici : le
  * geste, la fermeture des sessions et la ligne de journal tiennent ou
@@ -79,7 +79,7 @@ export async function creerUnCompteInterne(
 }
 
 /**
- * Suspend ou rétablit un compte — WF-15, resserré en S.208.
+ * Suspend ou rétablit un compte — WF-15, resserré en S.210.
  *
  * Un candidat se suspend depuis le rôle administrateur, comme avant. Un
  * compte interne, depuis le rôle super-administrateur seulement, et le

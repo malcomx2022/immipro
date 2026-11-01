@@ -46,7 +46,7 @@ export async function exigerRole(roles: readonly Role[], suite?: string): Promis
 }
 
 /*
-  Les rôles admis se lisent dans la hiérarchie (S.208) : un
+  Les rôles admis se lisent dans la hiérarchie (S.210) : un
   super-administrateur passe partout où passe un administrateur.
 */
 export const exigerVeilleur = (suite?: string) => exigerRole(rolesAuMoins("VEILLEUR"), suite);

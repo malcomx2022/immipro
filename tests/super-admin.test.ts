@@ -20,7 +20,7 @@ import {
 import { actionsPour, suspensionReservee, type Compte } from "@/domain/backoffice/comptes";
 
 /**
- * Rôle SUPER_ADMIN — S.208. Domaine pur : hiérarchie, changement de rôle,
+ * Rôle SUPER_ADMIN — S.210. Domaine pur : hiérarchie, changement de rôle,
  * seuil des deux super-administrateurs, création interne, suspension.
  */
 

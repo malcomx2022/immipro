@@ -38,7 +38,7 @@ export interface Compte {
   analysesTotal: number;
   statut: StatutCompte;
   /**
-   * Le rôle du compte — S.208. Facultatif pour les lectures antérieures :
+   * Le rôle du compte — S.210. Facultatif pour les lectures antérieures :
    * absent, le compte se lit comme un candidat.
    */
   role?: RoleDeCompte;
@@ -244,7 +244,7 @@ export function messageDeRelance(bilan: BilanRelanceSuppression): {
 }
 
 /**
- * Les actions offertes sur ce compte, à cet acteur — S.208.
+ * Les actions offertes sur ce compte, à cet acteur — S.210.
  *
  * Sans acteur, la liste par statut (WF-15). Avec lui, la suspension et le
  * rétablissement disparaissent là où le serveur les refuserait : sur son

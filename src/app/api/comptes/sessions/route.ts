@@ -7,7 +7,7 @@ import {
 } from "@/server/securite/session";
 
 /**
- * Fermer toutes mes sessions — « Sécurité » (/compte/securite), S.208.
+ * Fermer toutes mes sessions — « Sécurité » (/compte/securite), S.210.
  *
  * Le geste d'une personne qui a oublié sa session sur un poste partagé :
  * toutes ses sessions se ferment, celle-ci comprise, et le cookie du

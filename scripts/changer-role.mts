@@ -10,7 +10,7 @@
  *
  * En local : `npm run compte:role -- --email … --role … --par … --motif …`.
  *
- * Le premier super-administrateur (S.208) se nomme ici, et seulement ici :
+ * Le premier super-administrateur (S.210) se nomme ici, et seulement ici :
  * aucun écran ne donne ce rôle tant qu'aucun super-administrateur n'existe.
  * La personne doit s'être inscrite et avoir vérifié son adresse :
  *

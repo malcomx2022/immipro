@@ -651,7 +651,7 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "compte.verification": "COMPTE",
   "compte.relance": "COMPTE",
   "compte.export": "COMPTE",
-  // S.208 — les gestes du super-administrateur, et ses refus.
+  // S.210 — les gestes du super-administrateur, et ses refus.
   "compte.role": "COMPTE",
   "compte.creation.interne": "COMPTE",
   "acces.refuse": "COMPTE",

@@ -13,7 +13,7 @@ import { MOTIF_MIN } from "@/domain/comptes/role";
 import { cn } from "@/lib/utils";
 
 /**
- * Changer le rôle d'un compte — B-03, S.208. Réservé au super-administrateur.
+ * Changer le rôle d'un compte — B-03, S.210. Réservé au super-administrateur.
  *
  * Double confirmation : « Changer le rôle », puis l'adresse du compte
  * ressaisie avant « Confirmer ». La route revérifie l'adresse ; l'écran

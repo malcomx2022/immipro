@@ -11,7 +11,7 @@ import type { EtatDeSecurite } from "@/server/acces/profil";
 import { momentEnFrancais } from "@/domain/format/moment";
 
 /**
- * « Sécurité » — S.208.
+ * « Sécurité » — S.210.
  *
  * Trois sections, et une absence dite comme telle :
  *

@@ -10,7 +10,7 @@ import { MENTION_AUDIT } from "@/domain/backoffice/navigation";
 import { momentEnFrancais } from "@/domain/format/moment";
 
 /**
- * Mon compte interne — S.208.
+ * Mon compte interne — S.210.
  *
  * `/mon-compte` et non `/compte` : le groupe `(admin)` partage l'espace
  * d'adresses de l'espace candidat, où `/compte` est déjà « Mon compte ».

@@ -41,7 +41,7 @@ export type Acces =
   | "super_admin";
 
 /**
- * Rôles acceptés par niveau d'accès, lus dans la hiérarchie (S.208) :
+ * Rôles acceptés par niveau d'accès, lus dans la hiérarchie (S.210) :
  * SUPER_ADMIN ⊃ ADMIN ⊃ VEILLEUR. Un super-administrateur passe partout.
  */
 const ROLES_ADMIS: Record<Exclude<Acces, "public">, readonly Role[]> = {
@@ -241,7 +241,7 @@ export function route<C = undefined, Q = undefined>(
 }
 
 /**
- * Un appel aux gestes du sommet par un compte qui ne l'est pas — S.208.
+ * Un appel aux gestes du sommet par un compte qui ne l'est pas — S.210.
  *
  * Il part au journal : un veilleur ou un candidat qui frappe la route
  * qui change les rôles n'a rien à y faire, et c'est le genre d'essai

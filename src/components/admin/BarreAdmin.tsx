@@ -63,7 +63,7 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
             </li>
           ))}
         </ul>
-        {/* La carte de l'opérateur mène à son compte interne (S.208). */}
+        {/* La carte de l'opérateur mène à son compte interne (S.210). */}
         <Link
           href="/mon-compte"
           aria-label={`Mon compte : ${nom}, ${role}`}

@@ -1154,3 +1154,13 @@ restauration.
 4. Activer le cron de 2 h UTC, constater le ping, puis faire la première
    restauration de contrôle hors du VPS, avec l'accord du responsable.
 5. Décider du sort de `restic` : le garder en copie locale, ou l'arrêter.
+
+## 28. S.208 — revue fonctionnelle et cartographie du restant — 31/10/2026
+
+Demande du responsable : revue fonctionnelle, cartographie du restant et
+chemin vers la fin. Base : `46c8b76` (#333, S.207, fusionnée). Lot
+documentaire, rien d'autre touché. La cartographie au 31/10, les constats
+F-1 à F-5 et l'ordre proposé en cinq étapes vivent dans
+[la revue du 31/10](revue-fonctionnelle-2026-10-31.md) ; elle remplace le
+§ 6 ci-dessus pour l'état du restant. Les tables du § 5 gardent leur état
+du 22/10.

@@ -529,7 +529,7 @@ test("inscription : téléphone normalisé, code capturé, vérification par Ent
 });
 
 /**
- * « Mon compte » (S.208) : nom affiché et date de naissance enregistrés à
+ * « Mon compte » (S.210) : nom affiché et date de naissance enregistrés à
  * l'écran, relus en base, puis à la réouverture de l'écran. Un nom affiché
  * d'un caractère est refusé sous le champ, sans requête. L'adresse reste
  * en lecture seule. Prénom, nom, téléphone et fuseau ne sont pas touchés :

@@ -1,4 +1,4 @@
-# S.208 — rôle SUPER_ADMIN et profils utilisateur — 31/10/2026
+# S.210 — rôle SUPER_ADMIN et profils utilisateur — 31/10/2026
 
 Lot demandé par le responsable. Base `46c8b76` (#333 fusionnée). Proposition
 sur `claude/upbeat-babbage-i68zmf` : rien n'est fusionné ni déployé par ce

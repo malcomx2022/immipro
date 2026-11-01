@@ -3,7 +3,7 @@ import { route } from "@/server/http/route";
 import { creerUnCompteInterne } from "@/server/comptes/gestion";
 
 /**
- * Création d'un compte interne — B-03, S.208.
+ * Création d'un compte interne — B-03, S.210.
  *
  * Réservée au super-administrateur (`acces: "super_admin"`) : le
  * composeur refuse tout autre rôle avec 403 et journalise l'essai. Comme

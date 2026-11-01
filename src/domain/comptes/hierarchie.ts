@@ -1,5 +1,5 @@
 /**
- * Hiérarchie des rôles — S.208, 31/10/2026.
+ * Hiérarchie des rôles — S.210, 31/10/2026.
  *
  *     SUPER_ADMIN ⊃ ADMIN ⊃ VEILLEUR ;   CANDIDAT à part.
  *

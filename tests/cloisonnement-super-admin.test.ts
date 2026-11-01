@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Cloisonnement du rôle SUPER_ADMIN — S.208.
+ * Cloisonnement du rôle SUPER_ADMIN — S.210.
  *
  * Le composeur réel (`route()`), avec la session et le journal remplacés :
  * un VEILLEUR, un CANDIDAT ou un ADMIN qui appelle un geste du sommet

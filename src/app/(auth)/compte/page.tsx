@@ -5,7 +5,7 @@ import { identiteDuCompte } from "@/server/acces/profil";
 import { estInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 
 /**
- * « Mon compte » — identité du compte, S.208.
+ * « Mon compte » — identité du compte, S.210.
  *
  * Rendu à la demande et derrière la garde : l'identité se relit en base à
  * chaque ouverture, et C-02 (`/profil`) écrit aussi le prénom, le nom et le

@@ -23,7 +23,7 @@ import {
 } from "@/domain/comptes/profil";
 
 /**
- * « Mon compte » — S.208.
+ * « Mon compte » — S.210.
  *
  * Un formulaire (Entrée envoie), validé à l'écran par la même fonction que
  * le serveur rejoue : un refus est dit sous le champ avant l'envoi, avec

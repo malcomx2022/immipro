@@ -10,7 +10,7 @@ import {
 import { rolesAuMoins } from "@/domain/comptes/hierarchie";
 
 /**
- * Le changement de rôle et sa ligne de journal, ensemble — S.115, S.208.
+ * Le changement de rôle et sa ligne de journal, ensemble — S.115, S.210.
  *
  * Les deux s'écrivent dans **une** transaction : un rôle changé sans trace
  * est précisément ce que ce module remplace, et une trace sans changement
@@ -22,7 +22,7 @@ import { rolesAuMoins } from "@/domain/comptes/hierarchie";
  *
  * - la **console du serveur** (`changer-role`), qui garde son autorité :
  *   c'est elle qui nomme le premier super-administrateur ;
- * - un **compte super-administrateur**, depuis B-03 (S.208). Le domaine
+ * - un **compte super-administrateur**, depuis B-03 (S.210). Le domaine
  *   refuse tout autre rôle et l'auto-promotion.
  *
  * **Les sessions du compte changé sont fermées dans la transaction.** La

@@ -159,7 +159,7 @@ export function normaliserTelephone(valeur: string): string {
 export const TELEPHONE_INTERNATIONAL = /^\+[1-9]\d{7,14}$/u;
 
 /* ------------------------------------------------------------------ *
- * L'identité du compte — S.208, écran « Mon compte » (/compte).
+ * L'identité du compte — S.210, écran « Mon compte » (/compte).
  * ------------------------------------------------------------------ */
 
 /**

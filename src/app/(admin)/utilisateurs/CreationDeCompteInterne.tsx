@@ -16,7 +16,7 @@ import { LIBELLE_ROLE } from "@/domain/comptes/hierarchie";
 import { cn } from "@/lib/utils";
 
 /**
- * Créer un compte interne — B-03, S.208. Réservé au super-administrateur.
+ * Créer un compte interne — B-03, S.210. Réservé au super-administrateur.
  *
  * Un `<form>` dont les refus sont ceux de la route, dits sous le champ
  * avant l'envoi (`lireLaCreation`). Le compte naît sans mot de passe : la

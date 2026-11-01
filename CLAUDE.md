@@ -77,18 +77,7 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
-### S.209 — D-35, exception d'audit `decode-uri-component` — 31/10/2026
-
-Lot dédié demandé par le responsable. Base `46c8b76` (#333 fusionnée).
-L'avis GHSA-qr28-fpjm-wq7f (élevée), porté par `minio` 8.0.7 ›
-`query-string` 7.1.3, faisait échouer `check:audit` sur toute branche.
-Mise à jour impossible : la 0.5.1 est ESM seule, `query-string` 7 la
-charge par `require()`. `minio` n'appelle que `stringify` : le décodage
-vulnérable n'est pas atteint. Exception motivée et datée ; à retirer à
-la prochaine version de `minio`. Ne pas forcer la 0.5.1 par `overrides`.
-Lire le registre, entrée S.209.
-
-### S.208 — rôle SUPER_ADMIN et profils utilisateur — 31/10/2026
+### S.210 — rôle SUPER_ADMIN et profils utilisateur — 31/10/2026
 
 Lot demandé par le responsable. Base `46c8b76` (#333 fusionnée).
 `SUPER_ADMIN ⊃ ADMIN ⊃ VEILLEUR` vit dans `domain/comptes/hierarchie` ; le
@@ -105,7 +94,35 @@ nomme par la console (`changer-role --role SUPER_ADMIN`). Profils :
 additifs, purgés à l'anonymisation. Mineur : propositions de partenaires
 retirées et refusées. Décisions du 31/10 : blocage au 5e échec conservé,
 liste `PAYS_DE_RESIDENCE` validée par le responsable. Lire
-[le lot](docs/revue/lot-s208-super-admin-profils-2026-10-31.md).
+[le lot](docs/revue/lot-s210-super-admin-profils-2026-10-31.md).
+
+### S.209 — D-35, exception d'audit `decode-uri-component` — 31/10/2026
+
+Lot dédié demandé par le responsable. Base `46c8b76` (#333 fusionnée).
+L'avis GHSA-qr28-fpjm-wq7f (élevée), porté par `minio` 8.0.7 ›
+`query-string` 7.1.3, faisait échouer `check:audit` sur toute branche.
+Mise à jour impossible : la 0.5.1 est ESM seule, `query-string` 7 la
+charge par `require()`. `minio` n'appelle que `stringify` : le décodage
+vulnérable n'est pas atteint. Exception motivée et datée ; à retirer à
+la prochaine version de `minio`. Ne pas forcer la 0.5.1 par `overrides`.
+Lire le registre, entrée S.209.
+
+### S.208 — revue fonctionnelle, restant et chemin vers la fin — 31/10/2026
+
+Lot documentaire demandé par le responsable. Base `46c8b76` (#333
+fusionnée). « Fini » = deux jalons : J1 ouverture publique (Q.A levé ;
+restent L5, sauvegardes R2 et restauration, C-13, L6, R-P du VPS) et J2
+encaissement (M.C, L8). Huit modules sur seize éprouvés ; aucun reste
+n'attend du code sans préalable. Constats : F-1 région IA de production
+`europe-west1` contre un modèle servi sur `eu` seulement, à relever
+d'abord ; F-2 sauvegardes `restic` locales contre le texte publié et
+INV-5 ; F-3 sortie IA peut-être sous-mesurée, B-07 compris ; F-4
+facturation partagée production / L5 ; F-5 C-13 et certificat dans la
+même fenêtre. Ordre : sécuriser l'existant, clore L5, NL 2027 avant le
+15/12, recette humaine et runbook, puis M.C. Deux lots de code
+seulement, conditionnels. Lire
+[la revue du 31/10](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 
 ### S.207 — D-26 révisé : sauvegardes sur Cloudflare R2 — 29/10/2026
 

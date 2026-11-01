@@ -25,7 +25,7 @@ import {
 } from "./hierarchie";
 
 /*
-  La liste des rôles vit dans `hierarchie` depuis S.208 (SUPER_ADMIN) :
+  La liste des rôles vit dans `hierarchie` depuis S.210 (SUPER_ADMIN) :
   elle est réexportée ici pour la ligne de commande et ses tests.
 */
 export { ROLES, type RoleDeCompte };
@@ -104,7 +104,7 @@ export type Verdict =
 const eleve = (role: RoleDeCompte) => role !== "CANDIDAT";
 
 /**
- * Ce que le changement sait de son contexte — S.208.
+ * Ce que le changement sait de son contexte — S.210.
  *
  * `superAdminsActifs` : les super-administrateurs ni suspendus ni
  * supprimés, cible comprise. Absent, il vaut zéro : un appelant qui ne

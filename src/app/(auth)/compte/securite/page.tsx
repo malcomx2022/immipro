@@ -5,7 +5,7 @@ import { etatDeSecurite } from "@/server/acces/profil";
 import { estInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 
 /**
- * « Sécurité » — S.208. Partagé par les candidats et les comptes
+ * « Sécurité » — S.210. Partagé par les candidats et les comptes
  * internes : le mot de passe, les sessions ouvertes, et ce qui n'existe
  * pas encore (la double authentification), dit comme tel.
  */

@@ -3,7 +3,7 @@ import { route } from "@/server/http/route";
 import { enregistrerLIdentite, identiteDuCompte } from "@/server/acces/profil";
 
 /**
- * Identité du compte — « Mon compte » (/compte), S.208.
+ * Identité du compte — « Mon compte » (/compte), S.210.
  *
  * Tout compte y a accès, interne compris (`acces: "candidat"` admet tous
  * les rôles). La lecture ne rend que l'identité : ni empreinte, ni jeton,

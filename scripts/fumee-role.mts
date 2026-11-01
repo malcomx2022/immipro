@@ -74,7 +74,7 @@ try {
   const sansMotif = lancer("--email", awa, "--role", "ADMIN", "--par", "Fumée");
   verifier(sansMotif.code === 2 && /--motif/u.test(sansMotif.sortie), "sans motif, elle refuse et dit quoi corriger");
 
-  // S.208 : le changement ferme les sessions du compte — deux ouvertes avant.
+  // S.210 : le changement ferme les sessions du compte — deux ouvertes avant.
   const avant = await db.user.findUniqueOrThrow({ where: { email: awa } });
   for (const n of [1, 2]) {
     await db.session.create({
@@ -112,7 +112,7 @@ try {
   );
   verifier((await db.auditLog.count({ where: { action: "compte.role" } })) === 1, "aucun refus n'écrit au journal");
 
-  console.log("\nLe premier super-administrateur (S.208)");
+  console.log("\nLe premier super-administrateur (S.210)");
   const sommet = lancer("--email", awa, "--role", "SUPER_ADMIN", "--par", "Opérateur de fumée", "--motif", MOTIF);
   verifier(
     sommet.code === 0 && (await db.user.findUniqueOrThrow({ where: { email: awa } })).role === "SUPER_ADMIN",
