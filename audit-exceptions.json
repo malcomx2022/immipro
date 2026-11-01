@@ -6,5 +6,13 @@
     "Une entrée dont l'avis n'est plus signalé fait échouer l'audit : on la retire avec la dépendance.",
     "Au-delà de cinq entrées, ce n'est plus une exception, c'est une dette : la porte refuse."
   ],
-  "exceptions": []
+  "exceptions": [
+    {
+      "avis": "GHSA-qr28-fpjm-wq7f",
+      "paquet": "decode-uri-component",
+      "chemin": "minio › query-string › decode-uri-component",
+      "motif": "D-35, risque accepté par le responsable le 31/10/2026. Déni de service par remplacement quadratique de séquences encodées en pourcentage, dans la fonction de décodage. minio 8.0.7, dernière version publiée, n'appelle de query-string que stringify (étiquettes X-Amz-Tagging) : le décodage n'est jamais atteint, et ni src/ ni scripts/ n'importent ces paquets. La seule version corrigée, 0.5.1, n'existe qu'en module ESM à export par défaut : query-string 7 la charge par require() et la recevrait comme objet, donc une surcharge casserait minio. À retirer à la prochaine version de minio, ou quand query-string accepte une version corrigée.",
+      "date": "2026-10-31"
+    }
+  ]
 }
