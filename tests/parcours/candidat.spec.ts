@@ -529,6 +529,57 @@ test("inscription : téléphone normalisé, code capturé, vérification par Ent
 });
 
 /**
+ * « Mon compte » (S.210) : nom affiché et date de naissance enregistrés à
+ * l'écran, relus en base, puis à la réouverture de l'écran. Un nom affiché
+ * d'un caractère est refusé sous le champ, sans requête. L'adresse reste
+ * en lecture seule. Prénom, nom, téléphone et fuseau ne sont pas touchés :
+ * les parcours suivants les relisent.
+ */
+test("Mon compte : refus avant l'envoi, enregistrement, relecture en base et à l'écran", async () => {
+  await aller("/compte");
+  await attendreLHydratation(page, "form");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mon compte");
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
+
+  const requetes: string[] = [];
+  const noter = (r: { url: () => string; method: () => string }) => {
+    if (r.url().endsWith("/api/comptes/identite") && r.method() === "PUT") requetes.push(r.url());
+  };
+  page.on("request", noter);
+  await page.getByLabel("Nom affiché", { exact: true }).fill("R");
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await expect(page.getByText(/Le nom affiché tient entre 2 et 80 caractères/u)).toBeVisible();
+  expect(requetes).toHaveLength(0);
+
+  await page.getByLabel("Nom affiché", { exact: true }).fill("Recette S208");
+  await page.getByLabel("Date de naissance", { exact: true }).fill("1995-04-12");
+  const [reponse] = await Promise.all([
+    page.waitForResponse((r) => r.url().endsWith("/api/comptes/identite") && r.request().method() === "PUT"),
+    page.getByRole("button", { name: "Enregistrer", exact: true }).click(),
+  ]);
+  page.off("request", noter);
+  expect(reponse.status()).toBe(200);
+  await expect(page.getByRole("status")).toHaveText("Compte enregistré.");
+
+  const [enBase] = await lire<{ displayName: string | null; naissance: string | null; phone: string | null }>(
+    `SELECT "displayName", to_char("birthDate", 'YYYY-MM-DD') AS naissance, phone FROM "User" WHERE id=$1`,
+    [compte],
+  );
+  expect(enBase).toEqual({ displayName: "Recette S208", naissance: "1995-04-12", phone: "+2290197000042" });
+
+  await aller("/compte");
+  await attendreLHydratation(page, "form");
+  await expect(page.getByLabel("Nom affiché", { exact: true })).toHaveValue("Recette S208");
+  await expect(page.getByLabel("Date de naissance", { exact: true })).toHaveValue("1995-04-12");
+  await relever();
+  await aller("/tableau-de-bord");
+  preuves.push({
+    controle: "Mon compte : refus sans requête, enregistrement, relecture en base et à la réouverture",
+    conforme: true,
+  });
+});
+
+/**
  * WF-03, C-03 (S.194) : le comparateur montre exactement les règles qu'un
  * candidat peut lire, et les valeurs du référentiel. Les règles attendues
  * sont relues en base, en lecture seule, sous les conditions de la

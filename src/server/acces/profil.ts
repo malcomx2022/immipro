@@ -1,5 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { FUSEAUX_PROPOSES } from "@/domain/dossiers/preferences-rappels";
+import {
+  CONSENTEMENTS_REFUSES_AU_MINEUR,
+  estMineur,
+  validerIdentite,
+  type SaisieDIdentite,
+} from "@/domain/comptes/profil";
+import { jourCivil } from "@/domain/format/fuseau";
+import { GENRE_DU_CONSENTEMENT, VERSION_TEXTES } from "@/server/acces/consentements";
+import { echec } from "@/server/http/echecs";
 
 /**
  * Enregistrement du profil — C-02, WF-02 étapes 3 et 4.
@@ -145,4 +155,171 @@ export async function enregistrerLeProfil(userId: string, corps: CorpsDuProfil):
     create: { userId, ...profil },
     update: profil,
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * L'identité du compte — « Mon compte » (/compte), S.210.
+ * ------------------------------------------------------------------ */
+
+
+export interface IdentiteDuCompte {
+  email: string;
+  emailVerifie: boolean;
+  prenom: string;
+  nom: string;
+  nomAffiche: string;
+  telephone: string;
+  dateNaissance: string;
+  pays: string;
+  langue: string;
+  fuseau: string;
+}
+
+/** `AAAA-MM-JJ` d'une colonne `@db.Date`, lue à minuit UTC. */
+const versJourCivil = (d: Date | null): string => (d ? d.toISOString().slice(0, 10) : "");
+
+/** Ce que l'écran affiche. Ni empreinte, ni jeton, ni compteur d'échecs. */
+export async function identiteDuCompte(userId: string): Promise<IdentiteDuCompte> {
+  const u = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      emailVerified: true,
+      firstName: true,
+      lastName: true,
+      displayName: true,
+      phone: true,
+      birthDate: true,
+      countryCode: true,
+      locale: true,
+      reminderTimeZone: true,
+    },
+  });
+  if (!u) throw echec("authentification_requise");
+  return {
+    email: u.email,
+    emailVerifie: u.emailVerified !== null,
+    prenom: u.firstName ?? "",
+    nom: u.lastName ?? "",
+    nomAffiche: u.displayName ?? "",
+    telephone: u.phone ?? "",
+    dateNaissance: versJourCivil(u.birthDate),
+    pays: u.countryCode ?? "",
+    langue: u.locale,
+    fuseau: u.reminderTimeZone,
+  };
+}
+
+/**
+ * Enregistre l'identité du compte.
+ *
+ * La validation est celle du domaine (`validerIdentite`), rejouée ici
+ * avant toute écriture. Le fuseau est celui des rappels : un fuseau par
+ * compte. L'adresse électronique n'est jamais écrite par ce chemin.
+ *
+ * **Mineur.** Une date de naissance qui dit moins de dix-huit ans retire,
+ * dans la même transaction, les autorisations qu'un mineur ne peut pas
+ * accorder (propositions de partenaires). Le retrait suit la règle des
+ * consentements : la ligne précédente est datée comme retirée, une ligne
+ * de refus est écrite — la preuve n'est jamais réécrite.
+ *
+ * Aucune facture n'est touchée : chacune garde l'identité figée à son
+ * émission.
+ */
+export async function enregistrerLIdentite(
+  userId: string,
+  saisie: SaisieDIdentite,
+  maintenant = new Date(),
+): Promise<{ enregistre: true; autorisationsRetirees: number }> {
+  const lue = validerIdentite(
+    saisie,
+    jourCivil(maintenant),
+    FUSEAUX_PROPOSES.map((f) => f.id),
+  );
+  if (!lue.ok) throw echec("champs_invalides", { champs: lue.champs });
+  const i = lue.identite;
+
+  return db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        firstName: i.prenom,
+        lastName: i.nom,
+        displayName: i.nomAffiche,
+        phone: i.telephone,
+        birthDate: i.dateNaissance ? new Date(`${i.dateNaissance}T00:00:00.000Z`) : null,
+        countryCode: i.pays,
+        locale: i.langue,
+        reminderTimeZone: i.fuseau,
+      },
+    });
+    let autorisationsRetirees = 0;
+    if (i.mineur) {
+      for (const code of CONSENTEMENTS_REFUSES_AU_MINEUR) {
+        const kind = GENRE_DU_CONSENTEMENT[code];
+        const { count } = await tx.consent.updateMany({
+          where: { userId, kind, revokedAt: null, granted: true },
+          data: { revokedAt: maintenant },
+        });
+        if (count > 0) {
+          await tx.consent.create({
+            data: { userId, kind, granted: false, version: VERSION_TEXTES, grantedAt: maintenant },
+          });
+          autorisationsRetirees += count;
+        }
+      }
+    }
+    return { enregistre: true as const, autorisationsRetirees };
+  });
+}
+
+/**
+ * Refuse d'accorder une autorisation qu'un mineur ne peut pas donner.
+ * Le refus, lui, passe toujours : retirer est un droit, à tout âge.
+ */
+export async function exigerAutorisationPermise(
+  userId: string,
+  code: string,
+  accorde: boolean,
+  maintenant = new Date(),
+): Promise<void> {
+  if (!accorde || !(CONSENTEMENTS_REFUSES_AU_MINEUR as readonly string[]).includes(code)) return;
+  const u = await db.user.findUnique({ where: { id: userId }, select: { birthDate: true } });
+  if (estMineur(versJourCivil(u?.birthDate ?? null) || null, jourCivil(maintenant))) {
+    throw echec("etat_incompatible", {
+      corps:
+        "Ta date de naissance indique que tu as moins de dix-huit ans : les propositions de partenaires ne peuvent pas être activées. Si la date est fausse, corrige-la dans Mon compte.",
+    });
+  }
+}
+
+/**
+ * Ce que « Sécurité » (/compte/securite) affiche — S.210 : les sessions
+ * ouvertes et la plus récente. Ni jeton, ni empreinte, ni agent complet :
+ * la date d'ouverture, la dernière activité et le début de l'agent.
+ */
+export interface EtatDeSecurite {
+  sessions: number;
+  plusRecente: { ouverteLe: string; vueLe: string; appareil: string | null } | null;
+}
+
+export async function etatDeSecurite(userId: string): Promise<EtatDeSecurite> {
+  const [sessions, plusRecente] = await Promise.all([
+    db.session.count({ where: { userId, expiresAt: { gt: new Date() } } }),
+    db.session.findFirst({
+      where: { userId, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, lastSeenAt: true, userAgent: true },
+    }),
+  ]);
+  return {
+    sessions,
+    plusRecente: plusRecente
+      ? {
+          ouverteLe: plusRecente.createdAt.toISOString(),
+          vueLe: plusRecente.lastSeenAt.toISOString(),
+          appareil: plusRecente.userAgent ? plusRecente.userAgent.slice(0, 60) : null,
+        }
+      : null,
+  };
 }

@@ -8,6 +8,9 @@ import { CHAMP_CONTROLE } from "@/components/ui/champ";
 import { EnteteAdmin } from "@/components/admin/EnteteAdmin";
 import { appeler } from "@/lib/api";
 import { CorrectionDuDepot } from "./CorrectionDuDepot";
+import { CreationDeCompteInterne } from "./CreationDeCompteInterne";
+import { GestionDuRole } from "./GestionDuRole";
+import { LIBELLE_ROLE, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { Filtres } from "@/components/admin/Filtres";
 import { ListeSelectionnable } from "@/components/admin/ListeSelectionnable";
@@ -23,6 +26,7 @@ import {
   filtrerComptes,
   obstacleALActionCompte,
   resumeComptes,
+  suspensionReservee,
   type ActionCompte,
   type BilanRelanceSuppression,
   type Compte,
@@ -63,7 +67,19 @@ import { cn } from "@/lib/utils";
  * d'export n'existe dans le dépôt, et un bouton qui promet un fichier
  * qu'aucune ligne ne produit vaut moins qu'une absence.
  */
-export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
+export function Utilisateurs({
+  comptes,
+  acteur,
+}: {
+  comptes: readonly Compte[];
+  /**
+   * L'opérateur connecté — S.210. Il décide des gestes offerts : rôle et
+   * création pour le super-administrateur, suspension d'un compte interne
+   * réservée à lui. Absent, l'écran se lit comme celui d'un administrateur.
+   */
+  acteur?: { id: string; role: RoleDeCompte };
+}) {
+  const superAdmin = acteur?.role === "SUPER_ADMIN";
   const router = useRouter();
   const [filtre, setFiltre] = useState<FiltreCompte>("TOUS");
   const [recherche, setRecherche] = useState("");
@@ -130,6 +146,11 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
       />
 
       <div className="flex flex-col gap-4 p-6">
+        {superAdmin ? (
+          <div className="flex flex-col items-start">
+            <CreationDeCompteInterne />
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Filtres
             libelle="Filtrer les comptes"
@@ -202,6 +223,7 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                 <p className="text-16 font-semibold text-ink-900">{retenu.nom}</p>
                 <p className="text-13 text-ink-500">{retenu.email}</p>
                 <dl className="flex flex-col pt-1">
+                  <Ligne intitule="Rôle" valeur={LIBELLE_ROLE[retenu.role ?? "CANDIDAT"]} />
                   <Ligne intitule="Inscrit le" valeur={jourEnFrancais(retenu.inscritLe)} />
                   <Ligne intitule="Dossiers" valeur={String(retenu.dossiers)} />
                   <Ligne intitule="Pack" valeur={retenu.pack} />
@@ -293,7 +315,13 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                   </p>
                 ) : null}
 
-                {actionsPour(retenu).map((action) => (
+                {acteur && suspensionReservee(retenu, acteur) ? (
+                  <p className="text-pretty text-13 text-ink-500">
+                    {suspensionReservee(retenu, acteur)}
+                  </p>
+                ) : null}
+
+                {actionsPour(retenu, acteur).map((action) => (
                   <div key={action.cle} className="flex flex-col gap-1.5">
                     <Button
                       variante="secondaire"
@@ -314,6 +342,13 @@ export function Utilisateurs({ comptes }: { comptes: readonly Compte[] }) {
                   </div>
                 ))}
               </section>
+
+              {superAdmin ? (
+                <GestionDuRole
+                  key={retenu.id}
+                  compte={{ id: retenu.id, email: retenu.email, role: retenu.role ?? "CANDIDAT" }}
+                />
+              ) : null}
 
               <p className="text-pretty text-13 text-ink-500">{MENTION_AUDIT}</p>
             </aside>

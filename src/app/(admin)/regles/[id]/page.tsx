@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { EditionRegle } from "./EditionRegle";
 import { editionDeLaRegle } from "@/server/lecture/backoffice";
 import { exigerVeilleur } from "@/server/securite/page";
+import { couvre } from "@/domain/comptes/hierarchie";
 
 /**
  * B-02 — Édition d'une règle versionnée. WF-14.
@@ -43,7 +44,7 @@ export default async function PageEditionRegle({
       // RG-14.2 : la route de publication est réservée à un administrateur.
       // L'écran lit le même rôle, pour le dire avant le clic plutôt que
       // de laisser un veilleur enregistrer puis buter sur un refus.
-      peutPublier={acteur.role === "ADMIN"}
+      peutPublier={couvre(acteur.role, "ADMIN")}
       // L'enregistrement écrit toujours un brouillon : celui qui existe, ou
       // celui qu'il ouvre. L'écran annonce lequel avant le clic, plutôt que
       // d'appeler « brouillon » la version que les dossiers ont figée.

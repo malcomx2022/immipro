@@ -124,6 +124,8 @@ export async function donneesDuCompte(userId: string): Promise<ExportCompte> {
       email: compte.email,
       prenom: compte.firstName,
       nom: compte.lastName,
+      nomAffiche: compte.displayName,
+      dateDeNaissance: compte.birthDate ? compte.birthDate.toISOString().slice(0, 10) : null,
       telephone: compte.phone,
       nomDeFacturation: compte.billingName,
       adresseDeFacturation: compte.billingAddress,

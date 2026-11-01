@@ -6,6 +6,8 @@ import { echec } from "@/server/http/echecs";
 import { correspond } from "@/server/securite/secret";
 import { COOKIE_SESSION, attributsSuppression } from "@/server/securite/session";
 import { demanderLaSuppression } from "@/server/acces/suppression";
+import { estInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
+import { SUPPRESSION_INTERNE_REFUSEE } from "@/domain/comptes/gestion-interne";
 
 /**
  * Suppression de compte — A-05, RG-10.4.
@@ -29,6 +31,10 @@ export const POST = route({
     motDePasse: z.string().min(1, "Saisis ton mot de passe pour confirmer."),
   }),
   async traiter({ corps, acteur }) {
+    // S.210 : un compte interne ne se supprime pas lui-même (RG-10.4).
+    if (estInterne(acteur!.role as RoleDeCompte)) {
+      throw echec("etat_incompatible", { corps: SUPPRESSION_INTERNE_REFUSEE });
+    }
     const compte = await db.user.findUnique({
       where: { id: acteur!.id },
       select: { passwordHash: true },

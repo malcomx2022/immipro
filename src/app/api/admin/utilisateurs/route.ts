@@ -6,6 +6,9 @@ import { echec } from "@/server/http/echecs";
 import { journaliser } from "@/server/acces/journal";
 import { fermerToutesLesSessions } from "@/server/securite/session";
 import { MOTIF_MINIMUM_COMPTE } from "@/domain/backoffice/comptes";
+import { verdictDeSuspension } from "@/domain/comptes/gestion-interne";
+import { estInterne, estRole, type RoleDeCompte } from "@/domain/comptes/hierarchie";
+import { suspendreOuRetablir } from "@/server/comptes/gestion";
 
 /**
  * Comptes — B-03, WF-15.
@@ -18,6 +21,16 @@ import { MOTIF_MINIMUM_COMPTE } from "@/domain/backoffice/comptes";
  * effet qu'à l'expiration du cookie — c'est-à-dire trente jours plus tard,
  * pendant lesquels la personne suspendue continuerait d'utiliser la
  * plateforme.
+ *
+ * ── Comptes internes — S.210 ────────────────────────────────────────
+ *
+ * Un candidat se suspend depuis le rôle administrateur, comme avant. Un
+ * compte interne (veilleur et au-dessus), depuis le rôle
+ * super-administrateur seulement : sinon un administrateur pourrait
+ * écarter celui qui gère les rôles. Ce cas passe par
+ * `suspendreOuRetablir`, en transaction sérialisable : deux
+ * super-administrateurs qui se suspendraient l'un l'autre au même instant
+ * ne laissent pas la plateforme sans sommet.
  */
 export const GET = route({
   nom: "admin.utilisateurs",
@@ -42,6 +55,18 @@ export const PUT = route({
   async traiter({ corps, acteur }) {
     const cible = await db.user.findUnique({ where: { id: corps.userId } });
     if (!cible) throw echec("introuvable");
+
+    const role: RoleDeCompte = typeof cible.role === "string" && estRole(cible.role) ? cible.role : "CANDIDAT";
+    if (estInterne(role)) return suspendreOuRetablir(acteur!, corps);
+
+    const verdict = verdictDeSuspension(
+      { id: acteur!.id, role: acteur!.role as RoleDeCompte },
+      { id: cible.id, role, suspendu: Boolean(cible.suspendedAt), supprime: Boolean(cible.deletedAt) },
+      corps.suspendre,
+      // Un candidat n'est jamais super-administrateur : la borne ne joue pas.
+      Number.POSITIVE_INFINITY,
+    );
+    if (!verdict.permis) throw echec("etat_incompatible", { corps: verdict.raison });
 
     await journaliser({
       acteurId: acteur!.id,

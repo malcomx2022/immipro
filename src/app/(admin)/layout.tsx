@@ -1,6 +1,7 @@
 import { BarreAdmin } from "@/components/admin/BarreAdmin";
 import { db } from "@/lib/db";
 import { exigerVeilleur, initiales } from "@/server/securite/page";
+import { LIBELLE_ROLE, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 
 /**
  * Gabarit back-office — section B (DOC-12 §3.7).
@@ -17,22 +18,21 @@ import { exigerVeilleur, initiales } from "@/server/securite/page";
  */
 export const dynamic = "force-dynamic";
 
-const LIBELLE_ROLE: Record<string, string> = {
-  VEILLEUR: "Analyste réglementaire",
-  ADMIN: "Administration",
-};
-
 export default async function GabaritAdmin({ children }: { children: React.ReactNode }) {
   const acteur = await exigerVeilleur();
   const compte = await db.user.findUnique({
     where: { id: acteur.id },
-    select: { firstName: true, lastName: true },
+    select: { firstName: true, lastName: true, displayName: true },
   });
 
   return (
     <BarreAdmin
-      nom={[compte?.firstName, compte?.lastName].filter(Boolean).join(" ") || acteur.email}
-      role={LIBELLE_ROLE[acteur.role] ?? acteur.role}
+      nom={
+        compte?.displayName ||
+        [compte?.firstName, compte?.lastName].filter(Boolean).join(" ") ||
+        acteur.email
+      }
+      role={LIBELLE_ROLE[acteur.role as RoleDeCompte] ?? acteur.role}
       initialesAffichees={initiales(acteur, compte?.firstName, compte?.lastName)}
     >
       {children}

@@ -9,6 +9,8 @@ import { origineAdmise } from "./origine";
 import { json, reponseEchec, type OptionsReponse, type Public } from "./reponse";
 import { adresseDeLAppelant, cleDAppel, consommer, type NomRegle } from "./limites";
 import { COOKIE_SESSION, lireSession, type Acteur } from "@/server/securite/session";
+import { journaliser } from "@/server/acces/journal";
+import { rolesAuMoins } from "@/domain/comptes/hierarchie";
 
 /**
  * Composition d'une route d'API.
@@ -30,14 +32,24 @@ import { COOKIE_SESSION, lireSession, type Acteur } from "@/server/securite/sess
  *   traitement où on l'oublie.
  */
 
-export type Acces = "public" | "candidat" | "candidat_verifie" | "veilleur" | "admin";
+export type Acces =
+  | "public"
+  | "candidat"
+  | "candidat_verifie"
+  | "veilleur"
+  | "admin"
+  | "super_admin";
 
-/** Rôles acceptés par niveau d'accès. Un administrateur passe partout. */
+/**
+ * Rôles acceptés par niveau d'accès, lus dans la hiérarchie (S.210) :
+ * SUPER_ADMIN ⊃ ADMIN ⊃ VEILLEUR. Un super-administrateur passe partout.
+ */
 const ROLES_ADMIS: Record<Exclude<Acces, "public">, readonly Role[]> = {
-  candidat: ["CANDIDAT", "VEILLEUR", "ADMIN"],
-  candidat_verifie: ["CANDIDAT", "VEILLEUR", "ADMIN"],
-  veilleur: ["VEILLEUR", "ADMIN"],
-  admin: ["ADMIN"],
+  candidat: rolesAuMoins("CANDIDAT"),
+  candidat_verifie: rolesAuMoins("CANDIDAT"),
+  veilleur: rolesAuMoins("VEILLEUR"),
+  admin: rolesAuMoins("ADMIN"),
+  super_admin: rolesAuMoins("SUPER_ADMIN"),
 };
 
 const PUBLIC_PAR_ACCES: Record<Acces, Public> = {
@@ -46,6 +58,7 @@ const PUBLIC_PAR_ACCES: Record<Acces, Public> = {
   candidat_verifie: "candidat",
   veilleur: "operateur",
   admin: "operateur",
+  super_admin: "operateur",
 };
 
 export interface Contexte<C, Q> {
@@ -169,6 +182,9 @@ export function route<C = undefined, Q = undefined>(
         acteur = await lireSession(magasin.get(COOKIE_SESSION)?.value);
         if (!acteur) throw echec("authentification_requise");
         if (!ROLES_ADMIS[definition.acces].includes(acteur.role)) {
+          if (definition.acces === "super_admin") {
+            await refusDuSommet(definition.nom, acteur);
+          }
           throw echec("droits_insuffisants");
         }
         destinataireEffectif = destinataire;
@@ -222,6 +238,35 @@ export function route<C = undefined, Q = undefined>(
       return versReponse(erreur, destinataireEffectif, definition.nom);
     }
   };
+}
+
+/**
+ * Un appel aux gestes du sommet par un compte qui ne l'est pas — S.210.
+ *
+ * Il part au journal : un veilleur ou un candidat qui frappe la route
+ * qui change les rôles n'a rien à y faire, et c'est le genre d'essai
+ * qu'on veut relire. Le débit est compté **avant** l'écriture : sans
+ * lui, n'importe quel compte connecté écrirait au journal autant de
+ * lignes qu'il enverrait de requêtes. Au-delà, la réponse reste un refus
+ * de droits, sans nouvelle ligne.
+ */
+async function refusDuSommet(nom: string, acteur: Acteur): Promise<void> {
+  const entetes = await headers();
+  const verdict = consommer(
+    cleDAppel(`${nom}.refus`, acteur.id, adresseDeLAppelant(entetes)),
+    "sensible",
+  );
+  if (!verdict.autorise) return;
+  await journaliser({
+    acteurId: acteur.id,
+    action: "acces.refuse",
+    cible: `route:${nom}`,
+    motif: `Rôle ${acteur.role} insuffisant : geste réservé au super-administrateur.`,
+    details: { role: acteur.role, route: nom },
+  }).catch((erreur: unknown) => {
+    // Le refus tient même si le journal ne répond pas : il est la réponse.
+    console.warn(`[route:${nom}] refus non journalisé`, erreur);
+  });
 }
 
 function lireRequete<C, Q>(definition: Definition<C, Q>, requete: Request): Q {

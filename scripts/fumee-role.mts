@@ -62,6 +62,8 @@ const lancer = (...args: string[]) => {
   return { code: r.status, sortie: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 };
 const MOTIF = "Responsable de la revue manuelle désigné par la direction";
+const trie = (valeur: unknown): string =>
+  JSON.stringify(Object.entries((valeur ?? {}) as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)));
 
 try {
   await db.user.create({ data: { email: `awa-${process.pid}@exemple.test`, emailVerified: new Date() } });
@@ -72,6 +74,13 @@ try {
   const sansMotif = lancer("--email", awa, "--role", "ADMIN", "--par", "Fumée");
   verifier(sansMotif.code === 2 && /--motif/u.test(sansMotif.sortie), "sans motif, elle refuse et dit quoi corriger");
 
+  // S.210 : le changement ferme les sessions du compte — deux ouvertes avant.
+  const avant = await db.user.findUniqueOrThrow({ where: { email: awa } });
+  for (const n of [1, 2]) {
+    await db.session.create({
+      data: { tokenHash: `fumee-role-${process.pid}-${n}`, userId: avant.id, expiresAt: new Date(Date.now() + 86_400_000) },
+    });
+  }
   const promotion = lancer("--email", awa, "--role", "ADMIN", "--par", "Opérateur de fumée", "--motif", MOTIF);
   const apres = await db.user.findUniqueOrThrow({ where: { email: awa } });
   verifier(promotion.code === 0 && apres.role === "ADMIN", `le rôle est donné (${promotion.sortie.trim()})`);
@@ -80,7 +89,12 @@ try {
     ligne !== null && ligne.actorId === "console:Opérateur de fumée" && ligne.reason === MOTIF,
     "le journal porte l'auteur déclaré et le motif",
   );
-  verifier(JSON.stringify(ligne?.metadata) === JSON.stringify({ de: "CANDIDAT", vers: "ADMIN" }), "et ce qui a changé");
+  verifier(
+    // jsonb range ses clés à sa façon : la comparaison se fait clé par clé.
+    trie(ligne?.metadata) === trie({ de: "CANDIDAT", vers: "ADMIN", sessionsFermees: 2, origine: "console" }),
+    "et ce qui a changé, sessions fermées comprises",
+  );
+  verifier((await db.session.count({ where: { userId: apres.id } })) === 0, "les sessions du compte sont fermées");
 
   const rejeu = lancer("--email", awa, "--role", "ADMIN", "--par", "Opérateur de fumée", "--motif", MOTIF);
   const lignes = await db.auditLog.count({ where: { action: "compte.role" } });
@@ -97,6 +111,19 @@ try {
     "le dernier administrateur ne se retire pas",
   );
   verifier((await db.auditLog.count({ where: { action: "compte.role" } })) === 1, "aucun refus n'écrit au journal");
+
+  console.log("\nLe premier super-administrateur (S.210)");
+  const sommet = lancer("--email", awa, "--role", "SUPER_ADMIN", "--par", "Opérateur de fumée", "--motif", MOTIF);
+  verifier(
+    sommet.code === 0 && (await db.user.findUniqueOrThrow({ where: { email: awa } })).role === "SUPER_ADMIN",
+    "la console nomme le premier super-administrateur",
+  );
+  const seul = lancer("--email", awa, "--role", "ADMIN", "--par", "Fumée", "--motif", MOTIF);
+  verifier(
+    seul.code === 1 && /il en faut au moins 2/u.test(seul.sortie) && (await db.user.findUniqueOrThrow({ where: { email: awa } })).role === "SUPER_ADMIN",
+    "seul actif, il n'est pas rétrogradé",
+  );
+  verifier((await db.auditLog.count({ where: { action: "compte.role" } })) === 2, "le refus n'écrit pas au journal");
 } catch (erreur) {
   console.error(`\n✗ ${erreur instanceof Error ? erreur.stack : String(erreur)}`);
   echecs.push("exception");

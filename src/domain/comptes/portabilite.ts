@@ -41,7 +41,7 @@ export const A_PROPOS =
 
 /** Ce que l'export contient, dans l'ordre où cela intéresse la personne. */
 export const CE_QUE_CONTIENT: readonly string[] = [
-  "Ton compte : nom, adresse email, téléphone, pays, date d'inscription.",
+  "Ton compte : nom, nom affiché, adresse email, téléphone, date de naissance, pays, date d'inscription.",
   "Ton profil : objectif, diplôme, domaine, langues, budget déclaré.",
   "Tes dossiers : destination, dates, état de chaque pièce et verdict de chaque analyse.",
   "Les textes que tu as rédigés ici, dans toutes leurs versions.",

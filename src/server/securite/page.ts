@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { COOKIE_SESSION, lireSession, type Acteur } from "./session";
 import { EN_TETE_CHEMIN, suiteInterne } from "@/domain/comptes/suite";
+import { rolesAuMoins } from "@/domain/comptes/hierarchie";
 
 /**
  * Accès à l'acteur depuis une page serveur.
@@ -44,8 +45,13 @@ export async function exigerRole(roles: readonly Role[], suite?: string): Promis
   return acteur;
 }
 
-export const exigerVeilleur = (suite?: string) => exigerRole(["VEILLEUR", "ADMIN"], suite);
-export const exigerAdmin = (suite?: string) => exigerRole(["ADMIN"], suite);
+/*
+  Les rôles admis se lisent dans la hiérarchie (S.210) : un
+  super-administrateur passe partout où passe un administrateur.
+*/
+export const exigerVeilleur = (suite?: string) => exigerRole(rolesAuMoins("VEILLEUR"), suite);
+export const exigerAdmin = (suite?: string) => exigerRole(rolesAuMoins("ADMIN"), suite);
+export const exigerSuperAdmin = (suite?: string) => exigerRole(rolesAuMoins("SUPER_ADMIN"), suite);
 
 async function versConnexion(suite?: string): Promise<string> {
   const retour = suiteInterne(suite ?? (await headers()).get(EN_TETE_CHEMIN));

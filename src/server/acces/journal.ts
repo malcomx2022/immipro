@@ -33,8 +33,19 @@ export type ActionAuditee =
   | "piece.signalement"
   | "dossier.consultation"
   | "compte.suspension"
-  /** Un rôle donné ou retiré depuis la console du serveur (S.115). */
+  /**
+   * Un rôle donné ou retiré — depuis la console du serveur (S.115), ou
+   * depuis B-03 par un super-administrateur (S.210). Les détails disent
+   * l'ancien et le nouveau rôle, et les sessions fermées.
+   */
   | "compte.role"
+  /** Un compte interne créé depuis B-03 par un super-administrateur (S.210). */
+  | "compte.creation.interne"
+  /**
+   * Un geste du sommet refusé à un compte qui ne l'est pas (S.210) : la
+   * route, le rôle de l'appelant. Écrit par le composeur, sous débit.
+   */
+  | "acces.refuse"
   | "compte.retablissement"
   | "compte.suppression"
   /**
