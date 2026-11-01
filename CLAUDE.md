@@ -88,6 +88,22 @@ vulnérable n'est pas atteint. Exception motivée et datée ; à retirer à
 la prochaine version de `minio`. Ne pas forcer la 0.5.1 par `overrides`.
 Lire le registre, entrée S.209.
 
+### S.208 — revue fonctionnelle, restant et chemin vers la fin — 31/10/2026
+
+Lot documentaire demandé par le responsable. Base `46c8b76` (#333
+fusionnée). « Fini » = deux jalons : J1 ouverture publique (Q.A levé ;
+restent L5, sauvegardes R2 et restauration, C-13, L6, R-P du VPS) et J2
+encaissement (M.C, L8). Huit modules sur seize éprouvés ; aucun reste
+n'attend du code sans préalable. Constats : F-1 région IA de production
+`europe-west1` contre un modèle servi sur `eu` seulement, à relever
+d'abord ; F-2 sauvegardes `restic` locales contre le texte publié et
+INV-5 ; F-3 sortie IA peut-être sous-mesurée, B-07 compris ; F-4
+facturation partagée production / L5 ; F-5 C-13 et certificat dans la
+même fenêtre. Ordre : sécuriser l'existant, clore L5, NL 2027 avant le
+15/12, recette humaine et runbook, puis M.C. Deux lots de code
+seulement, conditionnels. Lire
+[la revue du 31/10](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 ### S.207 — D-26 révisé : sauvegardes sur Cloudflare R2 — 29/10/2026
 
 Demandé par le responsable après le relevé du 29/10 : aucune sauvegarde
