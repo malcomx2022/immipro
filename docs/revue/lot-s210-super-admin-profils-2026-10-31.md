@@ -140,3 +140,30 @@ Nouveaux tests : `tests/super-admin.test.ts`, `tests/profil-identite.test.ts`,
   d'Ivoire, Guinée-Bissau, Mali, Niger, Sénégal, Togo, Cameroun, RD Congo,
   France, Belgique, Pays-Bas, Canada, avec leurs indicatifs.
 - Firefox et WebKit non rejoués localement, laissés à la CI.
+
+## S.211 — arrivée sur le back-office après connexion — 03/11/2026
+
+Relevé par le responsable après la mise en service de `6c4d57b` et la
+nomination du premier SUPER_ADMIN par la console : la base et `/mon-compte`
+disaient « Super-administration », mais la connexion menait au tableau de
+bord candidat, sans lien vers le back-office. Un onglet ouvert avant le
+changement affichait encore « Administration » : Next garde le gabarit lors
+d'une navigation interne, un rechargement le met à jour (comportement
+attendu, pas un défaut).
+
+Décision du responsable : arrivée directe sur le back-office.
+
+- `destinationApresConnexion(suite, emailVerifie, role)` dans
+  `src/domain/comptes/suite.ts` (pur). Sans suite, un compte interne arrive
+  sur `/veille` (`ACCUEIL_INTERNE`), ouverte à tout rôle interne ; un
+  candidat sur `/tableau-de-bord`. Une suite interne reste suivie pour tout
+  rôle, une adresse non vérifiée passe toujours par la vérification.
+- `/mon-compte` porte « Mon espace candidat » : un compte interne garde un
+  chemin vers ses propres dossiers.
+- Parcours : `connecter()` prend l'accueil attendu ; l'administrateur du banc
+  arrive sur `/veille`. `scripts/recette/revue-navigateur.py` accepte les
+  deux accueils.
+
+Preuves : lint, typecheck, `check:copy`, 212 fichiers / 4 231 tests,
+`build`, parcours Chromium 1440 (35/35) après reconstruction (le banc
+réutilise un `.next` existant : reconstruire avant de rejouer un parcours).

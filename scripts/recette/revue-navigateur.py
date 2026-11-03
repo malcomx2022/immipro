@@ -35,7 +35,8 @@ with sync_playwright() as p:
   page.get_by_label('Adresse email',exact=True).fill(email)
   page.get_by_label('Mot de passe',exact=True).fill(pwd)
   page.get_by_label('Mot de passe',exact=True).press('Enter')
-  page.wait_for_url('**/tableau-de-bord',timeout=15000)
+  # S.211 : un compte interne arrive sur le back-office (/veille).
+  page.wait_for_url(re.compile(r'/(tableau-de-bord|veille)$'),timeout=15000)
   actions.append({'action':'connexion par formulaire et touche Entrée','role':email.split('@')[0],'conforme':True})
  for path in ['/','/comment-ca-marche','/tarifs','/simulateur','/resultats','/destinations','/destinations/pays-bas','/conditions','/mentions-legales','/donnees-personnelles','/guides','/guides/pays-bas','/articles','/contact','/inscription','/mot-de-passe']:
   check(path,'public')

@@ -280,9 +280,15 @@ async function ouvrirLaConnexion(p: Page, suite?: string) {
  * l'adresse quand l'écran en a une — une page protégée y a renvoyé —,
  * sinon le tableau de bord.
  */
-async function connecter(p: Page, adresse: string, motDePasse: string) {
+async function connecter(
+  p: Page,
+  adresse: string,
+  motDePasse: string,
+  // S.211 : sans suite, un compte interne arrive sur le back-office.
+  accueil = "/tableau-de-bord",
+) {
   await ouvrirLaConnexion(p);
-  const suite = new URL(p.url()).searchParams.get("suite") ?? "/tableau-de-bord";
+  const suite = new URL(p.url()).searchParams.get("suite") ?? accueil;
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasse);
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
@@ -316,7 +322,7 @@ async function administration(): Promise<Page> {
   });
   admin = await contexte.newPage();
   suivis.push(suivreErreurs(admin, moteur, origineApp));
-  await connecter(admin, "admin@immipro.test", motDePasseDuBanc());
+  await connecter(admin, "admin@immipro.test", motDePasseDuBanc(), "/veille");
   return admin;
 }
 
