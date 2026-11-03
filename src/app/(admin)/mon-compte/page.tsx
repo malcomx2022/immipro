@@ -69,6 +69,13 @@ export default async function PageMonCompteInterne() {
           <Link href="/compte/securite" className="flex min-h-touch items-center text-14 font-semibold text-ink-900">
             Sécurité et sessions
           </Link>
+          {/*
+            S.211 : la connexion mène un compte interne au back-office. Son
+            espace candidat (ses propres dossiers) reste à un lien d'ici.
+          */}
+          <Link href="/tableau-de-bord" className="flex min-h-touch items-center text-14 font-semibold text-ink-900">
+            Mon espace candidat
+          </Link>
         </section>
 
         <section className="flex flex-col gap-2 rounded-lg border border-ink-300 bg-white p-4">

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { appeler } from "@/lib/api";
-import { suiteInterne } from "@/domain/comptes/suite";
+import { destinationApresConnexion } from "@/domain/comptes/suite";
 
 /**
  * A-02 — Connexion.
@@ -45,7 +45,7 @@ export function Connexion() {
     if (!complet || envoi) return;
     setEnvoi(true);
     setEchec(null);
-    const resultat = await appeler<{ compte: { emailVerifie: boolean } }>(
+    const resultat = await appeler<{ compte: { emailVerifie: boolean; role?: string } }>(
       "/api/comptes/session",
       { corps: { email: email.trim(), motDePasse, resterConnecte: rester } },
     );
@@ -54,7 +54,13 @@ export function Connexion() {
       // rendrait tout l'écran dynamique, alors que c'est le premier que voit
       // quelqu'un qui revient — celui qu'il faut servir le plus vite.
       const suite = new URLSearchParams(window.location.search).get("suite");
-      router.push(destination(suite, resultat.donnees.compte.emailVerifie));
+      router.push(
+        destinationApresConnexion(
+          suite,
+          resultat.donnees.compte.emailVerifie,
+          resultat.donnees.compte.role,
+        ),
+      );
       return;
     }
     setEnvoi(false);
@@ -176,27 +182,4 @@ export function Connexion() {
       </div>
     </form>
   );
-}
-
-/**
- * Où aller après la connexion.
- *
- * Une adresse non vérifiée passe d'abord par la vérification : c'est elle
- * qui conditionne l'ouverture d'un dossier, et y buter trois écrans plus
- * loin est plus désagréable que d'y passer tout de suite.
- *
- * La suite n'est suivie que si elle est interne. Une adresse absolue venue
- * du paramètre de requête ferait de cet écran une redirection ouverte, dont
- * on se sert pour faire atterrir quelqu'un sur une fausse page de connexion.
- *
- * La vérification garde la suite : un candidat qui se connecte pour ouvrir
- * un dossier sur la Suisse doit y arriver une fois son adresse vérifiée,
- * pas sur le tableau de bord.
- */
-function destination(suite: string | null, emailVerifie: boolean): string {
-  const retour = suiteInterne(suite);
-  if (!emailVerifie) {
-    return retour ? `/verification?suite=${encodeURIComponent(retour)}` : "/verification";
-  }
-  return retour ?? "/tableau-de-bord";
 }

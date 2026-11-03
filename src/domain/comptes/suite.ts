@@ -27,6 +27,8 @@
  *
  * Module pur : aucune dépendance à Prisma, Next ou au réseau.
  */
+import { estInterne, estRole } from "./hierarchie";
+
 export const EN_TETE_CHEMIN = "x-immipro-chemin";
 
 const ECRANS_DU_COMPTE = ["/connexion", "/inscription", "/verification", "/mot-de-passe"];
@@ -38,4 +40,37 @@ export function suiteInterne(valeur: string | null | undefined): string | null {
   const chemin = valeur.split(/[?#]/u)[0]!;
   if (ECRANS_DU_COMPTE.some((e) => chemin === e || chemin.startsWith(`${e}/`))) return null;
   return valeur;
+}
+
+/** Le premier écran du back-office : la veille, ouverte à tout compte interne. */
+export const ACCUEIL_INTERNE = "/veille";
+export const ACCUEIL_CANDIDAT = "/tableau-de-bord";
+
+/**
+ * Où aller après la connexion — S.211.
+ *
+ * Une adresse non vérifiée passe d'abord par la vérification : c'est elle
+ * qui conditionne l'ouverture d'un dossier, et y buter trois écrans plus
+ * loin est plus désagréable que d'y passer tout de suite. La vérification
+ * garde la suite.
+ *
+ * Une suite explicite (une page protégée y a renvoyé) est toujours suivie,
+ * pour tout rôle, si elle est interne (`suiteInterne`).
+ *
+ * Sans suite, un compte interne (veilleur et au-dessus) arrive sur le
+ * back-office et non sur le tableau de bord candidat, qui n'en porte aucun
+ * lien : l'équipe tapait l'adresse à la main. Un candidat, ou un rôle
+ * inconnu, arrive sur le tableau de bord, comme avant.
+ */
+export function destinationApresConnexion(
+  suite: string | null | undefined,
+  emailVerifie: boolean,
+  role?: string | null,
+): string {
+  const retour = suiteInterne(suite);
+  if (!emailVerifie) {
+    return retour ? `/verification?suite=${encodeURIComponent(retour)}` : "/verification";
+  }
+  if (retour) return retour;
+  return role && estRole(role) && estInterne(role) ? ACCUEIL_INTERNE : ACCUEIL_CANDIDAT;
 }

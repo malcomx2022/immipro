@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.211 — un compte interne arrive sur le back-office — 03/11/2026
+
+Demandé par le responsable après la mise en service de S.210 : connecté,
+le SUPER_ADMIN tombait sur le tableau de bord candidat, qui ne porte aucun
+lien vers le back-office. `destinationApresConnexion` (domaine, `suite.ts`)
+décide désormais : adresse non vérifiée → vérification (suite gardée) ;
+suite interne → suivie pour tout rôle ; sinon `/veille` pour un compte
+interne, `/tableau-de-bord` pour un candidat ou un rôle inconnu. `/mon-compte`
+porte « Mon espace candidat ». Le parcours Playwright connecte
+l'administrateur sur `/veille`. Ne pas remettre la décision dans l'écran de
+connexion. Lire [le lot S.210, § S.211](docs/revue/lot-s210-super-admin-profils-2026-10-31.md).
+
 ### S.210 — rôle SUPER_ADMIN et profils utilisateur — 31/10/2026
 
 Lot demandé par le responsable. Base `46c8b76` (#333 fusionnée).
