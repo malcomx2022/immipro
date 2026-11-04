@@ -1,4 +1,5 @@
 /** REV11-L5 : couverture et preuves manquantes, sans certification automatique. */
+import { partagerLesLectures } from "./perimetre";
 import { CAS_DE_LECTURE, CAS_DE_REDACTION } from "./jeu-d-essai";
 import type { SyntheseDuBanc } from "./notation";
 
@@ -39,7 +40,9 @@ export function etatDuPassage(
     fournisseurQualifie: false,
     couverture: {
       pieces: synthese.pieces,
-      piecesAttendues: CAS_DE_LECTURE.length,
+      // S.213 : rapportée aux pièces présentées au modèle ; les autres sont comptées à part.
+      piecesAttendues: partagerLesLectures(CAS_DE_LECTURE).aLire.length,
+      piecesHorsPerimetre: partagerLesLectures(CAS_DE_LECTURE).horsPerimetre.length,
       redactions: synthese.redactions.total,
       redactionsAttendues: CAS_DE_REDACTION.length,
     },

@@ -33,6 +33,7 @@
  * Module pur : aucune dépendance à Prisma, Next, au réseau ou à un SDK.
  */
 import type { ObstacleDuModele } from "@/domain/dossiers/extraction";
+import type { EmetteurDeLaPiece } from "./perimetre";
 
 /* ------------------------------------------------------------------ *
  * Les formes.
@@ -124,6 +125,12 @@ export interface CasDeLecture {
   regle: RegleVisee;
   /** La ligne de checklist où la pièce est déposée. */
   codeAttendu: string;
+  /**
+   * Qui a émis la pièce, déclaré à la main — S.213. Seul `TIERS` change
+   * quelque chose : une preuve de ressources de tiers n'est pas présentée
+   * au modèle (`classerAvantAppel`).
+   */
+  emetteurDeLaPiece?: EmetteurDeLaPiece;
   /** La date cible du dossier (rentrée, prise de poste), repère des durées. */
   repere: string | null;
   rendu: { format: Format; degradation: Degradation };
@@ -293,6 +300,7 @@ export const CAS_DE_LECTURE: readonly CasDeLecture[] = [
     objet: "Attestation de bourse annuelle sous le seuil",
     regle: NL_ETUDES,
     codeAttendu: "preuve_fonds",
+    emetteurDeLaPiece: "TIERS",
     repere: RENTREE_2027,
     rendu: { format: "pdf_natif", degradation: "aucune" },
     contenu: {
@@ -471,6 +479,7 @@ export const CAS_DE_LECTURE: readonly CasDeLecture[] = [
     objet: "Attestation de garant photographiée, sous le seuil",
     regle: CH_ETUDES,
     codeAttendu: "preuve_fonds",
+    emetteurDeLaPiece: "TIERS",
     repere: RENTREE_2027,
     rendu: { format: "jpeg", degradation: "aucune" },
     contenu: {

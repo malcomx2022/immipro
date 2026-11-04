@@ -27,7 +27,8 @@ let db: { $disconnect(): Promise<void> } | undefined;
 try {
   await cp("prisma/schema.prisma", join(temp, "schema.prisma"));
   for (const fichier of await readdir("prisma/migrations")) {
-    if (fichier !== migrationL2) await cp(join("prisma/migrations", fichier), join(temp, "migrations", fichier), { recursive: true });
+    // Une base d'avant L2 ne porte aucune migration postérieure (S.213 dépend de L2).
+    if (fichier === "migration_lock.toml" || fichier < migrationL2) await cp(join("prisma/migrations", fichier), join(temp, "migrations", fichier), { recursive: true });
   }
   const config = join(temp, "prisma.config.mjs");
   await writeFile(config, `export default {schema:${JSON.stringify(join(temp, "schema.prisma"))},migrations:{path:${JSON.stringify(join(temp, "migrations"))}},datasource:{url:process.env.DATABASE_URL}};`);
@@ -68,6 +69,27 @@ try {
     "les compteurs invalides ne font pas échouer l'écriture après appel");
   verifier(lignes.find(l => l.operation === "connue")?.costMicros === 810,
     "le coût connu est conservé, même indépendamment de tout verdict publié");
+  // S.213 : la part de raisonnement, comprise dans la sortie facturée et tarifée avec elle.
+  process.env.AI_TARIF_OPENAI_COMPATIBLE_ENTREE_PAR_MILLION = "0.825";
+  process.env.AI_TARIF_OPENAI_COMPATIBLE_SORTIE_PAR_MILLION = "4.125";
+  process.env.AI_TARIF_OPENAI_COMPATIBLE_DEVISE = "USD";
+  const { mesurerLUsageCompatible } = await import("../src/domain/ia/usage");
+  const compatible = { fournisseur: "openai_compatible" as const, modele: "google/gemini-3.8-flash" };
+  const pensee = mesurerLUsageCompatible({ prompt_tokens: 1000, completion_tokens: 30, thoughtsTokenCount: 70 });
+  await noterLesJetons("u-l2", "d-l2", "raisonnement", pensee.jetonsEntree, pensee.jetonsSortie, { ...compatible, mesure: pensee });
+  await noterLesJetons("u-l2", "d-l2", "raisonnement-absent", 1000, 30, { ...compatible, mesure: mesurerLUsageCompatible({ prompt_tokens: 1000, completion_tokens: 30 }) });
+  const r1 = await client.aiUsage.findFirstOrThrow({ where: { operation: "raisonnement" } });
+  verifier(r1.outputTokens === 100 && r1.reasoningTokens === 70 && r1.usageState === "CONNUE" && r1.costMicros === 1238,
+    "raisonnement : 30 visibles + 70 de réflexion persistés en sortie facturée 100, part 70, coût 1 000 × 0,825 + 100 × 4,125");
+  const r2 = await client.aiUsage.findFirstOrThrow({ where: { operation: "raisonnement-absent" } });
+  verifier(r2.reasoningTokens === null && r2.usageState === "CONNUE" && r2.outputTokens === 30,
+    "raisonnement non rapporté : NULL, mesure CONNUE, sortie inchangée (décision du 04/11)");
+  const refus = await sql(cible, `INSERT INTO "AiUsage" (id,"userId","applicationId",operation,"inputTokens","outputTokens","reasoningTokens","usageState")
+    VALUES ('raisonnement-trop','u-l2','d-l2','synthétique',10,5,6,'CONNUE')`).then(() => false, () => true);
+  verifier(refus, "la base refuse une part de raisonnement supérieure à la sortie facturée");
+  const refusEtat = await sql(cible, `INSERT INTO "AiUsage" (id,"userId","applicationId",operation,"inputTokens","outputTokens","reasoningTokens","usageState")
+    VALUES ('raisonnement-partiel','u-l2','d-l2','synthétique',10,NULL,3,'PARTIELLE')`).then(() => false, () => true);
+  verifier(refusEtat, "la base refuse un raisonnement sur une mesure qui n'est pas CONNUE");
   process.env.AI_TARIF_ENTREE_PAR_MILLION = "1000000000";
   await noterLesJetons("u-l2", "d-l2", "cout-hors-integer", 100, 30, appel);
   verifier((await client.aiUsage.findFirstOrThrow({ where: { operation: "cout-hors-integer" } })).costMicros === null,

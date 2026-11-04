@@ -62,6 +62,7 @@
     "banc:ia:aveugle": "tsx scripts/banc-ia/melanger.mts",
     "banc:ia:pieces": "tsx scripts/banc-ia/generer-pieces.mts",
     "banc:ia:rapprocher": "tsx scripts/banc-ia/rapprocher-vertex.mts",
+    "banc:ia:comparer": "tsx scripts/banc-ia/comparer-facture.mts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:garde-fous": "node scripts/garde-fous.mjs",

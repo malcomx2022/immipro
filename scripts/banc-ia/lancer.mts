@@ -44,6 +44,11 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { type CasDeLecture, type CasDeRedaction } from "@/domain/banc-ia/jeu-d-essai";
 import {
+  CONSIGNE_ECHEC_FOURNISSEUR,
+  issueDUnEchec,
+  partagerLesLectures,
+} from "@/domain/banc-ia/perimetre";
+import {
   noterUneLecture,
   noterUneRedaction,
   synthetiser,
@@ -318,8 +323,12 @@ async function main() {
     sansLecture: options["sans-lecture"],
     sansRedaction: options["sans-redaction"],
   });
-  const casDeLecture = selection.lectures;
+  // S.213 : une preuve de ressources de tiers n'est jamais présentée au modèle.
+  const { aLire: casDeLecture, horsPerimetre } = partagerLesLectures(selection.lectures);
   const casDeRedaction = selection.redactions;
+  if (casDeLecture.length + casDeRedaction.length === 0) {
+    throw new Error("La sélection ne contient que des pièces hors périmètre : rien n'est appelé.");
+  }
   // Lire et vérifier toutes les pièces avant le moindre appel payant.
   const fichiers = await Promise.all(
     casDeLecture.map(async (cas) => {
@@ -492,6 +501,7 @@ async function main() {
         horodatage,
         appelsPrevus,
         pieces: fichiers.map(({ id, type, sha256 }) => ({ id, type, sha256 })),
+        horsPerimetre,
         redactions: casDeRedaction.map((c) => c.id),
       },
       null,
@@ -530,7 +540,9 @@ async function main() {
     budgetActif?.exigerSuite();
   };
   console.log(`Banc IA — ${fournisseur} · ${modele}`);
-  console.log(`${casDeLecture.length} pièces, ${casDeRedaction.length} rédactions.\n`);
+  console.log(`${casDeLecture.length} pièces, ${casDeRedaction.length} rédactions.`);
+  for (const h of horsPerimetre) console.log(`  ${h.id} hors périmètre, non appelée : ${h.motif}`);
+  console.log("");
 
   const lectures: { note: NoteDeLecture; mesure: Mesure; cause: string | null }[] = [];
   for (const cas of casDeLecture) {
@@ -563,6 +575,9 @@ async function main() {
     console.log(
       `  ${cas.id} ${marque} ${note.verdictObtenu} (attendu ${note.verdictAttendu}) · ${ms} ms`,
     );
+    if (obtenue.etat === "NON_LUE" && issueDUnEchec(obtenue.cause) === "ECHEC_FOURNISSEUR") {
+      console.log(`    ${obtenue.cause} — ${CONSIGNE_ECHEC_FOURNISSEUR}`);
+    }
   }
 
   const references: {
@@ -699,6 +714,7 @@ async function main() {
         .digest("hex"),
     },
     appelsPrevus,
+    horsPerimetre,
     appels,
     references,
     mesureTotale: {
@@ -753,6 +769,7 @@ function resume(s: SyntheseDuBanc): string {
 type Resultat = {
   qualification: ReturnType<typeof etatDuPassage>;
   configuration: { adresse: string | null };
+  horsPerimetre: readonly { id: string; motif: string }[];
   mesureTotale: {
     entree: number | null;
     sortie: number | null;
@@ -813,7 +830,9 @@ function rapport(r: Resultat): string {
         : note.obstacle === "signale_a_tort"
           ? `obstacle signalé à tort (${cause})`
           : "",
-      note.echecTechnique ? `échec technique (${cause})` : "",
+      note.echecTechnique
+        ? `échec technique (${cause}${cause && issueDUnEchec(cause) === "ECHEC_FOURNISSEUR" ? ", fournisseur : à rapprocher" : ""})`
+        : "",
       champs,
     ]
       .filter(Boolean)
@@ -834,7 +853,7 @@ Passage du ${r.horodatage}. Jeu d'essai : \`src/domain/banc-ia/jeu-d-essai.ts\` 
 **${r.qualification.nature} — ${r.qualification.statut}. Fournisseur non qualifié.**
 Adresse déclarée : ${r.configuration.adresse ?? "aucune"}.
 La région du manifeste est déclarative ; l'URL ne prouve ni DPA, ni résidence.
-Couverture : ${r.qualification.couverture.pieces}/${r.qualification.couverture.piecesAttendues} pièces et ${r.qualification.couverture.redactions}/${r.qualification.couverture.redactionsAttendues} rédactions.
+Couverture : ${r.qualification.couverture.pieces}/${r.qualification.couverture.piecesAttendues} pièces (${r.qualification.couverture.piecesHorsPerimetre} hors périmètre) et ${r.qualification.couverture.redactions}/${r.qualification.couverture.redactionsAttendues} rédactions.
 Preuves restantes : ${r.qualification.preuvesRestantes.join(" ; ")}.
 
 ## Synthèse
@@ -848,6 +867,8 @@ ${resume(r.synthese)
 |---|---|---|---|
 | Lecture des pièces | ${r.jetons.lecture.entree} / ${r.jetons.lecture.sortie} | ${cout(r.coutMicros.lecture)} | ${moyenne(r.lectures)} ms |
 | Rédaction et relecture | ${r.jetons.redaction.entree} / ${r.jetons.redaction.sortie} | ${cout(r.coutMicros.redaction)} | ${moyenne(r.redactions)} ms |
+
+${r.horsPerimetre.length === 0 ? "Aucune pièce hors périmètre." : `Hors périmètre, non appelées (S.213) : ${r.horsPerimetre.map((h) => h.id).join(", ")} — preuve de ressources émise par un tiers ; ni réserve, ni appel, ni verdict.`}
 
 Total des appels, avis de référence compris : ${r.mesureTotale.entree} / ${r.mesureTotale.sortie} jetons ; ${cout(r.mesureTotale.coutMicros)}.
 Appels à rapprocher : ${r.mesureTotale.appelsARapprocher}. Rapprochement fournisseur : ${r.mesureTotale.rapprochementFournisseur}.

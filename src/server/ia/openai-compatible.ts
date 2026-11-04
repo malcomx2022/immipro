@@ -1,5 +1,6 @@
 import {
   mesurerLesJetons,
+  mesurerLUsageCompatible,
   usageNumerique,
   DETAIL_MESURE_INCOMPLETE,
   type MesureDeJetons,
@@ -159,11 +160,12 @@ export function observerLUsage(observateur: ((usage: UsageNumerique | null) => v
 const lireReponse = (charge: unknown): Reponse => {
   const c = charge as {
     choices?: { finish_reason?: unknown; message?: { content?: unknown; refusal?: unknown } }[];
-    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+    usage?: unknown;
   } | null;
   observateurDeLUsage?.(usageNumerique((charge as { usage?: unknown } | null)?.usage));
   // Mesurer avant de lire le contenu : une enveloppe refusée peut avoir coûté.
-  const mesure = mesurerLesJetons(c?.usage?.prompt_tokens, c?.usage?.completion_tokens);
+  // Le raisonnement est lu et ajouté à la sortie facturée (S.213).
+  const mesure = mesurerLUsageCompatible(c?.usage);
   if (mesure.etat !== "CONNUE") {
     return { ok: false, cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE, mesure, reponseDecodee: true };
   }

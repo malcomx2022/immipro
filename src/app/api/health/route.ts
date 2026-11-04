@@ -13,7 +13,9 @@ import {
   surveillanceRemboursementManuel,
 } from "@/domain/exploitation/dependances";
 import { constaterLesDependances } from "@/server/exploitation/capacites";
-import { etatDesFonctions } from "@/domain/ia/fournisseurs";
+import { etatDesFonctions, fournisseursATarifer } from "@/domain/ia/fournisseurs";
+import { etatDesTarifs } from "@/domain/ia/tarifs";
+import { jourCivil } from "@/domain/format/fuseau";
 import { fournisseursDeclares } from "@/domain/payments/rail";
 import { CLE_FOURNISSEURS, espaceReel, fournisseursActifs } from "@/server/paiement/secrets";
 import {
@@ -539,6 +541,13 @@ async function etatDeService() {
       */
       remboursementManuel,
       facturation,
+      /*
+        Les tarifs d'IA lus dans la configuration déployée, et leur
+        échéance — S.213. Des prix, jamais une clé. Un tarif échu ou sans
+        date de fin est dit ici, sans rendre l'instance inapte : il fausse
+        un coût dans B-07, il n'empêche pas de servir.
+      */
+      tarifsIA: etatDesTarifs(process.env, fournisseursATarifer(process.env, []), jourCivil(new Date())),
       fournisseursDePaiement: (() => {
         const lu = fournisseursDeclares(process.env[CLE_FOURNISSEURS]);
         return {

@@ -404,3 +404,55 @@ attribution de l'entrée facturée en trop, décision sur L06 et L14,
 fin du jeu (43 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.
+
+## S.213 — raisonnement mesuré, pièces de tiers écartées, facture comparée — 04/11/2026
+
+Lot de code demandé par le responsable (branche `fix/ia-jetons-raisonnement`,
+base `b363629`, #337 fusionnée). Deux décisions rendues avant le code, le
+04/11 : le classement des pièces de tiers vaut **pour le banc seul** ; un
+raisonnement non rapporté laisse la mesure **`CONNUE`**.
+
+**Mesure du raisonnement (F-3).** `mesurerLUsageCompatible` (domaine) lit la
+part de raisonnement là où un fournisseur la range :
+`completion_tokens_details.reasoning_tokens` (forme OpenAI, déjà comprise
+dans `completion_tokens`), `thoughtsTokenCount` ou `thoughts_token_count`
+(forme Gemini, hors de la sortie, donc ajoutée), à défaut l'excès de
+`total_tokens` sur entrée + sortie. `jetonsSortie` devient la **sortie
+facturée** ; coût, bornes du banc et B-07 la lisent sans autre changement.
+La part est écrite à part dans `AiUsage.reasoningTokens` (migration additive
+`20261104120000_raisonnement_ia`, contrainte : mesure `CONNUE`, jamais plus
+que la sortie). Absente : `NULL`, jamais 0. Présente mais invalide : mesure
+`INVALIDE`, aucune publication automatique (L2). Le point compatible de
+Vertex ne rend aujourd'hui aucun compteur (S.204) : **l'écart du 28/10
+reste donc inexpliqué**, et ce lot ne le comble pas ; il le comptera le jour
+où Vertex le rapporte, et `banc:ia:comparer` le signale d'ici là.
+
+**Pièces de tiers.** L06 et L14 portent `emetteurDeLaPiece: "TIERS"` dans le
+jeu d'essai. `classerAvantAppel` (domaine, `perimetre.ts`) classe une preuve
+de ressources de tiers `TIERS_HORS_PERIMETRE` ; le lanceur les écarte avant
+l'ouverture du journal et avant le premier appel : ni réserve, ni réseau, ni
+verdict. Le passage complet compte 28 pièces et 58 appels ; la couverture se
+rapporte aux 28 pièces présentées, avec les 2 écartées comptées à part. Un
+appel non abouti est rangé par `issueDUnEchec` : `ECHEC_FOURNISSEUR`
+(injoignable, délai, saturation : rapprocher dans la console avant reprise,
+ne pas allonger le délai), `CONFIGURATION`, ou `LECTURE`. Le produit ne
+connaît pas l'émetteur avant la lecture : une déclaration au dépôt serait un
+autre lot.
+
+**Facture comparée.** `npm run banc:ia:comparer -- --facture <relevé.json>
+--appels <appels.json,…>` compare la somme des appels mesurés à la facture
+par SKU, saisie à la main (`periode`, `projet`, `entree`, `sortie`,
+`source`). Au-delà de 5 % du facturé, dans un sens ou dans l'autre, l'écart
+est signalé ; un appel sans mesure connue rend la comparaison incomplète.
+Aucun réseau, aucune écriture, code 2 si signalement. Rejoué sur les quatre
+passages du 28/10 : 18 034 / 1 631 mesurés pour 21 986 / 3 201 facturés,
+écarts de 18,0 % et 49,0 % signalés, trois appels sans mesure (L06 deux
+fois, L14). C'est le chiffre consigné en S.203.
+
+**Journal.** Le schéma du journal accepte la part de raisonnement en champ
+facultatif : la copie `93175249…` se lit toujours (19 invocations,
+835,95 XOF, aucun blocage), inchangée.
+
+**Reste.** La reprise reste suspendue comme en S.205 : facture du 29/10 par
+SKU, puis décision du responsable. Elle portera sur L15 à L30, les
+rédactions, relectures et avis, sans L06 ni L14 (41 invocations au plus).

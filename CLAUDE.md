@@ -77,6 +77,24 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.213 — raisonnement IA mesuré, pièces de tiers, facture et tarifs — 04/11/2026
+
+Lot de code demandé par le responsable, branche `fix/ia-jetons-raisonnement`.
+Base `b363629` (#337 fusionnée). `mesurerLUsageCompatible` lit le
+raisonnement (`reasoning_tokens`, `thoughtsTokenCount`, excès de
+`total_tokens`) ; `jetonsSortie` = sortie **facturée**, la part va dans
+`AiUsage.reasoningTokens` (migration additive). Décision du 04/11 : absent,
+`NULL` et mesure `CONNUE` ; ne pas passer en `PARTIELLE`, Vertex n'en rapporte
+aucun (S.204). Banc seul : L06 et L14 déclarées de tiers,
+`TIERS_HORS_PERIMETRE` avant journal et réseau ; `issueDUnEchec` distingue
+l'échec fournisseur. `banc:ia:comparer` signale un écart mesuré/facturé
+au-delà de 5 %. `/api/health` (détail) porte `tarifsIA` et l'échéance
+`AI_TARIF_*_VALIDE_JUSQU_AU`, sans rendre inapte. L'écart du 28/10 reste
+inexpliqué ; reprise L5 toujours suspendue (S.205). Ouvert sous le
+numéro S.212, renuméroté S.213 à la fusion de `main` le 04/11 : S.212 est
+la déconnexion (#338). Lire
+[le suivi L5, § S.213](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.212 — « Se déconnecter » dans les deux espaces — 04/11/2026
 
 Relevé par le responsable : aucun bouton de déconnexion. `DELETE
