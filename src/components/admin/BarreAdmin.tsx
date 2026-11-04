@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { LienDeNavigation } from "@/components/layout/LienDeNavigation";
 import { SkipLink } from "@/components/layout/SkipLink";
+import { BoutonDeconnexion } from "@/components/layout/BoutonDeconnexion";
 import { NAVIGATION_ADMIN } from "@/domain/backoffice/navigation";
 
 /**
@@ -80,6 +81,8 @@ export function BarreAdmin({ nom, role, initialesAffichees, children }: BarreAdm
             <span className="text-13 text-ink-500">{role}</span>
           </span>
         </Link>
+        {/* S.212 : la sortie, sous la carte de l'opérateur. */}
+        <BoutonDeconnexion className="w-full" />
       </nav>
 
       <main className="min-w-0 flex-1">{children}</main>

@@ -323,7 +323,7 @@ async function main() {
     sansLecture: options["sans-lecture"],
     sansRedaction: options["sans-redaction"],
   });
-  // S.212 : une preuve de ressources de tiers n'est jamais présentée au modèle.
+  // S.213 : une preuve de ressources de tiers n'est jamais présentée au modèle.
   const { aLire: casDeLecture, horsPerimetre } = partagerLesLectures(selection.lectures);
   const casDeRedaction = selection.redactions;
   if (casDeLecture.length + casDeRedaction.length === 0) {
@@ -868,7 +868,7 @@ ${resume(r.synthese)
 | Lecture des pièces | ${r.jetons.lecture.entree} / ${r.jetons.lecture.sortie} | ${cout(r.coutMicros.lecture)} | ${moyenne(r.lectures)} ms |
 | Rédaction et relecture | ${r.jetons.redaction.entree} / ${r.jetons.redaction.sortie} | ${cout(r.coutMicros.redaction)} | ${moyenne(r.redactions)} ms |
 
-${r.horsPerimetre.length === 0 ? "Aucune pièce hors périmètre." : `Hors périmètre, non appelées (S.212) : ${r.horsPerimetre.map((h) => h.id).join(", ")} — preuve de ressources émise par un tiers ; ni réserve, ni appel, ni verdict.`}
+${r.horsPerimetre.length === 0 ? "Aucune pièce hors périmètre." : `Hors périmètre, non appelées (S.213) : ${r.horsPerimetre.map((h) => h.id).join(", ")} — preuve de ressources émise par un tiers ; ni réserve, ni appel, ni verdict.`}
 
 Total des appels, avis de référence compris : ${r.mesureTotale.entree} / ${r.mesureTotale.sortie} jetons ; ${cout(r.mesureTotale.coutMicros)}.
 Appels à rapprocher : ${r.mesureTotale.appelsARapprocher}. Rapprochement fournisseur : ${r.mesureTotale.rapprochementFournisseur}.

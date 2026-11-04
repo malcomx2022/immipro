@@ -339,7 +339,7 @@ describe("REV11-L5 — vrai CLI, vrais adaptateurs, HTTP local", () => {
       const r = JSON.parse(await readFile(path.join(sortie, dirs[0]!, "resultats.json"), "utf8"));
       expect(code).toBe(simulation === "credule" ? 2 : 0);
       expect(r.qualification).toMatchObject({ nature: "SIMULATION", fournisseurQualifie: false });
-      // S.212 : L06 et L14, preuves de ressources de tiers, ne sont jamais présentées au modèle.
+      // S.213 : L06 et L14, preuves de ressources de tiers, ne sont jamais présentées au modèle.
       expect(r.horsPerimetre.map((h: { id: string }) => h.id)).toEqual(["L06", "L14"]);
       expect(r.lectures).toHaveLength(28);
       expect(r.lectures.map((l: { note: { id: string } }) => l.note.id)).not.toContain("L06");

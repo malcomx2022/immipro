@@ -543,7 +543,7 @@ async function etatDeService() {
       facturation,
       /*
         Les tarifs d'IA lus dans la configuration déployée, et leur
-        échéance — S.212. Des prix, jamais une clé. Un tarif échu ou sans
+        échéance — S.213. Des prix, jamais une clé. Un tarif échu ou sans
         date de fin est dit ici, sans rendre l'instance inapte : il fausse
         un coût dans B-07, il n'empêche pas de servir.
       */

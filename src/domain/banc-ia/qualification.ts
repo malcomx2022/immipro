@@ -40,7 +40,7 @@ export function etatDuPassage(
     fournisseurQualifie: false,
     couverture: {
       pieces: synthese.pieces,
-      // S.212 : rapportée aux pièces présentées au modèle ; les autres sont comptées à part.
+      // S.213 : rapportée aux pièces présentées au modèle ; les autres sont comptées à part.
       piecesAttendues: partagerLesLectures(CAS_DE_LECTURE).aLire.length,
       piecesHorsPerimetre: partagerLesLectures(CAS_DE_LECTURE).horsPerimetre.length,
       redactions: synthese.redactions.total,

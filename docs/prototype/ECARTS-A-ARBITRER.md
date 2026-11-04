@@ -14122,7 +14122,7 @@ motivé et daté dans `audit-exceptions.json`.
 
 Aucun code applicatif, schéma ni service touché ; aucun préalable levé.
 
-## S.212 — raisonnement IA, pièces de tiers du banc, facture et tarifs
+## S.213 — raisonnement IA, pièces de tiers du banc, facture et tarifs
 
 04/11/2026, lot de code demandé par le responsable. Base : `main`
 `b363629` (#337). Deux décisions du responsable, rendues avant le code :
@@ -14134,5 +14134,5 @@ Aucun code applicatif, schéma ni service touché ; aucun préalable levé.
   depuis l'émetteur déclaré au jeu d'essai (L06, L14). Une déclaration de
   l'émetteur au dépôt, en production, reste un autre lot.
 
-Code, tests et reste : [suivi L5, § S.212](../revue/lot-l5-vertex-2026-10-28.md).
+Code, tests et reste : [suivi L5, § S.213](../revue/lot-l5-vertex-2026-10-28.md).
 Aucun préalable levé ; L5 reste ouvert.

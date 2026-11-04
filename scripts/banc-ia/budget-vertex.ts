@@ -47,7 +47,7 @@ const schemaEtat = z
         etat: z.enum(["CONNUE", "PARTIELLE", "INCONNUE", "INVALIDE", "NON_APPELE", "SIMULATION"]),
         jetonsEntree: z.number().int().nonnegative().nullable(),
         jetonsSortie: z.number().int().nonnegative().nullable(),
-        // S.212 : facultatifs, pour que les journaux antérieurs restent lisibles.
+        // S.213 : facultatifs, pour que les journaux antérieurs restent lisibles.
         jetonsRaisonnement: z.number().int().nonnegative().nullable().optional(),
         sourceDuRaisonnement: z.enum(["DETAIL_DE_SORTIE", "GEMINI_THOUGHTS", "ECART_DU_TOTAL"]).optional(),
         fournisseur: z.string().nullable(),

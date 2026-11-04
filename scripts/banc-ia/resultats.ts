@@ -7,7 +7,7 @@ import type { AppelMesure } from "@/server/ia/appel";
 export interface MesureDuBanc {
   etat: MesureDeJetons["etat"] | "NON_APPELE" | "SIMULATION";
   jetonsEntree: number | null;
-  /** Sortie facturée, raisonnement compris quand il est rapporté (S.212). */
+  /** Sortie facturée, raisonnement compris quand il est rapporté (S.213). */
   jetonsSortie: number | null;
   /** La part de raisonnement ; `null` si non rapportée, absente hors fournisseur compatible. */
   jetonsRaisonnement?: number | null;

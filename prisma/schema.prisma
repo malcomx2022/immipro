@@ -787,7 +787,7 @@ model AiUsage {
   model         String?
   inputTokens   Int?
   outputTokens  Int?
-  /// La part de `outputTokens` passée en raisonnement — S.212. Comprise
+  /// La part de `outputTokens` passée en raisonnement — S.213. Comprise
   /// dans la sortie facturée ; nulle quand le fournisseur ne la rapporte
   /// pas, ce qui n'est pas un zéro.
   reasoningTokens Int?

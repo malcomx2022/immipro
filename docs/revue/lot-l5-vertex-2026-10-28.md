@@ -405,7 +405,7 @@ fin du jeu (43 invocations), rapprochement avec
 la facture, deux grilles humaines, DPA, résidence, conservation, incidents réels, configuration déployée.
 **L5 non clôturé**, Q.A et M.C non levés.
 
-## S.212 — raisonnement mesuré, pièces de tiers écartées, facture comparée — 04/11/2026
+## S.213 — raisonnement mesuré, pièces de tiers écartées, facture comparée — 04/11/2026
 
 Lot de code demandé par le responsable (branche `fix/ia-jetons-raisonnement`,
 base `b363629`, #337 fusionnée). Deux décisions rendues avant le code, le

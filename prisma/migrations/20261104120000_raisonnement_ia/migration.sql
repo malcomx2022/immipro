@@ -1,4 +1,4 @@
--- S.212 : la part de raisonnement d'un appel, comprise dans "outputTokens".
+-- S.213 : la part de raisonnement d'un appel, comprise dans "outputTokens".
 -- Additive, sans UPDATE : les lignes existantes restent NULL (« non rapporté »).
 ALTER TABLE "AiUsage" ADD COLUMN "reasoningTokens" INTEGER;
 

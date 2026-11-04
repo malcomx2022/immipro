@@ -27,7 +27,7 @@ let db: { $disconnect(): Promise<void> } | undefined;
 try {
   await cp("prisma/schema.prisma", join(temp, "schema.prisma"));
   for (const fichier of await readdir("prisma/migrations")) {
-    // Une base d'avant L2 ne porte aucune migration postérieure (S.212 dépend de L2).
+    // Une base d'avant L2 ne porte aucune migration postérieure (S.213 dépend de L2).
     if (fichier === "migration_lock.toml" || fichier < migrationL2) await cp(join("prisma/migrations", fichier), join(temp, "migrations", fichier), { recursive: true });
   }
   const config = join(temp, "prisma.config.mjs");
@@ -69,7 +69,7 @@ try {
     "les compteurs invalides ne font pas échouer l'écriture après appel");
   verifier(lignes.find(l => l.operation === "connue")?.costMicros === 810,
     "le coût connu est conservé, même indépendamment de tout verdict publié");
-  // S.212 : la part de raisonnement, comprise dans la sortie facturée et tarifée avec elle.
+  // S.213 : la part de raisonnement, comprise dans la sortie facturée et tarifée avec elle.
   process.env.AI_TARIF_OPENAI_COMPATIBLE_ENTREE_PAR_MILLION = "0.825";
   process.env.AI_TARIF_OPENAI_COMPATIBLE_SORTIE_PAR_MILLION = "4.125";
   process.env.AI_TARIF_OPENAI_COMPATIBLE_DEVISE = "USD";

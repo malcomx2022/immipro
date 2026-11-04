@@ -5,12 +5,12 @@ export interface MesureDeJetons {
   jetonsEntree: number | null;
   /**
    * La sortie **facturée** : texte rendu et raisonnement compris, quand le
-   * fournisseur rapporte le raisonnement (S.212). C'est elle que le coût,
+   * fournisseur rapporte le raisonnement (S.213). C'est elle que le coût,
    * les bornes du banc et B-07 lisent.
    */
   jetonsSortie: number | null;
   /**
-   * La part de `jetonsSortie` passée en raisonnement — S.212. `null` : le
+   * La part de `jetonsSortie` passée en raisonnement — S.213. `null` : le
    * fournisseur ne l'a pas rapportée, ce qui n'est pas un zéro. Absente
    * des mesures qui ne la cherchent pas (Anthropic, historique).
    */
@@ -20,7 +20,7 @@ export interface MesureDeJetons {
 }
 
 /**
- * Où le raisonnement a été lu — S.212.
+ * Où le raisonnement a été lu — S.213.
  *
  * - `DETAIL_DE_SORTIE` : `completion_tokens_details.reasoning_tokens`,
  *   forme OpenAI, déjà **compris** dans `completion_tokens` ;
@@ -49,7 +49,7 @@ export function mesurerLesJetons(entree: unknown, sortie: unknown): MesureDeJeto
 
 /**
  * La mesure d'un bloc `usage` de la forme compatible OpenAI, raisonnement
- * compris — S.212, F-3 de la revue du 31/10.
+ * compris — S.213, F-3 de la revue du 31/10.
  *
  * Le 28/10, Google a facturé 3 201 jetons de sortie pour 1 631 mesurés :
  * l'adaptateur ne lisait que `completion_tokens`. Le raisonnement se lit

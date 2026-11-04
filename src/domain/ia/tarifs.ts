@@ -1,6 +1,6 @@
 /**
  * Les tarifs d'IA tels que la configuration déployée les porte, et leur
- * échéance — S.212.
+ * échéance — S.213.
  *
  * ── Pourquoi une échéance ───────────────────────────────────────────
  *

@@ -1,5 +1,5 @@
 /**
- * Ce que le banc ne présente pas au modèle, et pourquoi — S.212.
+ * Ce que le banc ne présente pas au modèle, et pourquoi — S.213.
  *
  * ── Le constat ──────────────────────────────────────────────────────
  *
@@ -40,7 +40,7 @@ export type EmetteurDeLaPiece =
 export const PIECES_DE_RESSOURCES: ReadonlySet<string> = new Set(["preuve_fonds"]);
 
 export const MOTIF_TIERS_HORS_PERIMETRE =
-  "preuve de ressources émise par un tiers (fondation, garant) : hors du périmètre du banc depuis S.212, après trois lectures abandonnées par délai le 28/10 ; aucune réserve, aucun appel";
+  "preuve de ressources émise par un tiers (fondation, garant) : hors du périmètre du banc depuis S.213, après trois lectures abandonnées par délai le 28/10 ; aucune réserve, aucun appel";
 
 export type ClassementAvantAppel =
   | { classe: "A_LIRE" }
@@ -71,7 +71,7 @@ export function partagerLesLectures<T extends { id: string; codeAttendu: string;
 }
 
 /**
- * Ce qu'un appel non abouti dit du fournisseur — S.212.
+ * Ce qu'un appel non abouti dit du fournisseur — S.213.
  *
  * - `ECHEC_FOURNISSEUR` : le service n'a pas répondu, trop tard, ou faute
  *   de capacité. Ni la pièce ni le modèle ne sont jugés ; la mesure est à

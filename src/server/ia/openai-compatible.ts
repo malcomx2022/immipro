@@ -164,7 +164,7 @@ const lireReponse = (charge: unknown): Reponse => {
   } | null;
   observateurDeLUsage?.(usageNumerique((charge as { usage?: unknown } | null)?.usage));
   // Mesurer avant de lire le contenu : une enveloppe refusée peut avoir coûté.
-  // Le raisonnement est lu et ajouté à la sortie facturée (S.212).
+  // Le raisonnement est lu et ajouté à la sortie facturée (S.213).
   const mesure = mesurerLUsageCompatible(c?.usage);
   if (mesure.etat !== "CONNUE") {
     return { ok: false, cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE, mesure, reponseDecodee: true };

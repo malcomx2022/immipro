@@ -77,7 +77,7 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
-### S.212 — raisonnement IA mesuré, pièces de tiers, facture et tarifs — 04/11/2026
+### S.213 — raisonnement IA mesuré, pièces de tiers, facture et tarifs — 04/11/2026
 
 Lot de code demandé par le responsable, branche `fix/ia-jetons-raisonnement`.
 Base `b363629` (#337 fusionnée). `mesurerLUsageCompatible` lit le
@@ -90,8 +90,24 @@ aucun (S.204). Banc seul : L06 et L14 déclarées de tiers,
 l'échec fournisseur. `banc:ia:comparer` signale un écart mesuré/facturé
 au-delà de 5 %. `/api/health` (détail) porte `tarifsIA` et l'échéance
 `AI_TARIF_*_VALIDE_JUSQU_AU`, sans rendre inapte. L'écart du 28/10 reste
-inexpliqué ; reprise L5 toujours suspendue (S.205). Lire
-[le suivi L5, § S.212](docs/revue/lot-l5-vertex-2026-10-28.md).
+inexpliqué ; reprise L5 toujours suspendue (S.205). Ouvert sous le
+numéro S.212, renuméroté S.213 à la fusion de `main` le 04/11 : S.212 est
+la déconnexion (#338). Lire
+[le suivi L5, § S.213](docs/revue/lot-l5-vertex-2026-10-28.md).
+
+### S.212 — « Se déconnecter » dans les deux espaces — 04/11/2026
+
+Relevé par le responsable : aucun bouton de déconnexion. `DELETE
+/api/comptes/session` (WF-02) existait sans appelant ; sur un poste
+partagé, seule l'échéance fermait la session. `BoutonDeconnexion`
+(`components/layout`) l'appelle, puis recharge `/connexion` en entier
+(`location.replace`) : une navigation interne laisserait au routeur les
+gabarits du compte précédent. Une session déjà échue (401) mène aussi à la
+connexion ; seule une coupure réseau retient l'écran. Placé en bas de la
+colonne candidate, dans l'en-tête mobile et sous la carte de l'opérateur au
+back-office. Test d'écran (mutation détectée) ; parcours « déconnexion au
+back-office » (session supprimée en base, page protégée refermée), 36/36
+en Chromium 1440 et 390. Lire [le lot S.210, § S.212](docs/revue/lot-s210-super-admin-profils-2026-10-31.md).
 
 ### S.211 — un compte interne arrive sur le back-office — 03/11/2026
 

@@ -1,5 +1,5 @@
 /**
- * Compare les jetons mesurés par le banc aux jetons facturés — S.212.
+ * Compare les jetons mesurés par le banc aux jetons facturés — S.213.
  *
  *     npm run banc:ia:comparer -- \
  *       --facture releve-facture-2026-10-28.json \

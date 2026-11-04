@@ -126,7 +126,7 @@ export interface CasDeLecture {
   /** La ligne de checklist où la pièce est déposée. */
   codeAttendu: string;
   /**
-   * Qui a émis la pièce, déclaré à la main — S.212. Seul `TIERS` change
+   * Qui a émis la pièce, déclaré à la main — S.213. Seul `TIERS` change
    * quelque chose : une preuve de ressources de tiers n'est pas présentée
    * au modèle (`classerAvantAppel`).
    */

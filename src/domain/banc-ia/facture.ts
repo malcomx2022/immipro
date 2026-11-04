@@ -1,5 +1,5 @@
 /**
- * Les jetons mesurés par le banc, comparés aux jetons facturés — S.212.
+ * Les jetons mesurés par le banc, comparés aux jetons facturés — S.213.
  *
  * Le 28/10, le banc mesurait 18 034 jetons d'entrée et 1 631 de sortie ;
  * la facture du jour en portait 21 986 et 3 201. L'écart ne s'est vu que

@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * S.212 — le raisonnement mesuré, persisté et tarifé (F-3 de la revue du 31/10).
+ * S.213 — le raisonnement mesuré, persisté et tarifé (F-3 de la revue du 31/10).
  *
  * Le 28/10, Google a facturé 3 201 jetons de sortie pour 1 631 mesurés :
  * l'adaptateur compatible ne lisait que `completion_tokens`. Ces tests
@@ -87,7 +87,7 @@ describe("le coût suit la sortie facturée, raisonnement compris", () => {
     expect(avec).toBe(Math.round(1136 * 0.825 + 231 * 4.125));
     expect(avec! - sans!).toBe(Math.round(202 * 4.125));
   });
-  it("sans raisonnement rapporté, le coût est celui d'avant S.212", () => {
+  it("sans raisonnement rapporté, le coût est celui d'avant S.213", () => {
     const mesure = mesurerLUsageCompatible({ prompt_tokens: 990, completion_tokens: 32 });
     expect(coutMicrosDesJetons(tarif, mesure.jetonsEntree, mesure.jetonsSortie)).toBe(coutMicrosDesJetons(tarif, 990, 32));
   });
