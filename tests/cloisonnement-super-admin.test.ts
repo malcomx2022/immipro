@@ -53,6 +53,8 @@ const acteur = (role: string, id = `${role.toLowerCase()}-1`) => ({
   email: `${id}@immipro.test`,
   role,
   emailVerifie: true,
+  // S.215 : un compte interne n'agit au back-office qu'avec son second facteur.
+  secondFacteurActif: true,
 });
 
 const appeler = (gestionnaire: typeof changerRole, corps: unknown) =>

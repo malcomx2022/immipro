@@ -42,6 +42,12 @@ export interface Acteur {
   role: Role;
   /** Adresse vérifiée. Certaines actions l'exigent, la connexion non. */
   emailVerifie: boolean;
+  /**
+   * Double authentification active — S.215. Obligatoire pour un compte
+   * interne : sans elle, le composeur et les gardes de pages ferment le
+   * back-office (`domain/comptes/hierarchie`, `exigeSecondFacteur`).
+   */
+  secondFacteurActif: boolean;
 }
 
 export interface SessionOuverte {
@@ -87,7 +93,18 @@ export async function lireSession(valeur: string | undefined): Promise<Acteur | 
   if (!valeur) return null;
   const session = await db.session.findUnique({
     where: { tokenHash: empreinteRapide(valeur) },
-    include: { user: { select: { id: true, email: true, role: true, emailVerified: true, suspendedAt: true } } },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          emailVerified: true,
+          suspendedAt: true,
+          secondFacteur: { select: { activeLe: true } },
+        },
+      },
+    },
   });
   if (!session) return null;
 
@@ -113,6 +130,7 @@ export async function lireSession(valeur: string | undefined): Promise<Acteur | 
     email: session.user.email,
     role: session.user.role,
     emailVerifie: session.user.emailVerified !== null,
+    secondFacteurActif: Boolean(session.user.secondFacteur?.activeLe),
   };
 }
 

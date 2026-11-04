@@ -82,7 +82,13 @@ const appeler = (g: Gestionnaire, corps?: unknown, options: { origine?: string; 
     { params: Promise.resolve({}) },
   );
 
-const acteur = (role: string, id = `${role.toLowerCase()}-1`) => ({ id, email: `${id}@immipro.test`, role, emailVerifie: true });
+const acteur = (role: string, id = `${role.toLowerCase()}-1`) => ({
+  id,
+  email: `${id}@immipro.test`,
+  role,
+  emailVerifie: true,
+  secondFacteurActif: true,
+});
 const CIBLE = "6f9619ff-8b86-4d01-b42d-00cf4fc964ff";
 const USER = { id: "awa-1", firstName: "Awa", emailVerified: new Date(), role: "CANDIDAT" };
 

@@ -11,6 +11,7 @@ import type { EchecCandidat } from "@/server/http/echecs";
 import type { EtatDuSecondFacteur } from "@/server/comptes/second-facteur";
 import {
   CHIFFRES_TOTP,
+  DESACTIVATION_INTERDITE_INTERNE,
   NOMBRE_CODES_DE_SECOURS,
   libelleCodesRestants,
   lireLaSaisie,
@@ -44,7 +45,17 @@ type Etape =
   | { nom: "nouveauxCodes" }
   | { nom: "desactivation" };
 
-export function DoubleAuthentification({ etat }: { etat: EtatDuSecondFacteur }) {
+export function DoubleAuthentification({
+  etat,
+  obligatoire = false,
+}: {
+  etat: EtatDuSecondFacteur;
+  /**
+   * Compte interne (S.215) : obligatoire. L'écran dit que le back-office
+   * reste fermé tant qu'elle n'est pas active, et n'offre pas « Désactiver ».
+   */
+  obligatoire?: boolean;
+}) {
   const router = useRouter();
   const [etape, setEtape] = useState<Etape>({ nom: "repos" });
   const [motDePasse, setMotDePasse] = useState("");
@@ -116,7 +127,18 @@ export function DoubleAuthentification({ etat }: { etat: EtatDuSecondFacteur }) 
       ) : null}
       {echecGeneral ? <BlocEchec echec={echecGeneral} annonce /> : null}
 
-      {!etat.disponible && !etat.active ? (
+      {obligatoire && !etat.active ? (
+        <div role="alert" className="flex flex-col gap-1 rounded-md border border-ink-500 bg-ink-100 p-3">
+          <p className="text-14 font-semibold text-ink-900">Obligatoire pour ton rôle</p>
+          <p className="text-pretty text-14 text-ink-700">
+            {etat.disponible
+              ? "Le back-office reste fermé tant que la double authentification n'est pas activée. Active-la ci-dessous : ton mot de passe et une application d'authentification sur ton téléphone suffisent."
+              : "Le back-office reste fermé tant que la double authentification n'est pas activée, et elle n'est pas encore disponible sur ce serveur : l'exploitant doit poser la clé de chiffrement (DEUX_FACTEURS_CLE). Ton espace candidat reste ouvert."}
+          </p>
+        </div>
+      ) : null}
+
+      {!etat.disponible && !etat.active && !obligatoire ? (
         <p className="text-pretty text-14 text-ink-700">
           Pas encore disponible sur ce serveur. Ton compte reste protégé par ton mot de passe, le
           blocage après cinq essais faux et la fermeture des sessions à chaque changement de mot de passe.
@@ -244,13 +266,20 @@ export function DoubleAuthentification({ etat }: { etat: EtatDuSecondFacteur }) 
       ) : null}
 
       {etat.active && etape.nom === "repos" ? (
-        <div className="flex flex-wrap gap-2">
-          <Button variante="secondaire" onClick={() => aller({ nom: "nouveauxCodes" })}>
-            Générer de nouveaux codes de secours
-          </Button>
-          <Button variante="tertiaire" onClick={() => aller({ nom: "desactivation" })}>
-            Désactiver
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variante="secondaire" onClick={() => aller({ nom: "nouveauxCodes" })}>
+              Générer de nouveaux codes de secours
+            </Button>
+            {obligatoire ? null : (
+              <Button variante="tertiaire" onClick={() => aller({ nom: "desactivation" })}>
+                Désactiver
+              </Button>
+            )}
+          </div>
+          {obligatoire ? (
+            <p className="text-pretty text-13 text-ink-500">{DESACTIVATION_INTERDITE_INTERNE}</p>
+          ) : null}
         </div>
       ) : null}
 

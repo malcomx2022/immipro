@@ -339,3 +339,17 @@ export function libelleCodesRestants(restants: number): string {
 
 /** Le titre du refus qui ramène au mot de passe : défi échu, épuisé ou servi. */
 export const TITRE_CONNEXION_A_RECOMMENCER = "Connexion à recommencer";
+
+/**
+ * Le refus d'un compte interne sans second facteur — S.215. Il dit quoi
+ * faire et où : l'activation ne demande que le mot de passe et le téléphone.
+ */
+export const SECOND_FACTEUR_REQUIS =
+  "La double authentification est obligatoire pour le back-office. Active-la depuis « Sécurité du compte » (/compte/securite) : ton mot de passe et une application d'authentification sur ton téléphone suffisent.";
+
+/** Le chemin où un compte interne sans second facteur est renvoyé. */
+export const CHEMIN_ACTIVATION_EXIGEE = "/compte/securite?exige=1";
+
+/** Pourquoi « Désactiver » n'est pas offert à un compte interne — S.215. */
+export const DESACTIVATION_INTERDITE_INTERNE =
+  "Ton rôle exige la double authentification : elle ne se désactive pas. Pour changer de téléphone, demande à un super-administrateur de la réinitialiser depuis Utilisateurs ; tu la réactiveras avec le nouveau téléphone à la connexion suivante.";

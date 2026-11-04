@@ -48,7 +48,9 @@ Créer l'environnement `production` et y exiger une approbation manuelle : le d�
 ssh <user>@<vps>
 sudo mkdir -p /srv/immipro && sudo chown $USER /srv/immipro
 cd /srv/immipro
-# créer .env.app, .env.db, .env.minio à partir de .env.example, et
+# créer .env.app, .env.db, .env.minio à partir de .env.example — avec
+# DEUX_FACTEURS_CLE (openssl rand -base64 32), sans laquelle aucun compte
+# interne n'ouvre le back-office (docs/exploitation/second-facteur.md) —, et
 # .env.sauvegarde (BACKUP_GPG_RECIPIENT) — ces fichiers ne sont jamais
 # versionnés. docker-compose.prod.yml et scripts/deployer.sh sont recopiés
 # par chaque déploiement (docs/exploitation/deploiement.md).

@@ -170,3 +170,43 @@ connexions sur vingt avec un code de secours. Les deux sont rouges.
 - La réinitialisation B-03 ne vérifie pas l'identité de la personne : elle
   exige un motif qui dit comment elle l'a été.
 - Lecteur d'écran humain non joué sur ces écrans (même limite que L6).
+
+## S.215 — obligatoire pour les comptes internes — 04/11/2026
+
+Demandé par le responsable après la fusion de S.214 (#341, `f1ada94`) :
+« rends la 2FA obligatoire pour les comptes internes ». Tranche la limite
+« Optionnelle pour tous » ci-dessus.
+
+| Point | Règle |
+|---|---|
+| Qui | `exigeSecondFacteur(role)` = compte interne (VEILLEUR, ADMIN, SUPER_ADMIN), dans `domain/comptes/hierarchie` |
+| Routes | le composeur refuse `veilleur`, `admin`, `super_admin` à un compte interne sans `secondFacteurActif` : 409, « active-la depuis Sécurité du compte » ; champ absent = inactif (échec fermé) |
+| Pages | `exigerVeilleur`, `exigerAdmin`, `exigerSuperAdmin` renvoient sur `/compte/securite?exige=1` ; la session reste ouverte |
+| Espace candidat | inchangé : un compte interne sans second facteur garde ses routes candidat, dont l'activation |
+| Désactivation | refusée à un compte interne (rôle relu en base) ; l'écran n'offre pas le bouton et dit de demander une réinitialisation |
+| Secours | `dist/reinitialiser-second-facteur.mjs` (console, motif, auteur `console:<nom>`), quand plus aucun super-administrateur n'ouvre le back-office |
+| Exploitation | `/api/health` (détail) : `secondFacteur.cle` `posee` ou `absente` |
+| Recette | la graine enrôle les opérateurs de démonstration quand la clé est posée et écrit leur secret au journal du banc ; les parcours calculent leurs codes (pas neuf attendu, pas de rejeu) |
+
+Lu à chaque appel en base, comme la suspension : une activation ouvre le
+back-office sans reconnexion, une réinitialisation le referme au geste
+suivant.
+
+**Preuves.** `tests/second-facteur-obligatoire.test.ts` (composeur réel :
+trois niveaux refusés sans second facteur, ouverts avec, routes candidat
+ouvertes, champ absent refusé ; gardes de pages ; désactivation refusée),
+`tests/ui/deux-facteurs.test.tsx` (bandeau « obligatoire », clé absente,
+« Désactiver » retiré). Parcours « compte interne » : candidat promu
+VEILLEUR par la console, `/veille` renvoyé sur Sécurité, route en 409,
+activation, `/veille` ouvert, désactivation refusée en 409, rôle rendu et
+second facteur réinitialisé par la console (journal `console:…`). Porte :
+lint, typecheck, 221 fichiers / 4 414 tests, `check:copy`, `smoke:second-facteur`,
+`smoke:role`, build ; parcours 76/76 en Chromium 390 et 1440, Firefox et
+WebKit laissés à la CI.
+
+**Limites.** Clé à poser **avant** le déploiement (procédure :
+`docs/exploitation/second-facteur.md`) : sans elle, le back-office est fermé
+à tous les comptes internes — échec fermé voulu. Les scripts manuels
+`scripts/recette/recette-documentaire.py` et `revue-navigateur.py`, hors
+porte, se connectent en administrateur sans second temps : à adapter avant
+leur prochain usage.

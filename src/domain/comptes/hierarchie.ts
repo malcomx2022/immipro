@@ -53,6 +53,19 @@ export const rolesAuMoins = (requis: RoleDeCompte): RoleDeCompte[] =>
 /** Un compte interne est un compte du back-office : veilleur et au-dessus. */
 export const estInterne = (role: RoleDeCompte): boolean => couvre(role, "VEILLEUR");
 
+/**
+ * La double authentification est obligatoire pour un compte interne —
+ * S.215, décision du responsable du 04/11/2026. Un compte interne sans
+ * second facteur actif n'ouvre aucune page ni aucune route du
+ * back-office ; il garde son espace candidat et « Sécurité du compte »,
+ * où il l'active. Le candidat reste libre de l'activer ou non.
+ */
+export const exigeSecondFacteur = (role: RoleDeCompte): boolean => estInterne(role);
+
+/** Le back-office est-il ouvert à ce compte ? Rôle suffisant et, s'il est interne, second facteur actif. */
+export const backOfficeOuvert = (role: RoleDeCompte, requis: RoleDeCompte, secondFacteurActif: boolean): boolean =>
+  couvre(role, requis) && (!exigeSecondFacteur(role) || secondFacteurActif);
+
 /** Changer un rôle depuis le back-office : le sommet seul (un ADMIN ne peut plus rien changer). */
 export const peutChangerLesRoles = (role: RoleDeCompte): boolean => role === "SUPER_ADMIN";
 

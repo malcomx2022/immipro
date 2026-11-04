@@ -13,11 +13,13 @@ import {
   depuisBase32,
   etatDuBlocage,
   formaterCodeDeSecours,
+  DESACTIVATION_INTERDITE_INTERNE,
   libelleDuRefus,
   lireLaSaisie,
   verifierLeCode,
 } from "@/domain/comptes/deux-facteurs";
 import { MOTIF_MAX, MOTIF_MIN } from "@/domain/comptes/role";
+import { exigeSecondFacteur, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 
 /**
  * Double authentification — S.214, WF-02.
@@ -360,6 +362,12 @@ export async function desactiverLeSecondFacteur(
   saisie: string,
   jetonDeSessionCourante: string | undefined,
 ): Promise<{ sessionsFermees: number }> {
+  // S.215 : un compte interne ne retire pas son second facteur. Le rôle est
+  // relu en base, pas pris de la session : une promotion récente compte.
+  const compte = await db.user.findUnique({ where: { id: acteur.id }, select: { role: true } });
+  if (compte && exigeSecondFacteur(compte.role as RoleDeCompte)) {
+    throw echec("etat_incompatible", { corps: DESACTIVATION_INTERDITE_INTERNE });
+  }
   await exigerLeMotDePasse(acteur.id, motDePasse);
   const issue = await verifierUneSaisie(acteur.id, saisie);
   if (!issue.acceptee) throw echec("champs_invalides", { champs: { code: issue.message } });

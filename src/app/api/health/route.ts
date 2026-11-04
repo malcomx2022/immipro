@@ -1,3 +1,4 @@
+import { VARIABLE_CLE, cleMaitresse } from "@/server/securite/chiffrement";
 import { db } from "@/lib/db";
 import { route } from "@/server/http/route";
 import { lecteurExploitant } from "@/server/exploitation/lecteur";
@@ -548,6 +549,16 @@ async function etatDeService() {
         un coût dans B-07, il n'empêche pas de servir.
       */
       tarifsIA: etatDesTarifs(process.env, fournisseursATarifer(process.env, []), jourCivil(new Date())),
+      /*
+        S.215 : la clé de la double authentification. Absente, aucun compte
+        interne ne peut l'activer, donc aucun n'ouvre le back-office. Dit
+        ici, sans rendre l'instance inapte : le site candidat sert.
+      */
+      secondFacteur: {
+        variable: VARIABLE_CLE,
+        cle: cleMaitresse() ? "posee" : "absente",
+        obligatoirePour: "VEILLEUR, ADMIN, SUPER_ADMIN",
+      },
       fournisseursDePaiement: (() => {
         const lu = fournisseursDeclares(process.env[CLE_FOURNISSEURS]);
         return {

@@ -10,7 +10,8 @@ import { json, reponseEchec, type OptionsReponse, type Public } from "./reponse"
 import { adresseDeLAppelant, cleDAppel, consommer, type NomRegle } from "./limites";
 import { COOKIE_SESSION, lireSession, type Acteur } from "@/server/securite/session";
 import { journaliser } from "@/server/acces/journal";
-import { rolesAuMoins } from "@/domain/comptes/hierarchie";
+import { exigeSecondFacteur, rolesAuMoins, type RoleDeCompte } from "@/domain/comptes/hierarchie";
+import { SECOND_FACTEUR_REQUIS } from "@/domain/comptes/deux-facteurs";
 
 /**
  * Composition d'une route d'API.
@@ -51,6 +52,9 @@ const ROLES_ADMIS: Record<Exclude<Acces, "public">, readonly Role[]> = {
   admin: rolesAuMoins("ADMIN"),
   super_admin: rolesAuMoins("SUPER_ADMIN"),
 };
+
+/** Les niveaux du back-office : ceux qui exigent le second facteur d'un compte interne (S.215). */
+const ACCES_INTERNES: ReadonlySet<Acces> = new Set(["veilleur", "admin", "super_admin"]);
 
 const PUBLIC_PAR_ACCES: Record<Acces, Public> = {
   public: "candidat",
@@ -188,6 +192,15 @@ export function route<C = undefined, Q = undefined>(
           throw echec("droits_insuffisants");
         }
         destinataireEffectif = destinataire;
+        // S.215 : un compte interne n'agit au back-office qu'avec son second
+        // facteur actif. Il garde ses routes candidat — dont celle qui l'active.
+        if (
+          ACCES_INTERNES.has(definition.acces) &&
+          exigeSecondFacteur(acteur.role as RoleDeCompte) &&
+          acteur.secondFacteurActif !== true
+        ) {
+          throw echec("etat_incompatible", { corps: SECOND_FACTEUR_REQUIS });
+        }
         if (definition.acces === "candidat_verifie" && !acteur.emailVerifie) {
           throw echec("etat_incompatible", {
             corps:
