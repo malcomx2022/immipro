@@ -77,6 +77,20 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.212 — « Se déconnecter » dans les deux espaces — 04/11/2026
+
+Relevé par le responsable : aucun bouton de déconnexion. `DELETE
+/api/comptes/session` (WF-02) existait sans appelant ; sur un poste
+partagé, seule l'échéance fermait la session. `BoutonDeconnexion`
+(`components/layout`) l'appelle, puis recharge `/connexion` en entier
+(`location.replace`) : une navigation interne laisserait au routeur les
+gabarits du compte précédent. Une session déjà échue (401) mène aussi à la
+connexion ; seule une coupure réseau retient l'écran. Placé en bas de la
+colonne candidate, dans l'en-tête mobile et sous la carte de l'opérateur au
+back-office. Test d'écran (mutation détectée) ; parcours « déconnexion au
+back-office » (session supprimée en base, page protégée refermée), 36/36
+en Chromium 1440 et 390. Lire [le lot S.210, § S.212](docs/revue/lot-s210-super-admin-profils-2026-10-31.md).
+
 ### S.211 — un compte interne arrive sur le back-office — 03/11/2026
 
 Demandé par le responsable après la mise en service de S.210 : connecté,
