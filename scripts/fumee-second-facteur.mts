@@ -253,7 +253,7 @@ try {
   // joués ensemble sans transaction sérialisable, les trois liraient « 3 »
   // et la plateforme n'aurait plus de sommet. Un acteur suspendu entre-temps
   // ne suspend plus personne.
-  const acteurDe = (u: { id: string; email: string; role: string }) => ({ id: u.id, email: u.email, role: u.role as "SUPER_ADMIN", emailVerifie: true });
+  const acteurDe = (u: { id: string; email: string; role: string }) => ({ id: u.id, email: u.email, role: u.role as "SUPER_ADMIN", emailVerifie: true, secondFacteurActif: true });
   const issue = await Promise.allSettled([
     suspendreOuRetablir(acteurDe(sommet), { userId: s2.id, suspendre: true, motif: "Départ de l'équipe" }),
     suspendreOuRetablir(acteurDe(s2), { userId: s3.id, suspendre: true, motif: "Départ de l'équipe" }),
@@ -311,9 +311,12 @@ try {
   verifier((await db.session.count({ where: { userId: candidat.id } })) === 0, "dans tous les cas, les sessions du compte sont fermées");
 
   const role = await db.auditLog.findFirst({ where: { action: "compte.role", target: `user:${candidat.id}` } });
+  // Selon l'ordre des deux transactions, la promotion aboutit ou perd la
+  // course (refus « relancez ») : seule une promotion réelle porte sa ligne.
+  const promu = promotion.status === "fulfilled" && promotion.value.issue === "change";
   verifier(
-    promotion.status !== "fulfilled" || (promotion.value.issue === "change" && role !== null),
-    "un rôle changé porte sa ligne de journal",
+    promu ? role !== null && relu.role === "SUPER_ADMIN" : role === null && relu.role !== "SUPER_ADMIN",
+    `un rôle changé porte sa ligne de journal, un refus n'en écrit aucune (${promu ? "promu" : "refusé"})`,
   );
 } finally {
   await db.$disconnect();

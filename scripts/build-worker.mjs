@@ -189,6 +189,33 @@ const octetsRole = Object.values(role.metafile.outputs).find((o) => o.entryPoint
 console.log(`dist/changer-role.mjs — ${(octetsRole / 1024).toFixed(0)} Kio`);
 
 /*
+  La réinitialisation d'un second facteur depuis la console (S.215), même
+  image et même méthode. L'issue de secours quand plus aucun
+  super-administrateur ne peut ouvrir le back-office :
+
+      docker compose -f docker-compose.prod.yml run --rm app node dist/reinitialiser-second-facteur.mjs \
+        --email <adresse> --par "<votre nom>" --motif "<pourquoi>"
+*/
+const secondFacteur = await build({
+  entryPoints: ["scripts/reinitialiser-second-facteur.mts"],
+  outfile: "dist/reinitialiser-second-facteur.mjs",
+  bundle: true,
+  platform: "node",
+  target: "node24",
+  format: "esm",
+  banner: REQUIRE_EN_ESM,
+  external: EXTERNES,
+  tsconfig: "tsconfig.json",
+  sourcemap: true,
+  logLevel: "info",
+  metafile: true,
+});
+
+const octetsSecondFacteur =
+  Object.values(secondFacteur.metafile.outputs).find((o) => o.entryPoint)?.bytes ?? 0;
+console.log(`dist/reinitialiser-second-facteur.mjs — ${(octetsSecondFacteur / 1024).toFixed(0)} Kio`);
+
+/*
   Le diagnostic d'un paiement (S.116), même image et même méthode. Lecture
   seule — base, journal, fournisseur —, sans donnée du payeur :
 

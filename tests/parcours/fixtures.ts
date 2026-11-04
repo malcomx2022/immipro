@@ -6,9 +6,10 @@
  * la commande d'exploitation elle-même, lancée sur le banc.
  */
 import { Client } from "pg";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { codeAuPas, depuisBase32, pasDeTemps } from "../../src/domain/comptes/deux-facteurs";
 
 export const BASE = "immipro_recette_parcours";
 export const JOURNAL = ".recette/parcours-banc.log";
@@ -52,6 +53,46 @@ export function motDePasseDuBanc(): string {
   const m = /Mot de passe des comptes de démonstration : (\S+)/u.exec(journal());
   if (!m) throw Error("Mot de passe synthétique du banc absent du journal.");
   return m[1]!;
+}
+
+/**
+ * Le secret TOTP d'un opérateur de démonstration, écrit une fois par la
+ * graine (S.215) ; `null` pour un compte sans second facteur.
+ */
+export function secretTotpDuBanc(email: string): string | null {
+  const echappe = email.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const m = new RegExp(`second facteur ${echappe} : ([A-Z2-7]+)`, "u").exec(journal());
+  return m ? m[1]! : null;
+}
+
+const hmacSha1 = (cle: Uint8Array, message: Uint8Array) =>
+  new Uint8Array(createHmac("sha1", cle).update(message).digest());
+
+/** Le code qu'afficherait l'application du téléphone (RFC 6238). */
+export const codeTotp = (secret: string, pas = pasDeTemps(Date.now())): string =>
+  codeAuPas(depuisBase32(secret)!, pas, hmacSha1);
+
+/**
+ * Un code neuf pour ce compte : si le pas courant a déjà servi (connexion
+ * précédente dans les mêmes trente secondes), on attend le suivant — un
+ * code rejoué est refusé, et c'est voulu.
+ */
+export async function codeTotpNeuf(email: string, secret: string): Promise<string> {
+  const dernier = async () =>
+    Number(
+      (
+        await lire<{ pas: string | null }>(
+          `SELECT s."dernierPas"::text AS pas FROM "SecondFacteur" s JOIN "User" u ON u.id = s."userId" WHERE u.email = $1`,
+          [email],
+        )
+      )[0]?.pas ?? -1,
+    );
+  const fin = Date.now() + 40_000;
+  while (pasDeTemps(Date.now()) <= (await dernier())) {
+    if (Date.now() > fin) throw Error(`Aucun pas neuf pour ${email} après quarante secondes.`);
+    await new Promise((ok) => setTimeout(ok, 500));
+  }
+  return codeTotp(secret);
 }
 
 export function origineDesFournisseurs(): string {
@@ -204,6 +245,23 @@ export function purgerALaMain(par: string): { code: number | null; sortie: strin
       MINIO_BUCKET_QUARANTAINE: "immipro-quarantaine",
       MINIO_PUBLIC_URL: `http://localhost:${port}`,
     },
+  });
+  return { code: r.status, sortie: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+}
+
+/**
+ * Une commande de la console d'exploitation (S.115, S.215), lancée sur la
+ * base du banc : changer un rôle, réinitialiser un second facteur. C'est la
+ * commande de l'image, par ses sources ; elle journalise comme en production.
+ */
+export function commandeDeConsole(
+  script: "changer-role" | "reinitialiser-second-facteur",
+  args: string[],
+): { code: number | null; sortie: string } {
+  const r = spawnSync("npx", ["tsx", `scripts/${script}.mts`, ...args], {
+    encoding: "utf8",
+    timeout: 120_000,
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: "production", DATABASE_URL: cible() },
   });
   return { code: r.status, sortie: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }

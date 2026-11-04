@@ -3,7 +3,7 @@ import { Securite } from "./Securite";
 import { exigerCandidat } from "@/server/securite/page";
 import { etatDeSecurite } from "@/server/acces/profil";
 import { etatDuSecondFacteur } from "@/server/comptes/second-facteur";
-import { estInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
+import { estInterne, exigeSecondFacteur, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 
 /**
  * « Sécurité » — S.210. Partagé par les candidats et les comptes
@@ -23,12 +23,18 @@ export default async function PageSecurite() {
     etatDeSecurite(acteur.id),
     etatDuSecondFacteur(acteur.id),
   ]);
+  const role = acteur.role as RoleDeCompte;
+  // S.215 : obligatoire pour un compte interne. Tant qu'elle n'est pas
+  // active, « Mon compte interne » (back-office) est fermé : le retour mène
+  // à l'espace candidat, que le compte garde.
+  const obligatoire = exigeSecondFacteur(role);
   return (
     <Securite
       email={acteur.email}
       etat={etat}
       secondFacteur={secondFacteur}
-      retour={estInterne(acteur.role as RoleDeCompte) ? "/mon-compte" : "/compte"}
+      obligatoire={obligatoire}
+      retour={estInterne(role) && secondFacteur.active ? "/mon-compte" : estInterne(role) ? "/tableau-de-bord" : "/compte"}
     />
   );
 }

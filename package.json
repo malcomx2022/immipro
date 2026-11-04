@@ -47,6 +47,7 @@
     "smoke:second-facteur": "tsx scripts/fumee-second-facteur.mts",
     "smoke:editoriale": "tsx scripts/fumee-editoriale.mts",
     "compte:role": "tsx scripts/changer-role.mts",
+    "compte:second-facteur": "tsx scripts/reinitialiser-second-facteur.mts",
     "smoke:diagnostic": "tsx scripts/fumee-diagnostic.mts",
     "paiement:diagnostic": "tsx scripts/diagnostic-paiement.mts",
     "donnees:diagnostic": "tsx scripts/diagnostic-donnees.mts",

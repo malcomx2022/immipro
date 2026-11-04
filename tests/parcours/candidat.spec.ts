@@ -31,10 +31,13 @@ import {
 import { CONSEQUENCE_ETAT, LIBELLE_ETAT } from "../../src/domain/backoffice/consultants";
 import { EDITORIAL } from "../../src/lib/contenu/destinations";
 import { jourCivil } from "../../src/domain/format/fuseau";
-import { createHmac } from "node:crypto";
-import { codeAuPas, depuisBase32, pasDeTemps } from "../../src/domain/comptes/deux-facteurs";
+import { pasDeTemps } from "../../src/domain/comptes/deux-facteurs";
 import {
   codeDeVerification,
+  codeTotp,
+  codeTotpNeuf,
+  commandeDeConsole,
+  secretTotpDuBanc,
   controlerLesFournisseurs,
   echoirLaPurge,
   journal,
@@ -294,7 +297,21 @@ async function connecter(
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasse);
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
+  await secondTempsSiDemande(p, adresse);
   await p.waitForURL((u) => u.pathname === suite);
+}
+
+/**
+ * S.215 — un compte interne a toujours un second facteur : après le mot de
+ * passe, l'écran demande le code, calculé ici depuis le secret que la graine
+ * a écrit. Un candidat sans second facteur passe sans rien saisir.
+ */
+async function secondTempsSiDemande(p: Page, adresse: string) {
+  const secret = secretTotpDuBanc(adresse);
+  if (!secret) return;
+  await expect(p.getByRole("heading", { level: 1 })).toHaveText("Double authentification");
+  await p.getByLabel("Code à six chiffres", { exact: true }).fill(await codeTotpNeuf(adresse, secret));
+  await p.getByRole("button", { name: "Vérifier et me connecter", exact: true }).click();
 }
 
 /** Un opérateur, au bureau, dans son propre contexte, arrivé sur `suite`. */
@@ -310,6 +327,7 @@ async function operateur(adresse: string, suite: string): Promise<Page> {
   await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasseDuBanc());
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
+  await secondTempsSiDemande(p, adresse);
   await p.waitForURL(`**${suite}`);
   return p;
 }
@@ -594,10 +612,6 @@ test("Mon compte : refus avant l'envoi, enregistrement, relecture en base et à 
  * codes en empreinte, défi sans session, rejeu refusé sans session, code
  * de secours consommé et journalisé, désactivation qui efface tout.
  */
-const hmacSha1 = (cle: Uint8Array, message: Uint8Array) =>
-  new Uint8Array(createHmac("sha1", cle).update(message).digest());
-const codeTotp = (secret: string, pas = pasDeTemps(Date.now())) =>
-  codeAuPas(depuisBase32(secret)!, pas, hmacSha1);
 
 test("double authentification : activation par la clé, connexion en deux temps, rejeu refusé, code de secours, désactivation", async () => {
   const etat = async () =>
@@ -647,17 +661,19 @@ test("double authentification : activation par la clé, connexion en deux temps,
   const code = codeTotp(secret);
 
   /*
-    Sortie par « Se déconnecter », qui recharge /connexion en entier : pas
-    de `goto("/connexion")`, que Firefox double sans l'achever (S.193, S.197 ;
-    vu de nouveau ici sur firefox-1440). La session de cet onglet est
-    supprimée en base.
+    Sortie sans aucune navigation de document vers /connexion : Firefox la
+    double sans l'achever (S.193, S.197), que ce soit un `goto` ou la
+    recharge de « Se déconnecter » (vu sur firefox-1440 puis firefox-390).
+    La session se ferme par la route de déconnexion — supprimée en base, le
+    cookie effacé dans le contexte —, puis le parcours suit les liens du
+    candidat : l'accueil, puis « Connexion » de l'en-tête, comme R-O05.
   */
   const deuxTemps = async () => {
-    if (new URL(page.url()).pathname !== "/tableau-de-bord") await aller("/tableau-de-bord");
-    await Promise.all([
-      page.waitForURL((u) => u.pathname === "/connexion"),
-      page.getByRole("button", { name: "Se déconnecter", exact: true }).first().click(),
-    ]);
+    const sortie = await page.request.delete("/api/comptes/session");
+    expect(sortie.status()).toBe(204);
+    await aller("/");
+    await page.getByRole("banner").getByRole("link", { name: "Connexion", exact: true }).click();
+    await page.waitForURL((u) => u.pathname === "/connexion");
     await attendreLHydratation(page, "form");
     await page.getByLabel("Adresse email", { exact: true }).fill(email);
     await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
@@ -721,6 +737,78 @@ test("double authentification : activation par la clé, connexion en deux temps,
   preuves.push({
     controle:
       "S.214 2FA : secret chiffré, dix codes en empreinte, mot de passe sans session, code neuf accepté, rejeu refusé, code de secours unique et journalisé, désactivation sous mot de passe et code",
+    conforme: true,
+  });
+});
+
+/**
+ * S.215 — la double authentification est obligatoire pour un compte
+ * interne. Le candidat du profil est promu analyste réglementaire par la
+ * console (comme en production) : le back-office lui reste fermé — page
+ * renvoyée sur « Sécurité du compte », route refusée — jusqu'à l'activation,
+ * puis s'ouvre ; « Désactiver » n'est plus offert. Il est ensuite rendu
+ * candidat, et son second facteur réinitialisé par la console, ce qui
+ * éprouve l'issue de secours et laisse les parcours suivants inchangés.
+ */
+test("compte interne : back-office fermé sans double authentification, ouvert après l'activation", async () => {
+  const par = `Recette S.215 ${moteur}-${largeur}`;
+  const promotion = commandeDeConsole("changer-role", [
+    "--email", email, "--role", "VEILLEUR", "--par", par, "--motif", "Promotion de recette, double authentification obligatoire",
+  ]);
+  expect(promotion.code, promotion.sortie).toBe(0);
+  // Le changement de rôle a fermé les sessions : reconnexion, sans second facteur.
+  await connecter(page, email, MOT_DE_PASSE, "/compte/securite");
+  expect(new URL(page.url()).searchParams.get("exige")).toBe("1");
+  await attendreLHydratation(page);
+  await expect(page.getByRole("alert").filter({ hasText: "Obligatoire pour ton rôle" })).toBeVisible();
+
+  // La page du back-office renvoie ici ; la route refuse, et dit quoi faire.
+  await aller("/veille");
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/compte/securite");
+  const refus = await page.request.get("/api/admin/veille");
+  expect(refus.status()).toBe(409);
+  expect(JSON.stringify(await refus.json())).toMatch(/obligatoire pour le back-office/u);
+
+  // Activation, puis le back-office s'ouvre sans reconnexion.
+  await page.getByRole("button", { name: "Activer la double authentification", exact: true }).click();
+  await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  const secret = (await page.getByTestId("secret-totp").innerText()).replace(/\s/gu, "");
+  await page.getByLabel("Code à six chiffres", { exact: true }).fill(codeTotp(secret));
+  await page.getByRole("button", { name: "Confirmer l'activation", exact: true }).click();
+  await expect(page.getByTestId("codes-de-secours")).toBeVisible();
+  await page.getByRole("button", { name: "J'ai noté mes codes", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Désactiver", exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Ton rôle exige la double authentification/u)).toBeVisible();
+  expect((await page.request.get("/api/admin/veille")).status()).toBe(200);
+  await aller("/veille");
+  expect(new URL(page.url()).pathname).toBe("/veille");
+
+  // La route de désactivation refuse aussi, même avec un code juste.
+  const desactivation = await page.request.post("/api/comptes/second-facteur", {
+    data: { action: "desactiver", motDePasse: MOT_DE_PASSE, code: "000000" },
+  });
+  expect(desactivation.status()).toBe(409);
+  expect(JSON.stringify(await desactivation.json())).toMatch(/ne se désactive pas/u);
+
+  // Retour à l'état candidat : rôle par la console, second facteur réinitialisé par la console.
+  expect(
+    commandeDeConsole("changer-role", ["--email", email, "--role", "CANDIDAT", "--par", par, "--motif", "Fin de la promotion de recette"]).code,
+  ).toBe(0);
+  const reinit = commandeDeConsole("reinitialiser-second-facteur", [
+    "--email", email, "--par", par, "--motif", "Fin de la recette, identité du compte synthétique connue",
+  ]);
+  expect(reinit.code, reinit.sortie).toBe(0);
+  const [trace] = await lire<{ acteur: string; n: string }>(
+    `SELECT max("actorId") AS acteur, count(*) AS n FROM "AuditLog"
+      WHERE action = 'compte.second_facteur.reinitialisation' AND target = $1`,
+    [`user:${compte}`],
+  );
+  expect(trace).toMatchObject({ acteur: `console:${par}`, n: "1" });
+  await connecter(page, email, MOT_DE_PASSE);
+  preuves.push({
+    controle:
+      "S.215 : compte interne sans 2FA renvoyé vers Sécurité, route du back-office refusée (409), activation qui ouvre le back-office, désactivation refusée, réinitialisation par la console journalisée",
     conforme: true,
   });
 });

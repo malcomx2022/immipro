@@ -30,10 +30,12 @@ export interface SecuriteProps {
   email: string;
   etat: EtatDeSecurite;
   secondFacteur: EtatDuSecondFacteur;
+  /** Compte interne : la double authentification est obligatoire (S.215). */
+  obligatoire?: boolean;
   retour: string;
 }
 
-export function Securite({ email, etat, secondFacteur, retour }: SecuriteProps) {
+export function Securite({ email, etat, secondFacteur, obligatoire = false, retour }: SecuriteProps) {
   const router = useRouter();
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -57,7 +59,11 @@ export function Securite({ email, etat, secondFacteur, retour }: SecuriteProps) 
   return (
     <div className="mx-auto flex w-full max-w-reglages flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
       <Link href={retour} className="text-14 font-semibold text-ink-900">
-        {retour === "/mon-compte" ? "Revenir à mon compte interne" : "Revenir à mon compte"}
+        {retour === "/mon-compte"
+          ? "Revenir à mon compte interne"
+          : retour === "/tableau-de-bord"
+            ? "Revenir à mon espace candidat"
+            : "Revenir à mon compte"}
       </Link>
 
       <div className="flex flex-col gap-2">
@@ -119,7 +125,7 @@ export function Securite({ email, etat, secondFacteur, retour }: SecuriteProps) 
         )}
       </section>
 
-<DoubleAuthentification etat={secondFacteur} />
+<DoubleAuthentification etat={secondFacteur} obligatoire={obligatoire} />
     </div>
   );
 }

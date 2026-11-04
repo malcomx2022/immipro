@@ -77,6 +77,23 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.215 — double authentification obligatoire pour les comptes internes — 04/11/2026
+
+Demandé par le responsable après la fusion de S.214 (#341). Base `f1ada94`.
+`exigeSecondFacteur` (domaine, `hierarchie`) : VEILLEUR, ADMIN, SUPER_ADMIN.
+La session porte `secondFacteurActif` ; le composeur refuse toute route
+`veilleur`/`admin`/`super_admin` sans lui (409, message qui dit où l'activer),
+les gardes de pages renvoient sur `/compte/securite?exige=1`. Les routes
+candidat restent ouvertes, dont celle qui l'active. Un compte interne ne la
+désactive pas (rôle relu en base). Issue de secours :
+`dist/reinitialiser-second-facteur.mjs`, journalisée `console:<nom>`.
+`/api/health` (détail) dit `secondFacteur.cle`. La graine enrôle les
+opérateurs quand la clé est posée ; les parcours calculent leurs codes.
+**Poser `DEUX_FACTEURS_CLE` avant de déployer** : sans elle, aucun compte
+interne n'ouvre le back-office. Lire
+[la procédure](docs/exploitation/second-facteur.md) et
+[le lot, § S.215](docs/revue/lot-s214-securite-comptes-2026-11-04.md).
+
 ### S.214 — sessions, rôles et double authentification — 04/11/2026
 
 Lot demandé par le responsable (« points de sécurité »). Base `aa205d4`

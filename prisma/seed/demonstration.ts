@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { creerClientPrisma } from "../../src/lib/client-prisma";
 import { empreinte } from "../../src/server/securite/secret";
+import { chiffrer, cleMaitresse } from "../../src/server/securite/chiffrement";
+import { secretNeuf } from "../../src/server/securite/totp";
 import { checklistDepuis, echeancesDepuis } from "../../src/server/acces/dossiers";
 import { payload } from "../../src/server/acces/regles";
 import { getPack } from "../../src/domain/payments/pricing";
@@ -393,6 +395,28 @@ async function main() {
       },
     });
     console.log(`✓ ${operateur.role.toLowerCase()} ${operateur.email}`);
+  }
+
+  /*
+    S.215 : la double authentification est obligatoire pour un compte
+    interne. Les opérateurs de démonstration naissent enrôlés quand la clé
+    est posée, et leur secret est écrit une fois, ici, comme le mot de
+    passe : c'est ce qu'un banc relit pour calculer leurs codes. Sans clé,
+    ils n'ouvrent pas le back-office — c'est la règle, pas un défaut du jeu.
+  */
+  if (cleMaitresse()) {
+    for (const operateur of OPERATEURS) {
+      const compte = await prisma.user.findUniqueOrThrow({ where: { email: operateur.email }, select: { id: true } });
+      const secretTotp = secretNeuf();
+      await prisma.secondFacteur.create({
+        data: { userId: compte.id, secretChiffre: chiffrer(secretTotp, compte.id), activeLe: new Date() },
+      });
+      console.log(`✓ second facteur ${operateur.email} : ${secretTotp}`);
+    }
+  } else {
+    console.log(
+      "  Opérateurs sans double authentification : DEUX_FACTEURS_CLE absente. Ils n'ouvriront le back-office qu'après l'avoir posée et activée depuis /compte/securite.",
+    );
   }
 
   console.log(`✓ candidate ${EMAIL}`);

@@ -193,3 +193,26 @@ describe("B-03 — réinitialiser le second facteur, double confirmation", () =>
     expect(screen.getByRole("status").textContent).toMatch(/retirée et sessions fermées/u);
   });
 });
+
+describe("S.215 — compte interne : obligatoire", () => {
+  const base = { disponible: true, enCours: false, codesRestants: 10 };
+
+  it("inactive : l'écran dit que le back-office reste fermé et propose l'activation", () => {
+    render(<DoubleAuthentification etat={{ ...base, active: false, activeLe: null }} obligatoire />);
+    expect(screen.getByRole("alert").textContent).toMatch(/Obligatoire pour ton rôle.*back-office reste fermé/su);
+    expect(screen.getByRole("button", { name: "Activer la double authentification" })).toBeTruthy();
+  });
+
+  it("sans clé sur le serveur : il dit que l'exploitant doit la poser", () => {
+    render(<DoubleAuthentification etat={{ ...base, disponible: false, active: false, activeLe: null }} obligatoire />);
+    expect(screen.getByRole("alert").textContent).toMatch(/DEUX_FACTEURS_CLE/u);
+    expect(screen.queryByText(/Pas encore disponible sur ce serveur\. Ton compte/u)).toBeNull();
+  });
+
+  it("active : « Désactiver » n'est pas offert, l'écran dit quoi faire pour changer de téléphone", () => {
+    render(<DoubleAuthentification etat={{ ...base, active: true, activeLe: "2026-11-04T10:00:00.000Z" }} obligatoire />);
+    expect(screen.queryByRole("button", { name: "Désactiver" })).toBeNull();
+    expect(screen.getByText(/ne se désactive pas/u)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Générer de nouveaux codes de secours" })).toBeTruthy();
+  });
+});
