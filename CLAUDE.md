@@ -90,7 +90,9 @@ aucun (S.204). Banc seul : L06 et L14 déclarées de tiers,
 l'échec fournisseur. `banc:ia:comparer` signale un écart mesuré/facturé
 au-delà de 5 %. `/api/health` (détail) porte `tarifsIA` et l'échéance
 `AI_TARIF_*_VALIDE_JUSQU_AU`, sans rendre inapte. L'écart du 28/10 reste
-inexpliqué ; reprise L5 toujours suspendue (S.205). Ouvert sous le
+inexpliqué ; reprise L5 toujours suspendue (S.205). En service le 04/11
+(`aa205d4`) : `ETAT_DE_SERVICE_JETON` manquait, ajouté ; tarif Vertex
+0.825 / 4.125 USD saisi, `EN_VIGUEUR` jusqu'au 31/12. Ouvert sous le
 numéro S.212, renuméroté S.213 à la fusion de `main` le 04/11 : S.212 est
 la déconnexion (#338). Lire
 [le suivi L5, § S.213](docs/revue/lot-l5-vertex-2026-10-28.md).

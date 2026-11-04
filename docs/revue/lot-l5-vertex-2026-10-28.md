@@ -456,3 +456,35 @@ facultatif : la copie `93175249…` se lit toujours (19 invocations,
 **Reste.** La reprise reste suspendue comme en S.205 : facture du 29/10 par
 SKU, puis décision du responsable. Elle portera sur L15 à L30, les
 rédactions, relectures et avis, sans L06 ni L14 (41 invocations au plus).
+
+### Mise en service de S.213 — 04/11/2026
+
+Relevé de l'exploitant sur le VPS, consigné à la demande du responsable.
+Aucun code changé ; seule la configuration du serveur a bougé.
+
+- **Déploiement.** `aa205d4` (#339) en service à 03:03:25 UTC par le
+  pipeline de `main` (exécution 41760409268) : sauvegarde
+  `avant-aa205d4.dump.gpg`, migration `20261104120000_raisonnement_ia`
+  appliquée, garde-fous verts. `prisma migrate status` : 63 migrations,
+  « Database schema is up to date! ».
+- **Détail de `/api/health` fermé.** La première lecture rendait
+  `tarifsIA: null` : `ETAT_DE_SERVICE_JETON` manquait dans `.env.app` et
+  dans le conteneur (longueur 0), la porte restait donc fermée par
+  conception (`lecteur.ts`) — confirmé en interrogeant l'application
+  directement, sans nginx. Un jeton aléatoire de 32 octets a été ajouté à
+  `.env.app`, puis `app` recréé (`up -d`, un `restart` ne relit pas
+  `env_file`). Le jeton ne quitte pas le serveur.
+- **Tarif saisi.** Avec l'échéance seule, l'état était `NON_TARIFE`. Saisis
+  dans `.env.app` depuis le relevé officiel S.181 (Gemini 3.8 Flash, point
+  `eu`, hors global) : entrée 0.825, sortie 4.125, devise `USD`, valable
+  jusqu'au 2026-12-31 ; `app` et `worker` recréés. Lu ensuite :
+  `EN_VIGUEUR`, 57 jours restants. Préavis de trente jours : l'alerte
+  s'ouvre le 01/12/2026, et dit le tarif échu après le 31/12.
+- **Conséquence.** B-07 chiffre les appels à ce tarif à partir de cette
+  mise en service ; les usages antérieurs ne sont pas rechiffrés.
+
+**Reste.** Rapprocher les deux prix de la facture Google (devise de
+facturation du compte jamais confirmée) ; relever la grille 2027 et sa
+date avant le 31/12 ; décider si une surveillance externe lit le détail
+avec le jeton — sinon l'alerte n'est vue que par qui ouvre l'adresse ;
+supprimer les copies `.env.app.avant-*` du serveur.
