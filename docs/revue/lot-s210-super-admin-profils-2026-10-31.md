@@ -167,3 +167,24 @@ Décision du responsable : arrivée directe sur le back-office.
 Preuves : lint, typecheck, `check:copy`, 212 fichiers / 4 231 tests,
 `build`, parcours Chromium 1440 (35/35) après reconstruction (le banc
 réutilise un `.next` existant : reconstruire avant de rejouer un parcours).
+
+## S.212 — « Se déconnecter » — 04/11/2026
+
+Relevé par le responsable : aucun bouton de déconnexion dans l'interface.
+La route `DELETE /api/comptes/session` (WF-02, ligne de session supprimée
+et cookie effacé) n'avait aucun appelant, dans aucun espace.
+
+- `src/components/layout/BoutonDeconnexion.tsx` : appelle la route, puis
+  recharge `/connexion` en entier (`window.location.replace`). Une
+  navigation interne garderait les gabarits du compte fermé dans le
+  routeur — c'est ce qui laissait « Administration » affiché après la
+  promotion en S.211. Session déjà échue (401) : connexion aussi. Coupure
+  réseau : l'écran reste, avec un message qui dit quoi faire.
+- Placé en bas de la colonne de l'espace candidat, dans son en-tête mobile
+  (390 px), et sous la carte de l'opérateur au back-office.
+
+Preuves : `tests/ui/deconnexion.test.tsx` (appel, 401, hors ligne, présence
+dans les deux espaces ; une mutation qui saute l'appel est détectée),
+parcours « déconnexion au back-office » : session supprimée en base, page
+protégée renvoyée à la connexion. Chromium 1440 et 390 : 36/36. Porte :
+lint, typecheck, `check:copy`, 213 fichiers / 4 236 tests, `build`.

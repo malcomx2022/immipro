@@ -2584,6 +2584,37 @@ test("R-O05 : suppression demandée pendant une panne du stockage, connexion ref
   });
 });
 
+/**
+ * Se déconnecter (S.212) : la route existait, aucun écran ne l'appelait.
+ * Au back-office, le bouton supprime la ligne de session en base et recharge
+ * la connexion ; une page protégée rouverte renvoie ensuite à la connexion.
+ */
+test("déconnexion au back-office : session supprimée en base, page protégée refermée", async () => {
+  const b = await administration();
+  await aller("/veille", b);
+  const sessions = async () =>
+    Number(
+      (
+        await lire<{ n: string }>(
+          'SELECT count(*) AS n FROM "Session" s JOIN "User" u ON u.id = s."userId" WHERE u.email = $1',
+          ["admin@immipro.test"],
+        )
+      )[0]!.n,
+    );
+  const avant = await sessions();
+  expect(avant).toBeGreaterThan(0);
+  await Promise.all([
+    b.waitForURL((u) => u.pathname === "/connexion"),
+    b.getByRole("button", { name: "Se déconnecter", exact: true }).click(),
+  ]);
+  expect(await sessions()).toBe(avant - 1);
+  await aller("/veille", b);
+  await expect.poll(() => new URL(b.url()).pathname).toBe("/connexion");
+  await b.context().close();
+  admin = null;
+  preuves.push({ controle: "Déconnexion au back-office : session supprimée, page protégée refermée", conforme: true });
+});
+
 test("bilan du profil : aucun défilement horizontal, aucune erreur JavaScript", async ({}, info) => {
   const debordements = mesures.filter((m) => m.contenu > m.largeur);
   const bilans = suivis.map((lire) => lire());

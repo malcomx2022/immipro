@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { LienDeNavigation } from "@/components/layout/LienDeNavigation";
 import { SkipLink } from "@/components/layout/SkipLink";
+import { BoutonDeconnexion } from "@/components/layout/BoutonDeconnexion";
 import { NAVIGATION_CANDIDAT } from "@/domain/navigation/courant";
 import { db } from "@/lib/db";
 import { exigerCandidat, initiales } from "@/server/securite/page";
@@ -67,6 +68,10 @@ export default async function GabaritDossier({
             </li>
           ))}
         </ul>
+        {/* S.212 : la sortie, en bas de la colonne, comme au back-office. */}
+        <div className="mt-auto border-t border-ink-300 pt-3">
+          <BoutonDeconnexion className="w-full" />
+        </div>
       </nav>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -83,13 +88,16 @@ export default async function GabaritDossier({
               unoptimized
             />
           </Link>
-          <Link
-            href="/profil"
-            aria-label="Mon profil"
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-ink-100 text-14 font-semibold text-ink-700"
-          >
-            {initiales(acteur, profil?.firstName, profil?.lastName)}
-          </Link>
+          <div className="flex items-center gap-2">
+            <BoutonDeconnexion />
+            <Link
+              href="/profil"
+              aria-label="Mon profil"
+              className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-ink-100 text-14 font-semibold text-ink-700"
+            >
+              {initiales(acteur, profil?.firstName, profil?.lastName)}
+            </Link>
+          </div>
         </header>
         <main className="flex-1 pb-20 md:pb-0">{children}</main>
       </div>
