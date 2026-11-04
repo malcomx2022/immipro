@@ -646,9 +646,19 @@ test("double authentification : activation par la clé, connexion en deux temps,
   await expect.poll(() => pasDeTemps(Date.now()) > Number(active.pas), { timeout: 35_000, intervals: [500] }).toBe(true);
   const code = codeTotp(secret);
 
+  /*
+    Sortie par « Se déconnecter », qui recharge /connexion en entier : pas
+    de `goto("/connexion")`, que Firefox double sans l'achever (S.193, S.197 ;
+    vu de nouveau ici sur firefox-1440). La session de cet onglet est
+    supprimée en base.
+  */
   const deuxTemps = async () => {
-    await context.clearCookies();
-    await ouvrirLaConnexion(page);
+    if (new URL(page.url()).pathname !== "/tableau-de-bord") await aller("/tableau-de-bord");
+    await Promise.all([
+      page.waitForURL((u) => u.pathname === "/connexion"),
+      page.getByRole("button", { name: "Se déconnecter", exact: true }).first().click(),
+    ]);
+    await attendreLHydratation(page, "form");
     await page.getByLabel("Adresse email", { exact: true }).fill(email);
     await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
     const [premier] = await Promise.all([
@@ -658,17 +668,17 @@ test("double authentification : activation par la clé, connexion en deux temps,
     expect(premier.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Double authentification");
   };
-  const sessionsAvant = Number((await etat()).sessions);
   await deuxTemps();
-  // Le mot de passe juste n'a ouvert aucune session.
-  expect(Number((await etat()).sessions)).toBe(sessionsAvant);
+  // Déconnecté, puis le mot de passe juste : aucune session ouverte.
+  expect((await etat()).sessions).toBe("0");
   await page.getByLabel("Code à six chiffres", { exact: true }).fill(code);
   await page.getByRole("button", { name: "Vérifier et me connecter", exact: true }).click();
   await page.waitForURL((u) => u.pathname === "/tableau-de-bord");
-  expect(Number((await etat()).sessions)).toBe(sessionsAvant + 1);
+  expect((await etat()).sessions).toBe("1");
 
   // Le même code, rejoué dans la même fenêtre : refusé, sans session.
   await deuxTemps();
+  expect((await etat()).sessions).toBe("0");
   await page.getByLabel("Code à six chiffres", { exact: true }).fill(code);
   const [rejeu] = await Promise.all([
     page.waitForResponse((r) => r.url().endsWith("/api/comptes/session/second-facteur")),
@@ -676,7 +686,7 @@ test("double authentification : activation par la clé, connexion en deux temps,
   ]);
   expect(rejeu.status()).toBe(401);
   await expect(page.getByRole("alert").filter({ hasText: /déjà de servir/u })).toBeVisible();
-  expect(Number((await etat()).sessions)).toBe(sessionsAvant + 1);
+  expect((await etat()).sessions).toBe("0");
 
   // Un code de secours, saisi en minuscules : accepté une fois.
   await page.getByRole("button", { name: "Utiliser un code de secours", exact: true }).click();
