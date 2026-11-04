@@ -10,7 +10,16 @@ import { jourCivil } from "../../src/domain/format/fuseau";
 import { environnementDuBanc } from "./environnement";
 
 export async function recetteHttpDesUsages(db: PrismaClient, url: string): Promise<void> {
-  const admin = await db.user.create({ data: { email: "admin-l2@exemple.test", role: "ADMIN" } });
+  // S.215 : un compte interne n'ouvre le back-office qu'avec son second
+  // facteur actif. Le secret n'est jamais lu ici (aucun code n'est saisi) :
+  // seule l'activation compte pour la session.
+  const admin = await db.user.create({
+    data: {
+      email: "admin-l2@exemple.test",
+      role: "ADMIN",
+      secondFacteur: { create: { secretChiffre: "v1.recette.recette.recette", activeLe: new Date() } },
+    },
+  });
   const candidat = await db.user.create({ data: { email: "candidat-l2@exemple.test", emailVerified: new Date() } });
   const modele = REGLES_DE_REFERENCE.find(r => r.countryCode === "NL")!;
   const regle = await db.visaRule.create({ data: {
