@@ -315,7 +315,7 @@ describe("REV11-L5 — vrai CLI, vrais adaptateurs, HTTP local", () => {
     expect(appels).toBe(0);
   });
   it.each(["parfaite", "credule"])(
-    "le passage complet simulé %s porte sa nature et ses soixante appels",
+    "le passage complet simulé %s porte sa nature, ses cinquante-huit appels et ses deux pièces hors périmètre",
     async (simulation) => {
       const sortie = await mkdtemp(path.join(dossier, "simulation-"));
       let code = 0;
@@ -339,12 +339,17 @@ describe("REV11-L5 — vrai CLI, vrais adaptateurs, HTTP local", () => {
       const r = JSON.parse(await readFile(path.join(sortie, dirs[0]!, "resultats.json"), "utf8"));
       expect(code).toBe(simulation === "credule" ? 2 : 0);
       expect(r.qualification).toMatchObject({ nature: "SIMULATION", fournisseurQualifie: false });
-      expect(r.lectures).toHaveLength(30);
+      // S.212 : L06 et L14, preuves de ressources de tiers, ne sont jamais présentées au modèle.
+      expect(r.horsPerimetre.map((h: { id: string }) => h.id)).toEqual(["L06", "L14"]);
+      expect(r.lectures).toHaveLength(28);
+      expect(r.lectures.map((l: { note: { id: string } }) => l.note.id)).not.toContain("L06");
+      expect(r.appels.some((a: { cas: string }) => a.cas === "L06" || a.cas === "L14")).toBe(false);
+      expect(r.qualification.couverture).toMatchObject({ piecesAttendues: 28, piecesHorsPerimetre: 2 });
       expect(r.references).toHaveLength(10);
-      expect(r.appels).toHaveLength(60);
+      expect(r.appels).toHaveLength(58);
       expect(r.references.every((a: { avisValide: boolean }) => a.avisValide)).toBe(true);
       if (simulation === "credule") expect(r.synthese.fausseConformite.length).toBeGreaterThan(0);
-      else expect(r.synthese.verdicts.justes).toBe(30);
+      else expect(r.synthese.verdicts.justes).toBe(28);
     },
   );
   it("le timeout réel du transport conserve la mesure inconnue", async () => {

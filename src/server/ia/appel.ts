@@ -147,6 +147,10 @@ export async function noterLesJetons(
     : mesurerLesJetons(jetonsEntree, jetonsSortie);
   // Garder la qualification d'une valeur rejetée, même normalisée en NULL.
   if (declaree?.etat === "INVALIDE" && mesure.etat !== "CONNUE") mesure.etat = "INVALIDE";
+  // S.212 : la part de raisonnement, comprise dans la sortie facturée ; NULL si non rapportée.
+  const raisonnement = declaree?.jetonsRaisonnement;
+  mesure.jetonsRaisonnement =
+    mesure.etat === "CONNUE" && compteurValide(raisonnement) && raisonnement <= mesure.jetonsSortie! ? raisonnement : null;
   // Les refus avant appel restent sans ligne. Un zéro réellement observé est enregistré.
   if (!appel && jetonsEntree === 0 && jetonsSortie === 0) return mesure;
   const fournisseur = appel?.fournisseur ?? FOURNISSEUR_PAR_DEFAUT;
@@ -161,6 +165,7 @@ export async function noterLesJetons(
       model: appel?.modele ?? null,
       inputTokens: mesure.jetonsEntree,
       outputTokens: mesure.jetonsSortie,
+      reasoningTokens: mesure.jetonsRaisonnement,
       usageState: mesure.etat,
       // Un tarif excessif ne doit pas faire rejouer un appel déjà facturable.
       costMicros: compteurValide(cout) ? cout : null,
