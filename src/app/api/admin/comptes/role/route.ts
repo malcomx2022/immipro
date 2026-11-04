@@ -12,7 +12,7 @@ import { MOTIF_MAX, MOTIF_MIN } from "@/domain/comptes/role";
  *
  * Réservé au super-administrateur (`acces: "super_admin"`) : un ADMIN, un
  * VEILLEUR ou un candidat reçoit 403, et l'essai part au journal. Contrôle
- * d'origine (CSRF) et limite sensible comme toute écriture.
+ * d'origine (CSRF) comme toute écriture, régime `critique` (S.214).
  *
  * **Double confirmation.** L'écran demande un premier clic, puis l'adresse
  * du compte ressaisie ; la route vérifie la seconde, qu'un script qui
@@ -25,7 +25,8 @@ import { MOTIF_MAX, MOTIF_MIN } from "@/domain/comptes/role";
 export const POST = route({
   nom: "admin.comptes.role",
   acces: "super_admin",
-  limite: "sensible",
+  // Régime `critique` (S.214) : un geste qui change qui peut quoi.
+  limite: "critique",
   corps: z.object({
     userId: z.guid(),
     role: z.enum(ROLES),

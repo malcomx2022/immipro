@@ -10,6 +10,7 @@ import { appeler } from "@/lib/api";
 import { CorrectionDuDepot } from "./CorrectionDuDepot";
 import { CreationDeCompteInterne } from "./CreationDeCompteInterne";
 import { GestionDuRole } from "./GestionDuRole";
+import { GestionDuSecondFacteur } from "./GestionDuSecondFacteur";
 import { LIBELLE_ROLE, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 import type { EchecCandidat } from "@/server/http/echecs";
 import { Filtres } from "@/components/admin/Filtres";
@@ -89,6 +90,8 @@ export function Utilisateurs({
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
   /** Ce que l'écran dit une fois l'action faite : un succès muet ne se distingue pas d'un clic perdu. */
   const [fait, setFait] = useState<{ texte: string; achevee: boolean } | null>(null);
+  /** L'action dont le second clic est attendu (S.214) : rien n'est parti. */
+  const [enAttente, setEnAttente] = useState<ActionCompte["cle"] | null>(null);
 
   const visibles = filtrerComptes(comptes, filtre, recherche);
   const retenu = visibles.find((c) => c.id === selection) ?? visibles[0];
@@ -99,12 +102,21 @@ export function Utilisateurs({
   function choisir(cle: string | null) {
     setSelection(cle);
     setMotif("");
+    setEnAttente(null);
     setEchec(null);
     setFait(null);
   }
 
-  async function agir(action: ActionCompte) {
+  async function agir(action: ActionCompte, confirmee = false) {
     if (!retenu || manque) return;
+    // Double confirmation : le premier clic n'envoie rien.
+    if (action.aConfirmer && !confirmee) {
+      setEnAttente(action.cle);
+      setEchec(null);
+      setFait(null);
+      return;
+    }
+    setEnAttente(null);
     setEnvoi(action.cle);
     setEchec(null);
     setFait(null);
@@ -224,6 +236,10 @@ export function Utilisateurs({
                 <p className="text-13 text-ink-500">{retenu.email}</p>
                 <dl className="flex flex-col pt-1">
                   <Ligne intitule="Rôle" valeur={LIBELLE_ROLE[retenu.role ?? "CANDIDAT"]} />
+                  <Ligne
+                    intitule="Double authentification"
+                    valeur={retenu.secondFacteur ? "Activée" : "Non activée"}
+                  />
                   <Ligne intitule="Inscrit le" valeur={jourEnFrancais(retenu.inscritLe)} />
                   <Ligne intitule="Dossiers" valeur={String(retenu.dossiers)} />
                   <Ligne intitule="Pack" valeur={retenu.pack} />
@@ -323,6 +339,23 @@ export function Utilisateurs({
 
                 {actionsPour(retenu, acteur).map((action) => (
                   <div key={action.cle} className="flex flex-col gap-1.5">
+                    {enAttente === action.cle && action.aConfirmer ? (
+                      <div className="flex flex-col gap-2 rounded-md border border-ink-500 bg-ink-100 p-3">
+                        <p className="text-pretty text-14 text-ink-900">{action.aConfirmer.question}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            disabled={manque !== null || envoi !== ""}
+                            raisonDesactivation={manque ?? "Envoi en cours."}
+                            onClick={() => agir(action, true)}
+                          >
+                            {envoi === action.cle ? "Envoi…" : action.aConfirmer.bouton}
+                          </Button>
+                          <Button variante="tertiaire" disabled={envoi !== ""} onClick={() => setEnAttente(null)}>
+                            Annuler
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
                     <Button
                       variante="secondaire"
                       pleineLargeur
@@ -336,6 +369,7 @@ export function Utilisateurs({
                           : "Envoi…"
                         : action.libelle}
                     </Button>
+                    )}
                     <span className="text-pretty text-13 text-ink-500">
                       {action.consequence}
                     </span>
@@ -348,6 +382,10 @@ export function Utilisateurs({
                   key={retenu.id}
                   compte={{ id: retenu.id, email: retenu.email, role: retenu.role ?? "CANDIDAT" }}
                 />
+              ) : null}
+
+              {superAdmin && retenu.secondFacteur && retenu.id !== acteur?.id ? (
+                <GestionDuSecondFacteur key={`2fa-${retenu.id}`} compte={{ id: retenu.id, email: retenu.email }} />
               ) : null}
 
               <p className="text-pretty text-13 text-ink-500">{MENTION_AUDIT}</p>

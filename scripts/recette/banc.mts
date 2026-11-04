@@ -230,6 +230,8 @@ async function demarrer(): Promise<void> {
     SMTP_URL: `smtp://127.0.0.1:${portSmtp}`,
     SMTP_FROM: "recette@immipro.test",
     ETAT_DE_SERVICE_JETON: randomBytes(16).toString("hex"),
+    // S.214 : une clé jetable par banc ; la double authentification s'y éprouve.
+    DEUX_FACTEURS_CLE: randomBytes(32).toString("base64"),
   };
 
   // Option explicite : les clés du parent restent neutralisées, les seules

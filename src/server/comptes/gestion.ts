@@ -1,13 +1,14 @@
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { echec } from "@/server/http/echecs";
+import { estUneCoursePerdue } from "@/server/http/concurrence";
 import { journaliser } from "@/server/acces/journal";
 import {
   lireLaCreation,
   verdictDeSuspension,
   type SaisieDeCreation,
 } from "@/domain/comptes/gestion-interne";
-import { peutCreerUnCompteInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
+import { estRole, peutCreerUnCompteInterne, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 import type { Acteur } from "@/server/securite/session";
 
 /**
@@ -79,58 +80,95 @@ export async function creerUnCompteInterne(
 }
 
 /**
- * Suspend ou rétablit un compte — WF-15, resserré en S.210.
+ * Suspend ou rétablit un compte — WF-15, resserré en S.210, atomique en S.214.
  *
  * Un candidat se suspend depuis le rôle administrateur, comme avant. Un
  * compte interne, depuis le rôle super-administrateur seulement, et le
- * dernier super-administrateur actif ne se suspend pas. La suspension
- * ferme les sessions ouvertes, dans la même transaction que sa trace.
+ * dernier super-administrateur actif ne se suspend pas.
+ *
+ * **Tout passe ici, candidat compris (S.214).** La route lisait le rôle de
+ * la cible hors transaction, puis suspendait un « candidat » en trois
+ * écritures séparées : un compte promu entre la lecture et l'écriture
+ * était suspendu par un administrateur, au mépris de la règle ci-dessus,
+ * et une panne entre deux écritures laissait une trace sans suspension ou
+ * une suspension sans fermeture des sessions. Désormais : lecture du rôle,
+ * décompte des super-administrateurs, écriture conditionnée à l'état lu,
+ * fermeture des sessions et ligne de journal, dans une transaction
+ * sérialisable. Deux suspensions simultanées de deux super-administrateurs
+ * ne laissent pas la plateforme sans sommet : la base en refuse une.
  */
 export async function suspendreOuRetablir(
   acteur: Acteur,
   demande: { userId: string; suspendre: boolean; motif: string },
 ): Promise<{ suspendu: boolean; sessionsFermees: number }> {
-  return db.$transaction(
-    async (tx) => {
-      const cible = await tx.user.findUnique({
-        where: { id: demande.userId },
-        select: { id: true, role: true, suspendedAt: true, deletedAt: true },
-      });
-      if (!cible) throw echec("introuvable");
-      const superAdminsActifs = await tx.user.count({
-        where: { role: "SUPER_ADMIN", deletedAt: null, suspendedAt: null },
-      });
-      const verdict = verdictDeSuspension(
-        acteurDuDomaine(acteur),
-        {
-          id: cible.id,
-          role: cible.role as RoleDeCompte,
-          suspendu: cible.suspendedAt !== null,
-          supprime: cible.deletedAt !== null,
-        },
-        demande.suspendre,
-        superAdminsActifs,
-      );
-      if (!verdict.permis) throw echec("etat_incompatible", { corps: verdict.raison });
+  try {
+    return await db.$transaction(
+      async (tx) => {
+        const cible = await tx.user.findUnique({
+          where: { id: demande.userId },
+          select: { id: true, role: true, suspendedAt: true, deletedAt: true },
+        });
+        if (!cible) throw echec("introuvable");
+        // L'acteur relu dans la même transaction (S.214) : un opérateur
+        // suspendu, ou dont le rôle a baissé, pendant que sa requête était
+        // en vol ne décide plus rien avec l'autorité qu'il n'a plus.
+        const auteur = await tx.user.findUnique({
+          where: { id: acteur.id },
+          select: { role: true, suspendedAt: true, deletedAt: true },
+        });
+        if (!auteur || auteur.suspendedAt || auteur.deletedAt || auteur.role !== acteur.role) {
+          throw echec("droits_insuffisants");
+        }
+        const superAdminsActifs = await tx.user.count({
+          where: { role: "SUPER_ADMIN", deletedAt: null, suspendedAt: null },
+        });
+        const role: RoleDeCompte = estRole(String(cible.role)) ? (cible.role as RoleDeCompte) : "CANDIDAT";
+        const verdict = verdictDeSuspension(
+          acteurDuDomaine(acteur),
+          {
+            id: cible.id,
+            role,
+            suspendu: cible.suspendedAt !== null,
+            supprime: cible.deletedAt !== null,
+          },
+          demande.suspendre,
+          superAdminsActifs,
+        );
+        if (!verdict.permis) throw echec("etat_incompatible", { corps: verdict.raison });
 
-      await journaliser(
-        {
-          acteurId: acteur.id,
-          action: demande.suspendre ? "compte.suspension" : "compte.retablissement",
-          cible: `user:${cible.id}`,
-          motif: demande.motif,
-        },
-        tx,
-      );
-      await tx.user.update({
-        where: { id: cible.id },
-        data: { suspendedAt: demande.suspendre ? new Date() : null },
+        // La trace d'abord : un journal qui échoue n'a rien laissé changer.
+        await journaliser(
+          {
+            acteurId: acteur.id,
+            action: demande.suspendre ? "compte.suspension" : "compte.retablissement",
+            cible: `user:${cible.id}`,
+            motif: demande.motif,
+            details: { role },
+          },
+          tx,
+        );
+        // Conditionnée au rôle et à l'état lus : si l'un a changé entre-temps,
+        // ce geste raisonne sur le passé et ne s'écrit pas.
+        const { count } = await tx.user.updateMany({
+          where: { id: cible.id, role: cible.role },
+          data: { suspendedAt: demande.suspendre ? (cible.suspendedAt ?? new Date()) : null },
+        });
+        if (count !== 1) throw new Concurrence();
+        const sessionsFermees = demande.suspendre
+          ? (await tx.session.deleteMany({ where: { userId: cible.id } })).count
+          : 0;
+        return { suspendu: demande.suspendre, sessionsFermees };
+      },
+      { isolationLevel: "Serializable" },
+    );
+  } catch (erreur) {
+    if (erreur instanceof Concurrence || estUneCoursePerdue(erreur)) {
+      throw echec("etat_incompatible", {
+        corps: "Ce compte vient d'être modifié par une autre action. Recharge la page pour lire son état actuel, puis recommence.",
       });
-      const sessionsFermees = demande.suspendre
-        ? (await tx.session.deleteMany({ where: { userId: cible.id } })).count
-        : 0;
-      return { suspendu: demande.suspendre, sessionsFermees };
-    },
-    { isolationLevel: "Serializable" },
-  );
+    }
+    throw erreur;
+  }
 }
+
+class Concurrence extends Error {}

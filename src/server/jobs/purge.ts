@@ -474,6 +474,11 @@ export async function purgerCeQuiEstEchu(
   const sessions = await db.session.deleteMany({
     where: { expiresAt: { lt: maintenant } },
   });
+  // S.214 : un défi de connexion échu ou servi ne rouvre rien ; il part
+  // avec les sessions échues, et ne s'additionne pas au bilan.
+  await db.defiDeConnexion.deleteMany({
+    where: { OR: [{ expireLe: { lt: maintenant } }, { consommeLe: { not: null } }] },
+  });
 
   return {
     alertes: alertes.count,

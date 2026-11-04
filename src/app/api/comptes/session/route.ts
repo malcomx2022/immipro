@@ -10,6 +10,12 @@ import {
   COOKIE_SESSION,
 } from "@/server/securite/session";
 import { json, sansContenu } from "@/server/http/reponse";
+import {
+  COOKIE_DEFI,
+  attributsCookieDefi,
+  ouvrirUnDefi,
+  secondFacteurExige,
+} from "@/server/comptes/second-facteur";
 
 /**
  * Connexion et déconnexion — A-02.
@@ -55,6 +61,19 @@ export const POST = route({
     }
 
     const entetes = await headers();
+
+    /*
+      Second facteur actif (S.214) : le mot de passe juste n'ouvre pas de
+      session. Un défi de cinq minutes part dans un cookie strict, limité à
+      la route qui l'attend ; la réponse ne dit rien du compte tant que le
+      code n'est pas accepté.
+    */
+    if (await secondFacteurExige(resultat.user.id)) {
+      const defi = await ouvrirUnDefi(resultat.user.id, corps.resterConnecte, entetes.get("user-agent"));
+      (await cookies()).set(COOKIE_DEFI, defi.valeur, attributsCookieDefi(defi.expireLe));
+      return { secondFacteur: { requis: true } };
+    }
+
     const session = await ouvrirSession(
       resultat.user.id,
       entetes.get("user-agent"),

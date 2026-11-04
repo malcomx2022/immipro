@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { appeler } from "@/lib/api";
 import { destinationApresConnexion } from "@/domain/comptes/suite";
+import { TITRE_CONNEXION_A_RECOMMENCER } from "@/domain/comptes/deux-facteurs";
+import { SecondFacteurDeConnexion } from "./SecondFacteurDeConnexion";
 
 /**
  * A-02 — Connexion.
@@ -29,6 +31,11 @@ import { destinationApresConnexion } from "@/domain/comptes/suite";
  * champ connecte, comme partout ailleurs sur le web, et le gestionnaire de
  * mots de passe reconnaît la paire `email` / `password`. `noValidate` : les
  * messages sont ceux de l'écran, en français, pas les bulles du navigateur.
+ *
+ * Double authentification (S.214) : quand le compte l'a activée, le mot de
+ * passe juste ne connecte pas encore. L'écran passe au second temps — le
+ * code à six chiffres ou un code de secours — sans recharger la page ; un
+ * défi échu ramène ici, adresse gardée.
  */
 export function Connexion() {
   const router = useRouter();
@@ -38,6 +45,8 @@ export function Connexion() {
   const [envoi, setEnvoi] = useState(false);
   // Le refus vient du serveur ; l'écran sait seulement l'afficher.
   const [echec, setEchec] = useState<string | null>(null);
+  const [secondTemps, setSecondTemps] = useState(false);
+  const [aRecommencer, setARecommencer] = useState<string | null>(null);
 
   const complet = Boolean(email && motDePasse);
 
@@ -45,22 +54,19 @@ export function Connexion() {
     if (!complet || envoi) return;
     setEnvoi(true);
     setEchec(null);
-    const resultat = await appeler<{ compte: { emailVerifie: boolean; role?: string } }>(
-      "/api/comptes/session",
-      { corps: { email: email.trim(), motDePasse, resterConnecte: rester } },
-    );
+    const resultat = await appeler<
+      { compte: { emailVerifie: boolean; role?: string } } | { secondFacteur: { requis: true } }
+    >("/api/comptes/session", { corps: { email: email.trim(), motDePasse, resterConnecte: rester } });
     if (resultat.ok) {
-      // La suite est lue au moment de l'envoi, pas au rendu : `useSearchParams`
-      // rendrait tout l'écran dynamique, alors que c'est le premier que voit
-      // quelqu'un qui revient — celui qu'il faut servir le plus vite.
-      const suite = new URLSearchParams(window.location.search).get("suite");
-      router.push(
-        destinationApresConnexion(
-          suite,
-          resultat.donnees.compte.emailVerifie,
-          resultat.donnees.compte.role,
-        ),
-      );
+      if ("secondFacteur" in resultat.donnees) {
+        setEnvoi(false);
+        setARecommencer(null);
+        // Le mot de passe a servi : il ne reste pas dans la mémoire de l'écran.
+        setMotDePasse("");
+        setSecondTemps(true);
+        return;
+      }
+      allerALaSuite(resultat.donnees.compte);
       return;
     }
     setEnvoi(false);
@@ -68,6 +74,26 @@ export function Connexion() {
     // 3 essais… ». Le réextraire pour le recomposer ici ferait deux endroits
     // où le même nombre peut diverger.
     setEchec(resultat.echec.corps);
+  }
+
+  function allerALaSuite(compte: { emailVerifie: boolean; role?: string }) {
+    // La suite est lue au moment de l'envoi, pas au rendu : `useSearchParams`
+    // rendrait tout l'écran dynamique, alors que c'est le premier que voit
+    // quelqu'un qui revient — celui qu'il faut servir le plus vite.
+    const suite = new URLSearchParams(window.location.search).get("suite");
+    router.push(destinationApresConnexion(suite, compte.emailVerifie, compte.role));
+  }
+
+  if (secondTemps) {
+    return (
+      <SecondFacteurDeConnexion
+        onConnecte={allerALaSuite}
+        onRecommencer={(message) => {
+          setSecondTemps(false);
+          setARecommencer(message);
+        }}
+      />
+    );
   }
 
   return (
@@ -92,6 +118,13 @@ export function Connexion() {
           Ton dossier t&apos;attend là où tu l&apos;as laissé.
         </p>
       </div>
+
+      {aRecommencer ? (
+        <div role="alert" className="flex flex-col gap-1 rounded-md bg-ink-100 p-3.5">
+          <span className="text-14 font-semibold text-ink-900">{TITRE_CONNEXION_A_RECOMMENCER}</span>
+          <span className="text-pretty text-14 text-ink-700">{aRecommencer}</span>
+        </div>
+      ) : null}
 
       {echec ? (
         <div role="alert" className="flex items-start gap-3 rounded-md bg-ink-100 p-3.5">

@@ -882,6 +882,16 @@ SELECT passe('L2 · PARTIELLE', $q$INSERT INTO "AiUsage" (id,"userId",operation,
 
 SELECT passe('L2 · INVALIDE', $q$INSERT INTO "AiUsage" (id,"userId",operation,"inputTokens","outputTokens","costMicros","usageState") VALUES ('l2-passe-3','u1','synthétique',NULL,30,NULL,'INVALIDE')$q$);
 
+-- S.214 : le secret du second facteur n'entre qu'au format chiffré, et la
+-- dérive d'horloge retenue ne dépasse pas un pas.
+SELECT refuse('S.214 · secret du second facteur en clair', $q$INSERT INTO "SecondFacteur" (id,"userId","secretChiffre","updatedAt") VALUES ('sf-refus-0','u1','JBSWY3DPEHPK3PXP',now())$q$);
+
+SELECT refuse('S.214 · dérive de deux pas', $q$INSERT INTO "SecondFacteur" (id,"userId","secretChiffre",derive,"updatedAt") VALUES ('sf-refus-1','u1','v1.aaaa.bbbb.cccc',2,now())$q$);
+
+SELECT refuse('S.214 · compteur d''échecs négatif', $q$INSERT INTO "SecondFacteur" (id,"userId","secretChiffre",echecs,"updatedAt") VALUES ('sf-refus-2','u1','v1.aaaa.bbbb.cccc',-1,now())$q$);
+
+SELECT passe('S.214 · secret chiffré', $q$INSERT INTO "SecondFacteur" (id,"userId","secretChiffre",derive,"updatedAt") VALUES ('sf-passe-0','u1','v1.aaaa.bbbb.cccc',-1,now())$q$);
+
 ROLLBACK;
 
 DROP FUNCTION IF EXISTS refuse(text, text);

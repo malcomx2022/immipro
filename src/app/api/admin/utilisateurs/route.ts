@@ -1,13 +1,7 @@
 import { z } from "zod";
 import { route } from "@/server/http/route";
-import { db } from "@/lib/db";
 import { comptes } from "@/server/lecture/backoffice";
-import { echec } from "@/server/http/echecs";
-import { journaliser } from "@/server/acces/journal";
-import { fermerToutesLesSessions } from "@/server/securite/session";
 import { MOTIF_MINIMUM_COMPTE } from "@/domain/backoffice/comptes";
-import { verdictDeSuspension } from "@/domain/comptes/gestion-interne";
-import { estInterne, estRole, type RoleDeCompte } from "@/domain/comptes/hierarchie";
 import { suspendreOuRetablir } from "@/server/comptes/gestion";
 
 /**
@@ -27,10 +21,15 @@ import { suspendreOuRetablir } from "@/server/comptes/gestion";
  * Un candidat se suspend depuis le rôle administrateur, comme avant. Un
  * compte interne (veilleur et au-dessus), depuis le rôle
  * super-administrateur seulement : sinon un administrateur pourrait
- * écarter celui qui gère les rôles. Ce cas passe par
- * `suspendreOuRetablir`, en transaction sérialisable : deux
- * super-administrateurs qui se suspendraient l'un l'autre au même instant
- * ne laissent pas la plateforme sans sommet.
+ * écarter celui qui gère les rôles.
+ *
+ * ── Une seule écriture, en transaction — S.214 ───────────────────────
+ *
+ * Tous les comptes passent par `suspendreOuRetablir` : le rôle est relu
+ * dans la transaction sérialisable qui suspend, ferme les sessions et
+ * journalise. Le chemin « candidat » lisait le rôle avant, hors
+ * transaction : un compte promu entre-temps était suspendu par un
+ * administrateur.
  */
 export const GET = route({
   nom: "admin.utilisateurs",
@@ -45,7 +44,8 @@ export const GET = route({
 export const PUT = route({
   nom: "admin.utilisateurs.suspension",
   acces: "admin",
-  limite: "sensible",
+  // Régime `critique` (S.214) : la suspension coupe l'accès d'une personne.
+  limite: "critique",
   corps: z.object({
     userId: z.guid(),
     suspendre: z.boolean(),
@@ -53,34 +53,7 @@ export const PUT = route({
     motif: z.string().trim().min(MOTIF_MINIMUM_COMPTE).max(500),
   }),
   async traiter({ corps, acteur }) {
-    const cible = await db.user.findUnique({ where: { id: corps.userId } });
-    if (!cible) throw echec("introuvable");
-
-    const role: RoleDeCompte = typeof cible.role === "string" && estRole(cible.role) ? cible.role : "CANDIDAT";
-    if (estInterne(role)) return suspendreOuRetablir(acteur!, corps);
-
-    const verdict = verdictDeSuspension(
-      { id: acteur!.id, role: acteur!.role as RoleDeCompte },
-      { id: cible.id, role, suspendu: Boolean(cible.suspendedAt), supprime: Boolean(cible.deletedAt) },
-      corps.suspendre,
-      // Un candidat n'est jamais super-administrateur : la borne ne joue pas.
-      Number.POSITIVE_INFINITY,
-    );
-    if (!verdict.permis) throw echec("etat_incompatible", { corps: verdict.raison });
-
-    await journaliser({
-      acteurId: acteur!.id,
-      action: corps.suspendre ? "compte.suspension" : "compte.retablissement",
-      cible: `user:${cible.id}`,
-      motif: corps.motif,
-    });
-
-    await db.user.update({
-      where: { id: cible.id },
-      data: { suspendedAt: corps.suspendre ? new Date() : null },
-    });
-
-    const fermees = corps.suspendre ? await fermerToutesLesSessions(cible.id) : 0;
-    return { suspendu: corps.suspendre, sessionsFermees: fermees };
+    // Candidat ou compte interne : une seule écriture, en transaction (S.214).
+    return suspendreOuRetablir(acteur!, corps);
   },
 });

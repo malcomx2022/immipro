@@ -38,6 +38,14 @@ export const REGLES = {
   lecture: { appels: 240, fenetreSecondes: 60 },
   sensible: { appels: 10, fenetreSecondes: 60 },
   attente: { appels: 130, fenetreSecondes: 300 },
+  /*
+    S.214 — les gestes qui changent qui peut quoi : rôle, suspension,
+    création d'un compte interne, réinitialisation d'un second facteur.
+    Un opérateur en fait quelques-uns dans une journée ; une session volée
+    qui les enchaîne en fait cent. Vingt par quart d'heure laisse la
+    recette rejouer ses parcours sur six profils, et coupe le second.
+  */
+  critique: { appels: 20, fenetreSecondes: 900 },
 } as const satisfies Record<string, Regle>;
 
 export type NomRegle = keyof typeof REGLES;

@@ -8,7 +8,7 @@ import { creerUnCompteInterne } from "@/server/comptes/gestion";
  * Réservée au super-administrateur (`acces: "super_admin"`) : le
  * composeur refuse tout autre rôle avec 403 et journalise l'essai. Comme
  * toute écriture, la requête passe le contrôle d'origine (CSRF) et la
- * limite sensible avant d'atteindre le service.
+ * régime `critique` (S.214) avant d'atteindre le service.
  *
  * Le compte naît sans mot de passe : la personne le choisit par « Mot de
  * passe oublié », dont le code part à son adresse. La réponse ne porte ni
@@ -21,7 +21,8 @@ import { creerUnCompteInterne } from "@/server/comptes/gestion";
 export const POST = route({
   nom: "admin.comptes.creation",
   acces: "super_admin",
-  limite: "sensible",
+  // Régime `critique` (S.214) : un geste qui change qui peut quoi.
+  limite: "critique",
   corps: z.object({
     email: z.string().max(254),
     prenom: z.string().max(200),

@@ -43,6 +43,11 @@ export interface Compte {
    */
   role?: RoleDeCompte;
   /**
+   * Double authentification active — S.214. Facultatif pour les lectures
+   * antérieures : absent, elle se lit comme inactive.
+   */
+  secondFacteur?: boolean;
+  /**
    * Les dépôts déclarés de ce compte — S.89. La date réelle ne se modifie
    * pas depuis le dossier ; sa correction passe par le back-office, avec
    * motif, et c'est ici qu'elle se lit.
@@ -176,6 +181,12 @@ export interface ActionCompte {
   consequence: string;
   /** Ce que l'écran dit une fois l'action faite — l'état « fait » n'est pas muet. */
   confirmation: string;
+  /**
+   * Double confirmation — S.214. Présente, l'action demande un second clic
+   * sur un bouton qui la nomme, après cette phrase : un clic perdu ne
+   * coupe pas l'accès de quelqu'un.
+   */
+  aConfirmer?: { question: string; bouton: string };
 }
 
 export const ACTIONS_COMPTE: readonly ActionCompte[] = [
@@ -188,6 +199,11 @@ export const ACTIONS_COMPTE: readonly ActionCompte[] = [
     consequence:
       "Les sessions ouvertes se ferment immédiatement. Sans cela, la suspension ne prendrait effet qu'à l'expiration du cookie, trente jours plus tard.",
     confirmation: "Compte suspendu. Les sessions ouvertes sont fermées.",
+    aConfirmer: {
+      question:
+        "Suspendre ce compte ? Ses sessions se ferment tout de suite et la personne ne peut plus se connecter jusqu'au rétablissement.",
+      bouton: "Confirmer la suspension",
+    },
   },
   {
     cle: "retablir",

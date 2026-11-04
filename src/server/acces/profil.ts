@@ -4,6 +4,9 @@ import { FUSEAUX_PROPOSES } from "@/domain/dossiers/preferences-rappels";
 import {
   CONSENTEMENTS_REFUSES_AU_MINEUR,
   estMineur,
+  normaliserTelephone,
+  paysCouvert,
+  refusDuTelephone,
   validerIdentite,
   type SaisieDIdentite,
 } from "@/domain/comptes/profil";
@@ -125,13 +128,27 @@ type ColonnesDuProfil = Omit<
 >;
 
 export async function enregistrerLeProfil(userId: string, corps: CorpsDuProfil): Promise<void> {
+  /*
+    La route valide déjà (S.214) ; le service revalide ce qui a une règle
+    métier, pour qu'aucun appelant — fumée, script, route future — n'écrive
+    un téléphone ou un pays que « Mon compte » refuserait.
+  */
+  const refus: Record<string, string> = {};
+  if (corps.telephone?.trim()) {
+    const motif = refusDuTelephone(normaliserTelephone(corps.telephone.trim()));
+    if (motif) refus.telephone = motif;
+  }
+  if (corps.pays?.trim() && !paysCouvert(corps.pays.trim().toUpperCase())) {
+    refus.pays = "Choisis ton pays de résidence dans la liste.";
+  }
+  if (Object.keys(refus).length > 0) throw echec("champs_invalides", { champs: refus });
   const compte = mentionnees<ColonnesDuCompte>({
     firstName: texte(corps.prenom),
     lastName: texte(corps.nom),
-    phone: texte(corps.telephone),
+    phone: texte(corps.telephone === undefined ? undefined : normaliserTelephone(corps.telephone.trim())),
     billingName: texte(corps.facturationNom),
     billingAddress: texte(corps.facturationAdresse),
-    countryCode: texte(corps.pays),
+    countryCode: texte(corps.pays?.toUpperCase()),
   });
   if (Object.keys(compte).length > 0) {
     await db.user.update({ where: { id: userId }, data: compte });
