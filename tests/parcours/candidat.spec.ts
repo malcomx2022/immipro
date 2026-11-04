@@ -661,17 +661,19 @@ test("double authentification : activation par la clé, connexion en deux temps,
   const code = codeTotp(secret);
 
   /*
-    Sortie par « Se déconnecter », qui recharge /connexion en entier : pas
-    de `goto("/connexion")`, que Firefox double sans l'achever (S.193, S.197 ;
-    vu de nouveau ici sur firefox-1440). La session de cet onglet est
-    supprimée en base.
+    Sortie sans aucune navigation de document vers /connexion : Firefox la
+    double sans l'achever (S.193, S.197), que ce soit un `goto` ou la
+    recharge de « Se déconnecter » (vu sur firefox-1440 puis firefox-390).
+    La session se ferme par la route de déconnexion — supprimée en base, le
+    cookie effacé dans le contexte —, puis le parcours suit les liens du
+    candidat : l'accueil, puis « Connexion » de l'en-tête, comme R-O05.
   */
   const deuxTemps = async () => {
-    if (new URL(page.url()).pathname !== "/tableau-de-bord") await aller("/tableau-de-bord");
-    await Promise.all([
-      page.waitForURL((u) => u.pathname === "/connexion"),
-      page.getByRole("button", { name: "Se déconnecter", exact: true }).first().click(),
-    ]);
+    const sortie = await page.request.delete("/api/comptes/session");
+    expect(sortie.status()).toBe(204);
+    await aller("/");
+    await page.getByRole("banner").getByRole("link", { name: "Connexion", exact: true }).click();
+    await page.waitForURL((u) => u.pathname === "/connexion");
     await attendreLHydratation(page, "form");
     await page.getByLabel("Adresse email", { exact: true }).fill(email);
     await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
