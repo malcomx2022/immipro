@@ -180,6 +180,10 @@ model User {
   notifications Notification[]
   sessions      Session[]
   secrets       AuthSecret[]
+  /// Double authentification TOTP — S.214. Absente : mot de passe seul.
+  secondFacteur    SecondFacteur?
+  codesDeSecours   CodeDeSecours[]
+  defisDeConnexion DefiDeConnexion[]
 
   /// La reprise des suppressions restées à mi-chemin (RG-10.4) balaie
   /// exactement ces deux colonnes, une fois par nuit, sur toute la table.
@@ -242,6 +246,73 @@ model AuthSecret {
 
   @@index([userId, kind, consumedAt])
   @@index([expiresAt])
+}
+
+/// Double authentification TOTP (RFC 6238) — S.214.
+///
+/// Le secret n'est jamais en clair : AES-256-GCM sous `DEUX_FACTEURS_CLE`,
+/// lié au compte par les données associées (une ligne recopiée sur un autre
+/// compte ne se déchiffre pas). `activeLe` nul : enrôlement commencé, pas
+/// encore confirmé par un premier code — la connexion ne l'exige pas.
+///
+/// `dernierPas` porte l'anti-rejeu : un code n'est accepté que pour un pas
+/// de temps strictement postérieur au dernier accepté, et l'écriture est
+/// conditionnée à cette valeur — deux envois simultanés du même code n'en
+/// ouvrent qu'une. `derive` retient le décalage d'horloge du téléphone
+/// (resynchronisation, RFC 6238 §6), borné à un pas.
+///
+/// `echecs` et `bloqueJusqua` : le blocage propre au second facteur,
+/// indépendant de celui du mot de passe — une réinitialisation par courriel
+/// ne le remet pas à zéro. À la levée, le compteur redescend à un seuil
+/// intermédiaire et non à zéro (hystérésis) : seul un code juste l'efface.
+model SecondFacteur {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretChiffre String
+  activeLe      DateTime?
+  dernierPas    BigInt?
+  derive        Int       @default(0)
+  echecs        Int       @default(0)
+  bloqueJusqua  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+/// Code de secours à usage unique — S.214. Seule une empreinte HMAC-SHA256
+/// (clé dérivée de `DEUX_FACTEURS_CLE`) est gardée : une copie de la base
+/// ne suffit pas à les retrouver par essais. `utiliseLe` plutôt qu'une
+/// suppression : l'écran dit combien il en reste, le journal lequel a servi.
+model CodeDeSecours {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empreinte String
+  utiliseLe DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, empreinte])
+  @@index([userId, utiliseLe])
+}
+
+/// Défi de connexion — S.214. Le mot de passe est juste, le second facteur
+/// reste à fournir. Le cookie porte un secret aléatoire, la table son
+/// empreinte. Cinq minutes, cinq essais, un seul usage : aucune session
+/// n'existe avant que le code soit accepté.
+model DefiDeConnexion {
+  id         String    @id @default(uuid())
+  jetonHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memoriser  Boolean   @default(false)
+  userAgent  String?
+  essais     Int       @default(0)
+  expireLe   DateTime
+  consommeLe DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expireLe])
 }
 
 model Profile {

@@ -889,6 +889,13 @@ describe("B-03 — Utilisateurs", () => {
       target: { value: "Compte signalé pour usurpation d'identité." },
     });
     fireEvent.click(screen.getByRole("button", { name: "Suspendre le compte" }));
+    // Double confirmation (S.214) : le premier clic n'envoie rien.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(appels).toHaveLength(0);
+    expect(screen.getByText(/Suspendre ce compte \?/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmer la suspension" }));
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

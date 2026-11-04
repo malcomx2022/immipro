@@ -98,6 +98,13 @@ export async function demanderLaSuppression(
   // téléverser une pièce dans un dossier en train d'être vidé.
   await fermerToutesLesSessions(userId);
   await db.authSecret.deleteMany({ where: { userId } });
+  // S.214 : le second facteur et ses codes partent avec l'accès. Un défi de
+  // connexion en cours ne s'achève plus.
+  await db.$transaction(async (tx) => {
+    await tx.defiDeConnexion.deleteMany({ where: { userId } });
+    await tx.codeDeSecours.deleteMany({ where: { userId } });
+    await tx.secondFacteur.deleteMany({ where: { userId } });
+  });
 
   return acheverLaSuppression(userId, maintenant);
 }

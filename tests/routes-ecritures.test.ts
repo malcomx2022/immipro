@@ -58,6 +58,7 @@ const m = vi.hoisted(() => ({
   tenir: vi.fn(),
   rattacher: vi.fn(),
   ouvrirLeTunnel: vi.fn(),
+  suspendre: vi.fn(),
 }));
 
 vi.mock("@/server/http/route", () => ({
@@ -77,6 +78,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/server/acces/journal", () => ({ journaliser: m.journaliser }));
+vi.mock("@/server/comptes/gestion", () => ({ suspendreOuRetablir: m.suspendre }));
 vi.mock("@/server/acces/paiements", () => ({
   declarerLeRemboursementManuel: m.declarer,
   trancherLaRevueManuelle: m.trancher,
@@ -175,7 +177,6 @@ describe("toutes les écritures C-1 déclarent leur rôle et une limite sensible
     ["comptes.partages.retrait", "candidat"],
     ["dossier.migration", "candidat_verifie"],
     ["dossier.depot.correction", "candidat_verifie"],
-    ["admin.utilisateurs.suspension", "admin"],
     ["admin.veille.relecture", "veilleur"],
     ["comptes.rappels.maj", "candidat"],
     ["notification.lue", "candidat"],
@@ -185,6 +186,11 @@ describe("toutes les écritures C-1 déclarent leur rôle et une limite sensible
   ])("%s : rôle %s, limite sensible", (nom, acces) => {
     expect(definition(nom).acces).toBe(acces);
     expect(definition(nom).limite).toBe("sensible");
+  });
+
+  it("la suspension : rôle admin, régime critique (S.214)", () => {
+    expect(definition("admin.utilisateurs.suspension").acces).toBe("admin");
+    expect(definition("admin.utilisateurs.suspension").limite).toBe("critique");
   });
 });
 
@@ -544,35 +550,30 @@ describe("B-03 — suspension et rétablissement d'un compte", () => {
     expect(corpsAccepte(NOM, { userId, suspendre: false, motif: "Erreur levée" })).toBe(true);
   });
 
-  it("un compte inconnu n'est ni journalisé ni modifié", async () => {
-    m.utilisateur.mockResolvedValue(null);
-    expect(await codeDeLEchec(appeler(true))).toBe("introuvable");
-    expect(m.journaliser).not.toHaveBeenCalled();
+  /*
+    S.214 : candidat ou compte interne, la route ne lit ni n'écrit plus
+    rien elle-même. Tout passe par la transaction de \`suspendreOuRetablir\`
+    (rôle relu, écriture conditionnée, sessions fermées, journal) — dont
+    \`cloisonnement-super-admin.test.ts\` éprouve le détail.
+  */
+  it.each([true, false])("suspendre=%s : délégué tel quel au service transactionnel", async (suspendre) => {
+    m.suspendre.mockResolvedValue({ suspendu: suspendre, sessionsFermees: suspendre ? 2 : 0 });
+    expect(await appeler(suspendre)).toEqual({ suspendu: suspendre, sessionsFermees: suspendre ? 2 : 0 });
+    expect(m.suspendre).toHaveBeenCalledWith(ADMIN, {
+      userId,
+      suspendre,
+      motif: "Signalement de fraude au paiement.",
+    });
+    expect(m.utilisateur).not.toHaveBeenCalled();
     expect(m.majUtilisateur).not.toHaveBeenCalled();
-  });
-
-  it("la suspension est journalisée avant l'écriture et ferme toutes les sessions", async () => {
-    m.utilisateur.mockResolvedValue({ id: userId });
-    m.fermerSessions.mockResolvedValue(2);
-
-    expect(await appeler(true)).toEqual({ suspendu: true, sessionsFermees: 2 });
-    expect(m.journaliser).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "compte.suspension", cible: `user:${userId}` }),
-    );
-    expect(m.journaliser.mock.invocationCallOrder[0]).toBeLessThan(
-      m.majUtilisateur.mock.invocationCallOrder[0]!,
-    );
-    expect(m.majUtilisateur.mock.calls[0]![0].data.suspendedAt).toBeInstanceOf(Date);
-    expect(m.fermerSessions).toHaveBeenCalledWith(userId);
-  });
-
-  it("le rétablissement efface la date sans toucher aux sessions", async () => {
-    m.utilisateur.mockResolvedValue({ id: userId });
-
-    expect(await appeler(false)).toEqual({ suspendu: false, sessionsFermees: 0 });
-    expect(m.journaliser.mock.calls[0]![0].action).toBe("compte.retablissement");
-    expect(m.majUtilisateur.mock.calls[0]![0].data).toEqual({ suspendedAt: null });
+    expect(m.journaliser).not.toHaveBeenCalled();
     expect(m.fermerSessions).not.toHaveBeenCalled();
+  });
+
+  it("un refus du service remonte sans rien écrire", async () => {
+    m.suspendre.mockRejectedValue(new EchecHttp("introuvable"));
+    expect(await codeDeLEchec(appeler(true))).toBe("introuvable");
+    expect(m.majUtilisateur).not.toHaveBeenCalled();
   });
 });
 

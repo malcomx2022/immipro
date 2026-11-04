@@ -9,6 +9,8 @@ import { appeler } from "@/lib/api";
 import type { EchecCandidat } from "@/server/http/echecs";
 import type { EtatDeSecurite } from "@/server/acces/profil";
 import { momentEnFrancais } from "@/domain/format/moment";
+import type { EtatDuSecondFacteur } from "@/server/comptes/second-facteur";
+import { DoubleAuthentification } from "./DoubleAuthentification";
 
 /**
  * « Sécurité » — S.210.
@@ -19,16 +21,19 @@ import { momentEnFrancais } from "@/domain/format/moment";
  *   (`/mot-de-passe`) — le changement ferme toutes les sessions ;
  * - les sessions ouvertes, et un bouton qui les ferme toutes, celle-ci
  *   comprise : le geste de qui a oublié sa session sur un poste partagé ;
- * - la double authentification **n'existe pas encore**. L'écran le dit,
+ * - la double authentification (S.214) : activation par code QR, codes
+ *   de secours, désactivation sous mot de passe et code. Sans clé de
+ *   chiffrement sur le serveur, l'écran dit qu'elle n'est pas disponible,
  *   sans interrupteur : un réglage qui ne règle rien serait une promesse.
  */
 export interface SecuriteProps {
   email: string;
   etat: EtatDeSecurite;
+  secondFacteur: EtatDuSecondFacteur;
   retour: string;
 }
 
-export function Securite({ email, etat, retour }: SecuriteProps) {
+export function Securite({ email, etat, secondFacteur, retour }: SecuriteProps) {
   const router = useRouter();
   const [envoi, setEnvoi] = useState(false);
   const [echec, setEchec] = useState<EchecCandidat | null>(null);
@@ -114,13 +119,7 @@ export function Securite({ email, etat, retour }: SecuriteProps) {
         )}
       </section>
 
-      <section className="flex flex-col gap-2 border-t border-ink-300 pt-5">
-        <h2 className="text-16 font-semibold text-ink-900">Double authentification</h2>
-        <p className="text-pretty text-14 text-ink-700">
-          Pas encore disponible. Ton compte est protégé par ton mot de passe, le blocage après
-          cinq essais faux et la fermeture des sessions à chaque changement de mot de passe.
-        </p>
-      </section>
+<DoubleAuthentification etat={secondFacteur} />
     </div>
   );
 }

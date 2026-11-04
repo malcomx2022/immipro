@@ -31,6 +31,8 @@ import {
 import { CONSEQUENCE_ETAT, LIBELLE_ETAT } from "../../src/domain/backoffice/consultants";
 import { EDITORIAL } from "../../src/lib/contenu/destinations";
 import { jourCivil } from "../../src/domain/format/fuseau";
+import { createHmac } from "node:crypto";
+import { codeAuPas, depuisBase32, pasDeTemps } from "../../src/domain/comptes/deux-facteurs";
 import {
   codeDeVerification,
   controlerLesFournisseurs,
@@ -581,6 +583,134 @@ test("Mon compte : refus avant l'envoi, enregistrement, relecture en base et à 
   await aller("/tableau-de-bord");
   preuves.push({
     controle: "Mon compte : refus sans requête, enregistrement, relecture en base et à la réouverture",
+    conforme: true,
+  });
+});
+
+/**
+ * S.214 — double authentification, de bout en bout. Le code est calculé
+ * ici comme le ferait l'application du téléphone (RFC 6238), depuis la clé
+ * affichée à l'écran. Chaque geste est relu en base : secret chiffré, dix
+ * codes en empreinte, défi sans session, rejeu refusé sans session, code
+ * de secours consommé et journalisé, désactivation qui efface tout.
+ */
+const hmacSha1 = (cle: Uint8Array, message: Uint8Array) =>
+  new Uint8Array(createHmac("sha1", cle).update(message).digest());
+const codeTotp = (secret: string, pas = pasDeTemps(Date.now())) =>
+  codeAuPas(depuisBase32(secret)!, pas, hmacSha1);
+
+test("double authentification : activation par la clé, connexion en deux temps, rejeu refusé, code de secours, désactivation", async () => {
+  const etat = async () =>
+    (
+      await lire<{ active: boolean | null; chiffre: string | null; pas: string | null; codes: string; libres: string; sessions: string }>(
+        `SELECT (SELECT "activeLe" IS NOT NULL FROM "SecondFacteur" WHERE "userId"=$1) AS active,
+                (SELECT "secretChiffre" FROM "SecondFacteur" WHERE "userId"=$1) AS chiffre,
+                (SELECT "dernierPas"::text FROM "SecondFacteur" WHERE "userId"=$1) AS pas,
+                (SELECT count(*) FROM "CodeDeSecours" WHERE "userId"=$1) AS codes,
+                (SELECT count(*) FROM "CodeDeSecours" WHERE "userId"=$1 AND "utiliseLe" IS NULL) AS libres,
+                (SELECT count(*) FROM "Session" WHERE "userId"=$1) AS sessions`,
+        [compte],
+      )
+    )[0]!;
+
+  await aller("/compte/securite");
+  await page.getByRole("button", { name: "Activer la double authentification", exact: true }).click();
+  await page.getByLabel("Mot de passe", { exact: true }).fill("pas-le-bon-mot-de-passe");
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  await expect(page.getByText(/ne correspond pas à ton compte/u)).toBeVisible();
+  expect((await etat()).chiffre).toBeNull();
+
+  await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  await expect(page.getByRole("img", { name: /Code QR/u })).toBeVisible();
+  const secret = (await page.getByTestId("secret-totp").innerText()).replace(/\s/gu, "");
+  expect(secret).toMatch(/^[A-Z2-7]{32}$/u);
+  const prepare = await etat();
+  expect(prepare.active).toBe(false);
+  expect(prepare.chiffre).toMatch(/^v1\./u);
+  expect(prepare.chiffre).not.toContain(secret);
+
+  await page.getByLabel("Code à six chiffres", { exact: true }).fill(codeTotp(secret));
+  await page.getByRole("button", { name: "Confirmer l'activation", exact: true }).click();
+  await expect(page.getByText(/Double authentification activée/u)).toBeVisible();
+  const codes = (await page.getByTestId("codes-de-secours").locator("li").allInnerTexts()).map((c) => c.trim());
+  expect(codes).toHaveLength(10);
+  for (const c of codes) expect(c).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/u);
+  const active = await etat();
+  expect(active).toMatchObject({ active: true, codes: "10", libres: "10", sessions: "1" });
+  await page.getByRole("button", { name: "J'ai noté mes codes", exact: true }).click();
+  await expect(page.getByText(/10 codes de secours restants sur 10/u)).toBeVisible();
+  await relever();
+
+  // Un code neuf : le pas courant doit dépasser celui de l'activation.
+  await expect.poll(() => pasDeTemps(Date.now()) > Number(active.pas), { timeout: 35_000, intervals: [500] }).toBe(true);
+  const code = codeTotp(secret);
+
+  const deuxTemps = async () => {
+    await context.clearCookies();
+    await ouvrirLaConnexion(page);
+    await page.getByLabel("Adresse email", { exact: true }).fill(email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
+    const [premier] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/comptes/session") && r.request().method() === "POST"),
+      page.getByLabel("Mot de passe", { exact: true }).press("Enter"),
+    ]);
+    expect(premier.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Double authentification");
+  };
+  const sessionsAvant = Number((await etat()).sessions);
+  await deuxTemps();
+  // Le mot de passe juste n'a ouvert aucune session.
+  expect(Number((await etat()).sessions)).toBe(sessionsAvant);
+  await page.getByLabel("Code à six chiffres", { exact: true }).fill(code);
+  await page.getByRole("button", { name: "Vérifier et me connecter", exact: true }).click();
+  await page.waitForURL((u) => u.pathname === "/tableau-de-bord");
+  expect(Number((await etat()).sessions)).toBe(sessionsAvant + 1);
+
+  // Le même code, rejoué dans la même fenêtre : refusé, sans session.
+  await deuxTemps();
+  await page.getByLabel("Code à six chiffres", { exact: true }).fill(code);
+  const [rejeu] = await Promise.all([
+    page.waitForResponse((r) => r.url().endsWith("/api/comptes/session/second-facteur")),
+    page.getByRole("button", { name: "Vérifier et me connecter", exact: true }).click(),
+  ]);
+  expect(rejeu.status()).toBe(401);
+  await expect(page.getByRole("alert").filter({ hasText: /déjà de servir/u })).toBeVisible();
+  expect(Number((await etat()).sessions)).toBe(sessionsAvant + 1);
+
+  // Un code de secours, saisi en minuscules : accepté une fois.
+  await page.getByRole("button", { name: "Utiliser un code de secours", exact: true }).click();
+  await page.getByLabel("Code de secours", { exact: true }).fill(codes[0]!.toLowerCase());
+  await page.getByRole("button", { name: "Vérifier et me connecter", exact: true }).click();
+  await page.waitForURL((u) => u.pathname === "/tableau-de-bord");
+  expect((await etat()).libres).toBe("9");
+  const [secours] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE action='compte.second_facteur.secours' AND target=$1`,
+    [`user:${compte}`],
+  );
+  expect(secours!.n).toBe("1");
+
+  // Désactivation : premier clic, puis mot de passe et un code de secours.
+  await aller("/compte/securite");
+  await page.getByRole("button", { name: "Désactiver", exact: true }).click();
+  await page.getByLabel("Mot de passe", { exact: true }).fill(MOT_DE_PASSE);
+  await page.getByLabel("Code de l'application ou code de secours", { exact: true }).fill(codes[0]!);
+  await page.getByRole("button", { name: "Confirmer la désactivation", exact: true }).click();
+  await expect(page.getByText(/n'est pas valable ou a déjà servi/u)).toBeVisible();
+  expect((await etat()).active).toBe(true);
+  await page.getByLabel("Code de l'application ou code de secours", { exact: true }).fill(codes[1]!);
+  await page.getByRole("button", { name: "Confirmer la désactivation", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText(/Double authentification désactivée/u);
+  expect(await etat()).toMatchObject({ active: null, chiffre: null, codes: "0", sessions: "1" });
+  const [traces] = await lire<{ n: string }>(
+    `SELECT count(*) AS n FROM "AuditLog" WHERE target=$1 AND action IN ('compte.second_facteur.activation','compte.second_facteur.desactivation')`,
+    [`user:${compte}`],
+  );
+  expect(traces!.n).toBe("2");
+  await aller("/tableau-de-bord");
+  preuves.push({
+    controle:
+      "S.214 2FA : secret chiffré, dix codes en empreinte, mot de passe sans session, code neuf accepté, rejeu refusé, code de secours unique et journalisé, désactivation sous mot de passe et code",
     conforme: true,
   });
 });
@@ -1990,6 +2120,10 @@ test("B-03 : motif court refusé, suspension qui ferme les sessions, rétablisse
   await expect(b.getByText(/en 10 caractères au moins/u).first()).toBeVisible();
   await b.getByLabel("Motif de la décision", { exact: true }).fill(`Recette S.191 ${moteur}-${largeur} : suspension éprouvée`);
   await suspendre.click();
+  // Double confirmation (S.214) : le premier clic n'envoie rien.
+  await expect(b.getByText(/Suspendre ce compte \?/u)).toBeVisible();
+  expect((await etat()).suspendu).toBe(false);
+  await b.getByRole("button", { name: "Confirmer la suspension", exact: true }).click();
   await expect(b.getByRole("status")).toHaveText(/Compte suspendu/u);
   await expect.poll(async () => (await etat()).suspendu).toBe(true);
   expect((await etat()).sessions).toBe("0");

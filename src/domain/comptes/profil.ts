@@ -274,6 +274,52 @@ export const estMineur = (naissance: string | null | undefined, aujourdhui: stri
   return age !== null && age < AGE_MAJORITE;
 };
 
+/**
+ * Le refus d'un numéro déjà normalisé, ou `null` s'il est recevable —
+ * S.214. Une seule règle pour les trois écritures de la colonne `phone`
+ * (inscription, C-02, « Mon compte ») : E.164 (« + », indicatif, 8 à 15
+ * chiffres) et un indicatif de pays couvert. Avant, C-02 et l'inscription
+ * ne lisaient que le format, et écrivaient ce que « Mon compte » refusait.
+ */
+export function refusDuTelephone(telephone: string): string | null {
+  const chiffres = telephone.slice(1);
+  if (!telephone.startsWith("+") || !/^\d+$/u.test(chiffres)) {
+    return "Commence par « + » et l'indicatif du pays, puis les chiffres : +229 01 23 45 67 89.";
+  }
+  if (
+    chiffres.length < BORNES_TELEPHONE_CHIFFRES.min ||
+    chiffres.length > BORNES_TELEPHONE_CHIFFRES.max ||
+    !TELEPHONE_INTERNATIONAL.test(telephone)
+  ) {
+    return `Le numéro compte ${chiffres.length} chiffres, indicatif compris : il en faut entre ${BORNES_TELEPHONE_CHIFFRES.min} et ${BORNES_TELEPHONE_CHIFFRES.max}.`;
+  }
+  if (!indicatifAdmis(telephone)) {
+    return `Cet indicatif n'est pas celui d'un pays couvert. Indicatifs admis : ${INDICATIFS.slice()
+      .sort((a, b) => Number(a) - Number(b))
+      .map((i) => `+${i}`)
+      .join(", ")}.`;
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Bornes des champs de C-02 — S.214. La route les lit : un corps hors
+ * bornes est refusé avant toute écriture, avec un message par champ.
+ * ------------------------------------------------------------------ */
+
+export const BORNES_PROFIL = {
+  texte: 80,
+  domaine: 120,
+  /** Langues déclarées : un code ISO 639-1 et un niveau court. */
+  langues: 10,
+  niveauDeLangue: 40,
+  anneesExperience: 60,
+  /** Un budget au-delà ne décrit plus un projet de visa : c'est une faute de frappe. */
+  budgetMax: 1_000_000_000,
+} as const;
+
+export const CODE_LANGUE = /^[a-z]{2}$/u;
+
 export interface SaisieDIdentite {
   prenom: string;
   nom: string;
@@ -332,21 +378,8 @@ export function validerIdentite(
 
   const telephone = saisie.telephone.trim() === "" ? null : normaliserTelephone(saisie.telephone.trim());
   if (telephone) {
-    const chiffres = telephone.slice(1);
-    if (!telephone.startsWith("+") || !/^\d+$/u.test(chiffres)) {
-      champs.telephone = "Commence par « + » et l'indicatif du pays, puis les chiffres : +229 01 23 45 67 89.";
-    } else if (
-      chiffres.length < BORNES_TELEPHONE_CHIFFRES.min ||
-      chiffres.length > BORNES_TELEPHONE_CHIFFRES.max ||
-      !TELEPHONE_INTERNATIONAL.test(telephone)
-    ) {
-      champs.telephone = `Le numéro compte ${chiffres.length} chiffres, indicatif compris : il en faut entre ${BORNES_TELEPHONE_CHIFFRES.min} et ${BORNES_TELEPHONE_CHIFFRES.max}.`;
-    } else if (!indicatifAdmis(telephone)) {
-      champs.telephone = `Cet indicatif n'est pas celui d'un pays couvert. Indicatifs admis : ${INDICATIFS.slice()
-        .sort((a, b) => Number(a) - Number(b))
-        .map((i) => `+${i}`)
-        .join(", ")}.`;
-    }
+    const refus = refusDuTelephone(telephone);
+    if (refus) champs.telephone = refus;
   }
 
   const dateNaissance = saisie.dateNaissance.trim() === "" ? null : saisie.dateNaissance.trim();

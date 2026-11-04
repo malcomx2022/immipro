@@ -1,6 +1,7 @@
 import type { Prisma, Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { journaliser } from "@/server/acces/journal";
+import { estUneCoursePerdue } from "@/server/http/concurrence";
 import {
   auteurConsole,
   verdictDuChangement,
@@ -73,6 +74,20 @@ export async function appliquerLeChangementDeRole(
           where: "email" in changement.cible ? { email: changement.cible.email } : { id: changement.cible.id },
         });
         if (!cible) throw new Refus({ issue: "introuvable" });
+        // L'auteur relu dans la transaction (S.214) : suspendu ou rétrogradé
+        // pendant que sa requête était en vol, il ne change plus de rôle.
+        if (auteur.genre === "compte") {
+          const lu = await tx.user.findUnique({
+            where: { id: auteur.id },
+            select: { role: true, suspendedAt: true, deletedAt: true },
+          });
+          if (!lu || lu.suspendedAt || lu.deletedAt || lu.role !== auteur.role) {
+            throw new Refus({
+              issue: "refuse",
+              raison: "Ton compte a changé pendant la demande (rôle ou suspension) : reconnecte-toi pour lire tes droits actuels.",
+            });
+          }
+        }
 
         const [administrateurs, superAdminsActifs] = await Promise.all([
           tx.user.count({
@@ -141,7 +156,8 @@ export async function appliquerLeChangementDeRole(
     if (erreur instanceof Refus) return erreur.issue;
     // Deux commandes simultanées : la base en sérialise une, l'autre échoue
     // plutôt que de raisonner sur un état périmé.
-    if ((erreur as { code?: unknown }).code === "P2034") {
+    // P2034, ou `TransactionWriteConflict` de l'adaptateur pg (S.214).
+    if (estUneCoursePerdue(erreur)) {
       return { issue: "refuse", raison: "Une autre commande a modifié les rôles en même temps : relancez celle-ci." };
     }
     throw erreur;

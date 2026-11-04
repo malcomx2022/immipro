@@ -141,11 +141,12 @@ describe("les routes réelles du sommet", () => {
   it.each([
     ["src/app/api/admin/comptes/role/route.ts", "admin.comptes.role"],
     ["src/app/api/admin/comptes/route.ts", "admin.comptes.creation"],
-  ])("%s : accès super_admin, limite sensible, POST", (fichier, nom) => {
+    ["src/app/api/admin/comptes/second-facteur/route.ts", "admin.comptes.second_facteur"],
+  ])("%s : accès super_admin, régime critique (S.214), POST", (fichier, nom) => {
     const source = readFileSync(fichier, "utf8");
     expect(source).toContain(`nom: "${nom}"`);
     expect(source).toMatch(/acces: "super_admin"/u);
-    expect(source).toMatch(/limite: "sensible"/u);
+    expect(source).toMatch(/limite: "critique"/u);
     expect(source).toMatch(/export const POST = route/u);
   });
 
@@ -201,6 +202,21 @@ describe("les routes réelles du sommet", () => {
   });
 });
 
+
+/**
+ * Les lectures de comptes dans la transaction, par identifiant ou adresse.
+ * S.214 : l'auteur est relu aussi ; un identifiant absent des lignes
+ * données se lit comme un compte actif du rôle que son préfixe nomme.
+ */
+const annuaire = (...lignes: Array<Record<string, unknown> & { id: string }>) =>
+  m.tx.user.findUnique.mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
+    const trouvee = lignes.find((l) => (where.id ? l.id === where.id : l.email === where.email));
+    if (trouvee) return trouvee;
+    if (!where.id) return null;
+    const role = where.id.startsWith("sommet") ? "SUPER_ADMIN" : where.id.startsWith("admin") ? "ADMIN" : "CANDIDAT";
+    return { id: where.id, role, suspendedAt: null, deletedAt: null };
+  });
+
 describe("le changement de rôle ferme les sessions du compte, dans la transaction", () => {
   const cible = {
     id: CIBLE,
@@ -213,7 +229,7 @@ describe("le changement de rôle ferme les sessions du compte, dans la transacti
   const sommet = { genre: "compte" as const, id: "sommet-1", role: "SUPER_ADMIN" as const };
 
   it("promotion : rôle écrit sous condition, sessions fermées, trace avec le nombre fermé", async () => {
-    m.tx.user.findUnique.mockResolvedValue(cible);
+    annuaire(cible);
     m.tx.user.count.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
     m.tx.user.updateMany.mockResolvedValue({ count: 1 });
     m.tx.session.deleteMany.mockResolvedValue({ count: 3 });
@@ -242,7 +258,7 @@ describe("le changement de rôle ferme les sessions du compte, dans la transacti
   });
 
   it("depuis la console, l'auteur est « console:<nom> »", async () => {
-    m.tx.user.findUnique.mockResolvedValue(cible);
+    annuaire(cible);
     m.tx.user.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     m.tx.user.updateMany.mockResolvedValue({ count: 1 });
     m.tx.session.deleteMany.mockResolvedValue({ count: 0 });
@@ -256,7 +272,7 @@ describe("le changement de rôle ferme les sessions du compte, dans la transacti
   });
 
   it("un ADMIN qui passerait la route est encore refusé par le domaine : rien n'est fermé", async () => {
-    m.tx.user.findUnique.mockResolvedValue(cible);
+    annuaire(cible);
     m.tx.user.count.mockResolvedValue(2);
     const issue = await appliquerLeChangementDeRole({
       cible: { id: CIBLE },
@@ -271,7 +287,7 @@ describe("le changement de rôle ferme les sessions du compte, dans la transacti
   });
 
   it("le dernier super-administrateur actif ne se retire pas : aucune écriture", async () => {
-    m.tx.user.findUnique.mockResolvedValue({ ...cible, id: "sommet-1", role: "SUPER_ADMIN" });
+    annuaire({ ...cible, id: "sommet-1", role: "SUPER_ADMIN" });
     m.tx.user.count.mockResolvedValueOnce(3).mockResolvedValueOnce(1);
     const issue = await appliquerLeChangementDeRole({
       cible: { id: "sommet-1" },
@@ -291,19 +307,92 @@ describe("suspension d'un compte interne", () => {
   const demande = { userId: CIBLE, suspendre: true, motif: "Départ de l'équipe" };
 
   it("un administrateur ne suspend pas un veilleur : refus, rien d'écrit", async () => {
-    m.tx.user.findUnique.mockResolvedValue({ id: CIBLE, role: "VEILLEUR", suspendedAt: null, deletedAt: null });
+    annuaire({ id: CIBLE, role: "VEILLEUR", suspendedAt: null, deletedAt: null });
     m.tx.user.count.mockResolvedValue(1);
     await expect(suspendreOuRetablir(admin, demande)).rejects.toBeInstanceOf(EchecHttp);
     expect(m.journaliser).not.toHaveBeenCalled();
     expect(m.tx.user.update).not.toHaveBeenCalled();
+    expect(m.tx.user.updateMany).not.toHaveBeenCalled();
   });
 
   it("un super-administrateur le suspend : trace, date, sessions fermées", async () => {
-    m.tx.user.findUnique.mockResolvedValue({ id: CIBLE, role: "VEILLEUR", suspendedAt: null, deletedAt: null });
+    annuaire({ id: CIBLE, role: "VEILLEUR", suspendedAt: null, deletedAt: null });
     m.tx.user.count.mockResolvedValue(1);
     m.tx.session.deleteMany.mockResolvedValue({ count: 2 });
+    m.tx.user.updateMany.mockResolvedValue({ count: 1 });
     expect(await suspendreOuRetablir(sommet, demande)).toEqual({ suspendu: true, sessionsFermees: 2 });
     expect(m.journaliser).toHaveBeenCalledWith(expect.objectContaining({ action: "compte.suspension" }), m.tx);
-    expect(m.journaliser.mock.invocationCallOrder[0]).toBeLessThan(m.tx.user.update.mock.invocationCallOrder[0]!);
+    expect(m.journaliser.mock.invocationCallOrder[0]).toBeLessThan(m.tx.user.updateMany.mock.invocationCallOrder[0]!);
+    // S.214 : l'écriture est conditionnée au rôle lu dans la transaction.
+    expect(m.tx.user.updateMany.mock.calls[0]![0].where).toEqual({ id: CIBLE, role: "VEILLEUR" });
+  });
+});
+
+describe("S.214 — l'auteur relu, la suspension d'un candidat dans la même transaction", () => {
+  const admin = acteur("ADMIN", "admin-1") as Parameters<typeof suspendreOuRetablir>[0];
+  const demande = { userId: CIBLE, suspendre: true, motif: "Signalement de fraude au paiement" };
+
+  it("un administrateur suspend un candidat : rôle relu, écriture conditionnée, sessions, trace", async () => {
+    annuaire({ id: CIBLE, role: "CANDIDAT", suspendedAt: null, deletedAt: null });
+    m.tx.user.count.mockResolvedValue(2);
+    m.tx.user.updateMany.mockResolvedValue({ count: 1 });
+    m.tx.session.deleteMany.mockResolvedValue({ count: 3 });
+    expect(await suspendreOuRetablir(admin, demande)).toEqual({ suspendu: true, sessionsFermees: 3 });
+    expect(m.tx.user.updateMany.mock.calls[0]![0].where).toEqual({ id: CIBLE, role: "CANDIDAT" });
+    expect(m.journaliser).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "compte.suspension", details: { role: "CANDIDAT" } }),
+      m.tx,
+    );
+  });
+
+  it("le candidat promu au sommet entre-temps : l'administrateur est refusé, rien n'est écrit", async () => {
+    annuaire({ id: CIBLE, role: "SUPER_ADMIN", suspendedAt: null, deletedAt: null });
+    m.tx.user.count.mockResolvedValue(3);
+    await expect(suspendreOuRetablir(admin, demande)).rejects.toMatchObject({ echec: { code: "etat_incompatible" } });
+    expect(m.tx.user.updateMany).not.toHaveBeenCalled();
+    expect(m.journaliser).not.toHaveBeenCalled();
+  });
+
+  it("le rôle change entre la lecture et l'écriture : refus actionnable", async () => {
+    annuaire({ id: CIBLE, role: "CANDIDAT", suspendedAt: null, deletedAt: null });
+    m.tx.user.count.mockResolvedValue(2);
+    m.tx.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(suspendreOuRetablir(admin, demande)).rejects.toMatchObject({
+      echec: { code: "etat_incompatible", corps: expect.stringMatching(/Recharge la page/u) },
+    });
+    expect(m.tx.session.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("une course sérialisable perdue (P2034) devient un refus, jamais une erreur brute", async () => {
+    m.tx.user.findUnique.mockRejectedValue(Object.assign(new Error("conflit"), { code: "P2034" }));
+    await expect(suspendreOuRetablir(admin, demande)).rejects.toMatchObject({ echec: { code: "etat_incompatible" } });
+  });
+
+  it("un auteur suspendu pendant que sa requête était en vol ne suspend plus personne", async () => {
+    annuaire(
+      { id: CIBLE, role: "CANDIDAT", suspendedAt: null, deletedAt: null },
+      { id: "admin-1", role: "ADMIN", suspendedAt: new Date(), deletedAt: null },
+    );
+    m.tx.user.count.mockResolvedValue(2);
+    await expect(suspendreOuRetablir(admin, demande)).rejects.toMatchObject({ echec: { code: "droits_insuffisants" } });
+    expect(m.tx.user.updateMany).not.toHaveBeenCalled();
+    expect(m.journaliser).not.toHaveBeenCalled();
+  });
+
+  it("un super-administrateur rétrogradé en vol ne change plus de rôle", async () => {
+    annuaire(
+      { id: CIBLE, email: "awa@exemple.com", role: "CANDIDAT", emailVerified: new Date(), suspendedAt: null, deletedAt: null },
+      { id: "sommet-1", role: "ADMIN", suspendedAt: null, deletedAt: null },
+    );
+    m.tx.user.count.mockResolvedValue(3);
+    const issue = await appliquerLeChangementDeRole({
+      cible: { id: CIBLE },
+      vers: "ADMIN",
+      motif: "Responsable de la revue manuelle",
+      auteur: { genre: "compte", id: "sommet-1", role: "SUPER_ADMIN" },
+    });
+    expect(issue).toMatchObject({ issue: "refuse", raison: expect.stringMatching(/reconnecte-toi/u) });
+    expect(m.tx.user.updateMany).not.toHaveBeenCalled();
+    expect(m.tx.session.deleteMany).not.toHaveBeenCalled();
   });
 });

@@ -235,6 +235,7 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
     take: 50,
     include: {
       consents: { where: { revokedAt: null, granted: true } },
+      secondFacteur: { select: { activeLe: true } },
       applications: {
         include: {
           credits: { include: { transaction: { select: SELECTION_COUVRANTE } } },
@@ -275,6 +276,7 @@ export async function comptes(recherche?: string): Promise<Compte[]> {
       analysesTotal: octroyees,
       statut: statutDuCompte(u),
       role: u.role,
+      secondFacteur: Boolean(u.secondFacteur?.activeLe),
       depots: u.applications.flatMap((a) =>
         a.depositedOn && a.submittedAt
           ? [
@@ -655,6 +657,13 @@ const CATEGORIE: Record<string, CategorieAudit> = {
   "compte.role": "COMPTE",
   "compte.creation.interne": "COMPTE",
   "acces.refuse": "COMPTE",
+  // S.214 — la double authentification.
+  "compte.second_facteur.activation": "COMPTE",
+  "compte.second_facteur.desactivation": "COMPTE",
+  "compte.second_facteur.codes": "COMPTE",
+  "compte.second_facteur.blocage": "COMPTE",
+  "compte.second_facteur.secours": "COMPTE",
+  "compte.second_facteur.reinitialisation": "COMPTE",
   "paiement.remboursement": "PAIEMENT",
   "paiement.remboursement.manuel": "PAIEMENT",
   "paiement.remboursement.tranche": "PAIEMENT",

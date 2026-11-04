@@ -344,6 +344,12 @@ jobs:
       - name: Changement de rôle journalisé
         run: npm run smoke:role
       - run: echo "- **Changement de rôle** — par le paquet de l'image, motif et auteur au journal, adresse vérifiée, jamais sans administrateur" >> "$GITHUB_STEP_SUMMARY"
+      # S.214 : la double authentification et les seuils du sommet sous des
+      # appels simultanés — anti-rejeu, code de secours à usage unique,
+      # blocage avec hystérésis, suspensions croisées sérialisées.
+      - name: Double authentification et sessions
+        run: npm run smoke:second-facteur
+      - run: echo "- **Double authentification** — secret chiffré, un code n'ouvre qu'une connexion même envoyé vingt fois, code de secours à usage unique, blocage avec hystérésis, sommet jamais vidé par des suspensions simultanées" >> "$GITHUB_STEP_SUMMARY"
       # La graine éditoriale et les garde-fous SQL, par les paquets de l'image
       # (S.120) : la graine ne crée que ce qui manque, et le paquet des
       # garde-fous sort en code non nul sur une base sans migrations.

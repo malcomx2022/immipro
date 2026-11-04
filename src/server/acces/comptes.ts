@@ -10,11 +10,7 @@ import {
 } from "@/server/securite/secret";
 import { fermerToutesLesSessions } from "@/server/securite/session";
 import { lireEchecsSansCompte, noterEchecSansCompte } from "@/server/acces/echecs-sans-compte";
-import {
-  CHAMP_TELEPHONE,
-  normaliserTelephone,
-  TELEPHONE_INTERNATIONAL,
-} from "@/domain/comptes/profil";
+import { normaliserTelephone, paysCouvert, refusDuTelephone } from "@/domain/comptes/profil";
 import { motDePasseRecevable } from "@/domain/comptes/mot-de-passe";
 import { LONGUEUR_CODE, VALIDITE_MINUTES } from "@/domain/comptes/code-verification";
 import {
@@ -64,8 +60,13 @@ export async function inscrire(
     });
   }
   const telephone = normaliserTelephone(donnees.telephone ?? "");
-  if (telephone && !TELEPHONE_INTERNATIONAL.test(telephone)) {
-    throw echec("champs_invalides", { champs: { telephone: CHAMP_TELEPHONE.aide } });
+  // S.214 : la règle de « Mon compte » — E.164 et indicatif couvert.
+  const refus = telephone ? refusDuTelephone(telephone) : null;
+  if (refus) {
+    throw echec("champs_invalides", { champs: { telephone: refus } });
+  }
+  if (donnees.pays && !paysCouvert(donnees.pays.toUpperCase())) {
+    throw echec("champs_invalides", { champs: { pays: "Choisis ton pays de résidence dans la liste." } });
   }
   const email = normaliserEmail(donnees.email);
   const existant = await db.user.findUnique({ where: { email }, select: { id: true } });
@@ -77,7 +78,7 @@ export async function inscrire(
       passwordHash: await empreinte(donnees.motDePasse),
       firstName: donnees.prenom ?? null,
       lastName: donnees.nom ?? null,
-      countryCode: donnees.pays ?? null,
+      countryCode: donnees.pays?.toUpperCase() ?? null,
       phone: telephone || null,
     },
   });

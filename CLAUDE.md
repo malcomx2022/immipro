@@ -77,6 +77,26 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.214 — sessions, rôles et double authentification — 04/11/2026
+
+Lot demandé par le responsable (« points de sécurité »). Base `aa205d4`
+(#339 fusionnée). Toute suspension, candidat compris, passe par la
+transaction sérialisable de `suspendreOuRetablir` : rôle **et auteur**
+relus, écriture conditionnée au rôle lu ; même relecture de l'auteur au
+changement de rôle. `estUneCoursePerdue` lit `P2034` **et**
+`TransactionWriteConflict` de l'adaptateur pg (un 500 avant) : ne pas
+revenir au seul `P2034`. 2FA TOTP (RFC 6238) : secret AES-256-GCM sous
+`DEUX_FACTEURS_CLE`, lié au compte, contrainte qui refuse le clair ; ±1 pas
+autour d'une dérive bornée à un pas ; anti-rejeu en écriture conditionnée
+`dernierPas < pas` ; blocage propre (5 → 15 min) avec hystérésis (levée à
+3, pas à 0) ; rejeu non compté ; dix codes de secours HMAC à usage unique.
+Mot de passe juste → défi de 5 min sans session. Profil : `refusDuTelephone`
+unique pour les trois écritures de `phone`, C-02 strict et borné, lecture
+sans colonnes internes. Régime `critique` (20 / 15 min) pour rôle,
+suspension, compte interne, réinitialisation 2FA ; suspension en deux clics.
+Clé à poser par l'exploitant, ne jamais la perdre une fois des comptes
+enrôlés. Lire [le lot](docs/revue/lot-s214-securite-comptes-2026-11-04.md).
+
 ### S.213 — raisonnement IA mesuré, pièces de tiers, facture et tarifs — 04/11/2026
 
 Lot de code demandé par le responsable, branche `fix/ia-jetons-raisonnement`.

@@ -112,6 +112,14 @@ export const EXPORTE: Record<string, true | string> = {
     "Empreintes de session et dates de connexion. Les exporter rendrait un fichier qui, volé, dit où et quand se connecter ; la liste des appareils se consulte à l'écran, où elle se révoque.",
   secrets:
     "Empreintes de mot de passe et secrets d'authentification. Rien de ce qui protège le compte ne sort du serveur.",
+  // S.214 — la double authentification : secret chiffré, empreintes des
+  // codes de secours, défis de connexion. Ce qui protège le compte ne sort pas.
+  secondFacteur:
+    "Secret de double authentification, chiffré sur le serveur. Le sortir permettrait de produire les codes à la place du téléphone.",
+  codesDeSecours:
+    "Empreintes des codes de secours. Les codes eux-mêmes ont été montrés une fois, à leur création, et ne sont pas conservés.",
+  defisDeConnexion:
+    "Étapes de connexion en attente du code, valables cinq minutes. Elles ne décrivent rien du titulaire.",
   // Sur un dossier
   documents: true,
   deadlines: true,

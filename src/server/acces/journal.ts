@@ -42,6 +42,19 @@ export type ActionAuditee =
   /** Un compte interne créé depuis B-03 par un super-administrateur (S.210). */
   | "compte.creation.interne"
   /**
+   * Double authentification — S.214. Activation, désactivation et
+   * renouvellement des codes de secours par le titulaire ; blocage après
+   * une série de codes faux ; connexion avec un code de secours ;
+   * réinitialisation par un super-administrateur (motif obligatoire).
+   * Jamais un code ni un secret dans les détails.
+   */
+  | "compte.second_facteur.activation"
+  | "compte.second_facteur.desactivation"
+  | "compte.second_facteur.codes"
+  | "compte.second_facteur.blocage"
+  | "compte.second_facteur.secours"
+  | "compte.second_facteur.reinitialisation"
+  /**
    * Un geste du sommet refusé à un compte qui ne l'est pas (S.210) : la
    * route, le rôle de l'appelant. Écrit par le composeur, sous débit.
    */
