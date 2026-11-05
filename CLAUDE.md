@@ -77,6 +77,20 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.216 — reprise des navigateurs : apt-get arrêté en root — 05/11/2026
+
+Lot dédié demandé par le responsable après l'échec de #348. Base `3b9e0ad`
+(#347 fusionnée). Le 05/11, le miroir Azure lent a déclenché la reprise de
+S.192, qui s'est arrêtée sur « dpkg frontend lock was locked by
+/usr/bin/apt-get » : `timeout` tourne sous l'utilisateur du runner et ne
+peut pas tuer le `sudo apt-get` lancé par Playwright (EPERM), qui gardait
+les verrous. La reprise arrête désormais `apt-get` puis `dpkg` en root
+(`sudo pkill -KILL -x … || true`) avant `dpkg --configure -a` ; les verrous
+tombent avec leurs processus. Budget de l'étape inchangé (6 + 12 min sous
+20). Test rouge avant dans `tests/workflows.test.ts` ; mécanisme rejoué
+localement (kill non root refusé, verrou libéré après arrêt root). Ne pas
+revenir à un `timeout` seul pour libérer dpkg.
+
 ### S.215 — double authentification obligatoire pour les comptes internes — 04/11/2026
 
 Demandé par le responsable après la fusion de S.214 (#341). Base `f1ada94`.
