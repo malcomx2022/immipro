@@ -92,7 +92,9 @@ opérateurs quand la clé est posée ; les parcours calculent leurs codes.
 **Poser `DEUX_FACTEURS_CLE` avant de déployer** : sans elle, aucun compte
 interne n'ouvre le back-office. Le 05/11, les recettes Python manuelles
 (`recette-documentaire.py`, `revue-navigateur.py`) passent le second temps
-par `scripts/recette/second_facteur.py`. Lire
+par `scripts/recette/second_facteur.py`. Clé posée en production le
+05/11 après le déploiement (back-office fermé jusque-là), lue, super-
+administrateur enrôlé. Lire
 [la procédure](docs/exploitation/second-facteur.md) et
 [le lot, § S.215](docs/revue/lot-s214-securite-comptes-2026-11-04.md).
 
