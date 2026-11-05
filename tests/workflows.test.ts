@@ -156,4 +156,22 @@ describe("un miroir lent ne fige pas la porte", () => {
     expect(reprise.indexOf("dpkg --configure -a")).toBeGreaterThan(reprise.indexOf("sed -i"));
     expect(reprise.lastIndexOf("installer ")).toBeGreaterThan(reprise.indexOf("dpkg --configure -a"));
   });
+
+  // 05/11/2026, #348 : la reprise s'est arrêtée sur « dpkg frontend lock
+  // was locked by /usr/bin/apt-get ». `timeout` tourne sous l'utilisateur
+  // du runner : il ne peut pas tuer le `sudo apt-get` lancé par Playwright,
+  // qui garde les verrous. Ils ne tombent qu'avec leurs processus, arrêtés
+  // en root avant que dpkg soit remis d'aplomb.
+  it("la reprise arrête en root l'apt-get et le dpkg restants avant de réparer dpkg", () => {
+    const reprise = etape().slice(etape().indexOf("if ! installer"));
+    const reparation = reprise.indexOf("dpkg --configure -a");
+    for (const processus of ["apt-get", "dpkg"]) {
+      const arret = reprise.search(new RegExp(`sudo pkill -KILL -x ${processus}\\b`, "u"));
+      expect(arret, `arrêt de ${processus}`).toBeGreaterThanOrEqual(0);
+      expect(arret, `arrêt de ${processus} avant la réparation`).toBeLessThan(reparation);
+    }
+    // Un pkill sans processus à arrêter rend 1 : il ne doit pas faire
+    // échouer l'étape quand apt-get s'est terminé de lui-même.
+    expect(reprise).not.toMatch(/sudo pkill -KILL -x \S+\s*\n/u);
+  });
 });

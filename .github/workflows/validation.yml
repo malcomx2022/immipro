@@ -145,14 +145,19 @@ jobs:
       # S.192 : le 23/10, le même miroir à 30 Ko/s a épuisé deux fois les
       # quinze minutes (#312). Attendre plus longtemps le même miroir ne
       # sert à rien : après six minutes, on reprend sur le miroir officiel
-      # d'Ubuntu. `timeout` arrête aussi apt-get, et dpkg est remis d'aplomb
-      # avant la reprise ; une reprise lente échoue au plafond de l'étape.
+      # d'Ubuntu, dpkg remis d'aplomb ; une reprise lente échoue au plafond
+      # de l'étape. S.216 : `timeout` tourne sous l'utilisateur du runner et
+      # ne peut pas tuer le `sudo apt-get` lancé par Playwright, qui gardait
+      # les verrous de dpkg (#348, 05/11). On arrête apt-get et dpkg en root
+      # avant la réparation ; leurs verrous tombent avec eux.
       - name: Navigateurs de recette photographique
         timeout-minutes: 20
         run: |
           installer() { timeout --kill-after=30s "$1" npx playwright install --with-deps chromium firefox webkit; }
           if ! installer 6m; then
             echo "::warning::Installation des navigateurs interrompue sur le miroir Azure, reprise sur archive.ubuntu.com"
+            sudo pkill -KILL -x apt-get || true
+            sudo pkill -KILL -x dpkg || true
             sudo grep -rl 'azure\.archive\.ubuntu\.com' /etc/apt | xargs -r sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g'
             sudo dpkg --configure -a
             installer 12m
