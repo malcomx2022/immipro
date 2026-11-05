@@ -206,7 +206,15 @@ WebKit laissés à la CI.
 
 **Limites.** Clé à poser **avant** le déploiement (procédure :
 `docs/exploitation/second-facteur.md`) : sans elle, le back-office est fermé
-à tous les comptes internes — échec fermé voulu. Les scripts manuels
-`scripts/recette/recette-documentaire.py` et `revue-navigateur.py`, hors
-porte, se connectent en administrateur sans second temps : à adapter avant
-leur prochain usage.
+à tous les comptes internes — échec fermé voulu.
+
+**Recettes Python adaptées — 05/11/2026.** `scripts/recette/recette-documentaire.py`
+et `revue-navigateur.py` (manuels, hors porte) passent le second temps par
+`scripts/recette/second_facteur.py` : secret lu au journal du banc, code
+RFC 6238 en bibliothèque standard (vecteurs de l'annexe B identiques à ceux
+du domaine), pas suivant attendu une fois si le code vient de servir.
+`recette-documentaire.py` accepte aussi l'arrivée sur `/veille` (S.211), qu'il
+n'attendait pas. Rejoués sur un banc neuf : 2 contrôles conformes ; 45 pages,
+11 actions conformes (dont deux seconds temps), aucune erreur JavaScript, seules
+les quatre absences juridiques attendues ; deux connexions du même opérateur
+dans les trente secondes : la seconde attend le pas suivant et passe.

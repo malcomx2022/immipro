@@ -302,6 +302,11 @@ python scripts/recette/revue-navigateur.py \
   --chromium /usr/bin/chromium
 ```
 
+Depuis S.215, les comptes internes du banc ont un second facteur : le
+script le saisit seul (`scripts/recette/second_facteur.py`, secret lu au
+journal du banc). Le banc doit donc avoir été lancé avec la graine de
+démonstration, qui l'écrit.
+
 Le script produit `.recette/revue-navigateur.json`, vérifie les connexions,
 la session reconnue, les deux refus API, les erreurs JS et les débordements.
 Il accepte les quatre absences juridiques explicites du banc ; elles ne

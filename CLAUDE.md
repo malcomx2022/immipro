@@ -90,7 +90,9 @@ désactive pas (rôle relu en base). Issue de secours :
 `/api/health` (détail) dit `secondFacteur.cle`. La graine enrôle les
 opérateurs quand la clé est posée ; les parcours calculent leurs codes.
 **Poser `DEUX_FACTEURS_CLE` avant de déployer** : sans elle, aucun compte
-interne n'ouvre le back-office. Lire
+interne n'ouvre le back-office. Le 05/11, les recettes Python manuelles
+(`recette-documentaire.py`, `revue-navigateur.py`) passent le second temps
+par `scripts/recette/second_facteur.py`. Lire
 [la procédure](docs/exploitation/second-facteur.md) et
 [le lot, § S.215](docs/revue/lot-s214-securite-comptes-2026-11-04.md).
 
