@@ -117,7 +117,9 @@ et passe par le second lecteur (WF-14 § 4). Ne pas prolonger
 Relevés en croisant les documents ; aucun n'est une anomalie de code
 reproduite, tous sont des écarts entre l'état déclaré et l'état servi.
 
-**F-1 — Région de l'IA de production.** Le relevé du 29/10 (S.206) nomme
+**F-1 — Région de l'IA de production.** *Levé pour le traitement le
+05/11 (§ 8) : la production appelle `eu` ; le texte publié reste à
+corriger.* Le relevé du 29/10 (S.206) nomme
 `europe-west1` dans la configuration de production, alors que le relevé
 officiel du 16/10 (S.181) ne sert `gemini-3.8-flash` que sur `global`,
 `us` et `eu`, et que la destination Vertex autorisée exige `eu`. Soit les
@@ -235,3 +237,61 @@ Aucun accès au VPS, à la console Google ni aux comptes de paiement ;
 aucun appel IA ; aucun parcours navigateur rejoué. Les états cités
 viennent des relevés consignés jusqu'au 29/10. Porte locale relue : lint,
 types, 208 fichiers et 4 112 tests, vocabulaire : verts.
+
+## 8. Relevé de production du 05/11 — F-1, raisonnement, tarif (S.216)
+
+Relevé de l'exploitant sur le VPS, en lecture seule, le 05/11/2026. Base :
+`main` `3b9e0ad` (#347). Lot documentaire : aucun code ni service touché
+par ce lot.
+
+| Contrôle | Constat |
+|---|---|
+| Fournisseur par fonction | `AI_FOURNISSEUR_EXTRACTION` et `AI_FOURNISSEUR_REDACTION` : `openai_compatible` |
+| Modèle | `google/gemini-3.8-flash` |
+| Point d'accès | `https://aiplatform.eu.rep.googleapis.com/v1beta1/projects/projetanatt/locations/eu/endpoints/openapi` |
+| Raisonnement | `AI_OPENAI_RAISONNEMENT` **absente** : aucun `reasoning_effort` envoyé |
+| Tarif (`/api/health`, détail) | un fournisseur tarifé, `EN_VIGUEUR`, 56 jours restants : échéance `2026-12-31`, déclarée après S.213 |
+
+**F-1, levé pour le traitement.** La production appelle le point
+multi-région `eu`, où le modèle est servi et le traitement reste dans
+l'Union ; elle n'appelle pas `europe-west1`. Reste le **texte publié** : la
+page des données personnelles annonce « Belgique (analyse IA, région
+europe-west1) ». La prochaine version relue doit dire « Union européenne
+(point multi-région `eu` de Google Cloud) », en même temps qu'elle ajoute
+Cloudflare (S.207) et retire « messagerie, à confirmer » ; validée
+nommément en B-08.
+
+**F-6, nouveau : la production ne tourne pas dans la configuration
+qualifiée.**
+
+| | Production au 05/11 | Campagne L5 |
+|---|---|---|
+| Raisonnement | défaut du fournisseur (`medium` pour Gemini 3) | `low`, imposé (`campagne-vertex.ts`) |
+| Version d'API | `v1beta1` | `v1` |
+
+Le raisonnement est facturé en sortie : la production raisonne, et paie,
+davantage que ce que L5 mesure, et ce trafic partage le projet
+`projetanatt` avec la campagne (F-4). C'est une piste pour l'écart de
+sortie du 28/10, non une preuve : rien n'attribue encore les jetons
+facturés à la production plutôt qu'au banc. Le préalable L5 « choix
+extraction/rédaction et configuration déployée » ne peut pas se lever
+tant que la production diffère de la configuration éprouvée.
+
+**Décision du responsable (05/11) : aligner la production** sur la
+campagne : `AI_OPENAI_RAISONNEMENT=low` et `AI_OPENAI_URL` en `/v1/`.
+L'origine autorisée (`AI_OPENAI_ORIGINE_AUTORISEE`) ne change pas : seul le
+chemin change, l'envoi des pièces reste autorisé. Application par
+l'exploitant dans `.env.app`, puis recréation de `app` et `worker`.
+**Non vérifié à la date de ce lot** : la sortie de `printenv` après
+recréation, puis une lecture réelle `CONNUE` dans `AiUsage`, sont à
+consigner.
+
+**Échéance du tarif.** L'alerte de `/api/health` passera en
+`EXPIRE_BIENTOT` le 01/12 : relever la grille 2027 sur la page officielle
+des prix avant le 31/12, dans la même fenêtre que C-13.
+
+**Reste de l'étape 1** (§ 5) : vérification de l'alignement ; R-P11
+(détail de `/api/health`, désormais lisible avec le jeton) ; R-P01
+(`certbot renew --dry-run`, `nginx -T`) ; R-P12 (limites, battement,
+réconciliation) ; F-2 (contenu et rétention de `restic`) ; mise en
+service R2 et restauration hors VPS.
