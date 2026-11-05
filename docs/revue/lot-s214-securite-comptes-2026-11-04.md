@@ -218,3 +218,25 @@ n'attendait pas. Rejoués sur un banc neuf : 2 contrôles conformes ; 45 pages,
 11 actions conformes (dont deux seconds temps), aucune erreur JavaScript, seules
 les quatre absences juridiques attendues ; deux connexions du même opérateur
 dans les trente secondes : la seconde attend le pas suivant et passe.
+
+**Mise en service — 05/11/2026.** Relevé de l'exploitant sur le VPS,
+consigné à la demande du responsable ; aucun code changé.
+
+- **Constat.** S.215 était en service (pipeline de `main`) alors que le
+  détail de `/api/health` rendait `secondFacteur.cle: "absente"` : la clé
+  n'avait pas été posée avant le déploiement, et le back-office était fermé
+  à tous les comptes internes jusqu'à la pose — l'échec fermé voulu, sans
+  effet sur l'espace candidat.
+- **Pose.** Clé générée sur le VPS (`openssl rand -base64 32`) et ajoutée à
+  `.env.app` (droits `600`), jamais affichée dans le chat ni versée au
+  dépôt. Un second ajout par erreur a laissé deux lignes : la seconde a été
+  retirée avant toute lecture par l'application et avant tout enrôlement,
+  donc sans conséquence. `app` et `worker` recréés (`--force-recreate`).
+- **Vérifié.** `secondFacteur.cle: "posee"` ; le super-administrateur a
+  activé sa double authentification et ouvre de nouveau le back-office.
+
+**Reste.** Confirmer que la clé est copiée hors du VPS (coffre du
+responsable, avec la date de pose) — sans elle, une restauration ne rend
+pas les seconds facteurs ; supprimer `.env.app.avant-2fa`, qui la contient
+aussi ; faire activer la double authentification aux autres comptes
+internes. Ne jamais changer ni retirer la clé désormais (procédure, § 4).

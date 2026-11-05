@@ -77,7 +77,7 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
-### S.216 — relevé IA de production, F-1 levé, F-6 ouvert — 05/11/2026
+### S.217 — relevé IA de production, F-1 levé, F-6 ouvert — 05/11/2026
 
 Lot documentaire demandé par le responsable. Base `3b9e0ad` (#347
 fusionnée). Relevé du 05/11 sur le VPS : extraction et rédaction sur
@@ -88,6 +88,20 @@ F-6 : la production tournait sans `AI_OPENAI_RAISONNEMENT` (défaut
 Décision : aligner la production ; vérification après recréation de `app`
 et `worker` encore à consigner. Tarif à 56 jours, alerte le 01/12. Lire
 [la revue du 31/10, § 8](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
+### S.216 — reprise des navigateurs : apt-get arrêté en root — 05/11/2026
+
+Lot dédié demandé par le responsable après l'échec de #348. Base `3b9e0ad`
+(#347 fusionnée). Le 05/11, le miroir Azure lent a déclenché la reprise de
+S.192, qui s'est arrêtée sur « dpkg frontend lock was locked by
+/usr/bin/apt-get » : `timeout` tourne sous l'utilisateur du runner et ne
+peut pas tuer le `sudo apt-get` lancé par Playwright (EPERM), qui gardait
+les verrous. La reprise arrête désormais `apt-get` puis `dpkg` en root
+(`sudo pkill -KILL -x … || true`) avant `dpkg --configure -a` ; les verrous
+tombent avec leurs processus. Budget de l'étape inchangé (6 + 12 min sous
+20). Test rouge avant dans `tests/workflows.test.ts` ; mécanisme rejoué
+localement (kill non root refusé, verrou libéré après arrêt root). Ne pas
+revenir à un `timeout` seul pour libérer dpkg.
 
 ### S.215 — double authentification obligatoire pour les comptes internes — 04/11/2026
 
@@ -104,7 +118,9 @@ opérateurs quand la clé est posée ; les parcours calculent leurs codes.
 **Poser `DEUX_FACTEURS_CLE` avant de déployer** : sans elle, aucun compte
 interne n'ouvre le back-office. Le 05/11, les recettes Python manuelles
 (`recette-documentaire.py`, `revue-navigateur.py`) passent le second temps
-par `scripts/recette/second_facteur.py`. Lire
+par `scripts/recette/second_facteur.py`. Clé posée en production le
+05/11 après le déploiement (back-office fermé jusque-là), lue, super-
+administrateur enrôlé. Lire
 [la procédure](docs/exploitation/second-facteur.md) et
 [le lot, § S.215](docs/revue/lot-s214-securite-comptes-2026-11-04.md).
 

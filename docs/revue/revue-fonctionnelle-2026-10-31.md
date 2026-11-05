@@ -238,7 +238,7 @@ aucun appel IA ; aucun parcours navigateur rejoué. Les états cités
 viennent des relevés consignés jusqu'au 29/10. Porte locale relue : lint,
 types, 208 fichiers et 4 112 tests, vocabulaire : verts.
 
-## 8. Relevé de production du 05/11 — F-1, raisonnement, tarif (S.216)
+## 8. Relevé de production du 05/11 — F-1, raisonnement, tarif (S.217)
 
 Relevé de l'exploitant sur le VPS, en lecture seule, le 05/11/2026. Base :
 `main` `3b9e0ad` (#347). Lot documentaire : aucun code ni service touché

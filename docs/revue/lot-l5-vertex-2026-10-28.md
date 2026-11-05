@@ -489,7 +489,7 @@ date avant le 31/12 ; décider si une surveillance externe lit le détail
 avec le jeton — sinon l'alerte n'est vue que par qui ouvre l'adresse ;
 supprimer les copies `.env.app.avant-*` du serveur.
 
-## Configuration de production relevée — S.216, 05/11/2026
+## Configuration de production relevée — S.217, 05/11/2026
 
 Relevé de l'exploitant : la production appelle Vertex `eu` avec
 `gemini-3.8-flash`, mais **sans `AI_OPENAI_RAISONNEMENT`** (raisonnement par
