@@ -11,6 +11,7 @@ import subprocess
 import time
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
+from second_facteur import second_temps
 
 cli = argparse.ArgumentParser()
 cli.add_argument('--url', default='http://127.0.0.1:3100')
@@ -23,7 +24,8 @@ assert urlparse(args.url).hostname in ['localhost', '127.0.0.1', '::1'], 'Banc l
 assert re.fullmatch(r'immipro_recette\w*', args.base), 'Base jetable du banc requise.'
 assert os.environ.get('DATABASE_URL'), 'DATABASE_URL manque.'
 base = args.url.rstrip('/')
-match = re.search(r'Mot de passe des comptes de démonstration : (\S+)', Path(args.banc_log).read_text())
+journal = Path(args.banc_log).read_text()
+match = re.search(r'Mot de passe des comptes de démonstration : (\S+)', journal)
 assert match, 'Mot de passe synthétique absent du journal du banc.'
 pwd = match.group(1)
 # Requêtes paramétrées et lecture seule. La connexion complète ne sort jamais
@@ -69,7 +71,11 @@ with sync_playwright() as p:
         page.get_by_label('Adresse email', exact=True).fill(email)
         page.get_by_label('Mot de passe', exact=True).fill(pwd)
         page.get_by_label('Mot de passe', exact=True).press('Enter')
-        page.wait_for_url('**/tableau-de-bord')
+        # S.215 : un compte interne passe le second temps (code calculé depuis
+        # le secret que la graine a écrit au journal du banc) ; S.211 : il
+        # arrive ensuite sur le back-office.
+        second_temps(page, journal, email)
+        page.wait_for_url(re.compile(r'/(tableau-de-bord|veille)$'), timeout=15000)
     connexion('aline.dossou@immipro.test')
     avant = quota()
     precedente = version()
