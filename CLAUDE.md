@@ -85,8 +85,9 @@ Vertex `eu` (`gemini-3.8-flash`) ; F-1 levé pour le traitement, le texte
 publié « Belgique, europe-west1 » reste à corriger en B-08 avec Cloudflare.
 F-6 : la production tournait sans `AI_OPENAI_RAISONNEMENT` (défaut
 `medium`) et sur `v1beta1`, la campagne L5 qualifie `low` sur `v1`.
-Décision : aligner la production ; vérification après recréation de `app`
-et `worker` encore à consigner. Tarif à 56 jours, alerte le 01/12. Lire
+Décision : aligner la production ; vérifié le 06/11 (`low`, `/v1/`, `app`
+et `worker` recréés) : F-6 clos pour la configuration, reste une lecture
+réelle `CONNUE` après l'alignement. Tarif à 56 jours, alerte le 01/12. Lire
 [la revue du 31/10, § 8](docs/revue/revue-fonctionnelle-2026-10-31.md).
 
 ### S.216 — reprise des navigateurs : apt-get arrêté en root — 05/11/2026
