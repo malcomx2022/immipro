@@ -1164,3 +1164,47 @@ F-1 à F-5 et l'ordre proposé en cinq étapes vivent dans
 [la revue du 31/10](revue-fonctionnelle-2026-10-31.md) ; elle remplace le
 § 6 ci-dessus pour l'état du restant. Les tables du § 5 gardent leur état
 du 22/10.
+
+## 29. S.222 — `connecter()` tolère le rechargement de repli de Firefox — 06/11/2026
+
+Lot dédié. Il était nécessaire pour mener au vert les PR que le responsable
+a demandé de fusionner. Le 06/11, le parcours « compte interne : back-office
+fermé sans double authentification, ouvert après l'activation » (S.215) a
+échoué sous Firefox, toujours au même endroit, la saisie de l'adresse dans
+`connecter()` :
+
+| Où | Profil | Contenu |
+|---|---|---|
+| #352 (S.218) | firefox-390 | lien « Rédiger » |
+| #354 (S.220) | firefox-1440 | documentation seule |
+| #356, première version | firefox-390 et 1440 | « Se déconnecter » au lieu du `goto` |
+| local, deuxième version | firefox-390 | onglet neuf au lieu du `goto` |
+
+**Signature, lue dans les traces (CI de #356 et local).** `/connexion`
+répond 200 et le formulaire est entièrement rendu. Quatre-vingts
+millisecondes plus tard, Firefox relance une navigation vers le même
+document, avec `Cache-Control: max-age=0` et `If-None-Match` : c'est un
+rechargement, qui reçoit 304 et ne s'achève jamais du point de vue de
+Playwright. La saisie attend « la fin de la navigation » trente secondes.
+Rien dans l'écran de connexion ne recharge la page. Ce n'est ni le geste ni
+l'onglet : un `goto`, le bouton « Se déconnecter » et un onglet neuf mènent
+au même blocage. Le défaut est intermittent, et R-O05 en avait la
+signature en S.193.
+
+**Correction.** `saisirLAdresse` tente la saisie huit secondes. Si elle
+bute sur cette navigation pendante, elle revient à `/connexion` comme R-O05
+en S.193 : `goto("/")`, puis le lien « Connexion » de l'en-tête, une
+navigation du routeur qui ne charge aucun document `/connexion`. Une
+troisième version, qui relançait simplement la navigation de document,
+retombait dans le même état en local. Une adresse qui porte une suite est
+rechargée telle quelle, pour ne pas perdre la suite. Les versions
+précédentes de ce lot sont retirées, et le parcours rappelle `connecter()`
+comme avant. Attentes inchangées, produit non touché.
+
+**Preuves.** Firefox installé dans la session : le groupe 2FA rejoué en
+boucle en Firefox 390 en local, puis le parcours complet. Chromium 390 et
+1440 sur la première version (76/76). WebKit par la CI de cette PR.
+
+**Reste.** R-O03 a échoué une fois en local en firefox-1440, sur
+`page.reload` (`NS_BINDING_ABORTED`) : c'est un autre défaut, non relevé en
+CI, et il n'est pas traité ici.
