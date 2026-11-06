@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { LienBouton } from "@/components/ui/LienBouton";
 import { RadioGroup } from "@/components/ui/RadioGroup";
 import type { Dossier } from "@/domain/dossiers/dossier";
 import type { PieceRedigeable } from "@/domain/redaction/entretien";
@@ -12,6 +13,10 @@ import {
   dureeEstimee,
 } from "@/domain/redaction/entretien";
 import { EnteteDossier } from "../EnteteDossier";
+
+/** S.223 — l'écran sans pièce rédigeable. */
+export const AUCUNE_PIECE_A_REDIGER =
+  "Aucune pièce de ce dossier n'a d'entretien guidé : elles se déposent toutes en PDF ou en photo depuis la checklist.";
 
 /**
  * R-01 — Type de pièce. WF-08.
@@ -34,6 +39,34 @@ export function ChoixDeLaPiece({
   const router = useRouter();
   const [type, setType] = useState<string | null>(null);
   const choisie = pieces.find((p) => p.type === type);
+
+  // S.223 — rien à choisir : le dire, et renvoyer là où les pièces se
+  // déposent. Un groupe d'options vide sous un bouton grisé qui demande de
+  // « choisir d'abord » était une impasse (dossier Suisse études, 06/11).
+  if (pieces.length === 0) {
+    return (
+      <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+        <EnteteDossier
+          dossier={dossier}
+          retour={`/dossiers/${dossier.id}`}
+          libelleRetour="Checklist"
+        />
+        <div className="flex flex-col gap-2">
+          <h1
+            id="contenu"
+            tabIndex={-1}
+            className="text-24 font-semibold text-ink-900 outline-none md:text-32"
+          >
+            Rien à rédiger dans ce dossier
+          </h1>
+          <p className="text-pretty text-16 text-ink-700">{AUCUNE_PIECE_A_REDIGER}</p>
+        </div>
+        <LienBouton href={`/dossiers/${dossier.id}`} pleineLargeur className="min-h-action">
+          Revenir à la checklist
+        </LienBouton>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-colonne flex-col gap-6 px-4 py-6 md:px-8 md:py-8">

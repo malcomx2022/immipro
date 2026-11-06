@@ -5,6 +5,7 @@ import { CompletenessTier } from "@/components/ui/CompletenessTier";
 import { LienBouton } from "@/components/ui/LienBouton";
 import { SourceNote } from "@/components/ui/SourceNote";
 import {
+  aDesPiecesARediger,
   LIBELLE_FAMILLE,
   libelleAction,
   mentionDeLaPiece,
@@ -143,7 +144,10 @@ export function Checklist({ dossier, pieces, aide }: ChecklistProps) {
 
       <nav aria-label="Vues du dossier" className="flex flex-wrap gap-2">
         <LienVue href={`/dossiers/${id}/completude`}>Complétude</LienVue>
-        <LienVue href={`/dossiers/${id}/redaction`}>Rédiger une pièce</LienVue>
+        {/* S.223 — seulement si une pièce du dossier a son entretien guidé. */}
+        {aDesPiecesARediger(pieces) ? (
+          <LienVue href={`/dossiers/${id}/redaction`}>Rédiger une pièce</LienVue>
+        ) : null}
         <LienVue href={`/consultants?dossier=${id}`}>Consultants</LienVue>
         {/* K.A — une entrée de navigation n'est pas une proposition : elle
             ne nomme aucun prestataire, aucun prix, et rien ne la déclenche.
