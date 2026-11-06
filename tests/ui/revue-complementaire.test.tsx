@@ -29,17 +29,23 @@ describe("revue complémentaire — réponses et faits affichés", () => {
     expect(screen.queryByText(/SECRET_LOCATION|ECHO_SENSIBLE/)).toBeNull();
   });
 
-  it("L1 : le candidat voit la revue humaine après refus de destination", () => {
+  it("L1 : le candidat voit la revue humaine après refus de destination", async () => {
     const dossier = DOSSIERS[0]!;
     const piece = { ...PIECES_PAR_DOSSIER[dossier.id]![0]!, etat: "ILLISIBLE" as const };
     const analyse = { ...ANALYSE_RESSOURCES, verdict: "ILLISIBLE" as const, verdictLu: "ILLISIBLE" as const,
       titre: "Cette pièce demande une relecture", corps: MESSAGE_AU_CANDIDAT.non_configure,
       champs: [], relecture: { etat: "EN_COURS" as const, signalee: false } };
+    appeler.mockResolvedValue({ ok: true, donnees: { apercu: null, mentionApercu: null } });
     render(<PieceDuDossier dossier={dossier} piece={piece} quota={QUOTA} analyse={analyse}
       autorise prixRecharge="3 000 F" volumeRecharge={10} />);
     expect(screen.getByText(MESSAGE_AU_CANDIDAT.non_configure)).toBeDefined();
     expect(screen.queryByText(/adresse finale|HTTP 308/)).toBeNull();
-    expect(appeler).not.toHaveBeenCalled();
+    // S.221 : seule la lecture de l'aperçu part à l'affichage — un GET de
+    // la pièce, sans méthode ni corps. Aucune relance, aucun débit.
+    for (const [url, options] of appeler.mock.calls) {
+      expect(url).toBe(`/api/dossiers/${dossier.id}/pieces/${piece.id}`);
+      expect(options).toBeUndefined();
+    }
   });
 
   it("ne montre pas l'aperçu d'une pièce après sélection d'une autre", async () => {

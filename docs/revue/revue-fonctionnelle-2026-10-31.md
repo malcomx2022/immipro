@@ -337,3 +337,36 @@ assistée » : la ligne de checklist est cliquée et l'adresse attendue est
 
 **Reste.** Un entretien dédié au CV et plan d'études, s'il est voulu :
 contenu à écrire et relire.
+
+## 10. Le fichier envoyé n'était pas montré (S.221) — 06/11/2026
+
+Relevé par le responsable en production, le 06/11, sur le résultat
+d'analyse d'un justificatif de logement : l'écran C-08 affiche un cadre gris
+« aperçu de la pièce · page 1 sur 1 », sans le fichier. Rattachement :
+WF-06, écran C-08, RG-06.4.
+
+**Cause.** Le cadre est un texte du prototype, posé sur aucun fichier, et
+le nombre de pages était écrit en dur par la lecture (`pages: 1`). La route
+de la pièce signait pourtant déjà l'URL de lecture (`urlDeLecture`), et
+l'archive comme B-05 s'en servaient. B-05 avait perdu le même faux aperçu
+en S.157 ; l'écran candidat l'avait gardé.
+
+**Correction.** `ApercuDeLaPiece` demande l'URL à la route de la pièce à
+l'ouverture de l'écran, et la charge dans un cadre (`frame-src` du stockage,
+déjà autorisé pour B-05). L'URL n'est ni stockée ni posée dans le rendu
+serveur : elle vaut cinq minutes, et « Recharger l'aperçu » en redemande
+une. La décision de montrer reste à `urlDeLecture` : une pièce en contrôle
+antivirus dit la raison du serveur, une pièce purgée le dit, un échec de la
+route est dit avec « Réessayer l'aperçu ».
+
+**Preuves.** `tests/ui/apercu-piece.test.tsx` (7 tests, le premier rouge sur
+le code d'avant) : plus de cadre inventé, URL demandée à la route et chargée,
+rechargement, raison du contrôle, purge, échec puis reprise, aucune
+signature côté écran. Le test L1 de S.172 n'admet plus « aucun appel » mais
+« la seule lecture de la pièce, sans méthode ni corps » : aucune relance ni
+débit à l'affichage. Porte unitaire : 223 fichiers, 4 444 tests.
+
+**Non éprouvé.** L'affichage réel d'un PDF et d'une photo depuis le stockage
+de production : il dépend du type de contenu conservé à la promotion hors
+quarantaine, comme pour B-05.
+

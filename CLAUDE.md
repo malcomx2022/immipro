@@ -89,6 +89,18 @@ désormais par le bouton (S.212), puis `connecter()` part de `/connexion`
 sans renaviguer (S.197) ; ses attentes sont inchangées. Ne pas revenir à
 un `goto` après une session fermée côté serveur.
 
+### S.221 — C-08 montre le fichier envoyé — 06/11/2026
+
+Relevé en production par le responsable : le résultat d'analyse affichait
+« aperçu de la pièce · page 1 sur 1 », un cadre du prototype sans fichier.
+`ApercuDeLaPiece` demande l'URL signée à la route de la pièce à l'ouverture
+et la charge dans un cadre ; « Recharger l'aperçu » en redemande une (cinq
+minutes). Contrôle en cours, purge et échec sont dits, sans cadre vide. La
+décision reste à `urlDeLecture` : ne jamais signer ni filtrer dans l'écran,
+ne jamais réintroduire de cadre inventé. Le test L1 de S.172 admet la seule
+lecture `GET` de la pièce. Lire
+[la revue du 31/10, § 10](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 ### S.219 — raisonnement en sus de la sortie, régression de S.213 — 06/11/2026
 
 Relevé de l'exploitant juste après l'alignement : quatre lectures de
