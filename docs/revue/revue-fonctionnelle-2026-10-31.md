@@ -381,3 +381,31 @@ débit à l'affichage. Porte unitaire : 223 fichiers, 4 444 tests.
 de production : il dépend du type de contenu conservé à la promotion hors
 quarantaine, comme pour B-05.
 
+## 11. « Rédiger une pièce » menait à un choix vide (S.223) — 06/11/2026
+
+Relevé par le responsable en production, le 06/11, sur le dossier Suisse
+études : « Rédiger une pièce » ouvre R-01 avec « Pièce à rédiger » sans
+aucune option, sous un bouton grisé qui demande de « choisir d'abord la
+pièce ». Rattachement : WF-08, écrans C-06 (checklist) et R-01.
+
+**Cause.** Le référentiel Suisse études ne marque qu'une pièce « à
+rédiger », le CV et plan d'études, et aucun entretien guidé n'existe pour
+elle (S.218). `piecesARediger` l'écarte à raison ; la liste est vide, mais
+la checklist offrait toujours le lien, et R-01 n'avait pas d'état vide.
+
+**Correction.** `aDesPiecesARediger` (domaine) : la checklist n'affiche
+« Rédiger une pièce » que si une pièce du dossier a son entretien. R-01,
+ouvert par son adresse sans pièce rédigeable, dit « Rien à rédiger dans ce
+dossier », explique que les pièces se déposent depuis la checklist et y
+renvoie ; ni groupe d'options vide, ni bouton grisé.
+
+**Preuves.** `tests/ui/redaction-vide.test.tsx` (4 tests, trois rouges sur
+le code d'avant) : décision du domaine, lien présent ou absent dans la
+checklist, état vide de R-01, choix inchangé avec des pièces. Porte
+unitaire : 224 fichiers, 4 448 tests.
+
+**Conséquence pour la mesure (S.220).** La rédaction ne peut pas être
+relevée sur un dossier Suisse études. La lecture `CONNUE` de rédaction
+attendue se fera sur une destination qui a un entretien guidé, par exemple
+la lettre de motivation d'un dossier Pays-Bas études.
+

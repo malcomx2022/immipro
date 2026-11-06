@@ -77,6 +77,17 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.223 — « Rédiger une pièce » seulement s'il y a quoi rédiger — 06/11/2026
+
+Relevé en production par le responsable : sur Suisse études, R-01 montrait
+« Pièce à rédiger » sans option sous un bouton grisé. La seule pièce « à
+rédiger » (CV et plan d'études) n'a pas d'entretien (S.218).
+`aDesPiecesARediger` (domaine) : la checklist n'offre le lien que si une
+pièce a son entretien ; R-01 sans pièce dit « Rien à rédiger dans ce
+dossier » et renvoie à la checklist. Ne pas réafficher un choix vide. La
+lecture de rédaction de S.220 se relève sur une destination à entretien.
+Lire [la revue du 31/10, § 11](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 ### S.222 — `connecter()` tolère le rechargement de repli de Firefox — 06/11/2026
 
 Lot dédié, nécessaire pour mener au vert les PR que le responsable a

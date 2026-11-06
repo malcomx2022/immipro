@@ -554,3 +554,12 @@ export function libelleAPreparer(pieces: readonly Piece[], compteurs: CompteursD
   /* L'exigence passe devant : elle ne se règle pas en téléversant. */
   return mention !== "" ? `${mention} ${phrase}` : phrase;
 }
+
+/**
+ * S.223 — le dossier a-t-il au moins une pièce qu'un entretien guidé sait
+ * rédiger ? La checklist n'offre « Rédiger une pièce » qu'à cette condition :
+ * un dossier Suisse études, dont la seule pièce « à rédiger » n'a pas
+ * d'entretien (S.218), menait à un choix vide au bouton grisé.
+ */
+export const aDesPiecesARediger = (pieces: readonly Pick<Piece, "redaction">[]): boolean =>
+  pieces.some((piece) => Boolean(piece.redaction));
