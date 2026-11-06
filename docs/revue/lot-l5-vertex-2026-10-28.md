@@ -488,3 +488,13 @@ facturation du compte jamais confirmée) ; relever la grille 2027 et sa
 date avant le 31/12 ; décider si une surveillance externe lit le détail
 avec le jeton — sinon l'alerte n'est vue que par qui ouvre l'adresse ;
 supprimer les copies `.env.app.avant-*` du serveur.
+
+## Configuration de production relevée — S.217, 05/11/2026
+
+Relevé de l'exploitant : la production appelle Vertex `eu` avec
+`gemini-3.8-flash`, mais **sans `AI_OPENAI_RAISONNEMENT`** (raisonnement par
+défaut, `medium`) et sur `v1beta1`, alors que la campagne qualifie `low` sur
+`v1`. Le trafic de production partage `projetanatt` : toute comparaison
+facture / banc d'une journée où la production a appelé Vertex mêle les
+deux. Décision du responsable : aligner la production (`low`, `v1`).
+Détail : [revue du 31/10, § 8](revue-fonctionnelle-2026-10-31.md).

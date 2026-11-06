@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.217 — relevé IA de production, F-1 levé, F-6 ouvert — 05/11/2026
+
+Lot documentaire demandé par le responsable. Base `3b9e0ad` (#347
+fusionnée). Relevé du 05/11 sur le VPS : extraction et rédaction sur
+Vertex `eu` (`gemini-3.8-flash`) ; F-1 levé pour le traitement, le texte
+publié « Belgique, europe-west1 » reste à corriger en B-08 avec Cloudflare.
+F-6 : la production tournait sans `AI_OPENAI_RAISONNEMENT` (défaut
+`medium`) et sur `v1beta1`, la campagne L5 qualifie `low` sur `v1`.
+Décision : aligner la production ; vérification après recréation de `app`
+et `worker` encore à consigner. Tarif à 56 jours, alerte le 01/12. Lire
+[la revue du 31/10, § 8](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 ### S.216 — reprise des navigateurs : apt-get arrêté en root — 05/11/2026
 
 Lot dédié demandé par le responsable après l'échec de #348. Base `3b9e0ad`
