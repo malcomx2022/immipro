@@ -281,28 +281,37 @@ async function ouvrirLaConnexion(p: Page, suite?: string) {
 }
 
 /**
- * S.222 — la saisie de l'adresse, tolérante à la navigation de repli.
+ * S.222 — la saisie de l'adresse, tolérante au rechargement de repli.
  *
- * Sous Firefox, `/connexion` chargé (200, formulaire rendu) est parfois
- * suivi, quatre-vingts millisecondes plus tard, d'un rechargement du même
- * document (`Cache-Control: max-age=0`, 304) que le navigateur n'achève
- * jamais : la saisie attendait alors trente secondes la fin d'une
- * navigation qui ne vient pas (CI du 06/11 sur #352, #354, #356 ; trace
- * locale). Rien dans l'écran ne recharge la page. Une nouvelle navigation
- * annule la pendante : on la relance une fois, puis on saisit. Le
- * formulaire et ses attentes sont les mêmes.
+ * Sous Firefox, `/connexion` chargé comme document (200, formulaire rendu)
+ * est parfois rechargé quatre-vingts millisecondes plus tard
+ * (`Cache-Control: max-age=0`, 304), et ce rechargement ne s'achève
+ * jamais : la saisie attendait trente secondes la fin d'une navigation qui
+ * ne vient pas (CI du 06/11 sur #352, #354, #356 ; reproduit en local).
+ * Rien dans l'écran ne recharge la page, et une nouvelle navigation de
+ * document vers `/connexion` retombe dans le même état. On y revient donc
+ * comme en S.193 : depuis l'accueil, par le lien « Connexion » de l'en-tête,
+ * une navigation du routeur qui ne recharge aucun document. Une adresse qui
+ * porte une suite est rechargée telle quelle, pour ne pas perdre la suite.
  */
 async function saisirLAdresse(p: Page, adresse: string) {
   const champ = p.getByLabel("Adresse email", { exact: true });
   try {
     await champ.fill(adresse, { timeout: 8_000 });
+    return;
   } catch (erreur) {
     if (!/Timeout/u.test(String(erreur))) throw erreur;
-    const ici = new URL(p.url());
-    await aller(`${ici.pathname}${ici.search}`, p);
-    await attendreLHydratation(p, "form");
-    await champ.fill(adresse);
   }
+  const ici = new URL(p.url());
+  if (ici.search) {
+    await aller(`${ici.pathname}${ici.search}`, p);
+  } else {
+    await aller("/", p);
+    await p.getByRole("banner").getByRole("link", { name: "Connexion", exact: true }).click();
+    await p.waitForURL((url) => url.pathname === "/connexion");
+  }
+  await attendreLHydratation(p, "form");
+  await champ.fill(adresse);
 }
 
 /**

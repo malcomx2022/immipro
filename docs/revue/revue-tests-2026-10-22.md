@@ -1192,11 +1192,14 @@ au même blocage. Le défaut est intermittent, et R-O05 en avait la
 signature en S.193.
 
 **Correction.** `saisirLAdresse` tente la saisie huit secondes. Si elle
-bute sur cette navigation pendante, elle relance une fois la navigation
-vers la même adresse, ce qui annule la pendante, attend l'hydratation du
-formulaire, puis saisit. Les deux premières versions de ce lot sont
-retirées, et le parcours rappelle `connecter()` comme avant. Attentes
-inchangées, produit non touché.
+bute sur cette navigation pendante, elle revient à `/connexion` comme R-O05
+en S.193 : `goto("/")`, puis le lien « Connexion » de l'en-tête, une
+navigation du routeur qui ne charge aucun document `/connexion`. Une
+troisième version, qui relançait simplement la navigation de document,
+retombait dans le même état en local. Une adresse qui porte une suite est
+rechargée telle quelle, pour ne pas perdre la suite. Les versions
+précédentes de ce lot sont retirées, et le parcours rappelle `connecter()`
+comme avant. Attentes inchangées, produit non touché.
 
 **Preuves.** Firefox installé dans la session : le groupe 2FA rejoué en
 boucle en Firefox 390 en local, puis le parcours complet. Chromium 390 et
