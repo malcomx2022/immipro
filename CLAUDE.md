@@ -77,6 +77,19 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.218 — « Rédiger » mène à l'entretien, ou au dépôt — 06/11/2026
+
+Relevé en production par le responsable : « CV et plan d'études motivé »
+(CH) menait à « Cette page n'existe pas ou plus ». `lienDePiece` mettait
+l'identifiant du document là où `/redaction/[type]` attend un type : toute
+pièce à rédiger était touchée. La pièce porte désormais `redaction`
+(`typeDeRedaction`, seule correspondance code → route) ; sans entretien
+guidé, la ligne dit « Ajouter » et mène au dépôt (décision du 06/11 pour
+`cv_plan_etudes`). Ne jamais construire un lien de rédaction sur
+`piece.id`. Le parcours clique la ligne ; un test d'inventaire n'admet que
+`CH:cv_plan_etudes` sans entretien. Lire
+[la revue du 31/10, § 9](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 ### S.217 — relevé IA de production, F-1 levé, F-6 ouvert — 05/11/2026
 
 Lot documentaire demandé par le responsable. Base `3b9e0ad` (#347

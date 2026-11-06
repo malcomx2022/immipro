@@ -53,6 +53,13 @@ export interface Piece {
    * téléversement, donc sur toutes les pièces, y compris une lettre.
    */
   astuce?: string;
+  /**
+   * Le type de l'entretien guidé qui écrit cette pièce (`lettre-motivation`),
+   * segment de `dossiers/[id]/redaction/[type]` — S.218. Absent quand
+   * aucun entretien n'existe : une pièce « à rédiger » sans entretien se
+   * dépose comme les autres. L'identifiant du document n'est jamais un type.
+   */
+  redaction?: string;
 }
 
 export const LIBELLE_FAMILLE: Record<FamillePiece, string> = {
@@ -238,7 +245,9 @@ export const estAPhotographier = (piece: Piece): boolean => piece.remede !== "RE
 export const sousTitreDepot = (piece: Piece): string =>
   estAPhotographier(piece)
     ? `PDF ou photo, ${TAILLE_MAXI_MO} Mo maximum. Plusieurs pages acceptées.`
-    : `Dépose ta lettre en PDF, ${TAILLE_MAXI_MO} Mo maximum, ou rédige-la avec l'entretien guidé.`;
+    : piece.redaction
+      ? `Dépose ta lettre en PDF, ${TAILLE_MAXI_MO} Mo maximum, ou rédige-la avec l'entretien guidé.`
+      : `Dépose ton document en PDF, ${TAILLE_MAXI_MO} Mo maximum.`;
 
 /**
  * Libellé de l'issue d'une ligne de checklist. Une pièce, un libellé, sur
@@ -253,7 +262,8 @@ export function libelleAction(piece: Piece): string {
     case "REMPLACER":
       return "Remplacer";
     case "REDIGER":
-      return "Rédiger";
+      // Sans entretien guidé, il n'y a rien à rédiger ici : on dépose (S.218).
+      return piece.redaction ? "Rédiger" : "Ajouter";
     case "DEMARCHE":
       return "Voir";
   }
@@ -474,8 +484,8 @@ export function libelleBlocage(compteurs: CompteursDeBlocage): string {
  * qui n'a rien écrit ne l'avance pas.
  */
 export const lienDePiece = (dossierId: string, piece: Piece): string =>
-  piece.remede === "REDIGER"
-    ? `/dossiers/${dossierId}/redaction/${piece.id}`
+  piece.remede === "REDIGER" && piece.redaction
+    ? `/dossiers/${dossierId}/redaction/${piece.redaction}`
     : `/dossiers/${dossierId}/pieces/${piece.id}`;
 
 /** Première pièce à traiter : celle qui bloque, sinon celle qui renforce. */

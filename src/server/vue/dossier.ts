@@ -11,6 +11,7 @@ import { estEchue, premiereObligatoireEchue, type PieceExigee } from "@/domain/d
 /** Un jour ISO, en UTC — même convention que l'échéancier. */
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 import type { FicheDestination } from "@/domain/destinations/fiche";
+import { typeDeRedaction } from "@/lib/contenu/redaction";
 import { jourCivil } from "@/domain/format/fuseau";
 import { confirmationOuverte, debutDeLInvitation } from "@/domain/dossiers/conservation";
 import { echeanceDuDossierSoumis } from "@/server/dossiers/conservation";
@@ -65,6 +66,10 @@ export function versPiece(document: Document, aujourdhui = jourCivil(new Date())
     ...(document.finding ? { constat: document.finding } : {}),
     ...(document.expiresAt ? { perimeLe: document.expiresAt.toISOString().slice(0, 10) } : {}),
     ...(document.hint ? { astuce: document.hint } : {}),
+    ...(() => {
+      const type = document.remedy === "REDIGER" ? typeDeRedaction(document.code) : null;
+      return type ? { redaction: type } : {};
+    })(),
   };
 }
 

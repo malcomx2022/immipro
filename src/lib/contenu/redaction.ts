@@ -183,6 +183,15 @@ export const PIECES_REDIGEABLES: readonly PieceRedigeable[] = [
 export const pieceRedigeable = (type: string) =>
   PIECES_REDIGEABLES.find((p) => p.type === type);
 
+/**
+ * Le type d'entretien guidé qui écrit une pièce du référentiel, ou `null`
+ * — S.218. Le référentiel écrit `lettre_motivation`, la route
+ * `lettre-motivation`. Une pièce marquée « à rédiger » sans jeu de
+ * questions (`cv_plan_etudes`) n'en a pas : elle se dépose.
+ */
+export const typeDeRedaction = (code: string): string | null =>
+  pieceRedigeable(code.replace(/_/gu, "-"))?.type ?? null;
+
 export const VERSIONS_MOTIVATION: readonly Version[] = [
   {
     rang: 1,

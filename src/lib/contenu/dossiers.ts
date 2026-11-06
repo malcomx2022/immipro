@@ -112,6 +112,7 @@ export const PIECES_NL: readonly Piece[] = [
     famille: "COMPLEMENTAIRE",
     etat: "ATTENDUE",
     remede: "REDIGER",
+    redaction: "lettre-motivation",
     message:
       "Tu peux la rédiger avec l'entretien guidé, puis la relire ligne par ligne.",
     constat: "Rédaction possible via l'entretien guidé, avec relecture critique.",
@@ -141,7 +142,7 @@ export const PIECES_DE: readonly Piece[] = [
   { id: "compte-bloque", code: "FIN", libelle: "Attestation de compte bloqué", famille: "OBLIGATOIRE", etat: "ATTENDUE", remede: "TELEVERSER" },
   { id: "admission", code: "ADM", libelle: "Lettre d'admission", famille: "OBLIGATOIRE", etat: "ATTENDUE", remede: "TELEVERSER" },
   { id: "assurance", code: "ASS", libelle: "Assurance maladie", famille: "OBLIGATOIRE", etat: "ATTENDUE", remede: "TELEVERSER" },
-  { id: "lettre-motivation", code: "MOT", libelle: "Lettre de motivation", famille: "COMPLEMENTAIRE", etat: "ATTENDUE", remede: "REDIGER" },
+  { id: "lettre-motivation", code: "MOT", libelle: "Lettre de motivation", famille: "COMPLEMENTAIRE", etat: "ATTENDUE", remede: "REDIGER", redaction: "lettre-motivation" },
 ];
 
 export const PIECES_PAR_DOSSIER: Record<string, readonly Piece[]> = {

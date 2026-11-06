@@ -73,7 +73,9 @@ describe("C-06 — pièces de la checklist", () => {
     // mentirait sur l'effort demandé.
     expect(libelleAction(piece({ etat: "A_CORRIGER", remede: "DEMARCHE" }))).toBe("Voir");
     expect(libelleAction(piece({ etat: "A_CORRIGER", remede: "REMPLACER" }))).toBe("Remplacer");
-    expect(libelleAction(piece({ etat: "ATTENDUE", remede: "REDIGER" }))).toBe("Rédiger");
+    expect(libelleAction(piece({ etat: "ATTENDUE", remede: "REDIGER", redaction: "lettre-motivation" }))).toBe("Rédiger");
+    // Sans entretien guidé, une pièce « à rédiger » se dépose (S.218).
+    expect(libelleAction(piece({ etat: "ATTENDUE", remede: "REDIGER" }))).toBe("Ajouter");
     expect(libelleAction(piece({ etat: "ATTENDUE", remede: "TELEVERSER" }))).toBe("Ajouter");
   });
 
