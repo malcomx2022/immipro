@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.221 — C-08 montre le fichier envoyé — 06/11/2026
+
+Relevé en production par le responsable : le résultat d'analyse affichait
+« aperçu de la pièce · page 1 sur 1 », un cadre du prototype sans fichier.
+`ApercuDeLaPiece` demande l'URL signée à la route de la pièce à l'ouverture
+et la charge dans un cadre ; « Recharger l'aperçu » en redemande une (cinq
+minutes). Contrôle en cours, purge et échec sont dits, sans cadre vide. La
+décision reste à `urlDeLecture` : ne jamais signer ni filtrer dans l'écran,
+ne jamais réintroduire de cadre inventé. Le test L1 de S.172 admet la seule
+lecture `GET` de la pièce. Lire
+[la revue du 31/10, § 10](docs/revue/revue-fonctionnelle-2026-10-31.md).
+
 ### S.220 — relevé IA après S.219 : lecture `CONNUE`, F-6 clos — 06/11/2026
 
 Lot documentaire demandé par le responsable. Base `0d83979` (#352

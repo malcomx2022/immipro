@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { MENTION_AU_CHOIX, SANS_EXIGENCE_CHIFFREE } from "@/domain/dossiers/verification";
 import { SourceNote } from "@/components/ui/SourceNote";
 import { EnteteDossier } from "../../EnteteDossier";
+import { ApercuDeLaPiece } from "./ApercuDeLaPiece";
 import { CODE_MONTEE_DOSSIER } from "@/domain/payments/montee";
 
 /**
@@ -712,12 +713,8 @@ function Analyse({
         <StatusBadge etat={analyse.verdict} className="self-start" />
       </div>
 
-      <div
-        aria-hidden="true"
-        className="flex h-40 items-center justify-center rounded-lg bg-ink-100 text-13 text-ink-500"
-      >
-        aperçu de la pièce · page 1 sur {analyse.pages}
-      </div>
+      {/* S.221 — le fichier envoyé, signé à la demande ; plus de cadre inventé. */}
+      <ApercuDeLaPiece dossierId={dossier.id} pieceId={piece.id} libelle={piece.libelle} />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-pretty text-19 font-semibold text-ink-900">{analyse.titre}</h2>
