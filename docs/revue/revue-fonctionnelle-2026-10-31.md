@@ -59,7 +59,7 @@ suspendue à un préalable externe) ; **Phase 3**.
 | WF-13 Partenaires | Partiel | Conditions d'affiliation et activation conformité (K.D) par destination | Décision commerciale | aucun : désactivé tant qu'absent |
 | WF-14 Veille et publication | Partiel | Routine de veille réelle : qui relit, à quelle cadence, avec quelle trace | Organisation | J1 |
 | WF-15 Administration | Partiel | B-04 remboursements réels (R-O04) | M.C | J2 |
-| WF-16 Coûts IA | Partiel | Rapprochement facture réelle ; question de la sortie sous-mesurée (F-3) | L5 | J1 |
+| WF-16 Coûts IA | Partiel | Rapprochement facture réelle ; sortie mesurée avec le raisonnement depuis S.219 (F-3 étayé, S.220) | L5 | J1 |
 
 **Lecture.** Huit modules sur seize sont éprouvés. Aucun module n'attend
 du code applicatif sans préalable : tous les restes tombent dans cinq
@@ -286,9 +286,20 @@ l'exploitant dans `.env.app`, puis recréation de `app` et `worker`.
 copie de sûreté `.env.app.avant-s216` et recréation de `app` et `worker`) :
 `AI_OPENAI_RAISONNEMENT=low`, `AI_OPENAI_URL` en
 `https://aiplatform.eu.rep.googleapis.com/v1/projects/projetanatt/locations/eu/endpoints/openapi`.
-F-6 est clos pour la configuration. **Reste non vérifié** : une lecture
-réelle après l'alignement, avec sa ligne `CONNUE` dans `AiUsage` ; le
-préalable L5 « configuration déployée » ne se lève qu'avec elle.
+F-6 est clos pour la configuration. La lecture réelle qui manquait est
+venue après S.219 (S.220, 06/11 à 07:51 UTC, pièce fictive) : `CONNUE`,
+entrée 3 658, sortie facturée 254 dont 236 de raisonnement, 4 066 µUSD.
+**F-6 est clos.** Le préalable L5 « configuration déployée » a sa preuve
+pour l'extraction ; la rédaction n'a pas encore de lecture après
+l'alignement. Détail au
+[suivi L5, § S.219](lot-l5-vertex-2026-10-28.md).
+
+**F-3, étayé pour la production.** Les quatre lectures `INVALIDE` du 06/11
+au matin montrent que Vertex rend le raisonnement hors de
+`completion_tokens`. Avant S.213, la production n'en comptait donc rien :
+B-07 sous-estimait la sortie, ici d'un facteur quatorze (254 facturés pour
+18 visibles). Les coûts relevés avant le 04/11 sont à lire comme des
+minimums. Le quota en analyses (D1) n'est pas touché.
 
 **Échéance du tarif.** L'alerte de `/api/health` passera en
 `EXPIRE_BIENTOT` le 01/12 : relever la grille 2027 sur la page officielle

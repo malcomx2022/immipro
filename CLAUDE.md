@@ -105,6 +105,19 @@ ne jamais réintroduire de cadre inventé. Le test L1 de S.172 admet la seule
 lecture `GET` de la pièce. Lire
 [la revue du 31/10, § 10](docs/revue/revue-fonctionnelle-2026-10-31.md).
 
+### S.220 — relevé IA après S.219 : lecture `CONNUE`, F-6 clos — 06/11/2026
+
+Lot documentaire demandé par le responsable. Base `0d83979` (#352
+fusionnée). `app` et `worker` en `4381f07` ; lecture d'une pièce fictive
+à 07:51 UTC : `analyse:logement` `CONNUE`, entrée 3 658, sortie facturée
+254 dont 236 de raisonnement, 4 066 µUSD, conforme au tarif. F-6 clos ;
+F-3 étayé : avant S.213 la sortie était sous-comptée (×14 ici), les coûts
+antérieurs sont des minimums. La ligne ne garde pas `completion_tokens` :
+elle ne départage pas « en sus » et « compris » (même coût) ; les quatre
+`INVALIDE` du matin prouvent le « en sus ». Rédaction non relevée après
+l'alignement. Reprise L5 non bloquée par l'adaptateur, suspendue jusqu'à
+décision. Lire [le suivi L5, § S.219](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.219 — raisonnement en sus de la sortie, régression de S.213 — 06/11/2026
 
 Relevé de l'exploitant juste après l'alignement : quatre lectures de

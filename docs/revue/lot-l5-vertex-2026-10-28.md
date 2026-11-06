@@ -533,3 +533,37 @@ réelle publiée, détail chiffré sans texte), puis 33/33. `smoke:usages-ia`
 **Reste.** Après déploiement, une lecture réelle `CONNUE` avec
 `reasoningTokens` renseigné prouvera la convention ; à défaut, le détail
 chiffré d'un `INVALIDE` dira ce que Vertex rend.
+
+### Relevé de production après S.219 (S.220) — 06/11/2026
+
+`app` et `worker` en `4381f07` (S.219), relevé par l'exploitant avant la
+lecture. Une lecture d'une pièce **fictive** (justificatif de logement), le
+06/11 à 07:51:10 UTC, ligne `AiUsage` relue en base :
+
+| `operation` | `model` | `usageState` | entrée | sortie facturée | raisonnement | `costMicros` |
+|---|---|---|---|---|---|---|
+| `analyse:logement` | `google/gemini-3.8-flash` | `CONNUE` | 3 658 | 254 | 236 | 4 066 |
+
+- **Mesure acceptée.** La régression de S.213 ne se reproduit pas : la
+  même opération était `INVALIDE` à 05:31.
+- **Raisonnement mesuré.** 236 jetons sur 254 de sortie facturée, soit 18
+  de réponse visible : 93 % de la sortie.
+- **Coût cohérent avec le tarif saisi.** 3 658 × 0,825 + 254 × 4,125 =
+  4 065,6 µUSD, arrondi à 4 066 : le raisonnement est facturé en sortie.
+- **Ce que la ligne ne départage pas.** La table garde la sortie facturée
+  et le raisonnement, pas le `completion_tokens` brut. Les deux lectures
+  de `total_tokens` donnent donc la même ligne : 18 + 236 en sus, ou 254
+  avec 236 compris. Le coût est le même dans les deux cas. Ce qui prouve
+  l'existence du cas « en sus », ce sont les quatre `INVALIDE` de 05:26 à
+  05:31 : S.213 ne les refusait que parce que le raisonnement dépassait
+  `completion_tokens`.
+
+Les quatre lignes `INVALIDE` restent telles quelles (L2 : on ne réécrit pas
+l'historique) ; leurs pièces restent en revue humaine au B-05.
+
+**Conséquences.** Le préalable L5 « configuration déployée » a sa lecture
+réelle `CONNUE` (F-6, revue du 31/10, § 8). F-3 est étayé pour la
+production : avant S.213, seule la réponse visible était comptée, et le
+raisonnement pèse ici treize fois plus. La reprise de la campagne L5 n'est
+plus bloquée par l'adaptateur (S.203) ; elle reste suspendue jusqu'à la
+décision du responsable (S.205).
