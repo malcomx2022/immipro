@@ -1165,36 +1165,43 @@ F-1 à F-5 et l'ordre proposé en cinq étapes vivent dans
 § 6 ci-dessus pour l'état du restant. Les tables du § 5 gardent leur état
 du 22/10.
 
-## 29. S.222 — parcours 2FA « compte interne » fiabilisé sous Firefox — 06/11/2026
+## 29. S.222 — `connecter()` tolère le rechargement de repli de Firefox — 06/11/2026
 
 Lot dédié. Il était nécessaire pour mener au vert les PR que le responsable
 a demandé de fusionner. Le 06/11, le parcours « compte interne : back-office
 fermé sans double authentification, ouvert après l'activation » (S.215) a
-échoué sous Firefox, toujours au même endroit :
+échoué sous Firefox, toujours au même endroit, la saisie de l'adresse dans
+`connecter()` :
 
-| PR | Profil | Contenu de la PR |
+| Où | Profil | Contenu |
 |---|---|---|
 | #352 (S.218) | firefox-390 | lien « Rédiger » |
 | #354 (S.220) | firefox-1440 | documentation seule |
-| #356, première version | firefox-390 et 1440 | ce lot |
+| #356, première version | firefox-390 et 1440 | « Se déconnecter » au lieu du `goto` |
+| local, deuxième version | firefox-390 | onglet neuf au lieu du `goto` |
 
-**Signature, lue dans la trace CI de #356.** À la fin du parcours, la
-console rend le rôle `CANDIDAT`, ce qui ferme la session alors que l'onglet
-est sur `/veille`. La première version de ce lot remplaçait le `goto` par
-« Se déconnecter » : la route répond 401 (session déjà fermée), le bouton
-charge `/connexion` (200), puis Firefox relance aussitôt une seconde requête
-du même document (304). Playwright attend la fin de cette seconde
-navigation, qui ne vient pas, et la saisie attend trente secondes. Le geste
-n'y était pour rien : c'est l'onglet qui a quitté le back-office sur une
-session fermée. Depuis une page candidat, le même `connecter()` passe après
-le premier changement de rôle du même parcours. C'est la signature de R-O05
-en S.193.
+**Signature, lue dans les traces (CI de #356 et local).** `/connexion`
+répond 200 et le formulaire est entièrement rendu. Quatre-vingts
+millisecondes plus tard, Firefox relance une navigation vers le même
+document, avec `Cache-Control: max-age=0` et `If-None-Match` : c'est un
+rechargement, qui reçoit 304 et ne s'achève jamais du point de vue de
+Playwright. La saisie attend « la fin de la navigation » trente secondes.
+Rien dans l'écran de connexion ne recharge la page. Ce n'est ni le geste ni
+l'onglet : un `goto`, le bouton « Se déconnecter » et un onglet neuf mènent
+au même blocage. Le défaut est intermittent, et R-O05 en avait la
+signature en S.193.
 
-**Correction.** La reconnexion de fin de parcours repart d'un onglet neuf du
-même contexte, comme le premier `connecter()` de chaque profil ; ses erreurs
-JavaScript restent relevées pour le bilan. Les attentes du parcours sont
-inchangées. Le produit n'est pas touché.
+**Correction.** `saisirLAdresse` tente la saisie huit secondes. Si elle
+bute sur cette navigation pendante, elle relance une fois la navigation
+vers la même adresse, ce qui annule la pendante, attend l'hydratation du
+formulaire, puis saisit. Les deux premières versions de ce lot sont
+retirées, et le parcours rappelle `connecter()` comme avant. Attentes
+inchangées, produit non touché.
 
-**Preuves.** Firefox installé dans la session : parcours Firefox 390 et 1440
-rejoués en local ; Chromium 390 et 1440 sur la première version (76/76) ;
-WebKit par la CI de cette PR.
+**Preuves.** Firefox installé dans la session : le groupe 2FA rejoué en
+boucle en Firefox 390 en local, puis le parcours complet. Chromium 390 et
+1440 sur la première version (76/76). WebKit par la CI de cette PR.
+
+**Reste.** R-O03 a échoué une fois en local en firefox-1440, sur
+`page.reload` (`NS_BINDING_ABORTED`) : c'est un autre défaut, non relevé en
+CI, et il n'est pas traité ici.

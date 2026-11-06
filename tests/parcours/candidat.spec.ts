@@ -281,6 +281,31 @@ async function ouvrirLaConnexion(p: Page, suite?: string) {
 }
 
 /**
+ * S.222 — la saisie de l'adresse, tolérante à la navigation de repli.
+ *
+ * Sous Firefox, `/connexion` chargé (200, formulaire rendu) est parfois
+ * suivi, quatre-vingts millisecondes plus tard, d'un rechargement du même
+ * document (`Cache-Control: max-age=0`, 304) que le navigateur n'achève
+ * jamais : la saisie attendait alors trente secondes la fin d'une
+ * navigation qui ne vient pas (CI du 06/11 sur #352, #354, #356 ; trace
+ * locale). Rien dans l'écran ne recharge la page. Une nouvelle navigation
+ * annule la pendante : on la relance une fois, puis on saisit. Le
+ * formulaire et ses attentes sont les mêmes.
+ */
+async function saisirLAdresse(p: Page, adresse: string) {
+  const champ = p.getByLabel("Adresse email", { exact: true });
+  try {
+    await champ.fill(adresse, { timeout: 8_000 });
+  } catch (erreur) {
+    if (!/Timeout/u.test(String(erreur))) throw erreur;
+    const ici = new URL(p.url());
+    await aller(`${ici.pathname}${ici.search}`, p);
+    await attendreLHydratation(p, "form");
+    await champ.fill(adresse);
+  }
+}
+
+/**
  * Se connecter, et arriver où l'écran l'a promis : la suite portée par
  * l'adresse quand l'écran en a une — une page protégée y a renvoyé —,
  * sinon le tableau de bord.
@@ -294,7 +319,7 @@ async function connecter(
 ) {
   await ouvrirLaConnexion(p);
   const suite = new URL(p.url()).searchParams.get("suite") ?? accueil;
-  await p.getByLabel("Adresse email", { exact: true }).fill(adresse);
+  await saisirLAdresse(p, adresse);
   await p.getByLabel("Mot de passe", { exact: true }).fill(motDePasse);
   await p.getByLabel("Mot de passe", { exact: true }).press("Enter");
   await secondTempsSiDemande(p, adresse);
@@ -805,17 +830,6 @@ test("compte interne : back-office fermé sans double authentification, ouvert a
     [`user:${compte}`],
   );
   expect(trace).toMatchObject({ acteur: `console:${par}`, n: "1" });
-  // S.222 : le changement de rôle a fermé la session pendant que l'onglet
-  // était sur /veille. Toute navigation de document vers /connexion depuis
-  // cet onglet — `goto` (#352, #354) comme « Se déconnecter » (#356) — y
-  // laissait Firefox relancer une seconde requête du document (304) jamais
-  // achevée : la saisie attendait trente secondes (traces CI du 06/11).
-  // Le même `connecter()` passe depuis une page candidat (ligne du dessus).
-  // La reconnexion repart donc d'un onglet neuf du même contexte, comme le
-  // premier `connecter()` du profil ; ses attentes sont inchangées.
-  await page.close();
-  page = await context.newPage();
-  suivis.push(suivreErreurs(page, moteur, origineApp));
   await connecter(page, email, MOT_DE_PASSE);
   preuves.push({
     controle:
