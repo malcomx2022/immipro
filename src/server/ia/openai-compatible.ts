@@ -2,7 +2,7 @@ import {
   mesurerLesJetons,
   mesurerLUsageCompatible,
   usageNumerique,
-  DETAIL_MESURE_INCOMPLETE,
+  detailMesureRefusee,
   type MesureDeJetons,
   type UsageNumerique,
 } from "@/domain/ia/usage";
@@ -167,7 +167,7 @@ const lireReponse = (charge: unknown): Reponse => {
   // Le raisonnement est lu et ajouté à la sortie facturée (S.213).
   const mesure = mesurerLUsageCompatible(c?.usage);
   if (mesure.etat !== "CONNUE") {
-    return { ok: false, cause: "reponse_illisible", detail: DETAIL_MESURE_INCOMPLETE, mesure, reponseDecodee: true };
+    return { ok: false, cause: "reponse_illisible", detail: detailMesureRefusee(c?.usage), mesure, reponseDecodee: true };
   }
   const choix = Array.isArray(c?.choices) ? c.choices[0] : undefined;
   if (!choix?.message) {
