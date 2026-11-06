@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.219 — raisonnement en sus de la sortie, régression de S.213 — 06/11/2026
+
+Relevé de l'exploitant juste après l'alignement : quatre lectures de
+production sur cinq `INVALIDE`. S.213 lisait `reasoning_tokens` comme
+compris dans `completion_tokens` (OpenAI) et rejetait un raisonnement plus
+grand que la sortie ; Vertex le rend en sus. `total_tokens` départage
+désormais (`DETAIL_EN_SUS` ajouté à la sortie facturée) ; sans total, plus
+grand que la sortie = en sus. Ne pas revenir au rejet. Une mesure refusée
+porte ses seuls compteurs numériques dans `engineLog`
+(`detailMesureRefusee`). Cinq tests rouges avant. Lire
+[le suivi L5, § S.219](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.218 — « Rédiger » mène à l'entretien, ou au dépôt — 06/11/2026
 
 Relevé en production par le responsable : « CV et plan d'études motivé »
@@ -98,8 +110,9 @@ Vertex `eu` (`gemini-3.8-flash`) ; F-1 levé pour le traitement, le texte
 publié « Belgique, europe-west1 » reste à corriger en B-08 avec Cloudflare.
 F-6 : la production tournait sans `AI_OPENAI_RAISONNEMENT` (défaut
 `medium`) et sur `v1beta1`, la campagne L5 qualifie `low` sur `v1`.
-Décision : aligner la production ; vérification après recréation de `app`
-et `worker` encore à consigner. Tarif à 56 jours, alerte le 01/12. Lire
+Décision : aligner la production ; vérifié le 06/11 (`low`, `/v1/`, `app`
+et `worker` recréés) : F-6 clos pour la configuration, reste une lecture
+réelle `CONNUE` après l'alignement. Tarif à 56 jours, alerte le 01/12. Lire
 [la revue du 31/10, § 8](docs/revue/revue-fonctionnelle-2026-10-31.md).
 
 ### S.216 — reprise des navigateurs : apt-get arrêté en root — 05/11/2026

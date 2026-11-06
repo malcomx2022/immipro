@@ -282,9 +282,13 @@ campagne : `AI_OPENAI_RAISONNEMENT=low` et `AI_OPENAI_URL` en `/v1/`.
 L'origine autorisée (`AI_OPENAI_ORIGINE_AUTORISEE`) ne change pas : seul le
 chemin change, l'envoi des pièces reste autorisé. Application par
 l'exploitant dans `.env.app`, puis recréation de `app` et `worker`.
-**Non vérifié à la date de ce lot** : la sortie de `printenv` après
-recréation, puis une lecture réelle `CONNUE` dans `AiUsage`, sont à
-consigner.
+**Configuration vérifiée le 06/11** (relevé de l'exploitant, après
+copie de sûreté `.env.app.avant-s216` et recréation de `app` et `worker`) :
+`AI_OPENAI_RAISONNEMENT=low`, `AI_OPENAI_URL` en
+`https://aiplatform.eu.rep.googleapis.com/v1/projects/projetanatt/locations/eu/endpoints/openapi`.
+F-6 est clos pour la configuration. **Reste non vérifié** : une lecture
+réelle après l'alignement, avec sa ligne `CONNUE` dans `AiUsage` ; le
+préalable L5 « configuration déployée » ne se lève qu'avec elle.
 
 **Échéance du tarif.** L'alerte de `/api/health` passera en
 `EXPIRE_BIENTOT` le 01/12 : relever la grille 2027 sur la page officielle
