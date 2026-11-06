@@ -1164,3 +1164,31 @@ F-1 à F-5 et l'ordre proposé en cinq étapes vivent dans
 [la revue du 31/10](revue-fonctionnelle-2026-10-31.md) ; elle remplace le
 § 6 ci-dessus pour l'état du restant. Les tables du § 5 gardent leur état
 du 22/10.
+
+## 29. S.222 — parcours 2FA « compte interne » fiabilisé sous Firefox — 06/11/2026
+
+Lot dédié. Il était nécessaire pour mener au vert les PR que le responsable
+a demandé de fusionner. Le 06/11, le parcours « compte interne : back-office
+fermé sans double authentification, ouvert après l'activation » (S.215) a
+échoué deux fois sous Firefox, toujours au même endroit :
+
+| PR | Profil | Contenu de la PR |
+|---|---|---|
+| #352 (S.218) | firefox-390 | lien « Rédiger » |
+| #354 (S.220) | firefox-1440 | documentation seule |
+
+**Signature.** À la fin du parcours, la console rend le rôle `CANDIDAT`, ce
+qui ferme la session alors que l'écran est sur `/veille`. `connecter()`
+navigue alors vers `/connexion` : le `goto` aboutit, puis la saisie attend
+« la fin de la navigation » trente secondes. Firefox a doublé la navigation
+de document sans l'achever. C'est le défaut de R-O05 en S.193, après une
+autre fermeture de session côté serveur. Chromium et WebKit ne le montrent
+pas ; il n'a pas été reproduit à la demande.
+
+**Correction.** Le parcours fait le geste du responsable : « Se déconnecter »,
+qui mène à `/connexion` même sur une session déjà échue (S.212). Ensuite
+`connecter()` part de `/connexion` sans renaviguer (S.197). Les attentes du
+parcours sont inchangées. Le produit n'est pas touché.
+
+**Preuves.** Parcours Chromium 390 et 1440 rejoués en local ; Firefox et
+WebKit passent par la CI de cette PR.
