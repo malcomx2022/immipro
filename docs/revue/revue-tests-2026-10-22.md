@@ -1170,25 +1170,31 @@ du 22/10.
 Lot dédié. Il était nécessaire pour mener au vert les PR que le responsable
 a demandé de fusionner. Le 06/11, le parcours « compte interne : back-office
 fermé sans double authentification, ouvert après l'activation » (S.215) a
-échoué deux fois sous Firefox, toujours au même endroit :
+échoué sous Firefox, toujours au même endroit :
 
 | PR | Profil | Contenu de la PR |
 |---|---|---|
 | #352 (S.218) | firefox-390 | lien « Rédiger » |
 | #354 (S.220) | firefox-1440 | documentation seule |
+| #356, première version | firefox-390 et 1440 | ce lot |
 
-**Signature.** À la fin du parcours, la console rend le rôle `CANDIDAT`, ce
-qui ferme la session alors que l'écran est sur `/veille`. `connecter()`
-navigue alors vers `/connexion` : le `goto` aboutit, puis la saisie attend
-« la fin de la navigation » trente secondes. Firefox a doublé la navigation
-de document sans l'achever. C'est le défaut de R-O05 en S.193, après une
-autre fermeture de session côté serveur. Chromium et WebKit ne le montrent
-pas ; il n'a pas été reproduit à la demande.
+**Signature, lue dans la trace CI de #356.** À la fin du parcours, la
+console rend le rôle `CANDIDAT`, ce qui ferme la session alors que l'onglet
+est sur `/veille`. La première version de ce lot remplaçait le `goto` par
+« Se déconnecter » : la route répond 401 (session déjà fermée), le bouton
+charge `/connexion` (200), puis Firefox relance aussitôt une seconde requête
+du même document (304). Playwright attend la fin de cette seconde
+navigation, qui ne vient pas, et la saisie attend trente secondes. Le geste
+n'y était pour rien : c'est l'onglet qui a quitté le back-office sur une
+session fermée. Depuis une page candidat, le même `connecter()` passe après
+le premier changement de rôle du même parcours. C'est la signature de R-O05
+en S.193.
 
-**Correction.** Le parcours fait le geste du responsable : « Se déconnecter »,
-qui mène à `/connexion` même sur une session déjà échue (S.212). Ensuite
-`connecter()` part de `/connexion` sans renaviguer (S.197). Les attentes du
-parcours sont inchangées. Le produit n'est pas touché.
+**Correction.** La reconnexion de fin de parcours repart d'un onglet neuf du
+même contexte, comme le premier `connecter()` de chaque profil ; ses erreurs
+JavaScript restent relevées pour le bilan. Les attentes du parcours sont
+inchangées. Le produit n'est pas touché.
 
-**Preuves.** Parcours Chromium 390 et 1440 rejoués en local ; Firefox et
-WebKit passent par la CI de cette PR.
+**Preuves.** Firefox installé dans la session : parcours Firefox 390 et 1440
+rejoués en local ; Chromium 390 et 1440 sur la première version (76/76) ;
+WebKit par la CI de cette PR.

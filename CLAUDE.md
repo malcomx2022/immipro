@@ -79,15 +79,18 @@ Un message d'échec est toujours actionnable.
 
 ### S.222 — parcours 2FA « compte interne » fiabilisé sous Firefox — 06/11/2026
 
-Lot dédié, nécessaire pour faire passer au vert #352 et #354 que le responsable a demandé de fusionner. Le
-06/11, ce parcours a échoué deux fois sous Firefox (390 sur #352, 1440 sur
-#354, PR documentaire) : le changement de rôle ferme la session pendant que
-l'écran est sur `/veille`, puis `goto("/connexion")` aboutit et Firefox
-double la navigation de document sans l'achever ; la saisie attend trente
-secondes. Même signature que R-O05 (S.193). Le parcours se déconnecte
-désormais par le bouton (S.212), puis `connecter()` part de `/connexion`
-sans renaviguer (S.197) ; ses attentes sont inchangées. Ne pas revenir à
-un `goto` après une session fermée côté serveur.
+Lot dédié, nécessaire pour mener au vert les PR que le responsable a
+demandé de fusionner. Le 06/11, ce parcours a échoué sous Firefox (390 sur
+#352, 1440 sur #354, PR documentaire, puis les deux sur la première
+version de #356). Trace CI : le changement de rôle ferme la session pendant
+que l'onglet est sur `/veille` ; toute navigation de document vers
+`/connexion` depuis cet onglet, `goto` comme « Se déconnecter », est suivie
+d'une seconde requête du document (304) que Firefox n'achève jamais, et la
+saisie attend trente secondes. Depuis une page candidat, le même
+`connecter()` passe. La reconnexion repart d'un onglet neuf du même
+contexte ; attentes inchangées. Ne pas reconnecter depuis l'onglet qui a
+quitté le back-office sur une session fermée. Lire
+[la revue, § 29](docs/revue/revue-tests-2026-10-22.md).
 
 ### S.221 — C-08 montre le fichier envoyé — 06/11/2026
 

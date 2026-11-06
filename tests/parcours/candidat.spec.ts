@@ -805,16 +805,17 @@ test("compte interne : back-office fermé sans double authentification, ouvert a
     [`user:${compte}`],
   );
   expect(trace).toMatchObject({ acteur: `console:${par}`, n: "1" });
-  // S.222 : le changement de rôle a fermé la session pendant que l'écran
-  // était sur /veille. Un `goto("/connexion")` d'ici laissait Firefox
-  // doubler la navigation de document sans l'achever (390 et 1440, 06/11),
-  // comme R-O05 en S.193. Le geste du responsable est de se déconnecter :
-  // le bouton mène à /connexion même sur une session déjà échue (S.212), et
-  // `connecter()` n'y renavigue pas (S.197).
-  await Promise.all([
-    page.waitForURL((u) => u.pathname === "/connexion"),
-    page.getByRole("button", { name: "Se déconnecter", exact: true }).click(),
-  ]);
+  // S.222 : le changement de rôle a fermé la session pendant que l'onglet
+  // était sur /veille. Toute navigation de document vers /connexion depuis
+  // cet onglet — `goto` (#352, #354) comme « Se déconnecter » (#356) — y
+  // laissait Firefox relancer une seconde requête du document (304) jamais
+  // achevée : la saisie attendait trente secondes (traces CI du 06/11).
+  // Le même `connecter()` passe depuis une page candidat (ligne du dessus).
+  // La reconnexion repart donc d'un onglet neuf du même contexte, comme le
+  // premier `connecter()` du profil ; ses attentes sont inchangées.
+  await page.close();
+  page = await context.newPage();
+  suivis.push(suivreErreurs(page, moteur, origineApp));
   await connecter(page, email, MOT_DE_PASSE);
   preuves.push({
     controle:
