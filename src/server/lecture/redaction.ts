@@ -11,7 +11,7 @@ import {
   type FaitsDuDossier,
   type Recoupements,
 } from "@/domain/redaction/coherence";
-import { PIECES_REDIGEABLES, pieceRedigeable } from "@/lib/contenu/redaction";
+import { PIECES_REDIGEABLES, pieceRedigeable, typeDeRedaction } from "@/lib/contenu/redaction";
 
 /**
  * Lecture de la rédaction assistée — R-01 à R-04, WF-08.
@@ -53,7 +53,6 @@ export interface PieceARediger extends PieceRedigeable {
  * base. Le référentiel nomme `lettre_motivation`, la route `lettre-motivation` :
  * un tiret contre un souligné, et rien d'autre.
  */
-const versType = (code: string) => code.replace(/_/gu, "-");
 
 export async function piecesARediger(
   applicationId: string,
@@ -70,7 +69,8 @@ export async function piecesARediger(
   });
 
   return documents.flatMap((d) => {
-    const modele = pieceRedigeable(versType(d.code));
+    const type = typeDeRedaction(d.code);
+    const modele = type ? pieceRedigeable(type) : undefined;
     // Une pièce à rédiger sans jeu de questions ne s'ouvre pas à moitié :
     // l'entretien guidé est ce qui la distingue d'un champ de texte libre.
     if (!modele) return [];

@@ -299,3 +299,41 @@ des prix avant le 31/12, dans la même fenêtre que C-13.
 (`certbot renew --dry-run`, `nginx -T`) ; R-P12 (limites, battement,
 réconciliation) ; F-2 (contenu et rétention de `restic`) ; mise en
 service R2 et restauration hors VPS.
+
+## 9. « Rédiger » menait à une page introuvable (S.218) — 06/11/2026
+
+Relevé par le responsable en production, le 06/11 : sur un dossier Suisse
+études, la ligne « CV et plan d'études motivé » affiche « Rédiger » et mène
+à « Cette page n'existe pas ou plus ». Rattachement : WF-08, écrans C-06
+(checklist) et C-09 (complétude), R-02.
+
+**Deux défauts.**
+
+1. `lienDePiece` construisait `/dossiers/<id>/redaction/<id du document>`.
+   La page de rédaction lit ce segment comme un **type** de pièce
+   (`lettre-motivation`…) : toute pièce à rédiger menait à « introuvable ».
+   Les parcours ouvraient la rédaction par son adresse et ne cliquaient
+   jamais sur la ligne ; le prototype utilisait le type comme identifiant,
+   ce qui masquait l'écart.
+2. `cv_plan_etudes` (CH) est `nature: rediger` au référentiel, mais aucun
+   entretien guidé n'existe pour elle (quatre seulement : lettre de
+   motivation, projet d'études, intention de retour, prise en charge).
+
+**Correction.** La pièce porte `redaction`, le type de son entretien quand
+il existe (`typeDeRedaction`, une seule correspondance code → route,
+partagée avec la lecture de la rédaction). `lienDePiece` mène à
+`/redaction/<type>` ; sans entretien, au dépôt `/pieces/<id>`, et la ligne
+se nomme « Ajouter » (décision du responsable, 06/11 : le CV et plan
+d'études se dépose en PDF en attendant un entretien dédié). Le sous-titre
+du dépôt ne propose l'entretien que s'il existe.
+
+**Preuves.** `tests/lien-rediger.test.ts` (16 tests, dont trois rouges sur
+le code d'avant) : lien jamais construit sur l'identifiant, repli au dépôt,
+libellé, sous-titre, `versPiece`, et un inventaire du référentiel qui
+n'admet que `CH:cv_plan_etudes` sans entretien. Parcours « rédaction
+assistée » : la ligne de checklist est cliquée et l'adresse attendue est
+`/redaction/lettre-motivation` ; 38/38 en Chromium 1440. Porte unitaire :
+222 fichiers, 4 431 tests.
+
+**Reste.** Un entretien dédié au CV et plan d'études, s'il est voulu :
+contenu à écrire et relire.

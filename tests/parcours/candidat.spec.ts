@@ -1272,6 +1272,12 @@ test("retrait du consentement : le dépôt se ferme, versions et quota inchangé
 
 test("rédaction assistée : entretien, premier texte scripté débité, version, export DOCX et relecture débitée", async () => {
   await preparerLettre(dossier, email);
+  // S.218 : la ligne de checklist ouvre l'entretien de son type, jamais une
+  // page introuvable (relevé en production le 06/11).
+  await aller(`/dossiers/${dossier}`);
+  await page.getByRole("link", { name: /Lettre synthétique de recette/u }).click();
+  await expect(page).toHaveURL(new RegExp(`/dossiers/${dossier}/redaction/lettre-motivation$`, "u"));
+  await expect(page.getByText("Cette page n'existe pas ou plus")).toHaveCount(0);
   await aller(`/dossiers/${dossier}/redaction`);
   await page.getByRole("radio").first().click();
   await page.getByRole("button", { name: "Commencer l'entretien", exact: true }).click();
