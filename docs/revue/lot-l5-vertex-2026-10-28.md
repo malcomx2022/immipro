@@ -498,3 +498,38 @@ défaut, `medium`) et sur `v1beta1`, alors que la campagne qualifie `low` sur
 facture / banc d'une journée où la production a appelé Vertex mêle les
 deux. Décision du responsable : aligner la production (`low`, `v1`).
 Détail : [revue du 31/10, § 8](revue-fonctionnelle-2026-10-31.md).
+
+## S.219 — raisonnement en sus de la sortie : régression de S.213 corrigée — 06/11/2026
+
+Relevé de l'exploitant, 06/11 entre 05:26 et 05:31 UTC, juste après
+l'alignement (`low`, `/v1/`) : cinq lectures de production, dont **quatre
+`INVALIDE`** (entrée connue, sortie vide) et une `CONNUE` sans part de
+raisonnement (`preuve_fonds`, 1 128 / 26). Les quatre pièces sont parties
+en revue humaine, analyse rendue.
+
+**Cause.** S.213 lisait `completion_tokens_details.reasoning_tokens` selon
+la seule convention d'OpenAI (raisonnement **compris** dans
+`completion_tokens`) et rejetait comme incohérent un raisonnement plus
+grand que la sortie. En `low`, Vertex le rend manifestement **en sus**,
+comme l'API Gemini native : il dépasse vite les vingt à quarante jetons
+d'une lecture. La production n'enregistrant pas le bloc `usage` brut, ce
+point reste une inférence forte, pas un relevé.
+
+**Correction.** `total_tokens` départage : entrée + sortie + raisonnement →
+en sus (`DETAIL_EN_SUS`, ajouté à la sortie facturée) ; entrée + sortie →
+compris. Sans total, un raisonnement plus grand que la sortie est en sus ;
+plus petit, il est lu compris (la lecture qui ne gonfle pas le coût). Seul
+un compteur négatif, fractionnaire, en texte ou hors INTEGER reste
+`INVALIDE`. Le détail d'exploitation d'une mesure refusée porte désormais
+les seuls compteurs numériques reçus (`detailMesureRefusee`), jamais un
+texte : la prochaine anomalie se prouvera dans `engineLog`.
+
+**Preuves.** `tests/ia-raisonnement.test.ts` : cinq cas rouges sur le code
+de S.213 (en sus sans total, en sus par le total, hors INTEGER, lecture
+réelle publiée, détail chiffré sans texte), puis 33/33. `smoke:usages-ia`
+(23 ✓, dont 30 + 400 persistés `CONNUE`), `smoke:extraction`,
+`smoke:redaction`, `smoke:avis-ia` verts. Porte : 4 421 tests.
+
+**Reste.** Après déploiement, une lecture réelle `CONNUE` avec
+`reasoningTokens` renseigné prouvera la convention ; à défaut, le détail
+chiffré d'un `INVALIDE` dira ce que Vertex rend.

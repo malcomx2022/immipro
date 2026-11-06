@@ -77,6 +77,18 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.219 — raisonnement en sus de la sortie, régression de S.213 — 06/11/2026
+
+Relevé de l'exploitant juste après l'alignement : quatre lectures de
+production sur cinq `INVALIDE`. S.213 lisait `reasoning_tokens` comme
+compris dans `completion_tokens` (OpenAI) et rejetait un raisonnement plus
+grand que la sortie ; Vertex le rend en sus. `total_tokens` départage
+désormais (`DETAIL_EN_SUS` ajouté à la sortie facturée) ; sans total, plus
+grand que la sortie = en sus. Ne pas revenir au rejet. Une mesure refusée
+porte ses seuls compteurs numériques dans `engineLog`
+(`detailMesureRefusee`). Cinq tests rouges avant. Lire
+[le suivi L5, § S.219](docs/revue/lot-l5-vertex-2026-10-28.md).
+
 ### S.217 — relevé IA de production, F-1 levé, F-6 ouvert — 05/11/2026
 
 Lot documentaire demandé par le responsable. Base `3b9e0ad` (#347

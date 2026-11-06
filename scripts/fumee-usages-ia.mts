@@ -84,6 +84,12 @@ try {
   const r2 = await client.aiUsage.findFirstOrThrow({ where: { operation: "raisonnement-absent" } });
   verifier(r2.reasoningTokens === null && r2.usageState === "CONNUE" && r2.outputTokens === 30,
     "raisonnement non rapporté : NULL, mesure CONNUE, sortie inchangée (décision du 04/11)");
+  // S.219 : le raisonnement rendu en sus de la sortie par Vertex le 06/11 se persiste, jamais INVALIDE.
+  const enSus = mesurerLUsageCompatible({ prompt_tokens: 1556, completion_tokens: 30, total_tokens: 1986, completion_tokens_details: { reasoning_tokens: 400 } });
+  await noterLesJetons("u-l2", "d-l2", "raisonnement-en-sus", enSus.jetonsEntree, enSus.jetonsSortie, { ...compatible, mesure: enSus });
+  const r3 = await client.aiUsage.findFirstOrThrow({ where: { operation: "raisonnement-en-sus" } });
+  verifier(r3.usageState === "CONNUE" && r3.outputTokens === 430 && r3.reasoningTokens === 400,
+    "raisonnement en sus (Vertex) : CONNUE, sortie facturée 30 + 400, part 400 acceptée par la base");
   const refus = await sql(cible, `INSERT INTO "AiUsage" (id,"userId","applicationId",operation,"inputTokens","outputTokens","reasoningTokens","usageState")
     VALUES ('raisonnement-trop','u-l2','d-l2','synthétique',10,5,6,'CONNUE')`).then(() => false, () => true);
   verifier(refus, "la base refuse une part de raisonnement supérieure à la sortie facturée");

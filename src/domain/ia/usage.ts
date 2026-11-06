@@ -22,14 +22,17 @@ export interface MesureDeJetons {
 /**
  * Où le raisonnement a été lu — S.213.
  *
- * - `DETAIL_DE_SORTIE` : `completion_tokens_details.reasoning_tokens`,
- *   forme OpenAI, déjà **compris** dans `completion_tokens` ;
+ * - `DETAIL_DE_SORTIE` : `completion_tokens_details.reasoning_tokens`
+ *   **compris** dans `completion_tokens`, la convention d'OpenAI ;
+ * - `DETAIL_EN_SUS` : le même champ, mais **en plus** de `completion_tokens`,
+ *   la convention de Vertex pour Gemini (S.219) : `total_tokens` vaut alors
+ *   entrée + sortie + raisonnement, ou le raisonnement dépasse la sortie ;
  * - `GEMINI_THOUGHTS` : `thoughtsTokenCount` (ou `thoughts_token_count`),
  *   forme Gemini, **hors** de `candidatesTokenCount` / `completion_tokens` ;
  * - `ECART_DU_TOTAL` : aucun champ, mais `total_tokens` dépasse entrée +
  *   sortie ; l'écart est ce que le fournisseur a compté sans le nommer.
  */
-export type SourceDuRaisonnement = "DETAIL_DE_SORTIE" | "GEMINI_THOUGHTS" | "ECART_DU_TOTAL";
+export type SourceDuRaisonnement = "DETAIL_DE_SORTIE" | "DETAIL_EN_SUS" | "GEMINI_THOUGHTS" | "ECART_DU_TOTAL";
 
 /** Limite de la colonne PostgreSQL INTEGER, contrôlée avant toute écriture. */
 export const MAXIMUM_JETONS = 2_147_483_647;
@@ -75,8 +78,21 @@ export function mesurerLUsageCompatible(usage: unknown): MesureDeJetons {
   const details = u.completion_tokens_details as Record<string, unknown> | null | undefined;
   const detail = details && typeof details === "object" ? details.reasoning_tokens : undefined;
   if (present(detail)) {
-    if (!compteurValide(detail) || detail > sortie) return invalide();
-    return { ...base, jetonsRaisonnement: detail, sourceDuRaisonnement: "DETAIL_DE_SORTIE" };
+    if (!compteurValide(detail)) return invalide();
+    /*
+      Compris ou en sus ? S.219 : le 06/11, Vertex a rendu en production un
+      raisonnement plus grand que `completion_tokens`, que S.213 rejetait
+      comme incohérent (convention d'OpenAI seule) : quatre lectures sur
+      cinq parties en revue humaine. `total_tokens` tranche quand il est
+      là ; sinon, un raisonnement plus grand que la sortie ne peut être
+      qu'en sus. Le doute restant (raisonnement plus petit, sans total) se
+      lit « compris » : c'est la lecture qui ne gonfle pas le coût.
+    */
+    const total = compteurValide(u.total_tokens) ? u.total_tokens : null;
+    const enSus = detail > sortie || (detail > 0 && total === entree + sortie + detail);
+    if (!enSus) return { ...base, jetonsRaisonnement: detail, sourceDuRaisonnement: "DETAIL_DE_SORTIE" };
+    if (sortie + detail > MAXIMUM_JETONS) return invalide();
+    return { ...base, jetonsSortie: sortie + detail, jetonsRaisonnement: detail, sourceDuRaisonnement: "DETAIL_EN_SUS" };
   }
 
   const pensees = present(u.thoughtsTokenCount) ? u.thoughtsTokenCount : u.thoughts_token_count;
@@ -97,6 +113,14 @@ export function mesurerLUsageCompatible(usage: unknown): MesureDeJetons {
 /** La sortie rendue au candidat, sans le raisonnement ; `null` si l'un manque. */
 export const sortieVisible = (m: Pick<MesureDeJetons, "jetonsSortie" | "jetonsRaisonnement">): number | null =>
   m.jetonsSortie === null || m.jetonsRaisonnement == null ? m.jetonsSortie ?? null : m.jetonsSortie - m.jetonsRaisonnement;
+
+/**
+ * Le détail d'exploitation d'une mesure refusée, avec les seuls compteurs
+ * numériques reçus — S.219. Il finit dans `engineLog` et les journaux,
+ * jamais chez le candidat ; aucun texte de la réponse n'y entre.
+ */
+export const detailMesureRefusee = (usage: unknown): string =>
+  `${DETAIL_MESURE_INCOMPLETE} ; compteurs reçus : ${JSON.stringify(usageNumerique(usage) ?? {})}`;
 
 export const DETAIL_MESURE_INCOMPLETE =
   "les compteurs de consommation sont absents, incomplets ou invalides : rapprocher cet appel du relevé fournisseur dans B-07 ; aucune relance automatique pour cette cause";

@@ -50,12 +50,37 @@ describe("mesurerLUsageCompatible — où le raisonnement se range", () => {
       etat: "CONNUE", jetonsEntree: 1000, jetonsSortie: 29, jetonsRaisonnement: null,
     });
   });
+  describe("S.219 — reasoning_tokens compris ou en sus de completion_tokens", () => {
+    it("plus grand que la sortie, sans total : forcément en sus", () => {
+      expect(mesurerLUsageCompatible({ prompt_tokens: 1564, completion_tokens: 29, completion_tokens_details: { reasoning_tokens: 300 } }))
+        .toEqual({ etat: "CONNUE", jetonsEntree: 1564, jetonsSortie: 329, jetonsRaisonnement: 300, sourceDuRaisonnement: "DETAIL_EN_SUS" });
+    });
+    it("total = entrée + sortie + raisonnement : en sus, même plus petit que la sortie", () => {
+      expect(mesurerLUsageCompatible({ prompt_tokens: 100, completion_tokens: 50, total_tokens: 170, completion_tokens_details: { reasoning_tokens: 20 } }))
+        .toMatchObject({ jetonsSortie: 70, jetonsRaisonnement: 20, sourceDuRaisonnement: "DETAIL_EN_SUS" });
+    });
+    it("total = entrée + sortie : compris (convention d'OpenAI)", () => {
+      expect(mesurerLUsageCompatible({ prompt_tokens: 100, completion_tokens: 50, total_tokens: 150, completion_tokens_details: { reasoning_tokens: 20 } }))
+        .toMatchObject({ jetonsSortie: 50, jetonsRaisonnement: 20, sourceDuRaisonnement: "DETAIL_DE_SORTIE" });
+    });
+    it("plus petit que la sortie, sans total : lu compris, la lecture qui ne gonfle pas le coût", () => {
+      expect(mesurerLUsageCompatible({ prompt_tokens: 100, completion_tokens: 50, completion_tokens_details: { reasoning_tokens: 20 } }))
+        .toMatchObject({ jetonsSortie: 50, sourceDuRaisonnement: "DETAIL_DE_SORTIE" });
+    });
+    it("un raisonnement nul n'ajoute rien", () => {
+      expect(mesurerLUsageCompatible({ prompt_tokens: 100, completion_tokens: 50, total_tokens: 150, completion_tokens_details: { reasoning_tokens: 0 } }))
+        .toMatchObject({ etat: "CONNUE", jetonsSortie: 50, jetonsRaisonnement: 0 });
+    });
+    it("en sus mais hors INTEGER : invalide", () => {
+      expect(mesurerLUsageCompatible({ prompt_tokens: 1, completion_tokens: MAXIMUM_JETONS - 10, completion_tokens_details: { reasoning_tokens: MAXIMUM_JETONS } }))
+        .toMatchObject({ etat: "INVALIDE", jetonsSortie: null });
+    });
+  });
   it("un champ nommé l'emporte sur l'écart du total", () => {
     expect(mesurerLUsageCompatible({ prompt_tokens: 10, completion_tokens: 5, thoughtsTokenCount: 3, total_tokens: 100 }))
       .toMatchObject({ jetonsSortie: 8, jetonsRaisonnement: 3, sourceDuRaisonnement: "GEMINI_THOUGHTS" });
   });
   it.each([
-    [{ completion_tokens_details: { reasoning_tokens: 101 } }, "raisonnement supérieur à la sortie qui le contient"],
     [{ completion_tokens_details: { reasoning_tokens: -1 } }, "raisonnement négatif"],
     [{ thoughtsTokenCount: 1.5 }, "réflexion fractionnaire"],
     [{ thoughtsTokenCount: "70" }, "réflexion en texte"],
@@ -162,10 +187,21 @@ describe("adaptateur compatible simulé — un vrai échange HTTP local", () => 
     const lu = await lireDesOctetsCompatible(config, "image/png", Buffer.from("png"), demande);
     expect(lu).toMatchObject({ etat: "LUE", jetonsSortie: 32, appel: { mesure: { etat: "CONNUE", jetonsRaisonnement: null } } });
   });
-  it("un compteur de raisonnement invalide empêche la publication, comme tout compteur invalide (L2)", async () => {
-    charge = { choices: [{ message: { content: lecture }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, completion_tokens_details: { reasoning_tokens: 9 } } };
+  it("S.219 — un raisonnement en sus de la sortie (Vertex, 06/11) se publie, et la sortie facturée l'inclut", async () => {
+    charge = { choices: [{ message: { content: lecture }, finish_reason: "stop" }], usage: { prompt_tokens: 1556, completion_tokens: 30, total_tokens: 1986, completion_tokens_details: { reasoning_tokens: 400 } } };
+    const lu = await lireDesOctetsCompatible(config, "image/png", Buffer.from("png"), demande);
+    expect(lu).toMatchObject({ etat: "LUE", jetonsEntree: 1556, jetonsSortie: 430,
+      appel: { mesure: { etat: "CONNUE", jetonsRaisonnement: 400, sourceDuRaisonnement: "DETAIL_EN_SUS" } } });
+  });
+  it("un compteur de raisonnement invalide empêche la publication, et le détail porte les seuls compteurs reçus", async () => {
+    charge = { choices: [{ message: { content: lecture }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, completion_tokens_details: { reasoning_tokens: -9 }, note: "texte jamais recopié" } };
     const lu = await lireDesOctetsCompatible(config, "image/png", Buffer.from("png"), demande);
     expect(lu).toMatchObject({ etat: "NON_LUE", cause: "reponse_illisible", appel: { mesure: { etat: "INVALIDE" } } });
+    const detail = (lu as { detail: string }).detail;
+    expect(detail).toContain('"prompt_tokens":10');
+    expect(detail).toContain('"reasoning_tokens":-9');
+    expect(detail).not.toContain("texte jamais recopié");
+    expect(detail).not.toContain("date_expiration");
   });
   it("une rédaction compte aussi son raisonnement dans la sortie", async () => {
     charge = { choices: [{ message: { content: "Madame, Monsieur, je sollicite un visa de visite familiale pour un séjour de deux semaines en famille, aux dates indiquées dans le dossier, avec un retour prévu." }, finish_reason: "stop" }], usage: { prompt_tokens: 522, completion_tokens: 158, completion_tokens_details: { reasoning_tokens: 40 } } };

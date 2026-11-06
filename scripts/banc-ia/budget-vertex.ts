@@ -49,7 +49,7 @@ const schemaEtat = z
         jetonsSortie: z.number().int().nonnegative().nullable(),
         // S.213 : facultatifs, pour que les journaux antérieurs restent lisibles.
         jetonsRaisonnement: z.number().int().nonnegative().nullable().optional(),
-        sourceDuRaisonnement: z.enum(["DETAIL_DE_SORTIE", "GEMINI_THOUGHTS", "ECART_DU_TOTAL"]).optional(),
+        sourceDuRaisonnement: z.enum(["DETAIL_DE_SORTIE", "DETAIL_EN_SUS", "GEMINI_THOUGHTS", "ECART_DU_TOTAL"]).optional(),
         fournisseur: z.string().nullable(),
         modele: z.string().nullable(),
       })
