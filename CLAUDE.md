@@ -77,6 +77,22 @@ Un message d'échec est toujours actionnable.
 
 ## Suivi du chantier fonctionnel — 09/10/2026
 
+### S.222 — `connecter()` tolère le rechargement de repli de Firefox — 06/11/2026
+
+Lot dédié, nécessaire pour mener au vert les PR que le responsable a
+demandé de fusionner. Le parcours 2FA « compte interne » a échoué sous
+Firefox sur #352, #354 (PR documentaire) et #356, puis en local. Trace :
+`/connexion` répond 200, le formulaire est rendu, puis Firefox recharge le
+même document 80 ms plus tard (`Cache-Control: max-age=0`, 304) sans jamais
+achever ce rechargement ; la saisie attend trente secondes. Rien dans
+l'écran ne recharge la page ; un `goto`, le bouton « Se déconnecter », un
+onglet neuf ou une seconde navigation de document y mènent pareil (trois
+essais écartés). `saisirLAdresse` revient alors comme en S.193 : accueil,
+puis lien « Connexion » de l'en-tête, sans recharger de document ; une
+adresse à suite est rechargée telle quelle. Attentes inchangées. Ne pas
+allonger le délai de saisie pour masquer ce cas. Lire
+[la revue, § 29](docs/revue/revue-tests-2026-10-22.md).
+
 ### S.221 — C-08 montre le fichier envoyé — 06/11/2026
 
 Relevé en production par le responsable : le résultat d'analyse affichait
