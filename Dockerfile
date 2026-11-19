@@ -3,13 +3,13 @@
 # Node 24 LTS (D-30, M19 étape 0), épinglé par empreinte (M15) : un tag
 # seul change sous les pieds d'une reconstruction. Dependabot tient
 # l'empreinte à jour (`.github/dependabot.yml`, écosystème docker).
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS deps
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS deps
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci
 
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS builder
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -25,12 +25,12 @@ RUN npx prisma generate && npm run build
 # CLI différentes. La version est désormais celle du verrou
 # `docker/prisma-cli/package-lock.json`, égale à celle du verrou racine
 # (tests/image-production.test.ts y veille).
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS prisma-cli
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS prisma-cli
 WORKDIR /opt/prisma-cli
 COPY docker/prisma-cli/package.json docker/prisma-cli/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runner
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
